@@ -32,10 +32,8 @@ type HostedCreditBillingActions = {
   products: OrganizationsHostedCreditProduct[];
   productsLoading: boolean;
   checkoutPending: boolean;
-  businessCheckoutPending: boolean;
   portalPending: boolean;
   startCheckout: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
-  startBusinessCheckout: () => Promise<void>;
   openInvoices: () => Promise<void>;
 };
 

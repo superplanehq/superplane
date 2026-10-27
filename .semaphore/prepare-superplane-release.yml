@@ -42,37 +42,36 @@ blocks:
               set -euo pipefail
               if [ -z "${RELEASE_CANDIDATE_VERSION:-}" ]; then
                 echo "* No release candidate to verify"
-                exit 0
+              else
+                node release/component-release.js verify-published-prerelease \
+                  --component superplane \
+                  --version "$RELEASE_CANDIDATE_VERSION" \
+                  --sha "$SEMAPHORE_GIT_SHA"
+
+                candidate_dir="build/superplane/$RELEASE_CANDIDATE_VERSION"
+                bash release/component-release-artifact.sh \
+                  pull superplane "$RELEASE_CANDIDATE_VERSION" "$candidate_dir"
+                (cd "$candidate_dir" && sha256sum --check release-manifest.sha256)
+                node release/component-release.js verify-manifest \
+                  --component superplane \
+                  --version "$RELEASE_CANDIDATE_VERSION" \
+                  --sha "$SEMAPHORE_GIT_SHA" \
+                  --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
+                  --directory "$candidate_dir" \
+                  --assets "superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_CANDIDATE_VERSION#v}.tgz,checksums.txt,superplane-amd64.oci.tar,superplane-arm64.oci.tar" \
+                  --manifest "$candidate_dir/release-manifest.json"
+                (cd "$candidate_dir" && sha256sum --check checksums.txt)
+
+                component_releases="superplane-component-releases-${RELEASE_CANDIDATE_VERSION}.yaml"
+                tar -xOf \
+                  "$candidate_dir/superplane-${RELEASE_CANDIDATE_VERSION#v}.tgz" \
+                  superplane-chart/values.yaml \
+                  >"$component_releases"
+                test -s "$component_releases"
+                sha256sum "$component_releases" >"$component_releases.sha256"
+                artifact push workflow "$component_releases"
+                artifact push workflow "$component_releases.sha256"
               fi
-
-              node release/component-release.js verify-published-prerelease \
-                --component superplane \
-                --version "$RELEASE_CANDIDATE_VERSION" \
-                --sha "$SEMAPHORE_GIT_SHA"
-
-              candidate_dir="build/superplane/$RELEASE_CANDIDATE_VERSION"
-              bash release/component-release-artifact.sh \
-                pull superplane "$RELEASE_CANDIDATE_VERSION" "$candidate_dir"
-              (cd "$candidate_dir" && sha256sum --check release-manifest.sha256)
-              node release/component-release.js verify-manifest \
-                --component superplane \
-                --version "$RELEASE_CANDIDATE_VERSION" \
-                --sha "$SEMAPHORE_GIT_SHA" \
-                --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
-                --directory "$candidate_dir" \
-                --assets "superplane-sbom.json,superplane-single-host.tar.gz,superplane-${RELEASE_CANDIDATE_VERSION#v}.tgz,checksums.txt,superplane-amd64.oci.tar,superplane-arm64.oci.tar" \
-                --manifest "$candidate_dir/release-manifest.json"
-              (cd "$candidate_dir" && sha256sum --check checksums.txt)
-
-              component_releases="superplane-component-releases-${RELEASE_CANDIDATE_VERSION}.yaml"
-              tar -xOf \
-                "$candidate_dir/superplane-${RELEASE_CANDIDATE_VERSION#v}.tgz" \
-                superplane-chart/values.yaml \
-                >"$component_releases"
-              test -s "$component_releases"
-              sha256sum "$component_releases" >"$component_releases.sha256"
-              artifact push workflow "$component_releases"
-              artifact push workflow "$component_releases.sha256"
 
   - name: "Build amd64 Image"
     dependencies: ["Verify Release Candidate"]
@@ -89,9 +88,9 @@ blocks:
             - docker buildx create --driver docker-container --use --name "superplane-release-$SEMAPHORE_JOB_ID"
             - docker buildx inspect --bootstrap
             - bash release/superplane/build-image.sh "$RELEASE_VERSION" "$SEMAPHORE_GIT_SHA" amd64 "superplane-amd64.oci.tar"
-            - artifact push workflow "superplane-amd64.oci.tar"
-            - artifact push workflow "superplane-amd64.oci.tar.sha256"
-            - artifact push workflow "superplane-amd64.oci.tar.descriptor.json"
+            - artifact push workflow "superplane-amd64.oci.tar" --force
+            - artifact push workflow "superplane-amd64.oci.tar.sha256" --force
+            - artifact push workflow "superplane-amd64.oci.tar.descriptor.json" --force
 
   - name: "Build arm64 Image"
     dependencies: ["Verify Release Candidate"]
@@ -108,9 +107,9 @@ blocks:
             - docker buildx create --driver docker-container --use --name "superplane-release-$SEMAPHORE_JOB_ID"
             - docker buildx inspect --bootstrap
             - bash release/superplane/build-image.sh "$RELEASE_VERSION" "$SEMAPHORE_GIT_SHA" arm64 "superplane-arm64.oci.tar"
-            - artifact push workflow "superplane-arm64.oci.tar"
-            - artifact push workflow "superplane-arm64.oci.tar.sha256"
-            - artifact push workflow "superplane-arm64.oci.tar.descriptor.json"
+            - artifact push workflow "superplane-arm64.oci.tar" --force
+            - artifact push workflow "superplane-arm64.oci.tar.sha256" --force
+            - artifact push workflow "superplane-arm64.oci.tar.descriptor.json" --force
 
   - name: "Build Release Assets"
     dependencies: ["Verify Release Candidate"]

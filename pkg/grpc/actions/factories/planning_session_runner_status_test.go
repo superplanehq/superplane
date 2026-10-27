@@ -72,7 +72,7 @@ func TestPlanningSessionReportsRunnerCapacityThroughSessionAndBoardAPIs(t *testi
 
 	assertStatus(models.RunnerTaskStateQueued, "parallelism_limit")
 	plan.ParallelTaskLimit = new(2)
-	require.NoError(t, models.SaveBillingPlan(db, plan))
+	require.NoError(t, billingmodels.SaveBillingPlan(db, plan))
 	assertStatus(models.RunnerTaskStateQueued, "")
 	runner := newRunner()
 	require.NoError(t, queued.Reserve(db, runner.ID))

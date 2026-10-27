@@ -288,7 +288,7 @@ function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): Wor
     key: "step-failed",
     headline: step ? `${step} did not pass` : "The run did not pass",
     text: credit?.message ?? SPLIT_RUN_FAILED_NOTE_TEXT,
-    cta: credit ? { label: credit.actionLabel, destination: "billing" } : { label: "Debug", icon: "bug" },
+    cta: credit ? { label: credit.actionLabel, destination: "billing" } : { label: "View run details" },
   };
 }
 

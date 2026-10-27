@@ -1,5 +1,3 @@
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
 import { type ReactNode } from "react";
 import { Navigate, useParams } from "react-router";
 
@@ -11,42 +9,22 @@ import type {
   OrganizationsHostedCreditProduct,
   OrganizationsOrganizationCreditGrant,
 } from "@/api-client";
-import { Badge } from "@/components/ui/badge";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
-import { hostedCreditRefreshMessage, type HostedCreditRefreshStatus } from "@/lib/hostedCredit";
-import { cn } from "@/lib/utils";
+import { type HostedCreditRefreshStatus } from "@/lib/hostedCredit";
 
-import {
-  adminCreditGrantCents,
-  billingCreditBucketsView,
-  billingCreditRemainingShares,
-  billingSpendOrderCopy,
-  type BillingCreditBarShare,
-  type BillingCreditBucketKey,
-  type BillingCreditBucketView,
-} from "../../lib/billingCreditBuckets";
-import { hostedCreditBillingBalanceCopy } from "../../lib/hostedCreditEmpty";
-import { formatUsdCents } from "../../lib/workOrderUsage";
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
-import { BillingCreditHistoryCard } from "./BillingCreditHistoryCard";
-import { BillingInvoicesCard } from "./BillingInvoicesCard";
+import { BillingHistory } from "./BillingHistory";
 import { BillingSeatPurchaseFlow } from "./BillingSeatPurchaseFlow";
 import { BillingPaymentSettings } from "./BillingPaymentSettings";
-import { BillingPlansSection } from "./BillingPlansSection";
-import { HostedCreditTopUpBanner } from "./HostedCreditTopUpBanner";
+import { HostedCreditRemainingCard } from "./HostedCreditRemainingCard";
 import { useOrganizationBillingPageModel } from "./useOrganizationBillingPageModel";
-
-const HOSTED_CREDIT_EXPLANATION =
-  "Hosted credit pays SuperPlane-hosted machines and managed models for this organization.";
-const HOSTED_CREDIT_REMAINING_CAPTION = "Remaining hosted credit";
 
 export function OrganizationSettingsBillingPage() {
   const { organizationId = "", factoryKey = "" } = useParams<{ organizationId: string; factoryKey: string }>();
   const billingProductEnabled = useBillingProductEnabled();
-  const newBilling = useExperimentalFeature(organizationId).has(FEATURE_NEW_BILLING);
   const model = useOrganizationBillingPageModel(organizationId);
   const packs = model.billing.products;
 
@@ -61,7 +39,6 @@ export function OrganizationSettingsBillingPage() {
     <FactorySettingsPageFrame title="Billing">
       <BillingSeatPurchaseFlow
         organizationId={organizationId}
-        newBilling={newBilling}
         canManageBilling={model.canManageBilling}
         seats={model.seats}
         currentPeriodEnd={model.currentPeriodEnd}
@@ -70,15 +47,10 @@ export function OrganizationSettingsBillingPage() {
       >
         {(seatsCard, dialog) => (
           <>
-            {newBilling && !model.isLoading && !model.error && (
-              <BillingPaymentSettings organizationId={organizationId} canManageBilling={model.canManageBilling} />
-            )}
             <BillingPageBody
               organizationId={organizationId}
-              newBilling={newBilling}
               billingContactMessage={model.billingContactMessage}
               billingEnabled={model.billingEnabled}
-              businessCheckoutPending={model.billing.businessCheckoutPending}
               canManageBilling={model.canManageBilling}
               checkoutPending={model.billing.checkoutPending}
               creditPurchaseAllowed={model.creditPurchaseAllowed}
@@ -92,11 +64,7 @@ export function OrganizationSettingsBillingPage() {
               plan={model.plan}
               planCategory={model.planCategory}
               planName={model.planName}
-              planPriceCents={model.planPriceCents}
-              planPerSeat={model.planPerSeat}
               seatsCard={seatsCard}
-              planSource={model.planSource}
-              cancelAtPeriodEnd={model.cancelAtPeriodEnd}
               subscriptionPending={model.cancelPending || model.keepPending}
               portalPending={model.billing.portalPending}
               purchased={model.purchased}
@@ -109,7 +77,6 @@ export function OrganizationSettingsBillingPage() {
               trialEndsAt={model.trialEndsAt}
               welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
               onAddCredit={model.billing.startCheckout}
-              onSubscribe={model.billing.startBusinessCheckout}
               onCancelSubscription={model.onCancelSubscription}
               onKeepSubscription={model.onKeepSubscription}
               onManageInvoices={model.billing.openInvoices}
@@ -124,10 +91,8 @@ export function OrganizationSettingsBillingPage() {
 
 type BillingPageBodyProps = {
   organizationId: string;
-  newBilling: boolean;
   billingContactMessage?: string;
   billingEnabled: boolean;
-  businessCheckoutPending: boolean;
   canManageBilling: boolean;
   checkoutPending: boolean;
   creditPurchaseAllowed: boolean;
@@ -141,11 +106,7 @@ type BillingPageBodyProps = {
   plan?: string;
   planCategory?: string;
   planName?: string;
-  planPriceCents?: string;
-  planPerSeat?: boolean;
   seatsCard?: ReactNode;
-  planSource?: string;
-  cancelAtPeriodEnd: boolean;
   subscriptionPending: boolean;
   portalPending: boolean;
   purchased: number;
@@ -158,7 +119,6 @@ type BillingPageBodyProps = {
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
   onAddCredit: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
-  onSubscribe: () => void | Promise<void>;
   onCancelSubscription: () => void | Promise<void>;
   onKeepSubscription: () => void | Promise<void>;
   onManageInvoices: () => void | Promise<void>;
@@ -166,10 +126,8 @@ type BillingPageBodyProps = {
 
 function BillingPageBody({
   organizationId,
-  newBilling,
   billingContactMessage,
   billingEnabled,
-  businessCheckoutPending,
   canManageBilling,
   checkoutPending,
   creditPurchaseAllowed,
@@ -183,11 +141,7 @@ function BillingPageBody({
   plan,
   planCategory,
   planName,
-  planPriceCents,
-  planPerSeat,
   seatsCard,
-  planSource,
-  cancelAtPeriodEnd,
   subscriptionPending,
   portalPending,
   purchased,
@@ -200,23 +154,16 @@ function BillingPageBody({
   trialEndsAt,
   welcomeCreditExpiresAt,
   onAddCredit,
-  onSubscribe,
   onCancelSubscription,
   onKeepSubscription,
   onManageInvoices,
 }: BillingPageBodyProps) {
-  if (isLoading) {
+  if (isLoading || error) {
     return (
       <FactorySettingsCard>
-        <p className="text-sm text-muted-foreground">Loading billing...</p>
-      </FactorySettingsCard>
-    );
-  }
-
-  if (error) {
-    return (
-      <FactorySettingsCard>
-        <p className="text-sm text-destructive">{getApiErrorMessage(error, "Unable to load billing.")}</p>
+        <p className={error ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
+          {error ? getApiErrorMessage(error, "Unable to load billing.") : "Loading billing..."}
+        </p>
       </FactorySettingsCard>
     );
   }
@@ -225,32 +172,22 @@ function BillingPageBody({
 
   return (
     <>
-      <BillingPlansSection
-        showUpgrade={!newBilling}
-        planName={planName}
-        planPriceCents={planPriceCents}
-        planPerSeat={planPerSeat}
+      <BillingPaymentSettings
+        organizationId={organizationId}
         canManageBilling={canManageBilling}
-        creditPurchaseAllowed={creditPurchaseAllowed}
-        planSource={planSource}
-        cancelAtPeriodEnd={cancelAtPeriodEnd}
-        currentPeriodEnd={currentPeriodEnd}
-        pending={businessCheckoutPending || subscriptionPending}
-        onSubscribe={onSubscribe}
-        onCancel={onCancelSubscription}
-        onKeep={onKeepSubscription}
+        subscriptionPending={subscriptionPending}
+        onCancelSubscription={onCancelSubscription}
+        onKeepSubscription={onKeepSubscription}
       />
       {seatsCard}
       <HostedCreditRemainingCard
         organizationId={organizationId}
         billingContactMessage={billingContactMessage}
-        billingEnabled={billingEnabled}
         canManageBilling={canManageBilling}
         checkoutPending={checkoutPending}
         creditPurchaseAllowed={creditPurchaseAllowed}
         creditRefreshStatus={creditRefreshStatus}
         currentPeriodEnd={currentPeriodEnd}
-        hasBillingCustomer={hasBillingCustomer}
         includedRemaining={includedRemaining}
         packs={packs}
         plan={plan}
@@ -266,237 +203,13 @@ function BillingPageBody({
         grants={grants}
         onAddCredit={onAddCredit}
       />
-      {showInvoices ? (
-        <BillingInvoicesCard invoices={invoices} portalPending={portalPending} onManageInvoices={onManageInvoices} />
-      ) : null}
-      <BillingCreditHistoryCard grants={grants} />
+      <BillingHistory
+        showInvoices={showInvoices}
+        invoices={invoices}
+        grants={grants}
+        portalPending={portalPending}
+        onManageInvoices={onManageInvoices}
+      />
     </>
   );
-}
-
-type HostedCreditRemainingCardProps = {
-  organizationId: string;
-  billingContactMessage?: string;
-  billingEnabled: boolean;
-  canManageBilling: boolean;
-  checkoutPending: boolean;
-  creditPurchaseAllowed: boolean;
-  creditRefreshStatus: HostedCreditRefreshStatus;
-  currentPeriodEnd?: string;
-  hasBillingCustomer: boolean;
-  includedRemaining: number;
-  packs: OrganizationsHostedCreditProduct[];
-  plan?: string;
-  planName?: string;
-  planCategory?: string;
-  purchased: number;
-  purchasedRemaining: number;
-  remaining: number;
-  trialEndsAt?: string;
-  welcomeCreditExpiresAt?: string;
-  welcomeRemaining: number;
-  adminRemaining: number;
-  grants: OrganizationsOrganizationCreditGrant[];
-  onAddCredit: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
-};
-
-function HostedCreditRemainingCard({
-  organizationId,
-  billingContactMessage,
-  billingEnabled,
-  canManageBilling,
-  checkoutPending,
-  creditPurchaseAllowed,
-  creditRefreshStatus,
-  currentPeriodEnd,
-  hasBillingCustomer,
-  includedRemaining,
-  packs,
-  plan,
-  planName,
-  planCategory,
-  purchased,
-  purchasedRemaining,
-  remaining,
-  trialEndsAt,
-  welcomeCreditExpiresAt,
-  welcomeRemaining,
-  adminRemaining,
-  grants,
-  onAddCredit,
-}: HostedCreditRemainingCardProps) {
-  const copy = hostedCreditBillingBalanceCopy({
-    remainingCents: remaining,
-    purchasedCents: purchased,
-    hasBillingCustomer,
-    billingEnabled,
-    welcomeCreditExpiresAt,
-    plan,
-    planCategory,
-    trialEndsAt,
-    creditPurchaseAllowed,
-  });
-  const buckets = billingCreditBucketsView({
-    welcomeRemainingCents: welcomeRemaining,
-    includedRemainingCents: includedRemaining,
-    purchasedRemainingCents: purchasedRemaining,
-    purchasedCents: purchased,
-    adminRemainingCents: adminRemaining,
-    adminGrantCents: adminCreditGrantCents(grants),
-    plan,
-    planName,
-    planCategory,
-    trialEndsAt,
-    welcomeCreditExpiresAt,
-    currentPeriodEnd,
-  });
-  const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
-  const showBuyMore = canManageBilling && creditPurchaseAllowed;
-  const remainingShares = billingCreditRemainingShares(buckets);
-  const spendOrderCopy = billingSpendOrderCopy(buckets);
-
-  return (
-    <FactorySettingsCard title="Hosted credit" data-testid="billing-credit-balance">
-      <p className="text-[12px] text-muted-foreground">{HOSTED_CREDIT_EXPLANATION}</p>
-      <div className="mt-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <p
-            className="text-xl font-semibold tracking-[-0.02em] tabular-nums"
-            data-testid="billing-credit-remaining-total"
-          >
-            {formatUsdCents(remaining)}
-          </p>
-          {copy.badge === "Trial" ? (
-            <Badge variant="outline" className="text-muted-foreground">
-              {copy.badge}
-            </Badge>
-          ) : null}
-        </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">{HOSTED_CREDIT_REMAINING_CAPTION}</p>
-        <RemainingSharesBar shares={remainingShares} />
-        <p className="mt-2 text-xs text-muted-foreground" data-testid="billing-credit-spend-order">
-          {spendOrderCopy}
-        </p>
-      </div>
-      <ul className="mt-4 divide-y divide-border">
-        {buckets.map((bucket) => (
-          <CreditBucketRow
-            key={bucket.key}
-            bucket={bucket}
-            action={
-              bucket.key === "topup" && showBuyMore ? (
-                <HostedCreditTopUpBanner
-                  organizationId={organizationId}
-                  checkoutPending={checkoutPending}
-                  packs={packs}
-                  onAddCredit={onAddCredit}
-                />
-              ) : undefined
-            }
-          />
-        ))}
-      </ul>
-      {creditRefreshMessage ? (
-        <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
-      ) : null}
-      {copy.description ? (
-        <p
-          className={cn(
-            "mt-3 text-sm",
-            remaining <= 0 ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
-          )}
-        >
-          {copy.description}
-        </p>
-      ) : null}
-      {!canManageBilling && billingContactMessage ? (
-        <p className="mt-3 text-sm text-muted-foreground">{billingContactMessage}</p>
-      ) : null}
-    </FactorySettingsCard>
-  );
-}
-
-function RemainingSharesBar({ shares }: { shares: BillingCreditBarShare[] }) {
-  const hasRemaining = shares.some((share) => share.percent > 0);
-
-  return (
-    <div
-      className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted"
-      data-testid="billing-credit-remaining-shares"
-      role="img"
-      aria-label="Remaining credit by spend order"
-    >
-      {hasRemaining
-        ? shares
-            .filter((share) => share.percent > 0)
-            .map((share) => (
-              <div
-                key={share.key}
-                className={cn("h-full", bucketAccentClassName(share.key))}
-                style={{ width: `${share.percent}%` }}
-              />
-            ))
-        : null}
-    </div>
-  );
-}
-
-function CreditBucketRow({ bucket, action }: { bucket: BillingCreditBucketView; action?: ReactNode }) {
-  const remainingPercent = Math.max(0, 100 - bucket.usedPercent);
-
-  return (
-    <li className="py-3 first:pt-1 last:pb-0" data-testid={`billing-credit-${bucket.key}`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={cn("size-1.5 shrink-0 rounded-full", bucketAccentClassName(bucket.key))} aria-hidden />
-            <h3 className="text-[13px] font-medium tracking-[-0.01em]">{bucket.heading}</h3>
-          </div>
-          <p className="mt-0.5 pl-3.5 text-[11px] text-muted-foreground">{bucket.spendOrderLabel}</p>
-        </div>
-        <p
-          className="shrink-0 text-[13px] font-medium tracking-[-0.01em] tabular-nums"
-          data-testid={`billing-credit-${bucket.key}-remaining`}
-        >
-          {bucket.remainingLabel}
-        </p>
-      </div>
-      <div
-        className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
-        role="progressbar"
-        aria-label={`${bucket.heading} remaining`}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={remainingPercent}
-        aria-valuetext={bucket.remainingLabel}
-      >
-        <div
-          className={cn("h-full rounded-full", bucketAccentClassName(bucket.key))}
-          style={{ width: `${remainingPercent}%` }}
-        />
-      </div>
-      {bucket.footer ? <p className="mt-1.5 text-xs text-muted-foreground">{bucket.footer}</p> : null}
-      {action}
-    </li>
-  );
-}
-
-function bucketAccentClassName(key: BillingCreditBucketKey) {
-  switch (key) {
-    case "trial":
-      return "bg-amber-500";
-    case "included":
-      return "bg-foreground";
-    case "topup":
-      return "bg-sky-500";
-    case "grant":
-      return "bg-emerald-500";
-  }
-}
-
-function creditRefreshClassName(status: HostedCreditRefreshStatus) {
-  if (status === "added") {
-    return "text-emerald-700 dark:text-emerald-400";
-  }
-  return "text-muted-foreground";
 }

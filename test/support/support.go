@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	eebilling "github.com/superplanehq/superplane/ee/billing"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	billingtestsupport "github.com/superplanehq/superplane/ee/billing/testsupport"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/billing"
@@ -737,6 +738,27 @@ func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID str
 
 func restoreSeedUsagePriceBooks(t require.TestingT) {
 	require.NoError(t, billingtestsupport.RestoreSeedUsagePriceBooks(database.Conn()))
+}
+
+// AssignOpenSystemTrial stores an open system trial on an organization that
+// already has a billing row. New organizations start on None. Tests that need
+// an active trial assign one here.
+func AssignOpenSystemTrial(t require.TestingT, organizationID uuid.UUID) {
+	ensureBilling(t)
+	db := database.Conn()
+	catalog, err := billingmodels.FindBillingPlan(db, billingmodels.BillingPlanTrial)
+	require.NoError(t, err)
+	now := time.Now()
+	end := now.AddDate(0, 0, catalog.TrialLengthDays)
+	result := db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", organizationID).Updates(map[string]any{
+		"plan":             catalog.ResponsePlan(),
+		"plan_id":          catalog.ID,
+		"plan_source":      billingmodels.BillingPlanSourceSystem,
+		"trial_started_at": now,
+		"trial_ends_at":    end,
+	})
+	require.NoError(t, result.Error)
+	require.Equal(t, int64(1), result.RowsAffected)
 }
 
 func ensureBilling(t require.TestingT) {

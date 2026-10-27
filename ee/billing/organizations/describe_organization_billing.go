@@ -14,10 +14,8 @@ import (
 	"github.com/superplanehq/superplane/ee/billing/polar"
 	"github.com/superplanehq/superplane/ee/billing/pricebook"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/grpc/organizationref"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"gorm.io/gorm"
 )
@@ -49,12 +47,8 @@ func DescribeOrganizationBilling(
 	}
 
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
-	newBilling, err := models.OrganizationHasExperimentalFeatures(db, organizationID, features.FeatureNewBilling)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
-	}
 	hasCard := false
-	if billingEnabled && newBilling && hasCustomer {
+	if billingEnabled && hasCustomer {
 		hasCard, err = polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())
 		if err != nil {
 			return nil, polarBillingError(err, "Could not verify the payment method.")
@@ -62,15 +56,7 @@ func DescribeOrganizationBilling(
 	}
 	available := []*pb.BillingPlanOption{}
 	checkoutEnabled := false
-	if billingEnabled && !newBilling {
-		productID, err := polar.BusinessCheckoutProductID(db)
-		if err != nil {
-			return nil, grpcerrors.Internal(err, "Could not load billing plans.")
-		}
-		checkoutEnabled = productID != ""
-	}
-	if billingEnabled && newBilling {
-		checkoutEnabled = false
+	if billingEnabled {
 		catalog, err := billingmodels.ListBillingPlans(db)
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "Could not load billing plans.")
@@ -104,7 +90,7 @@ func DescribeOrganizationBilling(
 	response := &pb.DescribeOrganizationBillingResponse{
 		Plan:                        plan.Plan,
 		ProductFeatures:             productFeatures,
-		RequirePaymentMethod:        billingmodels.BillingEnabled() && newBilling && plan.Catalog.RequirePaymentMethod,
+		RequirePaymentMethod:        billingmodels.BillingEnabled() && plan.Catalog.RequirePaymentMethod,
 		HasPaymentMethod:            hasCard,
 		AvailablePlans:              available,
 		PlanName:                    plan.Catalog.Name,
@@ -112,7 +98,7 @@ func DescribeOrganizationBilling(
 		PlanPriceCents:              plan.Catalog.PriceCents,
 		PlanPerSeat:                 plan.Catalog.PerSeat,
 		CatalogKey:                  plan.Catalog.Key,
-		HostedExecutionAllowed:      !billingmodels.BillingEnabled() || plan.AllowsHostedExecution(time.Now()) && (!newBilling || !plan.Catalog.RequirePaymentMethod || hasCard),
+		HostedExecutionAllowed:      !billingmodels.BillingEnabled() || plan.AllowsHostedExecution(time.Now()) && (!plan.Catalog.RequirePaymentMethod || hasCard),
 		HostedCreditAvailable:       !billingmodels.BillingEnabled() || credit.RemainingMicros > 0,
 		PlanSource:                  plan.PlanSource,
 		PolarSubscriptionStatus:     plan.PolarSubscriptionStatus,
@@ -289,8 +275,8 @@ func CreateBusinessCheckout(
 	ctx context.Context,
 	orgID string,
 	_ *pb.CreateBusinessCheckoutRequest,
-	accountID string,
-	baseURL string,
+	_ string,
+	_ string,
 ) (*pb.CreateBusinessCheckoutResponse, error) {
 	organizationID, err := organizationref.Resolve(ctx, orgID)
 	if err != nil {
@@ -314,61 +300,7 @@ func CreateBusinessCheckout(
 	if current != nil && billingmodels.PolarSubscriptionIsPastDue(current.PolarSubscriptionStatus) {
 		return nil, grpcerrors.FailedPrecondition(nil, "The last renewal payment failed. Update the payment method to recover the current subscription.")
 	}
-	newBilling, err := models.OrganizationHasExperimentalFeatures(database.DB(ctx), organizationID, features.FeatureNewBilling)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "Could not load billing settings.")
-	}
-	if newBilling {
-		return nil, grpcerrors.FailedPrecondition(nil, "Select a plan in Billing.")
-	}
-	// A paused subscription has no paid access but can resume billing. Checkout
-	// must not start a second subscription while any live one exists.
-	if current.HasLivePolarSubscription(time.Now()) {
-		return nil, grpcerrors.FailedPrecondition(nil, "Manage your current subscription in the billing portal before selecting another plan.")
-	}
-
-	email := actingUserEmail(ctx, organizationID.String(), accountID)
-	if email == "" {
-		return nil, grpcerrors.FailedPrecondition(nil, "A user email is required to start checkout.")
-	}
-
-	organization, err := models.FindOrganizationByIDInTransaction(database.DB(ctx), organizationID.String())
-	if err != nil {
-		return nil, grpcerrors.NotFound(err, "organization not found")
-	}
-
-	client := polar.NewClientFromEnv()
-	customer, err := client.EnsureCustomer(ctx, polar.CreateCustomerInput{
-		ExternalID: organizationID.String(),
-		Name:       organization.Name,
-		OwnerEmail: email,
-	})
-	if err != nil {
-		if polar.IsConflict(err) {
-			return nil, grpcerrors.FailedPrecondition(err, "hosted billing customer already exists for another organization")
-		}
-		return nil, polarBillingError(err, "failed to create Business checkout")
-	}
-	if err := billingmodels.SetOrganizationPolarCustomerID(database.DB(ctx), organizationID, customer.ID); err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create Business checkout")
-	}
-
-	session, err := startSubscriptionCheckout(ctx, subscriptionCheckoutRequest{
-		OrganizationID: organizationID,
-		PlanKey:        billingmodels.BillingPlanBusiness,
-		ProductID:      productID,
-		SuccessURL:     businessCheckoutSuccessURL(baseURL, organizationID),
-		CustomerIP:     clientIPFromContext(ctx),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if session.CustomerID != "" {
-		if err := billingmodels.SetOrganizationPolarCustomerID(database.DB(ctx), organizationID, session.CustomerID); err != nil {
-			return nil, grpcerrors.Internal(err, "failed to create Business checkout")
-		}
-	}
-	return &pb.CreateBusinessCheckoutResponse{CheckoutUrl: session.URL}, nil
+	return nil, grpcerrors.FailedPrecondition(nil, "Select a plan in Billing.")
 }
 
 func businessCheckoutSuccessURL(baseURL string, organizationID uuid.UUID) string {

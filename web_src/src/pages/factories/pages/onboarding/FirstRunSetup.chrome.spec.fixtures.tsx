@@ -1,10 +1,8 @@
 import { renderHook } from "@testing-library/react";
 import { vi } from "bun:test";
 
+import type { OnboardingPageModel } from "./useFirstRunSetupFlow";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
-import type { useOnboardingPageModel } from "./useOnboardingPageModel";
-
-type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
 export function setupState(): OnboardingSetupApi {
   const { result } = renderHook(() =>

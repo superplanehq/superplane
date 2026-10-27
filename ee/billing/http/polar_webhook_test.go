@@ -23,7 +23,6 @@ import (
 	"github.com/superplanehq/superplane/ee/billing/polar"
 	"github.com/superplanehq/superplane/ee/billing/testsupport/polarfake"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
@@ -35,7 +34,6 @@ func Test__WebhookSettlesALostPurchaseResponseWithoutAQuantityWrite(t *testing.T
 	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	t.Setenv("POLAR_WEBHOOK_SECRET", "whsec_test-secret")
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	provider := polarfake.NewServer(t)
 	sub := provider.AddSeatPlan(db, r.Organization.ID, 3, time.Now().AddDate(0, 1, 0))
 	provider.Update(sub.ID, func(sub *polarfake.Subscription) { sub.PendingSeats = new(1) })
@@ -491,7 +489,6 @@ func Test__SubscriptionWebhooksSendNoQuantityWrite(t *testing.T) {
 			t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 			t.Setenv("POLAR_WEBHOOK_SECRET", secret)
 			db := database.DB(t.Context())
-			require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 			member, err := models.CreateAccount("Member", uuid.NewString()+"@example.com")
 			require.NoError(t, err)
 			_, err = models.CreateUser(r.Organization.ID, member.ID, member.Email, member.Name)

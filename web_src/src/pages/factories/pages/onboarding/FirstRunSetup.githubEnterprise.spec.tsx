@@ -69,6 +69,30 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({ has: () => true, isLoading: false, organizationReady: true }),
 }));
 
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+}));
+
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
+  useOrganizationBilling: () => ({
+    data: { billingEnabled: false, productFeatures: { byo_key: true } },
+    isPending: false,
+    isSuccess: true,
+    refetch: async () => ({ data: { billingEnabled: false, productFeatures: { byo_key: true } } }),
+  }),
+}));
+
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({
+    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+  }),
+}));
+
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 vi.mock("./AgentStep", () => ({ AgentStep: () => <div data-testid="agent-step" /> }));
 

@@ -22,6 +22,7 @@ interface RunsListProps {
   isError?: boolean;
   onRetry?: () => void;
   onClearFilters: () => void;
+  hasAnyFilter?: boolean;
 }
 
 export function RunsList({
@@ -35,6 +36,7 @@ export function RunsList({
   isError,
   onRetry,
   onClearFilters,
+  hasAnyFilter = false,
 }: RunsListProps) {
   if (isError && runs.length === 0) {
     return (
@@ -58,7 +60,7 @@ export function RunsList({
     );
   }
 
-  if (runs.length === 0) {
+  if (runs.length === 0 && !hasAnyFilter) {
     return (
       <div className="flex flex-col items-center gap-2 px-3 py-6 text-center text-[13px] text-gray-500">
         <Rabbit className="h-4 w-4" aria-hidden />

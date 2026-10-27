@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -483,15 +483,13 @@ func oldestCanvasRunsFirst(tx *gorm.DB) *gorm.DB {
 }
 
 type CanvasRunFilters struct {
-	States  []string
-	Results []string
+	States     []string
+	Results    []string
+	Search     string
+	TriggerIDs []string
 }
 
-func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
-	return ListCanvasRunsInTransaction(database.Conn(), workflowID, limit, beforeTime, filters)
-}
-
-func ListCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
+func ListCanvasRuns(tx *gorm.DB, workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
 	var runs []CanvasRun
 	query := tx.
 		Where("workflow_id = ?", workflowID).
@@ -512,11 +510,7 @@ func ListCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, limit int, b
 	return runs, nil
 }
 
-func CountCanvasRuns(workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
-	return CountCanvasRunsInTransaction(database.Conn(), workflowID, filters)
-}
-
-func CountCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
+func CountCanvasRuns(tx *gorm.DB, workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
 	var count int64
 	query := tx.
 		Model(&CanvasRun{}).
@@ -533,6 +527,18 @@ func CountCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, filters Can
 }
 
 func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
+	if len(filters.TriggerIDs) > 0 {
+		query = query.Where("workflow_runs.node_id IN ?", filters.TriggerIDs)
+	}
+	if search := strings.TrimSpace(filters.Search); search != "" {
+		rootEvents := query.Session(&gorm.Session{NewDB: true}).
+			Table("workflow_events AS root_event").Select("1").
+			Where("root_event.workflow_id = workflow_runs.workflow_id").
+			Where("root_event.run_id = workflow_runs.id").
+			Where("root_event.execution_id IS NULL").
+			Where("strpos(lower(root_event.custom_name), lower(?)) > 0", search)
+		query = query.Where("EXISTS (?)", rootEvents)
+	}
 	hasStates := len(filters.States) > 0
 	hasResults := len(filters.Results) > 0
 

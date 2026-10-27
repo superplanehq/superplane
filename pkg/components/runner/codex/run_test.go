@@ -90,14 +90,31 @@ func TestCodexExecEnvRejectsMissingAPIKey(t *testing.T) {
 
 func TestCodexExecArgsAddsMergeConfidenceMCP(t *testing.T) {
 	args := codexExecArgsFromScript(t, map[string]string{
-		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
+		"SUPERPLANE_BASE_URL":               "http://superplane.test",
+		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "merge-confidence-secret",
 	}, "gpt-5", "/task/merge_confidence_mcp.js")
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
 	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/merge_confidence_mcp.js"]`)
+	assertForwardsMCPEnvVars(t, args, "SUPERPLANE_BASE_URL", "SUPERPLANE_MERGE_CONFIDENCE_TOKEN")
+	assert.NotContains(t, joined, "merge-confidence-secret")
 	assert.NotContains(t, joined, "approval_mode")
+}
+
+func assertForwardsMCPEnvVars(t *testing.T, args []string, names ...string) {
+	t.Helper()
+	var envVars string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "mcp_servers.superplane.env_vars=") {
+			envVars = arg
+		}
+	}
+	require.NotEmpty(t, envVars, "missing mcp_servers.superplane.env_vars override")
+	for _, name := range names {
+		assert.Contains(t, envVars, fmt.Sprintf("%q", name))
+	}
 }
 
 func TestCodexSuperplaneMCPScriptUsesMergeConfidence(t *testing.T) {
@@ -118,6 +135,8 @@ func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
 	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/task_artifact_mcp.js"]`)
+	assertForwardsMCPEnvVars(t, args, "SUPERPLANE_BASE_URL", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ARTIFACT_TOKEN")
+	assert.NotContains(t, joined, "artifact-token")
 	assert.NotContains(t, joined, "approval_mode")
 }
 
@@ -130,6 +149,7 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 				"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
 				"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 				"SUPERPLANE_WORKSPACE_MCP_CONFIG":  configPath,
+				"SUPERPLANE_RUN_TOKEN":             "run-token-secret",
 			}, "gpt-5", "/task/planning_session_mcp.js", session)
 
 			assert.NotContains(t, args, "--dangerously-bypass-approvals-and-sandbox")
@@ -142,6 +162,14 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 			assert.Contains(t, args, `mcp_servers.superplane.tools.propose_update.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
+			assertForwardsMCPEnvVars(t, args,
+				"SUPERPLANE_BASE_URL",
+				"SUPERPLANE_RUN_TOKEN",
+				"SUPERPLANE_TASK_DIR",
+				"SUPERPLANE_ANALYSIS_SPEC_FILE",
+				"SUPERPLANE_ANALYSIS_SCORE_FILE",
+			)
+			assert.NotContains(t, joined, "run-token-secret")
 			assert.Equal(t, 2, strings.Count(joined, "approval_mode="))
 			assert.NotContains(t, joined, "default_tools_approval_mode")
 		})
@@ -488,6 +516,19 @@ func TestCodexFormatterReportsPlanningToolFailures(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestCodexFormatterShowsFailedMCPToolResultText(t *testing.T) {
+	event := `{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_update","status":"failed","error":null,"result":{"content":[{"type":"text","text":"SUPERPLANE_BASE_URL is required"}],"structured_content":null}}}`
+	output := runCodexFormatterWithActivity(t, []string{event})
+
+	var errorOutput string
+	for _, record := range activityRecords(t, output) {
+		if record["channel"] == "tool_output" && record["output_stream"] == "stderr" {
+			errorOutput, _ = record["text"].(string)
+		}
+	}
+	assert.Equal(t, "SUPERPLANE_BASE_URL is required", errorOutput)
 }
 
 func TestFormatTurnResultWritesClaudeStyleDoneLine(t *testing.T) {

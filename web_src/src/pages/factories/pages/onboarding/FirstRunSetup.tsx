@@ -20,6 +20,7 @@ import { ownerOfRepository, repositoriesInOrganization } from "./first-run/githu
 import { FirstRunCardScreenHost } from "./FirstRunCardScreenHost";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
+import { isFirstRunVcsScreen } from "./firstRunScreens";
 import {
   useFirstRunSetupFlow,
   type FirstRunScreen,
@@ -78,7 +79,7 @@ function signOut() {
 // The last action on the tickets step scans the backlog. When the card step
 // or the model step follows, the button only continues.
 function ticketsContinueLabel(flow: FirstRunSetupFlow, skipInitialImport: boolean, initialWorkspace: boolean) {
-  const cardStepNext = !flow.cardStep.ready || flow.cardStep.required;
+  const cardStepNext = !flow.cardStep.ready || flow.cardStep.required || flow.cardStep.requiresAdmin;
   if (cardStepNext || !flow.skipAgentScreen) return FIRST_RUN_COPY.tickets.continue;
   if (!initialWorkspace && skipInitialImport) return FIRST_RUN_COPY.finish.action;
   return FIRST_RUN_COPY.tickets.analyze;
@@ -94,6 +95,10 @@ function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => 
     return () => flow.goToScreen(flow.githubEnterprise ? "ghe-host" : "host");
   }
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
+}
+
+function watchesGitHubInstallation(flow: FirstRunSetupFlow, hasDestination: boolean): boolean {
+  return flow.screen === "choose" && flow.vcsHost !== "bitbucket" && !flow.githubEnterprise && !hasDestination;
 }
 
 function TicketsScreenHost({
@@ -173,10 +178,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
   const destination = model.provisionedDestination;
-  useGitHubInstallationChecks(
-    organizationId,
-    flow.screen === "choose" && flow.vcsHost !== "bitbucket" && !flow.githubEnterprise && !destination,
-  );
+  useGitHubInstallationChecks(organizationId, watchesGitHubInstallation(flow, Boolean(destination)));
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
   const initialWorkspace = factory?.onboarding?.initial === true;
@@ -232,7 +234,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     );
   }
 
-  if (flow.screen === "host" || flow.screen === "connect" || flow.screen === "ghe-host" || flow.screen === "choose") {
+  if (isFirstRunVcsScreen(flow.screen)) {
     return (
       <FirstRunVcsScreen
         screen={flow.screen}
@@ -341,10 +343,12 @@ function CompleteSetupScreen({
         <p>
           {flow.accessError
             ? "SuperPlane could not verify model access. Try again."
-            : "Continue with the models available to your organization."}
+            : flow.cardStep.requiresAdmin
+              ? "Ask an organization admin to select a billing plan. You can complete workspace setup now."
+              : "Continue with the models available to your organization."}
         </p>
       </FirstRunHeading>
-      <Button disabled={flow.busy} onClick={() => void flow.finishSetup()}>
+      <Button disabled={flow.busy || !flow.cardStep.ready} onClick={() => void flow.finishSetup()}>
         Continue
       </Button>
     </FirstRunShell>

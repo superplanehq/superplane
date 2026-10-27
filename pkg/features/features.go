@@ -64,9 +64,6 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
-// FeatureNewBilling enables catalog plan selection and saved-card requirements.
-const FeatureNewBilling = "new_billing"
-
 // FeatureGitHubEnterprise gates GitHub Enterprise Cloud (ghe.com) connections.
 const FeatureGitHubEnterprise = "github_enterprise"
 
@@ -80,9 +77,9 @@ func released() *bool {
 }
 
 var registry = []Feature{
-	{ID: FeatureNewBilling, Label: "New Billing", Description: "Choose a billing plan and connect a payment card"},
 	{ID: FeatureGitHubEnterprise, Label: "GitHub Enterprise Cloud", Description: "Connect GitHub Enterprise Cloud (ghe.com) with a private GitHub App"},
 	{ID: FeatureGitHubEnterpriseServer, Label: "GitHub Enterprise Server", Description: "Connect GitHub Enterprise Server. This option is not available yet"},
+
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
