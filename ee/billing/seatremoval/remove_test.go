@@ -132,6 +132,10 @@ func TestUnknownChangeKeepsTheLowerLimitAndBlocksAnotherWrite(t *testing.T) {
 	_, err = fx.runner.Change(context.Background(), fx.request(6))
 	assert.Equal(t, ReasonOutcomeUnknown, removalReason(t, err))
 	assert.Equal(t, []int{7, 5}, fx.client.patches, "the unconfirmed change is not sent again")
+	preview, err := fx.runner.Preview(context.Background(), fx.resources.Organization.ID, 6)
+	require.NoError(t, err)
+	assert.False(t, preview.Allowed)
+	assert.Equal(t, ReasonOutcomeUnknown, preview.Reason)
 }
 
 func TestRaiseKeepsTheOldLimitUntilPolarConfirms(t *testing.T) {
@@ -245,6 +249,93 @@ func TestProtectiveCancelRestoresPaidSeatsWithoutBuyingOrRemovingMembers(t *test
 	assert.EqualValues(t, 8, count)
 }
 
+func TestLostCancellationClearsWhenPolarShowsNoPendingUpdate(t *testing.T) {
+	fx := newRemovalFixture(t, 10)
+	_, err := fx.runner.Schedule(context.Background(), fx.request(7))
+	require.NoError(t, err)
+	fx.client.fail = polar.ErrOutcomeUnknown
+	fx.client.onSchedule = func() {
+		fx.client.pending = nil
+	}
+
+	result, err := fx.runner.Cancel(context.Background(), fx.request(10))
+
+	require.NoError(t, err)
+	assert.Equal(t, billingmodels.SeatQuantityStatusUnknown, result.Operation.Status)
+	require.NotNil(t, fx.plan().SeatAdmissionLimit)
+	assert.Equal(t, 7, *fx.plan().SeatAdmissionLimit)
+
+	require.NoError(t, fx.runner.Recover(context.Background(), fx.resources.Organization.ID))
+
+	assert.Nil(t, fx.plan().SeatAdmissionLimit)
+	assert.Nil(t, fx.plan().SeatProvedTarget)
+	assert.Equal(t, []int{7, 10}, fx.client.patches, "recovery reads Polar and does not send the cancellation again")
+	assert.Equal(t, 10, fx.client.seats)
+	ops := fx.operationsByAction()
+	assert.Equal(t, billingmodels.SeatQuantityStatusSuperseded, ops[billingmodels.SeatQuantityActionSchedule].Status)
+	assert.Equal(t, billingmodels.SeatQuantityStatusCanceled, ops[billingmodels.SeatQuantityActionCancel].Status)
+}
+
+func TestProtectiveCancelInsideTheGuardLeavesNoSubmittingOperation(t *testing.T) {
+	fx := newRemovalFixture(t, 10)
+	_, err := fx.runner.Schedule(context.Background(), fx.request(7))
+	require.NoError(t, err)
+	for range 7 {
+		support.CreateUser(t, fx.resources, fx.resources.Organization.ID)
+	}
+	calls := 0
+	allowed := fx.periodEnd.Add(-seatquantity.MutationGuard - time.Minute)
+	denied := fx.periodEnd.Add(-seatquantity.MutationGuard)
+	fx.runner.Now = func() time.Time {
+		calls++
+		if calls >= 2 {
+			return denied
+		}
+		return allowed
+	}
+
+	require.NoError(t, fx.runner.Recover(context.Background(), fx.resources.Organization.ID))
+
+	assert.Equal(t, []int{7}, fx.client.patches, "the unsent cancellation does not reach Polar")
+	assert.Equal(t, 10, fx.client.seats)
+	inFlight, err := billingmodels.FindInFlightSeatQuantityOperation(database.Conn(), fx.resources.Organization.ID)
+	require.NoError(t, err)
+	assert.Nil(t, inFlight)
+	view, err := Describe(database.Conn(), fx.resources.Organization.ID, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, billingmodels.SeatQuantityStatusRepairRequired, view.Status)
+	ops := fx.operationsByAction()
+	assert.Equal(t, billingmodels.SeatQuantityStatusRepairRequired, ops[billingmodels.SeatQuantityActionSchedule].Status)
+	protective := ops[billingmodels.SeatQuantityActionProtectiveCancel]
+	assert.Equal(t, billingmodels.SeatQuantityStatusRejected, protective.Status)
+	assert.Nil(t, protective.DispatchedAt)
+	count, err := models.CountActiveHumanUsersByOrganization(database.Conn(), fx.resources.Organization.ID.String())
+	require.NoError(t, err)
+	assert.EqualValues(t, 8, count)
+}
+
+func TestMixedPendingUpdateBlocksProtectiveCancellation(t *testing.T) {
+	fx := newRemovalFixture(t, 10)
+	_, err := fx.runner.Schedule(context.Background(), fx.request(7))
+	require.NoError(t, err)
+	for range 7 {
+		support.CreateUser(t, fx.resources, fx.resources.Organization.ID)
+	}
+	fx.client.extraPending = map[string]any{
+		"seats": 7, "product_id": "prod_other", "applies_at": fx.periodEnd.Format(time.RFC3339),
+	}
+
+	require.NoError(t, fx.runner.Recover(context.Background(), fx.resources.Organization.ID))
+
+	assert.Equal(t, []int{7}, fx.client.patches, "recovery does not replace an unrelated pending change")
+	view, err := Describe(database.Conn(), fx.resources.Organization.ID, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, billingmodels.SeatQuantityStatusRepairRequired, view.Status)
+	count, err := models.CountActiveHumanUsersByOrganization(database.Conn(), fx.resources.Organization.ID.String())
+	require.NoError(t, err)
+	assert.EqualValues(t, 8, count)
+}
+
 func TestMembersAbovePaidSeatsStayAndBlockNewUse(t *testing.T) {
 	fx := newRemovalFixture(t, 2)
 	_, err := fx.runner.Schedule(context.Background(), fx.request(1))
@@ -322,6 +413,17 @@ func (f *removalFixture) request(target int) Request {
 		Target: target, SubscriptionID: *plan.PolarSubscriptionID, PeriodStart: *plan.CurrentPeriodStart,
 		PeriodEnd: *plan.CurrentPeriodEnd, SourcePaidQuantity: *plan.PurchasedSeats, SeatChangeVersion: plan.SeatChangeVersion,
 	}
+}
+
+func (f *removalFixture) operationsByAction() map[string]billingmodels.SeatQuantityOperation {
+	f.t.Helper()
+	var ops []billingmodels.SeatQuantityOperation
+	require.NoError(f.t, database.Conn().Where("organization_id = ?", f.resources.Organization.ID).Find(&ops).Error)
+	byAction := map[string]billingmodels.SeatQuantityOperation{}
+	for _, op := range ops {
+		byAction[op.Action] = op
+	}
+	return byAction
 }
 
 func (f *removalFixture) plan() *billingmodels.OrganizationBillingPlan {

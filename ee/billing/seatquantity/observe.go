@@ -138,6 +138,9 @@ func observeRemoval(tx *gorm.DB, plan *billingmodels.OrganizationBillingPlan, op
 	if op.InFlight() && scheduleVerified(op, snap) {
 		return proveSchedule(tx, plan, op, snap)
 	}
+	if op.InFlight() && cancellationVerified(op, snap) {
+		return proveCancellation(tx, plan, op, snap)
+	}
 	// Quantity or elapsed time alone does not resolve an unknown mutation.
 	return nil, nil
 }
@@ -216,6 +219,22 @@ func applyRenewal(tx *gorm.DB, plan *billingmodels.OrganizationBillingPlan, op *
 	return nil, nil
 }
 
+func proveCancellation(tx *gorm.DB, plan *billingmodels.OrganizationBillingPlan, op *billingmodels.SeatQuantityOperation, snap Snapshot) ([]billing.CapacityAlert, error) {
+	if err := supersedePredecessor(tx, op); err != nil {
+		return nil, err
+	}
+	if err := op.Transition(tx, billingmodels.SeatQuantityStatusCanceled, "", evidence(snap)); err != nil {
+		return nil, err
+	}
+	if plan.SeatQuantityOperationID != nil && *plan.SeatQuantityOperationID == op.ID {
+		billingmodels.ClearSeatRestriction(plan)
+		if err := billingmodels.SaveSeatChange(tx, plan); err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
+}
+
 func proveSchedule(tx *gorm.DB, plan *billingmodels.OrganizationBillingPlan, op *billingmodels.SeatQuantityOperation, snap Snapshot) ([]billing.CapacityAlert, error) {
 	if op.PredecessorID != nil {
 		if err := supersedePredecessor(tx, op); err != nil {
@@ -257,6 +276,29 @@ func scheduleVerified(op *billingmodels.SeatQuantityOperation, snap Snapshot) bo
 		return false
 	}
 	if snap.PeriodEnd == nil || !snap.PeriodEnd.Equal(op.PeriodEnd) || snap.SubscriptionID != op.SubscriptionID {
+		return false
+	}
+	if op.DispatchedAt == nil || snap.ModifiedAt == nil || snap.ModifiedAt.Before(*op.DispatchedAt) {
+		return false
+	}
+	return true
+}
+
+// cancellationVerified reports that a verified read shows the cancel reached
+// the provider. The current seats still equal the cancel target, and the
+// pending reduction is gone. A missing dispatch time means the request was
+// never sent, so absence of a pending update is not evidence.
+func cancellationVerified(op *billingmodels.SeatQuantityOperation, snap Snapshot) bool {
+	if !snap.Verified || snap.PendingUnrelated || snap.Seats == nil || *snap.Seats != op.TargetQuantity {
+		return false
+	}
+	if op.Action != billingmodels.SeatQuantityActionCancel && op.Action != billingmodels.SeatQuantityActionProtectiveCancel {
+		return false
+	}
+	if snap.PendingSeats != nil && *snap.PendingSeats < op.TargetQuantity {
+		return false
+	}
+	if snap.SubscriptionID == "" || snap.SubscriptionID != op.SubscriptionID || snap.PeriodEnd == nil || !snap.PeriodEnd.Equal(op.PeriodEnd) {
 		return false
 	}
 	if op.DispatchedAt == nil || snap.ModifiedAt == nil || snap.ModifiedAt.Before(*op.DispatchedAt) {

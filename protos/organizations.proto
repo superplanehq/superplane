@@ -986,7 +986,9 @@ message PurchaseSeatsRequest {
   google.protobuf.Timestamp confirmed_period_end = 7;
   // confirmed_seat_change_version binds a new purchase to the seat-removal
   // version of the preview. A new operation needs it, including version zero
-  // when no removal is pending. A recorded operation key replays without it.
+  // when no removal is pending. A purchase recorded with this field replays
+  // only when the request repeats the same version and pending identity.
+  // A purchase recorded before this field replays without it.
   optional int64 confirmed_seat_change_version = 8;
   // confirmed_pending_removal_id is empty when the preview showed no removal.
   // Together with the version, that empty id is a versioned absence.

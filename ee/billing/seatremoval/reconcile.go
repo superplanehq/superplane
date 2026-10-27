@@ -19,16 +19,20 @@ import (
 // when the member count no longer fits it. It never buys seats, never removes
 // a member, and never sends a lower seat count.
 func Recover(ctx context.Context, db *gorm.DB, client SubscriptionClient, orgID uuid.UUID) error {
-	ops, err := billingmodels.ListOpenSeatQuantityOperations(db.WithContext(ctx), orgID)
+	return NewRunner(db, client).Recover(ctx, orgID)
+}
+
+// Recover uses the runner clock. Tests move that clock across the renewal guard.
+func (r *Runner) Recover(ctx context.Context, orgID uuid.UUID) error {
+	ops, err := billingmodels.ListOpenSeatQuantityOperations(r.DB.WithContext(ctx), orgID)
 	if err != nil {
 		return err
 	}
 	if len(ops) == 0 {
 		return nil
 	}
-	runner := NewRunner(db, client)
-	return billingmodels.WithSeatQuantityLock(db.WithContext(ctx), orgID, func(*gorm.DB) error {
-		return runner.recoverLocked(ctx, orgID)
+	return billingmodels.WithSeatQuantityLock(r.DB.WithContext(ctx), orgID, func(*gorm.DB) error {
+		return r.recoverLocked(ctx, orgID)
 	})
 }
 
@@ -58,10 +62,10 @@ func (r *Runner) recoverLocked(ctx context.Context, orgID uuid.UUID) error {
 	for _, alert := range alerts {
 		alert.Emit()
 	}
-	return r.enforceFloorLocked(ctx, orgID)
+	return r.enforceFloorLocked(ctx, orgID, snap)
 }
 
-func (r *Runner) enforceFloorLocked(ctx context.Context, orgID uuid.UUID) error {
+func (r *Runner) enforceFloorLocked(ctx context.Context, orgID uuid.UUID, snap *polar.SubscriptionData) error {
 	var scheduled *billingmodels.SeatQuantityOperation
 	var plan *billingmodels.OrganizationBillingPlan
 	var members int
@@ -88,7 +92,9 @@ func (r *Runner) enforceFloorLocked(ctx context.Context, orgID uuid.UUID) error 
 	if members <= scheduled.TargetQuantity {
 		return nil
 	}
-	if members > paid || !seatquantity.AllowsMutation(r.now(), *plan.CurrentPeriodEnd) {
+	// A pending update that is not only seats must stay as Polar stored it.
+	mixed := snap != nil && snap.PendingUpdate != nil && snap.PendingUpdate.HasUnrelatedChanges()
+	if members > paid || mixed || !seatquantity.AllowsMutation(r.now(), *plan.CurrentPeriodEnd) {
 		return r.requireRepair(ctx, scheduled, members, plan)
 	}
 	return r.protectiveCancel(ctx, plan, scheduled, members)
@@ -192,7 +198,13 @@ func (r *Runner) protectiveCancel(ctx context.Context, plan *billingmodels.Organ
 	if err != nil || staged == nil || !staged.InFlight() {
 		return err
 	}
+	// The guard can start after registration and before the provider call.
+	// Close the unsent operation. A submitting row would block every later
+	// seat change even though Polar received nothing.
 	if !seatquantity.AllowsMutation(r.now(), staged.EffectiveAt) {
+		if err := r.reject(ctx, staged, prior, ReasonRenewalBoundary); err != nil {
+			return err
+		}
 		return r.requireRepair(ctx, scheduled, members, plan)
 	}
 	if err := staged.MarkDispatched(r.DB.WithContext(ctx), r.now()); err != nil {

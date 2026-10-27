@@ -49,6 +49,7 @@ const estimate: OrganizationsPreviewSeatPurchaseResponse = {
   newMonthlyTotalCents: "5000",
   subscriptionId: "sub_team",
   billingPeriodStart: "2026-10-15T00:00:00Z",
+  seatChangeVersion: "0",
 };
 
 function deferred<T>() {
@@ -218,6 +219,9 @@ describe("useSeatPurchase", () => {
       confirmedSubscriptionId: "sub_team",
       confirmedPeriodStart: "2026-10-15T00:00:00Z",
       confirmedPeriodEnd: "2026-11-15T00:00:00Z",
+      confirmedSeatChangeVersion: "0",
+      confirmedPendingRemovalId: "",
+      confirmedPendingRemovalRevision: 0,
     });
     act(() => hook.result.current.setAdditionalSeats("2"));
     expect(hook.result.current.additionalSeats).toBe("1");

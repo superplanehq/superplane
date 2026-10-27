@@ -104,9 +104,21 @@ func preview(plan *billingmodels.OrganizationBillingPlan, op *billingmodels.Seat
 	case billingmodels.PolarSubscriptionIsPaymentBlocked(plan.PolarSubscriptionStatus):
 		result.Reason = ReasonPaymentBlocked
 		result.Message = "Update the payment method before you change seats."
+	case plan.CancelAtPeriodEnd:
+		result.Reason = ReasonNotAvailable
+		result.Message = "Resume the subscription before you change seats."
+	case plan.PolarSubscriptionStatus != billingmodels.PolarSubscriptionStatusActive:
+		result.Reason = ReasonNotAvailable
+		result.Message = "Seat removal needs an active Team subscription."
 	case !seatquantity.AllowsMutation(now, result.PeriodEnd):
 		result.Reason = ReasonRenewalBoundary
 		result.Message = "The billing period renews soon. Confirm the seat removal after the renewal."
+	case op != nil && op.InFlight():
+		result.Reason = ReasonOutcomeUnknown
+		result.Message = "A seat change is still unconfirmed. Wait for billing to finish checking it."
+	case op != nil && op.Status == billingmodels.SeatQuantityStatusRepairRequired:
+		result.Reason = ReasonRepairRequired
+		result.Message = "Seat billing needs an admin to repair it. Remove members or buy seats. SuperPlane did not remove a member."
 	case target == paid && plan.SeatProvedTarget != nil:
 		result.Allowed = true
 		result.Reason = ""

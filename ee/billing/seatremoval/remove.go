@@ -218,7 +218,7 @@ func (r *Runner) mutateLocked(ctx context.Context, action string, req Request) (
 	if err := r.record(ctx, staged, prior, updated, updateErr); err != nil {
 		return Result{}, err
 	}
-	if err := r.enforceFloorLocked(ctx, req.OrganizationID); err != nil {
+	if err := r.enforceFloorLocked(ctx, req.OrganizationID, updated); err != nil {
 		return Result{}, err
 	}
 	if err := r.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
