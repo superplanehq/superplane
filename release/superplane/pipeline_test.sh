@@ -19,7 +19,7 @@ ruby -ryaml -e '
     commands = blocks.fetch("Build #{architecture} Image").dig("task", "jobs", 0, "commands").join("\n")
     archive = "superplane-#{architecture}.oci.tar"
     [archive, "#{archive}.sha256", "#{archive}.descriptor.json"].each do |artifact|
-      raise "#{architecture} must publish #{artifact}" unless commands.include?(%(artifact push workflow "#{artifact}"))
+      raise "#{architecture} must replace an existing #{artifact}" unless commands.include?(%(artifact push workflow "#{artifact}" --force))
     end
   end
   assemble = blocks.fetch("Assemble Release").dig("task", "jobs", 0, "commands").join("\n")
