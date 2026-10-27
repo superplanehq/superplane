@@ -105,6 +105,79 @@ func TestCodexConnectionAllowsParallelRunLeases(t *testing.T) {
 	}
 }
 
+func TestCodexRunRejectsAReplacementMember(t *testing.T) {
+	db, connection, task, _ := newReadyCodexConnection(t)
+	// The connection remains after its owner leaves the organization.
+	require.NoError(t, db.Delete(&models.User{}, "id = ?", connection.OwnerUserID).Error)
+	replacement := &models.User{ID: uuid.New(), OrganizationID: connection.OrganizationID, Type: models.UserTypeHuman, Name: "Replacement"}
+	require.NoError(t, db.Create(replacement).Error)
+	_, err := reserveCodexRun(db, connection, task.ID, time.Now())
+	require.ErrorIs(t, err, models.ErrCodexConnectionNotEligible)
+	assert.Empty(t, codexLeases(t, db, connection.ID))
+}
+
+func TestCodexCredentialsParticipateInKeyMigration(t *testing.T) {
+	db, connection, task, _ := newReadyCodexConnection(t)
+	_, err := reserveCodexRun(db, connection, task.ID, time.Now())
+	require.NoError(t, err)
+	lease := codexLeases(t, db, connection.ID)[0]
+	for _, store := range []struct {
+		name, id string
+		value    []byte
+	}{
+		{"factory_codex_connections.bundle_ciphertext", connection.ID.String(), connection.BundleCiphertext},
+		{"factory_codex_leases.secret_ciphertext", lease.ID.String(), lease.SecretCiphertext},
+	} {
+		t.Run(store.name, func(t *testing.T) {
+			var location *models.EncryptedStorageLocation
+			for _, candidate := range models.ApplicationEncryptedStorage() {
+				if candidate.Name == store.name {
+					location = &candidate
+					break
+				}
+			}
+			require.NotNil(t, location)
+			rows, err := location.ReadPage(db, "", 1)
+			require.NoError(t, err)
+			require.Len(t, rows, 1)
+			assert.Equal(t, store.id, rows[0].Cursor)
+			assert.Equal(t, connection.ID.String(), rows[0].AssociatedData)
+			assert.Equal(t, store.value, rows[0].Value)
+			replacement := []byte("rotated-ciphertext")
+			changed, err := location.Replace(db, rows[0], replacement)
+			require.NoError(t, err)
+			assert.True(t, changed)
+			changed, err = location.Replace(db, rows[0], []byte("stale-rotation"))
+			require.NoError(t, err)
+			assert.False(t, changed)
+			rotated, err := location.ReadPage(db, "", 1)
+			require.NoError(t, err)
+			require.Len(t, rotated, 1)
+			assert.Equal(t, replacement, rotated[0].Value)
+			remaining, err := location.ReadPage(db, store.id, 1)
+			require.NoError(t, err)
+			assert.Empty(t, remaining)
+		})
+	}
+}
+
+func TestCodexLoginCleanupSkipsATaskLockedByCompletion(t *testing.T) {
+	db, connection, task, _ := newDisconnectedCodexLogin(t)
+	completion := db.Begin()
+	require.NoError(t, completion.Error)
+	t.Cleanup(func() { completion.Rollback() })
+	require.NoError(t, completion.Exec("SELECT id FROM runner_tasks WHERE id = ? FOR UPDATE", task.ID).Error)
+	cleanup := db.Begin()
+	require.NoError(t, cleanup.Error)
+	t.Cleanup(func() { cleanup.Rollback() })
+	require.NoError(t, cleanup.Exec("SET LOCAL lock_timeout = '250ms'").Error)
+	require.NoError(t, models.ReleaseConfirmedCodexReservations(cleanup, time.Now().Add(16*time.Minute)))
+	// Cleanup must not hold the connection while completion holds the task.
+	require.NoError(t, completion.Exec("SET LOCAL lock_timeout = '250ms'").Error)
+	_, err := models.LockFactoryCodexConnection(completion, connection.OrganizationID, connection.FactoryID)
+	require.NoError(t, err)
+}
+
 func TestCodexConnectionLoginAndRunsExcludeEachOther(t *testing.T) {
 	db, connection, task, _ := newReadyCodexConnection(t)
 	now := time.Now()

@@ -15,7 +15,7 @@ import type { FirstRunChrome } from "./firstRunTypes";
 import { FirstRunVisualContext, useFirstRunVisual, type FirstRunVisual } from "./firstRunVisual";
 import { FirstRunWorkspaceSwitch } from "./FirstRunWorkspaceSwitch";
 
-export const FIRST_RUN_STEP_COUNT = 5;
+export const FIRST_RUN_STEP_COUNT = 6;
 export type { FirstRunVisual };
 
 const PREVIEW_TOKENS = {

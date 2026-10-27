@@ -4,35 +4,45 @@ import {
   organizationsCreateBillingPortalSession,
   organizationsCreatePaymentMethodSession,
   organizationsSelectBillingPlan,
-  type OrganizationsBillingPlanOption,
-  type OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
-import { Button } from "@/components/ui/button";
 import { polarPortalSettingsUrl, useBillingCardSetup } from "@/hooks/useBillingCardSetup";
 import { organizationBillingQueryKey, useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { BillingPaymentFailedBanner } from "./BillingPaymentFailedBanner";
-import { BillingSeatCheckout } from "./BillingSeatCheckout";
-import { FactorySettingsCard } from "../settings/FactorySettingsCard";
+import { BillingCurrentPlan } from "./BillingCurrentPlan";
+import { BillingChangePlanDialog } from "./BillingChangePlanDialog";
 import { billingIsPastDue, billingPaymentBlocked } from "../../lib/billingPlans";
-import { formatUsdCents } from "../../lib/workOrderUsage";
 
 type BillingAction = { planKey?: string; seats?: number; paymentMethod?: boolean };
+
+type BillingPaymentSettingsProps = {
+  organizationId: string;
+  canManageBilling: boolean;
+  subscriptionPending?: boolean;
+  onCancelSubscription?: () => void | Promise<void>;
+  onKeepSubscription?: () => void | Promise<void>;
+};
 
 export function BillingPaymentSettings({
   organizationId,
   canManageBilling,
-}: {
-  organizationId: string;
-  canManageBilling: boolean;
-}) {
+  subscriptionPending = false,
+  onCancelSubscription,
+  onKeepSubscription,
+}: BillingPaymentSettingsProps) {
   const { data: billing } = useOrganizationBilling(organizationId);
+  const changePlanButton = useRef<HTMLButtonElement>(null);
+  const [plansOpen, setPlansOpen] = useState(false);
   const cardSetup = useBillingCardSetup(organizationId);
-  const payment = useBillingPaymentAction(organizationId);
+  const payment = useBillingPaymentAction(organizationId, () => setPlansOpen(false));
 
   if (!billing?.billingEnabled) return null;
-  const busy = payment.pending || cardSetup.isPending;
+  const busy = payment.pending || cardSetup.isPending || subscriptionPending;
+  const paymentBlocked = billingPaymentBlocked(billing.polarSubscriptionStatus);
+  const subscriptionActive = billing.planSource === "polar" && billing.creditPurchaseAllowed;
+  const manageInPortal = subscriptionActive || billing.hasPaymentMethod || paymentBlocked;
+  const feedback = <BillingPaymentFeedback setup={cardSetup} error={payment.error} />;
   return (
     <>
       {billingIsPastDue(billing.polarSubscriptionStatus) && (
@@ -44,30 +54,44 @@ export function BillingPaymentSettings({
           onUpdatePaymentMethod={payment.updatePaymentMethod}
         />
       )}
-      <FactorySettingsCard title="Payment method">
-        <p>{billing.hasPaymentMethod ? "A saved card is available." : "No saved card is available."}</p>
-        {billing.requirePaymentMethod && !billing.hasPaymentMethod && (
-          <p role="status">Your plan requires a saved card before usage.</p>
-        )}
-        {canManageBilling ? (
-          <BillingPaymentControls
-            billing={billing}
-            busy={busy}
-            cardSetup={cardSetup}
-            error={payment.error}
-            onSelect={payment.submit}
-          />
-        ) : (
-          <p className="mt-2 text-sm text-muted-foreground">
-            Ask an organization admin to set up payment or change plans.
-          </p>
-        )}
-      </FactorySettingsCard>
+      <BillingCurrentPlan
+        changePlanButtonRef={changePlanButton}
+        billing={billing}
+        canManageBilling={canManageBilling}
+        busy={busy}
+        onChangePlan={() => setPlansOpen(true)}
+        onManagePayment={() => (manageInPortal ? payment.submit() : cardSetup.open())}
+        onCancel={onCancelSubscription}
+        onKeep={onKeepSubscription}
+      />
+      {!plansOpen && feedback}
+      {canManageBilling && !paymentBlocked && (
+        <BillingChangePlanDialog
+          onCloseAutoFocus={() => changePlanButton.current?.focus()}
+          open={plansOpen}
+          onOpenChange={(open) => {
+            if (!busy) setPlansOpen(open);
+          }}
+          billing={billing}
+          busy={busy}
+          subscriptionActive={Boolean(subscriptionActive)}
+          onSelect={(plan) => {
+            if (plan.requirePaymentMethod && !billing.hasPaymentMethod && !plan.subscriptionRequired) {
+              cardSetup.open(() => payment.submit(plan.key));
+              return;
+            }
+            payment.submit(plan.key);
+          }}
+          onSubscribeWithSeats={payment.submit}
+          onManageSubscription={() => payment.submit()}
+          feedback={feedback}
+        />
+      )}
     </>
   );
 }
 
-function useBillingPaymentAction(organizationId: string) {
+function useBillingPaymentAction(organizationId: string, onComplete: () => void) {
   const { refetch } = useOrganizationBilling(organizationId);
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
@@ -104,6 +128,7 @@ function useBillingPaymentAction(organizationId: string) {
         return;
       }
       await queryClient.invalidateQueries({ queryKey: organizationBillingQueryKey(organizationId) });
+      onComplete();
     },
     onError: async (cause) => {
       setError(getApiErrorMessage(cause, "Could not update billing."));
@@ -128,172 +153,20 @@ function useBillingPaymentAction(organizationId: string) {
   };
 }
 
-function BillingPaymentControls({
-  billing,
-  busy,
-  cardSetup,
-  error,
-  onSelect,
-}: {
-  billing: OrganizationsDescribeOrganizationBillingResponse;
-  busy: boolean;
-  cardSetup: ReturnType<typeof useBillingCardSetup>;
-  error: string;
-  onSelect: (planKey?: string, seats?: number) => void;
-}) {
-  const pastDue = billingIsPastDue(billing.polarSubscriptionStatus);
-  // A failed or paused payment locks plan changes on the server. Hide the checkout it would reject.
-  const paymentBlocked = billingPaymentBlocked(billing.polarSubscriptionStatus);
-  const plans = paymentBlocked ? [] : (billing.availablePlans ?? []);
-  const subscriptionActive = billing.planSource === "polar" && billing.creditPurchaseAllowed;
-  const manageInPortal = subscriptionActive || billing.hasPaymentMethod || paymentBlocked;
-  const cardRequiredPlan = plans.some((plan) => plan.requirePaymentMethod && !plan.subscriptionRequired);
-  return (
-    <div className="mt-3 space-y-3">
-      {!paymentBlocked && !manageInPortal && !cardRequiredPlan && (
-        <Button disabled={busy} onClick={() => cardSetup.open()}>
-          Add payment method
-        </Button>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {manageInPortal && !pastDue && (
-          <Button disabled={busy} onClick={() => onSelect()}>
-            {subscriptionActive ? "Manage subscription and card" : "Manage payment method"}
-          </Button>
-        )}
-      </div>
-      {plans.map((plan) => (
-        <BillingPlanChoice
-          key={plan.key}
-          plan={plan}
-          billing={billing}
-          busy={busy}
-          subscriptionActive={Boolean(subscriptionActive)}
-          cardSetup={cardSetup}
-          onSelect={onSelect}
-        />
-      ))}
-      <BillingPaymentFeedback
-        setup={cardSetup}
-        error={error}
-        subscriptionActive={Boolean(subscriptionActive) && !paymentBlocked}
-      />
-    </div>
-  );
-}
-
-function BillingPaymentFeedback({
-  setup,
-  error,
-  subscriptionActive,
-}: {
-  setup: ReturnType<typeof useBillingCardSetup>;
-  error: string;
-  subscriptionActive: boolean;
-}) {
+function BillingPaymentFeedback({ setup, error }: { setup: ReturnType<typeof useBillingCardSetup>; error: string }) {
   const message = error || setup.error;
   return (
     <>
-      {subscriptionActive && (
-        <p className="text-sm text-muted-foreground">
-          Manage your existing subscription in the billing portal to change plans.
+      {setup.isPending && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {setup.opening ? "Opening card setup…" : "Waiting for your saved card…"}
         </p>
       )}
-      {setup.isPending && <p role="status">{setup.opening ? "Opening card setup…" : "Waiting for your saved card…"}</p>}
       {message && (
         <p role="alert" className="text-sm text-destructive">
           {message}
         </p>
       )}
     </>
-  );
-}
-
-function BillingPlanChoice({
-  plan,
-  billing,
-  busy,
-  subscriptionActive,
-  cardSetup,
-  onSelect,
-}: {
-  plan: OrganizationsBillingPlanOption;
-  billing: OrganizationsDescribeOrganizationBillingResponse;
-  busy: boolean;
-  subscriptionActive: boolean;
-  cardSetup: ReturnType<typeof useBillingCardSetup>;
-  onSelect: (planKey: string | undefined, seats?: number) => void;
-}) {
-  const current = billing.catalogKey === plan.key;
-  const needsCard = Boolean(plan.requirePaymentMethod && !billing.hasPaymentMethod && !plan.subscriptionRequired);
-  const canStartSeatCheckout = plan.perSeat && !current && !subscriptionActive;
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded border p-3">
-      <div>
-        <p className="font-medium">{plan.name}</p>
-        <p className="text-sm text-muted-foreground">{billingPlanPrice(plan)}</p>
-        {needsCard && (
-          <p className="text-sm text-muted-foreground">
-            Save a card in the Polar popup to activate this plan. No subscription required.
-          </p>
-        )}
-      </div>
-      {canStartSeatCheckout ? (
-        <BillingSeatCheckout
-          plan={plan}
-          occupied={billing.occupiedSeats}
-          pending={billing.pendingInvitationSeats}
-          disabled={busy}
-          onSubscribe={(seats) => onSelect(plan.key, seats)}
-        />
-      ) : (
-        <BillingPlanButton
-          plan={plan}
-          current={current && !needsCard}
-          needsCard={needsCard}
-          disabled={busy || subscriptionActive}
-          onSelect={() => onSelect(plan.key)}
-          onSaveCard={(select) => cardSetup.open(select)}
-        />
-      )}
-    </div>
-  );
-}
-
-function billingPlanPrice(plan: OrganizationsBillingPlanOption): string {
-  const period = plan.perSeat ? " per seat per month" : plan.subscriptionRequired ? " per month" : "";
-  const card = plan.requirePaymentMethod ? " · Card required" : "";
-  return `${formatUsdCents(Number(plan.priceCents ?? 0))}${period}${card}`;
-}
-
-function BillingPlanButton({
-  plan,
-  current,
-  needsCard,
-  disabled,
-  onSelect,
-  onSaveCard,
-}: {
-  plan: OrganizationsBillingPlanOption;
-  current: boolean;
-  needsCard: boolean;
-  disabled: boolean;
-  onSelect: () => void;
-  onSaveCard: (select: () => void) => void;
-}) {
-  return (
-    <Button
-      variant="outline"
-      disabled={current || disabled}
-      onClick={() => {
-        if (needsCard) {
-          onSaveCard(onSelect);
-          return;
-        }
-        onSelect();
-      }}
-    >
-      {current ? "Current plan" : plan.subscriptionRequired ? `Subscribe to ${plan.name}` : `Select ${plan.name}`}
-    </Button>
   );
 }

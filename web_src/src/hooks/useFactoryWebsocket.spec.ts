@@ -56,6 +56,26 @@ async function emit(payload: unknown) {
 }
 
 describe("useFactoryWebsocket", () => {
+  it.each(["factory-1", "other-factory"])("refreshes capacity as a board batch scoped to %s", async (factoryId) => {
+    const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder");
+    const { queryClient } = renderFactoryWebsocket();
+    const listKey = factoryQueryKeys.workOrders("org-1", "factory-1");
+    const sessionKey = factoryQueryKeys.planningSession("org-1", "factory-1", "order-1");
+    const detailKey = factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1");
+    const otherKey = factoryQueryKeys.workOrders("org-1", "other-factory");
+    queryClient.setQueryData(listKey, [{ id: "order-1" }, { id: "order-2" }]);
+    queryClient.setQueryData(sessionKey, { runnerState: "queued", queueReason: "parallelism_limit" });
+    queryClient.setQueryData(detailKey, { id: "order-1" });
+    queryClient.setQueryData(otherKey, []);
+
+    await emit({ event: "work_order_updated", payload: { factoryId, reason: "runner_capacity" } });
+
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(factoryId === "factory-1");
+    expect(queryClient.getQueryState(sessionKey)?.isInvalidated).toBe(factoryId === "factory-1");
+    expect(queryClient.getQueryState(detailKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    expect(describeWorkOrder).not.toHaveBeenCalled();
+  });
   it.each(["existing", "new", "archived"])(
     "updates historical tasks without reloading all pages: %s",
     async (state) => {

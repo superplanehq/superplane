@@ -19,7 +19,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 func DescribeFactoryCodexConnection(
@@ -219,7 +218,7 @@ func CancelFactoryCodexConnection(
 		if lockErr != nil {
 			return lockErr
 		}
-		connection, lockErr = models.LockFactoryCodexConnection(tx, orgID, factory.ID)
+		connection, lockErr = models.FindFactoryCodexConnection(tx, orgID, factory.ID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -233,7 +232,7 @@ func CancelFactoryCodexConnection(
 		if cancelErr := tasks.RequestCancel(connection.LoginLease.TaskID.String()); cancelErr != nil && !errors.Is(cancelErr, models.ErrRunnerTaskNotFound) {
 			return cancelErr
 		}
-		return models.ReleaseConfirmedCodexReservations(tx, time.Now())
+		return models.ReleaseCodexReservationForTask(tx, connection.LoginLease.TaskID, time.Now())
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to cancel ChatGPT sign-in")
@@ -341,15 +340,10 @@ func lockFactory(tx *gorm.DB, organizationID uuid.UUID, ref string) (*models.Fac
 	if err != nil {
 		return nil, err
 	}
-	var locked models.Factory
-	err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("id = ? AND organization_id = ?", factory.ID, organizationID).
-		First(&locked).
-		Error
-	if err != nil {
+	if err := factory.LockForUpdate(tx); err != nil {
 		return nil, err
 	}
-	return &locked, nil
+	return factory, nil
 }
 
 func findOrCreateCodexConnection(

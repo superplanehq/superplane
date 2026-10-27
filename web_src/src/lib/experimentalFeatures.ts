@@ -36,6 +36,3 @@ export const FEATURE_CODEX_SUBSCRIPTIONS = "codex_subscriptions";
 
 /** Organization experimental feature: scheduled task proposals in Backlog. */
 export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
-
-/** Organization experimental feature: catalog billing and payment setup. */
-export const FEATURE_NEW_BILLING = "new_billing";

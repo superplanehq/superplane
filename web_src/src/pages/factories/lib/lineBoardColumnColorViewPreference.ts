@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTheme } from "@/contexts/useTheme";
 
 export const LINE_BOARD_COLUMN_COLOR_VIEWS = ["vivid", "dim", "borders", "off"] as const;
 
@@ -14,40 +15,38 @@ export function isLineBoardColumnColorView(value: unknown): value is LineBoardCo
   return value === "vivid" || value === "dim" || value === "borders" || value === "off";
 }
 
-function migrateStoredView(value: string | null): LineBoardColumnColorView {
+function migrateStoredView(value: string | null): LineBoardColumnColorView | null {
   if (value === LEGACY_FILL_VIEW) {
     return "dim";
   }
-  return isLineBoardColumnColorView(value) ? value : DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW;
+  return isLineBoardColumnColorView(value) ? value : null;
 }
 
-/** Read the persisted column-color view. Missing or invalid values use vivid. */
-export function readStoredLineBoardColumnColorView(): LineBoardColumnColorView {
+/** Null means the board follows the active theme. */
+export function readStoredLineBoardColumnColorView(): LineBoardColumnColorView | null {
   try {
     return migrateStoredView(window.localStorage.getItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY));
   } catch {
-    return DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW;
+    return null;
   }
 }
 
 function persistLineBoardColumnColorView(view: LineBoardColumnColorView): void {
   try {
-    if (view === DEFAULT_LINE_BOARD_COLUMN_COLOR_VIEW) {
-      window.localStorage.removeItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY);
-      return;
-    }
     window.localStorage.setItem(LINE_BOARD_COLUMN_COLOR_VIEW_STORAGE_KEY, view);
   } catch {
     // Ignore storage failures (private mode, quota, etc.).
   }
 }
 
-/** Owns the line-board column-color layout. Vivid is the default and is not stored. */
+/** Follow the theme until the person explicitly selects a board view. */
 export function useLineBoardColumnColorViewPreference(): {
   view: LineBoardColumnColorView;
   setView: (view: LineBoardColumnColorView) => void;
 } {
-  const [view, setViewState] = useState<LineBoardColumnColorView>(readStoredLineBoardColumnColorView);
+  const { resolvedTheme } = useTheme();
+  const [selectedView, setViewState] = useState(readStoredLineBoardColumnColorView);
+  const view = selectedView ?? (resolvedTheme === "dark" ? "dim" : "vivid");
 
   const setView = useCallback((next: LineBoardColumnColorView) => {
     setViewState(next);

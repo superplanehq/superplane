@@ -1,4 +1,4 @@
-.PHONY: lint test test.release test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners runner.new doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
+.PHONY: lint test test.release test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners runner.new doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status check.ee.imports simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -168,7 +168,7 @@ dev.setup.runner.fleet:
 .PHONY: dev.setup.billing.catalog
 dev.setup.billing.catalog:
 	@$(MAKE) dev.test.is.running
-	@$(COMPOSE) exec -T app bash ./scripts/db_seed_local_billing_catalog.sh superplane_dev
+	@$(COMPOSE) exec -T app bash ./ee/billing/development/db_seed_local_billing_catalog.sh superplane_dev
 
 dev.clean.go.cache:
 	@$(MAKE) dev.test.is.running
@@ -326,6 +326,10 @@ check.models.tx.debt:
 check.models.tx.debt.baseline.update:
 	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go --update-baseline
 
+# Core workflows depend on billing contracts; server binds Enterprise code.
+check.ee.imports:
+	@$(COMPOSE) exec app go run ./scripts/check_ee_imports.go
+
 check.grpc.actions.status:
 	bash ./scripts/verify_grpc_actions_status.sh
 
@@ -465,14 +469,14 @@ db.restore:
 # deletes usage ledger rows in superplane_dev. Cancel the Polar sandbox
 # subscription separately.
 db.reset.billing.trial:
-	@$(COMPOSE) exec app ./scripts/db_reset_billing_trial.sh superplane_dev
+	@$(COMPOSE) exec app ./ee/billing/development/db_reset_billing_trial.sh superplane_dev
 
 # Local only. Keeps org, workspace, GitHub, apps, lines, and intakes in
 # superplane_dev. Wipes tasks, runs, usage, subscription, and credits, then
 # reseeds intake from GitHub. Cancel the Polar sandbox subscription
 # separately. Run `make dev.server` so seeded intake events become tasks.
 db.reset.after.onboarding:
-	@$(COMPOSE) exec app ./scripts/db_reset_after_onboarding.sh superplane_dev
+	@$(COMPOSE) exec app ./ee/billing/development/db_reset_after_onboarding.sh superplane_dev
 
 # Local only. Inserts fake hosted model + runner VM usage into superplane_dev.
 # MONEY is the total dollar amount. It is spread across TASKS (default 20)
@@ -486,7 +490,7 @@ simulate.usage simulate-usage:
 		-e DAYS="$(DAYS)" \
 		-e ORGANIZATION_ID="$(ORGANIZATION_ID)" \
 		-e FACTORY_ID="$(FACTORY_ID)" \
-		app ./scripts/db_simulate_usage.sh superplane_dev
+		app ./ee/billing/development/db_simulate_usage.sh superplane_dev
 
 db.console:
 	$(COMPOSE) exec -it --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)

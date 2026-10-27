@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/entitlements"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -118,7 +118,7 @@ func (s *InvitationService) List(ctx context.Context, orgID string) (*pb.ListInv
 		if err != nil {
 			return err
 		}
-		seats, err := entitlements.ResolveSeats(tx, organization)
+		seats, err := billing.ResolveSeats(tx, organization)
 		if err != nil {
 			return err
 		}
@@ -315,43 +315,7 @@ func requireNoPendingInvitation(tx *gorm.DB, invitation *models.OrganizationInvi
 }
 
 func requireInvitationCapacity(tx *gorm.DB, orgID uuid.UUID, alreadyPending bool) error {
-	seats, err := entitlements.ResolveSeats(tx, orgID)
-	if err != nil {
-		return err
-	}
-	if seats.PaymentBlocked {
-		return grpcerrors.FailedPreconditionWithReason("The last renewal payment failed. Update the payment method before you invite members.", "PAYMENT_PAST_DUE")
-	}
-	if seats.PerSeat {
-		if alreadyPending || *seats.Invitable > 0 {
-			return nil
-		}
-		if seats.Purchasable != nil && *seats.Purchasable == 0 {
-			return grpcerrors.FailedPreconditionWithReason("This organization has reached its plan seat maximum.", "PLAN_MAXIMUM_REACHED")
-		}
-		return grpcerrors.FailedPreconditionWithReason("Purchase a seat before sending another invitation.", "SEAT_PURCHASE_REQUIRED")
-	}
-	if seats.MemberLimit != nil && seats.Occupied >= *seats.MemberLimit {
-		return grpcerrors.FailedPreconditionWithReason("This organization has reached its member limit.", "MEMBER_LIMIT_REACHED")
-	}
-	if seats.MemberLimit == nil && !alreadyPending {
-		return requirePendingInvitationRoom(tx, orgID)
-	}
-	return nil
-}
-
-// requirePendingInvitationRoom caps pending invitations for organizations
-// that no seat or member limit bounds. ResolveSeats reports no pending
-// invitations when billing is off, so this counts them directly.
-func requirePendingInvitationRoom(tx *gorm.DB, orgID uuid.UUID) error {
-	pending, err := models.CountPendingOrganizationInvitations(tx, orgID)
-	if err != nil {
-		return err
-	}
-	if pending >= loadInvitationLimits().pending {
-		return grpcerrors.FailedPreconditionWithReason("This organization has too many pending invitations. Cancel some before you send more.", "PENDING_INVITATION_LIMIT_REACHED")
-	}
-	return nil
+	return billing.ValidateInvitationCapacity(tx, orgID, alreadyPending, int(loadInvitationLimits().pending))
 }
 
 // reserveInvitationSend checks all limits and records the send in the caller's

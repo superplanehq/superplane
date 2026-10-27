@@ -18,6 +18,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
@@ -787,9 +788,9 @@ func Test__CreateOrganization(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, roles)
 
-		credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), org.ID)
+		credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), org.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), credit.GrantMicros)
+		assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), credit.GrantMicros)
 
 		reloaded, err := models.FindAccountByID(account.ID.String())
 		require.NoError(t, err)
@@ -859,11 +860,11 @@ func Test__CreateOrganization(t *testing.T) {
 		assert.NotEqual(t, firstOrg.ID, secondOrg.ID)
 		assert.NotEqual(t, firstOrg.Slug, secondOrg.Slug)
 
-		firstCredit, err := models.DescribeOrganizationLLMCredit(database.Conn(), firstOrg.ID)
+		firstCredit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), firstOrg.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), firstCredit.GrantMicros)
+		assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), firstCredit.GrantMicros)
 
-		secondCredit, err := models.DescribeOrganizationLLMCredit(database.Conn(), secondOrg.ID)
+		secondCredit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), secondOrg.ID)
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), secondCredit.GrantMicros)
 	})

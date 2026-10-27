@@ -163,6 +163,9 @@ export const canvasKeys = {
       ...(filters?.states?.length ? ["states", ...filters.states] : []),
       ...(filters?.results?.length ? ["results", ...filters.results] : []),
       ...(filters?.includeTask ? [INCLUDE_TASK_QUERY_TOKEN] : []),
+      ...(filters?.search || filters?.triggerIds?.length
+        ? ["searchFilters", { search: filters.search, triggerIds: filters.triggerIds }]
+        : []),
     ] as const,
   run: (canvasId: string, runId: string, includeTask = false) =>
     [...canvasKeys.runs(), canvasId, runId, ...(includeTask ? [INCLUDE_TASK_QUERY_TOKEN] : [])] as const,
@@ -738,6 +741,8 @@ export const useDeleteCanvas = (organizationId: string) => {
 };
 
 export type CanvasRunsFilters = {
+  search?: string;
+  triggerIds?: string[];
   states?: CanvasesCanvasRunState[];
   results?: CanvasesCanvasRunResult[];
   includeTask?: boolean;
@@ -785,7 +790,7 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
 
   return useInfiniteQuery({
     queryKey,
-    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+    queryFn: async ({ pageParam, signal }) => {
       // Full refetches (invalidate / refetch()) walk every already-
       // loaded cursor sequentially — TanStack Query's infinite behavior. To
       // avoid re-issuing N ListRuns calls during a resync for a canvas whose
@@ -807,11 +812,14 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
       const response = await canvasesListRuns(
         withOrganizationHeader({
           path: { canvasId },
+          signal,
           query: {
             limit,
             ...(filters.states?.length ? { states: filters.states } : {}),
             ...(filters.results?.length ? { results: filters.results } : {}),
             ...(filters.includeTask ? { includeTask: true } : {}),
+            ...(filters.search ? { search: filters.search } : {}),
+            ...(filters.triggerIds?.length ? { triggerIds: filters.triggerIds } : {}),
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),

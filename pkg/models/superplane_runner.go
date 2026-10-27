@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"gorm.io/gorm"
 )
 
@@ -177,20 +178,20 @@ func SuperPlaneRunnerReadinessError(tx *gorm.DB, orgID uuid.UUID, factoryID *uui
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
 
-	if err := AssertHostedRunAllowed(tx, orgID, factoryID); err != nil {
-		if errors.Is(err, ErrHostedPaymentPastDue) {
-			return ErrHostedPaymentPastDue
+	if err := billing.AssertHostedRunAllowed(tx, orgID, factoryID); err != nil {
+		if errors.Is(err, billing.ErrHostedPaymentPastDue) {
+			return billing.ErrHostedPaymentPastDue
 		}
-		if errors.Is(err, ErrHostedSubscriptionPaused) {
-			return ErrHostedSubscriptionPaused
+		if errors.Is(err, billing.ErrHostedSubscriptionPaused) {
+			return billing.ErrHostedSubscriptionPaused
 		}
-		if errors.Is(err, ErrHostedSubscriptionRequired) {
-			return ErrHostedSubscriptionRequired
+		if errors.Is(err, billing.ErrHostedSubscriptionRequired) {
+			return billing.ErrHostedSubscriptionRequired
 		}
-		if errors.Is(err, ErrHostedCreditEmpty) {
+		if errors.Is(err, billing.ErrHostedCreditEmpty) {
 			return ErrSuperPlaneRunnerNoCredit
 		}
-		if errors.Is(err, ErrFactoryHostedBudgetEmpty) {
+		if errors.Is(err, billing.ErrFactoryHostedBudgetEmpty) {
 			return ErrSuperPlaneRunnerNoFactoryBudget
 		}
 		return err
@@ -313,15 +314,15 @@ func AnnotateSuperPlaneRunnerNodes(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid
 
 func SuperPlaneRunnerReadinessMessage(err error) string {
 	switch {
-	case errors.Is(err, ErrHostedPaymentPastDue):
+	case errors.Is(err, billing.ErrHostedPaymentPastDue):
 		return SuperPlaneRunnerPaymentPastDueMessage
-	case errors.Is(err, ErrHostedSubscriptionPaused):
+	case errors.Is(err, billing.ErrHostedSubscriptionPaused):
 		return SuperPlaneRunnerSubscriptionPausedMessage
-	case errors.Is(err, ErrHostedSubscriptionRequired):
+	case errors.Is(err, billing.ErrHostedSubscriptionRequired):
 		return SuperPlaneRunnerSubscribeMessage
-	case errors.Is(err, ErrSuperPlaneRunnerNoCredit), errors.Is(err, ErrHostedCreditEmpty):
+	case errors.Is(err, ErrSuperPlaneRunnerNoCredit), errors.Is(err, billing.ErrHostedCreditEmpty):
 		return SuperPlaneRunnerNoCreditMessage
-	case errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget), errors.Is(err, ErrFactoryHostedBudgetEmpty):
+	case errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget), errors.Is(err, billing.ErrFactoryHostedBudgetEmpty):
 		return SuperPlaneRunnerNoFactoryBudgetMessage
 	case errors.Is(err, ErrSuperPlaneRunnerNoModel):
 		return SuperPlaneRunnerNoModelMessage
@@ -333,10 +334,10 @@ func SuperPlaneRunnerReadinessMessage(err error) string {
 }
 
 func isSuperPlaneReadinessError(err error) bool {
-	return errors.Is(err, ErrHostedSubscriptionRequired) ||
+	return errors.Is(err, billing.ErrHostedSubscriptionRequired) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoCredit) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget) ||
-		errors.Is(err, ErrFactoryHostedBudgetEmpty) ||
+		errors.Is(err, billing.ErrFactoryHostedBudgetEmpty) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoModel) ||
 		errors.Is(err, ErrSuperPlaneRunnerModelNotAllowed)
 }

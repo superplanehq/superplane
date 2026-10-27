@@ -4861,6 +4861,13 @@ CREATE INDEX runner_tasks_fleet_state_idx ON public.runner_tasks USING btree (fl
 
 
 --
+-- Name: runner_tasks_organization_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING btree (organization_id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = ANY ((ARRAY['reserved'::character varying, 'running'::character varying])::text[])));
+
+
+--
 -- Name: runner_tasks_organization_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6443,7 +6450,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261026135100	f
+20261027163500	f
 \.
 
 

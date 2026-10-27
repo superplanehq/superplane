@@ -9,6 +9,9 @@ import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "re
 
 import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
 import { ImplementConfiguration } from "./ImplementConfiguration";
+import { MergeConfidenceConfiguration } from "./MergeConfidenceConfiguration";
+import { useMergeConfidenceSettingsDraft } from "./mergeConfidenceSettingsDraft";
+import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
 import { useImplementSettingsDraft } from "./implementSettingsDraft";
 import { IMPLEMENT_AGENT_NODE_ID, columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
@@ -89,6 +92,7 @@ export function MergeConfidenceConfigShell(props: MergeConfidenceConfigShellProp
 
 function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
   const simplifiedImplement = Boolean(props.graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID));
+  const simplifiedConfiguration = simplifiedImplement || Boolean(mergeConfidenceSettingsNode(props.graph));
   const showAutomationTab = props.showAutomationTab ?? true;
   return (
     <>
@@ -109,6 +113,7 @@ function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
                 showRunsTab={props.showRunsTab}
                 onTabChange={props.onTabChange}
                 simplifiedImplement={simplifiedImplement}
+                simplifiedConfiguration={simplifiedConfiguration}
               />
             }
           />
@@ -164,22 +169,24 @@ function ConfigTabs({
   showRunsTab,
   onTabChange,
   simplifiedImplement,
+  simplifiedConfiguration,
 }: {
   tab: MergeConfidenceConfigTab;
   showRunsTab: boolean;
   onTabChange: (tab: MergeConfidenceConfigTab) => void;
   simplifiedImplement: boolean;
+  simplifiedConfiguration: boolean;
 }) {
   return (
     <Tabs value={tab} onValueChange={(value) => onTabChange(value as MergeConfidenceConfigTab)}>
       <TabsList aria-label={simplifiedImplement ? "Implement sections" : MERGE_CONFIDENCE_CONFIG_COPY.tabsLabel}>
         <TabsTrigger value="automation" data-testid="merge-confidence-config-tab-automation">
-          {simplifiedImplement ? <Settings aria-hidden /> : null}
-          {simplifiedImplement ? "Configuration" : MERGE_CONFIDENCE_CONFIG_COPY.automationTab}
+          {simplifiedConfiguration ? <Settings aria-hidden /> : null}
+          {simplifiedConfiguration ? "Configuration" : MERGE_CONFIDENCE_CONFIG_COPY.automationTab}
         </TabsTrigger>
         {showRunsTab ? (
           <TabsTrigger value="runs" data-testid="merge-confidence-config-tab-runs">
-            {simplifiedImplement ? <History aria-hidden /> : null}
+            {simplifiedConfiguration ? <History aria-hidden /> : null}
             {MERGE_CONFIDENCE_CONFIG_COPY.runsTab}
           </TabsTrigger>
         ) : null}
@@ -203,6 +210,11 @@ function automationHistoryContext({
 function implementSettingsNode({ tab, graph }: ReturnType<typeof configBodyProps>) {
   if (tab !== "automation") return undefined;
   return graph?.specNodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID);
+}
+
+function mergeConfidenceSettingsNode(graph: IntakeAutomationGraph | undefined) {
+  if (!graph?.specNodes?.some((node) => node.id === "on-pr-risk")) return undefined;
+  return graph.specNodes.find((node) => node.id === "assess-risk" && isAgentHarnessComponent(node.component));
 }
 
 function ImplementSettingsScreen(props: {
@@ -261,9 +273,29 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     layoutFitNonce,
   } = props;
   const implementSettings = useImplementSettingsDraft(graph?.specNodes);
+  const mergeConfidenceAgent = mergeConfidenceSettingsNode(graph);
+  const mergeConfidenceSettings = useMergeConfidenceSettingsDraft(mergeConfidenceAgent, {
+    organizationId,
+    factoryId,
+    canvasId,
+  });
   const implementAgent = implementSettingsNode(props);
   if (implementAgent && implementSettings.draft) {
     return <ImplementSettingsScreen settings={implementSettings} body={props} />;
+  }
+  if (tab === "automation" && mergeConfidenceAgent && mergeConfidenceSettings.draft) {
+    return (
+      <MergeConfidenceConfiguration
+        agent={mergeConfidenceAgent}
+        settings={mergeConfidenceSettings}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        canvasId={canvasId}
+        onSave={onSaveNode}
+        onClose={props.onClose}
+      />
+    );
   }
   const historyContext = automationHistoryContext(props);
   if (historyContext) {

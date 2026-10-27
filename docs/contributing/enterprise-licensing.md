@@ -33,6 +33,11 @@ License in `ee/LICENSE`. All other code is licensed under the Apache License,
 Version 2.0. To add an Enterprise feature, follow
 [`ee/README.md`](../../ee/README.md).
 
+Billing source in `ee/billing` uses the Enterprise source license. Billing
+does not require an installation license or a runtime license feature. The
+server always installs billing, including when billing enforcement is disabled.
+Usage costs remain recorded in that mode.
+
 The Enterprise features are:
 
 | Feature        | Operations that require the license                    |

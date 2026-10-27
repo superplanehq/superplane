@@ -374,8 +374,8 @@ func validateCodexSubscriptionOnboarding(
 	if connection.Status != models.CodexConnectionStatusReady || connection.Reserved() {
 		return invalidArgument("Wait until the ChatGPT sign-in runner has stopped")
 	}
-	var canvases []models.Canvas
-	if err := db.Where("factory_id = ?", factory.ID).Find(&canvases).Error; err != nil {
+	canvases, err := factory.ListCanvases(db)
+	if err != nil {
 		return err
 	}
 	for i := range canvases {

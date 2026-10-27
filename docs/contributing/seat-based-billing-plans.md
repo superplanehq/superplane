@@ -74,16 +74,43 @@ The target requires the Docker `db` service and the Polar sandbox.
 | Plan | Monthly price | Maximum seats | Sandbox product ID |
 | --- | --- | --- | --- |
 | Team | $50 per seat | 50 | `633e8026-988b-44de-8d65-31829948c975` |
-| Starter | $20 | Unlimited | `abc9ef98-20c0-48b5-8204-1448df733737` |
-| Pay-as-you-go | Usage-based | Existing setting | None |
+| Starter | $20 | 10 | `abc9ef98-20c0-48b5-8204-1448df733737` |
+| Pay-as-you-go | Usage-based | 10 | None |
 
 All three plans are public and require a payment card. Team includes every
-defined feature. Starter and Pay-as-you-go include only BYOS.
+defined feature. Starter and Pay-as-you-go include only BYOS. The seed
+creates Pay-as-you-go with no monthly subscription. Both starter plans allow
+10 members. Pay-as-you-go allows five tasks at once; Starter has no task limit.
 The seed enables local gating for features other than BYOS to enforce plan access.
-Repeated runs refresh these settings and preserve existing prices, product links,
-seat limits, and credit policies.
+Repeated runs refresh these settings and preserve existing prices and product links.
 The seed does not assign plans to organizations or change subscriptions.
 Production migrations do not run this seed.
+
+## Onboarding plan selection
+
+Workspace onboarding shows Pay-as-you-go and Starter after ticket-source
+setup. Pay-as-you-go is selected initially. The choices come from the public
+billing catalog. Team is not an onboarding choice. The step is skipped when
+billing is off, a paid plan already exists, or starter plans are unavailable.
+
+Pay-as-you-go collects a card in an embedded Polar form, then activates
+without a subscription charge. Starter opens subscription checkout directly.
+After checkout, onboarding synchronizes billing with Polar before continuing.
+Organizations with an existing paid plan skip this step.
+There is no admin setting for a default onboarding plan.
+
+In Polar **Settings → Preferences → Embedding**, allow each host that serves
+onboarding. For local testing, add `localhost:8000` and your HTTPS tunnel
+host to the sandbox organization. Use host names without a URL scheme.
+Configure production hosts in the live organization separately. Without this
+setting, Polar blocks the card form with its `frame-ancestors` policy.
+
+Every new account receives $10 in signup credit, valid for 365 days.
+The grant does not depend on the plan. The grant is limited to one per account.
+Selecting a plan does not add a second signup grant. Older accounts whose
+onboarding deferred credit receive the grant during plan selection.
+Credit alone does not permit runs. An existing trial company keeps its stored
+credit balance and trial dates.
 
 ## Credit policy and follow-up work
 
@@ -119,9 +146,9 @@ production cards or production tokens. The $20 monthly seat price below is
 an example. Use your catalog price for the actual estimates.
 
 1. Configure the sandbox product and public Team plan as described above.
-2. Enable **New Billing** for a new Trial organization with an owner and one active teammate.
-3. Complete workspace onboarding without selecting a plan or entering payment details.
-4. Confirm that the organization remains on Trial with the original trial expiration.
+2. Create a new company with an owner and one active teammate. The company starts on None.
+3. Complete workspace onboarding and select Pay-as-you-go. Confirm that card setup activates that plan.
+4. Confirm that the organization has one signup credit grant.
 5. Open **Settings → Billing → Payment method** as a billing manager.
 6. Confirm that Team starts at two seats and shows the effective plan maximum.
 7. Select three seats. At $20 per seat, confirm a $60 initial estimate and $60 monthly total.
@@ -134,8 +161,8 @@ an example. Use your catalog price for the actual estimates.
 14. Confirm that the stored organization plan is Team and `purchased_seats` equals 3.
 15. Resolve seat usage. Confirm purchased 3, occupied 2, and available 1.
 16. Confirm that stored period dates match the webhook's supplied monthly start and end dates.
-17. Repeat the flow with a separate two-member Trial organization, then abandon checkout before payment.
-18. Confirm that this organization remains on Trial and its purchased capacity and expiration stay unchanged.
+17. Repeat the flow with a separate two-member company, then abandon checkout before payment.
+18. Confirm that this company remains on None and its purchased capacity stays unchanged.
 
 Team checkout accepts Polar discount codes. The request omits
 `allow_discount_codes`, so the Polar default applies. Legacy Business checkout
@@ -203,7 +230,7 @@ prorated amount at once and does not change the renewal date. SuperPlane adds
 capacity only from the Polar subscription snapshot that follows a successful
 payment. The $20 monthly seat price below is an example. Use your catalog price.
 
-The API has two routes. Both need `org:update` and **New Billing**:
+The API has two routes. Both need `org:update`:
 
 - `POST /api/v1/organizations/{id}/billing/seats/preview` with `additional_seats`.
   It estimates the charge and makes no change.

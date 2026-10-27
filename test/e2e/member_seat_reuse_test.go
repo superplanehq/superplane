@@ -13,10 +13,10 @@ import (
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -57,23 +57,22 @@ func (s *memberSeatReuseSteps) givenAFourSeatOrganizationIsFull() {
 	s.t.Cleanup(polar.Close)
 	s.t.Setenv("POLAR_API_BASE_URL", polar.URL)
 	s.t.Setenv("POLAR_ACCESS_TOKEN", "seat-reuse-test")
-	s.t.Setenv(models.BillingEnabledEnv, "yes")
+	s.t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	s.client.Timeout = 5 * time.Second
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
 	db := database.DB(s.t.Context())
-	require.NoError(s.t, models.EnableExperimentalFeatureInTransaction(db, s.session.OrgID, features.FeatureNewBilling))
 	maximum, purchased := 50, 4
 	product := "product_" + uuid.NewString()
-	plan := models.BillingPlan{
+	plan := billingmodels.BillingPlan{
 		Key: "seat_reuse_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private",
 		PerSeat: true, PriceCents: 2000, SeatLimit: &maximum, PolarProductID: &product,
 		CreditFrequency: "none", CreditExpiration: "never",
 	}
-	require.NoError(s.t, models.SaveBillingPlan(db, &plan))
-	require.NoError(s.t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", s.session.OrgID).Updates(map[string]any{
-		"plan_id": plan.ID, "plan": plan.Key, "plan_source": models.BillingPlanSourcePolar,
-		"polar_subscription_id": "sub_" + uuid.NewString(), "polar_subscription_status": models.PolarSubscriptionStatusActive,
+	require.NoError(s.t, billingmodels.SaveBillingPlan(db, &plan))
+	require.NoError(s.t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", s.session.OrgID).Updates(map[string]any{
+		"plan_id": plan.ID, "plan": plan.Key, "plan_source": billingmodels.BillingPlanSourcePolar,
+		"polar_subscription_id": "sub_" + uuid.NewString(), "polar_subscription_status": billingmodels.PolarSubscriptionStatusActive,
 		"purchased_seats": purchased, "current_period_end": time.Now().Add(30 * 24 * time.Hour),
 	}).Error)
 	auth, err := authorization.NewAuthService()

@@ -28,17 +28,30 @@ type Fleet struct {
 }
 
 type Runner struct {
-	ID                string     `json:"id"`
-	FleetID           string     `json:"fleetId"`
-	State             string     `json:"state"`
-	RunnerVersion     string     `json:"runnerVersion"`
-	RegisteredAt      *time.Time `json:"registeredAt,omitempty"`
-	LastSeenAt        *time.Time `json:"lastSeenAt,omitempty"`
-	TerminationReason *string    `json:"terminationReason,omitempty"`
-	CreatedAt         time.Time  `json:"createdAt"`
-	UpdatedAt         time.Time  `json:"updatedAt"`
-	TerminatedAt      *time.Time `json:"terminatedAt,omitempty"`
-	Ephemeral         bool       `json:"ephemeral"`
+	ID                string            `json:"id"`
+	FleetID           string            `json:"fleetId"`
+	State             string            `json:"state"`
+	RunnerVersion     string            `json:"runnerVersion"`
+	RegisteredAt      *time.Time        `json:"registeredAt,omitempty"`
+	LastSeenAt        *time.Time        `json:"lastSeenAt,omitempty"`
+	TerminationReason *string           `json:"terminationReason,omitempty"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	UpdatedAt         time.Time         `json:"updatedAt"`
+	TerminatedAt      *time.Time        `json:"terminatedAt,omitempty"`
+	ProviderDeletedAt *time.Time        `json:"providerDeletedAt,omitempty"`
+	Ephemeral         bool              `json:"ephemeral"`
+	Tags              map[string]string `json:"tags"`
+}
+
+type ListRunnersRequest struct {
+	States  []string
+	Limit   int
+	AfterID string
+}
+
+type RunnerListPage struct {
+	Runners     []Runner `json:"runners"`
+	HasNextPage bool     `json:"hasNextPage"`
 }
 
 type Capacity struct {
@@ -53,6 +66,13 @@ type Capacity struct {
 type CreateRunnerRequest struct {
 	IdempotencyKey string `json:"idempotencyKey,omitempty"`
 	Ephemeral      bool   `json:"ephemeral"`
+	FleetManagerID string `json:"fleetManagerId,omitempty"`
+	Provider       string `json:"provider,omitempty"`
+}
+
+type ProviderDeletionRequest struct {
+	FleetManagerID string `json:"fleetManagerId"`
+	Provider       string `json:"provider"`
 }
 
 type CreateRunnerResponse struct {

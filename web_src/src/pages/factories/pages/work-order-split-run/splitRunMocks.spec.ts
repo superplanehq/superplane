@@ -811,7 +811,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes[0]?.text).toBe(
       "This automation did not finish. Fix the error, then run this step again.",
     );
-    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Debug");
+    expect(fixture.waitingNotes[0]?.cta?.label).toBe("View run details");
     expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(fixture.checks).toEqual([]);

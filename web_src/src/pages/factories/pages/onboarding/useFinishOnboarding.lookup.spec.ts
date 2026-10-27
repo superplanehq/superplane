@@ -133,7 +133,7 @@ describe("useFinishOnboarding", () => {
                 ? "AGENT_HARNESS_CODEX"
                 : "AGENT_HARNESS_SUPERPLANE",
           agentIntegrationId: connection === "connected" ? "claude-1" : "",
-          ...(connection === "subscription" ? { codexSubscription: true } : {}),
+          codexSubscription: connection === "subscription",
         }),
       );
       expect(installFactory).toHaveBeenCalled();

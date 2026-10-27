@@ -463,13 +463,23 @@ describe("LinesPage board", () => {
   });
 
   it("sets a pastel colour on the backlog from circular swatches", async () => {
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({
+      id: REFUND_LINE_PLAN_ID,
+      columnColors: { backlog: "sky" },
+    });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
-    await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
+    await user.click(screen.getByTestId("lines-backlog-menu-color-sky"));
 
-    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
+    await waitFor(() =>
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
+        lineId: REFUND_LINE_PLAN_ID,
+        columnColors: { backlog: "sky" },
+      }),
+    );
+    expect(screen.getByTestId("lines-backlog-column")).toHaveClass("line-board-color-sky", "line-board-column-vivid");
   });
 
   it("shows a score on a draft card and hides it on other columns", () => {
@@ -1638,17 +1648,16 @@ describe("LinesPage board editing", () => {
 
   it("saves supported Implement settings after the user confirms", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
-    const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
-    const dialog = screen.getByTestId("merge-confidence-config");
+    fireEvent.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
+    const dialog = await screen.findByTestId("merge-confidence-config");
     const concurrency = within(dialog).getByRole("spinbutton", { name: "Maximum simultaneous runs" });
     fireEvent.change(concurrency, { target: { value: "3" } });
     expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
     expect(commitCanvasStagingMutateAsync).not.toHaveBeenCalled();
 
-    await user.click(within(dialog).getByTestId("implement-settings-save"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step"));
     const saved = updateCanvasVersionMutateAsync.mock.calls.at(-1)?.[0] as { canvasYaml?: string };
@@ -2027,18 +2036,20 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     const first = renderLinesBoard();
 
-    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column")).toHaveClass("line-board-color-lime", "line-board-column-vivid");
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
     await user.hover(screen.getByTestId("lines-board-view-column-color"));
     fireEvent.click(await screen.findByTestId("lines-board-view-no-column-colors"));
 
-    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column")).not.toHaveClass("line-board-color-lime");
+    expect(screen.getByTestId("lines-backlog-column")).toHaveClass("bg-muted");
 
     first.unmount();
     renderLinesBoard();
 
-    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column")).not.toHaveClass("line-board-color-lime");
+    expect(screen.getByTestId("lines-backlog-column")).toHaveClass("bg-muted");
   });
 
   it("lets the header view menu show column colors as borders", async () => {
@@ -2050,8 +2061,8 @@ describe("LinesPage board editing", () => {
     fireEvent.click(await screen.findByTestId("lines-board-view-colored-borders"));
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(backlog.className).not.toContain("bg-lime-300");
-    expect(backlog.className).toContain("border-lime-400");
+    expect(backlog).toHaveClass("line-board-color-lime", "line-board-column-bordered", "bg-card");
+    expect(backlog).not.toHaveClass("line-board-column-vivid");
   });
 
   it("lets the header view menu show soft column colors", async () => {
@@ -2059,18 +2070,15 @@ describe("LinesPage board editing", () => {
     renderLinesBoard();
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(backlog.className).toContain("bg-lime-300");
-    expect(backlog.className).toContain("dark:bg-lime-800");
+    expect(backlog).toHaveClass("line-board-color-lime", "line-board-column-vivid");
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
     await user.hover(screen.getByTestId("lines-board-view-column-color"));
     fireEvent.click(await screen.findByTestId("lines-board-view-dim-column-colors"));
 
     const softBacklog = screen.getByTestId("lines-backlog-column");
-    expect(softBacklog.className).toContain("bg-lime-100");
-    expect(softBacklog.className).toContain("dark:bg-lime-950/40");
-    expect(softBacklog.className).not.toContain("bg-lime-300");
-    expect(softBacklog.className).not.toContain("dark:bg-lime-800");
+    expect(softBacklog).toHaveClass("line-board-color-lime", "line-board-column-soft");
+    expect(softBacklog).not.toHaveClass("line-board-column-vivid");
   });
 
   it("lets the header view menu switch automation names to icons and persist the choice", async () => {

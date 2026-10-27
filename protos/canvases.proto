@@ -731,6 +731,9 @@ message ListRunsRequest {
   repeated CanvasRun.State states = 4;
   repeated CanvasRun.Result results = 5;
   optional bool include_task = 6;
+  // Case-insensitive substring match on the root event's custom run title.
+  string search = 7;
+  repeated string trigger_ids = 8;
 }
 
 message ListRunsResponse {
@@ -867,6 +870,8 @@ message CanvasRun {
   // Models that recorded spend on this run tree.
   repeated string models = 18;
   CanvasRunTask task = 19;
+  // Trigger node that starts this run, including before its root event exists.
+  string node_id = 20;
 }
 
 message CanvasRunRef {

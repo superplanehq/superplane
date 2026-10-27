@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import type { OrganizationsDescribeOrganizationBillingResponse } from "@/api-client";
 import { useBillingCardSetup } from "@/hooks/useBillingCardSetup";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useSeatPurchase, type UseSeatPurchaseResult } from "@/hooks/useSeatPurchase";
 import { recentSeatPurchase } from "@/lib/seatPurchases";
@@ -14,7 +13,6 @@ import type { BillingSeatSummary } from "./useOrganizationBillingPageModel";
 
 type BillingSeatPurchaseFlowProps = {
   organizationId: string;
-  newBilling: boolean;
   canManageBilling: boolean;
   seats?: BillingSeatSummary;
   currentPeriodEnd?: string;
@@ -24,24 +22,23 @@ type BillingSeatPurchaseFlowProps = {
 };
 
 export function BillingSeatPurchaseFlow(props: BillingSeatPurchaseFlowProps) {
-  const { organizationId, newBilling, canManageBilling, seats, currentPeriodEnd, cancelAtPeriodEnd } = props;
+  const { organizationId, canManageBilling, seats, currentPeriodEnd, cancelAtPeriodEnd } = props;
   const { data: billing } = useOrganizationBilling(organizationId);
-  const features = useExperimentalFeature(organizationId);
-  const canBuySeats = seatPurchasesAllowed(billing, newBilling && canManageBilling);
+  const canBuySeats = seatPurchasesAllowed(billing, canManageBilling);
   const purchase = useSeatPurchase({
     organizationId,
     billing,
     enabled: canBuySeats,
-    pollingEnabled: newBilling && canManageBilling,
+    pollingEnabled: canManageBilling,
   });
   const cardSetup = useBillingCardSetup(organizationId);
-  const canRecoverPurchase = newBilling && canManageBilling;
+  const canRecoverPurchase = canManageBilling;
   const updatePaymentMethod = () => cardSetup.open(purchase.requestPreview);
   const denied = useSeatPurchaseDeepLink({
     organizationId,
     canBuySeats,
     canManageBilling,
-    loading: props.loading || features.isLoading || !features.organizationReady,
+    loading: props.loading,
     setOpen: purchase.setOpen,
   });
 

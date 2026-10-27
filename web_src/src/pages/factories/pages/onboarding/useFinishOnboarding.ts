@@ -180,7 +180,7 @@ export async function provisionWorkspace(args: {
     backlogRepository: args.backlogRepository,
     issuesSource: apiIssuesSource(args.issuesChoice),
     agentHarness: subscription ? "AGENT_HARNESS_CODEX" : args.agentPlan.harness,
-    ...(subscription ? { codexSubscription: true } : {}),
+    codexSubscription: subscription,
   });
   // Onboarding installs the Implement app with the real default branch (main,
   // master, staging, ...) instead of hardcoding "main", so Create Branch and

@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -404,6 +405,7 @@ func (s *Server) reconcileRunnerConnection(
 	}
 	if reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug, fleetScope)
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), reservedTask)
 	}
 
 	if shouldStartTask {
@@ -434,6 +436,10 @@ func (s *Server) reconcileRunnerConnection(
 	if !json.Valid(payload) {
 		return errors.New("runner task payload is invalid")
 	}
+	payload, err = s.refreshCodexSubscriptionTaskToken(ctx, task, payload)
+	if err != nil {
+		return err
+	}
 	if err := connection.write(taskMessage{
 		Type: messageTypeTask,
 		Task: json.RawMessage(payload),
@@ -450,7 +456,8 @@ func (s *Server) startRunnerTask(
 	taskID uuid.UUID,
 	connectionID uuid.UUID,
 ) error {
-	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	var startedTask *models.RunnerTask
+	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		currentRunner, err := models.FindRunner(tx, runner.ID)
 		if err != nil {
 			return err
@@ -466,9 +473,15 @@ func (s *Server) startRunnerTask(
 		if err := currentTask.Start(tx, currentRunner, s.activeLogStoreName, time.Now()); err != nil {
 			return err
 		}
+		startedTask = currentTask
 		*runner = *currentRunner
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	messages.PublishPlanningBoardStatusForTask(database.DB(ctx), startedTask)
+	return nil
 }
 
 func (s *Server) initializeTaskLogs(ctx context.Context, taskID uuid.UUID) error {
@@ -539,6 +552,7 @@ func (s *Server) completeRunnerTask(
 	}
 	if completedNow {
 		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask, fleetSlug, fleetScope)
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), completedTask)
 	}
 	// The task result must be committed before its execution request reads it.
 	// Failures leave the scheduled request available as a fallback.

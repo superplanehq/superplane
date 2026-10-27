@@ -37,6 +37,9 @@ export function composerChipsWorking(input: {
   score?: number;
   machineStatus?: CreateWithAgentMachineStatus;
 }): boolean {
+  if (input.machineStatus === "queued") {
+    return false;
+  }
   if (input.machineStatus === "starting" || input.machineStatus === "running") {
     return true;
   }

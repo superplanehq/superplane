@@ -1,6 +1,6 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { useCallback, useEffect, useRef, type UIEvent } from "react";
-import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
+import type { CanvasRunsFilters } from "@/hooks/useCanvasData";
 import { LiveCanvasSidebarRow } from "./LiveCanvasSidebarRow";
 import { RunsTabListView } from "./RunsTabListView";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
@@ -29,7 +29,7 @@ export interface RunsTabPanelProps {
   onRetry?: () => void;
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
-  onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
+  onFiltersChange?: (filters: CanvasRunsFilters) => void;
 }
 
 export function RunsTabPanel({
@@ -45,9 +45,9 @@ export function RunsTabPanel({
   onRetry,
   workflowNodes = [],
   componentIconMap = {},
-  onStatusFiltersChange,
+  onFiltersChange,
 }: RunsTabPanelProps) {
-  const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onFiltersChange });
 
   return (
     <RunsTabPanelContent

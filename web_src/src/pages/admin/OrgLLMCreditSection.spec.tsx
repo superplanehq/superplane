@@ -388,7 +388,7 @@ describe("OrgLLMCreditSection balances", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
 
     const history = screen.getByTestId("admin-org-credit-history");
-    expect(await within(history).findByText("Trial adjustment")).toBeInTheDocument();
+    expect(await within(history).findByText("Signup credit adjustment")).toBeInTheDocument();
     expect(within(history).getByText("-$5.00")).toBeInTheDocument();
     expect(within(history).getByText("Support correction · Adjusted by Ada")).toBeInTheDocument();
   });
@@ -546,7 +546,7 @@ describe("OrgLLMCreditSection balances", () => {
     grantsFailed = false;
     const history = screen.getByTestId("admin-org-credit-history");
     await user.click(within(history).getByRole("button", { name: "Try again" }));
-    expect(await within(history).findByText("Trial adjustment")).toBeInTheDocument();
+    expect(await within(history).findByText("Signup credit adjustment")).toBeInTheDocument();
     expect(within(history).queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
   });
 });

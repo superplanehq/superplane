@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -23,6 +24,7 @@ type OrganizationService struct {
 	oidcProvider         oidc.Provider
 	baseURL              string
 	webhooksBaseURL      string
+	billing              enterprise.BillingOperations
 }
 
 func NewOrganizationService(
@@ -31,8 +33,10 @@ func NewOrganizationService(
 	oidcProvider oidc.Provider,
 	baseURL string,
 	webhooksBaseURL string,
+	billingImplementation enterprise.BillingOperations,
 ) *OrganizationService {
 	return &OrganizationService{
+		billing:              billingImplementation,
 		registry:             registry,
 		oidcProvider:         oidcProvider,
 		baseURL:              baseURL,
@@ -72,7 +76,7 @@ func (s *OrganizationService) DescribeOrganizationWorkspaceUsage(
 	req *pb.DescribeOrganizationWorkspaceUsageRequest,
 ) (*pb.DescribeOrganizationWorkspaceUsageResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.DescribeOrganizationWorkspaceUsage(ctx, orgID, req)
+	return s.billing.DescribeOrganizationWorkspaceUsage(ctx, orgID, req)
 }
 
 func (s *OrganizationService) DescribeOrganizationSpendingReport(
@@ -80,7 +84,7 @@ func (s *OrganizationService) DescribeOrganizationSpendingReport(
 	req *pb.DescribeOrganizationSpendingReportRequest,
 ) (*pb.DescribeOrganizationSpendingReportResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.DescribeOrganizationSpendingReport(ctx, orgID, req)
+	return s.billing.DescribeOrganizationSpendingReport(ctx, orgID, req)
 }
 
 func (s *OrganizationService) ListOrganizationRunnerFleets(
@@ -138,7 +142,7 @@ func (s *OrganizationService) ListHostedCreditProducts(
 	req *pb.ListHostedCreditProductsRequest,
 ) (*pb.ListHostedCreditProductsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListHostedCreditProducts(ctx, orgID, req)
+	return s.billing.ListHostedCreditProducts(ctx, orgID, req)
 }
 
 func (s *OrganizationService) QuoteHostedCreditCheckout(
@@ -146,7 +150,7 @@ func (s *OrganizationService) QuoteHostedCreditCheckout(
 	req *pb.QuoteHostedCreditCheckoutRequest,
 ) (*pb.QuoteHostedCreditCheckoutResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.QuoteHostedCreditCheckout(ctx, orgID, req)
+	return s.billing.QuoteHostedCreditCheckout(ctx, orgID, req)
 }
 
 func (s *OrganizationService) CreateHostedCreditCheckout(
@@ -155,7 +159,7 @@ func (s *OrganizationService) CreateHostedCreditCheckout(
 ) (*pb.CreateHostedCreditCheckoutResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	accountID, _ := accountIDFromContext(ctx)
-	return organizations.CreateHostedCreditCheckout(ctx, orgID, req, accountID, s.baseURL)
+	return s.billing.CreateHostedCreditCheckout(ctx, orgID, req, accountID, s.baseURL)
 }
 
 func (s *OrganizationService) CreateBillingPortalSession(
@@ -163,7 +167,7 @@ func (s *OrganizationService) CreateBillingPortalSession(
 	req *pb.CreateBillingPortalSessionRequest,
 ) (*pb.CreateBillingPortalSessionResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CreateBillingPortalSession(ctx, orgID, req)
+	return s.billing.CreateBillingPortalSession(ctx, orgID, req)
 }
 
 func (s *OrganizationService) ListOrganizationCreditGrants(
@@ -171,7 +175,7 @@ func (s *OrganizationService) ListOrganizationCreditGrants(
 	req *pb.ListOrganizationCreditGrantsRequest,
 ) (*pb.ListOrganizationCreditGrantsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListOrganizationCreditGrants(ctx, orgID, req)
+	return s.billing.ListOrganizationCreditGrants(ctx, orgID, req)
 }
 
 func (s *OrganizationService) DescribeOrganizationBilling(
@@ -179,7 +183,7 @@ func (s *OrganizationService) DescribeOrganizationBilling(
 	req *pb.DescribeOrganizationBillingRequest,
 ) (*pb.DescribeOrganizationBillingResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.DescribeOrganizationBilling(ctx, orgID, req)
+	return s.billing.DescribeOrganizationBilling(ctx, orgID, req)
 }
 
 func (s *OrganizationService) CreateBusinessCheckout(
@@ -188,30 +192,30 @@ func (s *OrganizationService) CreateBusinessCheckout(
 ) (*pb.CreateBusinessCheckoutResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	accountID, _ := accountIDFromContext(ctx)
-	return organizations.CreateBusinessCheckout(ctx, orgID, req, accountID, s.baseURL)
+	return s.billing.CreateBusinessCheckout(ctx, orgID, req, accountID, s.baseURL)
 }
 
 func (s *OrganizationService) SelectBillingPlan(ctx context.Context, req *pb.SelectBillingPlanRequest) (*pb.CreateBusinessCheckoutResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	accountID, _ := accountIDFromContext(ctx)
-	return organizations.SelectBillingPlan(ctx, orgID, req, accountID, s.baseURL)
+	return s.billing.SelectBillingPlan(ctx, orgID, req, accountID, s.baseURL)
 }
 
 func (s *OrganizationService) CreatePaymentMethodSession(ctx context.Context, req *pb.CreatePaymentMethodSessionRequest) (*pb.CreateBillingPortalSessionResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	accountID, _ := accountIDFromContext(ctx)
-	return organizations.CreatePaymentMethodSession(ctx, orgID, req, accountID)
+	return s.billing.CreatePaymentMethodSession(ctx, orgID, req, accountID)
 }
 
 func (s *OrganizationService) PreviewSeatPurchase(ctx context.Context, req *pb.PreviewSeatPurchaseRequest) (*pb.PreviewSeatPurchaseResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.PreviewSeatPurchase(ctx, orgID, req)
+	return s.billing.PreviewSeatPurchase(ctx, orgID, req)
 }
 
 func (s *OrganizationService) PurchaseSeats(ctx context.Context, req *pb.PurchaseSeatsRequest) (*pb.PurchaseSeatsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	userID, _ := userIDFromContext(ctx)
-	return organizations.PurchaseSeats(ctx, orgID, req, userID)
+	return s.billing.PurchaseSeats(ctx, orgID, req, userID)
 }
 
 func (s *OrganizationService) SyncOrganizationBilling(
@@ -219,7 +223,7 @@ func (s *OrganizationService) SyncOrganizationBilling(
 	req *pb.SyncOrganizationBillingRequest,
 ) (*pb.DescribeOrganizationBillingResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.SyncOrganizationBilling(ctx, orgID, req)
+	return s.billing.SyncOrganizationBilling(ctx, orgID, req)
 }
 
 func (s *OrganizationService) CancelOrganizationSubscription(
@@ -227,7 +231,7 @@ func (s *OrganizationService) CancelOrganizationSubscription(
 	req *pb.CancelOrganizationSubscriptionRequest,
 ) (*pb.DescribeOrganizationBillingResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CancelOrganizationSubscription(ctx, orgID, req)
+	return s.billing.CancelOrganizationSubscription(ctx, orgID, req)
 }
 
 func (s *OrganizationService) ResumeOrganizationSubscription(
@@ -235,7 +239,7 @@ func (s *OrganizationService) ResumeOrganizationSubscription(
 	req *pb.ResumeOrganizationSubscriptionRequest,
 ) (*pb.DescribeOrganizationBillingResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ResumeOrganizationSubscription(ctx, orgID, req)
+	return s.billing.ResumeOrganizationSubscription(ctx, orgID, req)
 }
 
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {

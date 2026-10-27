@@ -13,7 +13,8 @@ import (
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/billing/polar"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/ee/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -132,19 +133,18 @@ func startSeatPurchaseTabs(t *testing.T) *seatPurchaseTabsSteps {
 
 func (s *seatPurchaseTabsSteps) givenATeamSubscriptionWithFourSeats() {
 	db := database.DB(s.t.Context())
-	require.NoError(s.t, models.EnableExperimentalFeatureInTransaction(db, s.session.OrgID, features.FeatureNewBilling))
 	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactories))
 	maximum := 50
-	plan := models.BillingPlan{
+	plan := billingmodels.BillingPlan{
 		Key: "seat_tabs_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "private",
 		PerSeat: true, PriceCents: 2000, SeatLimit: &maximum, PolarProductID: &s.polar.product,
 		CreditFrequency: "none", CreditExpiration: "never",
 	}
-	require.NoError(s.t, models.SaveBillingPlan(db, &plan))
+	require.NoError(s.t, billingmodels.SaveBillingPlan(db, &plan))
 	period := s.polar.period()
-	require.NoError(s.t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", s.session.OrgID).Updates(map[string]any{
-		"plan_id": plan.ID, "plan": plan.Key, "plan_source": models.BillingPlanSourcePolar,
-		"polar_subscription_id": s.polar.subscriptionID, "polar_subscription_status": models.PolarSubscriptionStatusActive,
+	require.NoError(s.t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", s.session.OrgID).Updates(map[string]any{
+		"plan_id": plan.ID, "plan": plan.Key, "plan_source": billingmodels.BillingPlanSourcePolar,
+		"polar_subscription_id": s.polar.subscriptionID, "polar_subscription_status": billingmodels.PolarSubscriptionStatusActive,
 		"purchased_seats": 4, "current_period_start": period.start, "current_period_end": period.end,
 		"cancel_at_period_end": false,
 	}).Error)
@@ -334,7 +334,7 @@ func newSeatPurchasePolar(t *testing.T, organizationID string) *seatPurchasePola
 	t.Cleanup(server.Close)
 	t.Setenv("POLAR_API_BASE_URL", server.URL)
 	t.Setenv("POLAR_ACCESS_TOKEN", "seat-purchase-tabs-test")
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	return f
 }
 

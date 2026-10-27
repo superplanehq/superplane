@@ -1,16 +1,16 @@
-# License exceptions for OSS Guard / osv-scanner.
-# Keep in sync with scripts/license_finder.yml where applicable.
+# Shared OSV-Scanner license exceptions. These do not suppress vulnerabilities.
+# Permitted licenses are listed in scripts/permitted-licenses.txt.
 
 [[PackageOverrides]]
 name = "@csstools/color-helpers"
 ecosystem = "npm"
-license.override = ["MIT"]
+license.ignore = true
 reason = "Package is MIT-0 (MIT No Attribution); permissive and compatible with Apache-2.0."
 
 [[PackageOverrides]]
 name = "@csstools/css-syntax-patches-for-csstree"
 ecosystem = "npm"
-license.override = ["MIT"]
+license.ignore = true
 reason = "Package is MIT-0 (MIT No Attribution); transitive jsdom/css-tree dependency, compatible with Apache-2.0."
 
 [[PackageOverrides]]
@@ -18,12 +18,6 @@ name = "argparse"
 ecosystem = "npm"
 license.ignore = true
 reason = "Python-2.0 license; bundled tooling dependency, compatible with Apache-2.0."
-
-[[PackageOverrides]]
-name = "csv"
-ecosystem = "RubyGems"
-license.ignore = true
-reason = "Dual-licensed Ruby/BSD-2-Clause; Ruby gem used by license_finder tooling only."
 
 [[PackageOverrides]]
 name = "elkjs"
@@ -48,3 +42,21 @@ name = "stdlib"
 ecosystem = "Go"
 license.override = ["BSD-3-Clause"]
 reason = "Go stdlib is licensed under BSD-3-Clause, see https://go.dev/LICENSE"
+
+[[PackageOverrides]]
+name = "robust-predicates"
+ecosystem = "npm"
+license.ignore = true
+reason = "Unlicense; retain the existing approval for this geometry dependency."
+
+[[PackageOverrides]]
+name = "gopkg.in/dnaeon/go-vcr.v2"
+ecosystem = "Go"
+license.override = ["BSD-2-Clause"]
+reason = "BSD-2-Clause per the upstream repository; retain the existing license decision."
+
+[[PackageOverrides]]
+name = "modernc.org/mathutil"
+ecosystem = "Go"
+license.override = ["BSD-3-Clause"]
+reason = "BSD-3-Clause per deps.dev; retain the existing license decision."

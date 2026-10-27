@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -21,7 +23,10 @@ func testGRPCServices(
 ) *grpc.Services {
 	t.Helper()
 
+	features := enterprise.NewRegistry()
+	features.Register(enterprise.Billing, billingorganizations.New())
 	services, err := grpc.NewServices(grpc.ServicesConfig{
+		Enterprise:       features,
 		BaseURL:          "http://localhost",
 		WebhooksBaseURL:  "http://localhost",
 		RunnerAPIBaseURL: "http://localhost",
