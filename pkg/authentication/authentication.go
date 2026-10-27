@@ -25,7 +25,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -203,39 +202,17 @@ func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 // Cloud registers GitHub at startup from GITHUB_CLIENT_ID and
-// GITHUB_CLIENT_SECRET. A self-hosted installation does not store a login
-// client, so those variables are the only way Sign in with GitHub starts.
-func (a *Handler) ensureGitHubOAuth(ctx context.Context) error {
+// GITHUB_CLIENT_SECRET. Those variables are the only way Sign in with GitHub
+// starts. The public GitHub App client credentials authorize pull requests
+// only, never sign-in.
+func (a *Handler) ensureGitHubOAuth(_ context.Context) error {
 	if strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID")) != "" && strings.TrimSpace(os.Getenv("GITHUB_CLIENT_SECRET")) != "" {
 		return nil
 	}
-	if a.encryptor == nil {
-		return errGitHubSignInNotConfigured
+	if _, err := goth.GetProvider(models.ProviderGitHub); err == nil {
+		return nil
 	}
-	cfg, err := githubapp.Resolve(ctx, database.DB(ctx), a.encryptor)
-	if err != nil {
-		return err
-	}
-	if cfg.ClientID == "" || cfg.ClientSecret == "" {
-		if _, err := goth.GetProvider(models.ProviderGitHub); err == nil {
-			return nil
-		}
-		return errGitHubSignInNotConfigured
-	}
-	goth.UseProviders(github.New(cfg.ClientID, cfg.ClientSecret, githubOAuthCallbackURL(), "user:email"))
-	return nil
-}
-
-func githubOAuthCallbackURL() string {
-	baseURL := strings.TrimSpace(os.Getenv("BASE_URL"))
-	if baseURL == "" {
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = "8000"
-		}
-		baseURL = "http://localhost:" + port
-	}
-	return githubapp.OAuthCallbackURL(baseURL)
+	return errGitHubSignInNotConfigured
 }
 
 // GitHub and Bitbucket otherwise authorize the active browser account, so a

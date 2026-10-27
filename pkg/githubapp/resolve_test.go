@@ -74,7 +74,7 @@ func TestResolveEmptyWhenMissing(t *testing.T) {
 	assert.False(t, cfg.Enabled())
 }
 
-func TestSaveDoesNotPersistLoginClient(t *testing.T) {
+func TestSaveStoresClientCredentialsForUserAuthorization(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	encryptor := testEncryptor()
 	clearGitHubAppEnv(t)
@@ -92,12 +92,31 @@ func TestSaveDoesNotPersistLoginClient(t *testing.T) {
 	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
 	require.NoError(t, err)
 	assert.Equal(t, int64(11), cfg.ID)
-	assert.Equal(t, "from-db", cfg.Slug)
-	assert.Equal(t, "db-pem", cfg.PrivateKey)
-	assert.Equal(t, "db-secret", cfg.WebhookSecret)
-	assert.Empty(t, cfg.ClientID)
-	assert.Empty(t, cfg.ClientSecret)
+	assert.Equal(t, "Iv1.client", cfg.ClientID)
+	assert.Equal(t, "client-secret", cfg.ClientSecret)
+	assert.True(t, cfg.UserAuthorizationEnabled())
 	assert.False(t, UserConnectReady(t.Context()))
+
+	record, err := models.FindInstallationGitHubApp(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.False(t, bytes.Equal(record.EncryptedClientSecret, []byte("client-secret")))
+}
+
+func TestResolveWithoutClientCredentialsDisablesUserAuthorization(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	encryptor := testEncryptor()
+	clearGitHubAppEnv(t)
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            11,
+		Slug:          "from-db",
+		PrivateKey:    "db-pem",
+		WebhookSecret: "db-secret",
+	}))
+
+	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
+	require.NoError(t, err)
+	assert.True(t, cfg.Enabled())
+	assert.False(t, cfg.UserAuthorizationEnabled())
 }
 
 func TestSaveKeepsFirstApp(t *testing.T) {
@@ -166,4 +185,6 @@ func clearGitHubAppEnv(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppSlug, "")
 	t.Setenv(config.EnvGitHubAppPrivateKey, "")
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	t.Setenv(config.EnvGitHubAppClientID, "")
+	t.Setenv(config.EnvGitHubAppClientSecret, "")
 }
