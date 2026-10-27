@@ -2532,5 +2532,9 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		return false, err
 	}
 
+	credentials, _ := resolved["credentials"].(map[string]any)
+	if credentials["source"] == models.UsageFundingSourceSubscription {
+		return false, nil
+	}
 	return models.RunnerAcceptsModel(b.tx, workflow.OrganizationID, workflow.FactoryID, node.ComponentName(), resolved, model)
 }

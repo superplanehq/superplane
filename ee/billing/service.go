@@ -134,6 +134,9 @@ func (*Service) LookupRate(provider, model string) (billing.Rate, bool) {
 	return pricebook.Lookup(provider, model)
 }
 func (*Service) PriceUsage(tx *gorm.DB, organizationID uuid.UUID, in billing.Usage) (billing.UsagePrice, error) {
+	if in.FundingSource == models.UsageFundingSourceSubscription {
+		return billing.UsagePrice{PriceBookVersion: pricebook.Version + "+subscription"}, nil
+	}
 	version := pricebook.Version
 	providerMicros := int64(0)
 	if in.CostMicros != nil {
