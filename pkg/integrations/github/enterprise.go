@@ -131,6 +131,12 @@ func ProbeGitHubHost(httpCtx core.HTTPContext, host common.Host, orgID uuid.UUID
 		return fmt.Errorf("failed to read GitHub meta response: %w", err)
 	}
 
+	// ghe.com tenants hide /meta from anonymous requests and answer 404 with GitHub headers.
+	if (res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusNotFound) &&
+		res.Header.Get("X-GitHub-Enterprise-Version") == "ghe.com" {
+		return nil
+	}
+
 	switch res.StatusCode {
 	case http.StatusOK:
 		break

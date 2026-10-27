@@ -86,6 +86,21 @@ func TestProbeGitHubHost(t *testing.T) {
 		assert.Contains(t, err.Error(), "this host is not a GitHub API")
 	})
 
+	t.Run("ghe.com 404 with enterprise version header", func(t *testing.T) {
+		header := make(http.Header)
+		header.Set("X-GitHub-Enterprise-Version", "ghe.com")
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusNotFound,
+				Header:     header,
+				Body: io.NopCloser(strings.NewReader(
+					`{"message":"Not Found","documentation_url":"https://docs.github.com/rest/meta/meta#get-apiname-meta-information","status":"404"}`,
+				)),
+			},
+		}}
+		require.NoError(t, ProbeGitHubHost(httpCtx, host, orgID))
+	})
+
 	t.Run("403 ip allow list", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 			{StatusCode: http.StatusForbidden, Body: io.NopCloser(strings.NewReader("forbidden"))},
