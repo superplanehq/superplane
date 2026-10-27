@@ -110,8 +110,9 @@ func NewSeatPurchase(orgID uuid.UUID, userID *uuid.UUID, subscriptionID string, 
 // fingerprint that also binds the confirmed subscription and billing period.
 // Bound is empty when the request has no complete binding.
 type SeatPurchaseFingerprints struct {
-	Counts string
-	Bound  string
+	Counts  string
+	Bound   string
+	Removal string
 }
 
 // SeatPurchaseFingerprint is the v1 fingerprint: it identifies the charge
@@ -137,6 +138,19 @@ func SeatPurchaseBoundFingerprint(additionalSeats, expectedPurchasedSeats int, s
 	))
 }
 
+// SeatPurchaseRemovalFingerprint is the v3 fingerprint: the v2 binding plus
+// the seat-removal version and the pending removal identity. An empty
+// pendingID is the versioned absence of a removal. A v3 fingerprint never
+// equals a v1 or v2 fingerprint.
+func SeatPurchaseRemovalFingerprint(additionalSeats, expectedPurchasedSeats int, subscriptionID string, periodStart, periodEnd time.Time, seatChangeVersion int64, pendingID string, pendingRevision int) string {
+	return seatPurchaseHash(fmt.Sprintf(
+		"seat_purchase/v3;additional_seats=%d;expected_purchased_seats=%d;subscription_id=%q;period_start=%s;period_end=%s;seat_change_version=%d;pending_removal_id=%q;pending_removal_revision=%d",
+		additionalSeats, expectedPurchasedSeats, subscriptionID,
+		periodStart.UTC().Format(time.RFC3339Nano), periodEnd.UTC().Format(time.RFC3339Nano),
+		seatChangeVersion, pendingID, pendingRevision,
+	))
+}
+
 func (SeatPurchase) TableName() string {
 	return "organization_seat_purchases"
 }
@@ -158,7 +172,7 @@ func (p *SeatPurchase) MatchesRequest(request SeatPurchaseFingerprints) bool {
 		return false
 	}
 	stored := *p.RequestFingerprint
-	return stored == request.Counts || (request.Bound != "" && stored == request.Bound)
+	return stored == request.Counts || (request.Bound != "" && stored == request.Bound) || (request.Removal != "" && stored == request.Removal)
 }
 
 // StartedInPeriod reports that a Polar snapshot with this period start

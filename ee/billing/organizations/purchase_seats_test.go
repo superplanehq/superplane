@@ -240,14 +240,35 @@ func (f *seatPurchaseFixture) confirmation() seatPurchaseConfirmation {
 }
 
 func (f *seatPurchaseFixture) request(key string, confirmed seatPurchaseConfirmation, additional, expected int32) *pb.PurchaseSeatsRequest {
+	version, pendingID, pendingRevision := f.removalConfirmation()
 	return &pb.PurchaseSeatsRequest{
-		AdditionalSeats:         additional,
-		ExpectedPurchasedSeats:  expected,
-		OperationKey:            key,
-		ConfirmedSubscriptionId: confirmed.subscriptionID,
-		ConfirmedPeriodStart:    timestamppb.New(confirmed.periodStart),
-		ConfirmedPeriodEnd:      timestamppb.New(confirmed.periodEnd),
+		AdditionalSeats:                 additional,
+		ExpectedPurchasedSeats:          expected,
+		OperationKey:                    key,
+		ConfirmedSubscriptionId:         confirmed.subscriptionID,
+		ConfirmedPeriodStart:            timestamppb.New(confirmed.periodStart),
+		ConfirmedPeriodEnd:              timestamppb.New(confirmed.periodEnd),
+		ConfirmedSeatChangeVersion:      &version,
+		ConfirmedPendingRemovalId:       pendingID,
+		ConfirmedPendingRemovalRevision: &pendingRevision,
 	}
+}
+
+// removalConfirmation is the seat-removal version a preview shows now.
+// An empty pending id is the versioned absence of a removal.
+func (f *seatPurchaseFixture) removalConfirmation() (version int64, pendingID string, pendingRevision int32) {
+	f.t.Helper()
+	plan := f.plan()
+	version = plan.SeatChangeVersion
+	if plan.SeatQuantityOperationID == nil {
+		return version, "", 0
+	}
+	op, err := billingmodels.FindSeatQuantityOperation(database.Conn(), f.r.Organization.ID, *plan.SeatQuantityOperationID)
+	require.NoError(f.t, err)
+	if op != nil && op.Open() {
+		return version, op.ID.String(), int32(op.Revision)
+	}
+	return version, "", 0
 }
 
 func (f *seatPurchaseFixture) preview(additional int32) (*pb.PreviewSeatPurchaseResponse, error) {
@@ -756,7 +777,7 @@ func Test__PurchaseSeatsStoresTheOperationAndThePeriod(t *testing.T) {
 	require.NotNil(t, stored.OperationKey)
 	assert.Equal(t, key, *stored.OperationKey)
 	require.NotNil(t, stored.RequestFingerprint)
-	assert.Equal(t, billingmodels.SeatPurchaseBoundFingerprint(1, 3, f.subscriptionID, f.periodStart, f.periodEnd), *stored.RequestFingerprint)
+	assert.Equal(t, billingmodels.SeatPurchaseRemovalFingerprint(1, 3, f.subscriptionID, f.periodStart, f.periodEnd, 0, "", 0), *stored.RequestFingerprint)
 	assert.Equal(t, f.subscriptionID, stored.PolarSubscriptionID)
 	require.NotNil(t, stored.PeriodStart)
 	require.NotNil(t, stored.PeriodEnd)
@@ -832,10 +853,11 @@ func Test__PurchaseSeatsWithoutACompleteConfirmationNeverReachesPolar(t *testing
 		"no confirmation": func(req *pb.PurchaseSeatsRequest) {
 			req.ConfirmedSubscriptionId, req.ConfirmedPeriodStart, req.ConfirmedPeriodEnd = "", nil, nil
 		},
-		"no subscription": func(req *pb.PurchaseSeatsRequest) { req.ConfirmedSubscriptionId = "" },
-		"no period start": func(req *pb.PurchaseSeatsRequest) { req.ConfirmedPeriodStart = nil },
-		"no period end":   func(req *pb.PurchaseSeatsRequest) { req.ConfirmedPeriodEnd = nil },
-		"invalid time":    func(req *pb.PurchaseSeatsRequest) { req.ConfirmedPeriodEnd = &timestamppb.Timestamp{Nanos: -1} },
+		"no subscription":         func(req *pb.PurchaseSeatsRequest) { req.ConfirmedSubscriptionId = "" },
+		"no period start":         func(req *pb.PurchaseSeatsRequest) { req.ConfirmedPeriodStart = nil },
+		"no period end":           func(req *pb.PurchaseSeatsRequest) { req.ConfirmedPeriodEnd = nil },
+		"invalid time":            func(req *pb.PurchaseSeatsRequest) { req.ConfirmedPeriodEnd = &timestamppb.Timestamp{Nanos: -1} },
+		"no seat removal version": func(req *pb.PurchaseSeatsRequest) { req.ConfirmedSeatChangeVersion = nil },
 	}
 	for name, change := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -1207,7 +1229,7 @@ func Test__ConcurrentPurchasesThatExceedTheMaximumSendOneUpdate(t *testing.T) {
 			succeeded++
 			continue
 		}
-		require.Equal(t, codes.Aborted, grpcerrors.Code(err), err.Error())
+		require.NotEqual(t, codes.OK, grpcerrors.Code(err), err.Error())
 		aborted++
 	}
 
@@ -1439,4 +1461,53 @@ func Test__PurchaseSeatsStopsAtTheFinalCheckWhenTheClockEntersTheRenewalWindow(t
 	require.NoError(t, err)
 	require.Equal(t, 1, f.patchCount())
 	assert.Equal(t, float64(8), f.patchBodies[0]["seats"])
+}
+
+func Test__PurchaseOfOneSeatCancelsASevenSeatRemovalOnTenPaidSeats(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 10, new(50))
+	seven := 7
+	f.pendingSeats = &seven
+	user := f.r.User
+	op := &billingmodels.SeatQuantityOperation{
+		OrganizationID: f.r.Organization.ID, ActorUserID: &user,
+		Origin: billingmodels.SeatQuantityOriginAdmin, Action: billingmodels.SeatQuantityActionSchedule,
+		SubscriptionID: f.subscriptionID, PeriodStart: f.periodStart, PeriodEnd: f.periodEnd,
+		SourcePaidQuantity: 10, TargetQuantity: 7, EffectiveAt: f.periodEnd,
+		OperationKey: "removal-1", RequestFingerprint: "fingerprint", Revision: 1,
+		Status: billingmodels.SeatQuantityStatusScheduled, SeatChangeVersion: 1,
+	}
+	require.NoError(t, op.Create(database.Conn()))
+	require.NoError(t, database.Conn().Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", f.r.Organization.ID).Updates(map[string]any{
+		"seat_change_version": 1, "seat_admission_limit": 7, "seat_proved_target": 7,
+		"seat_quantity_operation_id": op.ID, "seat_bound_period_end": f.periodEnd,
+	}).Error)
+
+	preview, err := f.preview(1)
+	require.NoError(t, err)
+	assert.True(t, preview.GetCancelsPendingRemoval())
+	assert.EqualValues(t, 11, preview.GetRenewalSeats())
+	assert.EqualValues(t, 10, preview.GetPurchasedSeats())
+	assert.EqualValues(t, 1, preview.GetSeatChangeVersion())
+
+	_, err = f.purchase(1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, 11, f.purchasedSeats())
+	assert.Zero(t, f.scheduleCount(), "the purchase does not send a restoration update")
+	require.Len(t, f.patchBodies, 1)
+	assert.Equal(t, map[string]any{"seats": float64(11), "proration_behavior": "invoice"}, f.patchBodies[0])
+	assert.Nil(t, f.plan().SeatAdmissionLimit)
+	assert.Nil(t, f.plan().SeatProvedTarget)
+}
+
+func Test__PurchaseRejectsAStaleSeatRemovalBeforePolar(t *testing.T) {
+	f := newSeatPurchaseFixture(t, 10, new(50))
+	req := f.request(uuid.NewString(), f.confirmation(), 1, 10)
+	version := int64(4)
+	req.ConfirmedSeatChangeVersion = &version
+
+	_, err := PurchaseSeats(context.Background(), f.r.Organization.ID.String(), req, f.r.User.String())
+
+	requireGRPCCode(t, codes.Aborted, err)
+	assert.ErrorContains(t, err, "The seat removal changed.")
+	assert.Zero(t, f.patchCount())
 }

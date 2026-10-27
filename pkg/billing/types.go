@@ -1,6 +1,10 @@
 package billing
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // Rate contains cents per million tokens from a provider catalog.
 type Rate struct {
@@ -47,6 +51,67 @@ type SeatUsage struct {
 	RenewalQuantity    *int `json:"renewal_quantity"`
 	MemberLimit        *int `json:"member_limit"`
 	PaymentBlocked     bool `json:"payment_blocked"`
+	// AdmissionLimit is the seat count that new members and invitations use.
+	// It can be lower than Purchased while a seat removal is pending. Paid
+	// quantity and the purchase maximum stay on Purchased and Purchasable.
+	AdmissionLimit *int `json:"admission_limit,omitempty"`
+	// AdmissionBlock is set when new seat use is stopped until the current
+	// billing period is verified. Empty means AdmissionLimit is in force.
+	AdmissionBlock string `json:"admission_block,omitempty"`
+}
+
+// SeatQuantityView is the removal state that Billing controls read. It carries
+// no billing rule of its own.
+type SeatQuantityView struct {
+	OrganizationID     uuid.UUID
+	SeatChangeVersion  int64
+	OperationID        string
+	Revision           int
+	Origin             string
+	Action             string
+	Target             *int
+	EffectiveAt        *time.Time
+	Status             string
+	AllowedActions     []string
+	Reasons            []string
+	SourcePaidQuantity *int
+	SubscriptionID     string
+	PeriodStart        *time.Time
+	PeriodEnd          *time.Time
+	MemberFloor        int
+	Cutoff             *time.Time
+	Binding            SeatQuantityBinding
+}
+
+// SeatQuantityBinding is the preview context a later confirmation must send
+// back. An empty PendingOperationID is the versioned absence of a removal.
+type SeatQuantityBinding struct {
+	OrganizationID     uuid.UUID
+	SubscriptionID     string
+	PeriodStart        time.Time
+	PeriodEnd          time.Time
+	SourcePaidQuantity int
+	Target             int
+	SeatChangeVersion  int64
+	PendingOperationID string
+	PendingRevision    int
+	ImmediateAdmission int
+	RenewalQuantity    int
+	MemberFloor        int
+	EffectiveAt        time.Time
+	Cutoff             time.Time
+	CurrentChargeCents int64
+	RefundCents        int64
+	CreditCents        int64
+	NoCurrentCharge    bool
+}
+
+// SeatQuantityPreview is the read-only description of one proposed removal.
+type SeatQuantityPreview struct {
+	SeatQuantityBinding
+	Allowed bool
+	Reason  string
+	Message string
 }
 
 type CreditSummary struct {

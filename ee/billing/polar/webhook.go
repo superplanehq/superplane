@@ -160,6 +160,88 @@ type SubscriptionData struct {
 	// CheckoutID names the Polar checkout that created the subscription. It
 	// is empty for a subscription that no checkout created.
 	CheckoutID string `json:"checkout_id"`
+
+	// PendingUpdate is a change that Polar applies at the next period, for
+	// example a seat count scheduled with proration_behavior next_period.
+	// Unknown fields are kept so a later read cannot drop them.
+	PendingUpdate *SubscriptionPendingUpdate `json:"pending_update"`
+}
+
+// SubscriptionPendingUpdate is a scheduled subscription change. Polar applies
+// it at AppliesAt, the start of the next billing period. Extra keeps every
+// field other than seats and applies_at.
+type SubscriptionPendingUpdate struct {
+	Seats     *int                       `json:"seats"`
+	AppliesAt polarTime                  `json:"applies_at"`
+	Extra     map[string]json.RawMessage `json:"-"`
+	Raw       json.RawMessage            `json:"-"`
+}
+
+// HasUnrelatedChanges reports a pending update that is not only a seat count.
+// Clearing or replacing it would drop those fields, so the caller must not
+// send a seat update.
+func (p *SubscriptionPendingUpdate) HasUnrelatedChanges() bool {
+	return p != nil && len(p.Extra) > 0
+}
+
+func (p *SubscriptionPendingUpdate) UnmarshalJSON(raw []byte) error {
+	if len(bytesTrim(raw)) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	p.Raw = append(json.RawMessage(nil), raw...)
+	p.Extra = map[string]json.RawMessage{}
+	for key, value := range fields {
+		switch key {
+		case "seats":
+			if string(value) == "null" {
+				continue
+			}
+			var seats int
+			if err := json.Unmarshal(value, &seats); err != nil {
+				return err
+			}
+			p.Seats = &seats
+		case "applies_at":
+			if err := json.Unmarshal(value, &p.AppliesAt); err != nil {
+				return err
+			}
+		default:
+			p.Extra[key] = append(json.RawMessage(nil), value...)
+		}
+	}
+	return nil
+}
+
+func (p SubscriptionPendingUpdate) MarshalJSON() ([]byte, error) {
+	if len(p.Raw) > 0 {
+		return append([]byte(nil), p.Raw...), nil
+	}
+	body := map[string]any{}
+	if p.Seats != nil {
+		body["seats"] = *p.Seats
+	}
+	if !p.AppliesAt.Time.IsZero() {
+		body["applies_at"] = p.AppliesAt.Time.UTC().Format(time.RFC3339Nano)
+	}
+	for key, value := range p.Extra {
+		body[key] = json.RawMessage(value)
+	}
+	return json.Marshal(body)
+}
+
+func bytesTrim(raw []byte) []byte { return bytes.TrimSpace(raw) }
+
+// NextPeriodSeats is the seat count that Polar renews with: the scheduled
+// seat count, or the current seats when no seat change is scheduled.
+func (d SubscriptionData) NextPeriodSeats() *int {
+	if d.PendingUpdate != nil && d.PendingUpdate.Seats != nil {
+		return d.PendingUpdate.Seats
+	}
+	return d.Seats
 }
 
 func (d SubscriptionData) organizationExternalID() string {

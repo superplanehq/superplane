@@ -476,3 +476,32 @@ func TestInvitationEmailRoleLabels(t *testing.T) {
 		})
 	}
 }
+
+func TestPendingResendIsRejectedWhenASeatRemovalLowersCapacity(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
+	db := database.Conn()
+	setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(3))
+	mail := services.NewNoopEmailService()
+	s := InvitationService{AuthService: r.AuthService, EmailService: mail, BaseURL: "https://example.com/"}
+	created, err := s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.CreateInvitationRequest{Email: "pending@example.com"})
+	require.NoError(t, err)
+	stored, err := models.FindOrganizationInvitation(db, r.Organization.ID, uuid.MustParse(created.Invitation.Id))
+	require.NoError(t, err)
+	tokenHash := *stored.TokenHash
+	periodEnd := time.Now().Add(24 * time.Hour).UTC().Truncate(time.Second)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
+		"seat_admission_limit": 1, "seat_proved_target": 1, "seat_change_version": 1,
+		"seat_bound_period_end": periodEnd, "current_period_end": periodEnd,
+	}).Error)
+
+	_, err = s.Resend(context.Background(), r.Organization.ID.String(), r.User.String(), created.Invitation.Id)
+
+	requireInvitationReason(t, err, "SEAT_REMOVAL_PENDING")
+	stored, err = models.FindOrganizationInvitation(db, r.Organization.ID, stored.ID)
+	require.NoError(t, err)
+	require.Equal(t, tokenHash, *stored.TokenHash)
+	require.Empty(t, mail.SentOrganizationInvitationEmails()[1:])
+	require.Len(t, mail.SentOrganizationInvitationEmails(), 1)
+}

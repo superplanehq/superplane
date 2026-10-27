@@ -84,6 +84,21 @@ func (s *Service) ValidateInvitationCapacity(tx *gorm.DB, organizationID uuid.UU
 func (*Service) ResolveSeats(tx *gorm.DB, organizationID uuid.UUID) (*billing.SeatUsage, error) {
 	return entitlements.ResolveSeats(tx, organizationID)
 }
+
+// SetSeatQuantityDescriber installs the removal read model. The server sets it
+// so this package does not import the provider. Preview, schedule, change, and
+// cancel stay on seatremoval.Runner, which the Billing removal RPCs will call.
+func SetSeatQuantityDescriber(describe func(*gorm.DB, uuid.UUID) (billing.SeatQuantityView, error)) {
+	seatQuantityDescriber = describe
+}
+
+var seatQuantityDescriber = func(*gorm.DB, uuid.UUID) (billing.SeatQuantityView, error) {
+	return billing.SeatQuantityView{}, billing.ErrImplementationMissing
+}
+
+func (*Service) DescribeSeatQuantity(tx *gorm.DB, organizationID uuid.UUID) (billing.SeatQuantityView, error) {
+	return seatQuantityDescriber(tx, organizationID)
+}
 func (s *Service) RecheckSeatCapacity(tx *gorm.DB, organizationID uuid.UUID, cause string) (billing.CapacityAlert, error) {
 	if s.provider == nil {
 		return nil, billing.ErrImplementationMissing

@@ -45,12 +45,15 @@ func Test__WebhookSettlesALostPurchaseResponseWithoutAQuantityWrite(t *testing.T
 	require.NoError(t, err)
 	provider.LoseNextPurchaseResponse()
 	response, err := organizations.PurchaseSeats(t.Context(), r.Organization.ID.String(), &pb.PurchaseSeatsRequest{
-		AdditionalSeats:         1,
-		ExpectedPurchasedSeats:  preview.PurchasedSeats,
-		OperationKey:            uuid.NewString(),
-		ConfirmedSubscriptionId: preview.SubscriptionId,
-		ConfirmedPeriodStart:    preview.BillingPeriodStart,
-		ConfirmedPeriodEnd:      preview.PeriodEnd,
+		AdditionalSeats:                 1,
+		ExpectedPurchasedSeats:          preview.PurchasedSeats,
+		OperationKey:                    uuid.NewString(),
+		ConfirmedSubscriptionId:         preview.SubscriptionId,
+		ConfirmedPeriodStart:            preview.BillingPeriodStart,
+		ConfirmedPeriodEnd:              preview.PeriodEnd,
+		ConfirmedSeatChangeVersion:      preview.SeatChangeVersion,
+		ConfirmedPendingRemovalId:       preview.PendingRemovalId,
+		ConfirmedPendingRemovalRevision: &preview.PendingRemovalRevision,
 	}, r.User.String())
 	require.NoError(t, err)
 	require.Equal(t, "awaiting_confirmation", response.Purchase.Status)

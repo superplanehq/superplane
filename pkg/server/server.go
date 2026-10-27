@@ -21,6 +21,7 @@ import (
 	billinghttp "github.com/superplanehq/superplane/ee/billing/http"
 	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
 	"github.com/superplanehq/superplane/ee/billing/polar"
+	"github.com/superplanehq/superplane/ee/billing/seatremoval"
 	billingworkers "github.com/superplanehq/superplane/ee/billing/workers"
 	"github.com/superplanehq/superplane/ee/rbac"
 	"github.com/superplanehq/superplane/pkg/agents"
@@ -768,6 +769,9 @@ func startPprofServer() {
 }
 
 func Start() {
+	eebilling.SetSeatQuantityDescriber(func(tx *gorm.DB, organizationID uuid.UUID) (billing.SeatQuantityView, error) {
+		return seatremoval.Describe(tx, organizationID, time.Now())
+	})
 	billing.Bind(eebilling.New(polar.NewRuntime()))
 	configureLogging()
 	setupOtel()
