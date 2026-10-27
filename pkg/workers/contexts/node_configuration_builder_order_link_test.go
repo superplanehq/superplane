@@ -59,6 +59,22 @@ func Test_NodeConfigurationBuilder_TaskFromPullRequestLink(t *testing.T) {
 		assert.Equal(t, "", resolveCoauthors(t, builder))
 	})
 
+	t.Run("open as users lists assignee IDs in assignee order", func(t *testing.T) {
+		second := support.CreateUser(t, r, r.Organization.ID)
+		linked := newPullRequestLinkedRun(t, r, r.Organization.ID, nil, "Address review", []uuid.UUID{r.User, second.ID})
+		builder := builderForRun(linked.canvas, linked.nodeExecution)
+
+		ids := []string{}
+		for _, assignee := range resolveAssignees(t, builder) {
+			ids = append(ids, assignee["id"].(string))
+		}
+		require.Len(t, ids, 2)
+
+		built, err := builder.Build(map[string]any{"openAsUsers": `{{ join(map(task().assignees, #.id), ",") }}`})
+		require.NoError(t, err)
+		assert.Equal(t, strings.Join(ids, ","), built["openAsUsers"])
+	})
+
 	t.Run("unrelated run returns nil", func(t *testing.T) {
 		factoryModel := createTestFactory(t, r.Organization.ID)
 		canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)

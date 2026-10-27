@@ -11,13 +11,15 @@ const (
 	EnvGitHubAppSlug          = "SUPERPLANE_GITHUB_APP_SLUG"
 	EnvGitHubAppPrivateKey    = "SUPERPLANE_GITHUB_APP_PRIVATE_KEY"
 	EnvGitHubAppWebhookSecret = "SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET"
+	EnvGitHubAppClientID      = "SUPERPLANE_GITHUB_APP_CLIENT_ID"
+	EnvGitHubAppClientSecret  = "SUPERPLANE_GITHUB_APP_CLIENT_SECRET"
 )
 
 // GitHubHostedAppConfig is SuperPlane Cloud's public GitHub App. The process
 // holds the credentials. New connections store only the GitHub installation id.
-// ClientID and ClientSecret are the app's user-login credentials. Cloud keeps
-// those in GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET. A self-hosted
-// installation does not store this pair.
+// ClientID and ClientSecret let a member authorize the app so SuperPlane can
+// open pull requests as that member. They are optional. Sign in with GitHub
+// uses a separate OAuth App in GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET.
 type GitHubHostedAppConfig struct {
 	ID            int64
 	Slug          string
@@ -49,12 +51,20 @@ func LoadGitHubHostedAppConfig() GitHubHostedAppConfig {
 		Slug:          slug,
 		PrivateKey:    privateKey,
 		WebhookSecret: webhookSecret,
+		ClientID:      strings.TrimSpace(os.Getenv(EnvGitHubAppClientID)),
+		ClientSecret:  strings.TrimSpace(os.Getenv(EnvGitHubAppClientSecret)),
 	}
 }
 
 // Enabled reports whether Cloud holds a complete public GitHub App.
 func (c GitHubHostedAppConfig) Enabled() bool {
 	return c.ID > 0 && c.Slug != "" && c.PrivateKey != "" && c.WebhookSecret != ""
+}
+
+// UserAuthorizationEnabled reports whether members can authorize the app to
+// open pull requests as themselves.
+func (c GitHubHostedAppConfig) UserAuthorizationEnabled() bool {
+	return c.Enabled() && c.ClientID != "" && c.ClientSecret != ""
 }
 
 func normalizePEM(value string) string {

@@ -3,14 +3,16 @@ import { useEffect, useState } from "react";
 
 import { PersonalApiTokenDialogs } from "@/components/PersonalApiTokens";
 import { SupportSessionReadOnly } from "@/components/SupportSessionReadOnly";
-import type { AccountLinkedAccount } from "@/contexts/accountContextState";
+import type { AccountGitHubPrAuthorization, AccountLinkedAccount } from "@/contexts/accountContextState";
 import { useAccount } from "@/contexts/useAccount";
 import { meKeys } from "@/hooks/useMe";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { usePersonalTokensPanel } from "@/hooks/usePersonalTokensPanel";
 import {
   accountEmailOptions,
+  disableGitHubPrAuthorization,
   disconnectLinkedAccount,
+  githubPrAuthorizationStartHref,
   linkedAccountConnectHref,
   updateAccountEmail,
   updateAccountName,
@@ -39,6 +41,33 @@ function removeLinkedProvider(
     .catch((error) => {
       showErrorToast(getApiErrorMessage(error, `Failed to remove the ${service} link.`));
     });
+}
+
+function changeGitHubPrAuthorization(enabled: boolean, redirectPath: string, refreshAccount: () => Promise<void>) {
+  if (enabled) {
+    window.location.assign(githubPrAuthorizationStartHref(redirectPath));
+    return;
+  }
+  void disableGitHubPrAuthorization()
+    .then(async () => {
+      await refreshAccount();
+      showSuccessToast("SuperPlane now opens your pull requests with the SuperPlane app.");
+    })
+    .catch((error) => {
+      showErrorToast(getApiErrorMessage(error, "Failed to turn off pull requests with your GitHub account."));
+    });
+}
+
+function githubPrAuthorizationState(authorization: AccountGitHubPrAuthorization | undefined) {
+  if (!authorization) {
+    return undefined;
+  }
+  return {
+    available: authorization.available,
+    enabled: authorization.enabled,
+    login: authorization.login,
+    needsReauthorization: authorization.needs_reauthorization,
+  };
 }
 
 function linkedAccountsFor(linkedAccounts: AccountLinkedAccount[] | undefined, provider: "github" | "bitbucket") {
@@ -114,8 +143,12 @@ export function FactorySettingsAccountProfilePage() {
           <AccountProfileAssociatedAccountsCard
             githubAccounts={linkedAccountsFor(account.linked_accounts, "github")}
             bitbucketAccounts={linkedAccountsFor(account.linked_accounts, "bitbucket")}
+            githubPrAuthorization={githubPrAuthorizationState(account.github_pr_authorization)}
             onLinkGithub={() => window.location.assign(linkedAccountConnectHref("github", redirectPath))}
             onRemoveGithub={(providerId) => removeLinkedProvider("github", providerId, refreshAccount)}
+            onGithubPrAuthorizationChange={(enabled) =>
+              changeGitHubPrAuthorization(enabled, redirectPath, refreshAccount)
+            }
             onLinkBitbucket={() => window.location.assign(linkedAccountConnectHref("bitbucket", redirectPath))}
             onRemoveBitbucket={(providerId) => removeLinkedProvider("bitbucket", providerId, refreshAccount)}
           />

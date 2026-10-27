@@ -21,6 +21,8 @@ type InstallationGitHubApp struct {
 	Slug                   string
 	EncryptedPrivateKey    []byte
 	EncryptedWebhookSecret []byte
+	ClientID               string
+	EncryptedClientSecret  []byte
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 }
@@ -38,22 +40,13 @@ func FindInstallationGitHubApp(tx *gorm.DB) (*InstallationGitHubApp, error) {
 	return &app, nil
 }
 
-func SaveInstallationGitHubApp(
-	tx *gorm.DB,
-	githubAppID int64,
-	slug string,
-	encryptedPrivateKey []byte,
-	encryptedWebhookSecret []byte,
-) error {
+func SaveInstallationGitHubApp(tx *gorm.DB, app InstallationGitHubApp) error {
 	now := time.Now()
-	app := InstallationGitHubApp{
-		ID:                     installationGitHubAppID,
-		GitHubAppID:            githubAppID,
-		Slug:                   slug,
-		EncryptedPrivateKey:    encryptedPrivateKey,
-		EncryptedWebhookSecret: encryptedWebhookSecret,
-		CreatedAt:              now,
-		UpdatedAt:              now,
+	app.ID = installationGitHubAppID
+	app.CreatedAt = now
+	app.UpdatedAt = now
+	if app.EncryptedClientSecret == nil {
+		app.EncryptedClientSecret = []byte{}
 	}
 
 	result := tx.Clauses(clause.OnConflict{

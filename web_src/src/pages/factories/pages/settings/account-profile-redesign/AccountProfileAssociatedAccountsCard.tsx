@@ -13,21 +13,34 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import { Switch } from "@/ui/switch";
+
 import { FactorySettingsCard } from "../FactorySettingsCard";
 import { SettingsActionRow } from "./accountProfileRedesignParts";
+
+export interface GitHubPrAuthorizationState {
+  available: boolean;
+  enabled: boolean;
+  login?: string;
+  needsReauthorization: boolean;
+}
 
 export function AccountProfileAssociatedAccountsCard({
   githubAccounts,
   bitbucketAccounts = [],
+  githubPrAuthorization,
   onLinkGithub,
   onRemoveGithub,
+  onGithubPrAuthorizationChange = () => undefined,
   onLinkBitbucket = () => undefined,
   onRemoveBitbucket = () => undefined,
 }: {
   githubAccounts: Array<{ providerId: string; username: string }>;
   bitbucketAccounts?: Array<{ providerId: string; username: string }>;
+  githubPrAuthorization?: GitHubPrAuthorizationState;
   onLinkGithub: () => void;
   onRemoveGithub: (providerId: string) => void;
+  onGithubPrAuthorizationChange?: (enabled: boolean) => void;
   onLinkBitbucket?: () => void;
   onRemoveBitbucket?: (providerId: string) => void;
 }) {
@@ -83,6 +96,11 @@ export function AccountProfileAssociatedAccountsCard({
               />
             </li>
           ) : null}
+          {githubPrAuthorization ? (
+            <li>
+              <GitHubPrAuthorizationRow state={githubPrAuthorization} onChange={onGithubPrAuthorizationChange} />
+            </li>
+          ) : null}
         </ul>
         <BitbucketAssociatedAccounts
           accounts={bitbucketAccounts}
@@ -113,6 +131,46 @@ export function AccountProfileAssociatedAccountsCard({
         }}
       />
     </>
+  );
+}
+
+const GITHUB_PR_AUTHORIZATION_TITLE = "Create pull requests with my GitHub account";
+
+function githubPrAuthorizationDescription(state: GitHubPrAuthorizationState): string {
+  if (!state.available) {
+    return "An administrator must configure the SuperPlane GitHub App before you can use this option.";
+  }
+  if (state.enabled) {
+    const account = state.login ? `as ${state.login}` : "with your GitHub account";
+    return `When you are the task assignee, SuperPlane opens implementation pull requests ${account}. If this fails, the SuperPlane app opens them.`;
+  }
+  if (state.needsReauthorization) {
+    return "Your GitHub authorization stopped working. Turn this on again to authorize SuperPlane.";
+  }
+  return "When you are the task assignee, SuperPlane opens implementation pull requests with your GitHub account. GitHub asks you to authorize SuperPlane.";
+}
+
+function GitHubPrAuthorizationRow({
+  state,
+  onChange,
+}: {
+  state: GitHubPrAuthorizationState;
+  onChange: (enabled: boolean) => void;
+}) {
+  return (
+    <SettingsActionRow
+      title={GITHUB_PR_AUTHORIZATION_TITLE}
+      description={githubPrAuthorizationDescription(state)}
+      testId="account-redesign-github-pr-authorization"
+      action={
+        <Switch
+          checked={state.available && state.enabled}
+          disabled={!state.available}
+          onCheckedChange={onChange}
+          aria-label={GITHUB_PR_AUTHORIZATION_TITLE}
+        />
+      }
+    />
   );
 }
 

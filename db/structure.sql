@@ -38,6 +38,27 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: account_github_authorizations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_github_authorizations (
+    account_id uuid NOT NULL,
+    github_app_id bigint NOT NULL,
+    github_user_id character varying(255) NOT NULL,
+    github_login character varying(255) NOT NULL,
+    encrypted_access_token bytea NOT NULL,
+    access_token_expires_at timestamp with time zone,
+    encrypted_refresh_token bytea DEFAULT '\x'::bytea NOT NULL,
+    refresh_token_expires_at timestamp with time zone,
+    invalidated_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT account_github_authorizations_login_present CHECK ((btrim((github_login)::text) <> ''::text)),
+    CONSTRAINT account_github_authorizations_user_present CHECK ((btrim((github_user_id)::text) <> ''::text))
+);
+
+
+--
 -- Name: account_linked_accounts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1097,6 +1118,8 @@ CREATE TABLE public.installation_github_apps (
     encrypted_webhook_secret bytea NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    client_id character varying(255) DEFAULT ''::character varying NOT NULL,
+    encrypted_client_secret bytea DEFAULT '\x'::bytea NOT NULL,
     CONSTRAINT installation_github_apps_singleton CHECK ((id = 1))
 );
 
@@ -2278,6 +2301,14 @@ CREATE TABLE public.workspace_usage_events (
 --
 
 ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
+
+
+--
+-- Name: account_github_authorizations account_github_authorizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_github_authorizations
+    ADD CONSTRAINT account_github_authorizations_pkey PRIMARY KEY (account_id);
 
 
 --
@@ -4941,6 +4972,14 @@ CREATE UNIQUE INDEX workflows_organization_id_name_active_key ON public.workflow
 
 
 --
+-- Name: account_github_authorizations account_github_authorizations_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_github_authorizations
+    ADD CONSTRAINT account_github_authorizations_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id) ON DELETE CASCADE;
+
+
+--
 -- Name: account_linked_accounts account_linked_accounts_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6316,7 +6355,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261027075507	f
+20261027161621	f
 \.
 
 

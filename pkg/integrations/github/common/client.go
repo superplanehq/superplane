@@ -710,6 +710,35 @@ func (c *Client) HTTPDo(req *http.Request) (*http.Response, error) {
 	return c.underlying.Client().Do(req)
 }
 
+// WithUserToken returns a client that acts as the member who owns the GitHub
+// App user access token. It keeps the repository owner of this client.
+func (c *Client) WithUserToken(httpCtx core.HTTPContext, token string) *Client {
+	return &Client{
+		authMethod: AuthMethodApp,
+		ownerType:  c.ownerType,
+		owner:      c.owner,
+		underlying: github.NewClient(&http.Client{
+			Transport: &oauth2.Transport{
+				Base:   &transport{http: httpCtx},
+				Source: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}),
+			},
+		}),
+	}
+}
+
+// UsesHostedApp reports whether the integration installs SuperPlane's public
+// GitHub App. Only that app can act for members who authorized it.
+func UsesHostedApp(ctx core.IntegrationContext) bool {
+	if ctx == nil || !ctx.LegacySetup() {
+		return false
+	}
+	var metadata Metadata
+	if err := mapstructure.Decode(ctx.GetMetadata(), &metadata); err != nil {
+		return false
+	}
+	return metadata.HostedApp
+}
+
 func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, error) {
 	if !ctx.LegacySetup() {
 		return newClientFromStorageContexts(httpCtx, ctx.Properties(), ctx.Secrets())

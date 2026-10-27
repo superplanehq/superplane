@@ -570,6 +570,19 @@ func Test__ToRepositoryMerge__NamesAgentWorkByItsCoAuthorTrailer(t *testing.T) {
 	// neither SuperPlane output nor work a person wrote.
 	_, ok = toRepositoryMerge(agent, "example/repo", map[string]bool{"other": true}, from, to)
 	assert.False(t, ok)
+
+	// A task assignee can open the agent's pull request with their own GitHub
+	// account. The trailer still marks it as agent work.
+	openedByAssignee := &github.PullRequest{
+		Number:         github.Ptr(31),
+		MergedAt:       mergedAt,
+		MergeCommitSHA: github.Ptr("def456"),
+		User:           &github.User{Login: github.Ptr("ada"), Type: github.Ptr("User")},
+	}
+	merge, ok = toRepositoryMerge(openedByAssignee, "example/repo", map[string]bool{"def456": true}, from, to)
+	require.True(t, ok)
+	assert.Equal(t, models.FactoryVelocityMergeSourceAgent, merge.source)
+	assert.Equal(t, "ada", merge.authorLogin)
 }
 
 func Test__HasAgentCoAuthor(t *testing.T) {

@@ -16,7 +16,14 @@ func TestInstallationGitHubAppPersistence(t *testing.T) {
 	_, err := FindInstallationGitHubApp(tx)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
-	require.NoError(t, SaveInstallationGitHubApp(tx, 99, "superplane-self", []byte("pem"), []byte("whsec")))
+	require.NoError(t, SaveInstallationGitHubApp(tx, InstallationGitHubApp{
+		GitHubAppID:            99,
+		Slug:                   "superplane-self",
+		EncryptedPrivateKey:    []byte("pem"),
+		EncryptedWebhookSecret: []byte("whsec"),
+		ClientID:               "Iv1.self",
+		EncryptedClientSecret:  []byte("client-secret"),
+	}))
 
 	stored, err := FindInstallationGitHubApp(tx)
 	require.NoError(t, err)
@@ -25,8 +32,15 @@ func TestInstallationGitHubAppPersistence(t *testing.T) {
 	assert.Equal(t, "superplane-self", stored.Slug)
 	assert.Equal(t, []byte("pem"), stored.EncryptedPrivateKey)
 	assert.Equal(t, []byte("whsec"), stored.EncryptedWebhookSecret)
+	assert.Equal(t, "Iv1.self", stored.ClientID)
+	assert.Equal(t, []byte("client-secret"), stored.EncryptedClientSecret)
 
-	err = SaveInstallationGitHubApp(tx, 100, "superplane-next", []byte("pem-2"), []byte("whsec-2"))
+	err = SaveInstallationGitHubApp(tx, InstallationGitHubApp{
+		GitHubAppID:            100,
+		Slug:                   "superplane-next",
+		EncryptedPrivateKey:    []byte("pem-2"),
+		EncryptedWebhookSecret: []byte("whsec-2"),
+	})
 	require.ErrorIs(t, err, ErrInstallationGitHubAppExists)
 	kept, err := FindInstallationGitHubApp(tx)
 	require.NoError(t, err)
