@@ -35,29 +35,25 @@ pull request, checks, and execution history together.
 
 ## How it works
 
-### Refine the task before the agent starts
+### Turn backlog issues into work agents can deliver
 
-![Task refinement with a plan and checks for clarity, complexity, and verifiability](./docs/images/backlog-refinement.png)
+<p align="center">
+  <img src="./docs/images/backlog-refinement.png" alt="Task refinement showing a plan and readiness assessment" width="60%">
+</p>
 
-SuperPlane reviews the task and repository context, develops a plan, and assesses
-clarity, complexity, and verifiability. It explains which parts are ready and
-which need attention. Refine the plan with the agent before starting implementation.
+Reliable automation starts with a clear task. SuperPlane analyzes the issue,
+helps refine the plan, and identifies decisions that need your input before
+implementation begins.
 
-In this example, the expected behavior and verification approach are clear,
-but the implementation affects two code paths. SuperPlane flags that complexity
-for review before work begins.
+### Bring verified changes to human review
 
-### Fix failed checks and assess the pull request
+<p align="center">
+  <img src="./docs/images/pull-request-verification.png" alt="Pull request verification showing check fixes and merge confidence" width="60%">
+</p>
 
-![Pull request verification showing failed-check fixes and merge confidence assessments](./docs/images/pull-request-verification.png)
-
-After implementation, SuperPlane sends failed PR checks back to the agent to fix.
-An agent also reviews the change and scores merge confidence across checks such
-as security, performance, blast radius, and alignment with the specification.
-
-Here, SuperPlane records multiple attempts to fix PR checks and highlights a
-blast-radius concern that still needs review. Your team can inspect the evidence,
-review the pull request, and decide whether to merge.
+SuperPlane checks the agent's work and sends failures back for correction.
+An agent review assesses merge confidence and highlights remaining concerns,
+so your team can make the final decision with evidence.
 
 ## Getting started
 
