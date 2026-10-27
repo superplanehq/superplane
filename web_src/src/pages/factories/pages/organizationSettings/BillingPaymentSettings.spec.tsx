@@ -213,7 +213,9 @@ it("defaults Team seats to members plus pending invitations", async () => {
   const seats = screen.getByRole("spinbutton", { name: "Team seats" });
   expect(seats).toHaveValue(3);
   expect(seats).toHaveAttribute("min", "1");
-  expect(screen.getByText(/Includes 2 seats for pending invitations/)).toBeInTheDocument();
+  expect(
+    screen.getByText("The default includes 2 seats for pending invitations. You can remove these seats."),
+  ).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Subscribe to Team" }));
   await waitFor(() =>
     expect(selectPlan).toHaveBeenCalledWith(expect.objectContaining({ body: { planKey: "team", seats: 3 } })),
