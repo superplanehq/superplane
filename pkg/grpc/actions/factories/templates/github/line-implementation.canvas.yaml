@@ -232,6 +232,7 @@ spec:
           Created via [SuperPlane](https://superplane.com).
         draft: false
         head: '{{ $["Implement From Task Description"].data.result.branch }}'
+        openAsUsers: '{{ join(map(task().assignees, #.id), ",") }}'
         repository: "{{ task().repository }}"
         title: '{{ fromBase64($["Implement From Task Description"].data.result.title) }}'
       position:

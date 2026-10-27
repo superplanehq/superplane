@@ -206,6 +206,8 @@ func TestHandler_handleAuthConfig_IgnoresInstallationGitHubApp(t *testing.T) {
 		Slug:          "superplane-self",
 		PrivateKey:    "pem",
 		WebhookSecret: "whsec",
+		ClientID:      "Iv1.self",
+		ClientSecret:  "client-secret",
 	}))
 
 	recorder := httptest.NewRecorder()

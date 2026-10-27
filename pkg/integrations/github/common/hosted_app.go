@@ -83,6 +83,24 @@ func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, er
 	}, nil
 }
 
+// HostedRepositoryGranted reports whether the workspace granted the repository
+// to its hosted GitHub App binding. A member token can reach more repositories
+// than the binding, so callers must check before they use one.
+func (c *Client) HostedRepositoryGranted(ctx core.IntegrationContext, repository string) (bool, error) {
+	owner, name := c.ownerAndName(repository)
+	repositories, err := models.ListVCSProviderBindingRepositories(database.Conn(), ctx.ID())
+	if err != nil {
+		return false, fmt.Errorf("failed to list repositories granted to the GitHub App binding: %w", err)
+	}
+	fullName := owner + "/" + name
+	for _, granted := range repositories {
+		if strings.EqualFold(granted.FullName, fullName) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func RestrictHostedAppTransport(transport *ghinstallation.Transport, repositoryIDs []int64) error {
 	if transport == nil {
 		return fmt.Errorf("GitHub App transport is required")
