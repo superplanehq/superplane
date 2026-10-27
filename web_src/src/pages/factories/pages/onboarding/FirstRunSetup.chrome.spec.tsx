@@ -1,23 +1,35 @@
-import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
 import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, OrganizationsBillingPlanOption } from "@/api-client";
+import type { FactoriesFactory } from "@/api-client";
 import { unmockedPackage } from "@/test/unmockedModule";
+
+import { billingState, defaultBillingState, refetchBilling } from "./FirstRunSetup.chrome.spec.billing";
+import { hostedVcsModel, pageModel, setupState } from "./FirstRunSetup.chrome.spec.fixtures";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
-import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+import { useOnboardingSetupState } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
 let factory: FactoriesFactory;
 let factories: FactoriesFactory[];
+let canManageBilling = true;
+let permissionsLoading = false;
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({
+    canAct: (resource: string, action: string) => resource !== "org" || action !== "update" || canManageBilling,
+    isLoading: permissionsLoading,
+  }),
+}));
 
 const layoutIds = { organizationId: "org-1", factoryId: "factory-1", factoryKey: "PAY", routeSegment: "pay" };
 vi.mock("../../layout/factoriesLayoutContext", () => ({
@@ -32,8 +44,7 @@ vi.mock("@/hooks/useMe", () => ({ useMe: () => ({ data: { id: "user-1" } }) }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: (feature: string) =>
-      feature === "organization_byok" ? billingState.byok : feature !== "new_billing" || billingState.newBilling,
+    has: (feature: string) => feature === "organization_byok" && billingState.byok,
     enabledExperimentalFeatures: [],
     organizationReady: true,
     isLoading: false,
@@ -76,30 +87,6 @@ vi.mock("./useGitHubOnboarding", () => ({
   useGitHubInstallationChecks: vi.fn(),
 }));
 
-const defaultBillingState = {
-  enabled: false,
-  newBilling: false,
-  byok: false,
-  planActive: false,
-  hasPaymentMethod: false,
-};
-const billingState: typeof defaultBillingState & { availablePlans?: OrganizationsBillingPlanOption[] } = {
-  ...defaultBillingState,
-};
-const billingData = () => ({
-  billingEnabled: billingState.enabled,
-  availablePlans: billingState.availablePlans,
-  productFeatures: { byo_key: true },
-  planCategory: billingState.planActive ? "paid" : "none",
-  creditPurchaseAllowed: billingState.planActive,
-  hasPaymentMethod: billingState.hasPaymentMethod,
-});
-const refetchBilling = vi.fn(async () => ({ data: billingData() }));
-vi.mock("@/hooks/useOrganizationBilling", () => ({
-  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
-  useOrganizationBilling: () => ({ data: billingData(), isPending: false, isSuccess: true, refetch: refetchBilling }),
-}));
-
 const workspaceUsage = { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" };
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
   useOrganizationWorkspaceUsage: () => ({
@@ -115,10 +102,11 @@ const activateOnboardingPlan = vi.fn(async () => {
   billingState.planActive = true;
   return false;
 });
+const resumeOnboardingPlan = vi.fn(async () => false);
 vi.mock("./onboardingCardPlan", () => ({
   activateOnboardingPlan,
   createOnboardingCardSession: openCardSetup,
-  resumeOnboardingPlan: vi.fn(async () => false),
+  resumeOnboardingPlan,
 }));
 
 const navigateSpy = vi.fn();
@@ -146,74 +134,6 @@ vi.mock("./AgentStep", () => ({
     <div data-testid="agent-step" data-custom-provider={showCustomProvider ? "yes" : "no"} />
   ),
 }));
-
-function setupState(): OnboardingSetupApi {
-  const { result } = renderHook(() =>
-    useOnboardingSetupState("Payments Service", {
-      simulateDiscovery: false,
-      connected: new Set(["github"]),
-      initial: { vcsHost: "github", issuesChoice: "vcs", selectedRepo: "acme/api" },
-    }),
-  );
-  return result.current;
-}
-
-function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPageModel {
-  return {
-    setup: setupState(),
-    hostedAgentReady: false,
-    hostedModelsAvailable: false,
-    hostedModelsAvailableLoading: false,
-    bringYourOwnKey: false,
-    bringYourOwnKeyLoading: false,
-    customProvider: false,
-    agentCredentialChoice: null,
-    setAgentCredentialChoice: vi.fn(),
-    agentLoading: false,
-    agentModelPicker: undefined,
-    openSection: "issues",
-    setOpenSection: vi.fn(),
-    requestConnect: vi.fn(),
-    selectCatalogRepository: vi.fn().mockResolvedValue(true),
-    selectBitbucketRepository: vi.fn().mockResolvedValue(true),
-    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
-    bitbucketIntegrationId: "",
-    integrationDialogs: <></>,
-    canConfigureWorkspace: true,
-    saving: false,
-    saveName: vi.fn().mockResolvedValue(true),
-    saveAgent: vi.fn().mockResolvedValue(true),
-    saveIssues: vi.fn().mockResolvedValue(true),
-    finish: vi.fn(),
-    provisionedDestination: null,
-    githubOwner: undefined,
-    jiraIntegrationId: "",
-    jiraProjectId: "",
-    setJiraProjectId: vi.fn(),
-    jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
-    jiraProjects: [],
-    jiraProjectsLoading: false,
-    jiraProjectsError: false,
-    retryJiraProjects: vi.fn(),
-    linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
-    ...overrides,
-  };
-}
-
-function hostedVcsModel(overrides: Partial<OnboardingPageModel> = {}) {
-  return pageModel({
-    hostedAgentReady: true,
-    hostedModelsAvailable: true,
-    setup: { ...setupState(), issuesChoice: "vcs" },
-    ...overrides,
-  });
-}
 
 function StatefulSetup({ model }: { model: OnboardingPageModel }) {
   const [choice, setChoice] = useState<OnboardingAgentCredentialChoice | null>(null);
@@ -257,9 +177,12 @@ describe("FirstRunSetup chrome", () => {
     refetchBilling.mockClear();
     openCardSetup.mockReset();
     activateOnboardingPlan.mockClear();
+    resumeOnboardingPlan.mockClear();
     localStorage.clear();
     githubPending = false;
     githubLinked = true;
+    canManageBilling = true;
+    permissionsLoading = false;
   });
 
   it("shows the workspace switch when another workspace exists", () => {
@@ -353,11 +276,11 @@ describe("FirstRunSetup chrome", () => {
   });
 
   it.each([
-    { newBilling: false, planActive: false },
-    { newBilling: true, planActive: false },
-    { newBilling: true, planActive: true },
-  ])("keeps repository and intake before the final model choice (%j)", async ({ newBilling, planActive }) => {
-    Object.assign(billingState, { enabled: newBilling, newBilling, planActive, byok: true });
+    { enabled: false, planActive: false },
+    { enabled: true, planActive: false },
+    { enabled: true, planActive: true },
+  ])("keeps repository and intake before the final model choice (%j)", async ({ enabled, planActive }) => {
+    Object.assign(billingState, { enabled, planActive, byok: true, availablePlans: [] });
     const user = userEvent.setup();
     const model = pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true, openSection: "vcs" });
     render(
@@ -517,7 +440,7 @@ describe("FirstRunSetup chrome", () => {
   });
 
   it("starts Pay-as-you-go after the backlog step when a card is saved", async () => {
-    Object.assign(billingState, { enabled: true, newBilling: true, hasPaymentMethod: true });
+    Object.assign(billingState, { enabled: true, hasPaymentMethod: true });
     billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
     const user = userEvent.setup();
     const model = hostedVcsModel();
@@ -537,14 +460,92 @@ describe("FirstRunSetup chrome", () => {
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
   });
 
+  it.each(["issues", "card"])("lets a maintainer finish unpaid workspace setup from %s", async (step) => {
+    Object.assign(billingState, { enabled: true });
+    billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
+    canManageBilling = false;
+    const user = userEvent.setup();
+    const model = hostedVcsModel();
+    const path = `/org-1/workspaces/PAY/setup?step=${step}${step === "card" ? "&plan=starter&card_setup=1&subscribed=1" : ""}`;
+    const previousUrl = window.location.href;
+    window.history.replaceState({}, "", path);
+    try {
+      renderSetup(model, path);
+
+      if (step === "issues") await user.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(await screen.findByTestId("first-run-complete")).toHaveTextContent(
+        "Ask an organization admin to select a billing plan. You can complete workspace setup now.",
+      );
+      expect(screen.queryByTestId("first-run-card")).not.toBeInTheDocument();
+      expect(model.finish).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+      await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+      expect(openCardSetup).not.toHaveBeenCalled();
+      expect(activateOnboardingPlan).not.toHaveBeenCalled();
+      expect(resumeOnboardingPlan).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState({}, "", previousUrl);
+    }
+  });
+
+  it("disables a restored card step until billing permission loads", async () => {
+    Object.assign(billingState, { enabled: true });
+    billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
+    permissionsLoading = true;
+    canManageBilling = false;
+    const model = hostedVcsModel();
+    const path = "/org-1/workspaces/PAY/setup?step=card";
+    const { rerender } = renderSetup(model, path);
+
+    expect(screen.getByRole("button", { name: "Continue with Pay-as-you-go" })).toBeDisabled();
+    expect(model.finish).not.toHaveBeenCalled();
+
+    permissionsLoading = false;
+    canManageBilling = true;
+    rerender(
+      <MemoryRouter initialEntries={[path]}>
+        <FirstRunSetup model={model} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("first-run-card")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue with Pay-as-you-go" })).toBeEnabled();
+    expect(model.finish).not.toHaveBeenCalled();
+  });
+
+  it("finishes a Starter checkout return after the saved GitHub connection restores", async () => {
+    Object.assign(billingState, { enabled: true, planActive: true });
+    billingState.availablePlans = [{ key: "starter", name: "Starter", subscriptionRequired: true }];
+    const path = "/org-1/workspaces/PAY/setup?step=card&plan=starter&card_setup=1&subscribed=1";
+    const previousUrl = window.location.href;
+    window.history.replaceState({}, "", path);
+    try {
+      const model = hostedVcsModel({ setup: { ...setupState(), connected: new Set() } });
+      const { rerender } = renderSetup(model, path);
+      expect(model.finish).not.toHaveBeenCalled();
+
+      const restored = { ...model, setup: { ...model.setup, connected: new Set(["github"] as const) } };
+      rerender(
+        <MemoryRouter initialEntries={[path]}>
+          <FirstRunSetup model={restored} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+      expect(activateOnboardingPlan).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState({}, "", previousUrl);
+    }
+  });
+
   it.each(
     ["issues", "billing"].flatMap((step) => [
-      { step, newBilling: false, availablePlans: [{ key: "free", name: "Free" }] },
-      { step, newBilling: true, availablePlans: [] },
-      { step, newBilling: true, availablePlans: undefined },
+      { step, enabled: false, availablePlans: [{ key: "pay_as_you_go", name: "Pay-as-you-go" }] },
+      { step, enabled: true, availablePlans: [{ key: "free", name: "Free" }] },
+      { step, enabled: true, availablePlans: [] },
+      { step, enabled: true, availablePlans: undefined },
     ]),
-  )("finishes without plan selection (%j)", async ({ step, newBilling, availablePlans }) => {
-    Object.assign(billingState, { enabled: true, newBilling, availablePlans });
+  )("finishes without plan selection (%j)", async ({ step, enabled, availablePlans }) => {
+    Object.assign(billingState, { enabled, availablePlans });
     const user = userEvent.setup();
     const model = hostedVcsModel();
     renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
@@ -558,7 +559,6 @@ describe("FirstRunSetup chrome", () => {
 
   it.each([false, true])("routes a restored billing URL through model access (own key: %s)", async (byok) => {
     billingState.enabled = true;
-    billingState.newBilling = true;
     const model = hostedVcsModel({ bringYourOwnKey: byok });
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=billing&plan=team&subscribed=1&checkout_id=old");
     expect(screen.queryByTestId("first-run-card")).not.toBeInTheDocument();

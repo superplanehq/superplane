@@ -99,6 +99,7 @@ export function RunsTabListView({
           isError={isError}
           onRetry={onRetry}
           onClearFilters={onClearFilters}
+          hasAnyFilter={hasAnyFilter}
         />
       </div>
 

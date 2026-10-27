@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useCanvasVersion, useDescribeRun, useEventExecutions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
@@ -121,6 +121,7 @@ function LoadedFactoryAutomationRunDetails({
   const nodes = versionQuery.data?.spec?.nodes ?? [];
   const mappedRun = useMemo(() => toAutomationRun(run, [], Date.now(), intakeSource), [run, intakeSource]);
   const { factoryKey, lineId } = useParams();
+  const [params, setParams] = useSearchParams();
   const taskNumber = taskPageNumber(mappedRun.task?.id);
   const details = {
     ...mappedRun,
@@ -144,6 +145,14 @@ function LoadedFactoryAutomationRunDetails({
       )}
       <AutomationRunDetails
         run={details}
+        selectedActivityId={params.get("activity")}
+        onSelectActivity={(id) =>
+          setParams((current) => {
+            const next = new URLSearchParams(current);
+            next.set("activity", id);
+            return next;
+          })
+        }
         onBack={() => onSelectRun(null)}
         onRetryLogs={() => void executionsQuery.refetch()}
         renderLogs={(activity) => {

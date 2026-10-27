@@ -296,14 +296,15 @@ func buildProvider(
 		return resourceProvider, releaseArtifactResolver, fleet.GCP.Architecture, err
 	case fleetconfig.ProviderDocker:
 		resourceProvider, err := dockerprovider.New(dockerprovider.Config{
-			Image:        fleet.Docker.Image,
-			RunnerAPIURL: fleet.Docker.RunnerAPIURL,
-			Network:      fleet.Docker.Network,
-			Volumes:      fleet.Docker.Volumes,
-			ExtraHosts:   fleet.Docker.ExtraHosts,
-			Init:         fleet.Docker.Init,
-			User:         fleet.Docker.User,
-			Entrypoint:   fleet.Docker.Entrypoint,
+			FleetManagerID: fleetManagerID,
+			Image:          fleet.Docker.Image,
+			RunnerAPIURL:   fleet.Docker.RunnerAPIURL,
+			Network:        fleet.Docker.Network,
+			Volumes:        fleet.Docker.Volumes,
+			ExtraHosts:     fleet.Docker.ExtraHosts,
+			Init:           fleet.Docker.Init,
+			User:           fleet.Docker.User,
+			Entrypoint:     fleet.Docker.Entrypoint,
 		}, log)
 		return resourceProvider, emptyArtifactResolver{},
 			fleet.Docker.Architecture, err

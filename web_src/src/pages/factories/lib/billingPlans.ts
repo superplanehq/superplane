@@ -2,7 +2,6 @@ export const BILLING_BUSINESS_NAME = "Business";
 export const BILLING_BUSINESS_PRICE = "$199";
 export const BILLING_BUSINESS_PRICE_PERIOD = "per month";
 export const BILLING_BUSINESS_DESCRIPTION = "For teams that run software factory workflows.";
-export const BILLING_UPGRADE_LABEL = "Upgrade to Business";
 export const BILLING_CANCEL_LABEL = "Cancel Business";
 export const BILLING_KEEP_LABEL = "Keep Business";
 
@@ -136,4 +135,8 @@ export function checkoutSeatBounds(
   const defaultSeats = Math.min(maximum, requested);
   const coveredInvitations = Math.min(invitations, Math.max(defaultSeats - members, 0));
   return { minimum, defaultSeats, coveredInvitations, invitationsWithoutSeat: invitations - coveredInvitations };
+}
+
+export function billingPlanParallelism(limit?: number): string {
+  return limit == null ? "Unlimited tasks at once" : `Up to ${limit} ${limit === 1 ? "task" : "tasks"} at once`;
 }

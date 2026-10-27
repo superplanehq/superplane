@@ -18,11 +18,19 @@
 - [Pull Request Description](#pull-request-description)
   - [Required Information](#required-information)
 - [Review Process](#review-process)
+- [Dependency License Checks](#dependency-license-checks)
 
 ## Overview
 
 Pull requests are the primary way to contribute code changes to SuperPlane. This guide covers the complete
 process of creating a pull request, from setting up your fork to getting your changes merged.
+
+Read [Before you start](../../CONTRIBUTING.md#before-you-start) in the contributing
+guide before you write code. Discuss substantial changes and wait for issue
+assignment. Documentation and typo fixes can go straight to a pull request.
+
+Keep each pull request focused on one change. If you are a new contributor,
+keep only one pull request open at a time.
 
 ## Creating a Pull Request
 
@@ -170,3 +178,31 @@ Once you submit a pull request:
 - Keep PRs focused and reasonably sized
 - Respond to review comments promptly
 - Don't hesitate to ask questions if something is unclear
+
+Maintainers may close a substantial pull request that was not discussed first.
+See [For maintainers](../../CONTRIBUTING.md#for-maintainers) for the close
+responses.
+
+## Dependency License Checks
+
+Run `make test.license.check` before you submit dependency changes.
+The Semaphore Licenses job runs the same check with a pinned OSV-Scanner container.
+Docker and network access to OSV and deps.dev are required.
+Go and Node.js installations are not required for this check.
+
+The check reads `go.mod` and `web_src/package-lock.json`, including development
+and transitive dependencies. Unknown or unapproved licenses fail the check.
+
+Review each violation before you change the policy:
+
+- Add permitted SPDX license identifiers to `scripts/permitted-licenses.txt`.
+- Add package exceptions to `osv-scanner.toml` with an ecosystem and a reason.
+- Use `license.override` to correct missing or incorrect license metadata.
+- Use `license.ignore` only for a package with an approved license exception.
+
+Run `bash scripts/license-check-test.sh` to check the scanner integration.
+For a focused scan, pass lockfile paths to `bash scripts/license-check.sh`.
+
+This command suppresses vulnerability findings through a temporary configuration.
+The shared `osv-scanner.toml` does not suppress vulnerabilities.
+Vulnerability checks for dependencies and release images are a separate follow-up.

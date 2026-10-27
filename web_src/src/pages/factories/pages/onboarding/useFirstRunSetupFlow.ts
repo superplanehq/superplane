@@ -125,6 +125,7 @@ function useFirstRunNavigation(
   github: { ready: boolean; returned: boolean },
 ) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { factory } = useFactoriesLayout();
   // Back from repository selection must not forward to it again.
   const [stayOnConnect, setStayOnConnect] = useState(false);
   const openedScreen =
@@ -162,7 +163,9 @@ function useFirstRunNavigation(
 
   // Final setup steps require a repository and a complete intake choice.
   let screen = availableScreen;
-  const intakePending = intakeLookupPending(model);
+  const savedVcsRestoring =
+    Boolean(factory?.onboarding?.vcsIntegrationId) && !model.setup.connected.has(model.setup.vcsHost ?? "github");
+  const intakePending = intakeLookupPending(model) || savedVcsRestoring;
   const githubPending = connection.onboarding.isPending;
   if (FINAL_SCREENS.has(screen) && !model.setup.selectedRepo) screen = "host";
   if (FINAL_SCREENS.has(screen) && !intakePrerequisitesSatisfied(model)) screen = "tickets";

@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -32,7 +31,7 @@ func setLegacyBillingPlanTestProduct(t *testing.T) {
 	require.NoError(t, db.Model(catalog).Update("polar_product_id", "prod_business").Error)
 }
 
-func Test__EnsureOrganizationBillingPlanIsTrial(t *testing.T) {
+func Test__EnsureOrganizationBillingPlanCreatesNone(t *testing.T) {
 	r := support.Setup(t)
 	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
@@ -40,9 +39,34 @@ func Test__EnsureOrganizationBillingPlanIsTrial(t *testing.T) {
 	plan, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
 	require.NotNil(t, plan)
-	assert.Equal(t, billingmodels.BillingPlanTrial, plan.Plan)
-	require.NotNil(t, plan.TrialEndsAt)
-	assert.True(t, plan.IsOpenTrial(time.Now()))
+	assert.Equal(t, billingmodels.BillingPlanNone, plan.Plan)
+	assert.Equal(t, billingmodels.BillingPlanNone, plan.Catalog.Key)
+	assert.Equal(t, billingmodels.BillingPlanSourceSystem, plan.PlanSource)
+	assert.Nil(t, plan.TrialStartedAt)
+	assert.Nil(t, plan.TrialEndsAt)
+	assert.False(t, plan.AllowsHostedExecution(time.Now()))
+
+	credit, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), credit.GrantMicros)
+	require.NotNil(t, credit.WelcomeCreditExpiresAt)
+	assert.WithinDuration(t, time.Now().AddDate(0, 0, billingmodels.SignupCreditDays), *credit.WelcomeCreditExpiresAt, time.Minute)
+	require.ErrorIs(t, billingmodels.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID), billingmodels.ErrHostedSubscriptionRequired)
+
+	again, err := billingmodels.EnsureOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, plan.PlanID, again.PlanID)
+	assert.Nil(t, again.TrialStartedAt)
+	assert.Nil(t, again.TrialEndsAt)
+
+	require.NoError(t, billingmodels.GrantWelcomeCredit(db, r.Organization.ID, r.Account.ID))
+	repeated, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, credit.GrantMicros, repeated.GrantMicros)
+	stored, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, billingmodels.BillingPlanNone, stored.Plan)
+	assert.Nil(t, stored.TrialEndsAt)
 }
 
 func Test__InitialPaidPlanAddsConfiguredTrialCredit(t *testing.T) {
@@ -60,7 +84,7 @@ func Test__InitialPaidPlanAddsConfiguredTrialCredit(t *testing.T) {
 			restoreInstallationLLMSettings(t)
 			r := support.Setup(t)
 			db := database.DB(t.Context())
-			require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+			support.AssignOpenSystemTrial(t, r.Organization.ID)
 			plan := billingmodels.BillingPlan{
 				Key: "selected_" + uuid.NewString()[:8], Name: "Selected", Category: "paid", Visibility: "public",
 				TrialCreditCents: tc.trialCents, CreditFrequency: "none", CreditExpiration: "never",
@@ -110,7 +134,7 @@ func Test__InitialPaidPlanTrialCreditIsNotRepeatedAfterReactivation(t *testing.T
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	product := "prod_" + uuid.NewString()
 	plan := billingmodels.BillingPlan{
 		Key: "selected_" + uuid.NewString()[:8], Name: "Selected", Category: "paid", Visibility: "public",
@@ -552,7 +576,7 @@ func Test__SetAdminOrganizationPlanBusinessHasNoIncludedUsageByDefault(t *testin
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Zero(t, summary.IncludedRemainingMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.WelcomeRemainingMicros)
 
 	_, err = billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, "business_manual", nil)
 	require.NoError(t, err)
@@ -634,13 +658,14 @@ func Test__SetAdminOrganizationPlanTrialExpiresIncludedUsage(t *testing.T) {
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.WelcomeRemainingMicros)
 }
 
 func Test__SetAdminOrganizationPlanExplicitTrialEndKeepsOpenStart(t *testing.T) {
 	r := support.Setup(t)
 	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 
 	before, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
@@ -707,6 +732,7 @@ func Test__SetAdminOrganizationPlanReopensExpiredTrialCredit(t *testing.T) {
 	r := support.Setup(t)
 	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 
 	before, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
@@ -795,6 +821,7 @@ func Test__SetAdminOrganizationPlanNilTrialEndKeepsFourteenDayDefault(t *testing
 	r := support.Setup(t)
 	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
 	before, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
@@ -817,6 +844,7 @@ func Test__SetAdminOrganizationPlanBusinessAndNoneClearTrialKeepWelcomeExpiry(t 
 	r := support.Setup(t)
 	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
 	planBefore, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
@@ -890,6 +918,7 @@ func Test__ApplyPolarSubscriptionCancelRestoresOpenTrial(t *testing.T) {
 	r := support.Setup(t)
 	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
 
@@ -973,6 +1002,7 @@ func Test__ApplyPolarSubscriptionIncompleteKeepsTrial(t *testing.T) {
 	r := support.Setup(t)
 	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	now := time.Now()
 	end := now.AddDate(0, 1, 0)
 
@@ -1084,6 +1114,7 @@ func Test__AssertOrganizationPlanAllowsRuns(t *testing.T) {
 		r := support.Setup(t)
 		db := database.Conn()
 		t.Setenv("POLAR_ACCESS_TOKEN", "")
+		support.AssignOpenSystemTrial(t, r.Organization.ID)
 
 		require.NoError(t, billingmodels.AssertOrganizationPlanAllowsRuns(db, r.Organization.ID))
 		require.NoError(t, billingmodels.AssertHostedRunAllowed(db, r.Organization.ID, nil))
@@ -1131,6 +1162,7 @@ func Test__ResolveOrganizationBillingPlanLeavesOpenTrial(t *testing.T) {
 	r := support.Setup(t)
 	setLegacyBillingPlanTestProduct(t)
 	db := database.Conn()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 
 	before, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)

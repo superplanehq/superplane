@@ -64,16 +64,12 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
-// FeatureNewBilling enables catalog plan selection and saved-card requirements.
-const FeatureNewBilling = "new_billing"
-
 func released() *bool {
 	v := true
 	return &v
 }
 
 var registry = []Feature{
-	{ID: FeatureNewBilling, Label: "New Billing", Description: "Choose a billing plan and connect a payment card"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},

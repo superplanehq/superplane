@@ -36,6 +36,7 @@ import {
   SentryIntakeSetupPage,
   FactoriesIndexPage,
   FactoryAppCanvasPage,
+  FactoryAutomationRunPage,
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   LegacyFactoryAppRedirect,
@@ -347,6 +348,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path="new" element={<HarnessLegacyAutomationsNewLineRedirect />} />
                 <Route path=":lineId/edit" element={<HarnessLegacyAutomationsLineEditRedirect />} />
                 <Route path=":appId" element={<FactoryAppCanvasPage />} />
+                <Route path=":appId/runs/:runId?" element={<FactoryAutomationRunPage />} />
                 <Route path=":appId/split-run" element={<FactoryAppSplitRunPage />} />
               </Route>
               <Route path="apps/:appId" element={<LegacyFactoryAppRedirect />} />

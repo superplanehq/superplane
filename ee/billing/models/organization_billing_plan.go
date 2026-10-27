@@ -531,6 +531,9 @@ func AssertOrganizationPlanAllowsRuns(tx *gorm.DB, orgID uuid.UUID) error {
 	return ErrHostedSubscriptionRequired
 }
 
+// EnsureOrganizationBillingPlan creates a None plan for an organization that
+// has no billing row. The source is system and the row has no trial dates.
+// An existing plan, including an open trial or a paid subscription, stays as stored.
 func EnsureOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationBillingPlan, error) {
 	existing, err := FindOrganizationBillingPlan(tx, orgID)
 	if err != nil {
@@ -539,29 +542,7 @@ func EnsureOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationB
 	if existing != nil {
 		return existing, nil
 	}
-
-	now := time.Now()
-	catalog, err := FindBillingPlan(tx, BillingPlanTrial)
-	if err != nil {
-		return nil, err
-	}
-	trialEnd := now.AddDate(0, 0, catalog.TrialLengthDays)
-	plan := OrganizationBillingPlan{
-		OrganizationID: orgID,
-		Plan:           BillingPlanTrial,
-		PlanSource:     BillingPlanSourceSystem,
-		TrialStartedAt: &now,
-		TrialEndsAt:    &trialEnd,
-		UpdatedAt:      now,
-	}
-	err = tx.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "organization_id"}},
-		DoNothing: true,
-	}).Create(&plan).Error
-	if err != nil {
-		return nil, err
-	}
-	return loadedOrganizationBillingPlan(tx, orgID)
+	return persistNoneBillingPlan(tx, orgID)
 }
 
 func OrganizationBillingIsPolarManaged(plan *OrganizationBillingPlan) bool {

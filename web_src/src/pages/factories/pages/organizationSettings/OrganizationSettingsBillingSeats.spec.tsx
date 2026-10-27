@@ -21,12 +21,11 @@ vi.mock("@/contexts/usePermissions", () => ({
   }),
 }));
 
-function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse, newBilling = false) {
+function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse, buySeats = false) {
   return render(
     <FactoriesHarness
-      experimentalFeatures={newBilling ? ["new_billing"] : []}
       pathSuffix={
-        "workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing" + (newBilling ? "?buySeats=1" : "")
+        "workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing" + (buySeats ? "?buySeats=1" : "")
       }
       factoriesFixture={{ ...defaultFactoriesFixture, organizationBilling: billing }}
     />,
@@ -195,7 +194,7 @@ describe("Organization billing seats", () => {
     { name: "billing off", billing: { ...TEAM_ORGANIZATION_BILLING, billingEnabled: false } },
   ])("hides seats for $name", async ({ billing }) => {
     renderBilling(billing);
-    await screen.findByTestId("billing-plans");
+    await screen.findByTestId("billing-credit-balance");
     expect(screen.queryByTestId("billing-seats")).not.toBeInTheDocument();
   });
 

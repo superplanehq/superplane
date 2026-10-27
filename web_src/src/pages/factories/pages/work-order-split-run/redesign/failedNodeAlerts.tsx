@@ -1,7 +1,6 @@
 import { Link } from "@/components/Link/link";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/reui/alert";
 import { Button } from "@/components/ui/button";
-import { Bug } from "lucide-react";
 
 import { NodeIcon } from "./redesignShared";
 import type { FailedNodeError } from "./failedNodeErrors";
@@ -17,6 +16,10 @@ export function FailedNodeAlerts({ nodes, runHref }: { nodes: FailedNodeError[];
 }
 
 function FailedNodeAlert({ node, runHref }: { node: FailedNodeError; runHref?: string | null }) {
+  const href =
+    runHref && node.executionId
+      ? `${runHref}${runHref.includes("?") ? "&" : "?"}activity=${encodeURIComponent(node.executionId)}`
+      : runHref;
   return (
     <Alert variant="destructive" data-testid="redesign-run-node-error">
       <NodeIcon iconSlug={node.iconSlug} />
@@ -26,13 +29,10 @@ function FailedNodeAlert({ node, runHref }: { node: FailedNodeError; runHref?: s
           {node.message}
         </pre>
       </AlertDescription>
-      {runHref ? (
+      {href ? (
         <AlertAction>
           <Button asChild size="sm" variant="outline">
-            <Link href={runHref}>
-              <Bug className="size-3.5" aria-hidden />
-              Debug
-            </Link>
+            <Link href={href}>View run details</Link>
           </Button>
         </AlertAction>
       ) : null}

@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func init() { billing.Bind(eebilling.New(NewRuntime())) }
@@ -39,7 +40,7 @@ func Test__ApplyOrderPaidGrantsFaceValueOnce(t *testing.T) {
 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents)+billingmodels.CentsToMicros(2500), summary.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents)+billingmodels.CentsToMicros(2500), summary.GrantMicros)
 }
 
 func Test__ApplyOrderPaidIgnoresNonPacks(t *testing.T) {
@@ -174,7 +175,7 @@ func TestApplyOrderPaidGrantsQuotedCreditsForDiscountedPurchaseOnce(t *testing.T
 			assert.Equal(t, billingmodels.CentsToMicros(10000), grant.AmountMicros)
 			summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 			require.NoError(t, err)
-			assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents)+billingmodels.CentsToMicros(10000), summary.GrantMicros)
+			assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents)+billingmodels.CentsToMicros(10000), summary.GrantMicros)
 
 			entries := logs.AllEntries()
 			require.Len(t, entries, 1, "webhook replays must not log another discounted grant")
@@ -515,12 +516,12 @@ func Test__ApplyOrderRefundedPartialDoesNotGoBelowZero(t *testing.T) {
 	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedPackEvent(org.ID, orderID, "partially_refunded", 1000), nil))
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents)+billingmodels.CentsToMicros(1500), summary.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents)+billingmodels.CentsToMicros(1500), summary.GrantMicros)
 
 	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedPackEvent(org.ID, orderID, "partially_refunded", 99999), nil))
 	after, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), after.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), after.GrantMicros)
 	assert.GreaterOrEqual(t, after.RemainingMicros, int64(0))
 }
 
@@ -605,7 +606,7 @@ func Test__ApplyOrderRefundedRetriesUntilGrantExists(t *testing.T) {
 
 	before, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), before.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), before.GrantMicros)
 
 	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(org.ID, orderID, 2500), nil))
 	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refund, nil))
@@ -717,5 +718,6 @@ func setupBillingOrganization(t *testing.T) *models.Organization {
 	account, err := models.CreateAccount("Billing test", uuid.NewString()+"@example.com")
 	require.NoError(t, err)
 	require.NoError(t, billingmodels.GrantWelcomeCredit(database.Conn(), org.ID, account.ID))
+	support.AssignOpenSystemTrial(t, org.ID)
 	return org
 }
