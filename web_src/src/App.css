@@ -1451,8 +1451,6 @@
   --workflow-card-border: #e0e5e9;
   --workflow-neutral-lane: #ffffff;
   --workflow-neutral-header: #ffffff;
-  --workflow-vivid-card-bg: rgb(255 255 255 / 17%);
-  --workflow-vivid-card-border: rgb(255 255 255 / 20%);
   --workflow-vivid-fg: #17212b;
   --workflow-vivid-border-opacity: 50%;
   --workflow-soft-border-opacity: 24%;
@@ -1483,8 +1481,6 @@
   --workflow-card-border: #313934;
   --workflow-neutral-lane: #171c1b;
   --workflow-neutral-header: #202624;
-  --workflow-vivid-card-bg: rgb(255 255 255 / 10%);
-  --workflow-vivid-card-border: rgb(255 255 255 / 12%);
   --workflow-vivid-fg: #f2f5f4;
   --workflow-vivid-border-opacity: 34%;
   --workflow-soft-border-opacity: 27%;
@@ -1566,15 +1562,11 @@
 }
 
 .line-board-column-vivid {
-  --foreground: var(--workflow-vivid-fg);
-  --card-foreground: var(--workflow-vivid-fg);
-  --card: var(--workflow-vivid-card-bg);
-  --border: var(--workflow-vivid-card-border);
-  --muted-foreground: color-mix(in srgb, var(--foreground) 85%, var(--board-column-vivid));
   --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-vivid-border-opacity), transparent);
 }
 
 .line-board-column-vivid > header {
+  --foreground: var(--workflow-vivid-fg);
   --muted-foreground: var(--workflow-vivid-fg);
   background: var(--board-column-vivid-header);
   border-bottom-width: 0;
