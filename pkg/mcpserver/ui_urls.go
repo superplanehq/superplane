@@ -23,7 +23,9 @@ func uiBaseURL() string {
 }
 
 func taskPermalink(orgID uuid.UUID, routeSegment string, number int64) string {
-    return fmt.Sprintf("%s/%s/workspaces/%s/work-order/%d", uiBaseURL(), orgID, routeSegment, number)
+    // UI permalink uses the singular task route; avoid legacy /work-order/ to
+    // prevent redirect and dependency on the legacy route existing.
+    return fmt.Sprintf("%s/%s/workspaces/%s/task/%d", uiBaseURL(), orgID, routeSegment, number)
 }
 
 func workspacePermalink(orgID uuid.UUID, routeSegment string) string {

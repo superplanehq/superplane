@@ -47,8 +47,10 @@ func decodeToolJSON(t *testing.T, result ToolResult) map[string]any {
 }
 
 func TestListTasksAppliesMineAndStates(t *testing.T) {
-	r := support.Setup(t)
-	enableFactories(t, r.Organization.ID)
+    r := support.Setup(t)
+    // Ensure MCP URL generation uses localhost even when BASE_URL is set in the environment.
+    t.Setenv("BASE_URL", "http://localhost:8000")
+    enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
 	db := database.DB(ctx)
 
@@ -81,7 +83,7 @@ func TestListTasksAppliesMineAndStates(t *testing.T) {
     assert.Equal(t, "draft", row["state"])
     assert.Equal(t, "", row["source_url"])
     // URL points to the task in the UI
-    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/work-order/" + strconv.FormatInt(draftMine.Number, 10)
+    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/task/" + strconv.FormatInt(draftMine.Number, 10)
     assert.Equal(t, expectedURL, row["url"])
     assert.Contains(t, row, "assignees")
 }
@@ -106,8 +108,10 @@ func TestGetTaskRejectsOtherWorkspace(t *testing.T) {
 }
 
 func TestCreateTaskReturnsNewTask(t *testing.T) {
-	r := support.Setup(t)
-	enableFactories(t, r.Organization.ID)
+    r := support.Setup(t)
+    // Ensure BASE_URL does not affect assertions.
+    t.Setenv("BASE_URL", "http://localhost:8000")
+    enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
 	db := database.DB(ctx)
 
@@ -128,13 +132,15 @@ func TestCreateTaskReturnsNewTask(t *testing.T) {
     createdID := uuid.MustParse(payload["id"].(string))
     order, err := factoryModel.FindWorkOrder(db, createdID)
     require.NoError(t, err)
-    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/work-order/" + strconv.FormatInt(order.Number, 10)
+    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/task/" + strconv.FormatInt(order.Number, 10)
     assert.Equal(t, expectedURL, payload["url"])
 }
 
 func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {
-	r := support.Setup(t)
-	enableFactories(t, r.Organization.ID)
+    r := support.Setup(t)
+    // Ensure BASE_URL does not affect assertions.
+    t.Setenv("BASE_URL", "http://localhost:8000")
+    enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
 	db := database.DB(ctx)
 
@@ -164,7 +170,7 @@ func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {
     handedID := uuid.MustParse(payload["id"].(string))
     handed, err := factoryModel.FindWorkOrder(db, handedID)
     require.NoError(t, err)
-    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/work-order/" + strconv.FormatInt(handed.Number, 10)
+    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/task/" + strconv.FormatInt(handed.Number, 10)
     assert.Equal(t, expectedURL, payload["url"])
 }
 
@@ -412,8 +418,10 @@ func TestResolveAssigneeMemberMatchesUUIDShapedLogin(t *testing.T) {
 }
 
 func TestAssignTaskSetsOneOwner(t *testing.T) {
-	r := support.Setup(t)
-	enableFactories(t, r.Organization.ID)
+    r := support.Setup(t)
+    // Ensure BASE_URL does not affect assertions.
+    t.Setenv("BASE_URL", "http://localhost:8000")
+    enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
 	db := database.DB(ctx)
 
@@ -452,7 +460,7 @@ func TestAssignTaskSetsOneOwner(t *testing.T) {
         assert.Equal(t, byID.ID.String(), payload["id"])
         assert.Equal(t, factoryModel.WorkOrderKey(byID.Number), payload["key"])
         assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, payload["assignees"]))
-        assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/work-order/"+strconv.FormatInt(byID.Number, 10), payload["url"])
+        assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/task/"+strconv.FormatInt(byID.Number, 10), payload["url"])
         assert.Equal(t, []string{owner.ID.String()}, storedAssigneeIDs(t, factoryModel, byID.ID))
     })
 
@@ -565,8 +573,10 @@ func TestAssignTaskRejectsInvalidChanges(t *testing.T) {
 }
 
 func TestTaskReadsIncludeAssignees(t *testing.T) {
-	r := support.Setup(t)
-	enableFactories(t, r.Organization.ID)
+    r := support.Setup(t)
+    // Ensure BASE_URL does not affect assertions.
+    t.Setenv("BASE_URL", "http://localhost:8000")
+    enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
 	db := database.DB(ctx)
 
@@ -588,13 +598,13 @@ func TestTaskReadsIncludeAssignees(t *testing.T) {
     payload := decodeToolJSON(t, got)
     assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, payload["assignees"]))
     assert.Equal(t, "Ada Lovelace", payload["assignees"].([]any)[0].(map[string]any)["name"])
-    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/work-order/"+strconv.FormatInt(order.Number, 10), payload["url"])
+        assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/task/"+strconv.FormatInt(order.Number, 10), payload["url"])
 
     listed, err := runtime.CallTool(ctx, claims, "list_tasks", map[string]any{})
     require.NoError(t, err)
     row := taskRowByID(t, decodeToolJSON(t, listed), order.ID.String())
     assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, row["assignees"]))
-    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/work-order/"+strconv.FormatInt(order.Number, 10), row["url"])
+    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/task/"+strconv.FormatInt(order.Number, 10), row["url"])
 
 	_, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
 		"task":     order.ID.String(),
@@ -610,7 +620,7 @@ func TestTaskReadsIncludeAssignees(t *testing.T) {
     require.NoError(t, err)
     row = taskRowByID(t, decodeToolJSON(t, listed), order.ID.String())
     assert.Empty(t, assigneeIDs(t, row["assignees"]))
-    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/work-order/"+strconv.FormatInt(order.Number, 10), row["url"])
+    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/task/"+strconv.FormatInt(order.Number, 10), row["url"])
 }
 
 func TestListMembersReturnsHumanMembers(t *testing.T) {
@@ -862,8 +872,10 @@ func memberIndex(t *testing.T, members []any, email string) int {
 }
 
 func TestListWorkspacesReturnsGrantedWorkspaces(t *testing.T) {
-	r := support.Setup(t)
-	enableFactories(t, r.Organization.ID)
+    r := support.Setup(t)
+    // Ensure BASE_URL does not affect assertions.
+    t.Setenv("BASE_URL", "http://localhost:8000")
+    enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
 	db := database.DB(ctx)
 	first, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "ALP")
@@ -903,6 +915,8 @@ func TestListWorkspacesReturnsGrantedWorkspaces(t *testing.T) {
 
 func TestGetTaskReportIncludesTaskURL(t *testing.T) {
     r := support.Setup(t)
+    // Ensure BASE_URL does not affect assertions.
+    t.Setenv("BASE_URL", "http://localhost:8000")
     enableFactories(t, r.Organization.ID)
     ctx := t.Context()
     db := database.DB(ctx)
@@ -919,7 +933,7 @@ func TestGetTaskReportIncludesTaskURL(t *testing.T) {
     payload := decodeToolJSON(t, result)
     taskDoc, ok := payload["task"].(map[string]any)
     require.True(t, ok)
-    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/work-order/" + strconv.FormatInt(order.Number, 10)
+    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/task/" + strconv.FormatInt(order.Number, 10)
     assert.Equal(t, expectedURL, taskDoc["url"])
 }
 
