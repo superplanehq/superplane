@@ -38,7 +38,7 @@ pull request, checks, and execution history together.
 ### Turn backlog issues into work agents can deliver
 
 <p align="center">
-  <img src="./docs/images/backlog-refinement.png" alt="Task refinement showing a plan and readiness assessment" width="60%">
+  <img src="./docs/images/backlog-refinement-framed.png" alt="Task refinement showing a plan and readiness assessment" width="100%">
 </p>
 
 Reliable automation starts with a clear task. SuperPlane analyzes the issue,
@@ -48,7 +48,7 @@ implementation begins.
 ### Bring verified changes to human review
 
 <p align="center">
-  <img src="./docs/images/pull-request-verification.png" alt="Pull request verification showing check fixes and merge confidence" width="60%">
+  <img src="./docs/images/pull-request-verification-framed.png" alt="Pull request verification showing check fixes and merge confidence" width="100%">
 </p>
 
 SuperPlane checks the agent's work and sends failures back for correction.
