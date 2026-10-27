@@ -363,6 +363,12 @@ describe("lineIntakeModel", () => {
     ]);
   });
 
+  it("hides Dependabot alerts for GitHub Enterprise Server", () => {
+    const templates = addIntakeTemplatesForOrg(() => true, { hideDependabot: true });
+    expect(templates.find((template) => template.id === "dependabot-alerts")).toBeUndefined();
+    expect(templates.find((template) => template.id === "github-issues")).toBeDefined();
+  });
+
   it("keeps Jira and Linear live when other flagged intake sources are off", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 

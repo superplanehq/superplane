@@ -427,6 +427,10 @@ func (f *recordingBitbucketFactory) VCSProvider() (string, error) {
 	return "", nil
 }
 
+func (f *recordingBitbucketFactory) GitHubHost() (string, error) {
+	return "", nil
+}
+
 func Test__OnPush__RepositoryRouting(t *testing.T) {
 
 	trigger := &OnPush{}

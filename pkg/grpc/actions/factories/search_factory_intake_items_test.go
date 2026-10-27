@@ -45,14 +45,21 @@ func Test__ProductiveTaskItem(t *testing.T) {
 }
 
 func TestParseGitHubIssueURL(t *testing.T) {
-	repository, number, ok := parseGitHubIssueURL("https://github.com/acme/payments/issues/12#issuecomment-1")
+	host, repository, number, ok := parseGitHubIssueURL("https://github.com/acme/payments/issues/12#issuecomment-1")
 	assert.True(t, ok)
+	assert.Equal(t, "github.com", host.WebHostname())
 	assert.Equal(t, "acme/payments", repository)
 	assert.Equal(t, 12, number)
 
-	_, _, ok = parseGitHubIssueURL("https://github.com/acme/payments/pull/12")
+	host, repository, number, ok = parseGitHubIssueURL("https://acme.ghe.com/acme/payments/issues/12")
+	assert.True(t, ok)
+	assert.Equal(t, "acme.ghe.com", host.WebHostname())
+	assert.Equal(t, "acme/payments", repository)
+	assert.Equal(t, 12, number)
+
+	_, _, _, ok = parseGitHubIssueURL("https://github.com/acme/payments/pull/12")
 	assert.False(t, ok)
-	_, _, ok = parseGitHubIssueURL("https://example.com/acme/payments/issues/12")
+	_, _, _, ok = parseGitHubIssueURL("https://example.com/acme/payments/issues/12")
 	assert.False(t, ok)
 }
 
