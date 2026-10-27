@@ -3,13 +3,23 @@
 Thank you for your interest in contributing to SuperPlane! We welcome
 contributions from the community.
 
-## Ways to Get Involved
+## Before you start
 
-Before starting your contribution, especially for core features, we encourage
-you to reach out to us on [Discord](https://discord.gg/KC78eCNsnw). This allows
-us to ensure that your proposed feature aligns with the project's roadmap and
-goals. Developers are the key to making SuperPlane the best platform it can be,
-and we value input from the community.
+We love contributions. For anything beyond a small fix, please talk with
+the core maintainers first.
+
+For features, larger bug fixes, or architectural changes:
+
+1. Find or open an issue that describes the change.
+2. Discuss the approach with us on the issue or on [Discord](https://discord.gg/KC78eCNsnw).
+3. Wait until a maintainer assigns the issue to you before you start implementation.
+
+This helps us avoid duplicate work. It also makes sure we agree on the
+direction before you spend time building the change.
+
+Documentation and typo fixes are always welcome as direct pull requests.
+
+## Ways to Get Involved
 
 There are many ways to contribute to SuperPlane:
 
@@ -94,6 +104,20 @@ Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
 in `.env` only when you need the SuperPlane-hosted provider. See
 [Connecting to third-party services](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
+## Pull requests
+
+Keep each pull request focused on one change.
+
+If you are a new contributor, keep only one pull request open at a time. We
+prefer to give one contribution proper attention rather than several competing
+for review.
+
+We may close a pull request for a substantial change that was not discussed
+with us first.
+
+See [Pull Requests](docs/contributing/pull-requests.md) for title format,
+sign-off, and the review process.
+
 ## Additional Development Resources
 
 ### Overview
@@ -115,7 +139,7 @@ in `.env` only when you need the SuperPlane-hosted provider. See
 
 ### Adding new integrations to SuperPlane
 
-- **[Building an Integration](docs/contributing/building-an-integration.md)** — High-level overview of the steps to add a new integration (claim a ticket, research, build, open a PR)
+- **[Building an Integration](docs/contributing/building-an-integration.md)** — High-level overview of the steps to add a new integration (get assigned, research, build, open a PR)
 - **[Opening PRs for integrations](docs/contributing/integration-prs.md)** — Checklist for opening and submitting integration PRs (title, description, video, frontend/backend/docs, CI, DCO)
 - **[Integrations](docs/contributing/integrations.md)** — Instructions for adding new third-party integrations to SuperPlane
 - **[Component Implementation](docs/contributing/component-implementations.md)** — Step-by-step instructions for creating new components or triggers
@@ -124,3 +148,40 @@ in `.env` only when you need the SuperPlane-hosted provider. See
 - **[Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/17)** — View all integration-related work on the SuperPlane Board
 - **[Integration bounties](docs/contributing/bounties.md)** — How to claim, work on, and get paid for bounties via BountyHub; review and dispute process
 - **[Connecting to Third-Party Services during Development](docs/contributing/connecting-to-3rdparty-services-from-development.md)**
+
+## For maintainers
+
+Assume good intent. Thank the contributor. Be clear and kind.
+
+Help people land good work. Talk through the idea. Assign the issue. Review
+one focused pull request.
+
+If a pull request skipped that process, close it with care. Invite a next
+step. Use a short, consistent response:
+
+### Substantial PR without prior discussion
+
+> Thanks for the contribution. For substantial changes, we ask contributors to
+> discuss the change with us and get the issue assigned before starting
+> implementation.
+>
+> I am going to close this PR for now. Please open or comment on the relevant
+> issue first. If we agree on the direction, we can take it from there.
+
+### Issue was not assigned
+
+> Thanks for jumping in. We ask contributors to wait until an issue is assigned
+> to them before starting implementation. This avoids duplicate work and
+> competing PRs.
+>
+> I am closing this one for now. Please comment on the issue and wait until a
+> maintainer assigns it to you.
+
+### Not something we will merge
+
+> Thanks for the contribution. This is not something we are going to merge in
+> its current form, so I am going to close it rather than ask you to spend more
+> time on it.
+>
+> If you would like to contribute another change, please start with an issue
+> and coordinate with us before opening another PR.
