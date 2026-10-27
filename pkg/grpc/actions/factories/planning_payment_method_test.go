@@ -10,7 +10,6 @@ import (
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -21,7 +20,6 @@ import (
 func TestPlanningFollowUpRequiresPaymentMethod(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	session := openAnalysisSession(t, r, db)
 	plan := billingmodels.BillingPlan{Key: "planning_card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))

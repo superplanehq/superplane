@@ -1,0 +1,265 @@
+# Coolify Git build pack: base directory /, this file as the Compose path.
+# Builds the runner and Fleet Manager from this repository.
+# SUPERPLANE_VERSION defaults to v1.0.0.
+# Coolify generates SERVICE_REALBASE64_32_ENCRYPTION and builds
+# ENCRYPTION_MASTER_KEYS. Keep that value. Do not paste a password.
+# Attach the public domain to service app on port 8000 (SERVICE_URL_APP_8000).
+# Coolify stores that URL with :8000 for the proxy. The app entrypoint strips
+# :8000 from HTTPS BASE_URL so OAuth callbacks use the public hostname.
+# Complete owner setup. Fleet Manager waits, then mints an admin token.
+# On ARM, set RUNNER_FLEET_ID=e1-large-arm64 and RUNNER_ARCH=arm64.
+# For a pasteable stack that only pulls published images, use
+# template/superplane.yaml. See README.md.
+
+services:
+  init:
+    image: alpine:3.22
+    user: "0:0"
+    restart: "no"
+    exclude_from_hc: true
+    volumes:
+      - oidc-keys:/oidc-keys
+      - blobs:/blobs
+      - runner-logs:/runner-logs
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ ! -f /oidc-keys/oidc.pem ]; then
+          apk add --no-cache openssl
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
+            -out /oidc-keys/oidc.pem
+        fi
+        chown -R 65534:65534 /oidc-keys /blobs /runner-logs
+        chmod 700 /oidc-keys /blobs /runner-logs
+        chmod 400 /oidc-keys/oidc.pem
+
+  db:
+    image: postgres:17.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: superplane
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.8.17-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${SERVICE_USER_RABBITMQ}
+      RABBITMQ_DEFAULT_PASS: ${SERVICE_PASSWORD_RABBITMQ}
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION:-v1.0.0}
+    pull_policy: always
+    restart: unless-stopped
+    stop_grace_period: 45s
+    expose:
+      - "8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - oidc-keys:/app/oidc-keys:ro
+      - blobs:/var/lib/superplane/blobs
+      - runner-logs:/var/lib/superplane/runner-logs
+    networks:
+      - default
+      - runners
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 180s
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -eu
+        public_origin() {
+          printf '%s' "$$1" | sed -E 's#^(https://[^/:]+):8000#\1#'
+        }
+        BASE_URL="$$(public_origin "$${BASE_URL:-}")"
+        WEBHOOKS_BASE_URL="$$(public_origin "$${WEBHOOKS_BASE_URL:-$$BASE_URL}")"
+        export BASE_URL WEBHOOKS_BASE_URL
+        exec bash /app/docker-entrypoint.sh
+    environment:
+      SERVICE_URL_APP:
+      SERVICE_URL_APP_8000:
+      SERVICE_REALBASE64_32_ENCRYPTION:
+      BASE_URL: ${SERVICE_URL_APP:-${SERVICE_URL_APP_8000:-http://localhost:8000}}
+      WEBHOOKS_BASE_URL: ${SERVICE_URL_APP:-${SERVICE_URL_APP_8000:-http://localhost:8000}}
+      PUBLIC_API_BASE_PATH: /api/v1
+      WEB_BASE_PATH: ""
+      RUNNER_API_BASE_URL: http://app:8000
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: superplane
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      APPLICATION_NAME: superplane
+      POSTGRES_DB_SSL: "false"
+      DB_POOL_SIZE: "20"
+      DB_STATEMENT_TIMEOUT: 60s
+      DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT: 30s
+      RABBITMQ_URL: amqp://${SERVICE_USER_RABBITMQ}:${SERVICE_PASSWORD_RABBITMQ}@rabbitmq:5672
+      JWT_SECRET: ${SERVICE_PASSWORD_64_JWT}
+      SESSION_SECRET: ${SERVICE_PASSWORD_64_SESSION}
+      BLOB_STORAGE_SIGNING_KEY: ${SERVICE_PASSWORD_64_BLOBSIGNING}
+      ENCRYPTION_MASTER_KEYS: ${ENCRYPTION_MASTER_KEYS:-env://coolify-v1:${SERVICE_REALBASE64_32_ENCRYPTION}}
+      SWAGGER_BASE_PATH: /app/api/swagger
+      RBAC_MODEL_PATH: /app/rbac/rbac_model.conf
+      RBAC_ORG_POLICY_PATH: /app/rbac/rbac_org_policy.csv
+      RBAC_CANVAS_POLICY_PATH: /app/rbac/rbac_canvas_policy.csv
+      TEMPLATE_DIR: /app/templates
+      OIDC_KEYS_PATH: /app/oidc-keys
+      BLOB_STORAGE_PROVIDER: filesystem
+      BLOB_STORAGE_LOCAL_PATH: /var/lib/superplane/blobs
+      RUNNER_ACTIVE_LOG_FS_PATH: /var/lib/superplane/runner-logs
+      START_PUBLIC_API: "yes"
+      START_WEB_SERVER: "yes"
+      START_WEBSOCKET_SERVER: "yes"
+      START_GRPC_GATEWAY: "yes"
+      START_EVENT_DISTRIBUTER: "yes"
+      START_RBAC_POLICY_RELOAD_CONSUMER: "yes"
+      START_CONSUMERS: "yes"
+      START_EVENT_ROUTER: "yes"
+      START_RUN_FINALIZER: "yes"
+      START_RUN_INITIALIZER: "yes"
+      START_NODE_EXECUTOR: "yes"
+      START_EXECUTION_TERMINATOR: "yes"
+      START_NODE_QUEUE_WORKER: "yes"
+      START_NODE_REQUEST_WORKER: "yes"
+      START_APP_MESSAGE_WORKER: "yes"
+      START_INTEGRATION_REQUEST_WORKER: "yes"
+      START_WEBHOOK_PROVISIONER: "yes"
+      START_WEBHOOK_CLEANUP_WORKER: "yes"
+      START_INTEGRATION_CLEANUP_WORKER: "yes"
+      START_CANVAS_CLEANUP_WORKER: "yes"
+      START_NODE_REQUEST_CLEANUP_WORKER: "yes"
+      START_ORGANIZATION_CLEANUP_WORKER: "yes"
+      START_FACTORY_CLEANUP_WORKER: "yes"
+      START_FACTORY_VELOCITY_SYNC_WORKER: "yes"
+      START_PRICE_BOOK_SYNC_WORKER: "yes"
+      START_PLANNING_SESSION_CLEANUP_WORKER: "yes"
+      START_EVENT_RETENTION_WORKER: "yes"
+      START_FILE_CLEANUP_WORKER: "yes"
+      START_RUNNER_API: "yes"
+      START_RUNNER_LOG_COMPACTOR: "yes"
+      START_RUNNER_CLEANUP_WORKER: "yes"
+      APP_ENV: production
+      OWNER_SETUP_ENABLED: "yes"
+      ENABLE_PASSWORD_LOGIN: "yes"
+      BLOCK_SIGNUP: "yes"
+      REDIRECT_HTTP_REQUESTS: "yes"
+      SUPERPLANE_VERSION: ${SUPERPLANE_VERSION:-v1.0.0}
+      RUNNER_STABLE_VERSION: ${RUNNER_VERSION:-v0.2.1}
+      SUPERPLANE_INSTALLATION_TYPE: single-host
+      SUPERPLANE_BILLING_ENABLED: "no"
+      SUPERPLANE_BEACON_ENABLED: "yes"
+      OTEL_ENABLED: "no"
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-single-host}
+
+  runner-image:
+    image: superplane-runner:${COMPOSE_PROJECT_NAME:-coolify}
+    build:
+      context: ../..
+      dockerfile: release/runner/Dockerfile
+      target: local
+    command: ["--version"]
+    restart: "no"
+    exclude_from_hc: true
+
+  fleet-manager:
+    build:
+      context: ../..
+      dockerfile: release/fleet-manager/Dockerfile
+      target: local
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+      runner-image:
+        condition: service_completed_successfully
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        /usr/local/bin/fleet-manager-entrypoint sync-fleets
+        exec /usr/local/bin/fleet-manager-entrypoint
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: superplane
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      FLEET_MANAGER_CONFIG: |
+        id: ${FLEET_MANAGER_ID:-${COMPOSE_PROJECT_NAME:-coolify}}
+        superplaneUrl: http://app:8000
+        reconciliation:
+          pollTimeout: 30s
+          errorRetryInterval: 2s
+        http:
+          requestTimeout: 60s
+        fleets:
+          - id: ${RUNNER_FLEET_ID:-e1-large-amd64}
+            runnerVersion: dev
+            provider: docker
+            maxCapacity: 1
+            warmCapacity: 1
+            spec:
+              operatingSystem: linux
+              architecture: ${RUNNER_ARCH:-amd64}
+              cpuMillicores: 2000
+              memoryMb: 8192
+              diskGb: 30
+              # Omit capabilities docker: the runner image has no Docker client.
+            docker:
+              image: superplane-runner:${COMPOSE_PROJECT_NAME:-coolify}
+              architecture: ${RUNNER_ARCH:-amd64}
+              runnerApiUrl: http://app:8000
+              network: ${RUNNER_NETWORK:-${COMPOSE_PROJECT_NAME}_runners}
+              extraHosts:
+                - host.docker.internal:host-gateway
+
+networks:
+  default:
+  runners:
+
+volumes:
+  pgdata:
+  rabbitmq:
+  oidc-keys:
+  blobs:
+  runner-logs:

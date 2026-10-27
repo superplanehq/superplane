@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -26,14 +27,14 @@ import (
 
 func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
 	resource := support.Setup(t)
-	t.Setenv(models.BillingEnabledEnv, "true")
+	t.Setenv(billingmodels.BillingEnabledEnv, "true")
 	db := database.DB(t.Context())
-	plan := &models.BillingPlan{
+	plan := &billingmodels.BillingPlan{
 		Key: "runner_" + uuid.NewString()[:8], Name: "Runner capacity", Category: "paid", Visibility: "private",
 		CreditFrequency: "none", CreditExpiration: "never", ParallelTaskLimit: new(1),
 	}
-	require.NoError(t, models.SaveBillingPlan(db, plan))
-	_, err := models.SetAdminOrganizationPlan(db, resource.Organization.ID, plan.Key, nil)
+	require.NoError(t, billingmodels.SaveBillingPlan(db, plan))
+	_, err := billingmodels.SetAdminOrganizationPlan(db, resource.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
 	runner, registration, fleet := createRegistrationFixture(t)
 	otherFleet := *fleet

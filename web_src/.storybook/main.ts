@@ -24,6 +24,13 @@ const config: StorybookConfig = {
     config.server = {
       ...config.server,
       strictPort: false,
+      fs: {
+        ...config.server?.fs,
+        allow: [
+          ...(config.server?.fs?.allow ?? [resolve(__dirname, "..")]),
+          resolve(__dirname, "../../templates/email"),
+        ],
+      },
     };
 
     // Add path aliases to match your main Vite config

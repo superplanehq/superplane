@@ -603,7 +603,6 @@ func TestNodeExecutorRejectsUsageWithoutRequiredCard(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	plan := billingmodels.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 	_, err := billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
@@ -634,7 +633,6 @@ func TestNodeExecutorRetriesWhenPaymentMethodVerificationFails(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	plan := billingmodels.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 	_, err := billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
@@ -663,6 +661,7 @@ func TestNodeExecutorRetriesWhenPaymentMethodVerificationFails(t *testing.T) {
 // Saved configurations must be checked at execution time after a rollout is removed.
 func TestNodeExecutorBYOKRevocation(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.Conn()
 	settings, err := models.GetInstallationLLMSettings(db)
 	require.NoError(t, err)
@@ -800,6 +799,7 @@ func TestNodeExecutorRunsAgentsOnOpenTrial(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
 			t.Setenv("POLAR_ACCESS_TOKEN", "")
+			support.AssignOpenSystemTrial(t, r.Organization.ID)
 
 			execution, step, calls := processAgentRunnerStep(t, r, runner)
 

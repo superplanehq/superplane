@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -16,14 +17,14 @@ import (
 
 func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
 	resource := support.Setup(t)
-	t.Setenv(models.BillingEnabledEnv, "true")
+	t.Setenv(billingmodels.BillingEnabledEnv, "true")
 	db := database.DB(t.Context())
-	plan := &models.BillingPlan{
+	plan := &billingmodels.BillingPlan{
 		Key: "runner_" + uuid.NewString()[:8], Name: "Runner capacity", Category: "paid",
 		Visibility: "private", CreditFrequency: "none", CreditExpiration: "never", ParallelTaskLimit: new(1),
 	}
-	require.NoError(t, models.SaveBillingPlan(db, plan))
-	_, err := models.SetAdminOrganizationPlan(db, resource.Organization.ID, plan.Key, nil)
+	require.NoError(t, billingmodels.SaveBillingPlan(db, plan))
+	_, err := billingmodels.SetAdminOrganizationPlan(db, resource.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
 	otherFleet := createTestFleetWithSlug(t, "other-capacity-fleet")

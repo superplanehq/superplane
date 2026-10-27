@@ -17,7 +17,6 @@ import {
   ACTIVE_TRIAL_ENDS_AT,
   ACTIVE_BILLING_PERIOD_ENDS_AT,
 } from "../../__fixtures__/usageReportFixtures";
-import { BILLING_SPEND_ORDER_COPY } from "../../lib/billingCreditBuckets";
 import { billingSubscriptionEndsCopy } from "../../lib/billingPlans";
 
 const WELCOME_EXPIRY_LABEL = new Date(ACTIVE_TRIAL_ENDS_AT).toLocaleDateString();
@@ -73,7 +72,7 @@ describe("OrganizationSettingsBillingPage plans", () => {
       expect(balance).not.toHaveTextContent("This is trial usage");
       expect(balance).not.toHaveTextContent("Subscribe to Business");
       expect(balance).not.toHaveTextContent("Included with Business");
-      expect(within(balance).getByTestId("billing-credit-trial")).toHaveTextContent("Trial credit");
+      expect(within(balance).getByTestId("billing-credit-trial")).toHaveTextContent("Signup credit");
       await user.click(screen.getByTestId("factories-sidebar-user-menu-trigger"));
       expect(screen.getByTestId("factories-sidebar-plan-status")).toHaveTextContent("Team");
       await user.keyboard("{Escape}");
@@ -86,11 +85,10 @@ describe("OrganizationSettingsBillingPage plans", () => {
     10000,
   );
 
-  it("uses the assigned catalog name and price with new billing enabled", async () => {
+  it("uses the assigned catalog name and price without a billing rollout flag", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        experimentalFeatures={["new_billing"]}
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
@@ -162,15 +160,10 @@ describe("OrganizationSettingsBillingPage plans", () => {
     const balance = await screen.findByTestId("billing-credit-balance");
     expect(within(balance).getByTestId("billing-credit-remaining-total")).toHaveTextContent("$1152.78");
     expect(within(balance).queryByTestId("billing-credit-trial")).not.toBeInTheDocument();
-    expect(within(balance).getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(within(balance).getByTestId("billing-credit-topup")).toHaveTextContent("Spend next");
-    expect(within(balance).getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$1042.78 remaining");
+    expect(within(balance).queryByTestId("billing-credit-included")).not.toBeInTheDocument();
+    expect(within(balance).getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$1042.78");
     expect(within(balance).getByTestId("billing-credit-grant")).toHaveTextContent("SuperPlane grant");
-    expect(within(balance).getByTestId("billing-credit-grant")).toHaveTextContent("Spend last");
-    expect(within(balance).getByTestId("billing-credit-grant-remaining")).toHaveTextContent("$110.00 remaining");
-    expect(balance).toHaveTextContent(
-      "Hosted runs spend included usage first, then top-up credit, then SuperPlane grant.",
-    );
+    expect(within(balance).getByTestId("billing-credit-grant-remaining")).toHaveTextContent("$110.00");
   }, 10000);
 
   it("does not show SuperPlane grant when remaining grant is zero", async () => {
@@ -196,9 +189,7 @@ describe("OrganizationSettingsBillingPage plans", () => {
 
     const balance = await screen.findByTestId("billing-credit-balance");
     expect(within(balance).queryByTestId("billing-credit-grant")).not.toBeInTheDocument();
-    expect(within(balance).getByTestId("billing-credit-topup")).toHaveTextContent("Spend last");
-    expect(balance).toHaveTextContent(BILLING_SPEND_ORDER_COPY);
-    expect(balance).not.toHaveTextContent("then SuperPlane grant");
+    await userEvent.setup().click(screen.getByRole("tab", { name: "Credit history" }));
     expect(screen.getByTestId("billing-credit-history")).toHaveTextContent("SuperPlane grant");
   }, 10000);
 
@@ -220,20 +211,19 @@ describe("OrganizationSettingsBillingPage plans", () => {
       />,
     );
 
-    expect(await screen.findByTestId("billing-credit-trial")).toHaveTextContent("Trial credit");
+    expect(await screen.findByTestId("billing-credit-trial")).toHaveTextContent("Signup credit");
     const plans = screen.getByTestId("billing-plans");
     expect(within(plans).getByRole("heading", { name: "Trial" })).toBeInTheDocument();
     expect(within(plans).getAllByText("Current plan")).toHaveLength(1);
-    expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$50.00 remaining");
+    expect(screen.getByTestId("billing-credit-trial-remaining")).toHaveTextContent("$50.00");
     expect(screen.getByTestId("billing-credit-trial")).toHaveTextContent(`Expires on ${WELCOME_EXPIRY_LABEL}`);
-    expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByTestId("billing-credit-topup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("billing-credit-included")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
 
     const balance = screen.getByTestId("billing-credit-balance");
-    expect(balance).toHaveTextContent("Trial");
-    expect(balance).toHaveTextContent("This is trial usage for machines and managed models.");
+    expect(balance).not.toHaveTextContent("Subscribe to Business");
     expect(balance).not.toHaveTextContent("Hosted runs cannot start.");
     expect(screen.queryByTestId("factories-sidebar-plan-label")).not.toBeInTheDocument();
   }, 10000);
@@ -319,9 +309,9 @@ describe("OrganizationSettingsBillingPage plans", () => {
     expect(screen.queryByRole("button", { name: "Keep Business" })).not.toBeInTheDocument();
   }, 10000);
   it("shows public catalog plans independently of the legacy checkout flag", async () => {
+    const user = userEvent.setup();
     render(
       <FactoriesHarness
-        experimentalFeatures={["new_billing"]}
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
@@ -333,8 +323,9 @@ describe("OrganizationSettingsBillingPage plans", () => {
         }}
       />,
     );
+    expect(await screen.findByRole("button", { name: "Add payment method" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Change plan" }));
     expect(await screen.findByRole("button", { name: "Select Pay-as-you-go" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
   });
 });

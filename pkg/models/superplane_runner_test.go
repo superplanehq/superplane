@@ -193,6 +193,7 @@ func Test__SuperPlaneRunnerReadinessMessage(t *testing.T) {
 func Test__SuperPlaneRunnerReadinessError(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 
 	t.Cleanup(func() {
@@ -221,6 +222,7 @@ func Test__SuperPlaneRunnerReadinessError(t *testing.T) {
 func Test__ResolveRunnableHostedLLMModel__UsesAllowedModelWhenDefaultIsExcluded(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
 		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
@@ -269,6 +271,7 @@ func Test__ResolveRunnableHostedLLMModel__UsesAllowedModelWhenDefaultIsExcluded(
 func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
 		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
@@ -351,6 +354,7 @@ func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(
 func Test__AnnotateSuperPlaneRunnerNodes(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 
 	t.Run("stamps a missing instance model", func(t *testing.T) {

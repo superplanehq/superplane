@@ -1,19 +1,21 @@
 import type { OrganizationsBillingPlanOption } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
-import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
 
 export type OnboardingCardStep = {
-  /** Billing and feature lookups have an answer. */
+  /** The billing and permission lookups have answers. */
   ready: boolean;
-  /** The card step belongs to this flow: new billing with an available starter plan. */
+  /** The user can select one of the available starter plans. */
   available: boolean;
-  /** The organization still has to select a starter plan. */
+  /** The user must select a starter plan during workspace setup. */
   required: boolean;
+  /** An organization admin must select the plan after workspace setup. */
+  requiresAdmin: boolean;
   plans: OrganizationsBillingPlanOption[];
   planActive: boolean;
   hasPaymentMethod: boolean;
   occupiedSeats?: number;
+  welcomeCreditCents?: number;
   refetch: () => Promise<unknown>;
 };
 
@@ -24,22 +26,26 @@ export type OnboardingCardStep = {
  * workspace, does not see the step.
  */
 export function useOnboardingCardStep(organizationId: string): OnboardingCardStep {
-  const rollout = useExperimentalFeature(organizationId);
   const billing = useOrganizationBilling(organizationId);
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const plans = ["pay_as_you_go", "starter"].flatMap((key) => {
     const plan = billing.data?.availablePlans?.find((candidate) => candidate.key === key && !candidate.perSeat);
     return plan ? [plan] : [];
   });
-  const available = rollout.has(FEATURE_NEW_BILLING) && Boolean(billing.data?.billingEnabled) && plans.length > 0;
+  const canManageBilling = !permissionsLoading && canAct("org", "update");
+  const hasStarterPlans = Boolean(billing.data?.billingEnabled) && plans.length > 0;
+  const available = hasStarterPlans && canManageBilling;
   const planActive = billing.data?.planCategory === "paid";
   return {
-    ready: !billing.isPending && !rollout.isLoading,
+    ready: !billing.isPending && !permissionsLoading,
     available,
     required: available && !planActive,
+    requiresAdmin: !permissionsLoading && hasStarterPlans && !planActive && !canManageBilling,
     plans,
     planActive,
     hasPaymentMethod: Boolean(billing.data?.hasPaymentMethod),
     occupiedSeats: billing.data?.occupiedSeats,
+    welcomeCreditCents: Number(billing.data?.welcomeRemainingCents ?? 0),
     refetch: billing.refetch,
   };
 }

@@ -155,7 +155,11 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
   it("keeps the standard note for a link that is not a pull request", () => {
     renderNote({
-      note: { headline: "Implement did not pass", text: "Fix the error.", cta: { label: "Debug", href: "/runs/1" } },
+      note: {
+        headline: "Implement did not pass",
+        text: "Fix the error.",
+        cta: { label: "View run details", href: "/runs/1" },
+      },
       tone: "failed",
     });
 

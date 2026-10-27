@@ -37,7 +37,7 @@ export function FirstRunCardScreenHost({
       <FirstRunCardReturnScreen
         chrome={chrome}
         sphere={sphere}
-        busy={working || flow.busy}
+        busy={working || flow.busy || !cardStep.ready}
         error={error}
         onRetry={() => void continueSetup(true)}
         onBack={backToPlans}
@@ -48,6 +48,7 @@ export function FirstRunCardScreenHost({
   return (
     <FirstRunCardScreen
       plans={cardStep.plans}
+      welcomeCreditCents={cardStep.welcomeCreditCents}
       selectedPlanKey={plan?.key}
       onSelectPlan={selectPlan}
       phase={
@@ -60,7 +61,7 @@ export function FirstRunCardScreenHost({
               : "add-card"
       }
       error={error || undefined}
-      busy={flow.busy}
+      busy={flow.busy || !cardStep.ready}
       chrome={chrome}
       sphere={sphere}
       onContinue={() => void continueSetup(false)}
