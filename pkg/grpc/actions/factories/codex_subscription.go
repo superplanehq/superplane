@@ -60,6 +60,9 @@ func StartFactoryCodexConnection(
 	if baseURL == "" {
 		return nil, grpcerrors.Internal(errors.New("base url is empty"), "ChatGPT sign-in is not configured")
 	}
+	if req.GetRefreshCatalog() {
+		return refreshFactoryCodexCatalog(ctx, encryptor, orgID, callerID, req.GetFactoryId(), secret, baseURL)
+	}
 
 	var connection *models.FactoryCodexConnection
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
@@ -100,6 +103,60 @@ func StartFactoryCodexConnection(
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to start ChatGPT sign-in")
+	}
+	return &pb.StartFactoryCodexConnectionResponse{
+		Connection: serializeCodexConnection(connection, true, callerID),
+	}, nil
+}
+
+func refreshFactoryCodexCatalog(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	organizationID, callerID uuid.UUID,
+	factoryRef, secret, baseURL string,
+) (*pb.StartFactoryCodexConnectionResponse, error) {
+	var connection *models.FactoryCodexConnection
+	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		factory, err := lockFactory(tx, organizationID, factoryRef)
+		if err != nil {
+			return err
+		}
+		member, err := models.SoleHumanOrganizationMember(tx, organizationID)
+		if err != nil {
+			return err
+		}
+		if member.ID != callerID {
+			return models.ErrCodexConnectionNotEligible
+		}
+		connection, err = models.LockFactoryCodexConnection(tx, organizationID, factory.ID)
+		if err != nil {
+			return err
+		}
+		if connection.OwnerUserID != member.ID {
+			return models.ErrCodexConnectionNotEligible
+		}
+		if len(connection.AvailableModels) > 0 {
+			return nil
+		}
+
+		taskID := uuid.New()
+		if err := connection.BeginCatalogRefresh(tx, taskID, time.Now()); err != nil {
+			return err
+		}
+		token, err := runner.MintCodexSubscriptionToken(jwt.NewSigner(secret), runner.CodexSubscriptionScope{
+			OrganizationID: organizationID,
+			FactoryID:      factory.ID,
+			ConnectionID:   connection.ID,
+			TaskID:         taskID,
+			Generation:     connection.ReservationGeneration,
+		}, models.CodexLoginTimeout)
+		if err != nil {
+			return err
+		}
+		return createCodexConnectionTask(tx, encryptor, organizationID, taskID, token, baseURL, "Refresh ChatGPT models", "refresh")
+	})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to refresh ChatGPT models")
 	}
 	return &pb.StartFactoryCodexConnectionResponse{
 		Connection: serializeCodexConnection(connection, true, callerID),
@@ -343,6 +400,7 @@ func serializeCodexConnection(
 	view.Status = connection.Status
 	view.AccountLabel = connection.AccountLabel
 	view.ReservationHeld = connection.Reserved()
+	view.AvailableModels = models.CompactModelIDs(codexModelIDs(connection.AvailableModels))
 	if connection.LoginLease != nil {
 		view.ActiveTaskId = connection.LoginLease.TaskID.String()
 	}
@@ -351,4 +409,12 @@ func serializeCodexConnection(
 		view.VerificationCode = connection.VerificationCode
 	}
 	return view
+}
+
+func codexModelIDs(available []models.CodexModel) []string {
+	ids := make([]string, 0, len(available))
+	for _, model := range available {
+		ids = append(ids, model.Model)
+	}
+	return ids
 }

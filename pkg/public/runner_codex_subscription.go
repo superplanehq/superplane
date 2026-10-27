@@ -24,6 +24,7 @@ type codexCheckpointRequest struct {
 	Bundle  json.RawMessage `json:"bundle"`
 	Version int64           `json:"version"`
 	Final   bool            `json:"final"`
+	Usage   json.RawMessage `json:"usage"`
 }
 
 type codexProgressRequest struct {
@@ -95,6 +96,19 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	var usage struct {
+		Limits json.RawMessage `json:"limits"`
+		Models json.RawMessage `json:"models"`
+	}
+	_ = json.Unmarshal(request.Usage, &usage)
+	var limits []models.CodexUsageLimit
+	if json.Unmarshal(usage.Limits, &limits) != nil || models.ValidateCodexUsageLimits(limits) != nil {
+		limits = nil
+	}
+	var availableModels []models.CodexModel
+	if json.Unmarshal(usage.Models, &availableModels) != nil || models.ValidateCodexModels(availableModels) != nil {
+		availableModels = nil
+	}
 	var version int64
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		if eligibleErr := codexSubscriptionStillEligible(tx, scope.OrganizationID); eligibleErr != nil {
@@ -109,6 +123,9 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 			return err
 		}
 		if lease.Purpose == models.CodexLeasePurposeRun {
+			if err := connection.StoreUsage(tx, limits, availableModels, time.Now()); err != nil {
+				return err
+			}
 			version = connection.CredentialVersion
 			return nil
 		}
@@ -126,6 +143,10 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		}
 		if storeErr := connection.StoreBundle(tx, scope.TaskID, scope.Generation, next, ciphertext, label, request.Final, time.Now()); storeErr != nil {
 			return storeErr
+		}
+		// Catalog and quota data are independent and optional.
+		if err := connection.StoreUsage(tx, limits, availableModels, time.Now()); err != nil {
+			return err
 		}
 		version = connection.CredentialVersion
 		return nil
