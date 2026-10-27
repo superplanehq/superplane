@@ -6,9 +6,11 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/ee/billing/polar"
+	"github.com/superplanehq/superplane/ee/billing/seatremoval"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 )
@@ -71,6 +73,7 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "unable to apply subscription", http.StatusInternalServerError)
 			return
 		}
+		recoverSeatRemoval(r, event.Subscription.Data)
 		acceptPolarWebhook(w)
 		return
 	}
@@ -96,6 +99,23 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	acceptPolarWebhook(w)
+}
+
+func recoverSeatRemoval(r *http.Request, data polar.SubscriptionData) {
+	if !polar.Configured() {
+		return
+	}
+	externalID := data.Customer.ExternalID
+	if externalID == "" {
+		externalID = data.ExternalCustomerID
+	}
+	orgID, err := uuid.Parse(externalID)
+	if err != nil {
+		return
+	}
+	if recErr := seatremoval.Recover(r.Context(), database.DB(r.Context()), polar.NewClientFromEnv(), orgID); recErr != nil {
+		log.WithError(recErr).WithField("organization_id", orgID.String()).Error("billing.seat_removal_reconcile_failed")
+	}
 }
 
 func acceptPolarWebhook(w http.ResponseWriter) {

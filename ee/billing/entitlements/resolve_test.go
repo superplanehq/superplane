@@ -121,7 +121,7 @@ func TestResolvePurchasedSeats(t *testing.T) {
 	_, err := models.CreateAPIKey(db, r.Organization.ID, "service", nil, r.User, nil, nil)
 	require.NoError(t, err)
 
-	expected := entitlements.SeatUsage{Invitable: seatCount(1), PerSeat: true, Purchased: seatCount(3), Occupied: 2, Available: seatCount(1), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(2)}
+	expected := entitlements.SeatUsage{Invitable: seatCount(1), PerSeat: true, Purchased: seatCount(3), Occupied: 2, Available: seatCount(1), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(2), AdmissionLimit: seatCount(3)}
 	check := func() {
 		t.Helper()
 		actual, err := entitlements.ResolveSeats(db, r.Organization.ID)
@@ -161,6 +161,7 @@ func TestResolvePurchasedSeats(t *testing.T) {
 		if quantity == nil || *quantity == 0 {
 			expected.Purchased, expected.RenewalQuantity = seatCount(0), nil
 		}
+		expected.AdmissionLimit = expected.Purchased
 		expected.Purchasable = seatCount(1 - *expected.Purchased)
 		check()
 	}
@@ -169,6 +170,7 @@ func TestResolvePurchasedSeats(t *testing.T) {
 	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 3).Error)
 	expected.Occupied, expected.RenewalQuantity = 0, seatCount(1)
 	expected.Purchased, expected.Available, expected.Invitable, expected.Purchasable = seatCount(3), seatCount(3), seatCount(3), seatCount(0)
+	expected.AdmissionLimit = seatCount(3)
 	check()
 	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	actual, err := entitlements.ResolveSeats(db, r.Organization.ID)
@@ -252,7 +254,7 @@ func TestResolveSeatsForPlanUsesLoadedPlan(t *testing.T) {
 
 	actual, err := entitlements.ResolveSeatsForPlan(db, r.Organization.ID, loaded)
 	require.NoError(t, err)
-	require.Equal(t, entitlements.SeatUsage{PendingInvitations: 1, Invitable: seatCount(1), PerSeat: true, Purchased: seatCount(3), Occupied: 1, Available: seatCount(2), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(1)}, *actual)
+	require.Equal(t, entitlements.SeatUsage{PendingInvitations: 1, Invitable: seatCount(1), PerSeat: true, Purchased: seatCount(3), Occupied: 1, Available: seatCount(2), PlanMaximum: seatCount(50), Purchasable: seatCount(47), RenewalQuantity: seatCount(1), AdmissionLimit: seatCount(3)}, *actual)
 
 	current, err := entitlements.ResolveSeats(db, r.Organization.ID)
 	require.NoError(t, err)

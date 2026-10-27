@@ -3,27 +3,21 @@ package organizations
 import (
 	"time"
 
-	"github.com/superplanehq/superplane/ee/billing/polar"
+	"github.com/superplanehq/superplane/ee/billing/seatquantity"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 )
 
 const (
-	// seatPurchaseClockSkewMargin covers the difference between the clock of
-	// this server and the clock that Polar uses to renew the subscription.
-	seatPurchaseClockSkewMargin = 5 * time.Minute
-
 	// seatPurchaseBoundaryWindow is the time before the end of the billing
 	// period in which the server does not send a seat purchase to Polar.
+	// It is the same guard as a seat removal: now + 10 minutes < renewal.
+	// Exactly ten minutes remaining is denied.
 	//
 	// A purchase sends an absolute seat count. A scheduled seat reduction
 	// applies at the renewal. If the renewal applies before Polar gets the
 	// update, the absolute count is wrong: a 10 to 7 reduction with a
-	// request for 1 more seat becomes a 7 to 11 purchase.
-	//
-	// The window is the Polar request margin plus the clock skew margin.
-	// Polar can take that long to answer, so a request that starts outside
-	// the window still lands before the renewal.
-	seatPurchaseBoundaryWindow = polar.SeatPurchaseConfirmationWindow + seatPurchaseClockSkewMargin
+	// request for 1 more seat becomes a charge for the wrong total.
+	seatPurchaseBoundaryWindow = seatquantity.MutationGuard
 )
 
 const (
@@ -38,7 +32,7 @@ type seatPurchaseClock func() time.Time
 // checkSeatPurchaseBoundary rejects a purchase that could reach Polar after
 // the billing period ends.
 func checkSeatPurchaseBoundary(periodEnd, now time.Time) error {
-	if now.Add(seatPurchaseBoundaryWindow).Before(periodEnd) {
+	if seatquantity.AllowsMutation(now, periodEnd) {
 		return nil
 	}
 	return grpcerrors.FailedPrecondition(nil, messageSeatPurchaseRenewsSoon)

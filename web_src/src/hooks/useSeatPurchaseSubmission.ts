@@ -98,10 +98,18 @@ function confirmOperation(organizationId: string, preview: CompletedSeatPurchase
 function confirmedContext(binding: SeatPurchaseBinding | undefined) {
   // A legacy operation has no binding. The server can only replay it.
   if (!binding) return {};
+  const removal = binding.removal
+    ? {
+        confirmedSeatChangeVersion: binding.removal.seatChangeVersion,
+        confirmedPendingRemovalId: binding.removal.pendingRemovalId,
+        confirmedPendingRemovalRevision: binding.removal.pendingRemovalRevision,
+      }
+    : {};
   return {
     confirmedSubscriptionId: binding.subscriptionId,
     confirmedPeriodStart: binding.periodStart,
     confirmedPeriodEnd: binding.periodEnd,
+    ...removal,
   };
 }
 

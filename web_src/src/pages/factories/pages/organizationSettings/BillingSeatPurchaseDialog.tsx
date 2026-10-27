@@ -192,6 +192,14 @@ function SeatPurchaseEstimate({ preview }: { preview: OrganizationsPreviewSeatPu
       <p>Estimated charge now: {formatUsdCents(Number(preview.proratedChargeCents ?? 0))}</p>
       <p>today to {billingPeriodEndLabel(preview.periodEnd) ?? "renewal date unavailable"}</p>
       <p>New monthly total: {formatUsdCents(Number(preview.newMonthlyTotalCents ?? 0))}</p>
+      {preview.cancelsPendingRemoval ? (
+        <>
+          <p>This purchase cancels the scheduled seat removal.</p>
+          <p>The renewal then keeps {preview.renewalSeats ?? preview.targetSeats} seats.</p>
+          <p>You pay for the added seats now.</p>
+          <p>To use a paid seat, cancel the seat removal instead of buying a seat.</p>
+        </>
+      ) : null}
       <p className="text-muted-foreground">Estimate. Tax is calculated at payment.</p>
     </div>
   );

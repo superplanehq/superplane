@@ -2,6 +2,7 @@ package entitlements
 
 import (
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
@@ -19,6 +20,9 @@ func JoinLimit(s *SeatUsage) *int {
 		return &occupied
 	}
 	if s.PerSeat {
+		if s.AdmissionLimit != nil {
+			return s.AdmissionLimit
+		}
 		return s.Purchased
 	}
 	return s.MemberLimit
@@ -73,6 +77,10 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *billingmodels.Organiza
 		if err != nil {
 			return nil, err
 		}
+		if plan.SeatProvedTarget != nil {
+			proved := *plan.SeatProvedTarget
+			renewal = &proved
+		}
 		usage.RenewalQuantity = renewal
 		return usage, nil
 	}
@@ -85,16 +93,25 @@ func resolvePlanSeats(tx *gorm.DB, orgID uuid.UUID, plan *billingmodels.Organiza
 	if plan.PurchasedSeats != nil {
 		purchased = *plan.PurchasedSeats
 	}
-	available := max(purchased-usage.Occupied, 0)
-	invitable := max(purchased-usage.Occupied-usage.PendingInvitations, 0)
+	limit := admissionLimit(plan, purchased, usage.Occupied, time.Now())
+	if removalPeriodUnverified(plan, time.Now()) {
+		usage.AdmissionBlock = AdmissionBlockUnverified
+	}
+	available := max(limit-usage.Occupied, 0)
+	invitable := max(limit-usage.Occupied-usage.PendingInvitations, 0)
 	usage.Invitable = &invitable
 	usage.PerSeat = true
 	usage.Purchased = &purchased
+	usage.AdmissionLimit = &limit
 	usage.Available = &available
 	usage.PlanMaximum = maximum
 	renewal, err := paidRenewalSeats(plan, usage.Occupied)
 	if err != nil {
 		return nil, err
+	}
+	if plan.SeatProvedTarget != nil {
+		proved := *plan.SeatProvedTarget
+		renewal = &proved
 	}
 	usage.RenewalQuantity = renewal
 	if maximum != nil {

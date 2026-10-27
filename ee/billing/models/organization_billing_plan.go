@@ -91,6 +91,26 @@ type OrganizationBillingPlan struct {
 	// purchased seats. A Polar snapshot never writes it.
 	// UpdateSeatCapacityState owns it.
 	OverCapacitySince *time.Time
+
+	// SeatChangeVersion advances on every seat-removal registration, including
+	// a cancellation that leaves no pending removal. A preview bound to an
+	// older version cannot become valid again.
+	SeatChangeVersion int64
+	// SeatAdmissionLimit is the conservative seat count that admission enforces
+	// now. Nil means admission uses the paid seats. A lowering sets it before
+	// the provider call. A raise or cancellation keeps the previous lower
+	// value until the provider verifies the change.
+	SeatAdmissionLimit *int
+	// SeatProvedTarget is the verified next-period seat count. Nil means no
+	// verified removal is in force.
+	SeatProvedTarget *int
+	// SeatQuantityOperationID is the operation that currently owns the removal
+	// or an unresolved change of it.
+	SeatQuantityOperationID *uuid.UUID
+	// SeatBoundPeriodEnd is the billing-period end the open removal was bound
+	// to. Admission stays restricted after this instant until a snapshot
+	// verifies the current period. The clock alone does not clear it.
+	SeatBoundPeriodEnd *time.Time
 }
 
 // SeatCapacityChange tells whether a capacity check started or ended the

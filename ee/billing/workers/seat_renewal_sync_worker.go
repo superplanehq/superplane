@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/ee/billing/polar"
+	"github.com/superplanehq/superplane/ee/billing/seatremoval"
 	"github.com/superplanehq/superplane/ee/billing/seatrenewal"
 	"github.com/superplanehq/superplane/pkg/database"
 )
@@ -34,9 +35,9 @@ const (
 // SeatRenewalSyncWorker reconciles the stored plan of each seat-based
 // organization with its Polar subscription. The reconciliation repairs lost
 // subscription webhooks: a missed renewal, payment failure, or recovery. It
-// covers organizations whose subscription lapsed too. It only reads Polar and
-// never changes a seat count: paid seats renew unchanged until an Admin
-// changes them.
+// covers organizations whose subscription lapsed too. Ordinary reconciliation
+// only reads Polar. Recovery of an Admin seat removal can clear that removal
+// when the member count no longer fits it. The worker never reduces seats.
 type SeatRenewalSyncWorker struct {
 	reconciler *seatrenewal.Reconciler
 	now        func() time.Time
@@ -89,12 +90,18 @@ func (w *SeatRenewalSyncWorker) tick(ctx context.Context) {
 		w.logger.WithError(err).Error("could not list organizations for the seat renewal sync")
 		return
 	}
+	seen := map[uuid.UUID]bool{}
 	for _, plan := range w.resumeFrom(plans) {
 		if ctx.Err() != nil {
 			return
 		}
+		seen[plan.OrganizationID] = true
 		result, err := w.reconciler.Reconcile(ctx, plan.OrganizationID)
 		if err == nil {
+			if recErr := w.recoverRemoval(ctx, plan.OrganizationID); recErr != nil && polar.IsRateLimited(recErr) {
+				w.resumeAfter = plan.OrganizationID
+				return
+			}
 			continue
 		}
 		w.logFailure(plan, result, err)
@@ -109,6 +116,36 @@ func (w *SeatRenewalSyncWorker) tick(ctx context.Context) {
 	// A completed run clears the position, so the next run starts again
 	// with the organizations that renew first.
 	w.resumeAfter = uuid.Nil
+	w.reconcileRemovalCandidates(ctx, seen)
+}
+
+// reconcileRemovalCandidates reads organizations that have an open seat
+// removal even when the ordinary subscription list skips them.
+func (w *SeatRenewalSyncWorker) reconcileRemovalCandidates(ctx context.Context, seen map[uuid.UUID]bool) {
+	ids, err := billingmodels.ListSeatQuantityReconcileOrganizations(database.Conn().WithContext(ctx))
+	if err != nil {
+		w.logger.WithError(err).Error("could not list seat removal organizations")
+		return
+	}
+	for _, orgID := range ids {
+		if ctx.Err() != nil || seen[orgID] {
+			continue
+		}
+		if _, err := w.reconciler.Reconcile(ctx, orgID); err != nil && polar.IsRateLimited(err) {
+			return
+		}
+		if err := w.recoverRemoval(ctx, orgID); err != nil && polar.IsRateLimited(err) {
+			return
+		}
+	}
+}
+
+func (w *SeatRenewalSyncWorker) recoverRemoval(ctx context.Context, orgID uuid.UUID) error {
+	err := seatremoval.Recover(ctx, database.Conn(), polar.NewClientFromEnv(), orgID)
+	if err != nil {
+		w.logger.WithError(err).WithField("organization_id", orgID.String()).Error("billing.seat_removal_reconcile_failed")
+	}
+	return err
 }
 
 // reportUnresolvedSeatPurchases writes one error line for each purchase that
