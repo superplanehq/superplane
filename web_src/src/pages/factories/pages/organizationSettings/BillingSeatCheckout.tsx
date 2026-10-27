@@ -98,7 +98,8 @@ function BillingSeatBounds({
       </p>
       {coveredInvitations > 0 && (
         <p className="text-muted-foreground">
-          Includes {countOf(coveredInvitations, "seat")} for pending invitations. You can remove these seats.
+          The default includes {countOf(coveredInvitations, "seat")} for pending invitations. You can remove these
+          seats.
         </p>
       )}
       {maximum != null && invitationsWithoutSeat > 0 && (
