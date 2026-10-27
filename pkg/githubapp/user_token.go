@@ -1,6 +1,7 @@
 package githubapp
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -23,6 +24,9 @@ var ErrUserAuthorizationNotUsable = errors.New("GitHub authorization is missing,
 type UserAccessToken struct {
 	Token string
 	Login string
+
+	accountID            uuid.UUID
+	encryptedAccessToken []byte
 }
 
 // SaveUserAuthorization stores an encrypted grant for the account.
@@ -85,7 +89,12 @@ func ResolveUserAccessToken(
 			if err != nil {
 				return fmt.Errorf("decrypt GitHub user access token: %w", err)
 			}
-			resolved = &UserAccessToken{Token: string(token), Login: authorization.GitHubLogin}
+			resolved = &UserAccessToken{
+				Token:                string(token),
+				Login:                authorization.GitHubLogin,
+				accountID:            accountID,
+				encryptedAccessToken: authorization.EncryptedAccessToken,
+			}
 			return nil
 		}
 
@@ -94,7 +103,12 @@ func ResolveUserAccessToken(
 		if err != nil || tokens == nil {
 			return err
 		}
-		resolved = &UserAccessToken{Token: tokens.AccessToken, Login: authorization.GitHubLogin}
+		resolved = &UserAccessToken{
+			Token:                tokens.AccessToken,
+			Login:                authorization.GitHubLogin,
+			accountID:            accountID,
+			encryptedAccessToken: authorization.EncryptedAccessToken,
+		}
 		return nil
 	})
 	if err != nil {
@@ -151,18 +165,19 @@ func DeleteUserAuthorization(
 	return RevokeUserToken(httpCtx, cfg, token), nil
 }
 
-// InvalidateUserAuthorization stops using a grant that GitHub rejected. The
-// member sees that the option needs a new authorization.
-func InvalidateUserAuthorization(db *gorm.DB, accountID uuid.UUID) error {
+// InvalidateUserAuthorization stops using a grant after GitHub rejected its
+// token. The member sees that the option needs a new authorization. A grant
+// that a refresh or a new authorization replaced stays usable.
+func InvalidateUserAuthorization(db *gorm.DB, rejected *UserAccessToken) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		authorization, err := models.LockAccountGitHubAuthorization(tx, accountID)
+		authorization, err := models.LockAccountGitHubAuthorization(tx, rejected.accountID)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		if authorization.InvalidatedAt != nil {
+		if authorization.InvalidatedAt != nil || !bytes.Equal(authorization.EncryptedAccessToken, rejected.encryptedAccessToken) {
 			return nil
 		}
 		return authorization.Invalidate(tx)

@@ -188,6 +188,28 @@ func TestResolveUserAccessTokenRejectsTokenFromAnotherApp(t *testing.T) {
 	require.ErrorIs(t, err, ErrUserAuthorizationNotUsable)
 }
 
+func TestInvalidateUserAuthorizationKeepsReplacedGrant(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	accountID := createAuthorizedAccount(t, &UserTokens{AccessToken: "ghu_first", AccessTokenExpiresAt: timeIn(time.Hour)})
+	db := database.DB(t.Context())
+	rejected, err := ResolveUserAccessToken(t.Context(), db, testEncryptor(), &queuedHTTP{}, userAuthorizationConfig(), accountID)
+	require.NoError(t, err)
+
+	require.NoError(t, SaveUserAuthorization(t.Context(), db, testEncryptor(), accountID, userAuthorizationConfig().ID,
+		&GitHubUser{ID: 583231, Login: "octocat"},
+		&UserTokens{AccessToken: "ghu_second", AccessTokenExpiresAt: timeIn(time.Hour)},
+	))
+	require.NoError(t, InvalidateUserAuthorization(db, rejected))
+
+	current, err := ResolveUserAccessToken(t.Context(), db, testEncryptor(), &queuedHTTP{}, userAuthorizationConfig(), accountID)
+	require.NoError(t, err)
+	assert.Equal(t, "ghu_second", current.Token)
+
+	require.NoError(t, InvalidateUserAuthorization(db, current))
+	_, err = ResolveUserAccessToken(t.Context(), db, testEncryptor(), &queuedHTTP{}, userAuthorizationConfig(), accountID)
+	require.ErrorIs(t, err, ErrUserAuthorizationNotUsable)
+}
+
 func TestDeleteUserAuthorizationRevokesToken(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	accountID := createAuthorizedAccount(t, &UserTokens{AccessToken: "ghu_fresh", AccessTokenExpiresAt: timeIn(time.Hour)})
