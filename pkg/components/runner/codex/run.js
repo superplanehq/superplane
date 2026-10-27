@@ -127,6 +127,11 @@ function artifactEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
 }
 
+function visualEvidenceEnabled(env = process.env) {
+  if (envFlag(env, "SUPERPLANE_VISUAL_EVIDENCE")) return true;
+  return artifactEnabled(env) && !envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
+}
+
 function mergeConfidenceEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
 }
@@ -375,7 +380,7 @@ async function runPrompt(promptFile, model, thinking) {
   }
 
   const startedAt = Date.now();
-  if (artifactEnabled()) {
+  if (visualEvidenceEnabled()) {
     const outputDir = path.join(sp, "evidence");
     fs.mkdirSync(outputDir, { recursive: true });
     process.env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;
