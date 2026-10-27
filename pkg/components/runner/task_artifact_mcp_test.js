@@ -422,6 +422,32 @@ test("reportVisualEvidenceUnavailable preserves a partial video result", async (
   assert.equal(result.artifacts.length, 1);
 });
 
+test("lists only publish_link when link publishing is enabled", () => {
+  const value = fixture();
+  const input = [
+    JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+    "",
+  ].join("\n");
+  const result = spawnSync(process.execPath, [path.join(__dirname, "task_artifact_mcp.js")], {
+    input,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ...value.env,
+      SUPERPLANE_PUBLISH_LINKS: "yes",
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const replies = result.stdout
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  assert.deepEqual(
+    replies.at(-1).result.tools.map((tool) => tool.name),
+    ["publish_link"],
+  );
+});
+
 test("lists artifact tools over newline-delimited JSON-RPC", () => {
   const value = fixture();
   const input = [
