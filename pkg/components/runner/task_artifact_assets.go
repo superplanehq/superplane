@@ -23,20 +23,23 @@ func TaskArtifactMCPFile() TaskFile {
 	return TaskFile{Path: "task_artifact_mcp.js", Content: taskArtifactMCPScript, Mode: "0644"}
 }
 
-func PublishLinkFiles() []TaskFile {
-	return []TaskFile{
-		{Path: "publish_link.js", Content: publishLinkScript, Mode: "0644"},
-		{Path: "bin/superplane", Content: publishLinkCommand, Mode: "0755"},
-	}
-}
-
 func AppendTaskArtifactMCP(environment []TaskEnvironmentVariable, files []TaskFile) []TaskFile {
 	if !HasArtifactUploadToken(environment) && !HasPublishLinks(environment) {
 		return files
 	}
-	files = append(files, TaskArtifactMCPFile())
+	// The MCP script loads publish_link.js at startup, including visual
+	// evidence runs that do not publish links.
+	files = append(files, TaskArtifactMCPFile(), PublishLinkScriptFile())
 	if HasPublishLinks(environment) {
-		files = append(files, PublishLinkFiles()...)
+		files = append(files, PublishLinkCommandFile())
 	}
 	return files
+}
+
+func PublishLinkScriptFile() TaskFile {
+	return TaskFile{Path: "publish_link.js", Content: publishLinkScript, Mode: "0644"}
+}
+
+func PublishLinkCommandFile() TaskFile {
+	return TaskFile{Path: "bin/superplane", Content: publishLinkCommand, Mode: "0755"}
 }
