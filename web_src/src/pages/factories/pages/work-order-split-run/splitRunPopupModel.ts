@@ -1,6 +1,7 @@
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
-import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
+import { factoryAppConfigurePath } from "../../lib/factoryPagePaths";
+import { factoryAutomationRunHistoryPath } from "../../lib/factoryAutomationRunHistoryPath";
 import {
   composeIntentDocument,
   EMPTY_INTENT_DOCUMENT,
@@ -98,7 +99,7 @@ export function splitRunPhaseAutomationHref(args: {
   return factoryAppConfigurePath(organizationId, factoryKey, phase.appId, { orderNumber });
 }
 
-/** Full-screen run page with the log in the sidebar. */
+/** Read-only history for the exact phase run. */
 export function splitRunPhaseRunHref(args: {
   organizationId?: string;
   factoryKey?: string;
@@ -107,15 +108,13 @@ export function splitRunPhaseRunHref(args: {
   phase: SplitRunPhase;
 }): string | undefined {
   const { organizationId, factoryKey, orderNumber, lineId, phase } = args;
-  if (!organizationId || !factoryKey || !phase.appId) {
+  if (!organizationId || !factoryKey || !phase.appId || !phase.runId) {
     return undefined;
   }
-  return factoryAppSplitRunPath(organizationId, factoryKey, phase.appId, {
+  return factoryAutomationRunHistoryPath(organizationId, factoryKey, phase.appId, phase.runId, {
     from: "task",
     orderNumber,
     lineId,
-    runId: phase.runId,
-    canvas: phase.canvasKey ?? undefined,
   });
 }
 

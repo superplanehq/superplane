@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
+import { factoryAppConfigurePath } from "../../lib/factoryPagePaths";
+import { factoryAutomationRunHistoryPath } from "../../lib/factoryAutomationRunHistoryPath";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import {
   DRAFT_WORK_ORDER,
@@ -79,9 +80,9 @@ describe("splitRunPopupModel", () => {
     ).toBeNull();
   });
 
-  it("opens the split-run page for a phase automation", () => {
+  it("opens read-only run details for a phase automation", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER);
-    const prCreation = fixture.phases.find((phase) => phase.id === "pr-creation-2");
+    const prCreation = { ...fixture.phases.find((phase) => phase.id === "pr-creation-2")!, runId: "run-closure" };
     expect(prCreation?.appId).toBe("app-pr-closure");
 
     expect(
@@ -92,10 +93,9 @@ describe("splitRunPopupModel", () => {
         phase: prCreation!,
       }),
     ).toBe(
-      factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
+      factoryAutomationRunHistoryPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", "run-closure", {
         from: "task",
         orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
-        canvas: "closure",
       }),
     );
     expect(

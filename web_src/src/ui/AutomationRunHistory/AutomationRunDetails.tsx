@@ -49,16 +49,21 @@ export function AutomationRunDetails({
   onRetryLogs,
   renderLogs,
   tasksLoading,
+  selectedActivityId,
+  onSelectActivity,
 }: {
   run: AutomationRun;
   onBack: () => void;
   onRetryLogs: (activityId: string) => void;
   renderLogs?: (activity: RunActivity) => ReactNode;
   tasksLoading?: boolean;
+  selectedActivityId?: string | null;
+  onSelectActivity?: (id: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string>();
+  const activityId = onSelectActivity ? selectedActivityId : selectedId;
   const selected =
-    run.activities.find((activity) => activity.id === selectedId) ??
+    run.activities.find((activity) => activity.id === activityId) ??
     run.activities.find(
       (activity) => activity.status === "Failed" || activity.status === "Running" || activity.status === "Pending",
     ) ??
@@ -97,7 +102,10 @@ export function AutomationRunDetails({
                 key={activity.id}
                 variant="ghost"
                 aria-pressed={selected?.id === activity.id}
-                onClick={() => setSelectedId(activity.id)}
+                onClick={() => {
+                  setSelectedId(activity.id);
+                  onSelectActivity?.(activity.id);
+                }}
                 className={`h-auto w-full rounded-md flex-col items-start gap-2 whitespace-normal px-3 py-4 text-left ${selected?.id === activity.id ? "bg-muted" : ""}`}
               >
                 <span>{activity.name}</span>
