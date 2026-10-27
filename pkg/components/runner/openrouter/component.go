@@ -154,7 +154,8 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
+	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasVisualEvidence(environment))
+	dispatched.Steps = runner.AppendPublishLinkProtocol(dispatched.Steps, runner.HasPublishLinks(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
 	task := buildOpenRouterTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)

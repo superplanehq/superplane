@@ -84,7 +84,9 @@ export function StepEditor({
         <div className="flex flex-col gap-1.5">
           <Label>{step.type === "prompt" ? "Prompt" : "Commands"}</Label>
           <p className="text-xs text-muted-foreground">
-            {step.type === "prompt" ? "Tell the agent what to do in this step." : "Add shell commands for the runner."}
+            {step.type === "prompt"
+              ? "Tell the agent what to do in this step. It can attach a link to the task."
+              : "Add shell commands for the runner. To attach a link, run superplane publish-link."}
           </p>
         </div>
         <PlanningReviewStepBody

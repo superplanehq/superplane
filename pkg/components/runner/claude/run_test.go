@@ -210,6 +210,18 @@ func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "Bash,Read,Edit,Write", tools)
 }
 
+func TestAllowedClaudeToolsAddsPublishLinkWithoutScreenshotTools(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+		"SUPERPLANE_PUBLISH_LINKS":  "yes",
+	})
+
+	assert.Contains(t, tools, "Bash,Read,Edit,Write")
+	assert.Contains(t, tools, "mcp__superplane__publish_link")
+	assert.NotContains(t, tools, "mcp__superplane__upload_artifact")
+	assert.NotContains(t, tools, "mcp__superplane__inspect_screenshot")
+}
+
 func TestAllowedClaudeToolsAddsArtifactToolsOutsidePlanning(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{
 		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",

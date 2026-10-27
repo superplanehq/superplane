@@ -95,6 +95,31 @@ func TestAppendVisualEvidenceProtocolAddsProtocolToFirstPromptOnly(t *testing.T)
 	assert.Equal(t, 1, strings.Count(*twice[1].Prompt, "## Visual evidence protocol"))
 }
 
+func TestAppendPublishLinkProtocolAddsCommandToFirstPromptOnly(t *testing.T) {
+	t.Parallel()
+
+	firstPrompt := "deploy this pull request"
+	secondPrompt := "confirm the deploy"
+	command := "git status"
+	steps := []AgentStep{
+		{Name: "Prepare", Type: AgentStepBash, Command: &command},
+		{Name: "Deploy", Type: AgentStepPrompt, Prompt: &firstPrompt},
+		{Name: "Confirm", Type: AgentStepPrompt, Prompt: &secondPrompt},
+	}
+
+	got := AppendPublishLinkProtocol(steps, true)
+
+	require.Len(t, got, len(steps))
+	assert.Equal(t, firstPrompt, *steps[1].Prompt, "the original prompt must not change")
+	assert.Contains(t, *got[1].Prompt, firstPrompt)
+	assert.Contains(t, *got[1].Prompt, "superplane publish-link")
+	assert.Contains(t, *got[1].Prompt, "publish_link")
+	assert.Equal(t, secondPrompt, *got[2].Prompt)
+	assert.Equal(t, command, *got[0].Command)
+	twice := AppendPublishLinkProtocol(got, true)
+	assert.Equal(t, 1, strings.Count(*twice[1].Prompt, "## Task link"))
+}
+
 func TestAppendVisualEvidenceProtocolDoesNothingWhenDisabled(t *testing.T) {
 	t.Parallel()
 
