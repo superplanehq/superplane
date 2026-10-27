@@ -83,7 +83,7 @@ this repository.
 1. Create a Docker Compose application from the Git repo.
 2. Set the base directory to `/`.
 3. Set the Compose path to `deploy/coolify/docker-compose.source.yml`.
-4. Leave `SUPERPLANE_VERSION` at `v1.0.0-rc7`, or set a published GHCR tag.
+4. Leave `SUPERPLANE_VERSION` at `v1.0.0`, or set a published GHCR tag.
 5. Attach the domain to `app` on port `8000`.
 6. Deploy. Complete owner setup.
 
@@ -97,12 +97,12 @@ Git checkout. This is also the Coolify one-click catalog file.
 
 1. Create a Docker Compose Empty resource in Coolify.
 2. Paste `template/superplane.yaml`.
-3. Leave `SUPERPLANE_VERSION` at `v1.0.0-rc7`, or set a published GHCR tag.
+3. Leave `SUPERPLANE_VERSION` at `v1.0.0`, or set a published GHCR tag.
 4. Leave the encryption variables as Coolify generated them.
 5. Attach the domain to `app` on port `8000`.
 6. Deploy. Complete owner setup. Wait for Fleet Manager.
 
-`SUPERPLANE_VERSION` defaults to `v1.0.0-rc7`.
+`SUPERPLANE_VERSION` defaults to `v1.0.0`.
 `FLEET_MANAGER_VERSION` defaults to `v0.1.6`.
 `RUNNER_VERSION` defaults to `v0.2.1`.
 
