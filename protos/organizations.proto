@@ -517,6 +517,7 @@ message Organization {
     // URL-friendly, unique identifier used to route to this organization in
     // the frontend. Editable in organization settings.
     string slug = 6;
+    google.protobuf.Timestamp suspended_at = 7;
   }
 
   message Spec {

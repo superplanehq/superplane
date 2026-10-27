@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -126,6 +127,13 @@ func (d *RunCallbackDispatcher) dispatchPendingHookOnEntryNode(callback core.Run
 }
 
 func (d *RunCallbackDispatcher) DispatchFinished() error {
+	if err := models.RequireCanvasOrganizationActive(d.tx, d.run.WorkflowID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			return nil
+		}
+		return err
+	}
+
 	finishedIndex := slices.IndexFunc(d.run.Callbacks, func(callback core.RunCallback) bool {
 		return callback.When == core.RunCallbackWhenFinished
 	})

@@ -1274,3 +1274,8 @@ func (r *CanvasRun) AddError(tx *gorm.DB, message string, maxSize int) error {
 		return tx.Model(r).Update("errors", r.Errors).Error
 	})
 }
+
+// BeforeCreate also protects callers that persist runs directly.
+func (r *CanvasRun) BeforeCreate(tx *gorm.DB) error {
+	return RequireCanvasOrganizationActive(tx.Clauses(clause.Locking{Strength: "SHARE", Table: clause.Table{Name: "organizations"}}), r.WorkflowID)
+}

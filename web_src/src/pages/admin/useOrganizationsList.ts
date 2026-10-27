@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SortDirection } from "./SortableHeader";
 
 export interface AdminOrganization {
+  suspended_at?: string;
   id: string;
   name: string;
   canvas_count: number;
@@ -78,11 +79,13 @@ async function requestOrganizationList(
   pageOffset: number,
   sort: OrganizationSortField,
   direction: SortDirection,
+  status: string,
 ): Promise<OrganizationListResponse | null> {
   const params = new URLSearchParams({ limit: String(ORGANIZATION_PAGE_SIZE), offset: String(pageOffset) });
   if (searchTerm) params.set("search", searchTerm);
   params.set("sort_by", sort);
   params.set("sort_direction", direction);
+  if (status !== "all") params.set("status", status);
   const response = await fetch(`/admin/api/organizations?${params}`, { credentials: "include" });
   if (!response.ok) {
     return null;
@@ -97,6 +100,7 @@ export function useOrganizationsList() {
   const [matchTotal, setMatchTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<OrganizationSortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -104,7 +108,7 @@ export function useOrganizationsList() {
   const listRequestID = useRef(0);
   const appliedFilterKeyRef = useRef(listFilterKey("", "created_at", "desc"));
   const listQueryRef = useRef<OrganizationListQuery>({ search, offset, sortBy, sortDirection });
-  const filterKey = listFilterKey(search, sortBy, sortDirection);
+  const filterKey = listFilterKey(`${status}:${search}`, sortBy, sortDirection);
   listQueryRef.current =
     filterKey === appliedFilterKeyRef.current
       ? { search, offset, sortBy, sortDirection }
@@ -129,7 +133,7 @@ export function useOrganizationsList() {
       const requestID = ++listRequestID.current;
       setLoading(true);
       try {
-        const list = await requestOrganizationList(searchTerm, pageOffset, sort, direction);
+        const list = await requestOrganizationList(searchTerm, pageOffset, sort, direction, status);
         if (requestID !== listRequestID.current) {
           return "stale";
         }
@@ -157,17 +161,17 @@ export function useOrganizationsList() {
         }
       }
     },
-    [],
+    [status],
   );
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      appliedFilterKeyRef.current = listFilterKey(search, sortBy, sortDirection);
+      appliedFilterKeyRef.current = listFilterKey(`${status}:${search}`, sortBy, sortDirection);
       setOffset(0);
       void fetchOrganizations(search, 0, sortBy, sortDirection);
     }, 200);
     return () => clearTimeout(timeout);
-  }, [search, sortBy, sortDirection, fetchOrganizations]);
+  }, [search, status, sortBy, sortDirection, fetchOrganizations]);
 
   const pinActions = useOrganizationPinActions(listQueryRef, fetchOrganizations, setListError);
 
@@ -193,6 +197,8 @@ export function useOrganizationsList() {
     offset,
     search,
     setSearch,
+    status,
+    setStatus,
     loading,
     sortBy,
     sortDirection,

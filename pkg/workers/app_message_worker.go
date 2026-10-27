@@ -93,6 +93,12 @@ func (w *AppMessageWorker) LockAndProcessMessage(message models.AppMessage) erro
 			return fmt.Errorf("find source canvas: %w", err)
 		}
 
+		if err := models.RequireOrganizationActive(tx, canvas.OrganizationID); err != nil {
+			if errors.Is(err, models.ErrOrganizationSuspended) {
+				return locked.Delete(tx)
+			}
+			return err
+		}
 		node, err := models.FindUnscopedCanvasNode(tx, locked.CanvasID, locked.NodeID)
 		if err != nil {
 			return fmt.Errorf("find source node: %w", err)
@@ -205,6 +211,13 @@ func (w *AppMessageWorker) findTargetNodes(tx *gorm.DB, subs []models.CanvasSubs
 }
 
 func (w *AppMessageWorker) sendMessageToNode(tx *gorm.DB, sourceCanvas *models.Canvas, sourceNode *models.CanvasNode, targetNode *models.CanvasNode, payload any, onNewEvents func([]models.CanvasEvent)) error {
+	if err := models.RequireCanvasOrganizationActive(tx, targetNode.WorkflowID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			return nil
+		}
+		return err
+	}
+
 	ref := targetNode.Ref.Data()
 	if targetNode.Type != models.NodeTypeTrigger || ref.Trigger == nil {
 		return nil

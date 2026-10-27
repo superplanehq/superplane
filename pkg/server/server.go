@@ -236,6 +236,14 @@ func startWorkers(
 		return
 	}
 
+	// Suspension cancellation is required even when retention cleanup is disabled.
+	var suspensionAgents *agents.Service
+	if agentProvider != nil {
+		suspensionAgents = agents.NewService(agentProvider, authService)
+	}
+	suspensionWorker := workers.NewOrganizationSuspensionWorker(suspensionAgents)
+	go suspensionWorker.Start(context.Background())
+
 	rabbitMQURL, err := config.RabbitMQURL()
 	if err != nil {
 		panic(err)

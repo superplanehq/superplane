@@ -244,6 +244,12 @@ func AdmitQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) ([]*Factor
 		return nil, err
 	}
 
+	if err := RequireOrganizationActive(tx, line.OrganizationID); err != nil {
+		if errors.Is(err, ErrOrganizationSuspended) {
+			return nil, nil
+		}
+		return nil, err
+	}
 	var admitted []*FactoryLineStepResult
 	for {
 		item, err := findOldestFactoryWorkOrderQueueItem(tx, lineID, stepIndex)

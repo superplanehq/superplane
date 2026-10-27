@@ -1490,6 +1490,22 @@ CREATE TABLE public.organization_seat_purchases (
 
 
 --
+-- Name: organization_suspension_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_suspension_events (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    account_id uuid NOT NULL,
+    action text NOT NULL,
+    reason text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    cancellation_completed_at timestamp with time zone,
+    CONSTRAINT organization_suspension_events_action_check CHECK ((action = ANY (ARRAY['suspend'::text, 'reactivate'::text])))
+);
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1504,7 +1520,10 @@ CREATE TABLE public.organizations (
     usage_retention_window_days integer DEFAULT 180,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
-    created_by_account_id uuid
+    created_by_account_id uuid,
+    suspended_at timestamp with time zone,
+    suspended_by_account_id uuid,
+    suspension_reason text DEFAULT ''::text NOT NULL
 );
 
 
@@ -3046,6 +3065,14 @@ ALTER TABLE ONLY public.organization_seat_limit_overrides
 
 ALTER TABLE ONLY public.organization_seat_purchases
     ADD CONSTRAINT organization_seat_purchases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_suspension_events organization_suspension_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_suspension_events
+    ADD CONSTRAINT organization_suspension_events_pkey PRIMARY KEY (id);
 
 
 --
@@ -4710,6 +4737,13 @@ CREATE UNIQUE INDEX organization_invitations_pending_email_idx ON public.organiz
 
 
 --
+-- Name: organization_suspension_events_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_suspension_events_pending_idx ON public.organization_suspension_events USING btree (created_at) WHERE ((action = 'suspend'::text) AND (cancellation_completed_at IS NULL));
+
+
+--
 -- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5789,6 +5823,14 @@ ALTER TABLE ONLY public.organization_seat_purchases
 
 
 --
+-- Name: organization_suspension_events organization_suspension_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_suspension_events
+    ADD CONSTRAINT organization_suspension_events_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organizations organizations_created_by_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6316,7 +6358,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261027075507	f
+20261027134021	f
 \.
 
 

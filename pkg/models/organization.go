@@ -31,6 +31,9 @@ type Organization struct {
 	// not by a gorm tag.
 	Slug                        string
 	Description                 string
+	SuspendedAt                 *time.Time
+	SuspendedByAccountID        *uuid.UUID
+	SuspensionReason            string
 	CreatedByAccountID          *uuid.UUID
 	AllowedProviders            datatypes.JSONSlice[string]
 	EnabledExperimentalFeatures datatypes.JSONSlice[string]

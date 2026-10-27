@@ -65,6 +65,24 @@ func (e *NodeRequestExecutor) execute(
 	lockRequest func(*gorm.DB, uuid.UUID) (*models.CanvasNodeRequest, error),
 ) error {
 	defer e.publishExecution(request)
+	// Keep pure schedule hooks alive so they advance to the next future tick.
+	// EventContext discards their output while the organization is suspended.
+	if err := models.RequireCanvasOrganizationActive(database.Conn(), request.WorkflowID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if !errors.Is(err, models.ErrOrganizationSuspended) {
+			return err
+		}
+		node, findErr := models.FindUnscopedCanvasNode(database.Conn(), request.WorkflowID, request.NodeID)
+		if findErr != nil {
+			return findErr
+		}
+		trigger := node.Ref.Data().Trigger
+		if request.ExecutionID != nil || trigger == nil || trigger.Name != "schedule" {
+			return request.Complete(database.Conn())
+		}
+	}
 
 	if request.Type == models.NodeRequestTypePullRequestChecksStart {
 		events, err := factoryactions.ProcessPullRequestChecksStartRequest(context.Background(), e.factoryIntakeDeps(), request.ID)

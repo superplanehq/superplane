@@ -746,6 +746,11 @@ func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope st
 	if !ok {
 		return ToolError("Not found")
 	}
+	if action != "read" {
+		if err := models.RequireOrganizationActive(database.DB(ctx), claims.OrgID); err != nil {
+			return ToolError(models.OrganizationSuspendedMessage)
+		}
+	}
 	allowed, err := rt.Auth.CheckOrganizationPermission(ctx, claims.UserID.String(), claims.OrgID.String(), resource, action)
 	if err != nil || !allowed {
 		return ToolError("Not found")

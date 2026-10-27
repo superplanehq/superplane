@@ -247,6 +247,9 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 					return
 				}
 
+				if rejectSuspendedOrganizationWrite(w, r, user) {
+					return
+				}
 				ctx = context.WithValue(ctx, UserContextKey, user)
 				SetRequestLogUser(ctx, user)
 				if scopedClaims != nil {
@@ -277,6 +280,9 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				return
 			}
 
+			if rejectSuspendedOrganizationWrite(w, r, user) {
+				return
+			}
 			ctx = context.WithValue(ctx, UserContextKey, user)
 			SetRequestLogUser(ctx, user)
 			if supportSessionInfo != nil {

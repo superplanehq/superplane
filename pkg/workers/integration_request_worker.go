@@ -128,6 +128,23 @@ func (w *IntegrationRequestWorker) claimRequest(request models.IntegrationReques
 }
 
 func (w *IntegrationRequestWorker) processRequest(request *models.IntegrationRequest) error {
+	db := database.Conn()
+	integration, err := models.FindUnscopedIntegrationInTransaction(db, request.AppInstallationID)
+	if err != nil {
+		return err
+	}
+	if err := models.RequireOrganizationActive(db, integration.OrganizationID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			// A sync is periodic provider maintenance. Retain its lease so
+			// future synchronization can resume after reactivation.
+			if request.Type == models.IntegrationRequestTypeSync {
+				return nil
+			}
+			return request.Complete(db)
+		}
+		return err
+	}
+
 	switch request.Type {
 	case models.IntegrationRequestTypeSync:
 		return w.syncIntegration(request)

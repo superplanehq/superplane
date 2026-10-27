@@ -192,6 +192,14 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 			return nil
 		}
 
+		if err := models.RequireCanvasOrganizationActive(tx, workflowID); err != nil {
+			if errors.Is(err, models.ErrOrganizationSuspended) {
+				_, err := locked.RequestCancellation(tx, nil)
+				stateUpdated = true
+				return err
+			}
+			return err
+		}
 		err = NewRunCallbackDispatcher(tx, w.registry, locked).
 			WithEventCollector(eventCollector).
 			DispatchPending()

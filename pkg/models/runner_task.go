@@ -247,7 +247,8 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (*RunnerTask, error) {
 		var skippedOrganizations []uuid.UUID
 		for {
 			query := tx.Where("fleet_id = ? AND backend = ? AND state = ? AND runner_id IS NULL AND cancel_requested_at IS NULL",
-				currentRunner.FleetID, RunnerTaskBackendIntegrated, RunnerTaskStateQueued)
+				currentRunner.FleetID, RunnerTaskBackendIntegrated, RunnerTaskStateQueued).
+				Where("organization_id IN (?)", tx.Model(&Organization{}).Select("id").Where("suspended_at IS NULL"))
 			if len(skippedOrganizations) > 0 {
 				query = query.Where("organization_id NOT IN ?", skippedOrganizations)
 			}
@@ -259,7 +260,7 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (*RunnerTask, error) {
 				return err
 			}
 			reserved, err = r.reserveCandidate(tx, &candidate)
-			if errors.Is(err, ErrRunnerTaskNotReservable) || errors.Is(err, ErrOrganizationRunnerCapacity) {
+			if errors.Is(err, ErrRunnerTaskNotReservable) || errors.Is(err, ErrOrganizationRunnerCapacity) || errors.Is(err, ErrOrganizationSuspended) {
 				// Retry this organization's oldest job on the next attempt.
 				// A later job must not overtake it if capacity changes mid-scan.
 				skippedOrganizations = append(skippedOrganizations, candidate.OrganizationID)
@@ -272,6 +273,9 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (*RunnerTask, error) {
 }
 
 func (t *RunnerTask) Start(tx *gorm.DB, runner *Runner, activeLogStore string, now time.Time) error {
+	if err := RequireOrganizationActive(tx, t.OrganizationID); err != nil {
+		return err
+	}
 	if t.RunnerID == nil || *t.RunnerID != runner.ID || t.State != RunnerTaskStateReserved {
 		return ErrRunnerTaskNotStartable
 	}
@@ -547,6 +551,9 @@ func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (*RunnerTa
 }
 
 func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
+	if err := RequireOrganizationActive(tx, t.OrganizationID); err != nil {
+		return err
+	}
 	if t.State != RunnerTaskStateQueued || t.RunnerID != nil || t.CancelRequestedAt != nil {
 		return ErrRunnerTaskNotReservable
 	}
@@ -622,4 +629,9 @@ func checkOrganizationRunnerCapacity(tx *gorm.DB, organizationID uuid.UUID) erro
 		return ErrOrganizationRunnerCapacity
 	}
 	return nil
+}
+
+// BeforeCreate guards every task producer, including background integration jobs.
+func (t *RunnerTask) BeforeCreate(tx *gorm.DB) error {
+	return RequireOrganizationActive(tx.Clauses(clause.Locking{Strength: "SHARE", Table: clause.Table{Name: "organizations"}}), t.OrganizationID)
 }

@@ -115,10 +115,12 @@ type CanvasNodeExecutionKVTestSteps struct {
 }
 
 func (s *CanvasNodeExecutionKVTestSteps) CreateCanvas() {
+	organization, err := CreateOrganization("KV test organization", "")
+	require.NoError(s.t, err)
 	now := time.Now()
 	liveVersionID := uuid.New()
 	wf := &Canvas{
-		OrganizationID: uuid.New(),
+		OrganizationID: organization.ID,
 		LiveVersionID:  &liveVersionID,
 		Name:           "Test Canvas",
 		Description:    "This is a test workflow",

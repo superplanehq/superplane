@@ -1,3 +1,5 @@
+import { OrganizationSuspensionContext } from "./contexts/organizationSuspension";
+import { OrganizationSuspensionBanner } from "./components/OrganizationSuspensionBanner";
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -418,10 +420,13 @@ export function OrganizationScope() {
   }
 
   return (
-    <PermissionsProvider>
-      <UserNotificationsListener organizationId={resolvedId} />
-      <Outlet />
-    </PermissionsProvider>
+    <OrganizationSuspensionContext.Provider value={Boolean(organization?.metadata?.suspendedAt)}>
+      <PermissionsProvider>
+        {organization?.metadata?.suspendedAt ? <OrganizationSuspensionBanner /> : null}
+        <UserNotificationsListener organizationId={resolvedId} />
+        <Outlet />
+      </PermissionsProvider>
+    </OrganizationSuspensionContext.Provider>
   );
 }
 

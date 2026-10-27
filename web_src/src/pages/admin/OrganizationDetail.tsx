@@ -1,3 +1,4 @@
+import { OrganizationSuspensionControl } from "./OrganizationSuspensionControl";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -219,6 +220,9 @@ const OrganizationDetail: React.FC = () => {
           />
         ) : null}
       </div>
+      {detail.organization ? (
+        <OrganizationSuspensionControl key={orgId} organization={detail.organization} onChange={detail.retry} />
+      ) : null}
       <Tabs
         value={tab}
         onValueChange={(nextTab) => {

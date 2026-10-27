@@ -315,6 +315,12 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		log.WithError(err).WithField("session_id", sessionID).Warn("agent stream: session not found, dropping")
 		return nil
 	}
+	if err := models.RequireOrganizationActive(database.DB(parentCtx), session.OrganizationID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			return models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusIdle)
+		}
+		return err
+	}
 	if session.Provider != w.provider.Name() {
 		// Another replica owns this provider; drop rather than requeue.
 		log.WithFields(log.Fields{
@@ -510,6 +516,9 @@ func (w *AgentStreamWorker) executeAndSendCustomToolResults(
 		}
 		toolUses[id] = toolUse
 
+		if err := models.RequireOrganizationActive(database.DB(ctx), session.OrganizationID); err != nil {
+			return err
+		}
 		logCustomToolExecutionStarted(session, toolUse)
 		startedAt := time.Now()
 		result := w.customToolExecutor.ExecuteCustomTool(ctx, agentSessionContext(session), toolUse)

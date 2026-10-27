@@ -41,6 +41,9 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 		},
 	}
 
+	if organization.SuspendedAt != nil {
+		response.Organization.Metadata.SuspendedAt = timestamppb.New(*organization.SuspendedAt)
+	}
 	return response, nil
 }
 

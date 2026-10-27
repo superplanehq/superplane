@@ -729,6 +729,9 @@ func (s *Service) checkAgentAccess(ctx context.Context, userID, organizationID u
 // a payment method when the plan needs one, and a plan that can run agents.
 func assertAgentRunsAllowed(ctx context.Context, organizationID uuid.UUID) error {
 	db := database.DB(ctx)
+	if err := models.RequireOrganizationActive(db, organizationID); err != nil {
+		return err
+	}
 	if err := billing.AssertOrganizationPaymentMethod(db, organizationID); err != nil {
 		return err
 	}

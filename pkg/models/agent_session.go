@@ -108,6 +108,16 @@ func ListAgentSessionsForOrganizationInTransaction(tx *gorm.DB, organizationID u
 }
 
 func UpdateAgentSessionStatusInTransaction(tx *gorm.DB, sessionID uuid.UUID, status string) error {
+	if status == AgentSessionStatusStreaming {
+		session, err := FindAgentSessionInTransaction(tx, sessionID)
+		if err != nil {
+			return err
+		}
+		if err := RequireOrganizationActive(tx, session.OrganizationID); err != nil {
+			return err
+		}
+	}
+
 	now := time.Now()
 	return tx.Model(&AgentSession{}).
 		Where("id = ?", sessionID).

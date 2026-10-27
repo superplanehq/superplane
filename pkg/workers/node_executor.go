@@ -447,6 +447,12 @@ func (w *NodeExecutor) executeActionNode(
 		logger.Errorf("failed to find workflow: %v", err)
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
+	if err := models.RequireOrganizationActive(tx, workflow.OrganizationID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			return execution.RequestCancellation(tx, nil)
+		}
+		return err
+	}
 	logger = logging.WithCanvasWorkspace(logger, workflow)
 
 	err = execution.StartInTransaction(tx)

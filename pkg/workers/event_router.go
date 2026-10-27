@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -243,6 +244,12 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 		return nil, uuid.Nil, err
 	}
 
+	if err := models.RequireOrganizationActive(tx, canvas.OrganizationID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			return nil, event.RunID, event.RoutedInTransaction(tx)
+		}
+		return nil, uuid.Nil, err
+	}
 	_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, canvas.ID)
 	if err != nil {
 		return nil, uuid.Nil, err

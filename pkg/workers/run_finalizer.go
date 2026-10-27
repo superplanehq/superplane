@@ -654,6 +654,16 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	if err := execution.MarkFinished(tx, run.Result); err != nil {
 		return nil, nil, err
 	}
+	if err := models.RequireOrganizationActive(tx, execution.OrganizationID); err != nil {
+		if !errors.Is(err, models.ErrOrganizationSuspended) {
+			return nil, nil, err
+		}
+		dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, dispatch.Finish(tx, models.CanvasRunResultCancelled)
+	}
 
 	//
 	// The finished run freed a slot at its step: admit queued work orders

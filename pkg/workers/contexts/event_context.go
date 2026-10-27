@@ -35,6 +35,13 @@ func (s *EventContext) EmitDeduplicated(payloadType string, payload any, dedupKe
 }
 
 func (s *EventContext) emit(payloadType string, payload any, dedupKey string) error {
+	if err := models.RequireCanvasOrganizationActive(s.tx, s.node.WorkflowID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) || errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
 	structuredPayload := map[string]any{
 		"type":      payloadType,
 		"timestamp": time.Now(),

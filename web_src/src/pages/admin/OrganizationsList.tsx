@@ -176,6 +176,9 @@ function OrganizationRow({
               </span>
             )}
           </Link>
+          {organization.suspended_at ? (
+            <span className="text-xs text-amber-700 dark:text-amber-300">Suspended</span>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -353,6 +356,23 @@ const OrganizationsList: React.FC = () => {
         onSearchChange={list.setSearch}
         placeholder="Search by name or ID..."
       />
+      <div role="group" aria-label="Organization status" className="mb-4 flex gap-2">
+        {[
+          { value: "all", label: "All" },
+          { value: "active", label: "Active" },
+          { value: "suspended", label: "Suspended" },
+        ].map((status) => (
+          <Button
+            key={status.value}
+            size="sm"
+            variant={list.status === status.value ? "default" : "outline"}
+            aria-pressed={list.status === status.value}
+            onClick={() => list.setStatus(status.value)}
+          >
+            {status.label}
+          </Button>
+        ))}
+      </div>
       {list.pinError ? <Text className="mb-3 text-sm text-red-600 dark:text-red-400">{list.pinError}</Text> : null}
       {list.listError ? (
         <div className="mb-3 flex flex-col items-start gap-2" role="alert">

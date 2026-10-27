@@ -52,7 +52,8 @@ export const useOrganization = (organizationId: string, enabled = true) => {
       );
       return response.data?.organization || null;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
     gcTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!organizationId && enabled,
   });

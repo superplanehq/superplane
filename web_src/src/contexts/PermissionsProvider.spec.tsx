@@ -1,3 +1,4 @@
+import { OrganizationSuspensionContext } from "./organizationSuspension";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
@@ -39,11 +40,13 @@ function PermissionProbe() {
   );
 }
 
-function renderProbe() {
+function renderProbe(suspended = false) {
   render(
-    <PermissionsProvider>
-      <PermissionProbe />
-    </PermissionsProvider>,
+    <OrganizationSuspensionContext.Provider value={suspended}>
+      <PermissionsProvider>
+        <PermissionProbe />
+      </PermissionsProvider>
+    </OrganizationSuspensionContext.Provider>,
   );
 }
 
@@ -57,6 +60,13 @@ describe("PermissionsProvider", () => {
 
     expect(screen.getByText("canAct read: true")).toBeInTheDocument();
     expect(screen.getByText("canAct update: true")).toBeInTheDocument();
+    expect(screen.getByText("hasPermission update: true")).toBeInTheDocument();
+  });
+
+  it("keeps page access but blocks writes in a suspended organization", () => {
+    renderProbe(true);
+    expect(screen.getByText("canAct read: true")).toBeInTheDocument();
+    expect(screen.getByText("canAct update: false")).toBeInTheDocument();
     expect(screen.getByText("hasPermission update: true")).toBeInTheDocument();
   });
 

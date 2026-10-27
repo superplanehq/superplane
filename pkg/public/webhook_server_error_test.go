@@ -95,7 +95,7 @@ func assertEventOmitsWebhookBody(t *testing.T, event *sentry.Event, encoded []by
 	assert.NotContains(t, string(encoded), string(encodedBody))
 }
 
-func Test__HandleWebhook_ServerErrorRepliesBeforeOrganizationLookup(t *testing.T) {
+func Test__HandleWebhook_ServerErrorRepliesBeforeErrorContextLookup(t *testing.T) {
 	transport := sentrytest.BindHub(t)
 	resources := support.Setup(t)
 	t.Cleanup(resources.Close)

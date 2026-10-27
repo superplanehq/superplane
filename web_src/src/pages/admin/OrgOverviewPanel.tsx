@@ -5,6 +5,9 @@ import { Building } from "lucide-react";
 import { formatDate } from "./formatDate";
 
 export interface OrganizationOverview {
+  suspended_at?: string;
+  suspended_by_account_id?: string;
+  suspension_reason?: string;
   id: string;
   name: string;
   slug: string;

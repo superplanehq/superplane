@@ -834,6 +834,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}", s.adminGetOrganization).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/pin", s.adminPinOrganization).Methods("PUT")
+	adminRoute.HandleFunc("/organizations/{orgId}/suspend", s.adminSuspendOrganization).Methods("POST")
+	adminRoute.HandleFunc("/organizations/{orgId}/reactivate", s.adminReactivateOrganization).Methods("POST")
+	adminRoute.HandleFunc("/organizations/{orgId}/suspension-history", s.adminOrganizationSuspensionHistory).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/pin", s.adminUnpinOrganization).Methods("DELETE")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/built-in-automations/reset", s.adminResetBuiltInAutomations).Methods("POST")
@@ -954,6 +957,15 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Request, integrationInstance *models.Integration) {
+	if err := models.RequireOrganizationActive(database.DB(r.Context()), integrationInstance.OrganizationID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			http.Error(w, models.OrganizationSuspendedMessage, http.StatusForbidden)
+			return
+		}
+		http.Error(w, "Could not load organization status.", http.StatusInternalServerError)
+		return
+	}
+
 	integration, err := s.registry.GetIntegration(integrationInstance.AppName)
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
@@ -2116,6 +2128,13 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, string, error) {
+	if err := models.RequireCanvasOrganizationActive(database.DB(ctx), node.WorkflowID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			return http.StatusOK, nil, "", nil
+		}
+		return http.StatusInternalServerError, nil, "", err
+	}
+
 	if node.Type == models.NodeTypeTrigger {
 		return s.executeTriggerNode(ctx, body, headers, query, node, onNewEvents)
 	}

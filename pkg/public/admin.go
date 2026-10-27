@@ -383,7 +383,8 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 
 	search, limit, offset := parsePagination(r)
 	sortBy, sortDirection := parseSorting(r)
-	db := database.DB(ctx)
+	status := r.URL.Query().Get("status")
+	db := models.FilterOrganizationSuspension(database.DB(ctx), status)
 
 	pinnedOrganizations, err := models.ListPinnedOrganizationsForAccount(db, account.ID)
 	if err != nil {
@@ -397,7 +398,7 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 		excludeIDs = append(excludeIDs, organization.ID)
 	}
 
-	organizations, total, matchTotal, err := listUnpinnedOrganizations(ctx, search, limit, offset, sortBy, sortDirection, excludeIDs)
+	organizations, total, matchTotal, err := listUnpinnedOrganizations(ctx, search, limit, offset, sortBy, sortDirection, excludeIDs, status)
 	if err != nil {
 		log.Errorf("admin: failed to list organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
@@ -1049,20 +1050,23 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 }
 
 type adminOrgItem struct {
-	ID                   string  `json:"id"`
-	Name                 string  `json:"name"`
-	Slug                 string  `json:"slug"`
-	Description          string  `json:"description"`
-	CanvasCount          int64   `json:"canvas_count"`
-	TaskCount            int64   `json:"task_count"`
-	DoneTaskCount        int64   `json:"done_task_count"`
-	MemberCount          int64   `json:"member_count"`
-	WorkspaceCount       int64   `json:"workspace_count"`
-	RepositoryCount      int64   `json:"repository_count"`
-	RemainingCreditCents int64   `json:"remaining_credit_cents"`
-	CreatedAt            *string `json:"created_at,omitempty"`
-	UpdatedAt            *string `json:"updated_at,omitempty"`
-	Pinned               bool    `json:"pinned"`
+	SuspendedAt          *time.Time `json:"suspended_at,omitempty"`
+	SuspendedByAccountID *uuid.UUID `json:"suspended_by_account_id,omitempty"`
+	SuspensionReason     string     `json:"suspension_reason"`
+	ID                   string     `json:"id"`
+	Name                 string     `json:"name"`
+	Slug                 string     `json:"slug"`
+	Description          string     `json:"description"`
+	CanvasCount          int64      `json:"canvas_count"`
+	TaskCount            int64      `json:"task_count"`
+	DoneTaskCount        int64      `json:"done_task_count"`
+	MemberCount          int64      `json:"member_count"`
+	WorkspaceCount       int64      `json:"workspace_count"`
+	RepositoryCount      int64      `json:"repository_count"`
+	RemainingCreditCents int64      `json:"remaining_credit_cents"`
+	CreatedAt            *string    `json:"created_at,omitempty"`
+	UpdatedAt            *string    `json:"updated_at,omitempty"`
+	Pinned               bool       `json:"pinned"`
 }
 
 type adminOrganizationListResponse struct {
@@ -1078,11 +1082,11 @@ type adminOrganizationPinState struct {
 	Pinned bool `json:"pinned"`
 }
 
-func listUnpinnedOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) (organizations []models.OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
+func listUnpinnedOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID, status string) (organizations []models.OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
 	ctx, done := telemetry.Span(ctx, "organizations.list")
 	defer done(&err)
 
-	return models.ListUnpinnedOrganizations(database.DB(ctx), search, limit, offset, sortBy, sortDirection, excludeIDs)
+	return models.ListUnpinnedOrganizations(models.FilterOrganizationSuspension(database.DB(ctx), status), search, limit, offset, sortBy, sortDirection, excludeIDs)
 }
 
 func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) (items []adminOrgItem, err error) {
@@ -1145,6 +1149,9 @@ func remainingCreditCentsByOrganization(ctx context.Context, organizationIDs []u
 
 func serializeAdminOrganization(org models.OrganizationWithCounts, remainingCreditCents int64) adminOrgItem {
 	item := adminOrgItem{
+		SuspendedAt:          org.SuspendedAt,
+		SuspendedByAccountID: org.SuspendedByAccountID,
+		SuspensionReason:     org.SuspensionReason,
 		ID:                   org.ID.String(),
 		Name:                 org.Name,
 		Slug:                 org.Slug,

@@ -148,6 +148,12 @@ func (s *Server) authenticatePlanningSessionRunner(w http.ResponseWriter, r *htt
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return nil, false
 	}
+	if r.Method != http.MethodGet {
+		if err := models.RequireOrganizationActive(database.DB(r.Context()), scope.OrganizationID); err != nil {
+			http.Error(w, models.OrganizationSuspendedMessage, http.StatusForbidden)
+			return nil, false
+		}
+	}
 	return scope, true
 }
 
