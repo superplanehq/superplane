@@ -60,15 +60,27 @@ func UpdateFactoryOnboarding(
 	}
 
 	if req.Complete != nil && *req.Complete {
-		if validationErr := validateFactoryOnboardingResources(db, orgID, factory, config); validationErr != nil {
-			return nil, factoryErrorToStatus(validationErr, "failed to update factory onboarding")
-		}
-		if !wasComplete {
-			if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, db, factory, patch, config); err != nil {
-				return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if err := validateFactoryOnboardingResources(tx, orgID, factory, config); err != nil {
+				return err
 			}
-		}
-		err = factory.CompleteOnboarding(db, patch)
+			if !wasComplete {
+				if err := synchronizeOnboardingSubscriptionApps(ctx, tx, deps, factory, config); err != nil {
+					return err
+				}
+			}
+			if config.CodexSubscription {
+				if err := validateSubscriptionCanvases(tx, factory); err != nil {
+					return err
+				}
+			}
+			if !wasComplete {
+				if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, tx, factory, patch, config); err != nil {
+					return err
+				}
+			}
+			return factory.CompleteOnboarding(tx, patch)
+		})
 	} else {
 		err = factory.UpdateOnboarding(db, patch)
 	}
@@ -374,6 +386,10 @@ func validateCodexSubscriptionOnboarding(
 	if connection.Status != models.CodexConnectionStatusReady || connection.Reserved() {
 		return invalidArgument("Wait until the ChatGPT sign-in runner has stopped")
 	}
+	return nil
+}
+
+func validateSubscriptionCanvases(db *gorm.DB, factory *models.Factory) error {
 	canvases, err := factory.ListCanvases(db)
 	if err != nil {
 		return err
