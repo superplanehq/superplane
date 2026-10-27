@@ -115,7 +115,7 @@
   "devDependencies": {
     "@chromatic-com/storybook": "^5.5.1",
     "@eslint/js": "^10.0.1",
-    "@happy-dom/global-registrator": "^20.14.5",
+    "@happy-dom/global-registrator": "^21.0.4",
     "@hey-api/openapi-ts": "^0.99.0",
     "@storybook/addon-a11y": "^10.6.3",
     "@storybook/addon-docs": "^10.6.3",
