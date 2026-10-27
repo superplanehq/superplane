@@ -12,7 +12,7 @@ import {
   type WorkOrderCheckLevel,
   type WorkOrderCheckPresentation,
 } from "../../lib/workOrderChecks";
-import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
+import { factoryAutomationRunHistoryPath } from "../../lib/factoryAutomationRunHistoryPath";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
 import { StartConfirmDialog } from "./StartConfirmDialog";
@@ -52,7 +52,10 @@ function reviewRunHref(
   if (!organizationId || !factoryKey || !run) {
     return null;
   }
-  return getWorkOrderRunHref(organizationId, factoryKey, run.appId, run.runId, { orderNumber });
+  return factoryAutomationRunHistoryPath(organizationId, factoryKey, run.appId, run.runId, {
+    from: "task",
+    orderNumber,
+  });
 }
 
 type FooterCallback = (() => void | Promise<void>) | undefined;
