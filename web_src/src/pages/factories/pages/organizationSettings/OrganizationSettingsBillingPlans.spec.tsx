@@ -319,6 +319,7 @@ describe("OrganizationSettingsBillingPage plans", () => {
     expect(screen.queryByRole("button", { name: "Keep Business" })).not.toBeInTheDocument();
   }, 10000);
   it("shows public catalog plans independently of the legacy checkout flag", async () => {
+    const user = userEvent.setup();
     render(
       <FactoriesHarness
         experimentalFeatures={["new_billing"]}
@@ -333,6 +334,7 @@ describe("OrganizationSettingsBillingPage plans", () => {
         }}
       />,
     );
+    await user.click(await screen.findByRole("button", { name: "Change plan" }));
     expect(await screen.findByRole("button", { name: "Select Pay-as-you-go" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Add payment method" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
