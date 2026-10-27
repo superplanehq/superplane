@@ -3,6 +3,7 @@ package pulls
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/google/go-github/v84/github"
@@ -45,6 +46,15 @@ func createPullRequestAsUsers(
 	if err != nil || !appConfig.UserAuthorizationEnabled() {
 		return nil
 	}
+	granted, err := appClient.HostedRepositoryGranted(ctx.Integration, repository)
+	if err != nil {
+		logOpenAsUser(ctx, "", err)
+		return nil
+	}
+	if !granted {
+		logOpenAsUser(ctx, "", fmt.Errorf("repository %q is not granted to this workspace", repository))
+		return nil
+	}
 	encryptor, err := crypto.ProcessEncryptor()
 	if err != nil {
 		logOpenAsUser(ctx, "", err)
@@ -78,6 +88,11 @@ func createPullRequestAsUser(
 	}
 
 	pr, _, err := appClient.WithUserToken(ctx.HTTP, token.Token).CreatePullRequest(background, repository, request)
+	if common.StatusCode(err) == http.StatusUnauthorized {
+		if invalidateErr := githubapp.InvalidateUserAuthorization(database.DB(background), *user.AccountID); invalidateErr != nil {
+			logOpenAsUser(ctx, user.ID.String(), invalidateErr)
+		}
+	}
 	if err != nil {
 		return nil, "", explainGitHubError(err)
 	}
@@ -85,7 +100,7 @@ func createPullRequestAsUser(
 }
 
 // assigneeUsers keeps the given order and drops users that are not active
-// human members of this organization.
+// human members of this organization, or whose account is blocked.
 func assigneeUsers(ctx core.ExecutionContext, userIDs []string) []models.User {
 	users, err := models.FindUsersByIDsInOrganization(database.DB(context.Background()), ctx.OrganizationID, userIDs)
 	if err != nil {
@@ -103,9 +118,15 @@ func assigneeUsers(ctx core.ExecutionContext, userIDs []string) []models.User {
 
 	ordered := make([]models.User, 0, len(byID))
 	for _, id := range userIDs {
-		if user, ok := byID[id]; ok {
-			ordered = append(ordered, user)
+		user, ok := byID[id]
+		if !ok {
+			continue
 		}
+		account, err := models.FindAccountByID(user.AccountID.String())
+		if err != nil || account.IsBlocked() {
+			continue
+		}
+		ordered = append(ordered, user)
 	}
 	return ordered
 }

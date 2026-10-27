@@ -63,6 +63,11 @@ func Resolve(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor) (conf
 		return config.GitHubHostedAppConfig{}, nil
 	}
 
+	if clientID, clientSecret := config.LoadGitHubAppClientCredentials(); clientID != "" && clientSecret != "" {
+		cfg.ClientID = clientID
+		cfg.ClientSecret = clientSecret
+		return cfg, nil
+	}
 	if record.ClientID == "" || len(record.EncryptedClientSecret) == 0 {
 		return cfg, nil
 	}

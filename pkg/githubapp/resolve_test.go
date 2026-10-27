@@ -117,6 +117,15 @@ func TestResolveWithoutClientCredentialsDisablesUserAuthorization(t *testing.T) 
 	require.NoError(t, err)
 	assert.True(t, cfg.Enabled())
 	assert.False(t, cfg.UserAuthorizationEnabled())
+
+	t.Setenv(config.EnvGitHubAppClientID, "Iv1.from-env")
+	t.Setenv(config.EnvGitHubAppClientSecret, "env-client-secret")
+	cfg, err = Resolve(t.Context(), database.DB(t.Context()), encryptor)
+	require.NoError(t, err)
+	assert.Equal(t, "from-db", cfg.Slug)
+	assert.Equal(t, "Iv1.from-env", cfg.ClientID)
+	assert.Equal(t, "env-client-secret", cfg.ClientSecret)
+	assert.True(t, cfg.UserAuthorizationEnabled())
 }
 
 func TestSaveKeepsFirstApp(t *testing.T) {

@@ -129,6 +129,6 @@ func SaveAccountGitHubAuthorization(tx *gorm.DB, authorization *AccountGitHubAut
 	}).Create(authorization).Error
 }
 
-func DeleteAccountGitHubAuthorization(tx *gorm.DB, accountID uuid.UUID) error {
-	return tx.Where("account_id = ?", accountID).Delete(&AccountGitHubAuthorization{}).Error
+func (a *AccountGitHubAuthorization) Delete(tx *gorm.DB) error {
+	return tx.Where("account_id = ?", a.AccountID).Delete(&AccountGitHubAuthorization{}).Error
 }

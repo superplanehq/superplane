@@ -12,8 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-import { Switch } from "@/ui/switch";
+import { Switch } from "@/components/ui/switch";
 
 import { FactorySettingsCard } from "../FactorySettingsCard";
 import { SettingsActionRow } from "./accountProfileRedesignParts";

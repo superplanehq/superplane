@@ -101,7 +101,7 @@ func (f *openAsUserFixture) member(t *testing.T, login string, authorized bool) 
 	return user
 }
 
-func (f *openAsUserFixture) execute(t *testing.T, httpCtx *contexts.HTTPContext, openAsUsers string) (*contexts.MetadataContext, *contexts.ExecutionStateContext) {
+func (f *openAsUserFixture) execute(t *testing.T, httpCtx *contexts.HTTPContext, repository, openAsUsers string) (*contexts.MetadataContext, *contexts.ExecutionStateContext) {
 	t.Helper()
 	metadata := &contexts.MetadataContext{}
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -112,7 +112,7 @@ func (f *openAsUserFixture) execute(t *testing.T, httpCtx *contexts.HTTPContext,
 		Metadata:       metadata,
 		ExecutionState: state,
 		Configuration: map[string]any{
-			"repository":  "api",
+			"repository":  repository,
 			"head":        "feature",
 			"base":        "main",
 			"title":       "Add feature",
@@ -130,7 +130,7 @@ func TestCreatePullRequestOpensAsFirstAuthorizedAssignee(t *testing.T) {
 		mocks.GitHubResponse(http.StatusCreated, pullRequestResponse),
 	}}
 
-	metadata, state := fixture.execute(t, httpCtx, unauthorized.ID.String()+","+authorized.ID.String())
+	metadata, state := fixture.execute(t, httpCtx, "api", unauthorized.ID.String()+","+authorized.ID.String())
 
 	require.Len(t, httpCtx.Requests, 1)
 	assert.Equal(t, "/repos/acme/api/pulls", httpCtx.Requests[0].URL.Path)
@@ -148,7 +148,7 @@ func TestCreatePullRequestFallsBackToAppWhenUserTokenIsRejected(t *testing.T) {
 		mocks.GitHubResponse(http.StatusCreated, pullRequestResponse),
 	}}
 
-	metadata, state := fixture.execute(t, httpCtx, assignee.ID.String())
+	metadata, state := fixture.execute(t, httpCtx, "api", assignee.ID.String())
 
 	require.Len(t, httpCtx.Requests, 3)
 	assert.Equal(t, "Bearer ghu_ada", httpCtx.Requests[0].Header.Get("Authorization"))
@@ -166,9 +166,63 @@ func TestCreatePullRequestIgnoresAssigneesForNonHostedIntegrations(t *testing.T)
 		mocks.GitHubResponse(http.StatusCreated, pullRequestResponse),
 	}}
 
-	metadata, _ := fixture.execute(t, httpCtx, assignee.ID.String())
+	metadata, _ := fixture.execute(t, httpCtx, "api", assignee.ID.String())
 
 	require.Len(t, httpCtx.Requests, 1)
 	assert.NotEqual(t, "Bearer ghu_ada", httpCtx.Requests[0].Header.Get("Authorization"))
 	assert.Equal(t, map[string]any{"openedAs": OpenedAsBot}, metadata.Metadata)
+}
+
+func appOpensPullRequest() *contexts.HTTPContext {
+	return &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_installation","expires_at":"2030-01-01T00:00:00Z"}`),
+		mocks.GitHubResponse(http.StatusCreated, pullRequestResponse),
+	}}
+}
+
+func assertOpenedByApp(t *testing.T, httpCtx *contexts.HTTPContext, metadata *contexts.MetadataContext) {
+	t.Helper()
+	require.Len(t, httpCtx.Requests, 2)
+	assert.Equal(t, "/app/installations/501/access_tokens", httpCtx.Requests[0].URL.Path)
+	assert.Equal(t, map[string]any{"openedAs": OpenedAsBot}, metadata.Metadata)
+}
+
+func TestCreatePullRequestDoesNotUseMemberTokenOutsideGrantedRepositories(t *testing.T) {
+	fixture := setupOpenAsUser(t)
+	assignee := fixture.member(t, "ada", true)
+	httpCtx := appOpensPullRequest()
+
+	metadata, _ := fixture.execute(t, httpCtx, "acme/private-elsewhere", assignee.ID.String())
+
+	assertOpenedByApp(t, httpCtx, metadata)
+}
+
+func TestCreatePullRequestSkipsBlockedAssignees(t *testing.T) {
+	fixture := setupOpenAsUser(t)
+	assignee := fixture.member(t, "ada", true)
+	account, err := models.FindAccountByID(assignee.AccountID.String())
+	require.NoError(t, err)
+	require.NoError(t, account.Block(database.Conn(), time.Now()))
+	httpCtx := appOpensPullRequest()
+
+	metadata, _ := fixture.execute(t, httpCtx, "api", assignee.ID.String())
+
+	assertOpenedByApp(t, httpCtx, metadata)
+}
+
+func TestCreatePullRequestInvalidatesRejectedMemberToken(t *testing.T) {
+	fixture := setupOpenAsUser(t)
+	assignee := fixture.member(t, "ada", true)
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusUnauthorized, `{"message":"Bad credentials"}`),
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_installation","expires_at":"2030-01-01T00:00:00Z"}`),
+		mocks.GitHubResponse(http.StatusCreated, pullRequestResponse),
+	}}
+
+	metadata, _ := fixture.execute(t, httpCtx, "api", assignee.ID.String())
+
+	assert.Equal(t, map[string]any{"openedAs": OpenedAsBot}, metadata.Metadata)
+	authorization, err := models.FindAccountGitHubAuthorization(database.Conn(), *assignee.AccountID)
+	require.NoError(t, err)
+	assert.NotNil(t, authorization.InvalidatedAt)
 }

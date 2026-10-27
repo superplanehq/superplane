@@ -87,6 +87,24 @@ func ApplicationEncryptedStorage() []EncryptedStorageLocation {
 			Replace:  ReplaceInstallationGitHubAppWebhookSecret,
 		},
 		{
+			Name:     "installation_github_apps.encrypted_client_secret",
+			Format:   EncryptedStorageBytes,
+			ReadPage: ReadInstallationGitHubAppClientSecretPage,
+			Replace:  ReplaceInstallationGitHubAppClientSecret,
+		},
+		{
+			Name:     "account_github_authorizations.encrypted_access_token",
+			Format:   EncryptedStorageBytes,
+			ReadPage: ReadAccountGitHubAuthorizationAccessTokenPage,
+			Replace:  ReplaceAccountGitHubAuthorizationAccessToken,
+		},
+		{
+			Name:     "account_github_authorizations.encrypted_refresh_token",
+			Format:   EncryptedStorageBytes,
+			ReadPage: ReadAccountGitHubAuthorizationRefreshTokenPage,
+			Replace:  ReplaceAccountGitHubAuthorizationRefreshToken,
+		},
+		{
 			Name:     "installation_licenses.encrypted_license",
 			Format:   EncryptedStorageBytes,
 			ReadPage: ReadInstallationLicensePage,
@@ -266,6 +284,51 @@ func ReadInstallationGitHubAppWebhookSecretPage(tx *gorm.DB, cursor string, limi
 
 func ReplaceInstallationGitHubAppWebhookSecret(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
 	result := tx.Exec("UPDATE installation_github_apps SET encrypted_webhook_secret = ? WHERE id = CAST(? AS integer) AND encrypted_webhook_secret = ?", replacement, row.Cursor, row.Value)
+	return result.RowsAffected == 1, result.Error
+}
+
+func ReadInstallationGitHubAppClientSecretPage(tx *gorm.DB, cursor string, limit int) ([]EncryptedStorageRow, error) {
+	query := tx.Table("installation_github_apps").
+		Select("id::text, encrypted_client_secret, 'installation_github_app_client_secret', ''").
+		Where("length(encrypted_client_secret) > 0")
+	if cursor != "" {
+		query = query.Where("id > CAST(? AS integer)", cursor)
+	}
+	return scanEncryptedStorageRows(query.Order("id").Limit(limit), limit)
+}
+
+func ReplaceInstallationGitHubAppClientSecret(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
+	result := tx.Exec("UPDATE installation_github_apps SET encrypted_client_secret = ? WHERE id = CAST(? AS integer) AND encrypted_client_secret = ?", replacement, row.Cursor, row.Value)
+	return result.RowsAffected == 1, result.Error
+}
+
+func ReadAccountGitHubAuthorizationAccessTokenPage(tx *gorm.DB, cursor string, limit int) ([]EncryptedStorageRow, error) {
+	query := tx.Table("account_github_authorizations").
+		Select("account_id::text, encrypted_access_token, 'account_github_authorization:' || account_id::text, ''").
+		Where("length(encrypted_access_token) > 0")
+	if cursor != "" {
+		query = query.Where("account_id > CAST(? AS uuid)", cursor)
+	}
+	return scanEncryptedStorageRows(query.Order("account_id").Limit(limit), limit)
+}
+
+func ReplaceAccountGitHubAuthorizationAccessToken(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
+	result := tx.Exec("UPDATE account_github_authorizations SET encrypted_access_token = ? WHERE account_id = CAST(? AS uuid) AND encrypted_access_token = ?", replacement, row.Cursor, row.Value)
+	return result.RowsAffected == 1, result.Error
+}
+
+func ReadAccountGitHubAuthorizationRefreshTokenPage(tx *gorm.DB, cursor string, limit int) ([]EncryptedStorageRow, error) {
+	query := tx.Table("account_github_authorizations").
+		Select("account_id::text, encrypted_refresh_token, 'account_github_authorization:' || account_id::text, ''").
+		Where("length(encrypted_refresh_token) > 0")
+	if cursor != "" {
+		query = query.Where("account_id > CAST(? AS uuid)", cursor)
+	}
+	return scanEncryptedStorageRows(query.Order("account_id").Limit(limit), limit)
+}
+
+func ReplaceAccountGitHubAuthorizationRefreshToken(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
+	result := tx.Exec("UPDATE account_github_authorizations SET encrypted_refresh_token = ? WHERE account_id = CAST(? AS uuid) AND encrypted_refresh_token = ?", replacement, row.Cursor, row.Value)
 	return result.RowsAffected == 1, result.Error
 }
 

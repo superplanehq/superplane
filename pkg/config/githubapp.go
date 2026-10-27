@@ -46,14 +46,21 @@ func LoadGitHubHostedAppConfig() GitHubHostedAppConfig {
 		return GitHubHostedAppConfig{}
 	}
 
+	clientID, clientSecret := LoadGitHubAppClientCredentials()
 	return GitHubHostedAppConfig{
 		ID:            id,
 		Slug:          slug,
 		PrivateKey:    privateKey,
 		WebhookSecret: webhookSecret,
-		ClientID:      strings.TrimSpace(os.Getenv(EnvGitHubAppClientID)),
-		ClientSecret:  strings.TrimSpace(os.Getenv(EnvGitHubAppClientSecret)),
+		ClientID:      clientID,
+		ClientSecret:  clientSecret,
 	}
+}
+
+// LoadGitHubAppClientCredentials reads the client ID and secret of the public
+// GitHub App. They also apply to an app stored on the installation.
+func LoadGitHubAppClientCredentials() (clientID, clientSecret string) {
+	return strings.TrimSpace(os.Getenv(EnvGitHubAppClientID)), strings.TrimSpace(os.Getenv(EnvGitHubAppClientSecret))
 }
 
 // Enabled reports whether Cloud holds a complete public GitHub App.

@@ -108,34 +108,65 @@ func ResolveUserAccessToken(
 
 // DeleteUserAuthorization removes the grant, then revokes the token at GitHub.
 // It returns the revoke error separately, so a failed revoke never keeps the
-// grant.
+// grant. The row lock makes sure a concurrent refresh cannot leave a newer
+// token alive at GitHub.
 func DeleteUserAuthorization(
 	ctx context.Context,
-	tx *gorm.DB,
+	db *gorm.DB,
 	encryptor crypto.Encryptor,
 	httpCtx core.HTTPContext,
 	cfg config.GitHubHostedAppConfig,
 	accountID uuid.UUID,
 ) (revokeErr error, err error) {
-	authorization, err := models.FindAccountGitHubAuthorization(tx, accountID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := models.DeleteAccountGitHubAuthorization(tx, accountID); err != nil {
-		return nil, err
-	}
-	if authorization.GitHubAppID != cfg.ID || authorization.InvalidatedAt != nil {
-		return nil, nil
-	}
+	var token string
+	err = db.Transaction(func(tx *gorm.DB) error {
+		authorization, err := models.LockAccountGitHubAuthorization(tx, accountID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := authorization.Delete(tx); err != nil {
+			return err
+		}
+		if !authorization.UsableFor(cfg.ID) {
+			return nil
+		}
 
-	token, err := encryption.ForDB(tx, encryptor).Decrypt(ctx, authorization.EncryptedAccessToken, userTokenAssociatedData(accountID))
+		decrypted, err := encryption.ForDB(tx, encryptor).Decrypt(ctx, authorization.EncryptedAccessToken, userTokenAssociatedData(accountID))
+		if err != nil {
+			revokeErr = err
+			return nil
+		}
+		token = string(decrypted)
+		return nil
+	})
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	return RevokeUserToken(httpCtx, cfg, string(token)), nil
+	if revokeErr != nil || token == "" {
+		return revokeErr, nil
+	}
+	return RevokeUserToken(httpCtx, cfg, token), nil
+}
+
+// InvalidateUserAuthorization stops using a grant that GitHub rejected. The
+// member sees that the option needs a new authorization.
+func InvalidateUserAuthorization(db *gorm.DB, accountID uuid.UUID) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		authorization, err := models.LockAccountGitHubAuthorization(tx, accountID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if authorization.InvalidatedAt != nil {
+			return nil
+		}
+		return authorization.Invalidate(tx)
+	})
 }
 
 // refreshAuthorization returns nil tokens and no error when it invalidates the
