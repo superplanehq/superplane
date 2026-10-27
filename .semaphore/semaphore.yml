@@ -109,6 +109,11 @@ blocks:
           commands:
             - bash ./scripts/check_committed_secrets.sh
 
+        - name: Licenses
+          commands:
+            - bash scripts/license-check-test.sh
+            - make test.license.check
+
         - name: npm audit
           commands:
             - make check.npm.audit.critical
