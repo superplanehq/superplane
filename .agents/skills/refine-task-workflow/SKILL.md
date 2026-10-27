@@ -1,6 +1,6 @@
 ---
 name: refine-task-workflow
-description: How to run a Backlog draft-task refinement session: role, chat voice, answer turns vs plan turns, research, and when to decide versus ask with a survey. Use only when refining a draft task, not when implementing one.
+description: "How to run a Backlog draft-task refinement session: role, chat voice, answer turns vs plan turns, research, and when to decide versus ask with a survey. Use only when refining a draft task, not when implementing one."
 ---
 
 # Refine task workflow

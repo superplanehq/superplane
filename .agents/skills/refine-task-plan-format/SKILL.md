@@ -1,6 +1,6 @@
 ---
 name: refine-task-plan-format
-description: Required structure and style for the published refinement plan: title, goal paragraph, spec summary headings, optional diagram, and build spec (Scope, Approach, Acceptance, Risks). Use only when writing a refinement plan.
+description: "Required structure and style for the published refinement plan: title, goal paragraph, spec summary headings, optional diagram, and build spec (Scope, Approach, Acceptance, Risks). Use only when writing a refinement plan."
 ---
 
 # Refine task plan format
