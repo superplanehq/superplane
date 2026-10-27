@@ -24,6 +24,13 @@
 Pull requests are the primary way to contribute code changes to SuperPlane. This guide covers the complete
 process of creating a pull request, from setting up your fork to getting your changes merged.
 
+Read [Before you start](../../CONTRIBUTING.md#before-you-start) in the contributing
+guide before you write code. Discuss substantial changes and wait for issue
+assignment. Documentation and typo fixes can go straight to a pull request.
+
+Keep each pull request focused on one change. If you are a new contributor,
+keep only one pull request open at a time.
+
 ## Creating a Pull Request
 
 ### 1. Fork and Clone the Repository
@@ -170,3 +177,7 @@ Once you submit a pull request:
 - Keep PRs focused and reasonably sized
 - Respond to review comments promptly
 - Don't hesitate to ask questions if something is unclear
+
+Maintainers may close a substantial pull request that was not discussed first.
+See [For maintainers](../../CONTRIBUTING.md#for-maintainers) for the close
+responses.
