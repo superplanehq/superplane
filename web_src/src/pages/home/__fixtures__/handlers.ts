@@ -144,7 +144,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       resolve: () => ({
         json: {
           features: [
-            { id: "new_billing", label: "New billing", description: "Select a plan and set up a payment method" },
             {
               id: "claude_managed_agents",
               label: "Managed agents",

@@ -17,6 +17,7 @@ export function useOnboardingModelTransition(
   // plan is active and the step is no longer required.
   const [cardStepShown, setCardStepShown] = useState(false);
   const continueAfterModelAccess = useCallback(async () => {
+    if (!cardStep.ready) return;
     try {
       if (await access.verify()) {
         navigation.goToScreen("agent");
@@ -26,7 +27,7 @@ export function useOnboardingModelTransition(
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "SuperPlane could not verify model access. Try again.");
     }
-  }, [access, navigation, model]);
+  }, [access, navigation, model, cardStep.ready]);
   useEffect(() => {
     if (!ticketsSaved || model.saving || !cardStep.ready) return;
     setTicketsSaved(false);
@@ -34,9 +35,21 @@ export function useOnboardingModelTransition(
       navigation.goToScreen("card");
       return;
     }
+    if (cardStep.requiresAdmin) {
+      navigation.goToScreen("complete");
+      return;
+    }
     setPending(true);
     void continueAfterModelAccess().finally(() => setPending(false));
-  }, [ticketsSaved, model.saving, cardStep.ready, cardStep.required, navigation, continueAfterModelAccess]);
+  }, [
+    ticketsSaved,
+    model.saving,
+    cardStep.ready,
+    cardStep.required,
+    cardStep.requiresAdmin,
+    navigation,
+    continueAfterModelAccess,
+  ]);
   let screen = navigation.screen;
   if (screen === "agent" && !access.allowed) screen = "complete";
   if (screen === "card" && cardStep.ready && !cardStep.available) screen = "complete";

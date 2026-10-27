@@ -132,6 +132,7 @@ func Test__EndPlanningSession__OverridesPendingCompletionWithCancellation(t *tes
 
 func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -180,6 +181,7 @@ func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 
 func Test__SendPlanningSessionMessage__RestartsCancelledAnalysisRun(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -224,6 +226,7 @@ func Test__SendPlanningSessionMessage__RestartsCancelledAnalysisRun(t *testing.T
 
 func Test__SendPlanningSessionMessage__KeepsLiveAnalysisOnTheCurrentRun(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -488,6 +491,7 @@ func draftAssigneeIDs(t *testing.T, db *gorm.DB, session *models.FactoryPlanning
 
 func openAnalysisSession(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.FactoryPlanningSession {
 	t.Helper()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)

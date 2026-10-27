@@ -4,14 +4,12 @@ import { BillingInvoicesCard } from "./BillingInvoicesCard";
 import { BillingCreditHistoryCard } from "./BillingCreditHistoryCard";
 
 export function BillingHistory({
-  newBilling,
   showInvoices,
   invoices,
   grants,
   portalPending,
   onManageInvoices,
 }: {
-  newBilling: boolean;
   showInvoices: boolean;
   invoices: OrganizationsHostedCreditInvoice[];
   grants: OrganizationsOrganizationCreditGrant[];
@@ -21,14 +19,8 @@ export function BillingHistory({
   const invoiceList = (
     <BillingInvoicesCard invoices={invoices} portalPending={portalPending} onManageInvoices={onManageInvoices} />
   );
-  const creditHistory = <BillingCreditHistoryCard grants={grants} newBilling={newBilling} />;
-  if (!newBilling || !showInvoices)
-    return (
-      <>
-        {showInvoices && invoiceList}
-        {creditHistory}
-      </>
-    );
+  const creditHistory = <BillingCreditHistoryCard grants={grants} />;
+  if (!showInvoices) return creditHistory;
   return (
     <Tabs defaultValue="invoices">
       <TabsList aria-label="Billing history" className="mb-2">

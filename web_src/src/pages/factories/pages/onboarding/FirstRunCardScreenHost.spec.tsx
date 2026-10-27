@@ -22,6 +22,7 @@ function cardStep(overrides: Partial<OnboardingCardStep> = {}): OnboardingCardSt
     ready: true,
     available: true,
     required: true,
+    requiresAdmin: false,
     plans,
     planActive: false,
     hasPaymentMethod: false,

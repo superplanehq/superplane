@@ -170,6 +170,7 @@ func Test__AdjustCreditBalanceRejectsTrialWithoutLiveWelcome(t *testing.T) {
 func Test__AdjustCreditBalanceSetsTrialWhenWelcomeGrantIsMissingOnOpenTrial(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	require.NoError(t, db.Where("organization_id = ? AND kind = ?", r.Organization.ID, billingmodels.LLMCreditGrantKindWelcome).
 		Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
@@ -216,6 +217,7 @@ func Test__AdjustCreditBalanceSetsTrialWhenWelcomeGrantIsMissingOnOpenTrial(t *t
 func Test__AdjustCreditBalanceSetsMissingTrialAfterHostedUsage(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	require.NoError(t, db.Where("organization_id = ? AND kind = ?", r.Organization.ID, billingmodels.LLMCreditGrantKindWelcome).
 		Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
@@ -268,6 +270,7 @@ func Test__AdjustCreditBalanceSetsMissingTrialAfterHostedUsage(t *testing.T) {
 func Test__AdjustCreditBalanceRaisesExpiredTrialOnOpenTrial(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
 	expireWelcomeGrant(t, db, r.Organization.ID)
@@ -279,7 +282,7 @@ func Test__AdjustCreditBalanceRaisesExpiredTrialOnOpenTrial(t *testing.T) {
 	require.NotNil(t, plan.TrialEndsAt)
 	require.Equal(t, int64(0), describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
 
-	target := billingmodels.CentsToMicros(1000)
+	target := billingmodels.CentsToMicros(1500)
 	adjustment, err := billingmodels.AdjustOrganizationLLMCreditBalance(db, billingmodels.CreditBalanceAdjustment{
 		OrganizationID: r.Organization.ID,
 		Bucket:         billingmodels.CreditBalanceBucketTrial,
@@ -306,6 +309,7 @@ func Test__AdjustCreditBalanceRaisesExpiredTrialOnOpenTrial(t *testing.T) {
 func Test__AdjustCreditBalanceRaisesExpiredTrialAfterHostedUsage(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
 	expireWelcomeGrant(t, db, r.Organization.ID)

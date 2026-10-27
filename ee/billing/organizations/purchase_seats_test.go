@@ -18,9 +18,7 @@ import (
 	"github.com/superplanehq/superplane/ee/billing/polar"
 	polartest "github.com/superplanehq/superplane/ee/billing/testsupport/polar"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -70,7 +68,6 @@ func newSeatPurchaseFixture(t *testing.T, purchased int, seatLimit *int) *seatPu
 	r := support.Setup(t)
 	t.Cleanup(r.Close)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 
 	product := "prod_team_" + uuid.NewString()
 	catalog := billingmodels.BillingPlan{
@@ -544,18 +541,6 @@ func Test__PurchaseSeatsRejectsSubscriptionsThatCannotTakeSeats(t *testing.T) {
 			assert.Equal(t, 0, f.getCount)
 		})
 	}
-}
-
-func Test__PurchaseSeatsRequiresNewBilling(t *testing.T) {
-	f := newSeatPurchaseFixture(t, 3, new(50))
-	require.NoError(t, models.DisableExperimentalFeatureInTransaction(database.Conn(), f.r.Organization.ID, features.FeatureNewBilling))
-
-	_, err := f.purchase(1, 3)
-	requireGRPCCode(t, codes.FailedPrecondition, err)
-	_, err = f.preview(1)
-	requireGRPCCode(t, codes.FailedPrecondition, err)
-
-	assert.Zero(t, f.patchCount())
 }
 
 func Test__PurchaseSeatsRejectedByPolarLeavesCapacityUnchanged(t *testing.T) {
