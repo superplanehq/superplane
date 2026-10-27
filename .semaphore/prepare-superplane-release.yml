@@ -88,9 +88,9 @@ blocks:
             - docker buildx create --driver docker-container --use --name "superplane-release-$SEMAPHORE_JOB_ID"
             - docker buildx inspect --bootstrap
             - bash release/superplane/build-image.sh "$RELEASE_VERSION" "$SEMAPHORE_GIT_SHA" amd64 "superplane-amd64.oci.tar"
-            - artifact push workflow "superplane-amd64.oci.tar"
-            - artifact push workflow "superplane-amd64.oci.tar.sha256"
-            - artifact push workflow "superplane-amd64.oci.tar.descriptor.json"
+            - artifact push workflow "superplane-amd64.oci.tar" --force
+            - artifact push workflow "superplane-amd64.oci.tar.sha256" --force
+            - artifact push workflow "superplane-amd64.oci.tar.descriptor.json" --force
 
   - name: "Build arm64 Image"
     dependencies: ["Verify Release Candidate"]
@@ -107,9 +107,9 @@ blocks:
             - docker buildx create --driver docker-container --use --name "superplane-release-$SEMAPHORE_JOB_ID"
             - docker buildx inspect --bootstrap
             - bash release/superplane/build-image.sh "$RELEASE_VERSION" "$SEMAPHORE_GIT_SHA" arm64 "superplane-arm64.oci.tar"
-            - artifact push workflow "superplane-arm64.oci.tar"
-            - artifact push workflow "superplane-arm64.oci.tar.sha256"
-            - artifact push workflow "superplane-arm64.oci.tar.descriptor.json"
+            - artifact push workflow "superplane-arm64.oci.tar" --force
+            - artifact push workflow "superplane-arm64.oci.tar.sha256" --force
+            - artifact push workflow "superplane-arm64.oci.tar.descriptor.json" --force
 
   - name: "Build Release Assets"
     dependencies: ["Verify Release Candidate"]

@@ -12,6 +12,7 @@ export type OnboardingCardStep = {
   planActive: boolean;
   hasPaymentMethod: boolean;
   occupiedSeats?: number;
+  welcomeCreditCents?: number;
   refetch: () => Promise<unknown>;
 };
 
@@ -37,6 +38,7 @@ export function useOnboardingCardStep(organizationId: string): OnboardingCardSte
     planActive,
     hasPaymentMethod: Boolean(billing.data?.hasPaymentMethod),
     occupiedSeats: billing.data?.occupiedSeats,
+    welcomeCreditCents: Number(billing.data?.welcomeRemainingCents ?? 0),
     refetch: billing.refetch,
   };
 }

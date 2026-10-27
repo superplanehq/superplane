@@ -156,6 +156,9 @@ export const STORYBOOK_CUSTOM_CREDIT_PRODUCT = {
 export const BUSINESS_ORGANIZATION_BILLING = {
   productFeatures: { byo_key: true },
   plan: "business",
+  planName: "Business",
+  planCategory: "paid",
+  planPriceCents: "19900",
   planSource: "polar",
   polarSubscriptionStatus: "active",
   trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
@@ -203,6 +206,8 @@ export const ADMIN_ORGANIZATION_BILLING = {
 
 export const EXPIRED_TRIAL_ORGANIZATION_BILLING = {
   plan: "trial",
+  planName: "Trial",
+  planCategory: "trial",
   planSource: "system",
   trialEndsAt: EXPIRED_TRIAL_ENDED_AT,
   remainingCreditCents: "0",
@@ -217,6 +222,8 @@ export const EXPIRED_TRIAL_ORGANIZATION_BILLING = {
 
 export const LAPSED_ORGANIZATION_BILLING = {
   plan: "none",
+  planName: "None",
+  planCategory: "none",
   planSource: "polar",
   polarSubscriptionStatus: "canceled",
   remainingCreditCents: "5000",
@@ -232,6 +239,8 @@ export const LAPSED_ORGANIZATION_BILLING = {
 
 export const RESTORED_TRIAL_ORGANIZATION_BILLING = {
   plan: "trial",
+  planName: "Trial",
+  planCategory: "trial",
   planSource: "polar",
   polarSubscriptionStatus: "canceled",
   trialEndsAt: ACTIVE_TRIAL_ENDS_AT,

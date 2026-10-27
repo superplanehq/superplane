@@ -12,7 +12,15 @@ const plans = [
   { key: "starter", name: "Starter", priceCents: "2000", subscriptionRequired: true },
 ];
 
-function PlanPreview({ initialPhase = "add-card", error }: { initialPhase?: FirstRunCardPhase; error?: string }) {
+function PlanPreview({
+  initialPhase = "add-card",
+  error,
+  welcomeCreditCents = 1000,
+}: {
+  initialPhase?: FirstRunCardPhase;
+  error?: string;
+  welcomeCreditCents?: number;
+}) {
   const [selectedPlanKey, setSelectedPlanKey] = useState("pay_as_you_go");
   const [phase, setPhase] = useState(initialPhase);
   const [tickets, setTickets] = useState(false);
@@ -34,6 +42,7 @@ function PlanPreview({ initialPhase = "add-card", error }: { initialPhase?: Firs
   return (
     <FirstRunCardScreen
       plans={plans}
+      welcomeCreditCents={welcomeCreditCents}
       selectedPlanKey={selectedPlanKey}
       phase={phase}
       error={error}
@@ -86,3 +95,5 @@ export const FinishSetupError: Story = {
 export const CardError: Story = {
   render: () => <PlanPreview error="Could not open card setup. Try again." />,
 };
+
+export const NoSignupCredit: Story = { render: () => <PlanPreview welcomeCreditCents={0} /> };

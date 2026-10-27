@@ -194,7 +194,7 @@ describe("Organization billing seats", () => {
     { name: "billing off", billing: { ...TEAM_ORGANIZATION_BILLING, billingEnabled: false } },
   ])("hides seats for $name", async ({ billing }) => {
     renderBilling(billing);
-    await screen.findByTestId("billing-plans");
+    await screen.findByTestId("billing-credit-balance");
     expect(screen.queryByTestId("billing-seats")).not.toBeInTheDocument();
   });
 
