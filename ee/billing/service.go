@@ -86,15 +86,12 @@ func (*Service) ResolveSeats(tx *gorm.DB, organizationID uuid.UUID) (*billing.Se
 }
 
 func (*Service) ResolveOrganizationPlanSummaries(tx *gorm.DB, organizationIDs []uuid.UUID) (map[uuid.UUID]billing.OrganizationPlanSummary, error) {
+	plans, err := billingmodels.ResolveOrganizationBillingPlans(tx, organizationIDs)
+	if err != nil {
+		return nil, err
+	}
 	summaries := make(map[uuid.UUID]billing.OrganizationPlanSummary, len(organizationIDs))
-	for _, id := range organizationIDs {
-		if _, resolved := summaries[id]; resolved {
-			continue
-		}
-		plan, err := billingmodels.ResolveOrganizationBillingPlan(tx, id)
-		if err != nil {
-			return nil, err
-		}
+	for id, plan := range plans {
 		summaries[id] = billing.OrganizationPlanSummary{Key: plan.Catalog.Key, Name: plan.Catalog.Name}
 	}
 	return summaries, nil
