@@ -154,19 +154,29 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 			); err != nil {
 				return
 			}
-			if authenticatedRunner.State != models.RunnerStateBusy {
-				if err := s.reconcileRunnerConnection(
-					r.Context(),
-					connection,
-					authenticatedRunner,
-					connectionID,
-					"",
-					fleet.Slug,
-					fleetScope,
-				); err != nil {
-					s.writeConnectionError(connection, err, "")
+			if authenticatedRunner.State == models.RunnerStateBusy {
+				active, err := authenticatedRunner.FindActiveTask(database.DB(r.Context()))
+				if err != nil {
 					return
 				}
+				if active.CancelRequestedAt != nil {
+					if err := connection.write(taskControlMessage{Type: messageTypeCancel, TaskID: active.ID.String()}); err != nil {
+						return
+					}
+				}
+				continue
+			}
+			if err := s.reconcileRunnerConnection(
+				r.Context(),
+				connection,
+				authenticatedRunner,
+				connectionID,
+				"",
+				fleet.Slug,
+				fleetScope,
+			); err != nil {
+				s.writeConnectionError(connection, err, "")
+				return
 			}
 		case messageTypeShutdownRequest:
 			var shutdown shutdownRequestMessage
