@@ -26,6 +26,17 @@ export interface AccountLinkedAccount {
   active: boolean;
 }
 
+/**
+ * Whether factory pull requests open with the member's GitHub account instead
+ * of the SuperPlane GitHub App.
+ */
+export interface AccountGitHubPrAuthorization {
+  available: boolean;
+  enabled: boolean;
+  login?: string;
+  needs_reauthorization: boolean;
+}
+
 export interface AccountOrganizationPendingDeletion {
   id: string;
   name: string;
@@ -40,6 +51,7 @@ interface Account {
   has_password: boolean;
   providers?: AccountProviderMethod[];
   linked_accounts?: AccountLinkedAccount[];
+  github_pr_authorization?: AccountGitHubPrAuthorization;
   organizations_pending_deletion?: AccountOrganizationPendingDeletion[];
   roles?: string[];
   groups?: string[];

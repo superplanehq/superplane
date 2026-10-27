@@ -15,12 +15,13 @@ import (
 type CreatePullRequest struct{}
 
 type CreatePullRequestConfiguration struct {
-	Repository string `mapstructure:"repository" json:"repository"`
-	Head       string `mapstructure:"head" json:"head"`
-	Base       string `mapstructure:"base" json:"base"`
-	Title      string `mapstructure:"title" json:"title"`
-	Body       string `mapstructure:"body" json:"body"`
-	Draft      bool   `mapstructure:"draft" json:"draft"`
+	Repository  string `mapstructure:"repository" json:"repository"`
+	Head        string `mapstructure:"head" json:"head"`
+	Base        string `mapstructure:"base" json:"base"`
+	Title       string `mapstructure:"title" json:"title"`
+	Body        string `mapstructure:"body" json:"body"`
+	Draft       bool   `mapstructure:"draft" json:"draft"`
+	OpenAsUsers string `mapstructure:"openAsUsers" json:"openAsUsers"`
 }
 
 func (c *CreatePullRequest) Name() string {
@@ -52,6 +53,7 @@ func (c *CreatePullRequest) Documentation() string {
 - **Title**: The pull request title (supports expressions)
 - **Body**: Optional pull request description (supports markdown and expressions)
 - **Draft**: Whether to create the pull request as a draft
+- **Open as users**: Optional comma-separated SuperPlane user IDs. SuperPlane tries each user in order. It opens the pull request with the GitHub account of the first user who turned on "Create pull requests with my GitHub account". If no user can open it, the GitHub App opens it. Only connections to the SuperPlane GitHub App support this.
 
 ## Output
 
@@ -151,6 +153,14 @@ func (c *CreatePullRequest) Configuration() []configuration.Field {
 			Default:     false,
 			Description: "Create the pull request as a draft",
 		},
+		{
+			Name:        "openAsUsers",
+			Label:       "Open as users",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Description: "Comma-separated SuperPlane user IDs. The first user who turned on \"Create pull requests with my GitHub account\" opens the pull request. Otherwise the GitHub App opens it. Supports expressions.",
+		},
 	}
 }
 
@@ -236,9 +246,27 @@ func (c *CreatePullRequest) Execute(ctx core.ExecutionContext) error {
 		prRequest.Draft = &config.Draft
 	}
 
+	if opened := createPullRequestAsUsers(ctx, client, config.Repository, prRequest, parseOpenAsUsers(config.OpenAsUsers)); opened != nil {
+		return emitCreatedPullRequest(ctx, opened.pullRequest, OpenedAsUser, opened.login)
+	}
+
 	pr, _, err := client.CreatePullRequest(context.Background(), config.Repository, prRequest)
 	if err != nil {
 		return fmt.Errorf("failed to create pull request: %w", explainGitHubError(err))
+	}
+
+	return emitCreatedPullRequest(ctx, pr, OpenedAsBot, "")
+}
+
+func emitCreatedPullRequest(ctx core.ExecutionContext, pr *github.PullRequest, openedAs, login string) error {
+	if ctx.Metadata != nil {
+		metadata := map[string]any{"openedAs": openedAs}
+		if login != "" {
+			metadata["openedAsLogin"] = login
+		}
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return fmt.Errorf("failed to save pull request metadata: %w", err)
+		}
 	}
 
 	return ctx.ExecutionState.Emit(

@@ -12,6 +12,8 @@ func TestLoadGitHubHostedAppConfig(t *testing.T) {
 	t.Setenv(EnvGitHubAppSlug, "")
 	t.Setenv(EnvGitHubAppPrivateKey, "")
 	t.Setenv(EnvGitHubAppWebhookSecret, "")
+	t.Setenv(EnvGitHubAppClientID, "")
+	t.Setenv(EnvGitHubAppClientSecret, "")
 
 	t.Run("empty env is not enabled", func(t *testing.T) {
 		cfg := LoadGitHubHostedAppConfig()
@@ -54,4 +56,20 @@ func TestLoadGitHubHostedAppConfig(t *testing.T) {
 		assert.False(t, LoadGitHubHostedAppConfig().Enabled())
 	})
 
+	t.Run("client credentials enable user authorization", func(t *testing.T) {
+		t.Setenv(EnvGitHubAppID, "12345")
+		t.Setenv(EnvGitHubAppSlug, "superplane")
+		t.Setenv(EnvGitHubAppPrivateKey, "pem")
+		t.Setenv(EnvGitHubAppWebhookSecret, "whsec")
+
+		assert.False(t, LoadGitHubHostedAppConfig().UserAuthorizationEnabled())
+
+		t.Setenv(EnvGitHubAppClientID, "Iv1.client")
+		t.Setenv(EnvGitHubAppClientSecret, "secret")
+
+		cfg := LoadGitHubHostedAppConfig()
+		assert.True(t, cfg.UserAuthorizationEnabled())
+		assert.Equal(t, "Iv1.client", cfg.ClientID)
+		assert.Equal(t, "secret", cfg.ClientSecret)
+	})
 }

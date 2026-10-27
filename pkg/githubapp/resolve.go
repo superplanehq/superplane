@@ -18,6 +18,7 @@ import (
 const (
 	privateKeyAssociatedData    = "installation_github_app_private_key"
 	webhookSecretAssociatedData = "installation_github_app_webhook_secret"
+	clientSecretAssociatedData  = "installation_github_app_client_secret"
 )
 
 var ErrAlreadyConfigured = errors.New("GitHub App is already configured")
@@ -61,6 +62,21 @@ func Resolve(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor) (conf
 	if !cfg.Enabled() {
 		return config.GitHubHostedAppConfig{}, nil
 	}
+
+	if clientID, clientSecret := config.LoadGitHubAppClientCredentials(); clientID != "" && clientSecret != "" {
+		cfg.ClientID = clientID
+		cfg.ClientSecret = clientSecret
+		return cfg, nil
+	}
+	if record.ClientID == "" || len(record.EncryptedClientSecret) == 0 {
+		return cfg, nil
+	}
+	clientSecret, err := encryptor.Decrypt(ctx, record.EncryptedClientSecret, []byte(clientSecretAssociatedData))
+	if err != nil {
+		return config.GitHubHostedAppConfig{}, fmt.Errorf("decrypt GitHub App client secret: %w", err)
+	}
+	cfg.ClientID = record.ClientID
+	cfg.ClientSecret = string(clientSecret)
 	return cfg, nil
 }
 
@@ -105,7 +121,21 @@ func Save(
 	if err != nil {
 		return fmt.Errorf("encrypt GitHub App webhook secret: %w", err)
 	}
-	err = models.SaveInstallationGitHubApp(tx, cfg.ID, cfg.Slug, privateKey, webhookSecret)
+	record := models.InstallationGitHubApp{
+		GitHubAppID:            cfg.ID,
+		Slug:                   cfg.Slug,
+		EncryptedPrivateKey:    privateKey,
+		EncryptedWebhookSecret: webhookSecret,
+	}
+	if cfg.ClientID != "" && cfg.ClientSecret != "" {
+		clientSecret, err := encryptor.Encrypt(ctx, []byte(cfg.ClientSecret), []byte(clientSecretAssociatedData))
+		if err != nil {
+			return fmt.Errorf("encrypt GitHub App client secret: %w", err)
+		}
+		record.ClientID = cfg.ClientID
+		record.EncryptedClientSecret = clientSecret
+	}
+	err = models.SaveInstallationGitHubApp(tx, record)
 	if errors.Is(err, models.ErrInstallationGitHubAppExists) {
 		return ErrAlreadyConfigured
 	}

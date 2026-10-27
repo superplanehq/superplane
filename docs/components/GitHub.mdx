@@ -2623,6 +2623,7 @@ The Create Pull Request component creates a new pull request in a specified GitH
 - **Title**: The pull request title (supports expressions)
 - **Body**: Optional pull request description (supports markdown and expressions)
 - **Draft**: Whether to create the pull request as a draft
+- **Open as users**: Optional comma-separated SuperPlane user IDs. SuperPlane tries each user in order. It opens the pull request with the GitHub account of the first user who turned on "Create pull requests with my GitHub account". If no user can open it, the GitHub App opens it. Only connections to the SuperPlane GitHub App support this.
 
 ### Output
 
