@@ -92,6 +92,7 @@ function PlanChoice({
 export function FirstRunCardScreen({
   plans,
   selectedPlanKey,
+  welcomeCreditCents = 0,
   phase,
   error,
   busy = false,
@@ -102,6 +103,7 @@ export function FirstRunCardScreen({
 }: {
   plans: OrganizationsBillingPlanOption[];
   selectedPlanKey?: string;
+  welcomeCreditCents?: number;
   phase: FirstRunCardPhase;
   error?: string;
   busy?: boolean;
@@ -120,13 +122,7 @@ export function FirstRunCardScreen({
       <FirstRunHeading greeting={copy.greeting} headline={copy.headline} />
 
       <div className="mt-5 space-y-3">
-        <div className="flex items-start gap-3 rounded-lg border border-[#c5ebc3]/20 bg-[#c5ebc3]/[0.04] px-4 py-3.5">
-          <Gift className="mt-0.5 size-4 shrink-0 text-[#c5ebc3]" aria-hidden />
-          <div>
-            <p className="text-[13px] font-medium text-[#c5ebc3]">{copy.credit}</p>
-            <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{copy.creditBody}</p>
-          </div>
-        </div>
+        <SignupCreditBanner remainingCents={welcomeCreditCents} />
         <fieldset disabled={plansDisabled}>
           <legend className="sr-only">{copy.headline}</legend>
           <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
@@ -166,5 +162,18 @@ export function FirstRunCardScreen({
         </div>
       </div>
     </FirstRunShell>
+  );
+}
+
+function SignupCreditBanner({ remainingCents }: { remainingCents: number }) {
+  if (!(remainingCents >= 1000)) return null;
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-[#c5ebc3]/20 bg-[#c5ebc3]/[0.04] px-4 py-3.5">
+      <Gift className="mt-0.5 size-4 shrink-0 text-[#c5ebc3]" aria-hidden />
+      <div>
+        <p className="text-[13px] font-medium text-[#c5ebc3]">{copy.credit}</p>
+        <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{copy.creditBody}</p>
+      </div>
+    </div>
   );
 }
