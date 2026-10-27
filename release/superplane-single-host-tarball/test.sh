@@ -14,7 +14,8 @@ bash "${SCRIPT_DIR}/build.sh" "${VERSION}"
 work_dir="$(mktemp -d)"
 guest_dir=""
 capacity_dir=""
-trap 'rm -rf "${work_dir}" "${guest_dir}" "${capacity_dir}"' EXIT
+uninstall_dir=""
+trap 'rm -rf "${work_dir}" "${guest_dir}" "${capacity_dir}" "${uninstall_dir}"' EXIT
 tar -C "${work_dir}" -xzf "${REPO_ROOT}/build/superplane-single-host-tarball-${VERSION}/superplane-single-host.tar.gz"
 cd "${work_dir}/superplane"
 
@@ -25,6 +26,8 @@ fi
 grep -q "ghcr.io/superplanehq/superplane:${VERSION}" docker-compose.yml
 grep -q "ghcr.io/superplanehq/fleet-manager:${FLEET_MANAGER_VERSION}-docker" docker-compose.yml
 test ! -e enable-runners.sh
+test -x uninstall.sh
+./uninstall.sh --help >/dev/null
 
 SUPERPLANE_DOMAIN=superplane.example.com SUPERPLANE_CONFIG_ONLY=yes ./install.sh >/dev/null
 grep -q "image: ghcr.io/superplanehq/runner:${RUNNER_VERSION}" fleet-manager.yaml
@@ -221,5 +224,105 @@ if SUPERPLANE_RUNNER_MAX_CAPACITY=5 SUPERPLANE_RUNNER_WARM_CAPACITY=09 SUPERPLAN
   echo "Error: zero-padded warm capacity above the maximum was accepted" >&2
   exit 1
 fi
+
+# Retire runners with the configured credential before physical removal.
+# Substitute only Docker replies; execute the real packaged uninstall script.
+uninstall_dir="$(mktemp -d)"
+mkdir "${uninstall_dir}/bin" "${uninstall_dir}/installation"
+cp uninstall.sh docker-compose.yml "${uninstall_dir}/installation/"
+cat >"${uninstall_dir}/bin/docker" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ -z "${EXPECTED_RUNNER_TOKEN}" || "$*" != *"${EXPECTED_RUNNER_TOKEN}"* ]] || {
+  echo 'Credential appeared in command arguments' >&2
+  exit 1
+}
+case "$*" in
+  'compose version' | info) ;;
+  'ps '*)
+    case "$*" in
+      *label=com.docker.compose.project=*) [[ -e removed-stack ]] || echo app ;;
+      *network=* | *id=runner*) [[ -e removed-runner ]] || echo runner ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  'network ls '*) [[ -e removed-stack ]] || echo test-network ;;
+  'network inspect '*) echo 'superplane default' ;;
+  'volume ls '*) ;;
+  'inspect '*)
+    case "$*" in
+      *working_dir*) pwd -P ;;
+      *config_files*) printf '%s/docker-compose.yml\n' "$(pwd -P)" ;;
+      *'.Name'*) echo 'runner-1 test-fleet /superplane-runner-runner-1' ;;
+      *superplane.runner-id*) echo 'runner-1 test-fleet' ;;
+      *State.Running*) echo true ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  'compose '*)
+    case "$*" in
+      *' exec '*)
+        header="$(cat)"
+        [[ "${header}" == "Authorization: Bearer ${EXPECTED_RUNNER_TOKEN}" ]] || {
+          echo 'Unexpected runner API credential' >&2
+          exit 1
+        }
+        echo retire >>events
+        printf '{"runner":{"state":"terminated"}}\n200'
+        ;;
+      *' stop '*) ;;
+      *' down '*) touch removed-stack ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  'rm -f runner')
+    grep -qx retire events
+    touch removed-runner
+    ;;
+  *) echo "Unexpected Docker command: $*" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "${uninstall_dir}/bin/docker"
+cd "${uninstall_dir}/installation"
+for credentials in app admin manager missing; do
+  rm -f removed-stack removed-runner events
+  : >superplane.env
+  : >fleet-manager.env
+  expected=""
+  case "${credentials}" in
+    app)
+      expected=app-fixture-token
+      printf 'FLEET_MANAGER_API_TOKEN=%s\n' "${expected}" >superplane.env
+      printf 'INSTALLATION_ADMIN_TOKEN=other-fixture-token\n' >fleet-manager.env
+      ;;
+    manager)
+      expected=manager-fixture-token
+      printf 'FLEET_MANAGER_API_TOKEN=%s\nINSTALLATION_ADMIN_TOKEN=other-fixture-token\n' "${expected}" >fleet-manager.env
+      ;;
+    admin)
+      expected=admin-fixture-token
+      printf 'INSTALLATION_ADMIN_TOKEN=%s\n' "${expected}" >fleet-manager.env
+      ;;
+  esac
+  uninstall_status=0
+  PATH="${uninstall_dir}/bin:${PATH}" EXPECTED_RUNNER_TOKEN="${expected}" \
+    ./uninstall.sh --force --yes >result.log 2>&1 || uninstall_status=$?
+  if [[ "${credentials}" == missing ]]; then
+    test "${uninstall_status}" -ne 0
+    grep -q 'No valid runner API token found' result.log
+    test ! -e removed-runner
+    test ! -e removed-stack
+    test ! -e events
+  else
+    if [[ "${uninstall_status}" -ne 0 ]]; then
+      echo "Error: uninstall failed with ${credentials} credentials" >&2
+      cat result.log >&2
+      exit 1
+    fi
+    test -e removed-runner
+    test -e removed-stack
+    grep -qx retire events
+  fi
+done
 
 echo "Single-host tarball tests passed."
