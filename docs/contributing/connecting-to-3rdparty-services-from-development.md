@@ -125,9 +125,11 @@ installation row.
    - Redirect on update: enabled
    - Webhook URL: `{WEBHOOKS_BASE_URL}/api/v1/github/app/webhook`
    - Webhook secret: a random string. Copy it for `.env`.
+   - Callback URL: `{BASE_URL}/account/github-authorization/callback`
 
-   Disable **Request user authorization (OAuth) during installation**. The
-   GitHub App does not authorize users.
+   Disable **Request user authorization (OAuth) during installation**.
+   Members authorize the app later from the account profile. Keep
+   **Expire user authorization tokens** enabled.
 
 5. Grant repository permissions that match the workspace GitHub App manifest:
    - Issues: Read and write
@@ -156,6 +158,16 @@ installation row.
    public SuperPlane app in `SUPERPLANE_GITHUB_APP_*`.
 8. Generate a private key and download the PEM file.
 9. Copy the App ID and slug from the app page.
+10. Optional: copy the client ID and generate a client secret. Set them as
+    `SUPERPLANE_GITHUB_APP_CLIENT_ID` and `SUPERPLANE_GITHUB_APP_CLIENT_SECRET`.
+    Members can then turn on **Create pull requests with my GitHub account**
+    in the account profile. Factory implementation lines then open pull
+    requests as the first task assignee who turned it on. SuperPlane opens
+    the pull request as the app when no assignee can open it.
+
+An app that the workspace wizard created before this option existed has no
+callback URL and no stored client secret. To turn on the option, add the
+callback URL on GitHub, generate a client secret, and set the two variables.
 
 ### 4. Configure the GitHub OAuth App
 
@@ -200,6 +212,9 @@ SUPERPLANE_GITHUB_APP_ID=123123
 SUPERPLANE_GITHUB_APP_SLUG=superplane-myslug
 SUPERPLANE_GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n<pem>\n-----END RSA PRIVATE KEY-----"
 SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET=123123
+# Optional: lets members open pull requests with their own GitHub account.
+SUPERPLANE_GITHUB_APP_CLIENT_ID=Iv1.app-client-id
+SUPERPLANE_GITHUB_APP_CLIENT_SECRET=app-client-secret
 ```
 
 Put the PEM on one line. Replace each newline in the file with `\n`.

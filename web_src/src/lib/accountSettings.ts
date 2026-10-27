@@ -130,3 +130,22 @@ export function linkedAccountConnectHref(provider: LinkableProvider, redirectPat
   const redirect = encodeURIComponent(redirectPath);
   return `/auth/${provider}?intent=connect&redirect=${redirect}`;
 }
+
+/**
+ * Starts GitHub authorization of the SuperPlane GitHub App, so factory pull
+ * requests open with the member's GitHub account.
+ */
+export function githubPrAuthorizationStartHref(redirectPath: string): string {
+  const redirect = encodeURIComponent(redirectPath);
+  return `/account/github-authorization/start?redirect=${redirect}`;
+}
+
+export async function disableGitHubPrAuthorization(): Promise<void> {
+  const response = await fetch("/account/github-authorization", {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(await readResponseError(response, "Failed to turn off pull requests with your GitHub account."));
+  }
+}

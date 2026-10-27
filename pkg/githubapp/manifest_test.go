@@ -22,8 +22,8 @@ func TestPublicManifestJSON(t *testing.T) {
 	assert.Equal(t, "SuperPlane", manifest["name"])
 	assert.Equal(t, "https://app.example/api/v1/github/app/setup", manifest["setup_url"])
 	assert.Equal(t, "https://app.example/api/v1/github/app/created", manifest["redirect_url"])
-	_, hasCallbackURLs := manifest["callback_urls"]
-	assert.False(t, hasCallbackURLs)
+	assert.Equal(t, []any{"https://app.example/account/github-authorization/callback"}, manifest["callback_urls"])
+	assert.Equal(t, false, manifest["request_oauth_on_install"])
 	hooks, ok := manifest["hook_attributes"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "https://hooks.example/api/v1/github/app/webhook", hooks["url"])
@@ -45,6 +45,8 @@ func TestConvertManifest(t *testing.T) {
 			"id": 44,
 			"slug": "superplane-self",
 			"webhook_secret": "whsec",
+			"client_id": "Iv1.self",
+			"client_secret": "client-secret",
 			"pem": "-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----"
 		}`,
 	}
@@ -54,8 +56,9 @@ func TestConvertManifest(t *testing.T) {
 	assert.Equal(t, int64(44), cfg.ID)
 	assert.Equal(t, "superplane-self", cfg.Slug)
 	assert.Equal(t, "whsec", cfg.WebhookSecret)
-	assert.Empty(t, cfg.ClientID)
-	assert.Empty(t, cfg.ClientSecret)
+	assert.Equal(t, "Iv1.self", cfg.ClientID)
+	assert.Equal(t, "client-secret", cfg.ClientSecret)
+	assert.True(t, cfg.UserAuthorizationEnabled())
 	assert.Contains(t, cfg.PrivateKey, "BEGIN RSA PRIVATE KEY")
 	require.NotNil(t, httpCtx.request)
 	assert.Equal(t, http.MethodPost, httpCtx.request.Method)

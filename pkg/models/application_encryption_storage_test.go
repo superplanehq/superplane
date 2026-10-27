@@ -19,7 +19,7 @@ func TestApplicationEncryptedStorageHandlersMatchSchema(t *testing.T) {
 
 			cursor := uuid.NewString()
 			switch location.Name {
-			case "installation_github_apps.encrypted_private_key", "installation_github_apps.encrypted_webhook_secret", "installation_licenses.encrypted_license":
+			case "installation_github_apps.encrypted_private_key", "installation_github_apps.encrypted_webhook_secret", "installation_github_apps.encrypted_client_secret", "installation_licenses.encrypted_license":
 				cursor = "0"
 			case "bitbucket_forge_installations.system_token", "sentry_app_install_grants.access_token", "sentry_app_install_grants.refresh_token":
 				cursor = "encryption-test-" + cursor

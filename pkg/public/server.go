@@ -817,6 +817,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/account", s.deleteAccount).Methods("DELETE")
 	accountRoute.HandleFunc("/account/providers/{provider}", s.disconnectAccountProvider).Methods("DELETE")
 	accountRoute.HandleFunc("/account/linked-accounts/{provider}/{providerID}", s.disconnectLinkedAccount).Methods("DELETE")
+	accountRoute.HandleFunc("/account/github-authorization/start", s.startGitHubPRAuthorization).Methods("GET")
+	accountRoute.HandleFunc("/account/github-authorization/callback", s.completeGitHubPRAuthorization).Methods("GET")
+	accountRoute.HandleFunc("/account/github-authorization", s.disableGitHubPRAuthorization).Methods("DELETE")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/account/onboarding", s.createInitialWorkspace).Methods("POST")
 	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
@@ -1545,6 +1548,7 @@ type AccountResponse struct {
 	HasPassword                  bool                                 `json:"has_password"`
 	Providers                    []AccountProviderResponse            `json:"providers"`
 	LinkedAccounts               []AccountLinkedAccountResponse       `json:"linked_accounts"`
+	GitHubPRAuthorization        AccountGitHubPRAuthorizationResponse `json:"github_pr_authorization"`
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
 	SupportSession               *AccountSupportSession               `json:"support_session,omitempty"`
 	License                      AccountLicense                       `json:"license"`
@@ -1652,6 +1656,13 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	githubPRAuthorization, err := s.accountGitHubPRAuthorization(r, account.ID)
+	if err != nil {
+		log.Errorf("Error getting GitHub pull request authorization for %s: %v", account.ID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
 	accountResponse := AccountResponse{
 		ID:                           account.ID.String(),
 		Name:                         account.Name,
@@ -1661,6 +1672,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		HasPassword:                  hasPassword,
 		Providers:                    accountProviderResponses(providers),
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
+		GitHubPRAuthorization:        githubPRAuthorization,
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
 		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
 		BillingEnabled:               billing.Enabled(),

@@ -19,6 +19,7 @@ const (
 	createdPath              = "/api/v1/github/app/created"
 	setupPath                = "/api/v1/github/app/setup"
 	webhookPath              = "/api/v1/github/app/webhook"
+	userAuthorizationPath    = "/account/github-authorization/callback"
 )
 
 // CreateForm is the GitHub App Manifest POST the browser sends to GitHub.
@@ -33,14 +34,18 @@ type convertedApp struct {
 	Slug          string `json:"slug"`
 	WebhookSecret string `json:"webhook_secret"`
 	PEM           string `json:"pem"`
+	ClientID      string `json:"client_id"`
+	ClientSecret  string `json:"client_secret"`
 }
 
 func CreateURL() string {
 	return githubAppCreateURL
 }
 
-func OAuthCallbackURL(baseURL string) string {
-	return strings.TrimRight(strings.TrimSpace(baseURL), "/") + "/auth/github/callback"
+// UserAuthorizationCallbackURL is where GitHub returns a member who authorizes
+// the app to open pull requests as that member.
+func UserAuthorizationCallbackURL(baseURL string) string {
+	return strings.TrimRight(strings.TrimSpace(baseURL), "/") + userAuthorizationPath
 }
 
 func CreatedPath() string {
@@ -78,6 +83,10 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 		"default_events": []string{"member"},
 		"setup_url":      baseURL + setupPath,
 		"redirect_url":   baseURL + createdPath,
+		// Members authorize the app later from the account profile. Install
+		// must not start user authorization.
+		"callback_urls":            []string{UserAuthorizationCallbackURL(baseURL)},
+		"request_oauth_on_install": false,
 		"hook_attributes": map[string]any{
 			"url": webhooksBaseURL + webhookPath,
 		},
@@ -126,6 +135,8 @@ func ConvertManifest(httpCtx core.HTTPContext, code string) (config.GitHubHosted
 		Slug:          strings.TrimSpace(app.Slug),
 		PrivateKey:    strings.TrimSpace(app.PEM),
 		WebhookSecret: strings.TrimSpace(app.WebhookSecret),
+		ClientID:      strings.TrimSpace(app.ClientID),
+		ClientSecret:  strings.TrimSpace(app.ClientSecret),
 	}
 	if !cfg.Enabled() {
 		return config.GitHubHostedAppConfig{}, fmt.Errorf("GitHub App manifest conversion is incomplete")
