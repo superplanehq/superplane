@@ -21,7 +21,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -798,7 +797,6 @@ func newAccountDeletionRenewalFixture(t *testing.T) *accountDeletionRenewalFixtu
 	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	require.NoError(t, db.Model(r.Account).Update("installation_admin", false).Error)
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	addOrganizationMember(t, r.Organization.ID, true)
 	addOrganizationMember(t, r.Organization.ID, false)
 

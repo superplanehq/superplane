@@ -31,7 +31,7 @@ export function useOnboardingCardFlow(organizationId: string, flow: CardStepFlow
 
   const continueSetup = useCallback(
     async (resume: boolean) => {
-      if (inFlight.current) return;
+      if (inFlight.current || !cardStep.ready || !cardStep.available) return;
       inFlight.current = true;
       setWorking(true);
       setError("");

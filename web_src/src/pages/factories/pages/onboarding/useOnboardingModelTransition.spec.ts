@@ -11,6 +11,7 @@ const cardStep: OnboardingCardStep = {
   ready: true,
   available: false,
   required: false,
+  requiresAdmin: false,
   plans: [],
   planActive: false,
   hasPaymentMethod: false,

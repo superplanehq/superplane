@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -162,6 +163,23 @@ func (s *TestSession) resetDatabase() {
 	}
 }
 
+func assignOpenTrial(organizationID uuid.UUID) error {
+	db := database.Conn()
+	catalog, err := billingmodels.FindBillingPlan(db, billingmodels.BillingPlanTrial)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	end := now.AddDate(0, 0, catalog.TrialLengthDays)
+	return db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", organizationID).Updates(map[string]any{
+		"plan":             catalog.ResponsePlan(),
+		"plan_id":          catalog.ID,
+		"plan_source":      billingmodels.BillingPlanSourceSystem,
+		"trial_started_at": now,
+		"trial_ends_at":    end,
+	}).Error
+}
+
 func (s *TestSession) Login() {
 	secret := os.Getenv("JWT_SECRET")
 	signer := spjwt.NewSigner(secret)
@@ -198,6 +216,11 @@ func (s *TestSession) setupUserAndOrganization() {
 		if err != nil {
 			s.t.Fatalf("create organization: %v", err)
 		}
+	}
+	// Browser tests run agents. A new company starts on None, so the shared
+	// session assigns an open trial before those runs.
+	if err := assignOpenTrial(organization.ID); err != nil {
+		s.t.Fatalf("assign trial plan: %v", err)
 	}
 
 	// New orgs enable factories by default. Classic canvas and Apps home

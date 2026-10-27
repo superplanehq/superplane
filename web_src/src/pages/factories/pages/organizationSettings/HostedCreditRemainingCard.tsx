@@ -1,10 +1,8 @@
-import type { ReactNode } from "react";
 import type {
   OrganizationsCreateHostedCreditCheckoutBody,
   OrganizationsHostedCreditProduct,
   OrganizationsOrganizationCreditGrant,
 } from "@/api-client";
-import { Badge } from "@/components/ui/badge";
 import { hostedCreditRefreshMessage, type HostedCreditRefreshStatus } from "@/lib/hostedCredit";
 import { cn } from "@/lib/utils";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
@@ -14,28 +12,23 @@ import {
   adminCreditGrantCents,
   billingCreditBucketsView,
   billingCreditRemainingShares,
-  billingSpendOrderCopy,
   type BillingCreditBarShare,
   type BillingCreditBucketKey,
   type BillingCreditBucketView,
 } from "../../lib/billingCreditBuckets";
-import { hostedCreditBillingBalanceCopy } from "../../lib/hostedCreditEmpty";
 import { formatUsdCents } from "../../lib/workOrderUsage";
 const HOSTED_CREDIT_EXPLANATION =
   "Hosted credit pays SuperPlane-hosted machines and managed models for this organization.";
 const HOSTED_CREDIT_REMAINING_CAPTION = "Remaining hosted credit";
 
 type HostedCreditRemainingCardProps = {
-  newBilling: boolean;
   organizationId: string;
   billingContactMessage?: string;
-  billingEnabled: boolean;
   canManageBilling: boolean;
   checkoutPending: boolean;
   creditPurchaseAllowed: boolean;
   creditRefreshStatus: HostedCreditRefreshStatus;
   currentPeriodEnd?: string;
-  hasBillingCustomer: boolean;
   includedRemaining: number;
   packs: OrganizationsHostedCreditProduct[];
   plan?: string;
@@ -53,16 +46,13 @@ type HostedCreditRemainingCardProps = {
 };
 
 export function HostedCreditRemainingCard({
-  newBilling,
   organizationId,
   billingContactMessage,
-  billingEnabled,
   canManageBilling,
   checkoutPending,
   creditPurchaseAllowed,
   creditRefreshStatus,
   currentPeriodEnd,
-  hasBillingCustomer,
   includedRemaining,
   packs,
   plan,
@@ -78,17 +68,6 @@ export function HostedCreditRemainingCard({
   grants,
   onAddCredit,
 }: HostedCreditRemainingCardProps) {
-  const copy = hostedCreditBillingBalanceCopy({
-    remainingCents: remaining,
-    purchasedCents: purchased,
-    hasBillingCustomer,
-    billingEnabled,
-    welcomeCreditExpiresAt,
-    plan,
-    planCategory,
-    trialEndsAt,
-    creditPurchaseAllowed,
-  });
   const buckets = billingCreditBucketsView({
     welcomeRemainingCents: welcomeRemaining,
     includedRemainingCents: includedRemaining,
@@ -103,12 +82,11 @@ export function HostedCreditRemainingCard({
     welcomeCreditExpiresAt,
     currentPeriodEnd,
   });
-  const description = newBilling ? (remaining <= 0 ? "Your hosted credit balance is empty." : null) : copy.description;
+  const description = remaining <= 0 ? "Your hosted credit balance is empty." : null;
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
   const showBuyMore = canManageBilling && creditPurchaseAllowed;
-  const visibleBuckets = newBilling ? buckets.filter((bucket) => bucket.remainingCents > 0) : buckets;
+  const visibleBuckets = buckets.filter((bucket) => bucket.remainingCents > 0);
   const remainingShares = billingCreditRemainingShares(visibleBuckets);
-  const spendOrderCopy = billingSpendOrderCopy(buckets);
 
   return (
     <FactorySettingsCard
@@ -135,24 +113,14 @@ export function HostedCreditRemainingCard({
           >
             {formatUsdCents(remaining)}
           </p>
-          {!newBilling && copy.badge === "Trial" ? (
-            <Badge variant="outline" className="text-muted-foreground">
-              {copy.badge}
-            </Badge>
-          ) : null}
         </div>
         <p className="mt-0.5 text-xs text-muted-foreground">{HOSTED_CREDIT_REMAINING_CAPTION}</p>
         <RemainingSharesBar shares={remainingShares} />
         <p className="mt-2 text-xs text-muted-foreground" data-testid="billing-credit-spend-order">
-          {newBilling
-            ? visibleBuckets.length > 1
-              ? "Credits are used in the order shown below."
-              : ""
-            : spendOrderCopy}
+          {visibleBuckets.length > 1 ? "Credits are used in the order shown below." : ""}
         </p>
       </div>
       <CreditBalances
-        newBilling={newBilling}
         visibleBuckets={visibleBuckets}
         expiresAt={trialEndsAt ?? welcomeCreditExpiresAt}
         currentPeriodEnd={currentPeriodEnd}
@@ -191,46 +159,6 @@ function RemainingSharesBar({ shares }: { shares: BillingCreditBarShare[] }) {
             ))
         : null}
     </div>
-  );
-}
-
-function CreditBucketRow({ bucket, action }: { bucket: BillingCreditBucketView; action?: ReactNode }) {
-  const remainingPercent = Math.max(0, 100 - bucket.usedPercent);
-
-  return (
-    <li className="py-3 first:pt-1 last:pb-0" data-testid={`billing-credit-${bucket.key}`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={cn("size-1.5 shrink-0 rounded-full", bucketAccentClassName(bucket.key))} aria-hidden />
-            <h3 className="text-[13px] font-medium tracking-[-0.01em]">{bucket.heading}</h3>
-          </div>
-          <p className="mt-0.5 pl-3.5 text-[11px] text-muted-foreground">{bucket.spendOrderLabel}</p>
-        </div>
-        <p
-          className="shrink-0 text-[13px] font-medium tracking-[-0.01em] tabular-nums"
-          data-testid={`billing-credit-${bucket.key}-remaining`}
-        >
-          {bucket.remainingLabel}
-        </p>
-      </div>
-      <div
-        className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
-        role="progressbar"
-        aria-label={`${bucket.heading} remaining`}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={remainingPercent}
-        aria-valuetext={bucket.remainingLabel}
-      >
-        <div
-          className={cn("h-full rounded-full", bucketAccentClassName(bucket.key))}
-          style={{ width: `${remainingPercent}%` }}
-        />
-      </div>
-      {bucket.footer ? <p className="mt-1.5 text-xs text-muted-foreground">{bucket.footer}</p> : null}
-      {action}
-    </li>
   );
 }
 
@@ -324,30 +252,24 @@ function CreditBalanceFeedback({
 }
 
 function CreditBalances({
-  newBilling,
   visibleBuckets,
   expiresAt,
   currentPeriodEnd,
 }: {
-  newBilling: boolean;
   visibleBuckets: BillingCreditBucketView[];
   expiresAt?: string;
   currentPeriodEnd?: string;
 }) {
   return (
     <ul className="mt-4 divide-y divide-border">
-      {visibleBuckets.map((bucket) =>
-        newBilling ? (
-          <BillingCreditBalanceRow
-            key={bucket.key}
-            bucket={bucket}
-            expiresAt={expiresAt}
-            currentPeriodEnd={currentPeriodEnd}
-          />
-        ) : (
-          <CreditBucketRow key={bucket.key} bucket={bucket} />
-        ),
-      )}
+      {visibleBuckets.map((bucket) => (
+        <BillingCreditBalanceRow
+          key={bucket.key}
+          bucket={bucket}
+          expiresAt={expiresAt}
+          currentPeriodEnd={currentPeriodEnd}
+        />
+      ))}
     </ul>
   );
 }
