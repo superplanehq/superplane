@@ -16,7 +16,6 @@ import (
 	"github.com/superplanehq/superplane/ee/billing/polar"
 	polartest "github.com/superplanehq/superplane/ee/billing/testsupport/polar"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -29,7 +28,6 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	plan := billingmodels.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: "Pay as you go", Category: "paid", Visibility: "public", RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 	hasCard := false
@@ -87,7 +85,6 @@ func TestSelectBillingPlanRecoversSignupCredit(t *testing.T) {
 	require.NoError(t, err)
 	organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
 	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, organization.ID, features.FeatureNewBilling))
 	before, err := billingmodels.DescribeOrganizationLLMCredit(db, organization.ID)
 	require.NoError(t, err)
 	require.Zero(t, before.GrantMicros, "the earlier onboarding deferred signup credit")
@@ -128,7 +125,6 @@ func TestSelectNoneBillingPlanWhenNoPublicPlansExist(t *testing.T) {
 	defer r.Close()
 	db := database.DB(t.Context())
 	cleanupDB := database.DB(context.WithoutCancel(t.Context()))
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	plans, err := billingmodels.ListBillingPlans(db)
 	require.NoError(t, err)
 	for _, plan := range plans {
@@ -167,51 +163,50 @@ func TestSelectNoneBillingPlanWhenNoPublicPlansExist(t *testing.T) {
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 }
 
-func TestNewBillingIsOptInAndKeepsMigratedTrial(t *testing.T) {
-	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "")
+func TestExistingTrialStaysUntilPlanSelection(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	requests := 0
-	server := polartest.APIServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		requests++
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}}))
+	server := polartest.APIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, http.MethodGet, req.Method)
+		writeFakeJSON(t, w, map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
 	})
 	polartest.UseServer(t, server)
-	require.NoError(t, billingmodels.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cust_legacy"))
-	trial, err := billingmodels.FindBillingPlan(db, billingmodels.BillingPlanTrial)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	before, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	plan := billingmodels.BillingPlan{Key: "opt_in_" + uuid.NewString()[:8], Name: "Opt in", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
+	plan := billingmodels.BillingPlan{Key: "keep_" + uuid.NewString()[:8], Name: "Keep", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 
 	response, err := DescribeOrganizationBilling(t.Context(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
 	require.NoError(t, err)
-	require.True(t, response.BillingEnabled)
-	require.Empty(t, response.AvailablePlans)
-	require.False(t, response.RequirePaymentMethod)
-	require.True(t, response.HostedExecutionAllowed)
 	require.Equal(t, billingmodels.BillingPlanTrial, response.CatalogKey)
-	require.Equal(t, trial.TrialCreditCents, response.WelcomeRemainingCents)
+	require.True(t, response.HostedExecutionAllowed)
+	var listed bool
+	for _, option := range response.AvailablePlans {
+		if option.Key == plan.Key {
+			listed = true
+			require.Equal(t, plan.Name, option.Name)
+		}
+	}
+	require.True(t, listed, "a public paid plan is listed without a feature flag")
 
-	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, r.Account.ID.String(), "http://localhost")
-	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
-	_, err = CreatePaymentMethodSession(t.Context(), r.Organization.ID.String(), &pb.CreatePaymentMethodSessionRequest{}, r.Account.ID.String())
-	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
-	require.Zero(t, requests, "legacy onboarding must not contact Polar")
-
-	_, err = billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	selected, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, r.Account.ID.String(), "http://localhost")
 	require.NoError(t, err)
-	plan.RequirePaymentMethod = true
-	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
-	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
-	require.Zero(t, requests, "card requirements must remain off without the flag")
+	require.Empty(t, selected.CheckoutUrl)
+	current, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, plan.ID, current.PlanID)
+	require.True(t, current.AllowsHostedExecution(time.Now()))
+	after, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, before.GrantMicros, after.GrantMicros)
 }
 
 func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	product := "prod_selected_" + uuid.NewString()
 	plan := billingmodels.BillingPlan{Key: "paid_" + uuid.NewString()[:8], Name: "Paid", Category: "paid", Visibility: "public", PriceCents: 25000, PolarProductID: &product, RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
@@ -284,7 +279,6 @@ func TestSelectBillingPlanBlocksPausedSubscription(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	free := billingmodels.BillingPlan{Key: "free_" + uuid.NewString()[:8], Name: "Free", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &free))
 	server := polartest.APIServer(t, func(w http.ResponseWriter, req *http.Request) {
@@ -325,7 +319,6 @@ func TestSelectBillingPlanBlocksElapsedScheduledCancellation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	polartest.UseServer(t, polartest.APIServer(t, func(w http.ResponseWriter, req *http.Request) {
 		t.Errorf("an elapsed scheduled cancellation must not start checkout: %s", req.URL.Path)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -356,7 +349,6 @@ func TestPaymentMethodSetupCreatesCustomerWithoutCheckout(t *testing.T) {
 	sessionToken := "polar_cst_setup"
 	r := support.Setup(t)
 	defer r.Close()
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(database.DB(t.Context()), r.Organization.ID, features.FeatureNewBilling))
 	created := false
 	server := polartest.APIServer(t, func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
@@ -393,7 +385,6 @@ func TestSelectPerSeatPlanValidatesBeforePolar(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	member := support.CreateUser(t, r, r.Organization.ID)
 	product := "prod_team_" + uuid.NewString()
 	team := billingmodels.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: new(5), PriceCents: 2000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
@@ -452,7 +443,6 @@ func TestSelectPerSeatPlanValidatesBeforePolar(t *testing.T) {
 	require.Zero(t, calls)
 	empty, err := models.CreateOrganization("empty-checkout-"+uuid.NewString()[:8], "")
 	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, empty.ID, features.FeatureNewBilling))
 	_, err = SelectBillingPlan(t.Context(), empty.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: team.Key, Seats: new(int32(0))}, r.Account.ID.String(), "http://localhost")
 	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	require.Contains(t, err.Error(), "Select at least 1 seats to cover current members.")
@@ -463,7 +453,7 @@ func TestTeamCheckoutCapacityLifecycle(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	support.CreateUser(t, r, r.Organization.ID)
 	product := "prod_team_" + uuid.NewString()
 	team := billingmodels.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: new(3), PriceCents: 2000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
@@ -574,7 +564,6 @@ func newTeamCheckoutFixture(t *testing.T) *teamCheckoutFixture {
 	r := support.Setup(t)
 	t.Cleanup(r.Close)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	product := "prod_team_" + uuid.NewString()
 	team := billingmodels.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: new(10), PriceCents: 2000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &team))

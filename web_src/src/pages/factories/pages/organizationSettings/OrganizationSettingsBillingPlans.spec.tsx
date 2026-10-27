@@ -90,7 +90,6 @@ describe("OrganizationSettingsBillingPage plans", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        experimentalFeatures={["new_billing"]}
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
@@ -228,7 +227,7 @@ describe("OrganizationSettingsBillingPage plans", () => {
     expect(screen.getByTestId("billing-credit-trial")).toHaveTextContent(`Expires on ${WELCOME_EXPIRY_LABEL}`);
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
     expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
 
     const balance = screen.getByTestId("billing-credit-balance");
@@ -321,7 +320,6 @@ describe("OrganizationSettingsBillingPage plans", () => {
   it("shows public catalog plans independently of the legacy checkout flag", async () => {
     render(
       <FactoriesHarness
-        experimentalFeatures={["new_billing"]}
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
         factoriesFixture={{
           ...defaultFactoriesFixture,

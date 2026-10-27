@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/billing"
-	"github.com/superplanehq/superplane/pkg/features"
 	coremodels "github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -35,6 +34,11 @@ const (
 	canceledIncludedGrantPrefix = "canceled:"
 
 	initialPlanTrialCreditNote = "Initial billing plan trial credit"
+
+	// SignupCreditCents is the one-time signup credit for an account.
+	SignupCreditCents int64 = 1000
+	// SignupCreditDays is how long that signup credit stays usable.
+	SignupCreditDays = 365
 )
 
 var (
@@ -113,22 +117,14 @@ type OrganizationLLMCreditSummary struct {
 	WelcomeCreditExpiresAt   *time.Time
 }
 
-// GrantWelcomeCredit grants signup credit once per account. New billing uses
-// the same $10 credit for either starter plan, independent of plan selection.
+// GrantWelcomeCredit grants signup credit once per account. Every account
+// receives $10, valid for 365 days. The grant does not depend on the plan,
+// and credit alone does not permit execution.
 func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
-	settings, err := FindBillingPlan(tx, BillingPlanTrial)
-	if err != nil {
-		return err
-	}
-	newBilling, err := coremodels.OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureNewBilling)
-	if err != nil {
-		return err
-	}
-	if newBilling {
-		settings.TrialCreditCents = 1000
-		settings.TrialLengthDays = 365
-	}
-	return grantWelcomeCredit(tx, orgID, accountID, settings)
+	return grantWelcomeCredit(tx, orgID, accountID, &BillingPlan{
+		TrialCreditCents: SignupCreditCents,
+		TrialLengthDays:  SignupCreditDays,
+	})
 }
 
 func SetWelcomeGrantExpiresAt(tx *gorm.DB, orgID uuid.UUID, endsAt time.Time) error {
@@ -1001,13 +997,6 @@ func addInitialPlanTrialCredit(tx *gorm.DB, previous, next *OrganizationBillingP
 	}
 	if previous == nil || previous.PlanSource == BillingPlanSourceAdmin || previous.Catalog.Category != "trial" ||
 		next.Catalog.Category != "paid" || next.Catalog.Visibility != "public" || next.Catalog.TrialCreditCents == 0 {
-		return nil
-	}
-	enabled, err := coremodels.OrganizationHasExperimentalFeatures(tx, next.OrganizationID, features.FeatureNewBilling)
-	if err != nil {
-		return err
-	}
-	if !enabled {
 		return nil
 	}
 

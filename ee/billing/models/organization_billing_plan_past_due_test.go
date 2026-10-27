@@ -44,6 +44,7 @@ func newPastDueReplay(t *testing.T, product pastDueProduct) *pastDueReplay {
 	t.Helper()
 	r := support.Setup(t)
 	db := database.Conn()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	replay := &pastDueReplay{t: t, db: db, orgID: r.Organization.ID, modifiedAt: time.Now().Add(-time.Hour)}
 	if !product.perSeat {
 		replay.productID = "prod_business"

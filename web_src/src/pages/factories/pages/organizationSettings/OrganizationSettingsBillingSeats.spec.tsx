@@ -21,12 +21,11 @@ vi.mock("@/contexts/usePermissions", () => ({
   }),
 }));
 
-function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse, newBilling = false) {
+function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse, buySeats = false) {
   return render(
     <FactoriesHarness
-      experimentalFeatures={newBilling ? ["new_billing"] : []}
       pathSuffix={
-        "workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing" + (newBilling ? "?buySeats=1" : "")
+        "workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing" + (buySeats ? "?buySeats=1" : "")
       }
       factoriesFixture={{ ...defaultFactoriesFixture, organizationBilling: billing }}
     />,

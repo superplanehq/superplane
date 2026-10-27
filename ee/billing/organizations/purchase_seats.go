@@ -302,9 +302,6 @@ func requireSeatPurchaseAvailable(ctx context.Context, orgID string) (uuid.UUID,
 	if !billingmodels.BillingEnabled() || !polar.Configured() {
 		return uuid.Nil, grpcerrors.FailedPrecondition(nil, "Billing is not configured.")
 	}
-	if err := requireNewBilling(ctx, organizationID); err != nil {
-		return uuid.Nil, err
-	}
 	return organizationID, nil
 }
 

@@ -52,7 +52,7 @@ func Test__ListOrganizationCreditGrants(t *testing.T) {
 		assert.Equal(t, r.Account.Name, resp.Grants[2].ActorName)
 
 		assert.Equal(t, billingmodels.LLMCreditGrantKindWelcome, resp.Grants[3].Kind)
-		assert.Equal(t, int64(billingmodels.DefaultWelcomeGrantCents), resp.Grants[3].AmountCents)
+		assert.Equal(t, billingmodels.SignupCreditCents, resp.Grants[3].AmountCents)
 		assert.Equal(t, r.Account.Name, resp.Grants[3].ActorName)
 		require.NotNil(t, resp.Grants[3].ExpiresAt)
 		assert.Nil(t, resp.Grants[2].ExpiresAt)

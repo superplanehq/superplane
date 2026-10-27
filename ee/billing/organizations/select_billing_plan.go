@@ -13,7 +13,6 @@ import (
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/ee/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/grpc/organizationref"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -28,9 +27,6 @@ func CreatePaymentMethodSession(ctx context.Context, orgID string, _ *pb.CreateP
 	}
 	if !billingmodels.BillingEnabled() || !polar.Configured() {
 		return nil, grpcerrors.FailedPrecondition(nil, "Billing is not configured.")
-	}
-	if err := requireNewBilling(ctx, organizationID); err != nil {
-		return nil, err
 	}
 	if err := ensureOrganizationBillingCustomer(ctx, organizationID, accountID); err != nil {
 		return nil, err
@@ -74,9 +70,6 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 	}
 	if !billingmodels.BillingEnabled() || !polar.Configured() {
 		return nil, grpcerrors.FailedPrecondition(nil, "Billing is not configured.")
-	}
-	if err := requireNewBilling(ctx, organizationID); err != nil {
-		return nil, err
 	}
 	db := database.DB(ctx)
 	current, err := billingmodels.ResolveOrganizationBillingPlan(db, organizationID)
@@ -191,17 +184,6 @@ func activatePlanWithWelcomeCredit(db *gorm.DB, organizationID uuid.UUID, accoun
 		}
 		return billingmodels.GrantWelcomeCredit(tx, organizationID, account)
 	})
-}
-
-func requireNewBilling(ctx context.Context, orgID uuid.UUID) error {
-	enabled, err := models.OrganizationHasExperimentalFeatures(database.DB(ctx), orgID, features.FeatureNewBilling)
-	if err != nil {
-		return grpcerrors.Internal(err, "Could not load billing settings.")
-	}
-	if !enabled {
-		return grpcerrors.FailedPrecondition(nil, "New billing is not enabled for this organization.")
-	}
-	return nil
 }
 
 func validateCheckoutSeats(db *gorm.DB, orgID uuid.UUID, catalog *billingmodels.BillingPlan, seats *int32) (*int, error) {

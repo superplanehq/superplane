@@ -5,7 +5,7 @@ Automated tests use simulated Polar responses and do not satisfy this gate.
 
 Status: pending. No manual sandbox purchase is recorded for this change.
 
-1. Use an organization with New Billing enabled and an active per-seat sandbox subscription.
+1. Use an organization with an active per-seat sandbox subscription.
 2. Sign in as an organization admin and open Billing.
 3. Select **Buy seats**. Confirm the additional seat count, prorated charge, renewal date, and new monthly total.
 4. Select **Confirm purchase** once.

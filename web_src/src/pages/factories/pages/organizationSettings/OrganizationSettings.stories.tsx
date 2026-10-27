@@ -1,7 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { userEvent, within } from "storybook/test";
-import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
-
 import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -154,7 +152,6 @@ export const BillingTeam: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
-      experimentalFeatures={[FEATURE_NEW_BILLING]}
       factoriesFixture={{ ...defaultFactoriesFixture, organizationBilling: { ...TEAM_ORGANIZATION_BILLING } }}
     />
   ),
@@ -175,7 +172,6 @@ export const BillingTeamAtMaximum: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
-      experimentalFeatures={[FEATURE_NEW_BILLING]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationBilling: {
@@ -196,7 +192,6 @@ export const BillingSeatPurchasePending: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
-      experimentalFeatures={[FEATURE_NEW_BILLING]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationBilling: {
@@ -219,7 +214,6 @@ export const BillingSeatPurchaseFailed: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
-      experimentalFeatures={[FEATURE_NEW_BILLING]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationBilling: {
@@ -243,7 +237,6 @@ export const BillingTeamEnding: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
-      experimentalFeatures={[FEATURE_NEW_BILLING]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationBilling: { ...TEAM_ORGANIZATION_BILLING, cancelAtPeriodEnd: true },
@@ -257,7 +250,6 @@ export const BillingTeamLegacyCapacity: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("billing")}
-      experimentalFeatures={[FEATURE_NEW_BILLING]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationBilling: {

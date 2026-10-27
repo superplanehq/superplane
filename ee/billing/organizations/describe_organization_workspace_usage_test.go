@@ -97,10 +97,10 @@ func Test__DescribeOrganizationWorkspaceUsage(t *testing.T) {
 	assert.Equal(t, computeMachineType, resp.ByMachineType[0].MachineType)
 	assert.Equal(t, computeSeconds, resp.ByMachineType[0].DurationSeconds)
 	// Hosted compute usage draws down the welcome grant at the raw provider rate.
-	grantMicros := billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents)
+	grantMicros := billingmodels.CentsToMicros(billingmodels.SignupCreditCents)
 	assert.Equal(t, pricebook.MicrosToCents(grantMicros-computeCostMicros), resp.RemainingCreditCents)
-	assert.Equal(t, billingmodels.DefaultWelcomeGrantCents, resp.GrantTotalCents)
-	assert.Equal(t, billingmodels.DefaultWelcomeGrantCents, resp.SuperplaneGrantCents)
+	assert.Equal(t, billingmodels.SignupCreditCents, resp.GrantTotalCents)
+	assert.Equal(t, billingmodels.SignupCreditCents, resp.SuperplaneGrantCents)
 	assert.Equal(t, int64(0), resp.PurchasedCreditCents)
 	assert.Equal(t, pricebook.MicrosToCents(computeCostMicros), resp.HostedBilledCents)
 	assert.False(t, resp.RemainingCreditWarning)
@@ -143,7 +143,7 @@ func Test__DescribeOrganizationWorkspaceUsageListsPolarInvoices(t *testing.T) {
 		&pb.DescribeOrganizationWorkspaceUsageRequest{},
 	)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.DefaultWelcomeGrantCents, resp.SuperplaneGrantCents)
+	assert.Equal(t, billingmodels.SignupCreditCents, resp.SuperplaneGrantCents)
 	assert.Equal(t, int64(10000), resp.PurchasedCreditCents)
 	require.Len(t, resp.Invoices, 1)
 	assert.Equal(t, "ord_100", resp.Invoices[0].Id)

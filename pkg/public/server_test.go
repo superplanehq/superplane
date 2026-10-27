@@ -790,7 +790,7 @@ func Test__CreateOrganization(t *testing.T) {
 
 		credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), org.ID)
 		require.NoError(t, err)
-		assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), credit.GrantMicros)
+		assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), credit.GrantMicros)
 
 		reloaded, err := models.FindAccountByID(account.ID.String())
 		require.NoError(t, err)
@@ -862,7 +862,7 @@ func Test__CreateOrganization(t *testing.T) {
 
 		firstCredit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), firstOrg.ID)
 		require.NoError(t, err)
-		assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), firstCredit.GrantMicros)
+		assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), firstCredit.GrantMicros)
 
 		secondCredit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), secondOrg.ID)
 		require.NoError(t, err)

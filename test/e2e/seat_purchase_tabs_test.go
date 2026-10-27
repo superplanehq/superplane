@@ -133,7 +133,6 @@ func startSeatPurchaseTabs(t *testing.T) *seatPurchaseTabsSteps {
 
 func (s *seatPurchaseTabsSteps) givenATeamSubscriptionWithFourSeats() {
 	db := database.DB(s.t.Context())
-	require.NoError(s.t, models.EnableExperimentalFeatureInTransaction(db, s.session.OrgID, features.FeatureNewBilling))
 	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactories))
 	maximum := 50
 	plan := billingmodels.BillingPlan{

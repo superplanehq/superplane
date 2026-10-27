@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
 
@@ -36,6 +37,7 @@ func setAdminBillingTestProduct(t *testing.T, productID string) {
 
 func TestAdminOrganizationCreditBalances(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	creditPath := "/admin/api/organizations/" + r.Organization.ID.String() + "/llm-credit"
 	balancesPath := creditPath + "/balances"
 	setBalance := func(authCookie string, body map[string]any) *httptest.ResponseRecorder {
@@ -68,19 +70,19 @@ func TestAdminOrganizationCreditBalances(t *testing.T) {
 		require.Equal(t, http.StatusOK, response.Code)
 		var credit organizationLLMCreditResponse
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
-		assert.Equal(t, billingmodels.DefaultWelcomeGrantCents, credit.WelcomeRemainingCents)
+		assert.Equal(t, billingmodels.SignupCreditCents, credit.WelcomeRemainingCents)
 		assert.NotNil(t, credit.WelcomeCreditExpiresAt)
 
 		response = setBalance(token, map[string]any{
 			"bucket":                   "trial",
-			"target_cents":             1000,
+			"target_cents":             400,
 			"expected_remaining_cents": credit.WelcomeRemainingCents,
 			"note":                     "support",
 		})
 		require.Equal(t, http.StatusOK, response.Code)
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
-		assert.Equal(t, int64(1000), credit.WelcomeRemainingCents)
-		assert.Equal(t, int64(1000), credit.RemainingCreditCents)
+		assert.Equal(t, int64(400), credit.WelcomeRemainingCents)
+		assert.Equal(t, int64(400), credit.RemainingCreditCents)
 
 		response = execRequest(server, requestParams{method: "GET", path: creditPath + "/grants", authCookie: token})
 		require.Equal(t, http.StatusOK, response.Code)
@@ -91,7 +93,7 @@ func TestAdminOrganizationCreditBalances(t *testing.T) {
 		require.Len(t, history.Grants, 2)
 		latest := history.Grants[0]
 		assert.Equal(t, billingmodels.LLMCreditGrantKindTrialAdjustment, latest["kind"])
-		assert.Equal(t, "-4000", latest["amountCents"])
+		assert.Equal(t, "-600", latest["amountCents"])
 		assert.Equal(t, "support", latest["note"])
 		assert.NotEmpty(t, latest["actorName"])
 	})
@@ -912,7 +914,7 @@ func TestAdminLLMSettings(t *testing.T) {
 		var credit organizationLLMCreditResponse
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
 		assert.Greater(t, credit.RemainingCreditCents, int64(0))
-		assert.Equal(t, billingmodels.DefaultWelcomeGrantCents, credit.SuperplaneGrantCents)
+		assert.Equal(t, billingmodels.SignupCreditCents, credit.SuperplaneGrantCents)
 		assert.Equal(t, int64(0), credit.PurchasedCreditCents)
 
 		body, err := json.Marshal(map[string]any{
@@ -929,8 +931,8 @@ func TestAdminLLMSettings(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
-		assert.GreaterOrEqual(t, credit.GrantTotalCents, int64(6000))
-		assert.GreaterOrEqual(t, credit.SuperplaneGrantCents, int64(6000))
+		assert.GreaterOrEqual(t, credit.GrantTotalCents, billingmodels.SignupCreditCents+1000)
+		assert.GreaterOrEqual(t, credit.SuperplaneGrantCents, billingmodels.SignupCreditCents)
 		assert.Equal(t, int64(0), credit.PurchasedCreditCents)
 
 		body, err = json.Marshal(map[string]any{"markup_bps": 0})

@@ -58,7 +58,7 @@ describe("OrganizationSettingsBillingPage", () => {
     const plans = await screen.findByTestId("billing-plans");
     expect(within(plans).queryByTestId("billing-plan-usage")).not.toBeInTheDocument();
     expect(within(plans).getByTestId("billing-plan-business")).toHaveTextContent("$199");
-    expect(within(plans).getByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(within(plans).queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", "https://superplane.com/pricing/");
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
@@ -149,7 +149,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(balance).toHaveTextContent("Subscribe to Business to keep hosted runs.");
     expect(within(balance).getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
     expect(within(balance).getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
     expect(screen.getByTestId("billing-credit-history")).toHaveTextContent("Trial");
   }, 10000);
@@ -183,7 +183,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(balance).queryByTestId("billing-credit-trial")).not.toBeInTheDocument();
     expect(balance).toHaveTextContent("Hosted runs spend included usage first, then top-up credit.");
     expect(screen.getByTestId("billing-credit-history")).toHaveTextContent("Trial");
-    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
   }, 10000);
 
   it("updates the plan after Polar sync finds a Business subscription", async () => {
@@ -200,47 +200,6 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(await screen.findByRole("heading", { name: "Billing" })).toBeInTheDocument();
     expect(await screen.findByTestId("billing-current-plan", {}, { timeout: 5000 })).toHaveTextContent("Current plan");
     expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
-  }, 10000);
-
-  it("opens Polar checkout from Business Subscribe", async () => {
-    const assign = vi.fn();
-    vi.stubGlobal("location", { ...window.location, assign });
-    const user = userEvent.setup();
-
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
-        factoriesFixture={defaultFactoriesFixture}
-      />,
-    );
-
-    await user.click(await screen.findByRole("button", { name: "Upgrade to Business" }));
-    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_business");
-    vi.unstubAllGlobals();
-  }, 10000);
-
-  it("opens Polar checkout from Subscribe when the checkout flag is off", async () => {
-    const assign = vi.fn();
-    vi.stubGlobal("location", { ...window.location, assign });
-    const user = userEvent.setup();
-
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
-        factoriesFixture={{
-          ...defaultFactoriesFixture,
-          organizationBilling: {
-            ...defaultFactoriesFixture.organizationBilling,
-            subscriptionCheckoutEnabled: false,
-          },
-        }}
-      />,
-    );
-
-    const business = await screen.findByTestId("billing-plan-business");
-    await user.click(within(business).getByRole("button", { name: "Upgrade to Business" }));
-    expect(assign).toHaveBeenCalledWith("https://buy.polar.sh/polar_c_business");
-    vi.unstubAllGlobals();
   }, 10000);
 
   it("opens Polar checkout from Top up when billing already has a customer", async () => {
@@ -378,9 +337,9 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-balance")).toHaveTextContent(
       "Hosted runs spend included usage first, then top-up credit.",
     );
-    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel Business" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("billing-current-plan")).not.toBeInTheDocument();
+    expect(screen.getByTestId("billing-current-plan")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Top up" })).not.toBeInTheDocument();
 
     const balance = screen.getByTestId("billing-credit-balance");
@@ -498,7 +457,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.getByTestId("billing-credit-trial")).toHaveTextContent(`Expires on ${WELCOME_EXPIRY_LABEL}`);
     expect(screen.getByTestId("billing-credit-topup-remaining")).toHaveTextContent("$0.00 remaining");
     expect(screen.getByTestId("billing-credit-included-remaining")).toHaveTextContent("$0.00 remaining");
-    expect(await screen.findByRole("button", { name: "Upgrade to Business" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Upgrade to Business" })).not.toBeInTheDocument();
 
     const balance = screen.getByTestId("billing-credit-balance");
     expect(balance).toHaveTextContent("Trial");

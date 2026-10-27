@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 
 import {
   organizationsCancelOrganizationSubscription,
-  organizationsCreateBusinessCheckout,
   organizationsDescribeOrganizationBilling,
   organizationsResumeOrganizationSubscription,
   organizationsSyncOrganizationBilling,
@@ -71,25 +70,6 @@ export function useOrganizationBilling(organizationId: string | undefined) {
     },
     enabled: Boolean(organizationId),
     staleTime: 30 * 1000,
-  });
-}
-
-export function useCreateBusinessCheckout(organizationId: string) {
-  return useMutation({
-    mutationFn: async () => {
-      const response = await organizationsCreateBusinessCheckout(
-        withOrganizationHeader({
-          organizationId,
-          path: { id: organizationId },
-          body: {},
-        }),
-      );
-      const checkoutUrl = response.data?.checkoutUrl;
-      if (!checkoutUrl) {
-        throw new Error("Checkout is not available");
-      }
-      return checkoutUrl;
-    },
   });
 }
 

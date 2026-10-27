@@ -1,5 +1,3 @@
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
 import { type ReactNode } from "react";
 import { Navigate, useParams } from "react-router";
 
@@ -46,7 +44,6 @@ const HOSTED_CREDIT_REMAINING_CAPTION = "Remaining hosted credit";
 export function OrganizationSettingsBillingPage() {
   const { organizationId = "", factoryKey = "" } = useParams<{ organizationId: string; factoryKey: string }>();
   const billingProductEnabled = useBillingProductEnabled();
-  const newBilling = useExperimentalFeature(organizationId).has(FEATURE_NEW_BILLING);
   const model = useOrganizationBillingPageModel(organizationId);
   const packs = model.billing.products;
 
@@ -61,7 +58,6 @@ export function OrganizationSettingsBillingPage() {
     <FactorySettingsPageFrame title="Billing">
       <BillingSeatPurchaseFlow
         organizationId={organizationId}
-        newBilling={newBilling}
         canManageBilling={model.canManageBilling}
         seats={model.seats}
         currentPeriodEnd={model.currentPeriodEnd}
@@ -70,15 +66,13 @@ export function OrganizationSettingsBillingPage() {
       >
         {(seatsCard, dialog) => (
           <>
-            {newBilling && !model.isLoading && !model.error && (
+            {!model.isLoading && !model.error && (
               <BillingPaymentSettings organizationId={organizationId} canManageBilling={model.canManageBilling} />
             )}
             <BillingPageBody
               organizationId={organizationId}
-              newBilling={newBilling}
               billingContactMessage={model.billingContactMessage}
               billingEnabled={model.billingEnabled}
-              businessCheckoutPending={model.billing.businessCheckoutPending}
               canManageBilling={model.canManageBilling}
               checkoutPending={model.billing.checkoutPending}
               creditPurchaseAllowed={model.creditPurchaseAllowed}
@@ -109,7 +103,6 @@ export function OrganizationSettingsBillingPage() {
               trialEndsAt={model.trialEndsAt}
               welcomeCreditExpiresAt={model.welcomeCreditExpiresAt}
               onAddCredit={model.billing.startCheckout}
-              onSubscribe={model.billing.startBusinessCheckout}
               onCancelSubscription={model.onCancelSubscription}
               onKeepSubscription={model.onKeepSubscription}
               onManageInvoices={model.billing.openInvoices}
@@ -124,10 +117,8 @@ export function OrganizationSettingsBillingPage() {
 
 type BillingPageBodyProps = {
   organizationId: string;
-  newBilling: boolean;
   billingContactMessage?: string;
   billingEnabled: boolean;
-  businessCheckoutPending: boolean;
   canManageBilling: boolean;
   checkoutPending: boolean;
   creditPurchaseAllowed: boolean;
@@ -158,7 +149,6 @@ type BillingPageBodyProps = {
   trialEndsAt?: string;
   welcomeCreditExpiresAt?: string;
   onAddCredit: (input: OrganizationsCreateHostedCreditCheckoutBody) => Promise<void>;
-  onSubscribe: () => void | Promise<void>;
   onCancelSubscription: () => void | Promise<void>;
   onKeepSubscription: () => void | Promise<void>;
   onManageInvoices: () => void | Promise<void>;
@@ -166,10 +156,8 @@ type BillingPageBodyProps = {
 
 function BillingPageBody({
   organizationId,
-  newBilling,
   billingContactMessage,
   billingEnabled,
-  businessCheckoutPending,
   canManageBilling,
   checkoutPending,
   creditPurchaseAllowed,
@@ -200,7 +188,6 @@ function BillingPageBody({
   trialEndsAt,
   welcomeCreditExpiresAt,
   onAddCredit,
-  onSubscribe,
   onCancelSubscription,
   onKeepSubscription,
   onManageInvoices,
@@ -226,7 +213,6 @@ function BillingPageBody({
   return (
     <>
       <BillingPlansSection
-        showUpgrade={!newBilling}
         planName={planName}
         planPriceCents={planPriceCents}
         planPerSeat={planPerSeat}
@@ -235,8 +221,7 @@ function BillingPageBody({
         planSource={planSource}
         cancelAtPeriodEnd={cancelAtPeriodEnd}
         currentPeriodEnd={currentPeriodEnd}
-        pending={businessCheckoutPending || subscriptionPending}
-        onSubscribe={onSubscribe}
+        pending={subscriptionPending}
         onCancel={onCancelSubscription}
         onKeep={onKeepSubscription}
       />

@@ -3,7 +3,6 @@ import type { OrganizationsBillingPlanOption } from "@/api-client";
 
 export const defaultBillingState = {
   enabled: false,
-  newBilling: false,
   byok: false,
   planActive: false,
   hasPaymentMethod: false,

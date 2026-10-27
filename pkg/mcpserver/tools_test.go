@@ -249,6 +249,7 @@ func TestGetTaskAgentWithoutSessionReturnsToolError(t *testing.T) {
 
 func TestSendTaskMessageStoresMessage(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
 	db := database.DB(ctx)
