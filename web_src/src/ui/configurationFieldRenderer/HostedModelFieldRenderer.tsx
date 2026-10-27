@@ -129,14 +129,13 @@ function SubscriptionModelField(props: FieldRendererProps) {
     );
   }
   const current = typeof props.value === "string" ? props.value : "";
-  const selected = current || models[0];
   return (
     <ModelThinkingSelect
       fieldName={props.field.name}
-      model={selected}
+      model={current}
       committedModel={current}
       thinkingLevel={normalizeThinkingLevel(props.allValues?.[THINKING_LEVEL_KEY])}
-      placeholder={props.field.placeholder || "Select a model"}
+      placeholder="Default"
       readOnly={props.readOnly}
       options={models.map((model) => ({ value: model, label: model }))}
       modelOnly={props.modelOnly ?? false}

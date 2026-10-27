@@ -33,7 +33,7 @@ vi.mock("@/pages/factories/pages/onboarding/useFactoryCodexConnection", () => ({
 }));
 
 describe("subscription model picker", () => {
-  it("uses the subscription catalog instead of API-key models", async () => {
+  it("shows Default for an unset model and saves an explicit subscription selection", async () => {
     vi.mocked(useFactoryCodexConnection).mockReturnValue({
       query: {
         data: { status: "ready", availableModels: ["gpt-5.4", "gpt-5.3"] },
@@ -42,24 +42,34 @@ describe("subscription model picker", () => {
       },
     } as unknown as ReturnType<typeof useFactoryCodexConnection>);
     mockSelectableModels([selectableModel("byok", "openai", "gpt-4o")]);
-    render(
+    const onChange = vi.fn();
+    const field = createField("openai");
+    const picker = (value: string) => (
       <MemoryRouter>
         <HostedModelFieldRenderer
-          field={createField("openai")}
-          value=""
-          onChange={vi.fn()}
+          field={field}
+          value={value}
+          onChange={onChange}
           organizationId="org-1"
           factoryId="factory-1"
           modelOnly
           allValues={{ credentials: { source: "subscription" } }}
         />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
+    const view = render(picker(""));
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("Default");
+    expect(screen.getByTestId("field-model-hosted-model")).not.toHaveTextContent("gpt-5.4");
+    expect(onChange).not.toHaveBeenCalled();
     const user = userEvent.setup();
     await user.click(screen.getByTestId("field-model-hosted-model"));
     expect(screen.getByRole("menuitem", { name: "gpt-5.4" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "gpt-5.3" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /gpt-4o/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "gpt-5.3" }));
+    expect(onChange).toHaveBeenCalledWith("gpt-5.3");
+    view.rerender(picker("gpt-5.3"));
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("gpt-5.3");
   });
 });
 
