@@ -19,19 +19,25 @@
   <a href="https://discord.superplane.com/">Discord</a>
 </p>
 
-## About SuperPlane
+## About
 
-**SuperPlane is an open source factory for one-shot engineering.** It turns
-focused backlog issues into verified pull requests, so engineers can spend more
-time on work that needs their judgment.
+**Open source factory for one-shot engineering.**
 
-Giving an agent a task is only the beginning. SuperPlane coordinates the work
-around that task: the plan, the coding agent, source control, CI, review, and
-approval. It assesses incoming work, runs the agent, and sends failures back
-with context for the next attempt.
+SuperPlane turns high-confidence backlog issues into verified, review-ready
+pull requests so engineers can focus on work that needs judgment.
 
-Your team defines the rules and reviews the result. SuperPlane keeps the task,
-the pull request, the checks, and the execution history together.
+SuperPlane lets AI agents fully automate routine development work. It
+coordinates coding agents, source control, CI, review, approvals and feedback
+in one visible system so engineers do not have to project-manage every step.
+
+The factory continuously evaluates which backlog issues agents can handle with
+high confidence. It applies the same workflow-level guardrails to every run,
+checks the result and sends failures back to the agent with actionable context.
+Ambiguous work and decisions that need human judgment stay with your team.
+
+SuperPlane is built on an Apache 2.0 open source engine. Choose your models,
+run in the cloud or on-prem and build the factory around your stack and cost
+constraints.
 
 ## How it works
 
