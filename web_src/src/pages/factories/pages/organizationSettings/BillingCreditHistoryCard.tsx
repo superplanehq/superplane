@@ -5,19 +5,21 @@ import { creditGrantDetails, creditGrantSourceLabel, formatCreditGrantAmount } f
 import { parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { FactorySettingsCard } from "../settings/FactorySettingsCard";
 
-export function BillingCreditHistoryCard({ grants }: { grants: OrganizationsOrganizationCreditGrant[] }) {
+type BillingCreditHistoryProps = { grants: OrganizationsOrganizationCreditGrant[]; newBilling?: boolean };
+
+export function BillingCreditHistoryCard({ grants, newBilling = false }: BillingCreditHistoryProps) {
   return (
     <FactorySettingsCard title="Credit history" data-testid="billing-credit-history">
       {grants.length === 0 ? (
         <p className="text-sm text-muted-foreground">No credit grants yet.</p>
       ) : (
-        <CreditGrantTable grants={grants} />
+        <CreditGrantTable grants={grants} newBilling={newBilling} />
       )}
     </FactorySettingsCard>
   );
 }
 
-export function CreditGrantTable({ grants }: { grants: OrganizationsOrganizationCreditGrant[] }) {
+export function CreditGrantTable({ grants, newBilling = false }: BillingCreditHistoryProps) {
   return (
     <div className="overflow-x-auto">
       <table className="mt-1 w-full text-left text-[13px]">
@@ -34,7 +36,9 @@ export function CreditGrantTable({ grants }: { grants: OrganizationsOrganization
             <tr key={grant.id ?? `${grant.kind}-${grant.createdAt}`} className="border-b border-border last:border-0">
               <td className="py-2 pr-3 whitespace-nowrap">{formatGrantDate(grant.createdAt)}</td>
               <td className="py-2 pr-3">
-                <Badge variant="secondary">{creditGrantSourceLabel(grant.kind)}</Badge>
+                <Badge variant="secondary">
+                  {creditGrantSourceLabel(grant.kind, newBilling ? "Signup credit" : "Trial")}
+                </Badge>
               </td>
               <td className="py-2 pr-3 whitespace-nowrap">
                 {formatCreditGrantAmount(parseWorkOrderMetric(grant.amountCents))}
