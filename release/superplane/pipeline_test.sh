@@ -19,7 +19,7 @@ ruby -ryaml -e '
     commands = blocks.fetch("Build #{architecture} Image").dig("task", "jobs", 0, "commands").join("\n")
     archive = "superplane-#{architecture}.oci.tar"
     [archive, "#{archive}.sha256", "#{archive}.descriptor.json"].each do |artifact|
-      raise "#{architecture} must publish #{artifact}" unless commands.include?(%(artifact push workflow "#{artifact}"))
+      raise "#{architecture} must replace an existing #{artifact}" unless commands.include?(%(artifact push workflow "#{artifact}" --force))
     end
   end
   assemble = blocks.fetch("Assemble Release").dig("task", "jobs", 0, "commands").join("\n")
@@ -36,6 +36,7 @@ ruby -ryaml -e '
   raise "candidate verification must check the published prerelease" unless candidate_verification.include?("verify-published-prerelease")
   raise "candidate verification must verify the prepared manifest" unless candidate_verification.include?("verify-manifest")
   raise "candidate verification must export resolved component defaults" unless candidate_verification.include?("component-releases-${RELEASE_CANDIDATE_VERSION}.yaml")
+  raise "candidate verification must not exit the Semaphore job" if candidate_verification.match?(/^\s*exit\b/)
   asset_build = blocks.fetch("Build Release Assets").dig("task", "jobs", 0, "commands").join("\n")
   raise "stable assets must use the finalization build" unless asset_build.include?("build-finalized-assets.sh")
   %w[$component_releases $RELEASE_VERSION $SEMAPHORE_GIT_SHA].each do |argument|
@@ -43,6 +44,10 @@ ruby -ryaml -e '
   end
 
   publish = YAML.safe_load(File.read(ARGV[1]))
+  publish_prologue = publish.dig("global_job_config", "prologue", "commands").join("\n")
+  unless publish_prologue.include?("verify-superplane-release-branch.sh")
+    raise "publication must accept SuperPlane release branches"
+  end
   publish_blocks = publish.fetch("blocks").to_h { |block| [block.fetch("name"), block] }
   expected_publishers = ["Publish amd64 Image", "Publish arm64 Image"]
   expected_publishers.each do |name|

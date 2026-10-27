@@ -77,7 +77,7 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 	require.NoError(t, err)
 	credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), credit.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), credit.GrantMicros)
 
 	owner, err := models.FindAccountByEmail("owner@example.com")
 	require.NoError(t, err)

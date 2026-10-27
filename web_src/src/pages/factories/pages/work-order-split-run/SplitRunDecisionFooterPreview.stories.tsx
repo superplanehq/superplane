@@ -39,7 +39,7 @@ const KINDS: { kind: DecisionFooterKind; label: string; note: string }[] = [
   {
     kind: "failed",
     label: "Step failed",
-    note: "Debug, Reject, and Rerun.",
+    note: "View run details, Reject, and Rerun.",
   },
   {
     kind: "draft",

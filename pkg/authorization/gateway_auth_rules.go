@@ -955,19 +955,15 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/select-plan"}: {
 			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureNewBilling},
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/seats/preview"}: {
 			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureNewBilling},
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/seats/purchase"}: {
 			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureNewBilling},
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/payment-method-session"}: {
 			Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureNewBilling},
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/billing/sync"}: {
 			Resource:   "org",

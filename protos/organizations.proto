@@ -982,6 +982,7 @@ message BillingPlanOption {
   bool require_payment_method = 5;
   bool subscription_required = 6;
   optional int32 seat_maximum = 7;
+  optional int32 parallel_task_limit = 8;
 }
 
 message SelectBillingPlanRequest {

@@ -28,7 +28,7 @@ func Test__WelcomeGrantOnOrgCreate(t *testing.T) {
 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.GrantMicros)
 	assert.Equal(t, summary.GrantMicros, summary.RemainingMicros)
 	assert.False(t, summary.Warning)
 
@@ -51,12 +51,38 @@ func Test__WelcomeGrantSetsExpiresAt(t *testing.T) {
 	require.NoError(t, db.Where("organization_id = ? AND kind = ?", r.Organization.ID, billingmodels.LLMCreditGrantKindWelcome).
 		First(&grant).Error)
 	require.NotNil(t, grant.ExpiresAt)
-	assert.WithinDuration(t, grant.CreatedAt.Add(billingmodels.DefaultWelcomeGrantTTL), *grant.ExpiresAt, time.Second)
+	assert.WithinDuration(t, grant.CreatedAt.AddDate(0, 0, billingmodels.SignupCreditDays), *grant.ExpiresAt, time.Second)
 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	require.NotNil(t, summary.WelcomeCreditExpiresAt)
 	assert.WithinDuration(t, *grant.ExpiresAt, *summary.WelcomeCreditExpiresAt, time.Second)
+}
+
+func Test__SignupCreditIsOncePerAccount(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	support.Setup(t)
+	db := database.DB(t.Context())
+	account, err := models.CreateAccountInTransaction(db, support.RandomName("account"), support.RandomName("owner")+"@example.com")
+	require.NoError(t, err)
+	organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
+	require.NoError(t, err)
+	require.NoError(t, billingmodels.GrantWelcomeCredit(db, organization.ID, account.ID))
+	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, billingmodels.CentsToMicros(1000), summary.GrantMicros)
+	require.NotNil(t, summary.WelcomeCreditExpiresAt)
+	require.WithinDuration(t, time.Now().AddDate(0, 0, 365), *summary.WelcomeCreditExpiresAt, time.Minute)
+	require.NoError(t, billingmodels.GrantWelcomeCredit(db, organization.ID, account.ID))
+	again, err := billingmodels.DescribeOrganizationLLMCredit(db, organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, summary.GrantMicros, again.GrantMicros)
+	second, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
+	require.NoError(t, err)
+	require.NoError(t, billingmodels.GrantWelcomeCredit(db, second.ID, account.ID))
+	secondCredit, err := billingmodels.DescribeOrganizationLLMCredit(db, second.ID)
+	require.NoError(t, err)
+	require.Zero(t, secondCredit.GrantMicros)
 }
 
 func Test__ExpiredWelcomeCreditIsNotUsable(t *testing.T) {
@@ -67,8 +93,8 @@ func Test__ExpiredWelcomeCreditIsNotUsable(t *testing.T) {
 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.GrantMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.SuperPlaneGrantMicros)
 	assert.Equal(t, int64(0), summary.RemainingMicros)
 	require.ErrorIs(t, billingmodels.AssertHostedCreditAvailable(db, r.Organization.ID), billingmodels.ErrHostedCreditEmpty)
 }
@@ -114,6 +140,7 @@ func Test__ExpiredWelcomeSpendDoesNotReducePurchasedCredit(t *testing.T) {
 func Test__ExpiredWelcomeSpendDoesNotReduceAdminGrant(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	execution := dispatchWorkOrderExecution(t, r)
 	recordHostedPromptUsage(t, db, r.Organization.ID, requireExecutionRunID(t, execution))
@@ -210,7 +237,7 @@ func Test__WelcomeGrantOnlyOncePerAccount(t *testing.T) {
 
 	first, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), first.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), first.GrantMicros)
 
 	skipped, err := billingmodels.DescribeOrganizationLLMCredit(db, second.ID)
 	require.NoError(t, err)
@@ -229,7 +256,7 @@ func Test__WelcomeGrantOnlyOncePerAccount(t *testing.T) {
 
 	granted, err := billingmodels.DescribeOrganizationLLMCredit(db, third.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), granted.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), granted.GrantMicros)
 
 	reloaded, err := models.FindAccountByID(other.ID.String())
 	require.NoError(t, err)
@@ -251,7 +278,7 @@ func Test__WelcomeGrantStampsAccountWhenOrgAlreadyHasWelcome(t *testing.T) {
 		ID:             uuid.New(),
 		OrganizationID: org.ID,
 		Kind:           billingmodels.LLMCreditGrantKindWelcome,
-		AmountMicros:   billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents),
+		AmountMicros:   billingmodels.CentsToMicros(billingmodels.SignupCreditCents),
 		CreatedAt:      now,
 		ExpiresAt:      &expiresAt,
 	}).Error)
@@ -260,14 +287,14 @@ func Test__WelcomeGrantStampsAccountWhenOrgAlreadyHasWelcome(t *testing.T) {
 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.GrantMicros)
 
 	reloaded, err := models.FindAccountByID(account.ID.String())
 	require.NoError(t, err)
 	assert.True(t, reloaded.HasReceivedWelcomeCredit())
 }
 
-func Test__WelcomeGrantSkippedWhenAmountIsZero(t *testing.T) {
+func Test__SignupCreditIgnoresTrialCatalogAmount(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	_ = support.Setup(t)
 	db := database.Conn()
@@ -275,7 +302,7 @@ func Test__WelcomeGrantSkippedWhenAmountIsZero(t *testing.T) {
 	err := db.Model(&billingmodels.BillingPlan{}).Where("key = ?", "trial").Update("trial_credit_cents", 0).Error
 	require.NoError(t, err)
 
-	account, err := models.CreateAccount("Zero Welcome", "zero-welcome@example.com")
+	account, err := models.CreateAccount("Catalog Zero", "catalog-zero@example.com")
 	require.NoError(t, err)
 	org, err := models.CreateOrganization(support.RandomName("org"), "")
 	require.NoError(t, err)
@@ -283,11 +310,15 @@ func Test__WelcomeGrantSkippedWhenAmountIsZero(t *testing.T) {
 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
-	assert.Equal(t, int64(0), summary.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.GrantMicros)
+	plan, err := billingmodels.FindOrganizationBillingPlan(db, org.ID)
+	require.NoError(t, err)
+	assert.Equal(t, billingmodels.BillingPlanNone, plan.Plan)
+	require.ErrorIs(t, billingmodels.AssertOrganizationPlanAllowsRuns(db, org.ID), billingmodels.ErrHostedSubscriptionRequired)
 
 	reloaded, err := models.FindAccountByID(account.ID.String())
 	require.NoError(t, err)
-	assert.False(t, reloaded.HasReceivedWelcomeCredit())
+	assert.True(t, reloaded.HasReceivedWelcomeCredit())
 }
 
 func Test__AdminGrantRestoresHostedCredit(t *testing.T) {
@@ -420,6 +451,7 @@ func Test__DescribeOrganizationLLMCreditSubtractsComputeUsage(t *testing.T) {
 func Test__ComputeUsageAloneCanExhaustHostedCredit(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	execution := dispatchWorkOrderExecution(t, r)
 	runID := requireExecutionRunID(t, execution)
@@ -466,6 +498,7 @@ func Test__AssertHostedCreditAvailable(t *testing.T) {
 func Test__AssertHostedRunAllowedAllowsConcurrentStarts(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.Conn()
 
 	errs := make(chan error, 2)
@@ -492,8 +525,8 @@ func Test__PolarGrantIsIdempotentByOrderID(t *testing.T) {
 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents)+billingmodels.CentsToMicros(2500), summary.GrantMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents)+billingmodels.CentsToMicros(2500), summary.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.SuperPlaneGrantMicros)
 	assert.Equal(t, billingmodels.CentsToMicros(2500), summary.PurchasedCreditMicros)
 }
 
@@ -506,7 +539,7 @@ func Test__DescribeOrganizationLLMCreditSplitsSuperPlaneAndPurchasedGrants(t *te
 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.SuperPlaneGrantMicros)
 	assert.Equal(t, billingmodels.CentsToMicros(10000), summary.PurchasedCreditMicros)
 	assert.Equal(t, summary.SuperPlaneGrantMicros+summary.PurchasedCreditMicros, summary.GrantMicros)
 	assert.Equal(t, summary.GrantMicros, summary.RemainingMicros)
@@ -533,8 +566,8 @@ func Test__PolarRefundIsIdempotentAndCapsAtGrant(t *testing.T) {
 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents)+billingmodels.CentsToMicros(1500), summary.GrantMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents)+billingmodels.CentsToMicros(1500), summary.GrantMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.SuperPlaneGrantMicros)
 	assert.Equal(t, billingmodels.CentsToMicros(1500), summary.PurchasedCreditMicros)
 }
 
@@ -563,6 +596,7 @@ func Test__ReversePolarOrderCreditDoesNotOverDebitConcurrently(t *testing.T) {
 func Test__FactoryHostedBudgetZeroBlocksHostedStart(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.Conn()
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -576,6 +610,7 @@ func Test__FactoryHostedBudgetZeroBlocksHostedStart(t *testing.T) {
 func Test__FactoryHostedBudgetHardStopWhenSpent(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	workOrderExecution := dispatchWorkOrderExecution(t, r)
 	factory, err := models.FindFactory(db, r.Organization.ID, workOrderExecution.FactoryID)
@@ -602,6 +637,7 @@ func Test__FactoryHostedBudgetHardStopWhenSpent(t *testing.T) {
 func Test__FactoryHostedBudgetHardStopWhenSpentOnCompute(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
 	workOrderExecution := dispatchWorkOrderExecution(t, r)
 	factory, err := models.FindFactory(db, r.Organization.ID, workOrderExecution.FactoryID)
@@ -717,8 +753,8 @@ func Test__ExpireOpenIncludedGrantsLeavesTopupSpendable(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
 	assert.Equal(t, billingmodels.CentsToMicros(2500), summary.PurchasedRemainingMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents)+billingmodels.CentsToMicros(2500), summary.RemainingMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents)+billingmodels.CentsToMicros(2500), summary.RemainingMicros)
 }
 
 func Test__ExpireOpenIncludedGrantsAfterResubscribeSameKey(t *testing.T) {

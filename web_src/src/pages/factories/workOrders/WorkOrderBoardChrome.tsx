@@ -52,7 +52,7 @@ export function WorkOrderKanbanBoard({ children, testId }: WorkOrderKanbanBoardP
   return (
     <div
       ref={boardRef}
-      className="flex min-h-0 min-w-0 w-full flex-1 items-stretch gap-3 overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable] [scrollbar-width:thin]"
+      className="workflow-board flex min-h-0 min-w-0 w-full flex-1 items-stretch gap-3 overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable] [scrollbar-width:thin]"
       data-testid={testId}
     >
       {children}
@@ -110,7 +110,7 @@ function LaneBody({
   }
   if (count === 0 && !keepChildrenWhenEmpty) {
     return (
-      <p className="mt-2 flex-1 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
+      <p className="workflow-board-empty-message mt-2 flex-1 px-3 py-6 text-center text-[12px] text-muted-foreground">
         {emptyDescription}
       </p>
     );

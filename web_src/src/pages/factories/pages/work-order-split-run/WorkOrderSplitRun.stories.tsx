@@ -2,9 +2,11 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP } from "../../__fixtures__/factoryOwnedCanvasFixture";
+import { failedImplementationCanvasFixture } from "../../__fixtures__/failedImplementationFixture";
 import {
   DRAFT_WORK_ORDER,
-  LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_FAILED_ID,
+  PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../../__fixtures__/factoryPageResponses";
@@ -12,6 +14,7 @@ import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFacto
 import { prReadyFactoriesFixture } from "../../__fixtures__/prReadyFactoriesFixture";
 import { LINE_BOARD_VERIFY_PR_REVIEW_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { refineChatBoardFixture } from "../../__fixtures__/refineChatBoardFixture";
+import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
 
 /**
  * Line board with the work-order popup. Open a card: finished steps stay
@@ -49,11 +52,30 @@ export const AutomationRun: Story = {
     const appId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
     return (
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}/split-run?from=lines&lineId=${line.id}&run=${LINE_RUN_IMPLEMENT_ID}&orderNumber=103&canvas=implementation`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/automations/${appId}/runs/${LINE_RUN_IMPLEMENT_FAILED_ID}?from=task&lineId=${line.id}&orderNumber=106`}
         factoriesFixture={lineMetricsFactoriesFixture}
+        appFixture={failedImplementationCanvasFixture()}
       />
     );
   },
+};
+
+export const FailedImplementation: Story = {
+  name: "Failed implementation",
+  render: () => (
+    <FactoriesHarness
+      mode="app"
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/106?lineId=${REFUND_FACTORY_LINES[0].id}`}
+      factoriesFixture={{
+        ...lineMetricsFactoriesFixture,
+        workOrdersByFactoryId: {
+          ...lineMetricsFactoriesFixture.workOrdersByFactoryId,
+          [PRIMARY_FACTORY_ID]: [{ ...BOARD_IMPLEMENT_FAILED_ORDER, state: "STATE_OPEN", result: undefined }],
+        },
+      }}
+      appFixture={failedImplementationCanvasFixture()}
+    />
+  ),
 };
 
 function refineChatOnBoard() {

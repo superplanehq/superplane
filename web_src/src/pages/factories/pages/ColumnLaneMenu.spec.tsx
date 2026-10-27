@@ -24,7 +24,7 @@ describe("ColumnLaneMenu", () => {
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     expect(screen.getByText("Set color")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-backlog-menu-color-lime")).toHaveAttribute("aria-label", "Lime");
+    expect(screen.getByTestId("lines-backlog-menu-color-lime")).toHaveAttribute("aria-label", "Mint");
 
     await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
     expect(onColorChange).toHaveBeenCalledWith("lime");

@@ -20,7 +20,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -123,7 +122,6 @@ func TestRemoveUserReusesPurchasedSeatWithoutPolar(t *testing.T) {
 			t.Cleanup(cancel)
 			ctx = authentication.SetUserIdInMetadata(ctx, r.User.String())
 			db := database.DB(ctx)
-			require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 			setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(4))
 			periodEnd := time.Now().Add(30 * 24 * time.Hour)
 			require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{

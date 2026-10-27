@@ -38,6 +38,7 @@ import {
   CreateWorkOrderComposeRedirect,
   FactoriesIndexPage,
   FactoryAppCanvasPage,
+  FactoryAutomationRunPage,
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
@@ -210,6 +211,7 @@ function organizationScopedRouteTree() {
               <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
               <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
               <Route path=":appId" element={<FactoryCanvasConfigureGate />} />
+              <Route path=":appId/runs/:runId?" element={<FactoryAutomationRunPage />} />
               <Route path=":appId/split-run" element={<FactoryAppSplitRunPage />} />
             </Route>
             <Route path="apps/:appId" element={<LegacyFactoryAppRedirect />} />

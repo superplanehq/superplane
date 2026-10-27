@@ -106,10 +106,10 @@ func Test__ApplySubscriptionActivatesBusinessAndGrantsIncluded(t *testing.T) {
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.WelcomeRemainingMicros)
 	assert.Equal(t, int64(0), summary.PurchasedRemainingMicros)
 	assertNoTrialConversionGrant(t, db, org.ID)
-	requireWelcomeGrantExpiresFourteenDaysAfterCreate(t, db, org.ID)
+	requireWelcomeGrantExpiresAfterCreate(t, db, org.ID)
 }
 
 func Test__ApplySubscriptionCancelRestoresTrialAndExpiresIncluded(t *testing.T) {
@@ -131,9 +131,9 @@ func Test__ApplySubscriptionCancelRestoresTrialAndExpiresIncluded(t *testing.T) 
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.WelcomeRemainingMicros)
 	assert.Equal(t, int64(0), summary.PurchasedRemainingMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.RemainingMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.RemainingMicros)
 	assertNoTrialConversionGrant(t, db, org.ID)
 }
 
@@ -186,7 +186,7 @@ func Test__ApplySubscriptionResubscribeSamePeriodGrantsIncludedAgain(t *testing.
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.WelcomeRemainingMicros)
 	assert.Equal(t, int64(0), summary.PurchasedRemainingMicros)
 	assertNoTrialConversionGrant(t, db, org.ID)
 
@@ -634,13 +634,13 @@ func assertNoTrialConversionGrant(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
 	}
 }
 
-func requireWelcomeGrantExpiresFourteenDaysAfterCreate(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
+func requireWelcomeGrantExpiresAfterCreate(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
 	t.Helper()
 	var grant billingmodels.OrganizationLLMCreditGrant
 	require.NoError(t, db.Where("organization_id = ? AND kind = ?", orgID, billingmodels.LLMCreditGrantKindWelcome).
 		First(&grant).Error)
 	require.NotNil(t, grant.ExpiresAt)
-	assert.WithinDuration(t, grant.CreatedAt.Add(billingmodels.DefaultWelcomeGrantTTL), *grant.ExpiresAt, time.Second)
+	assert.WithinDuration(t, grant.CreatedAt.AddDate(0, 0, billingmodels.SignupCreditDays), *grant.ExpiresAt, time.Second)
 }
 
 func subscriptionEvent(orgID uuid.UUID, subscriptionID, status string, start, end time.Time) *SubscriptionWebhookEvent {

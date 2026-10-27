@@ -24,23 +24,20 @@ export function HostedCreditTopUpBanner({
 
   return (
     <>
-      <div className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-violet-100 py-1 pr-1.5 pl-2.5 text-[12px] hover:bg-violet-200/80 dark:bg-violet-950 dark:hover:bg-violet-900">
-        <Button
-          ref={topUpButton}
-          type="button"
-          variant="ghost"
-          size="xs"
-          disabled={checkoutPending || !hasPurchasablePack}
-          aria-haspopup="dialog"
-          aria-label="Top up"
-          data-testid="billing-top-up"
-          onClick={() => setOpen(true)}
-          className="h-auto gap-1 px-0 py-0 text-[12px] font-medium text-violet-800 hover:bg-transparent dark:text-violet-200 dark:hover:bg-transparent"
-        >
-          {checkoutPending ? "Opening checkout..." : "Top up"}
-          <ChevronRight className="size-3.5" aria-hidden />
-        </Button>
-      </div>
+      <Button
+        ref={topUpButton}
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={checkoutPending || !hasPurchasablePack}
+        aria-haspopup="dialog"
+        aria-label="Top up"
+        data-testid="billing-top-up"
+        onClick={() => setOpen(true)}
+      >
+        {checkoutPending ? "Opening checkout..." : "Top up"}
+        <ChevronRight className="size-3.5" aria-hidden />
+      </Button>
       {open ? (
         <HostedCreditCheckoutDialog
           organizationId={organizationId}
