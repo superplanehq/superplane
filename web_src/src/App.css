@@ -1565,6 +1565,10 @@
   --board-column-border: color-mix(in srgb, var(--board-column-accent) var(--workflow-vivid-border-opacity), transparent);
 }
 
+.line-board-column-vivid .workflow-board-empty-message {
+  color: var(--workflow-vivid-fg);
+}
+
 .line-board-column-vivid > header {
   --foreground: var(--workflow-vivid-fg);
   --muted-foreground: var(--workflow-vivid-fg);

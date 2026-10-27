@@ -109,7 +109,11 @@ function LaneBody({
     return <div className={cn(workOrderKanbanLaneScrollClassName, "justify-center")}>{emptyContent}</div>;
   }
   if (count === 0 && !keepChildrenWhenEmpty) {
-    return <p className="mt-2 flex-1 px-3 py-6 text-center text-[12px] text-muted-foreground">{emptyDescription}</p>;
+    return (
+      <p className="workflow-board-empty-message mt-2 flex-1 px-3 py-6 text-center text-[12px] text-muted-foreground">
+        {emptyDescription}
+      </p>
+    );
   }
   return children;
 }
