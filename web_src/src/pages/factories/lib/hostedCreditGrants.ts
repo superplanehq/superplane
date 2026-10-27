@@ -22,18 +22,18 @@ export function isCreditAdjustmentKind(kind: string | undefined): boolean {
   return kind !== undefined && CREDIT_ADJUSTMENT_KINDS.includes(kind);
 }
 
-export function creditGrantSourceLabel(kind: string | undefined): string {
+export function creditGrantSourceLabel(kind: string | undefined, welcomeLabel = "Trial"): string {
   switch (kind) {
     case CREDIT_GRANT_KIND_INCLUDED_ADJUSTMENT:
       return "Included adjustment";
     case CREDIT_GRANT_KIND_TRIAL_ADJUSTMENT:
-      return "Trial adjustment";
+      return `${welcomeLabel} adjustment`;
     case CREDIT_GRANT_KIND_TOPUP_ADJUSTMENT:
       return "Top-up adjustment";
     case CREDIT_GRANT_KIND_ADMIN_ADJUSTMENT:
       return "SuperPlane grant adjustment";
     case CREDIT_GRANT_KIND_WELCOME:
-      return "Trial";
+      return welcomeLabel;
     case CREDIT_GRANT_KIND_ADMIN:
       return "SuperPlane grant";
     case CREDIT_GRANT_KIND_INCLUDED:
