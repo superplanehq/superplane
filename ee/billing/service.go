@@ -84,6 +84,21 @@ func (s *Service) ValidateInvitationCapacity(tx *gorm.DB, organizationID uuid.UU
 func (*Service) ResolveSeats(tx *gorm.DB, organizationID uuid.UUID) (*billing.SeatUsage, error) {
 	return entitlements.ResolveSeats(tx, organizationID)
 }
+
+func (*Service) ResolveOrganizationPlanSummaries(tx *gorm.DB, organizationIDs []uuid.UUID) (map[uuid.UUID]billing.OrganizationPlanSummary, error) {
+	summaries := make(map[uuid.UUID]billing.OrganizationPlanSummary, len(organizationIDs))
+	for _, id := range organizationIDs {
+		if _, resolved := summaries[id]; resolved {
+			continue
+		}
+		plan, err := billingmodels.ResolveOrganizationBillingPlan(tx, id)
+		if err != nil {
+			return nil, err
+		}
+		summaries[id] = billing.OrganizationPlanSummary{Key: plan.Catalog.Key, Name: plan.Catalog.Name}
+	}
+	return summaries, nil
+}
 func (s *Service) RecheckSeatCapacity(tx *gorm.DB, organizationID uuid.UUID, cause string) (billing.CapacityAlert, error) {
 	if s.provider == nil {
 		return nil, billing.ErrImplementationMissing
