@@ -82,23 +82,23 @@ change.
 
 ## Contributing
 
-We welcome bug reports, documentation improvements, integrations, and code
-contributions. Read the [contributing guide](./CONTRIBUTING.md)
-for the contribution process and Docker-based development setup.
+We welcome focused pull requests, bug reports and product ideas.
 
-Before reporting a bug or requesting a feature,
-[search existing issues](https://github.com/superplanehq/superplane/issues).
-For substantial changes, discuss the approach with maintainers and wait for
-issue assignment before implementation.
+1. Read the [contributing guide](./CONTRIBUTING.md).
+2. Review the [issue tracking process](./docs/contributing/issue-tracking.md).
+3. Find an [open issue](https://github.com/superplanehq/superplane/issues).
+4. Join the [Discord community](https://discord.superplane.com) to discuss an
+   approach with maintainers.
 
-## Community and support
+Contributor setup is Docker-based. Start with the repository instructions in
+[`AGENTS.md`](./AGENTS.md) and the development section of
+[`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-Join [Discord](https://discord.superplane.com/) to ask questions, share feedback,
-and discuss contributions. Read the [blog](https://superplane.com/blog/) for
-engineering notes, or join a [community event](https://luma.com/superplane)
-to meet the team.
+## Community and license
 
-## License
+- [Discord](https://discord.superplane.com) for discussions and support
+- [Blog](https://superplane.com/blog/) for engineering notes and releases
+- [Community events](https://luma.com/superplane) for maintainer sessions
+- [X](https://x.com/superplanehq) for product updates
 
-SuperPlane is available under the
-[Apache License 2.0](./LICENSE).
+SuperPlane is available under the [Apache License 2.0](./LICENSE).
