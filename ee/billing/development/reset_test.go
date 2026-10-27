@@ -78,7 +78,7 @@ func TestResetOrganizationBillingTrialRestoresTrial(t *testing.T) {
 	assert.Zero(t, usageEvents)
 	summary, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(catalog.TrialCreditCents), summary.RemainingMicros)
+	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), summary.RemainingMicros)
 	require.NotNil(t, summary.WelcomeCreditExpiresAt)
 	assert.WithinDuration(t, *plan.TrialEndsAt, *summary.WelcomeCreditExpiresAt, time.Second)
 }

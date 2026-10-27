@@ -1,12 +1,10 @@
 import type { OrganizationsBillingPlanOption } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
-import { FEATURE_NEW_BILLING } from "@/lib/experimentalFeatures";
 
 export type OnboardingCardStep = {
-  /** Billing and feature lookups have an answer. */
+  /** The billing lookup has an answer. */
   ready: boolean;
-  /** The card step belongs to this flow: new billing with an available starter plan. */
+  /** The card step belongs to this flow: billing is on and a starter plan is available. */
   available: boolean;
   /** The organization still has to select a starter plan. */
   required: boolean;
@@ -25,16 +23,15 @@ export type OnboardingCardStep = {
  * workspace, does not see the step.
  */
 export function useOnboardingCardStep(organizationId: string): OnboardingCardStep {
-  const rollout = useExperimentalFeature(organizationId);
   const billing = useOrganizationBilling(organizationId);
   const plans = ["pay_as_you_go", "starter"].flatMap((key) => {
     const plan = billing.data?.availablePlans?.find((candidate) => candidate.key === key && !candidate.perSeat);
     return plan ? [plan] : [];
   });
-  const available = rollout.has(FEATURE_NEW_BILLING) && Boolean(billing.data?.billingEnabled) && plans.length > 0;
+  const available = Boolean(billing.data?.billingEnabled) && plans.length > 0;
   const planActive = billing.data?.planCategory === "paid";
   return {
-    ready: !billing.isPending && !rollout.isLoading,
+    ready: !billing.isPending,
     available,
     required: available && !planActive,
     plans,
