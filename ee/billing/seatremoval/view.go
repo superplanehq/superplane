@@ -176,17 +176,21 @@ func allowed(plan *billingmodels.OrganizationBillingPlan, op *billingmodels.Seat
 	if plan == nil || plan.PurchasedSeats == nil || plan.CurrentPeriodEnd == nil {
 		return nil, []string{ReasonNotAvailable}
 	}
+	// Keep this order aligned with the checks that reject a confirmation.
+	if billingmodels.PolarSubscriptionIsPaymentBlocked(plan.PolarSubscriptionStatus) {
+		return nil, []string{ReasonPaymentBlocked}
+	}
+	if plan.CancelAtPeriodEnd || plan.PolarSubscriptionStatus != billingmodels.PolarSubscriptionStatusActive {
+		return nil, []string{ReasonNotAvailable}
+	}
+	if !seatquantity.AllowsMutation(now, *plan.CurrentPeriodEnd) {
+		return nil, []string{ReasonRenewalBoundary}
+	}
 	if op != nil && op.InFlight() {
 		return nil, []string{ReasonOutcomeUnknown}
 	}
 	if op != nil && op.Status == billingmodels.SeatQuantityStatusRepairRequired {
 		return nil, []string{ReasonRepairRequired}
-	}
-	if billingmodels.PolarSubscriptionIsPaymentBlocked(plan.PolarSubscriptionStatus) {
-		return nil, []string{ReasonPaymentBlocked}
-	}
-	if !seatquantity.AllowsMutation(now, *plan.CurrentPeriodEnd) {
-		return nil, []string{ReasonRenewalBoundary}
 	}
 	if plan.SeatProvedTarget != nil {
 		return []string{billingmodels.SeatQuantityActionChange, billingmodels.SeatQuantityActionCancel}, nil

@@ -33,6 +33,25 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
 
 
+--
+-- Name: seat_quantity_operations_require_actor(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.seat_quantity_operations_require_actor() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.origin NOT IN ('protective', 'legacy_cleanup')
+       AND NEW.actor_user_id IS NULL
+       AND NEW.actor_api_key_id IS NULL THEN
+        RAISE EXCEPTION 'seat quantity operation requires an actor'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -1712,7 +1731,6 @@ CREATE TABLE public.seat_quantity_operations (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT seat_quantity_operations_action_check CHECK ((action = ANY (ARRAY['schedule'::text, 'change'::text, 'cancel'::text, 'supersede'::text, 'protective_cancel'::text, 'legacy_cleanup'::text]))),
-    CONSTRAINT seat_quantity_operations_actor_check CHECK (((origin = ANY (ARRAY['protective'::text, 'legacy_cleanup'::text])) OR (actor_user_id IS NOT NULL) OR (actor_api_key_id IS NOT NULL))),
     CONSTRAINT seat_quantity_operations_fingerprint_check CHECK ((char_length(request_fingerprint) > 0)),
     CONSTRAINT seat_quantity_operations_key_length CHECK (((char_length(operation_key) >= 1) AND (char_length(operation_key) <= 128))),
     CONSTRAINT seat_quantity_operations_origin_check CHECK ((origin = ANY (ARRAY['admin'::text, 'purchase'::text, 'protective'::text, 'legacy_cleanup'::text]))),
@@ -5022,6 +5040,13 @@ CREATE UNIQUE INDEX workflows_factory_id_name_active_key ON public.workflows USI
 --
 
 CREATE UNIQUE INDEX workflows_organization_id_name_active_key ON public.workflows USING btree (organization_id, name) WHERE ((factory_id IS NULL) AND (deleted_at IS NULL));
+
+
+--
+-- Name: seat_quantity_operations seat_quantity_operations_actor; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER seat_quantity_operations_actor BEFORE INSERT ON public.seat_quantity_operations FOR EACH ROW EXECUTE FUNCTION public.seat_quantity_operations_require_actor();
 
 
 --

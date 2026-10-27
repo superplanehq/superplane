@@ -136,6 +136,10 @@ func TestUnknownChangeKeepsTheLowerLimitAndBlocksAnotherWrite(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, preview.Allowed)
 	assert.Equal(t, ReasonOutcomeUnknown, preview.Reason)
+	view, err := Describe(database.Conn(), fx.resources.Organization.ID, time.Now())
+	require.NoError(t, err)
+	assert.Empty(t, view.AllowedActions)
+	assert.Contains(t, view.Reasons, ReasonOutcomeUnknown)
 }
 
 func TestRaiseKeepsTheOldLimitUntilPolarConfirms(t *testing.T) {
@@ -350,9 +354,34 @@ func TestMembersAbovePaidSeatsStayAndBlockNewUse(t *testing.T) {
 	view, err := Describe(database.Conn(), fx.resources.Organization.ID, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, billingmodels.SeatQuantityStatusRepairRequired, view.Status)
+	assert.Empty(t, view.AllowedActions)
+	preview, err := fx.runner.Preview(context.Background(), fx.resources.Organization.ID, 1)
+	require.NoError(t, err)
+	assert.False(t, preview.Allowed)
+	assert.Equal(t, ReasonRepairRequired, preview.Reason)
 	count, err := models.CountActiveHumanUsersByOrganization(database.Conn(), fx.resources.Organization.ID.String())
 	require.NoError(t, err)
 	assert.EqualValues(t, 3, count)
+}
+
+func TestPreviewRejectsASubscriptionThatEndsThisPeriod(t *testing.T) {
+	fx := newRemovalFixture(t, 10)
+	require.NoError(t, database.Conn().Model(&billingmodels.OrganizationBillingPlan{}).
+		Where("organization_id = ?", fx.resources.Organization.ID).
+		Update("cancel_at_period_end", true).Error)
+
+	preview, err := fx.runner.Preview(context.Background(), fx.resources.Organization.ID, 7)
+	require.NoError(t, err)
+	assert.False(t, preview.Allowed)
+	assert.Equal(t, ReasonNotAvailable, preview.Reason)
+	assert.Equal(t, "Resume the subscription before you change seats.", preview.Message)
+	_, err = fx.runner.Schedule(context.Background(), fx.request(7))
+	assert.Equal(t, ReasonNotAvailable, removalReason(t, err))
+	assert.Empty(t, fx.client.patches)
+	view, err := Describe(database.Conn(), fx.resources.Organization.ID, time.Now())
+	require.NoError(t, err)
+	assert.Empty(t, view.AllowedActions)
+	assert.Contains(t, view.Reasons, ReasonNotAvailable)
 }
 
 func TestScheduleAfterMemberJoinPreservesTheFloor(t *testing.T) {

@@ -67,11 +67,6 @@ CREATE TABLE seat_quantity_operations (
     CONSTRAINT seat_quantity_operations_fingerprint_check CHECK (
         char_length(request_fingerprint) > 0
     ),
-    CONSTRAINT seat_quantity_operations_actor_check CHECK (
-        origin IN ('protective', 'legacy_cleanup')
-        OR actor_user_id IS NOT NULL
-        OR actor_api_key_id IS NOT NULL
-    ),
     CONSTRAINT seat_quantity_operations_predecessor_fk
         FOREIGN KEY (predecessor_id) REFERENCES seat_quantity_operations(id),
     CONSTRAINT seat_quantity_operations_superseder_fk
@@ -92,3 +87,24 @@ CREATE UNIQUE INDEX uq_seat_quantity_operations_scheduled
 CREATE INDEX idx_seat_quantity_operations_reconcile
     ON seat_quantity_operations (organization_id)
     WHERE status IN ('submitting', 'unknown', 'scheduled', 'repair_required');
+
+-- An admin or purchase operation needs an actor when it is registered.
+-- Deleting that actor's token sets actor_api_key_id to null. The row stays.
+-- A check constraint would reject that update, so the requirement is insert-only.
+CREATE FUNCTION seat_quantity_operations_require_actor() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.origin NOT IN ('protective', 'legacy_cleanup')
+       AND NEW.actor_user_id IS NULL
+       AND NEW.actor_api_key_id IS NULL THEN
+        RAISE EXCEPTION 'seat quantity operation requires an actor'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER seat_quantity_operations_actor
+    BEFORE INSERT ON seat_quantity_operations
+    FOR EACH ROW
+    EXECUTE FUNCTION seat_quantity_operations_require_actor();
