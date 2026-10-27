@@ -3,6 +3,7 @@ import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { findClosureAutomationApp } from "../../../lib/linePhaseRuns";
 import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
+import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../../lib/workOrderProgress";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { groupSplitRunActivities, type PullRequestActivityGroup } from "../splitRunActivityGroups";
 import { groupClaudeSteps, groupSplitRunStream, type ClaudeStepGroup, type StreamNodeGroup } from "../phaseLogStream";
@@ -25,6 +26,8 @@ import {
 export interface AutomationOutcome {
   statusLabel: string;
   status: SplitRunPhaseStatus;
+  /** Exact closed outcome when the phase status is intentionally still pending. */
+  displayStatus?: WorkOrderDisplayStatus;
   duration: string;
   startedLabel: string;
   spend: string;
@@ -143,9 +146,13 @@ export function outcomeSummary(fixture: SplitRunFixture): AutomationOutcome {
   );
   const models = uniqueModels(fixture);
   const checksPassed = fixture.checks.filter((check) => CHECK_PASS_LEVELS.has(check.level)).length;
+  const displayStatus = closedOutcomeDisplayStatus(fixture.displayStatus);
   return {
-    statusLabel: splitRunStatusLabel(fixture.lineStatus),
+    statusLabel: displayStatus
+      ? getWorkOrderDisplayStatusMeta(displayStatus).label
+      : splitRunStatusLabel(fixture.lineStatus),
     status: fixture.lineStatus,
+    displayStatus,
     duration: fixture.elapsed,
     startedLabel: fixture.startedLabel,
     spend: fixture.costUsd,
@@ -157,6 +164,13 @@ export function outcomeSummary(fixture: SplitRunFixture): AutomationOutcome {
     owner: fixture.owner,
     headline: fixture.footer.note?.headline ?? splitRunStatusLabel(fixture.lineStatus),
   };
+}
+
+function closedOutcomeDisplayStatus(status?: WorkOrderDisplayStatus): WorkOrderDisplayStatus | undefined {
+  if (status === "closed" || status === "rejected" || status === "cancelled") {
+    return status;
+  }
+  return undefined;
 }
 
 export function stagesFromFixture(fixture: SplitRunFixture): AutomationStageGroups {
