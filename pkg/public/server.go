@@ -1191,7 +1191,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
-	recordOrganizationCreated(organization, account.ID, "workspace_switcher")
+	recordOrganizationCreated(organization, account, "workspace_switcher")
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
@@ -1275,7 +1275,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
 	}
-	recordOrganizationCreated(organization, account.ID, "initial_onboarding")
+	recordOrganizationCreated(organization, account, "initial_onboarding")
 
 	writeInitialWorkspaceResponse(w, organization, workspace)
 }
@@ -1353,23 +1353,35 @@ func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.O
 	})
 }
 
-func recordOrganizationCreated(organization *models.Organization, accountID uuid.UUID, creationPath string) {
+func recordOrganizationCreated(organization *models.Organization, account *models.Account, creationPath string) {
 	organizationID := organization.ID.String()
+	properties := productanalytics.Properties{"creation_path": creationPath}
+	identity := productanalytics.Properties{}
+	for key, value := range map[string]string{"email": account.Email, "name": account.Name} {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		properties[key] = value
+		identity[key] = value
+	}
+	if len(identity) > 0 {
+		properties["$set"] = identity
+	}
 	productanalytics.Capture(productanalytics.Event{
 		Name:           productanalytics.EventOrganizationCreated,
 		EventID:        productanalytics.StableEventID(productanalytics.EventOrganizationCreated, organizationID),
-		DistinctID:     accountID.String(),
+		DistinctID:     account.ID.String(),
 		OrganizationID: organizationID,
 		ActorType:      productanalytics.ActorUser,
 		Source:         productanalytics.SourceUI,
-		Properties:     productanalytics.Properties{"creation_path": creationPath},
+		Properties:     properties,
 	})
 	productanalytics.IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity{
 		ID:        organizationID,
 		Name:      organization.Name,
 		Slug:      organization.Slug,
 		CreatedAt: organization.CreatedAt,
-		AccountID: accountID.String(),
+		AccountID: account.ID.String(),
 	})
 }
 

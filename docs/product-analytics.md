@@ -4,8 +4,8 @@ Factory product analytics measures SaaS acquisition, activation, activity, and
 retention. The server sends events only when `POSTHOG_KEY` is set. It sends the
 events to `https://us.i.posthog.com`.
 
-The browser sends the signup event and account identity. The server sends all
-Factory lifecycle events after the related operation succeeds. PostHog
+The browser sends the signup event and identifies the account. The server sends
+all Factory lifecycle events after the related operation succeeds. PostHog
 autocapture, page views, page leaves, surveys, and session recording are
 disabled.
 
@@ -21,6 +21,17 @@ user uses the global account UUID as the PostHog distinct ID. System and
 unmapped external actors use hashed, organization-scoped synthetic IDs. A
 mapped GitHub user uses the matching account UUID.
 
+For `organization_created`, the server includes the creator email and name
+from the authenticated account. It omits empty or whitespace-only identity
+fields.
+The event contains these values as top-level properties and in `$set`.
+PostHog uses `$set` to update the person properties through the same capture.
+This applies to initial onboarding and later organization creation.
+It does not depend on a browser identity call.
+
+Browser identification continues to supply account identity for browser events.
+It uses the same global account UUID as the server.
+
 Do not add task content, prompts, repository names, URLs, branches, pull
 request titles, errors, tokens, or credentials to an event.
 
@@ -29,7 +40,7 @@ request titles, errors, tokens, or credentials to an event.
 | Event | Successful outcome | Event properties |
 | --- | --- | --- |
 | `user_signed_up` | A new account returns through the signup callback. | Initial UTM properties and `product_updates_opt_in` when available. |
-| `organization_created` | The first or a later organization commits. | `creation_path`: `initial_onboarding` or `workspace_switcher`. |
+| `organization_created` | The first or a later organization commits. | `creation_path`: `initial_onboarding` or `workspace_switcher`; creator `email` and `name` when nonblank; `$set` with the same identity fields. |
 | `factory_onboarding_completed` | Factory onboarding first changes from incomplete to complete. | `vcs_provider`, `issues_source`, and `agent_harness` enum values. |
 | `factory_task_created` | A task commits. | `creation_source`: `manual`, `issue_import`, `automation`, `handoff`, or `mcp`; `issue_source` enum for imports. |
 | `factory_task_refined` | The first human planning interaction in a planning session succeeds. | `interaction`: `message` or `survey_answer`. |
