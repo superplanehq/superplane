@@ -131,17 +131,18 @@ type reportFactory struct {
 }
 
 type reportTask struct {
-	ID          string `json:"id"`
-	Key         string `json:"key"`
-	Number      int64  `json:"number"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	State       string `json:"state"`
-	Result      string `json:"result"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
-	SourceURL   string `json:"source_url"`
-	SourceLabel string `json:"source_label"`
+    ID          string `json:"id"`
+    Key         string `json:"key"`
+    Number      int64  `json:"number"`
+    Title       string `json:"title"`
+    Description string `json:"description"`
+    State       string `json:"state"`
+    Result      string `json:"result"`
+    CreatedAt   string `json:"created_at"`
+    UpdatedAt   string `json:"updated_at"`
+    SourceURL   string `json:"source_url"`
+    SourceLabel string `json:"source_label"`
+    URL         string `json:"url"`
 }
 
 type reportUsage struct {
@@ -229,22 +230,22 @@ type reportRunCount struct {
 
 func taskReportJSON(report *factories.TaskReport) taskReportDocument {
 	order := report.Order
-	document := taskReportDocument{
-		Factory: reportFactory{
-			ID:   report.Factory.ID.String(),
-			Name: report.Factory.Name,
-			Key:  report.Factory.Key,
-		},
-		Task:               reportTaskJSON(order),
-		Usage:              reportUsageJSON(report.UsageRecorded, order),
-		UsageByModel:       reportModelUsageJSON(report.UsageRecorded, order.GetUsageByModel()),
-		UsageByMachineType: reportMachineUsageJSON(report.UsageRecorded, order.GetUsageByMachineType()),
-		PullRequests:       reportPullRequestsJSON(order.GetPullRequests()),
-		LineDispatches:     reportDispatchesJSON(order.GetLineDispatches()),
-		Runs:               reportRunsJSON(report.Runs.Runs),
-		RunCounts:          reportRunCountsJSON(report.Runs.Counts),
-		HasNextRunPage:     report.Runs.HasNextPage,
-	}
+    document := taskReportDocument{
+        Factory: reportFactory{
+            ID:   report.Factory.ID.String(),
+            Name: report.Factory.Name,
+            Key:  report.Factory.Key,
+        },
+        Task:               reportTaskJSON(order, report.Factory.OrganizationID, report.Factory.RouteSegment()),
+        Usage:              reportUsageJSON(report.UsageRecorded, order),
+        UsageByModel:       reportModelUsageJSON(report.UsageRecorded, order.GetUsageByModel()),
+        UsageByMachineType: reportMachineUsageJSON(report.UsageRecorded, order.GetUsageByMachineType()),
+        PullRequests:       reportPullRequestsJSON(order.GetPullRequests()),
+        LineDispatches:     reportDispatchesJSON(order.GetLineDispatches()),
+        Runs:               reportRunsJSON(report.Runs.Runs),
+        RunCounts:          reportRunCountsJSON(report.Runs.Counts),
+        HasNextRunPage:     report.Runs.HasNextPage,
+    }
 	if report.Runs.HasNextPage && len(report.Runs.Runs) > 0 {
 		last := report.Runs.Runs[len(report.Runs.Runs)-1]
 		document.NextRunBefore = formatTaskRunCursor(last.CreatedAt, last.ID)
@@ -252,23 +253,24 @@ func taskReportJSON(report *factories.TaskReport) taskReportDocument {
 	return document
 }
 
-func reportTaskJSON(order *pb.WorkOrder) reportTask {
-	task := reportTask{
-		ID:          order.GetId(),
-		Key:         order.GetKey(),
-		Number:      order.GetNumber(),
-		Title:       order.GetTitle(),
-		Description: order.GetDescription(),
-		State:       protoStateName(order.GetState()),
-		Result:      enumToken(order.GetResult().String()),
-		CreatedAt:   timestampText(order.GetCreatedAt().AsTime()),
-		UpdatedAt:   timestampText(order.GetUpdatedAt().AsTime()),
-	}
-	if origin := order.GetOrigin(); origin != nil {
-		task.SourceURL = origin.GetUrl()
-		task.SourceLabel = origin.GetLabel()
-	}
-	return task
+func reportTaskJSON(order *pb.WorkOrder, orgID uuid.UUID, routeSegment string) reportTask {
+    task := reportTask{
+        ID:          order.GetId(),
+        Key:         order.GetKey(),
+        Number:      order.GetNumber(),
+        Title:       order.GetTitle(),
+        Description: order.GetDescription(),
+        State:       protoStateName(order.GetState()),
+        Result:      enumToken(order.GetResult().String()),
+        CreatedAt:   timestampText(order.GetCreatedAt().AsTime()),
+        UpdatedAt:   timestampText(order.GetUpdatedAt().AsTime()),
+        URL:         taskPermalink(orgID, routeSegment, order.GetNumber()),
+    }
+    if origin := order.GetOrigin(); origin != nil {
+        task.SourceURL = origin.GetUrl()
+        task.SourceLabel = origin.GetLabel()
+    }
+    return task
 }
 
 func reportUsageJSON(recorded bool, order *pb.WorkOrder) reportUsage {

@@ -25,15 +25,15 @@ type Runtime struct {
 }
 
 func Tools() []Tool {
-	tools := []Tool{
-		{
-			Name:        "list_workspaces",
-			Description: "List workspaces this connection can use. Each workspace has an id and a name.",
-			InputSchema: map[string]any{
-				"type":       "object",
-				"properties": map[string]any{},
-			},
-		},
+    tools := []Tool{
+        {
+            Name:        "list_workspaces",
+            Description: "List workspaces this connection can use. Each workspace has an id, a name, and a slug. The slug is the URL segment.",
+            InputSchema: map[string]any{
+                "type":       "object",
+                "properties": map[string]any{},
+            },
+        },
 		{
 			Name:        "list_tasks",
 			Description: "List tasks in this workspace. Draft is the backlog. Open is in progress. Closed is finished. Set mine to true to return tasks assigned to you or created by you. Set source_url to the full issue URL to return tasks created from that issue. Archived tasks stay hidden. Poll after a write to see new state.",
@@ -235,18 +235,19 @@ func (rt *Runtime) listWorkspaces(ctx context.Context, claims *AccessClaims, _ m
 	if !OrganizationAllowsPublicMCP(claims.OrgID) || !organizationAllowsFactories(claims.OrgID) {
 		return ToolResult{}, ToolError("Not found")
 	}
-	rows := make([]workspaceRow, 0, len(claims.WorkspaceIDs()))
-	for _, factoryID := range claims.WorkspaceIDs() {
-		factory, err := models.FindFactory(database.DB(ctx), claims.OrgID, factoryID)
-		if err != nil {
-			continue
-		}
-		if !OrganizationAllowsPublicMCP(factory.OrganizationID) || !organizationAllowsFactories(factory.OrganizationID) {
-			return ToolResult{}, ToolError("Not found")
-		}
-		rows = append(rows, workspaceRow{ID: factory.ID.String(), Name: factory.Name})
-	}
-	return TextResult(mustJSON(map[string]any{"workspaces": rows})), nil
+    rows := make([]workspaceRow, 0, len(claims.WorkspaceIDs()))
+    for _, factoryID := range claims.WorkspaceIDs() {
+        factory, err := models.FindFactory(database.DB(ctx), claims.OrgID, factoryID)
+        if err != nil {
+            continue
+        }
+        if !OrganizationAllowsPublicMCP(factory.OrganizationID) || !organizationAllowsFactories(factory.OrganizationID) {
+            return ToolResult{}, ToolError("Not found")
+        }
+        segment := factory.RouteSegment()
+        rows = append(rows, workspaceRow{ID: factory.ID.String(), Name: factory.Name, Slug: segment, URL: workspacePermalink(factory.OrganizationID, segment)})
+    }
+    return TextResult(mustJSON(map[string]any{"workspaces": rows})), nil
 }
 
 func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
@@ -281,30 +282,39 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
-	type taskRow struct {
-		ID        string        `json:"id"`
-		Key       string        `json:"key"`
-		Title     string        `json:"title"`
-		State     string        `json:"state"`
-		Assignees []assigneeRef `json:"assignees"`
-		SourceURL string        `json:"source_url"`
-	}
-	rows := make([]taskRow, 0, len(resp.GetOrders()))
-	for _, order := range resp.GetOrders() {
-		sourceURL := ""
-		if origin := order.GetOrigin(); origin != nil {
-			sourceURL = origin.GetUrl()
-		}
-		rows = append(rows, taskRow{
-			ID:        order.GetId(),
-			Key:       order.GetKey(),
-			Title:     order.GetTitle(),
-			State:     protoStateName(order.GetState()),
-			Assignees: assigneeRefs(order.GetAssignees()),
-			SourceURL: sourceURL,
-		})
-	}
-	payload := map[string]any{"tasks": rows, "has_next_page": resp.GetHasNextPage()}
+    type taskRow struct {
+        ID        string        `json:"id"`
+        Key       string        `json:"key"`
+        Title     string        `json:"title"`
+        State     string        `json:"state"`
+        Assignees []assigneeRef `json:"assignees"`
+        SourceURL string        `json:"source_url"`
+        URL       string        `json:"url"`
+    }
+    // Resolve the workspace route segment once for this call.
+    factoryModel, err := models.FindFactory(database.DB(ctx), claims.OrgID, factoryID)
+    if err != nil {
+        return ToolResult{}, ToolError("Not found")
+    }
+    routeSegment := factoryModel.RouteSegment()
+
+    rows := make([]taskRow, 0, len(resp.GetOrders()))
+    for _, order := range resp.GetOrders() {
+        sourceURL := ""
+        if origin := order.GetOrigin(); origin != nil {
+            sourceURL = origin.GetUrl()
+        }
+        rows = append(rows, taskRow{
+            ID:        order.GetId(),
+            Key:       order.GetKey(),
+            Title:     order.GetTitle(),
+            State:     protoStateName(order.GetState()),
+            Assignees: assigneeRefs(order.GetAssignees()),
+            SourceURL: sourceURL,
+            URL:       taskPermalink(claims.OrgID, routeSegment, order.GetNumber()),
+        })
+    }
+    payload := map[string]any{"tasks": rows, "has_next_page": resp.GetHasNextPage()}
 	if resp.GetHasNextPage() && len(rows) > 0 {
 		payload["next_before_id"] = rows[len(rows)-1].ID
 	}
@@ -312,10 +322,10 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 }
 
 func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
-	if err != nil {
-		return ToolResult{}, err
-	}
+    factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
+    if err != nil {
+        return ToolResult{}, err
+    }
 	task, err := stringArg(args, "task")
 	if err != nil {
 		return ToolResult{}, err
@@ -324,18 +334,23 @@ func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[s
 		FactoryId: factoryID.String(),
 		OrderId:   task,
 	})
-	if err != nil {
-		return ToolResult{}, actionError(err)
-	}
-	order := resp.GetOrder()
-	return TextResult(mustJSON(map[string]any{
-		"id":          order.GetId(),
-		"key":         order.GetKey(),
-		"title":       order.GetTitle(),
-		"description": order.GetDescription(),
-		"state":       protoStateName(order.GetState()),
-		"assignees":   assigneeRefs(order.GetAssignees()),
-	})), nil
+    if err != nil {
+        return ToolResult{}, actionError(err)
+    }
+    order := resp.GetOrder()
+    factoryModel, err := models.FindFactory(database.DB(ctx), claims.OrgID, factoryID)
+    if err != nil {
+        return ToolResult{}, ToolError("Not found")
+    }
+    return TextResult(mustJSON(map[string]any{
+        "id":          order.GetId(),
+        "key":         order.GetKey(),
+        "title":       order.GetTitle(),
+        "description": order.GetDescription(),
+        "state":       protoStateName(order.GetState()),
+        "assignees":   assigneeRefs(order.GetAssignees()),
+        "url":         taskPermalink(claims.OrgID, factoryModel.RouteSegment(), order.GetNumber()),
+    })), nil
 }
 
 func (rt *Runtime) listTaskArtifacts(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
@@ -447,10 +462,10 @@ func (rt *Runtime) sendTaskMessage(ctx context.Context, claims *AccessClaims, ar
 }
 
 func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:create")
-	if err != nil {
-		return ToolResult{}, err
-	}
+    factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:create")
+    if err != nil {
+        return ToolResult{}, err
+    }
 	title, err := stringArg(args, "title")
 	if err != nil {
 		return ToolResult{}, err
@@ -461,16 +476,21 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 		Title:       title,
 		Description: strings.TrimSpace(description),
 	})
-	if err != nil {
-		return ToolResult{}, actionError(err)
-	}
-	order := resp.GetOrder()
-	return TextResult(mustJSON(map[string]any{
-		"id":    order.GetId(),
-		"key":   order.GetKey(),
-		"title": order.GetTitle(),
-		"state": protoStateName(order.GetState()),
-	})), nil
+    if err != nil {
+        return ToolResult{}, actionError(err)
+    }
+    order := resp.GetOrder()
+    factoryModel, err := models.FindFactory(database.DB(ctx), claims.OrgID, factoryID)
+    if err != nil {
+        return ToolResult{}, ToolError("Not found")
+    }
+    return TextResult(mustJSON(map[string]any{
+        "id":    order.GetId(),
+        "key":   order.GetKey(),
+        "title": order.GetTitle(),
+        "state": protoStateName(order.GetState()),
+        "url":   taskPermalink(claims.OrgID, factoryModel.RouteSegment(), order.GetNumber()),
+    })), nil
 }
 
 func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
@@ -515,24 +535,29 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
-	order := result.Order
-	payload := map[string]any{
-		"id":     order.GetId(),
-		"key":    order.GetKey(),
-		"state":  protoStateName(order.GetState()),
-		"column": result.Column,
-	}
-	if result.PullRequestURL != "" {
-		payload["pull_request_url"] = result.PullRequestURL
-	}
-	return TextResult(mustJSON(payload)), nil
+    order := result.Order
+    factoryModel, err := models.FindFactory(database.DB(ctx), claims.OrgID, factoryID)
+    if err != nil {
+        return ToolResult{}, ToolError("Not found")
+    }
+    payload := map[string]any{
+        "id":     order.GetId(),
+        "key":    order.GetKey(),
+        "state":  protoStateName(order.GetState()),
+        "column": result.Column,
+        "url":    taskPermalink(claims.OrgID, factoryModel.RouteSegment(), order.GetNumber()),
+    }
+    if result.PullRequestURL != "" {
+        payload["pull_request_url"] = result.PullRequestURL
+    }
+    return TextResult(mustJSON(payload)), nil
 }
 
 func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:update")
-	if err != nil {
-		return ToolResult{}, err
-	}
+    factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:update")
+    if err != nil {
+        return ToolResult{}, err
+    }
 	task, err := stringArg(args, "task")
 	if err != nil {
 		return ToolResult{}, err
@@ -563,15 +588,20 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 		OrderId:     orderID,
 		AssigneeIds: assigneeIDs,
 	})
-	if err != nil {
-		return ToolResult{}, actionError(err)
-	}
-	order := resp.GetOrder()
-	return TextResult(mustJSON(map[string]any{
-		"id":        order.GetId(),
-		"key":       order.GetKey(),
-		"assignees": assigneeRefs(order.GetAssignees()),
-	})), nil
+    if err != nil {
+        return ToolResult{}, actionError(err)
+    }
+    order := resp.GetOrder()
+    factoryModel, err := models.FindFactory(database.DB(ctx), claims.OrgID, factoryID)
+    if err != nil {
+        return ToolResult{}, ToolError("Not found")
+    }
+    return TextResult(mustJSON(map[string]any{
+        "id":        order.GetId(),
+        "key":       order.GetKey(),
+        "assignees": assigneeRefs(order.GetAssignees()),
+        "url":       taskPermalink(claims.OrgID, factoryModel.RouteSegment(), order.GetNumber()),
+    })), nil
 }
 
 func (rt *Runtime) listMembers(ctx context.Context, claims *AccessClaims, _ map[string]any) (ToolResult, error) {
@@ -828,8 +858,10 @@ func sessionSummary(session *pb.PlanningSession) map[string]any {
 }
 
 type workspaceRow struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+    ID   string `json:"id"`
+    Name string `json:"name"`
+    Slug string `json:"slug"`
+    URL  string `json:"url"`
 }
 
 func (rt *Runtime) beginWorkspaceCall(ctx context.Context, claims *AccessClaims, args map[string]any, scope string) (uuid.UUID, error) {
