@@ -96,6 +96,14 @@ func ValidateInvitationCapacity(tx *gorm.DB, organizationID uuid.UUID, alreadyPe
 	return implementation.ValidateInvitationCapacity(tx, organizationID, alreadyPending, pendingLimit)
 }
 
+func DescribeSeatQuantity(tx *gorm.DB, organizationID uuid.UUID) (SeatQuantityView, error) {
+	implementation, err := Current()
+	if err != nil {
+		return SeatQuantityView{}, err
+	}
+	return implementation.DescribeSeatQuantity(tx, organizationID)
+}
+
 func ResolveSeats(tx *gorm.DB, organizationID uuid.UUID) (*SeatUsage, error) {
 	implementation, err := Current()
 	if err != nil {

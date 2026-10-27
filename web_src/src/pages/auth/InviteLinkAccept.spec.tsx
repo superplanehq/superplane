@@ -150,6 +150,10 @@ describe("Email invitation acceptance", () => {
   for (const [reason, message] of Object.entries({
     PAYMENT_PAST_DUE: "This organization cannot add members until its payment is updated. Ask an organization admin.",
     NO_SEAT_AVAILABLE: "No seat is available. Ask an organization admin to free or buy a seat.",
+    SEAT_REMOVAL_PENDING:
+      "No seat is available. An organization admin scheduled a seat removal. Ask an admin to change it or buy a seat.",
+    SEAT_REMOVAL_UNVERIFIED:
+      "SuperPlane is checking the billing period. Ask an organization admin, or try again after the check finishes.",
     MEMBER_LIMIT_REACHED: "This organization reached its member limit. Ask an organization admin.",
     CHECKOUT_SEAT_LIMIT:
       "This organization is changing its plan. The new plan has no seat for you yet. Ask an organization admin to finish the plan change and buy a seat for you.",

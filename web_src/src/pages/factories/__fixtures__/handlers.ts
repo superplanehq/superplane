@@ -1621,6 +1621,11 @@ function seatPurchasePreview(
     excludesTax: true,
     subscriptionId: "sub_storybook_team",
     billingPeriodStart: THIRTY_DAYS_AGO,
+    seatChangeVersion: "0",
+    pendingRemovalId: "",
+    pendingRemovalRevision: 0,
+    renewalSeats: purchasedSeats + additionalSeats,
+    cancelsPendingRemoval: false,
   };
 }
 

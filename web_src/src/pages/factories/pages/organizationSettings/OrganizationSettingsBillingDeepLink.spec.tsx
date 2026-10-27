@@ -107,6 +107,7 @@ beforeEach(() => {
       targetSeats: 11,
       subscriptionId: "sub_team",
       billingPeriodStart: "2026-10-01T00:00:00Z",
+      seatChangeVersion: "0",
       periodEnd: "2026-11-01T00:00:00Z",
     },
   });

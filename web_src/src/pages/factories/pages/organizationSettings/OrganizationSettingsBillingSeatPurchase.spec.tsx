@@ -69,6 +69,7 @@ describe("Organization billing seat purchases", () => {
             periodEnd: ACTIVE_BILLING_PERIOD_ENDS_AT,
             subscriptionId: "sub_team",
             billingPeriodStart: "2026-10-01T00:00:00Z",
+            seatChangeVersion: "0",
           },
         },
       },

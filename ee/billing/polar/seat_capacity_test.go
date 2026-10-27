@@ -165,8 +165,8 @@ func TestSubscriptionApplyEmitsOnlyCommittedCapacityTransitions(t *testing.T) {
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
 			alerts, err := StageOrganizationSubscription(t.Context(), tx, org.ID, snapshot)
 			require.NoError(t, err)
-			require.Len(t, alerts, 1)
-			assert.Equal(t, billingmodels.SeatCapacityResolved, alerts[0].Transition.Change)
+			require.Len(t, alerts.checks, 1)
+			assert.Equal(t, billingmodels.SeatCapacityResolved, alerts.checks[0].Transition.Change)
 			return errors.New("local settlement failed")
 		})
 

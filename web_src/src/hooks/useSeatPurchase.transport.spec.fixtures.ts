@@ -7,6 +7,9 @@ type PurchaseBody = {
   confirmedSubscriptionId?: string;
   confirmedPeriodStart?: string;
   confirmedPeriodEnd?: string;
+  confirmedSeatChangeVersion?: string;
+  confirmedPendingRemovalId?: string;
+  confirmedPendingRemovalRevision?: number;
 };
 type StoredOperation = { counts: string; binding: string | undefined; purchase: OrganizationsSeatPurchase };
 // A number is an HTTP status that the server returns before it processes the request.
@@ -54,6 +57,9 @@ export class FakeBillingServer {
       confirmedSubscriptionId: this.subscriptionId,
       confirmedPeriodStart: this.periodStart,
       confirmedPeriodEnd: this.periodEnd,
+      confirmedSeatChangeVersion: "0",
+      confirmedPendingRemovalId: "",
+      confirmedPendingRemovalRevision: 0,
     };
   }
 
@@ -90,7 +96,15 @@ export class FakeBillingServer {
         periodEnd: this.periodEnd,
         ...(this.previewOmitsBinding
           ? {}
-          : { subscriptionId: this.subscriptionId, billingPeriodStart: this.periodStart }),
+          : {
+              subscriptionId: this.subscriptionId,
+              billingPeriodStart: this.periodStart,
+              seatChangeVersion: "0",
+              pendingRemovalId: "",
+              pendingRemovalRevision: 0,
+              renewalSeats: this.purchasedSeats + additionalSeats,
+              cancelsPendingRemoval: false,
+            }),
       });
     }
     if (path.endsWith("/seats/purchase")) return this.purchase((await request.json()) as PurchaseBody);
@@ -123,7 +137,9 @@ export class FakeBillingServer {
       if (!matches) return this.respond(412, { message: "The operation key belongs to another purchase." });
       return this.respond(200, { purchase: stored.purchase, billing: this.billing() });
     }
-    if (!binding) return this.respond(400, { message: "Preview the purchase again and confirm it." });
+    if (!binding || body.confirmedSeatChangeVersion === undefined) {
+      return this.respond(400, { message: "Preview the purchase again and confirm it." });
+    }
     if (binding !== bindingOf(this.confirmedContext()))
       return this.respond(409, {
         message: "The subscription or billing period changed. Review the new price and confirm again.",

@@ -74,6 +74,7 @@ type Runtime interface {
 	ValidateMemberAdmission(*gorm.DB, uuid.UUID) error
 	ValidateInvitationCapacity(*gorm.DB, uuid.UUID, bool, int) error
 	ResolveSeats(*gorm.DB, uuid.UUID) (*SeatUsage, error)
+	DescribeSeatQuantity(*gorm.DB, uuid.UUID) (SeatQuantityView, error)
 	RecheckSeatCapacity(*gorm.DB, uuid.UUID, string) (CapacityAlert, error)
 	AssertOrganizationPaymentMethod(*gorm.DB, uuid.UUID) error
 	AssertOrganizationPlanAllowsRuns(*gorm.DB, uuid.UUID) error
