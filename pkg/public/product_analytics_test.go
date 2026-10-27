@@ -71,59 +71,88 @@ func useAnalytics(t *testing.T) *analyticsRecorder {
 }
 
 func TestOrganizationCreationAnalytics(t *testing.T) {
-	recorder := useAnalytics(t)
-	require.NoError(t, database.TruncateTables())
+	for _, tc := range []struct {
+		label    string
+		name     string
+		email    string
+		identity productanalytics.Properties
+	}{
+		{"email and name", "Metrics User", "metrics@example.com", productanalytics.Properties{"email": "metrics@example.com", "name": "Metrics User"}},
+		{"blank name", "", "metrics@example.com", productanalytics.Properties{"email": "metrics@example.com"}},
+		{"blank email", "Metrics User", "", productanalytics.Properties{"name": "Metrics User"}},
+		{"blank identity", " \t", " \t", productanalytics.Properties{}},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			recorder := useAnalytics(t)
+			require.NoError(t, database.TruncateTables())
 
-	account, err := models.CreateAccount("metrics@example.com", "Metrics User")
-	require.NoError(t, err)
-	signer := jwt.NewSigner("test")
+			account, err := models.CreateAccount(tc.name, tc.email)
+			require.NoError(t, err)
+			if tc.email == "metrics@example.com" {
+				assert.Equal(t, "metrics@example.com", account.Email)
+			}
+			signer := jwt.NewSigner("test")
 
-	authService, err := authorization.NewAuthService()
-	require.NoError(t, err)
-	encryptor := &crypto.NoOpEncryptor{}
-	componentRegistry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
-	require.NoError(t, err)
-	server, err := NewServer(encryptor, componentRegistry, signer, support.NewOIDCProvider(), "", "localhost", "", "test", "/app/templates", authService, false)
-	require.NoError(t, err)
+			authService, err := authorization.NewAuthService()
+			require.NoError(t, err)
+			encryptor := &crypto.NoOpEncryptor{}
+			componentRegistry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+			require.NoError(t, err)
+			server, err := NewServer(encryptor, componentRegistry, signer, support.NewOIDCProvider(), "", "localhost", "", "test", "/app/templates", authService, false)
+			require.NoError(t, err)
 
-	postOrganization := func(body []byte) *httptest.ResponseRecorder {
-		request := httptest.NewRequest(http.MethodPost, "/organizations", bytes.NewReader(body))
-		request = request.WithContext(accountContext(account))
-		response := httptest.NewRecorder()
-		server.createOrganization(response, request)
-		return response
+			postOrganization := func(body []byte) *httptest.ResponseRecorder {
+				request := httptest.NewRequest(http.MethodPost, "/organizations", bytes.NewReader(body))
+				request = request.WithContext(accountContext(account))
+				response := httptest.NewRecorder()
+				server.createOrganization(response, request)
+				return response
+			}
+
+			t.Run("rejected creation emits nothing", func(t *testing.T) {
+				response := postOrganization([]byte(`{"name":""}`))
+				assert.Equal(t, http.StatusBadRequest, response.Code)
+				assert.Empty(t, recorder.snapshot())
+				assert.Empty(t, recorder.groupIdentities())
+			})
+
+			t.Run("later organization creation emits one event", func(t *testing.T) {
+				body, err := json.Marshal(OrganizationCreationRequest{Name: "Metrics Organization"})
+				require.NoError(t, err)
+				response := postOrganization(body)
+				require.Equal(t, http.StatusOK, response.Code)
+
+				events := recorder.snapshot()
+				require.Len(t, events, 1)
+				assert.Equal(t, productanalytics.EventOrganizationCreated, events[0].Name)
+				assert.Equal(t, "workspace_switcher", events[0].Properties["creation_path"])
+				assert.Equal(t, account.ID.String(), events[0].DistinctID)
+				assert.Equal(t, productanalytics.ActorUser, events[0].ActorType)
+				assert.Equal(t, productanalytics.SourceUI, events[0].Source)
+				assert.NotEmpty(t, events[0].OrganizationID)
+				assert.Equal(t, productanalytics.StableEventID(productanalytics.EventOrganizationCreated, events[0].OrganizationID), events[0].EventID)
+				for _, key := range []string{"email", "name"} {
+					if expected, present := tc.identity[key]; present {
+						assert.Equal(t, expected, events[0].Properties[key])
+						continue
+					}
+					assert.NotContains(t, events[0].Properties, key)
+				}
+				groups := recorder.groupIdentities()
+				require.Len(t, groups, 1)
+				assert.Equal(t, events[0].OrganizationID, groups[0].ID)
+				assert.Equal(t, "Metrics Organization", groups[0].Name)
+				assert.Equal(t, account.ID.String(), groups[0].AccountID)
+				assert.NotEmpty(t, groups[0].Slug)
+				require.NotNil(t, groups[0].CreatedAt)
+				if len(tc.identity) == 0 {
+					assert.NotContains(t, events[0].Properties, "$set")
+					return
+				}
+				assert.Equal(t, tc.identity, events[0].Properties["$set"])
+			})
+		})
 	}
-
-	t.Run("rejected creation emits nothing", func(t *testing.T) {
-		response := postOrganization([]byte(`{"name":""}`))
-		assert.Equal(t, http.StatusBadRequest, response.Code)
-		assert.Empty(t, recorder.snapshot())
-		assert.Empty(t, recorder.groupIdentities())
-	})
-
-	t.Run("later organization creation emits one event", func(t *testing.T) {
-		body, err := json.Marshal(OrganizationCreationRequest{Name: "Metrics Organization"})
-		require.NoError(t, err)
-		response := postOrganization(body)
-		require.Equal(t, http.StatusOK, response.Code)
-
-		events := recorder.snapshot()
-		require.Len(t, events, 1)
-		assert.Equal(t, productanalytics.EventOrganizationCreated, events[0].Name)
-		assert.Equal(t, "workspace_switcher", events[0].Properties["creation_path"])
-		assert.Equal(t, account.ID.String(), events[0].DistinctID)
-		assert.Equal(t, productanalytics.ActorUser, events[0].ActorType)
-		assert.Equal(t, productanalytics.SourceUI, events[0].Source)
-		assert.NotEmpty(t, events[0].OrganizationID)
-
-		groups := recorder.groupIdentities()
-		require.Len(t, groups, 1)
-		assert.Equal(t, events[0].OrganizationID, groups[0].ID)
-		assert.Equal(t, "Metrics Organization", groups[0].Name)
-		assert.Equal(t, account.ID.String(), groups[0].AccountID)
-		assert.NotEmpty(t, groups[0].Slug)
-		require.NotNil(t, groups[0].CreatedAt)
-	})
 }
 
 func TestInitialWorkspaceAnalytics(t *testing.T) {
@@ -133,9 +162,11 @@ func TestInitialWorkspaceAnalytics(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
 	recorder := useAnalytics(t)
 	resource := support.Setup(t)
+	account, err := models.CreateAccount("Onboarding User", "onboarding@example.com")
+	require.NoError(t, err)
 	require.NoError(t, models.SaveAccountLinkedAccount(
 		database.DB(t.Context()),
-		models.NewAccountLinkedAccount(resource.Account.ID, models.ProviderGitHub, "github-owner-id", "github-owner", "GitHub Owner", ""),
+		models.NewAccountLinkedAccount(account.ID, models.ProviderGitHub, "github-owner-id", "github-owner", "GitHub Owner", ""),
 	))
 
 	server, err := NewServer(
@@ -158,7 +189,7 @@ func TestInitialWorkspaceAnalytics(t *testing.T) {
 		body, err := json.Marshal(initialWorkspaceRequest{Owner: "GitHub Owner", AttemptID: attemptID.String()})
 		require.NoError(t, err)
 		request := httptest.NewRequest(http.MethodPost, "/account/onboarding", bytes.NewReader(body))
-		request = request.WithContext(accountContext(resource.Account))
+		request = request.WithContext(accountContext(account))
 		response := httptest.NewRecorder()
 		server.createInitialWorkspace(response, request)
 		return response
@@ -171,13 +202,21 @@ func TestInitialWorkspaceAnalytics(t *testing.T) {
 	require.Len(t, events, 1)
 	assert.Equal(t, productanalytics.EventOrganizationCreated, events[0].Name)
 	assert.Equal(t, "initial_onboarding", events[0].Properties["creation_path"])
-	assert.Equal(t, resource.Account.ID.String(), events[0].DistinctID)
+	assert.Equal(t, account.ID.String(), events[0].DistinctID)
 	assert.Equal(t, productanalytics.ActorUser, events[0].ActorType)
+	assert.Equal(t, "onboarding@example.com", events[0].Properties["email"])
+	assert.Equal(t, "Onboarding User", events[0].Properties["name"])
+	assert.Equal(t, productanalytics.Properties{
+		"email": "onboarding@example.com",
+		"name":  "Onboarding User",
+	}, events[0].Properties["$set"])
+	assert.Equal(t, productanalytics.SourceUI, events[0].Source)
+	assert.Equal(t, productanalytics.StableEventID(productanalytics.EventOrganizationCreated, events[0].OrganizationID), events[0].EventID)
 
 	groups := recorder.groupIdentities()
 	require.Len(t, groups, 1)
 	assert.Equal(t, events[0].OrganizationID, groups[0].ID)
 	assert.Equal(t, "GitHub Owner", groups[0].Name)
-	assert.Equal(t, resource.Account.ID.String(), groups[0].AccountID)
+	assert.Equal(t, account.ID.String(), groups[0].AccountID)
 	assert.NotEmpty(t, groups[0].Slug)
 }
