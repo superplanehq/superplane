@@ -17,7 +17,13 @@ import {
   type SelectableLLMSourceID,
 } from "@/lib/selectableLLMModels";
 import { toTestId } from "@/lib/testID";
-import { THINKING_LEVEL_KEY, THINKING_LEVELS, normalizeThinkingLevel } from "@/lib/thinkingLevel";
+import { useFactoryCodexConnection } from "@/pages/factories/pages/onboarding/useFactoryCodexConnection";
+import {
+  CODEX_THINKING_LEVELS,
+  THINKING_LEVEL_KEY,
+  THINKING_LEVELS,
+  normalizeThinkingLevel,
+} from "@/lib/thinkingLevel";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
@@ -30,6 +36,16 @@ export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) =>
     return <SuperPlaneModelField {...props} />;
   }
   if (provider !== "") {
+    const credentials = props.allValues?.credentials;
+    if (
+      provider === "openai" &&
+      typeof credentials === "object" &&
+      credentials !== null &&
+      "source" in credentials &&
+      credentials.source === "subscription"
+    ) {
+      return <SubscriptionModelField {...props} />;
+    }
     return <ProviderBYOKModelField {...props} />;
   }
   return <StringFieldRenderer {...props} />;
@@ -97,6 +113,42 @@ function superPlanePickerValue(current: string, defaultKey: string, models: Arra
   return "";
 }
 
+function SubscriptionModelField(props: FieldRendererProps) {
+  const canvasScope = useCanvasFactoryScope(props.organizationId);
+  const { factoryId, waitingForCanvas } = preferredFactoryScope(props.factoryId, canvasScope);
+  const { query } = useFactoryCodexConnection(props.organizationId ?? "", factoryId ?? "", !waitingForCanvas);
+  const status = modelFieldStatus(props.organizationId, waitingForCanvas || query.isLoading, query.isError);
+  if (status) return status;
+  const connection = query.data;
+  const models = connection?.status === "ready" ? (connection.availableModels ?? []) : [];
+  if (models.length === 0) {
+    return (
+      <Text className="text-sm text-gray-500 dark:text-gray-400">
+        No ChatGPT models are available. Connect ChatGPT in workspace setup to load models.
+      </Text>
+    );
+  }
+  const current = typeof props.value === "string" ? props.value : "";
+  const selected = current || models[0];
+  return (
+    <ModelThinkingSelect
+      fieldName={props.field.name}
+      model={selected}
+      committedModel={current}
+      thinkingLevel={normalizeThinkingLevel(props.allValues?.[THINKING_LEVEL_KEY])}
+      placeholder={props.field.placeholder || "Select a model"}
+      readOnly={props.readOnly}
+      options={models.map((model) => ({ value: model, label: model }))}
+      modelOnly={props.modelOnly ?? false}
+      thinkingOptions={CODEX_THINKING_LEVELS}
+      triggerClassName={props.triggerClassName}
+      onCommit={(model, thinking) =>
+        commitModelAndThinking(props.field.name, model, thinking, props.onChange, props.onValuesChange)
+      }
+    />
+  );
+}
+
 function ProviderBYOKModelField({
   field,
   value,
@@ -147,6 +199,7 @@ function ProviderBYOKModelField({
       readOnly={readOnly}
       options={options}
       modelOnly={modelOnly}
+      thinkingOptions={provider === "openai" ? CODEX_THINKING_LEVELS : THINKING_LEVELS}
       triggerClassName={triggerClassName}
       onCommit={(nextModel, nextThinking) =>
         commitModelAndThinking(field.name, nextModel, nextThinking, onChange, onValuesChange)
@@ -180,6 +233,7 @@ function ModelThinkingSelect({
   readOnly,
   options,
   modelOnly,
+  thinkingOptions = THINKING_LEVELS,
   triggerClassName,
   onCommit,
 }: {
@@ -191,11 +245,12 @@ function ModelThinkingSelect({
   readOnly?: boolean;
   options: Array<{ value: string; label: string }>;
   modelOnly: boolean;
+  thinkingOptions?: ReadonlyArray<{ value: string; label: string }>;
   triggerClassName?: string;
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
   const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
-  const thinkingLabel = THINKING_LEVELS.find((level) => level.value === thinkingLevel)?.label ?? "Default";
+  const thinkingLabel = thinkingOptions.find((level) => level.value === thinkingLevel)?.label ?? "Default";
   const modelListTestId = fieldName ? toTestId(`field-${fieldName}-hosted-model-list`) : undefined;
   const thinkingTestId = fieldName ? toTestId(`field-${fieldName}-hosted-thinking`) : undefined;
 
@@ -241,7 +296,7 @@ function ModelThinkingSelect({
                 label="Thinking"
                 testId={thinkingTestId}
                 value={thinkingLevel}
-                options={[...THINKING_LEVELS]}
+                options={[...thinkingOptions]}
                 onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
               />,
             ]}

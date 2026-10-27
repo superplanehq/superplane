@@ -112,7 +112,7 @@ async function fetchWithRetry(url, options) {
   }
 }
 
-async function restore(env = process.env) {
+async function restore(env = process.env, options = {}) {
   const payload = await requestJSON(
     env,
     "GET",
@@ -128,12 +128,22 @@ async function restore(env = process.env) {
   const file = authPath(env);
   fs.writeFileSync(file, `${JSON.stringify(bundle)}\n`, { mode: 0o600 });
   fs.chmodSync(file, 0o600);
-  // A run keeps the lease secret in auth.json.
-
+  // A run keeps the lease secret in auth.json. Only a catalog refresh
+  // sends the real bundle back to SuperPlane.
+  if (options.final) {
+    return checkpoint({ env, final: true });
+  }
 }
 
 async function checkpoint(options = {}) {
   const env = options.env || process.env;
+  // Read limits before the bundle: app-server can renew the saved credentials.
+  const usage = await readUsage(env).catch(() => {
+    process.stderr.write(
+      "Codex usage is unavailable. Credentials will still be saved.\n",
+    );
+    return undefined;
+  });
   const bundle = readBundle(env);
   if (!bundle) {
     throw new Error("ChatGPT subscription credentials were not found");
@@ -146,6 +156,7 @@ async function checkpoint(options = {}) {
       bundle,
       version: options.version,
       final: Boolean(options.final),
+      usage,
     },
   );
   if (!payload || payload.accepted !== true) {
@@ -154,6 +165,118 @@ async function checkpoint(options = {}) {
   return payload.version;
 }
 
+function readUsage(env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("codex", ["app-server", "--listen", "stdio://"], {
+      env: subscriptionChildEnv(env),
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+    const lines = readline.createInterface({ input: child.stdout });
+    const timeout = setTimeout(() => {
+      if (limits !== undefined || models !== undefined) {
+        finish(null, { limits, models: models ?? undefined });
+        return;
+      }
+      finish(new Error("Codex usage request timed out"));
+    }, 10000);
+    let settled = false;
+    let limits;
+    let models;
+    const modelCatalog = [];
+    function finish(error, usage) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      lines.close();
+      child.stdin.destroy();
+      child.kill("SIGKILL");
+      if (error) reject(error);
+      else resolve(usage);
+    }
+    function send(message) {
+      child.stdin.write(`${JSON.stringify(message)}\n`);
+    }
+    function finishSnapshot() {
+      if (limits !== undefined && models !== undefined) {
+        finish(null, { limits, models: models ?? undefined });
+      }
+    }
+    child.on("error", () => finish(new Error("Codex usage process failed")));
+    child.stdin.on("error", () =>
+      finish(new Error("Codex usage connection failed")),
+    );
+    child.on("close", () => finish(new Error("Codex usage process stopped")));
+    lines.on("line", (line) => {
+      try {
+        const message = JSON.parse(line);
+        if (message.id !== 1 && message.id !== 2 && message.id !== 3) return;
+        if (message.error) {
+          if (message.id === 1) return finish(new Error("Codex usage request failed"));
+          if (message.id === 2) limits = [];
+          if (message.id === 3) models = null;
+          finishSnapshot();
+          return;
+        }
+        if (message.id === 1) {
+          send({ method: "initialized" });
+          send({ id: 2, method: "account/rateLimits/read" });
+          send({ id: 3, method: "model/list", params: { limit: 100 } });
+          return;
+        }
+        if (message.id === 3) {
+          const result = message.result || {};
+          const page = Array.isArray(result.data)
+            ? result.data.map((model) => ({
+                id: model.id,
+                model: model.model,
+                displayName: model.displayName,
+                defaultReasoningEffort: model.defaultReasoningEffort,
+                supportedReasoningEfforts: model.supportedReasoningEfforts,
+                isDefault: model.isDefault,
+              }))
+            : [];
+          modelCatalog.push(...page);
+          if (result.nextCursor) {
+            send({ id: 3, method: "model/list", params: { cursor: result.nextCursor, limit: 100 } });
+            return;
+          }
+          models = modelCatalog;
+          finishSnapshot();
+          return;
+        }
+        const result = message.result || {};
+        const buckets = Object.entries(result.rateLimitsByLimitId || {});
+        limits = buckets.length
+          ? buckets.map(([id, limit]) => ({
+              ...limit,
+              limitId: limit.limitId || id,
+            }))
+          : result.rateLimits
+            ? [
+                {
+                  ...result.rateLimits,
+                  limitId: result.rateLimits.limitId || "codex",
+                },
+              ]
+            : [];
+        finishSnapshot();
+      } catch (_err) {
+        finish(new Error("Codex usage response is invalid"));
+      }
+    });
+    send({
+      id: 1,
+      method: "initialize",
+      params: {
+        clientInfo: {
+          name: "superplane",
+          title: "SuperPlane",
+          version: "1.0.0",
+        },
+      },
+    });
+  });
+}
 
 function parseDeviceAuth(text) {
   const source = stripVTControlCharacters(String(text || ""));
@@ -165,6 +288,21 @@ function parseDeviceAuth(text) {
   };
 }
 
+async function reportUsage(env = process.env) {
+  let usage;
+  try {
+    usage = await readUsage(env);
+  } catch (_err) {
+    process.stdout.write("Codex usage is unavailable.\n");
+    return;
+  }
+  try {
+    await requestJSON(env, "POST", "/api/v1/runner/codex-subscription/checkpoint", { usage });
+    process.stdout.write("ChatGPT usage saved\n");
+  } catch (_err) {
+    process.stderr.write("Codex usage could not be saved. The run can continue.\n");
+  }
+}
 
 async function login(env = process.env) {
   const home = codexHome(env);
@@ -216,16 +354,25 @@ async function main(argv = process.argv.slice(2)) {
     process.stdout.write("ChatGPT sign-in restored\n");
     return;
   }
+  if (command === "refresh") {
+    await restore(process.env, { final: true });
+    process.stdout.write("ChatGPT model catalog refreshed\n");
+    return;
+  }
   if (command === "checkpoint") {
     await checkpoint({ final: argv.includes("--final") });
     process.stdout.write("ChatGPT sign-in saved\n");
+    return;
+  }
+  if (command === "usage") {
+    await reportUsage();
     return;
   }
   if (command === "login") {
     await login();
     return;
   }
-  throw new Error("usage: node codex_subscription.js restore|checkpoint|login");
+  throw new Error("usage: node codex_subscription.js restore|refresh|checkpoint|usage|login");
 }
 
 if (require.main === module) {
@@ -243,6 +390,7 @@ module.exports = {
   redactSecrets,
   restore,
   checkpoint,
+  reportUsage,
   parseDeviceAuth,
   login,
 };
