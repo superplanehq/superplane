@@ -67,24 +67,25 @@ approval.
 
 ## Getting started
 
-[Try SuperPlane](https://app.superplane.com/) and connect a GitHub repository.
-SuperPlane imports issues and assesses which tasks are suitable for an agent.
-Choose a small bug, a test fix, or a documentation update for your first run.
+### SuperPlane Cloud
 
-Follow the [quickstart](https://docs.superplane.com/get-started/quickstart/)
-for setup, or read the [product overview](https://docs.superplane.com/get-started/overview/)
-to learn how SuperPlane coordinates agents and verification.
+1. [Sign up](https://app.superplane.com/) and create a workspace.
+2. Connect a GitHub repository.
+3. Choose a small bug, a test fix, or a documentation update for the first run.
 
-To run SuperPlane on your infrastructure, see the
-[self-hosting guide](https://docs.superplane.com/self-hosting/overview/).
-It covers single-VM installations and Enterprise Kubernetes deployments.
+SuperPlane imports the issues and assesses which tasks are suitable for an agent.
 
-## Choose your agents and models
+- Follow the [quickstart](https://docs.superplane.com/get-started/quickstart/) for setup.
+- Read the [product overview](https://docs.superplane.com/get-started/overview/) to learn how SuperPlane coordinates agents and verification.
 
-Use the coding agents and models that fit your team's work and budget.
-SuperPlane coordinates their work with your repository, CI, review, and the
-other tools you connect. Your team keeps a shared process as those choices
-change.
+### Self-host
+
+Install SuperPlane on your own infrastructure.
+
+- Use Docker Compose on one Linux VM.
+- Use Kubernetes on AWS, Azure, or Google Cloud.
+
+See the [self-hosting guide](https://docs.superplane.com/self-hosting/overview/).
 
 ## Contributing
 
