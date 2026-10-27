@@ -76,6 +76,7 @@ bash -n \
   release/superplane-single-host-tarball/test.sh \
   release/superplane-single-host-tarball/smoke-test.sh \
   release/superplane-single-host-tarball/templates/install.sh \
+  release/superplane-single-host-tarball/templates/uninstall.sh \
   release/fleet-manager/docker-entrypoint.sh \
   release/fleet-manager/pipeline_test.sh \
   release/runner/publish-image.sh \
