@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"gorm.io/gorm"
 )
@@ -29,18 +30,31 @@ type SeatCapacityCheck struct {
 	Transition     billingmodels.SeatCapacityTransition
 }
 
-// SeatCapacityAlerts are the capacity transitions that a transaction staged.
-// Only the owner of the outermost transaction emits them, after its commit
-// succeeded. A rollback, a failed commit, or the end of a nested transaction
-// or savepoint emits nothing, so an alert never describes discarded state.
-type SeatCapacityAlerts []SeatCapacityCheck
+// SeatCapacityAlerts are the capacity transitions that a transaction staged,
+// plus removal recovery alerts from the same transaction. Only the owner of
+// the outermost transaction emits them, after its commit succeeded. A
+// rollback, a failed commit, or the end of a nested transaction or savepoint
+// emits nothing, so an alert never describes discarded state.
+type SeatCapacityAlerts struct {
+	checks []SeatCapacityCheck
+	extra  []billing.CapacityAlert
+}
 
 // Emit writes each staged transition. Call it only after the outermost
 // transaction committed.
 func (a SeatCapacityAlerts) Emit() {
-	for _, check := range a {
+	for _, check := range a.checks {
 		check.Log()
 	}
+	for _, alert := range a.extra {
+		if alert != nil {
+			alert.Emit()
+		}
+	}
+}
+
+func seatCapacityAlerts(check SeatCapacityCheck, extra []billing.CapacityAlert) SeatCapacityAlerts {
+	return SeatCapacityAlerts{checks: []SeatCapacityCheck{check}, extra: extra}
 }
 
 // RecheckSeatCapacity updates the over-capacity record of the organization

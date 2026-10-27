@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/ee/billing/entitlements"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/ee/billing/polar"
+	"github.com/superplanehq/superplane/ee/billing/seatremoval"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/grpc/organizationref"
@@ -45,6 +46,11 @@ type seatPurchaseOperation struct {
 	// binding is the confirmed preview context. It is nil when the request
 	// does not carry all of it. Such a request can only replay.
 	binding *seatPurchaseBinding
+	// removal is the confirmed seat-removal version. It is nil when the
+	// request does not carry it. A new charge needs it, including the
+	// versioned absence of a removal. A recorded operation can replay
+	// without it.
+	removal *seatremoval.PurchaseBinding
 }
 
 // seatPurchaseBinding is the subscription and the billing period that the
@@ -104,6 +110,15 @@ func previewSeatPurchase(ctx context.Context, orgID string, req *pb.PreviewSeatP
 	if state.seats.Purchasable != nil {
 		response.PurchasableSeats = new(int32(*state.seats.Purchasable))
 	}
+	removal, err := seatremoval.Describe(db, organizationID, now)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "Could not load the seat removal.")
+	}
+	response.CancelsPendingRemoval = removal.Binding.PendingOperationID != ""
+	response.RenewalSeats = int32(state.target)
+	response.SeatChangeVersion = &removal.SeatChangeVersion
+	response.PendingRemovalId = removal.Binding.PendingOperationID
+	response.PendingRemovalRevision = int32(removal.Binding.PendingRevision)
 	return response, nil
 }
 
@@ -140,13 +155,18 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 		return seatPurchaseResponse(ctx, organizationID, stored), nil
 	}
 
-	// A new purchase charges only for the subscription and the period that
-	// the user confirmed. A request without that context, such as one from
-	// a client before the binding, cannot start a charge.
-	if operation.binding == nil {
+	// A new purchase charges only for the subscription, the period, and the
+	// seat-removal version that the user confirmed. A request without that
+	// context, such as one from a client before the binding, cannot start a
+	// charge.
+	if operation.binding == nil || operation.removal == nil {
 		return nil, grpcerrors.InvalidArgument(nil, messageSeatPurchaseNeedsPreview)
 	}
+	return purchaseLocked(ctx, organizationID, req, operation, userID, clock)
+}
 
+func purchaseLocked(ctx context.Context, organizationID uuid.UUID, req *pb.PurchaseSeatsRequest, operation seatPurchaseOperation, userID string, clock seatPurchaseClock) (*pb.PurchaseSeatsResponse, error) {
+	db := database.DB(ctx)
 	// Settle an unfinished purchase before the local checks. Only a snapshot
 	// that proves the success of that purchase can settle it.
 	reconcileSeatPurchase(ctx, db, organizationID)
@@ -168,6 +188,18 @@ func purchaseSeats(ctx context.Context, orgID string, req *pb.PurchaseSeatsReque
 
 	// The refresh can apply a renewal. Such a purchase was previewed for
 	// another period, and its absolute seat count can be wrong.
+	// The seat-quantity lock covers registration and the charge so a removal
+	// cannot change the confirmed version while Polar is called.
+	var response *pb.PurchaseSeatsResponse
+	err = billingmodels.WithSeatQuantityLock(db.WithContext(ctx), organizationID, func(*gorm.DB) error {
+		var lockErr error
+		response, lockErr = purchaseCharged(ctx, organizationID, req, operation, userID, state, clock)
+		return lockErr
+	})
+	return response, err
+}
+
+func purchaseCharged(ctx context.Context, organizationID uuid.UUID, req *pb.PurchaseSeatsRequest, operation seatPurchaseOperation, userID string, state *seatPurchaseState, clock seatPurchaseClock) (*pb.PurchaseSeatsResponse, error) {
 	started, err := beginSeatPurchase(ctx, organizationID, req, operation, userID, state, clock)
 	if err != nil {
 		return nil, err
@@ -238,7 +270,31 @@ func newSeatPurchaseOperation(req *pb.PurchaseSeatsRequest) (seatPurchaseOperati
 	if binding := operation.binding; binding != nil {
 		operation.fingerprints.Bound = billingmodels.SeatPurchaseBoundFingerprint(additionalSeats, expectedPurchasedSeats, binding.subscriptionID, binding.periodStart, binding.periodEnd)
 	}
+	operation.removal = removalBindingFromRequest(req)
+	if operation.binding != nil && operation.removal != nil {
+		operation.fingerprints.Removal = billingmodels.SeatPurchaseRemovalFingerprint(
+			additionalSeats, expectedPurchasedSeats, operation.binding.subscriptionID, operation.binding.periodStart, operation.binding.periodEnd,
+			operation.removal.Version, operation.removal.PendingID, operation.removal.PendingRevision,
+		)
+	}
 	return operation, nil
+}
+
+func removalBindingFromRequest(req *pb.PurchaseSeatsRequest) *seatremoval.PurchaseBinding {
+	if req.ConfirmedSeatChangeVersion == nil {
+		return nil
+	}
+	binding := &seatremoval.PurchaseBinding{
+		Version:   req.GetConfirmedSeatChangeVersion(),
+		PendingID: req.GetConfirmedPendingRemovalId(),
+	}
+	if binding.PendingID != "" && req.ConfirmedPendingRemovalRevision == nil {
+		return nil
+	}
+	if req.ConfirmedPendingRemovalRevision != nil {
+		binding.PendingRevision = int(req.GetConfirmedPendingRemovalRevision())
+	}
+	return binding
 }
 
 // seatPurchaseBindingFromRequest returns the confirmed preview context, or
@@ -424,6 +480,14 @@ func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSea
 		if int(req.GetExpectedPurchasedSeats()) != state.purchased {
 			return grpcerrors.Conflict(nil, messageSeatCountChanged)
 		}
+		removal, err := seatremoval.BindPurchase(tx, orgID, *operation.removal)
+		if err != nil {
+			var status *seatremoval.StatusError
+			if errors.As(err, &status) {
+				return grpcerrors.Conflict(err, status.Message)
+			}
+			return grpcerrors.Internal(err, "Could not buy seats.")
+		}
 		inFlight, err := billingmodels.FindInFlightSeatPurchase(tx, orgID)
 		if err != nil {
 			return grpcerrors.Internal(err, "Could not buy seats.")
@@ -432,14 +496,23 @@ func beginSeatPurchase(ctx context.Context, orgID uuid.UUID, req *pb.PurchaseSea
 			return grpcerrors.Conflict(nil, messageSeatPurchaseInFlight)
 		}
 
+		fingerprint := operation.fingerprints.Removal
+		if fingerprint == "" {
+			fingerprint = operation.fingerprints.Bound
+		}
 		purchase := billingmodels.NewSeatPurchase(orgID, parseUserID(userID), state.subscriptionID, state.purchased, state.target, &billingmodels.SeatPurchaseOperation{
 			Key:         operation.key,
-			Fingerprint: operation.fingerprints.Bound,
+			Fingerprint: fingerprint,
 			PeriodStart: state.periodStart,
 			PeriodEnd:   state.periodEnd,
 		})
 		if err := purchase.Create(tx); err != nil {
 			return grpcerrors.Internal(err, "Could not buy seats.")
+		}
+		if removal != nil {
+			if err := seatremoval.LinkPurchaseSupersession(tx, purchase, removal); err != nil {
+				return grpcerrors.Internal(err, "Could not buy seats.")
+			}
 		}
 		started = &seatPurchaseStart{purchase: purchase, state: state}
 		return nil
@@ -490,14 +563,20 @@ func recordAppliedSeatPurchase(ctx context.Context, purchase *billingmodels.Seat
 			return err
 		}
 		if purchase.SucceededBy(evidence) {
-			return purchase.UpdateStatus(tx, billingmodels.SeatPurchaseStatusSucceeded, "")
+			if err := purchase.UpdateStatus(tx, billingmodels.SeatPurchaseStatusSucceeded, ""); err != nil {
+				return err
+			}
+			return seatremoval.FinishPurchase(tx, purchase, billingmodels.SeatPurchaseStatusSucceeded)
 		}
 		log.WithFields(log.Fields{
 			"organization_id":       purchase.OrganizationID.String(),
 			"seat_purchase_id":      purchase.ID.String(),
 			"polar_subscription_id": snapshot.ID,
 		}).Warn("the seat purchase response does not describe the purchase")
-		return purchase.UpdateStatus(tx, billingmodels.SeatPurchaseStatusUnknown, "")
+		if err := purchase.UpdateStatus(tx, billingmodels.SeatPurchaseStatusUnknown, ""); err != nil {
+			return err
+		}
+		return seatremoval.FinishPurchase(tx, purchase, billingmodels.SeatPurchaseStatusUnknown)
 	})
 	if err == nil {
 		alerts.Emit()
@@ -512,7 +591,10 @@ func recordSeatPurchaseStatus(ctx context.Context, purchase *billingmodels.SeatP
 		if _, err := models.LockOrganization(tx, purchase.OrganizationID); err != nil {
 			return err
 		}
-		return purchase.UpdateStatus(tx, status, errorCode)
+		if err := purchase.UpdateStatus(tx, status, errorCode); err != nil {
+			return err
+		}
+		return seatremoval.FinishPurchase(tx, purchase, status)
 	})
 	if err != nil {
 		return grpcerrors.Internal(err, "Could not record the seat purchase.")

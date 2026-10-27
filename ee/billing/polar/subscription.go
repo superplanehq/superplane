@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/ee/billing/seatquantity"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -79,7 +80,7 @@ func ApplyOrganizationSubscription(ctx context.Context, db *gorm.DB, orgID uuid.
 // transaction committed.
 func StageOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, data SubscriptionData) (SeatCapacityAlerts, error) {
 	if !inTransaction(tx) {
-		return nil, errors.New("stage the Polar subscription inside a transaction")
+		return SeatCapacityAlerts{}, errors.New("stage the Polar subscription inside a transaction")
 	}
 	return applySubscription(ctx, tx, withOrganizationCustomer(orgID, data), true)
 }
@@ -120,7 +121,7 @@ func inTransaction(db *gorm.DB) bool {
 func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, verified bool) (SeatCapacityAlerts, error) {
 	orgID, err := data.OrganizationID()
 	if err != nil {
-		return nil, err
+		return SeatCapacityAlerts{}, err
 	}
 	incoming := subscriptionSnapshot(data)
 	incoming.Verified = verified
@@ -128,7 +129,7 @@ func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, 
 	needsSnapshot := errors.New("Polar subscription snapshot required")
 	for {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return SeatCapacityAlerts{}, err
 		}
 		var alerts SeatCapacityAlerts
 		var readID, readReason string
@@ -199,24 +200,28 @@ func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, 
 			if err != nil {
 				return err
 			}
-			alerts = SeatCapacityAlerts{capacity}
+			removal, err := seatquantity.Observe(inner, orgID, removalSnapshot(appliedData, verified), seatquantity.LogAlert)
+			if err != nil {
+				return err
+			}
+			alerts = seatCapacityAlerts(capacity, removal)
 			return nil
 		})
 		if !errors.Is(err, needsSnapshot) {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				_, lookupErr := models.FindOrganizationByIDInTransaction(db.WithContext(ctx), orgID.String())
 				if errors.Is(lookupErr, gorm.ErrRecordNotFound) {
-					return nil, subscriptionOrganizationNotFound(db.WithContext(ctx), orgID, data)
+					return SeatCapacityAlerts{}, subscriptionOrganizationNotFound(db.WithContext(ctx), orgID, data)
 				}
 				if lookupErr != nil {
-					return nil, lookupErr
+					return SeatCapacityAlerts{}, lookupErr
 				}
 			}
 			if errors.Is(err, billingmodels.ErrInvalidPurchasedSeats) && !errors.Is(err, billingmodels.ErrPolarSubscriptionRefreshFailed) {
-				return nil, permanentApplyError(err.Error())
+				return SeatCapacityAlerts{}, permanentApplyError(err.Error())
 			}
 			if err != nil {
-				return nil, err
+				return SeatCapacityAlerts{}, err
 			}
 			return alerts, nil
 		}
@@ -224,11 +229,11 @@ func applySubscription(ctx context.Context, db *gorm.DB, data SubscriptionData, 
 		// rechecks identity and ordering under the lock after the response.
 		// An outer transaction belongs to the caller and cannot be released here.
 		if inTransaction(db) {
-			return nil, fmt.Errorf("%w: %s Polar subscription %q outside the caller transaction", billingmodels.ErrPolarSubscriptionRefreshFailed, readReason, readID)
+			return SeatCapacityAlerts{}, fmt.Errorf("%w: %s Polar subscription %q outside the caller transaction", billingmodels.ErrPolarSubscriptionRefreshFailed, readReason, readID)
 		}
 		refreshed, err := readOrganizationSubscription(ctx, orgID, readID, readReason)
 		if err != nil {
-			return nil, err
+			return SeatCapacityAlerts{}, err
 		}
 		if readReason == "verify" {
 			verifiedIncoming = refreshed
@@ -553,4 +558,17 @@ func SubscriptionDashboardURL(subscriptionID string) string {
 		host = "https://polar.sh"
 	}
 	return host + "/dashboard/" + url.PathEscape(slug) + "/sales/subscriptions/" + url.PathEscape(subscriptionID)
+}
+
+func removalSnapshot(data SubscriptionData, verified bool) seatquantity.Snapshot {
+	snap := seatquantity.Snapshot{SubscriptionID: data.ID, Seats: data.Seats, Status: data.Status, Verified: verified}
+	snap.PeriodStart = data.CurrentPeriodStart.TimePtr()
+	snap.PeriodEnd = data.CurrentPeriodEnd.TimePtr()
+	snap.ModifiedAt = data.ModifiedAt.TimePtr()
+	if data.PendingUpdate != nil {
+		snap.PendingSeats = data.PendingUpdate.Seats
+		snap.PendingUnrelated = data.PendingUpdate.HasUnrelatedChanges()
+		snap.PendingAppliesAt = data.PendingUpdate.AppliesAt.TimePtr()
+	}
+	return snap
 }

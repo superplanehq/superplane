@@ -33,6 +33,25 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
 
 
+--
+-- Name: seat_quantity_operations_require_actor(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.seat_quantity_operations_require_actor() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.origin NOT IN ('protective', 'legacy_cleanup')
+       AND NEW.actor_user_id IS NULL
+       AND NEW.actor_api_key_id IS NULL THEN
+        RAISE EXCEPTION 'seat quantity operation requires an actor'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -1317,8 +1336,15 @@ CREATE TABLE public.organization_billing_plans (
     over_capacity_since timestamp with time zone,
     renewal_seats_scheduled integer,
     renewal_seats_scheduled_at timestamp with time zone,
+    seat_change_version bigint DEFAULT 0 NOT NULL,
+    seat_admission_limit integer,
+    seat_proved_target integer,
+    seat_quantity_operation_id uuid,
+    seat_bound_period_end timestamp with time zone,
     CONSTRAINT organization_billing_plans_purchased_seats_check CHECK ((purchased_seats >= 0)),
     CONSTRAINT organization_billing_plans_renewal_seats_scheduled_check CHECK ((renewal_seats_scheduled >= 1)),
+    CONSTRAINT organization_billing_plans_seat_admission_limit_check CHECK (((seat_admission_limit IS NULL) OR (seat_admission_limit >= 1))),
+    CONSTRAINT organization_billing_plans_seat_proved_target_check CHECK (((seat_proved_target IS NULL) OR (seat_proved_target >= 1))),
     CONSTRAINT organization_billing_plans_source CHECK ((plan_source = ANY (ARRAY[''::text, 'system'::text, 'polar'::text, 'admin'::text])))
 );
 
@@ -1671,6 +1697,46 @@ CREATE TABLE public.runners (
 CREATE TABLE public.schema_migrations (
     version bigint NOT NULL,
     dirty boolean NOT NULL
+);
+
+
+--
+-- Name: seat_quantity_operations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.seat_quantity_operations (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    actor_user_id uuid,
+    actor_api_key_id uuid,
+    origin text NOT NULL,
+    action text NOT NULL,
+    subscription_id text NOT NULL,
+    period_start timestamp with time zone NOT NULL,
+    period_end timestamp with time zone NOT NULL,
+    source_paid_quantity integer NOT NULL,
+    target_quantity integer NOT NULL,
+    effective_at timestamp with time zone NOT NULL,
+    operation_key text NOT NULL,
+    request_fingerprint text NOT NULL,
+    revision integer NOT NULL,
+    predecessor_id uuid,
+    superseder_id uuid,
+    seat_purchase_id uuid,
+    provider_evidence jsonb,
+    status text NOT NULL,
+    cause text DEFAULT ''::text NOT NULL,
+    seat_change_version bigint NOT NULL,
+    dispatched_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT seat_quantity_operations_action_check CHECK ((action = ANY (ARRAY['schedule'::text, 'change'::text, 'cancel'::text, 'supersede'::text, 'protective_cancel'::text, 'legacy_cleanup'::text]))),
+    CONSTRAINT seat_quantity_operations_fingerprint_check CHECK ((char_length(request_fingerprint) > 0)),
+    CONSTRAINT seat_quantity_operations_key_length CHECK (((char_length(operation_key) >= 1) AND (char_length(operation_key) <= 128))),
+    CONSTRAINT seat_quantity_operations_origin_check CHECK ((origin = ANY (ARRAY['admin'::text, 'purchase'::text, 'protective'::text, 'legacy_cleanup'::text]))),
+    CONSTRAINT seat_quantity_operations_quantities_check CHECK (((source_paid_quantity >= 1) AND (target_quantity >= 1))),
+    CONSTRAINT seat_quantity_operations_revision_check CHECK ((revision >= 1)),
+    CONSTRAINT seat_quantity_operations_status_check CHECK ((status = ANY (ARRAY['submitting'::text, 'unknown'::text, 'scheduled'::text, 'rejected'::text, 'applied'::text, 'canceled'::text, 'superseded'::text, 'repair_required'::text])))
 );
 
 
@@ -3137,6 +3203,14 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: seat_quantity_operations seat_quantity_operations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.seat_quantity_operations
+    ADD CONSTRAINT seat_quantity_operations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: secrets secrets_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4262,6 +4336,13 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 
 
 --
+-- Name: idx_seat_quantity_operations_reconcile; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_seat_quantity_operations_reconcile ON public.seat_quantity_operations USING btree (organization_id) WHERE (status = ANY (ARRAY['submitting'::text, 'unknown'::text, 'scheduled'::text, 'repair_required'::text]));
+
+
+--
 -- Name: idx_sentry_app_install_grants_expires_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4843,6 +4924,27 @@ CREATE UNIQUE INDEX uq_organization_seat_purchases_operation_key ON public.organ
 
 
 --
+-- Name: uq_seat_quantity_operations_inflight; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_seat_quantity_operations_inflight ON public.seat_quantity_operations USING btree (organization_id) WHERE (status = ANY (ARRAY['submitting'::text, 'unknown'::text]));
+
+
+--
+-- Name: uq_seat_quantity_operations_operation_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_seat_quantity_operations_operation_key ON public.seat_quantity_operations USING btree (organization_id, operation_key);
+
+
+--
+-- Name: uq_seat_quantity_operations_scheduled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_seat_quantity_operations_scheduled ON public.seat_quantity_operations USING btree (organization_id) WHERE (status = 'scheduled'::text);
+
+
+--
 -- Name: usage_price_books_one_current; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4938,6 +5040,13 @@ CREATE UNIQUE INDEX workflows_factory_id_name_active_key ON public.workflows USI
 --
 
 CREATE UNIQUE INDEX workflows_organization_id_name_active_key ON public.workflows USING btree (organization_id, name) WHERE ((factory_id IS NULL) AND (deleted_at IS NULL));
+
+
+--
+-- Name: seat_quantity_operations seat_quantity_operations_actor; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER seat_quantity_operations_actor BEFORE INSERT ON public.seat_quantity_operations FOR EACH ROW EXECUTE FUNCTION public.seat_quantity_operations_require_actor();
 
 
 --
@@ -5861,6 +5970,54 @@ ALTER TABLE ONLY public.runners
 
 
 --
+-- Name: seat_quantity_operations seat_quantity_operations_actor_api_key_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.seat_quantity_operations
+    ADD CONSTRAINT seat_quantity_operations_actor_api_key_id_fkey FOREIGN KEY (actor_api_key_id) REFERENCES public.user_api_tokens(id) ON DELETE SET NULL;
+
+
+--
+-- Name: seat_quantity_operations seat_quantity_operations_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.seat_quantity_operations
+    ADD CONSTRAINT seat_quantity_operations_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: seat_quantity_operations seat_quantity_operations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.seat_quantity_operations
+    ADD CONSTRAINT seat_quantity_operations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: seat_quantity_operations seat_quantity_operations_predecessor_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.seat_quantity_operations
+    ADD CONSTRAINT seat_quantity_operations_predecessor_fk FOREIGN KEY (predecessor_id) REFERENCES public.seat_quantity_operations(id);
+
+
+--
+-- Name: seat_quantity_operations seat_quantity_operations_seat_purchase_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.seat_quantity_operations
+    ADD CONSTRAINT seat_quantity_operations_seat_purchase_id_fkey FOREIGN KEY (seat_purchase_id) REFERENCES public.organization_seat_purchases(id) ON DELETE SET NULL;
+
+
+--
+-- Name: seat_quantity_operations seat_quantity_operations_superseder_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.seat_quantity_operations
+    ADD CONSTRAINT seat_quantity_operations_superseder_fk FOREIGN KEY (superseder_id) REFERENCES public.seat_quantity_operations(id);
+
+
+--
 -- Name: usage_price_book_rates usage_price_book_rates_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6316,7 +6473,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261026153606	f
+20261027075155	f
 \.
 
 

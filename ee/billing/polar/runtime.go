@@ -46,6 +46,12 @@ func (*Runtime) ValidateMemberAdmission(tx *gorm.DB, orgID uuid.UUID) error {
 		return grpcerrors.FailedPreconditionWithReason("This organization cannot add members until its payment is updated. Ask an organization admin.", "PAYMENT_PAST_DUE")
 	}
 	if limit := entitlements.JoinLimit(seats); limit != nil && seats.Occupied >= *limit {
+		if seats.AdmissionBlock == entitlements.AdmissionBlockUnverified {
+			return grpcerrors.FailedPreconditionWithReason("SuperPlane is checking the billing period. Ask an organization admin, or try again after the check finishes.", "SEAT_REMOVAL_UNVERIFIED")
+		}
+		if seats.PerSeat && seats.AdmissionLimit != nil && seats.Purchased != nil && *seats.AdmissionLimit < *seats.Purchased {
+			return grpcerrors.FailedPreconditionWithReason("No seat is available. An organization admin scheduled a seat removal. Ask an admin to change it or buy a seat.", "SEAT_REMOVAL_PENDING")
+		}
 		if seats.PerSeat {
 			return grpcerrors.FailedPreconditionWithReason("No seat is available. Ask an organization admin to free or buy a seat.", "NO_SEAT_AVAILABLE")
 		}
@@ -72,8 +78,14 @@ func (*Runtime) ValidateInvitationCapacity(tx *gorm.DB, orgID uuid.UUID, already
 		return grpcerrors.FailedPreconditionWithReason("The last renewal payment failed. Update the payment method before you invite members.", "PAYMENT_PAST_DUE")
 	}
 	if seats.PerSeat {
-		if alreadyPending || *seats.Invitable > 0 {
+		if seatInvitationFits(seats, alreadyPending) {
 			return nil
+		}
+		if seats.AdmissionBlock == entitlements.AdmissionBlockUnverified {
+			return grpcerrors.FailedPreconditionWithReason("SuperPlane is checking the billing period. Ask an organization admin, or try again after the check finishes.", "SEAT_REMOVAL_UNVERIFIED")
+		}
+		if seats.AdmissionLimit != nil && seats.Purchased != nil && *seats.AdmissionLimit < *seats.Purchased {
+			return grpcerrors.FailedPreconditionWithReason("No seat is available. An organization admin scheduled a seat removal. Ask an admin to change it or buy a seat.", "SEAT_REMOVAL_PENDING")
 		}
 		if seats.Purchasable != nil && *seats.Purchasable == 0 {
 			return grpcerrors.FailedPreconditionWithReason("This organization has reached its plan seat maximum.", "PLAN_MAXIMUM_REACHED")
@@ -101,11 +113,28 @@ func (*Runtime) RecheckSeatCapacity(tx *gorm.DB, orgID uuid.UUID, cause string) 
 	if err != nil {
 		return nil, err
 	}
-	return SeatCapacityAlerts{check}, nil
+	return seatCapacityAlerts(check, nil), nil
 }
 
 func (*Runtime) AssertOrganizationPaymentMethod(tx *gorm.DB, orgID uuid.UUID) error {
 	return AssertOrganizationPaymentMethod(tx, orgID)
+}
+
+// seatInvitationFits allows a new invitation when one more reservation fits,
+// and a still-pending resend when its existing reservation already fits.
+func seatInvitationFits(seats *entitlements.SeatUsage, alreadyPending bool) bool {
+	limit := seats.Purchased
+	if seats.AdmissionLimit != nil {
+		limit = seats.AdmissionLimit
+	}
+	if limit == nil {
+		return false
+	}
+	used := seats.Occupied + seats.PendingInvitations
+	if !alreadyPending {
+		used++
+	}
+	return used <= *limit
 }
 
 const (

@@ -948,6 +948,23 @@ message PreviewSeatPurchaseResponse {
   // billing_period_start is the start of the billing period that the
   // preview priced. A purchase sends it back as confirmed_period_start.
   google.protobuf.Timestamp billing_period_start = 12;
+  // cancels_pending_removal is true when a successful purchase replaces a
+  // pending seat removal. The renewal quantity is then renewal_seats.
+  bool cancels_pending_removal = 13;
+  // renewal_seats is the seat count the next renewal keeps after this purchase.
+  // It is the paid seats plus the additional seats, including when a removal
+  // is pending.
+  int32 renewal_seats = 14;
+  // seat_change_version is the removal revision the purchase must confirm.
+  // Zero is a valid version when no removal has been registered. It is
+  // optional so a zero version is still present in the response.
+  optional int64 seat_change_version = 15;
+  // pending_removal_id is empty when no removal is pending. The purchase
+  // confirms that absence together with seat_change_version.
+  string pending_removal_id = 16;
+  // pending_removal_revision is the revision of pending_removal_id.
+  // It is zero when pending_removal_id is empty.
+  int32 pending_removal_revision = 17;
 }
 
 message PurchaseSeatsRequest {
@@ -967,6 +984,18 @@ message PurchaseSeatsRequest {
   string confirmed_subscription_id = 5;
   google.protobuf.Timestamp confirmed_period_start = 6;
   google.protobuf.Timestamp confirmed_period_end = 7;
+  // confirmed_seat_change_version binds a new purchase to the seat-removal
+  // version of the preview. A new operation needs it, including version zero
+  // when no removal is pending. A purchase recorded with this field replays
+  // only when the request repeats the same version and pending identity.
+  // A purchase recorded before this field replays without it.
+  optional int64 confirmed_seat_change_version = 8;
+  // confirmed_pending_removal_id is empty when the preview showed no removal.
+  // Together with the version, that empty id is a versioned absence.
+  string confirmed_pending_removal_id = 9;
+  // confirmed_pending_removal_revision is required when
+  // confirmed_pending_removal_id is set.
+  optional int32 confirmed_pending_removal_revision = 10;
 }
 
 message PurchaseSeatsResponse {

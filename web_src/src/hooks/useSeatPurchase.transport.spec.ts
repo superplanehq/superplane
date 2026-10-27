@@ -120,9 +120,7 @@ describe("seat purchase HTTP recovery", () => {
         additionalSeats: 1,
         expectedPurchasedSeats: 4,
         operationKey: expect.any(String),
-        confirmedSubscriptionId: "sub_team",
-        confirmedPeriodStart: server.periodStart,
-        confirmedPeriodEnd: server.periodEnd,
+        ...server.confirmedContext(),
       },
     ]);
     expect(server.charges).toBe(1);
@@ -376,13 +374,14 @@ describe("seat purchase HTTP recovery", () => {
         subscriptionId: server.subscriptionId,
         periodStart: server.periodStart,
         periodEnd: server.periodEnd,
+        removal: { seatChangeVersion: "0", pendingRemovalId: "", pendingRemovalRevision: 0 },
       };
       const other = { ...otherRequest, ...server.confirmedContext() };
       localStorage.setItem(
         storageKey,
         JSON.stringify([
           {
-            version: 2,
+            version: 3,
             organizationId,
             confirmedAt: new Date().toISOString(),
             ...otherRequest,
@@ -445,7 +444,7 @@ describe("seat purchase HTTP recovery", () => {
         storageKey,
         JSON.stringify([
           {
-            version: 2,
+            version: 3,
             organizationId,
             confirmedAt: new Date().toISOString(),
             ...other,
@@ -453,6 +452,7 @@ describe("seat purchase HTTP recovery", () => {
               subscriptionId: server.subscriptionId,
               periodStart: server.periodStart,
               periodEnd: server.periodEnd,
+              removal: { seatChangeVersion: "0", pendingRemovalId: "", pendingRemovalRevision: 0 },
             },
           },
         ]),

@@ -12,7 +12,8 @@
 
 import type { OrganizationsPreviewSeatPurchaseResponse } from "@/api-client";
 
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
+const PERIOD_STORAGE_VERSION = 2;
 const LEGACY_STORAGE_VERSION = 1;
 const STORAGE_PREFIX = "superplane:seat-purchase-operation:";
 
@@ -21,11 +22,20 @@ export type SeatPurchaseRequest = {
   expectedPurchasedSeats: number;
 };
 
-/** The subscription and the billing period that the confirmed preview showed. */
+/** The seat-removal version that the confirmed preview showed. */
+export type SeatRemovalBinding = {
+  seatChangeVersion: string;
+  pendingRemovalId: string;
+  pendingRemovalRevision: number;
+};
+
+/** The subscription, the billing period, and the seat removal that the confirmed preview showed. */
 export type SeatPurchaseBinding = {
   subscriptionId: string;
   periodStart: string;
   periodEnd: string;
+  /** Absent on a purchase recorded before seat-removal confirmation. */
+  removal?: SeatRemovalBinding;
 };
 
 export type SeatPurchaseOperation = SeatPurchaseRequest & {
@@ -46,9 +56,18 @@ type StoredSeatPurchaseOperation = SeatPurchaseOperation & { version: number };
 export function previewSeatPurchaseBinding(
   preview: OrganizationsPreviewSeatPurchaseResponse,
 ): SeatPurchaseBinding | undefined {
-  const { subscriptionId, billingPeriodStart, periodEnd } = preview;
-  if (!subscriptionId || !billingPeriodStart || !periodEnd) return undefined;
-  return { subscriptionId, periodStart: billingPeriodStart, periodEnd };
+  const { subscriptionId, billingPeriodStart, periodEnd, seatChangeVersion } = preview;
+  if (!subscriptionId || !billingPeriodStart || !periodEnd || typeof seatChangeVersion !== "string") return undefined;
+  return {
+    subscriptionId,
+    periodStart: billingPeriodStart,
+    periodEnd,
+    removal: {
+      seatChangeVersion,
+      pendingRemovalId: preview.pendingRemovalId ?? "",
+      pendingRemovalRevision: preview.pendingRemovalRevision ?? 0,
+    },
+  };
 }
 
 // The operations that this tab confirmed but could not save. Keys that other
@@ -71,6 +90,16 @@ function isBinding(value: unknown): value is SeatPurchaseBinding {
   const record = value as StoredRecord;
   return (
     nonEmptyString(record.subscriptionId) && nonEmptyString(record.periodStart) && nonEmptyString(record.periodEnd)
+  );
+}
+
+function isRemoval(value: unknown): value is SeatRemovalBinding {
+  if (!value || typeof value !== "object") return false;
+  const record = value as StoredRecord;
+  return (
+    typeof record.seatChangeVersion === "string" &&
+    typeof record.pendingRemovalId === "string" &&
+    Number.isSafeInteger(record.pendingRemovalRevision)
   );
 }
 
@@ -101,7 +130,11 @@ function parseOperation(value: unknown, organizationId: string): SeatPurchaseOpe
     expectedPurchasedSeats,
     confirmedAt,
   };
-  if (record.version === STORAGE_VERSION && isBinding(record.binding)) {
+  if (record.version === STORAGE_VERSION && isBinding(record.binding) && isRemoval(record.binding.removal)) {
+    const { subscriptionId, periodStart, periodEnd, removal } = record.binding;
+    return { ...operation, binding: { subscriptionId, periodStart, periodEnd, removal } };
+  }
+  if (record.version === PERIOD_STORAGE_VERSION && isBinding(record.binding)) {
     const { subscriptionId, periodStart, periodEnd } = record.binding;
     return { ...operation, binding: { subscriptionId, periodStart, periodEnd } };
   }
@@ -147,7 +180,11 @@ export function loadSeatPurchaseOperations(organizationId: string): SeatPurchase
  */
 function saveSeatPurchaseOperations(organizationId: string, operations: SeatPurchaseOperation[]) {
   const stored: StoredSeatPurchaseOperation[] = operations.map((operation) => ({
-    version: operation.binding ? STORAGE_VERSION : LEGACY_STORAGE_VERSION,
+    version: operation.binding?.removal
+      ? STORAGE_VERSION
+      : operation.binding
+        ? PERIOD_STORAGE_VERSION
+        : LEGACY_STORAGE_VERSION,
     ...operation,
   }));
   try {
