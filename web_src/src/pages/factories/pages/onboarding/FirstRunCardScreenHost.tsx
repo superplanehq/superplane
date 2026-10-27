@@ -48,6 +48,7 @@ export function FirstRunCardScreenHost({
   return (
     <FirstRunCardScreen
       plans={cardStep.plans}
+      welcomeCreditCents={cardStep.welcomeCreditCents}
       selectedPlanKey={plan?.key}
       onSelectPlan={selectPlan}
       phase={
