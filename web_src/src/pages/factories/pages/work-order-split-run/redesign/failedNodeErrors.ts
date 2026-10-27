@@ -6,6 +6,7 @@ export type FailedNodeError = {
   name: string;
   message: string;
   iconSlug?: string;
+  executionId?: string;
 };
 
 export function failedNodeErrors(lines: SplitRunStreamLine[], runStatus?: SplitRunPhaseStatus): FailedNodeError[] {
@@ -22,5 +23,6 @@ export function failedNodeErrors(lines: SplitRunStreamLine[], runStatus?: SplitR
       name: line.componentName,
       message: line.detail?.trim() || "This node failed.",
       iconSlug: line.iconSlug,
+      executionId: line.executionId,
     }));
 }
