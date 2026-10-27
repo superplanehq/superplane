@@ -1174,6 +1174,40 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-log-scroll")).not.toBeInTheDocument();
   });
 
+  it.each([
+    {
+      result: "RESULT_PR_CLOSED",
+      label: "Closed",
+      status: "closed",
+      noteHeading: "This task is closed",
+      noteText: "The pull request was closed without a merge.",
+    },
+    {
+      result: "RESULT_REJECTED",
+      label: "Rejected",
+      status: "rejected",
+      noteHeading: "This task did not succeed",
+      noteText: "The work is done. The result did not meet the goal.",
+    },
+  ] as const)("shows $label in the summary for a closed task", ({ result, label, status, noteHeading, noteText }) => {
+    const fixture = splitRunFixtureForWorkOrder({
+      ...OPEN_WORK_ORDER,
+      state: "STATE_CLOSED",
+      result,
+      lineDispatches: [],
+    });
+
+    renderPopup({ fixture });
+
+    const summary = screen.getByTestId("redesign-console-summary");
+    expect(within(summary).getByText(label, { exact: true })).toBeInTheDocument();
+    expect(within(summary).queryByText("Pending", { exact: true })).not.toBeInTheDocument();
+    expect(summary.querySelector(`[data-status-mark="${status}"]`)).not.toBeNull();
+    const note = within(summary).getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: noteHeading })).toBeInTheDocument();
+    expect(note).toHaveTextContent(noteText);
+  });
+
   it("shows pull request review guidance beside the pull request list", async () => {
     const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });

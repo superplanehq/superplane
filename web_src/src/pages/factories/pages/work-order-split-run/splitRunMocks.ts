@@ -240,6 +240,8 @@ export interface SplitRunFixture {
   usageByMachineType?: WorkOrderUsageByMachineType[];
   lineName: string;
   currentStepIndex: number;
+  /** Exact task status. Storybook fixtures can omit it. */
+  displayStatus?: WorkOrderDisplayStatus;
   lineStatus: SplitRunPhaseStatus;
   currentPhaseId: SplitRunPhaseId;
   /** When set, the popup opens this phase even if it already passed. */
@@ -524,6 +526,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       visibleDispatchForLine(order, options?.lineId)?.line?.name ||
       SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
+    displayStatus,
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: activeAutomationId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
     openPhaseId: activeAutomationId,

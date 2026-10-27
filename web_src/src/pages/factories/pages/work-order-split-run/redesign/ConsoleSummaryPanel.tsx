@@ -21,6 +21,7 @@ import { OrgUserReference, EmptyOwnerMark } from "../../../OrgUserReference";
 import { OwnerAssignTrigger } from "../../../WorkOrderAssigneesPopover";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
+import { WorkOrderStatusIcon } from "../../../workOrders/WorkOrderStatusIcon";
 import { OwnerSpendValue } from "../../work-order-popup-redesign/popupShared";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
 import { ConsoleCheckRows } from "./consoleCheckRows";
@@ -84,7 +85,11 @@ export function ConsoleSummaryPanel({
       <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
         <FrameHeader>
           <FrameTitle className="flex items-center gap-2">
-            <StaticStatusGlyph status={outcome.status} />
+            {outcome.displayStatus ? (
+              <WorkOrderStatusIcon status={outcome.displayStatus} aria-hidden />
+            ) : (
+              <StaticStatusGlyph status={outcome.status} />
+            )}
             {outcome.statusLabel}
           </FrameTitle>
           {panel.showsStrip ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
