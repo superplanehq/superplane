@@ -465,7 +465,14 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 
 	if wantsFactoryOnboarding(ctx.Configuration) && !host.IsDotCom() {
 		mapper := NewCapabilityMapper()
-		names := mapper.NamesForPermissions(PermissionIssues, PermissionContents, PermissionPullRequests, PermissionMetadata)
+		names := mapper.NamesForPermissions(
+			PermissionIssues,
+			PermissionContents,
+			PermissionPullRequests,
+			PermissionMetadata,
+			PermissionChecks,
+			PermissionCommitStatuses,
+		)
 		if ctx.Capabilities != nil {
 			ctx.Capabilities.Unavailable(mapper.AllNames()...)
 			ctx.Capabilities.Available(mapper.ForOwnerType(ownerType)...)

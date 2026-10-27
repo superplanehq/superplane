@@ -169,7 +169,6 @@ export async function bindGitHubEnterpriseOnboarding(args: {
   rememberPreferredInstance: (integrationName: string, integrationId: string) => void;
   refetchConnections: () => Promise<unknown>;
   setSelections: (update: (current: IntegrationSelections) => IntegrationSelections) => void;
-  updateOnboarding: UpdateOnboarding;
   selectVcsHost: (host: VcsHostId) => void;
 }): Promise<void> {
   const id = args.integrationId.trim();
@@ -181,9 +180,6 @@ export async function bindGitHubEnterpriseOnboarding(args: {
   const installationName = await describeInstallationName(args.organizationId, id);
   args.setSelections((current) => githubEnterpriseSelections(current, id, installationName));
   writeOnboardingGithubEnterprise(args.factoryId, true, args.host, id);
-  await args.updateOnboarding({
-    vcsIntegrationId: id,
-  });
   args.selectVcsHost("github");
 }
 
@@ -222,7 +218,6 @@ export function githubEnterpriseOnboardingActions(args: {
         rememberPreferredInstance: args.rememberPreferredInstance,
         refetchConnections: args.refetchConnections,
         setSelections: args.setSelections,
-        updateOnboarding: args.updateOnboarding,
         selectVcsHost: args.selectVcsHost,
       }),
   };

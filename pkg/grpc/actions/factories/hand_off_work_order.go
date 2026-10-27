@@ -31,7 +31,8 @@ const (
 	lineImplementationTemplateID = "line-implementation"
 	prClosureTemplateID          = "pr-closure"
 
-	handOffPullRequestURLInvalid = "pull_request_url must be a GitHub or Bitbucket pull request URL"
+	handOffPullRequestURLInvalid   = "pull_request_url must be a GitHub or Bitbucket pull request URL"
+	handOffPullRequestHostMismatch = "The pull request URL is not on this workspace GitHub host."
 )
 
 var bitbucketHandOffPullRequestURLPattern = regexp.MustCompile(
@@ -54,6 +55,7 @@ type parsedHandOffPullRequestURL struct {
 	Provider   string
 	Repository string
 	Number     int
+	Host       githubcommon.Host
 }
 
 type HandOffWorkOrderRequest struct {
@@ -393,6 +395,13 @@ func loadHandOffPullRequest(
 	if parsed.Provider == models.FactoryPullRequestProviderBitbucket {
 		return loadBitbucketHandOffPullRequest(db, deps, factory, rawURL, parsed)
 	}
+	workspaceHost, err := githubcommon.HostFromFactoryOnboarding(db, factory.OrganizationID, factory.OnboardingConfigValue())
+	if err != nil {
+		return nil, err
+	}
+	if !workspaceHost.IsWebHostname(parsed.Host.WebHostname()) {
+		return nil, invalidArgument(handOffPullRequestHostMismatch)
+	}
 	return loadGitHubHandOffPullRequest(ctx, db, deps, factory, rawURL, parsed)
 }
 
@@ -626,11 +635,12 @@ func joinStageNames(stages []handOffStage) string {
 }
 
 func parseHandOffPullRequestURL(rawURL string) (parsedHandOffPullRequestURL, bool) {
-	if repository, number, ok := parseGitHubPullRequestURL(rawURL); ok {
+	if host, repository, number, ok := parseGitHubPullRequestURL(rawURL); ok {
 		return parsedHandOffPullRequestURL{
 			Provider:   models.FactoryPullRequestProviderGitHub,
 			Repository: repository,
 			Number:     number,
+			Host:       host,
 		}, true
 	}
 	return parseBitbucketPullRequestURL(rawURL)
@@ -652,22 +662,26 @@ func parseBitbucketPullRequestURL(rawURL string) (parsedHandOffPullRequestURL, b
 	}, true
 }
 
-func parseGitHubPullRequestURL(rawURL string) (repository string, number int, ok bool) {
+func parseGitHubPullRequestURL(rawURL string) (host githubcommon.Host, repository string, number int, ok bool) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || !githubcommon.IsKnownGitHubWebHostname(parsed.Hostname()) {
-		return "", 0, false
+		return githubcommon.Host{}, "", 0, false
+	}
+	host, err = githubcommon.ParseHost(parsed.Hostname())
+	if err != nil {
+		return githubcommon.Host{}, "", 0, false
 	}
 
 	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
 	if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[2] != "pull" {
-		return "", 0, false
+		return githubcommon.Host{}, "", 0, false
 	}
 
 	number, err = strconv.Atoi(parts[3])
 	if err != nil || number <= 0 {
-		return "", 0, false
+		return githubcommon.Host{}, "", 0, false
 	}
-	return parts[0] + "/" + parts[1], number, true
+	return host, parts[0] + "/" + parts[1], number, true
 }
 
 func latestTrackedPullRequest(tx *gorm.DB, orderID uuid.UUID) (*models.FactoryPullRequest, error) {

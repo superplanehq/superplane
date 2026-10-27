@@ -463,7 +463,7 @@ func (s *gitHubIntakeItemSource) AvailabilityScope() string {
 }
 
 func (s *gitHubIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool) {
-	repository, number, ok := parseGitHubIssueURL(rawURL)
+	_, repository, number, ok := parseGitHubIssueURL(rawURL)
 	if !ok || !strings.EqualFold(repository, s.repository) {
 		return "", false
 	}
@@ -1000,22 +1000,26 @@ func gitHubIssueItem(issue *github.Issue) IntakeItem {
 	}
 }
 
-func parseGitHubIssueURL(rawURL string) (repository string, number int, ok bool) {
+func parseGitHubIssueURL(rawURL string) (host common.Host, repository string, number int, ok bool) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || !common.IsKnownGitHubWebHostname(parsed.Hostname()) {
-		return "", 0, false
+		return common.Host{}, "", 0, false
+	}
+	host, err = common.ParseHost(parsed.Hostname())
+	if err != nil {
+		return common.Host{}, "", 0, false
 	}
 
 	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
 	if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] != "issues" {
-		return "", 0, false
+		return common.Host{}, "", 0, false
 	}
 
 	number, err = strconv.Atoi(parts[3])
 	if err != nil || number <= 0 {
-		return "", 0, false
+		return common.Host{}, "", 0, false
 	}
-	return parts[0] + "/" + parts[1], number, true
+	return host, parts[0] + "/" + parts[1], number, true
 }
 
 func parseProductiveTaskURL(rawURL string) (organizationID string, taskID string, ok bool) {

@@ -371,6 +371,8 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 		assert.Equal(t, SetupStepCreateApp, next.Name)
 		assert.Contains(t, capCtx.RequestedCapabilties, "github.getIssue")
 		assert.Contains(t, capCtx.RequestedCapabilties, "github.createPullRequest")
+		assert.Contains(t, capCtx.RequestedCapabilties, "github.listCheckRunsForRef")
+		assert.Contains(t, capCtx.RequestedCapabilties, "github.getCombinedCommitStatus")
 		require.NotNil(t, next.RedirectPrompt)
 		assert.Equal(t, "https://acme.ghe.com/organizations/acme/settings/apps/new", next.RedirectPrompt.URL)
 	})

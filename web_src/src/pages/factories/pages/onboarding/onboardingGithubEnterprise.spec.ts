@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import {
   bindGitHubEnterpriseOnboarding,
   githubOnboardingIntegrationId,
+  persistGitHubEnterpriseRepository,
   readOnboardingGithubEnterprise,
   resolvedOnboardingGithubEnterprise,
   writeOnboardingGithubEnterprise,
@@ -108,11 +109,10 @@ describe("bindGitHubEnterpriseOnboarding", () => {
     sessionStorage.clear();
   });
 
-  it("stores the integration and marks GitHub as the workspace host", async () => {
+  it("remembers the integration without locking the workspace provider", async () => {
     const rememberPreferredInstance = vi.fn();
     const refetchConnections = vi.fn().mockResolvedValue(undefined);
     const setSelections = vi.fn((update) => update({}));
-    const updateOnboarding = vi.fn().mockResolvedValue(undefined);
     const selectVcsHost = vi.fn();
 
     await bindGitHubEnterpriseOnboarding({
@@ -123,17 +123,39 @@ describe("bindGitHubEnterpriseOnboarding", () => {
       rememberPreferredInstance,
       refetchConnections,
       setSelections,
-      updateOnboarding,
       selectVcsHost,
     });
 
     expect(rememberPreferredInstance).toHaveBeenCalledWith("github", "int-ghe");
-    expect(updateOnboarding).toHaveBeenCalledWith({ vcsIntegrationId: "int-ghe" });
     expect(selectVcsHost).toHaveBeenCalledWith("github");
     expect(readOnboardingGithubEnterprise("factory-1")).toEqual({
       enabled: true,
       host: "acme.ghe.com",
       integrationId: "int-ghe",
     });
+  });
+});
+
+describe("persistGitHubEnterpriseRepository", () => {
+  it("saves the workspace GitHub binding when a repository is chosen", async () => {
+    const updateOnboarding = vi.fn().mockResolvedValue(undefined);
+    const selectVcsHost = vi.fn();
+    const selectRepo = vi.fn();
+
+    await persistGitHubEnterpriseRepository({
+      fullName: "acme/app",
+      githubIntegrationId: "int-ghe",
+      updateOnboarding,
+      selectVcsHost,
+      selectRepo,
+    });
+
+    expect(updateOnboarding).toHaveBeenCalledWith({
+      vcsIntegrationId: "int-ghe",
+      appRepository: "acme/app",
+      backlogRepository: "acme/app",
+    });
+    expect(selectVcsHost).toHaveBeenCalledWith("github");
+    expect(selectRepo).toHaveBeenCalledWith("acme/app");
   });
 });
