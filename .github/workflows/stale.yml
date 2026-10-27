@@ -20,14 +20,14 @@ jobs:
           days-before-pr-close: 16
           stale-pr-label: stale
           stale-pr-message: >
-            Thanks for the contribution. This pull request has had no activity
-            for 14 days, so I am marking it as stale.
+            Thanks for sending this. It has been quiet for a couple of weeks,
+            so I am marking it stale for now.
 
-            If you still want to work on it, leave a comment and we can pick it
-            up. If there is no further activity, we will close it at 30 days.
+            If you still want to work on it, leave a comment and we will pick
+            it up. Otherwise we will close it in another two weeks.
           close-pr-message: >
-            I am closing this pull request because it has been inactive.
+            I am going to close this one for now since it has been quiet.
 
-            Thank you for the contribution. If you would like to continue,
-            please talk with us first, then open a new pull request. See the
-            contributing guide.
+            Thank you for sending it. If you want to pick it up later, talk
+            with us first and open a new pull request. Happy to help you land
+            it.
