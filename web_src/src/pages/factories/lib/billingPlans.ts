@@ -137,3 +137,7 @@ export function checkoutSeatBounds(
   const coveredInvitations = Math.min(invitations, Math.max(defaultSeats - members, 0));
   return { minimum, defaultSeats, coveredInvitations, invitationsWithoutSeat: invitations - coveredInvitations };
 }
+
+export function billingPlanParallelism(limit?: number): string {
+  return limit == null ? "Unlimited tasks at once" : `Up to ${limit} ${limit === 1 ? "task" : "tasks"} at once`;
+}
