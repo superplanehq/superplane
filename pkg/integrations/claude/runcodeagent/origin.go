@@ -16,6 +16,14 @@ type IssueRef struct {
 	// Repository is the "owner/repo" the issue lives in.
 	Repository string
 	Number     int
+	host       githubcommon.Host
+}
+
+func (r IssueRef) Host() githubcommon.Host {
+	if r.host.Kind == "" && r.host.Hostname == "" {
+		return githubcommon.DotCom()
+	}
+	return r.host
 }
 
 // parseGitHubIssueOrigin reads owner/repo and issue number from a GitHub
@@ -36,7 +44,12 @@ func parseGitHubIssueOrigin(rawURL string) (ref IssueRef, ok bool) {
 		return IssueRef{}, false
 	}
 
-	return IssueRef{Repository: parts[0] + "/" + parts[1], Number: number}, true
+	host, err := githubcommon.ParseHost(parsed.Hostname())
+	if err != nil {
+		return IssueRef{}, false
+	}
+
+	return IssueRef{Repository: parts[0] + "/" + parts[1], Number: number, host: host}, true
 }
 
 // resolveResolvesIssue reports the GitHub issue the current work order was
@@ -90,7 +103,10 @@ func repositorySlug(repository string) string {
 // "This resolves ..." backlink instruction: "#N" when the issue lives in the
 // same repository as the pull request being opened, otherwise
 // "owner/repo#N" so GitHub can still resolve the cross-repository reference.
-func issueBacklinkReference(issue IssueRef, targetRepository string) string {
+func issueBacklinkReference(issue IssueRef, targetRepository string, targetHost githubcommon.Host) string {
+	if !issue.Host().IsWebHostname(targetHost.WebHostname()) {
+		return ""
+	}
 	if slug := repositorySlug(targetRepository); slug != "" && strings.EqualFold(slug, issue.Repository) {
 		return fmt.Sprintf("#%d", issue.Number)
 	}

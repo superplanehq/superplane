@@ -93,7 +93,8 @@ func (r PackageRef) Origin() models.WorkOrderOrigin {
 // Matches reports whether both refs point at the same package. Repository
 // names are case-insensitive on GitHub.
 func (r PackageRef) Matches(other PackageRef) bool {
-	return strings.EqualFold(r.Repository, other.Repository) &&
+	return r.Host().IsWebHostname(other.Host().WebHostname()) &&
+		strings.EqualFold(r.Repository, other.Repository) &&
 		strings.EqualFold(r.Ecosystem, other.Ecosystem) &&
 		r.Name == other.Name
 }

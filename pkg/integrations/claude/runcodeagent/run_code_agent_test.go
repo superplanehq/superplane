@@ -253,6 +253,19 @@ func Test__RunCodeAgent__buildPrompt__resolvesIssue(t *testing.T) {
 		assert.Contains(t, got, `Include "This resolves other-owner/other-repo#12" in the pull request description`)
 	})
 
+	t.Run("enterprise issue origin on a public GitHub repository has no backlink", func(t *testing.T) {
+		host, err := githubcommon.ParseHost("acme.ghe.com")
+		require.NoError(t, err)
+		spec := Spec{
+			SourceMode:    "repository",
+			Repository:    "owner/repo",
+			Task:          "fix the bug",
+			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12, host: host},
+		}
+		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
+		assert.NotContains(t, got, "This resolves")
+	})
+
 	t.Run("no origin: no backlink instruction", func(t *testing.T) {
 		spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
 		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)

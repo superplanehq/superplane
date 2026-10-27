@@ -39,7 +39,9 @@ func buildRepositoryPrompt(spec Spec, branch string, attr commitAttribution, sch
 		}
 		fmt.Fprintf(&b, "5. Open a pull request from %s into %s (use the GitHub API with $GITHUB_TOKEN, or the gh CLI).\n", branch, target)
 		if ref := spec.ResolvesIssue; ref != nil {
-			fmt.Fprintf(&b, "   Include \"This resolves %s\" in the pull request description so GitHub closes the issue when the PR merges.\n", issueBacklinkReference(*ref, spec.Repository))
+			if backlink := issueBacklinkReference(*ref, spec.Repository, githubHostFromSpec(spec)); backlink != "" {
+				fmt.Fprintf(&b, "   Include \"This resolves %s\" in the pull request description so GitHub closes the issue when the PR merges.\n", backlink)
+			}
 		}
 	}
 	writeFinalMarker(&b, prEnabled(spec), schema)

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
   bindGitHubEnterpriseOnboarding,
+  githubEnterpriseOnboardingActions,
   githubOnboardingIntegrationId,
   persistGitHubEnterpriseRepository,
   readOnboardingGithubEnterprise,
@@ -76,21 +77,27 @@ describe("resolvedOnboardingGithubEnterprise", () => {
 });
 
 describe("githubOnboardingIntegrationId", () => {
-  it("prefers the ready selection, then onboarding, then the remembered id", () => {
+  it("prefers the session Enterprise integration over a leftover public selection", () => {
     expect(
       githubOnboardingIntegrationId({
         selectionId: "int-selected",
         vcsIntegrationId: "int-onboarding",
         rememberedIntegrationId: "int-session",
       }),
-    ).toBe("int-selected");
+    ).toBe("int-session");
     expect(
       githubOnboardingIntegrationId({
         vcsIntegrationId: "int-onboarding",
         rememberedIntegrationId: "int-session",
       }),
-    ).toBe("int-onboarding");
-    expect(githubOnboardingIntegrationId({ rememberedIntegrationId: "int-session" })).toBe("int-session");
+    ).toBe("int-session");
+    expect(
+      githubOnboardingIntegrationId({
+        selectionId: "int-selected",
+        vcsIntegrationId: "int-onboarding",
+      }),
+    ).toBe("int-selected");
+    expect(githubOnboardingIntegrationId({ vcsIntegrationId: "int-onboarding" })).toBe("int-onboarding");
   });
 
   it("ignores a Bitbucket onboarding integration", () => {
@@ -133,6 +140,46 @@ describe("bindGitHubEnterpriseOnboarding", () => {
       host: "acme.ghe.com",
       integrationId: "int-ghe",
     });
+  });
+});
+
+describe("githubEnterpriseOnboardingActions", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("saves the repository against the session Enterprise integration", async () => {
+    writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
+    const updateOnboarding = vi.fn().mockResolvedValue(undefined);
+    const selectVcsHost = vi.fn();
+    const selectRepo = vi.fn();
+    const runSave = vi.fn(async (_setSaving: (saving: boolean) => void, action: () => Promise<unknown>) => {
+      await action();
+      return true;
+    });
+
+    const actions = githubEnterpriseOnboardingActions({
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      githubIntegrationId: "int-github-com",
+      setSaving: vi.fn(),
+      updateOnboarding,
+      rememberPreferredInstance: vi.fn(),
+      refetchConnections: vi.fn().mockResolvedValue(undefined),
+      setSelections: vi.fn(),
+      selectVcsHost,
+      selectRepo,
+      runSave,
+    });
+
+    await actions.selectGitHubEnterpriseRepository("acme/app");
+
+    expect(updateOnboarding).toHaveBeenCalledWith({
+      vcsIntegrationId: "int-ghe",
+      appRepository: "acme/app",
+      backlogRepository: "acme/app",
+    });
+    expect(selectRepo).toHaveBeenCalledWith("acme/app");
   });
 });
 

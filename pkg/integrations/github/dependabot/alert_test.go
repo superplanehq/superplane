@@ -112,6 +112,25 @@ func TestPackageRefOriginURL_RoundTrips(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestPackageRefMatches_RequiresSameHost(t *testing.T) {
+	dotcom := PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}
+	ghe := PackageRef{
+		Repository: "acme/payments",
+		Ecosystem:  "npm",
+		Name:       "lodash",
+		host:       common.Host{Kind: common.HostKindGHECom, Hostname: "acme.ghe.com"},
+	}
+
+	assert.True(t, dotcom.Matches(PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}))
+	assert.False(t, dotcom.Matches(ghe))
+	assert.True(t, ghe.Matches(PackageRef{
+		Repository: "acme/payments",
+		Ecosystem:  "npm",
+		Name:       "lodash",
+		host:       ghe.host,
+	}))
+}
+
 func TestPackageRefFromEventData(t *testing.T) {
 	ref, ok := PackageRefFromEventData(map[string]any{
 		"type": AlertPayloadType,

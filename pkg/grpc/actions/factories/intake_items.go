@@ -463,8 +463,15 @@ func (s *gitHubIntakeItemSource) AvailabilityScope() string {
 }
 
 func (s *gitHubIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool) {
-	_, repository, number, ok := parseGitHubIssueURL(rawURL)
-	if !ok || !strings.EqualFold(repository, s.repository) {
+	return gitHubOriginItemID(s.github.Host(), s.repository, rawURL)
+}
+
+func gitHubOriginItemID(host common.Host, repository, rawURL string) (string, bool) {
+	originHost, originRepo, number, ok := parseGitHubIssueURL(rawURL)
+	if !ok || !strings.EqualFold(originRepo, repository) {
+		return "", false
+	}
+	if !host.IsWebHostname(originHost.WebHostname()) {
 		return "", false
 	}
 	return strconv.Itoa(number), true

@@ -131,18 +131,18 @@ export function githubOnboardingIntegrationId(args: {
   vcsIntegrationId?: string;
   rememberedIntegrationId?: string;
 }): string {
+  if (args.vcsProvider === "bitbucket") {
+    return "";
+  }
+  const remembered = args.rememberedIntegrationId?.trim() ?? "";
+  if (remembered) {
+    return remembered;
+  }
   const selected = args.selectionId?.trim() ?? "";
   if (selected) {
     return selected;
   }
-  if (args.vcsProvider === "bitbucket") {
-    return "";
-  }
-  const fromOnboarding = args.vcsIntegrationId?.trim() ?? "";
-  if (fromOnboarding) {
-    return fromOnboarding;
-  }
-  return args.rememberedIntegrationId?.trim() ?? "";
+  return args.vcsIntegrationId?.trim() ?? "";
 }
 
 export async function persistGitHubEnterpriseRepository(args: {
@@ -198,11 +198,13 @@ export function githubEnterpriseOnboardingActions(args: {
 }) {
   return {
     selectGitHubEnterpriseRepository: (fullName: string) => {
-      if (!args.githubIntegrationId || !fullName) return Promise.resolve(false);
+      const githubIntegrationId =
+        readOnboardingGithubEnterprise(args.factoryId).integrationId.trim() || args.githubIntegrationId;
+      if (!githubIntegrationId || !fullName) return Promise.resolve(false);
       return args.runSave(args.setSaving, () =>
         persistGitHubEnterpriseRepository({
           fullName,
-          githubIntegrationId: args.githubIntegrationId,
+          githubIntegrationId,
           updateOnboarding: args.updateOnboarding,
           selectVcsHost: args.selectVcsHost,
           selectRepo: args.selectRepo,
