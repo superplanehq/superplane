@@ -75,12 +75,15 @@ func TestListTasksAppliesMineAndStates(t *testing.T) {
 	tasks, ok := payload["tasks"].([]any)
 	require.True(t, ok)
 	require.Len(t, tasks, 1)
-	row, ok := tasks[0].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, draftMine.ID.String(), row["id"])
-	assert.Equal(t, "draft", row["state"])
-	assert.Equal(t, "", row["source_url"])
-	assert.Contains(t, row, "assignees")
+    row, ok := tasks[0].(map[string]any)
+    require.True(t, ok)
+    assert.Equal(t, draftMine.ID.String(), row["id"])
+    assert.Equal(t, "draft", row["state"])
+    assert.Equal(t, "", row["source_url"])
+    // URL points to the task in the UI
+    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/work-order/" + strconv.FormatInt(draftMine.Number, 10)
+    assert.Equal(t, expectedURL, row["url"])
+    assert.Contains(t, row, "assignees")
 }
 
 func TestGetTaskRejectsOtherWorkspace(t *testing.T) {
@@ -117,10 +120,16 @@ func TestCreateTaskReturnsNewTask(t *testing.T) {
 		"description": "Expose the workspace tools.",
 	})
 	require.NoError(t, err)
-	payload := decodeToolJSON(t, result)
-	assert.Equal(t, "Ship MCP", payload["title"])
-	assert.Equal(t, "draft", payload["state"])
-	require.NotEmpty(t, payload["id"])
+    payload := decodeToolJSON(t, result)
+    assert.Equal(t, "Ship MCP", payload["title"])
+    assert.Equal(t, "draft", payload["state"])
+    require.NotEmpty(t, payload["id"])
+    // URL points to the created task
+    createdID := uuid.MustParse(payload["id"].(string))
+    order, err := factoryModel.FindWorkOrder(db, createdID)
+    require.NoError(t, err)
+    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/work-order/" + strconv.FormatInt(order.Number, 10)
+    assert.Equal(t, expectedURL, payload["url"])
 }
 
 func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {
@@ -146,11 +155,17 @@ func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {
 		"column": "implement",
 	})
 	require.NoError(t, err)
-	payload := decodeToolJSON(t, result)
-	assert.Equal(t, "open", payload["state"])
-	assert.Equal(t, "implement", payload["column"])
-	require.NotEmpty(t, payload["id"])
-	require.NotEmpty(t, payload["key"])
+    payload := decodeToolJSON(t, result)
+    assert.Equal(t, "open", payload["state"])
+    assert.Equal(t, "implement", payload["column"])
+    require.NotEmpty(t, payload["id"])
+    require.NotEmpty(t, payload["key"])
+    // URL present
+    handedID := uuid.MustParse(payload["id"].(string))
+    handed, err := factoryModel.FindWorkOrder(db, handedID)
+    require.NoError(t, err)
+    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/work-order/" + strconv.FormatInt(handed.Number, 10)
+    assert.Equal(t, expectedURL, payload["url"])
 }
 
 func TestCallToolSucceedsWithoutMCPServerFlag(t *testing.T) {
@@ -428,17 +443,18 @@ func TestAssignTaskSetsOneOwner(t *testing.T) {
 		assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, decodeToolJSON(t, result)["assignees"]))
 
 		byID := createDraftTask(t, factoryModel, r.User)
-		result, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
-			"task":     byID.ID.String(),
-			"assignee": strings.ToUpper(owner.ID.String()),
-		})
-		require.NoError(t, err)
-		payload := decodeToolJSON(t, result)
-		assert.Equal(t, byID.ID.String(), payload["id"])
-		assert.Equal(t, factoryModel.WorkOrderKey(byID.Number), payload["key"])
-		assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, payload["assignees"]))
-		assert.Equal(t, []string{owner.ID.String()}, storedAssigneeIDs(t, factoryModel, byID.ID))
-	})
+        result, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+            "task":     byID.ID.String(),
+            "assignee": strings.ToUpper(owner.ID.String()),
+        })
+        require.NoError(t, err)
+        payload := decodeToolJSON(t, result)
+        assert.Equal(t, byID.ID.String(), payload["id"])
+        assert.Equal(t, factoryModel.WorkOrderKey(byID.Number), payload["key"])
+        assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, payload["assignees"]))
+        assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/work-order/"+strconv.FormatInt(byID.Number, 10), payload["url"])
+        assert.Equal(t, []string{owner.ID.String()}, storedAssigneeIDs(t, factoryModel, byID.ID))
+    })
 
 	t.Run("replaces the owner on a draft, an open task, and a closed task", func(t *testing.T) {
 		for _, state := range []string{
@@ -567,16 +583,18 @@ func TestTaskReadsIncludeAssignees(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	got, err := runtime.CallTool(ctx, claims, "get_task", map[string]any{"task": order.ID.String()})
-	require.NoError(t, err)
-	payload := decodeToolJSON(t, got)
-	assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, payload["assignees"]))
-	assert.Equal(t, "Ada Lovelace", payload["assignees"].([]any)[0].(map[string]any)["name"])
+    got, err := runtime.CallTool(ctx, claims, "get_task", map[string]any{"task": order.ID.String()})
+    require.NoError(t, err)
+    payload := decodeToolJSON(t, got)
+    assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, payload["assignees"]))
+    assert.Equal(t, "Ada Lovelace", payload["assignees"].([]any)[0].(map[string]any)["name"])
+    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/work-order/"+strconv.FormatInt(order.Number, 10), payload["url"])
 
-	listed, err := runtime.CallTool(ctx, claims, "list_tasks", map[string]any{})
-	require.NoError(t, err)
-	row := taskRowByID(t, decodeToolJSON(t, listed), order.ID.String())
-	assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, row["assignees"]))
+    listed, err := runtime.CallTool(ctx, claims, "list_tasks", map[string]any{})
+    require.NoError(t, err)
+    row := taskRowByID(t, decodeToolJSON(t, listed), order.ID.String())
+    assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, row["assignees"]))
+    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/work-order/"+strconv.FormatInt(order.Number, 10), row["url"])
 
 	_, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
 		"task":     order.ID.String(),
@@ -584,14 +602,15 @@ func TestTaskReadsIncludeAssignees(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	got, err = runtime.CallTool(ctx, claims, "get_task", map[string]any{"task": order.ID.String()})
-	require.NoError(t, err)
-	assert.Empty(t, assigneeIDs(t, decodeToolJSON(t, got)["assignees"]))
+    got, err = runtime.CallTool(ctx, claims, "get_task", map[string]any{"task": order.ID.String()})
+    require.NoError(t, err)
+    assert.Empty(t, assigneeIDs(t, decodeToolJSON(t, got)["assignees"]))
 
-	listed, err = runtime.CallTool(ctx, claims, "list_tasks", map[string]any{})
-	require.NoError(t, err)
-	row = taskRowByID(t, decodeToolJSON(t, listed), order.ID.String())
-	assert.Empty(t, assigneeIDs(t, row["assignees"]))
+    listed, err = runtime.CallTool(ctx, claims, "list_tasks", map[string]any{})
+    require.NoError(t, err)
+    row = taskRowByID(t, decodeToolJSON(t, listed), order.ID.String())
+    assert.Empty(t, assigneeIDs(t, row["assignees"]))
+    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+factoryModel.RouteSegment()+"/work-order/"+strconv.FormatInt(order.Number, 10), row["url"])
 }
 
 func TestListMembersReturnsHumanMembers(t *testing.T) {
@@ -860,18 +879,48 @@ func TestListWorkspacesReturnsGrantedWorkspaces(t *testing.T) {
 	result, err := runtime.CallTool(ctx, claims, "list_workspaces", nil)
 	require.NoError(t, err)
 	payload := decodeToolJSON(t, result)
-	rows, ok := payload["workspaces"].([]any)
-	require.True(t, ok)
-	require.Len(t, rows, 2)
-	names := map[string]string{}
-	for _, row := range rows {
-		item, ok := row.(map[string]any)
-		require.True(t, ok)
-		names[item["id"].(string)] = item["name"].(string)
-	}
-	assert.Equal(t, "Alpha", names[first.ID.String()])
-	assert.Equal(t, "Beta", names[second.ID.String()])
-	assert.NotContains(t, names, "Hidden")
+    rows, ok := payload["workspaces"].([]any)
+    require.True(t, ok)
+    require.Len(t, rows, 2)
+    names := map[string]string{}
+    slugs := map[string]string{}
+    urls := map[string]string{}
+    for _, row := range rows {
+        item, ok := row.(map[string]any)
+        require.True(t, ok)
+        names[item["id"].(string)] = item["name"].(string)
+        slugs[item["id"].(string)] = item["slug"].(string)
+        urls[item["id"].(string)] = item["url"].(string)
+    }
+    assert.Equal(t, "Alpha", names[first.ID.String()])
+    assert.Equal(t, "Beta", names[second.ID.String()])
+    assert.NotContains(t, names, "Hidden")
+    assert.Equal(t, first.RouteSegment(), slugs[first.ID.String()])
+    assert.Equal(t, second.RouteSegment(), slugs[second.ID.String()])
+    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+first.RouteSegment(), urls[first.ID.String()])
+    assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/workspaces/"+second.RouteSegment(), urls[second.ID.String()])
+}
+
+func TestGetTaskReportIncludesTaskURL(t *testing.T) {
+    r := support.Setup(t)
+    enableFactories(t, r.Organization.ID)
+    ctx := t.Context()
+    db := database.DB(ctx)
+
+    factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Report", "", "RPT")
+    require.NoError(t, err)
+    order := createDraftTask(t, factoryModel, r.User)
+
+    runtime := &Runtime{Auth: r.AuthService}
+    result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "get_task_report", map[string]any{
+        "task": order.ID.String(),
+    })
+    require.NoError(t, err)
+    payload := decodeToolJSON(t, result)
+    taskDoc, ok := payload["task"].(map[string]any)
+    require.True(t, ok)
+    expectedURL := "http://localhost:8000/" + r.Organization.ID.String() + "/workspaces/" + factoryModel.RouteSegment() + "/work-order/" + strconv.FormatInt(order.Number, 10)
+    assert.Equal(t, expectedURL, taskDoc["url"])
 }
 
 func TestWorkspaceArgumentSelectsGrantedWorkspace(t *testing.T) {
