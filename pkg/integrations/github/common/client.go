@@ -426,7 +426,18 @@ func (c *Client) CreateWorkflowDispatchEvent(ctx context.Context, repository str
 
 func (c *Client) GetRepositoryPermissionLevel(ctx context.Context, repository string, username string) (*github.RepositoryPermissionLevel, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
-	return c.underlying.Repositories.GetPermissionLevel(ctx, owner, name, username)
+	permission, response, err := c.underlying.Repositories.GetPermissionLevel(ctx, owner, name, username)
+	var apiError *github.ErrorResponse
+	if IsNotFoundError(err) && errors.As(err, &apiError) && apiError.Message == username+" is not a user" {
+		// Missing authors cannot have repository access. Keep other 404s as
+		// errors because they can indicate an inaccessible repository.
+		return &github.RepositoryPermissionLevel{
+			Permission: github.Ptr("none"),
+			RoleName:   github.Ptr("none"),
+		}, response, nil
+	}
+
+	return permission, response, err
 }
 
 func (c *Client) CancelWorkflowRun(repository string, workflowRunID int64) (*github.Response, error) {
