@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { showErrorToast } from "@/lib/toast";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { RESTORE_DEFAULT_PROMPT_COPY } from "../lib/defaultAgentPrompt";
+import { DefaultPromptUnavailableError, RESTORE_DEFAULT_PROMPT_COPY } from "../lib/defaultAgentPrompt";
 import { loadDefaultAgentPrompt } from "../lib/loadDefaultAgentPrompt";
 import { PlanningReviewEditor } from "./PlanningReviewEditor";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
@@ -163,6 +163,26 @@ describe("PlanningReviewEditor restore default prompt", () => {
     expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
     expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone repository");
     expect(screen.getByTestId("planning-review-step-summary-1")).toHaveTextContent("Refine Task");
+  });
+
+  it("does not warn when the default prompt is unavailable", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      loadDefault.mockRejectedValue(new DefaultPromptUnavailableError());
+      renderEditor();
+
+      await waitFor(() => expect(loadDefault).toHaveBeenCalled());
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(warn).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("planning-review-restore-default-prompt-error")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("planning-review-restore-default-prompt-retry")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("hides a failed background default prompt lookup", async () => {

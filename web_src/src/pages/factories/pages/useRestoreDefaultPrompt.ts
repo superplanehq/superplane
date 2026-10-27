@@ -7,6 +7,7 @@ import { showErrorToast } from "@/lib/toast";
 import {
   agentPromptsMatchDefault,
   applyDefaultAgentPrompts,
+  DefaultPromptUnavailableError,
   RESTORE_DEFAULT_PROMPT_COPY,
 } from "../lib/defaultAgentPrompt";
 import { loadDefaultAgentPrompt } from "../lib/loadDefaultAgentPrompt";
@@ -59,9 +60,10 @@ export function useRestoreDefaultPrompt({
         }
       })
       .catch((error: unknown) => {
-        if (!cancelled) {
-          console.warn("Could not load the default agent prompt.", error);
+        if (cancelled || error instanceof DefaultPromptUnavailableError) {
+          return;
         }
+        console.warn("Could not load the default agent prompt.", error);
       });
     return () => {
       cancelled = true;
@@ -132,11 +134,11 @@ async function loadDefaultSteps(restoreLoaderRef: {
 }): Promise<PlanningReviewStep[]> {
   const loader = restoreLoaderRef.current;
   if (!loader) {
-    throw new Error(RESTORE_DEFAULT_PROMPT_COPY.error);
+    throw new DefaultPromptUnavailableError();
   }
   const steps = await loader();
   if (!steps?.some((step) => step.prompt)) {
-    throw new Error(RESTORE_DEFAULT_PROMPT_COPY.error);
+    throw new DefaultPromptUnavailableError();
   }
   return steps;
 }
