@@ -2,7 +2,6 @@ export const BILLING_BUSINESS_NAME = "Business";
 export const BILLING_BUSINESS_PRICE = "$199";
 export const BILLING_BUSINESS_PRICE_PERIOD = "per month";
 export const BILLING_BUSINESS_DESCRIPTION = "For teams that run software factory workflows.";
-export const BILLING_UPGRADE_LABEL = "Upgrade to Business";
 export const BILLING_CANCEL_LABEL = "Cancel Business";
 export const BILLING_KEEP_LABEL = "Keep Business";
 

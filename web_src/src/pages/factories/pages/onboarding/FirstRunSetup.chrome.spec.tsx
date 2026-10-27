@@ -34,8 +34,7 @@ vi.mock("@/hooks/useMe", () => ({ useMe: () => ({ data: { id: "user-1" } }) }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: (feature: string) =>
-      feature === "organization_byok" ? billingState.byok : feature !== "new_billing" || billingState.newBilling,
+    has: (feature: string) => feature === "organization_byok" && billingState.byok,
     enabledExperimentalFeatures: [],
     organizationReady: true,
     isLoading: false,
@@ -331,11 +330,11 @@ describe("FirstRunSetup chrome", () => {
   });
 
   it.each([
-    { newBilling: false, planActive: false },
-    { newBilling: true, planActive: false },
-    { newBilling: true, planActive: true },
-  ])("keeps repository and intake before the final model choice (%j)", async ({ newBilling, planActive }) => {
-    Object.assign(billingState, { enabled: newBilling, newBilling, planActive, byok: true });
+    { enabled: false, planActive: false },
+    { enabled: true, planActive: false },
+    { enabled: true, planActive: true },
+  ])("keeps repository and intake before the final model choice (%j)", async ({ enabled, planActive }) => {
+    Object.assign(billingState, { enabled, planActive, byok: true, availablePlans: [] });
     const user = userEvent.setup();
     const model = pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true, openSection: "vcs" });
     render(
@@ -495,7 +494,7 @@ describe("FirstRunSetup chrome", () => {
   });
 
   it("starts Pay-as-you-go after the backlog step when a card is saved", async () => {
-    Object.assign(billingState, { enabled: true, newBilling: true, hasPaymentMethod: true });
+    Object.assign(billingState, { enabled: true, hasPaymentMethod: true });
     billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
     const user = userEvent.setup();
     const model = hostedVcsModel();
@@ -516,7 +515,7 @@ describe("FirstRunSetup chrome", () => {
   });
 
   it("finishes a Starter checkout return after the saved GitHub connection restores", async () => {
-    Object.assign(billingState, { enabled: true, newBilling: true, planActive: true });
+    Object.assign(billingState, { enabled: true, planActive: true });
     billingState.availablePlans = [{ key: "starter", name: "Starter", subscriptionRequired: true }];
     const path = "/org-1/workspaces/PAY/setup?step=card&plan=starter&card_setup=1&subscribed=1";
     const previousUrl = window.location.href;
@@ -541,12 +540,13 @@ describe("FirstRunSetup chrome", () => {
 
   it.each(
     ["issues", "billing"].flatMap((step) => [
-      { step, newBilling: false, availablePlans: [{ key: "free", name: "Free" }] },
-      { step, newBilling: true, availablePlans: [] },
-      { step, newBilling: true, availablePlans: undefined },
+      { step, enabled: false, availablePlans: [{ key: "pay_as_you_go", name: "Pay-as-you-go" }] },
+      { step, enabled: true, availablePlans: [{ key: "free", name: "Free" }] },
+      { step, enabled: true, availablePlans: [] },
+      { step, enabled: true, availablePlans: undefined },
     ]),
-  )("finishes without plan selection (%j)", async ({ step, newBilling, availablePlans }) => {
-    Object.assign(billingState, { enabled: true, newBilling, availablePlans });
+  )("finishes without plan selection (%j)", async ({ step, enabled, availablePlans }) => {
+    Object.assign(billingState, { enabled, availablePlans });
     const user = userEvent.setup();
     const model = hostedVcsModel();
     renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
@@ -560,7 +560,6 @@ describe("FirstRunSetup chrome", () => {
 
   it.each([false, true])("routes a restored billing URL through model access (own key: %s)", async (byok) => {
     billingState.enabled = true;
-    billingState.newBilling = true;
     const model = hostedVcsModel({ bringYourOwnKey: byok });
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=billing&plan=team&subscribed=1&checkout_id=old");
     expect(screen.queryByTestId("first-run-card")).not.toBeInTheDocument();

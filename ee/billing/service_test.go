@@ -29,8 +29,10 @@ func TestRuntimeInitializesOrganizationBilling(t *testing.T) {
 	plan, err := billingmodels.FindOrganizationBillingPlan(db, organization.ID)
 	require.NoError(t, err)
 	require.NotNil(t, plan, "core organization creation must initialize the bound billing implementation")
-	assert.Equal(t, billingmodels.BillingPlanTrial, plan.Plan)
-	assert.NotNil(t, plan.TrialEndsAt)
+	assert.Equal(t, billingmodels.BillingPlanNone, plan.Plan)
+	assert.Equal(t, billingmodels.BillingPlanSourceSystem, plan.PlanSource)
+	assert.Nil(t, plan.TrialStartedAt)
+	assert.Nil(t, plan.TrialEndsAt)
 }
 
 func TestInstallationSettingsUseCatalogTrialCredit(t *testing.T) {
@@ -110,6 +112,9 @@ func TestBoundRuntimeRecordsUsageAcrossBillingModes(t *testing.T) {
 			assert.Equal(t, published.Version, recorded.PriceBookVersion)
 			require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).
 				Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
+			if enabled == "yes" {
+				support.AssignOpenSystemTrial(t, r.Organization.ID)
+			}
 			err = billing.AssertHostedRunAllowed(db, r.Organization.ID, nil)
 			if enabled == "no" {
 				require.NoError(t, err)

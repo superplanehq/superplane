@@ -11,7 +11,6 @@ let permissionsLoading = false;
 let canManageBilling = true;
 let featuresLoading = false;
 let organizationReady = true;
-let newBilling = true;
 const previewPurchase = vi.fn();
 const purchaseSeats = vi.fn();
 const refetch = vi.fn();
@@ -27,7 +26,7 @@ vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => canManageBilling, isLoading: permissionsLoading }),
 }));
 vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ has: () => newBilling, isLoading: featuresLoading, organizationReady }),
+  useExperimentalFeature: () => ({ has: () => false, isLoading: featuresLoading, organizationReady }),
 }));
 vi.mock("@/hooks/useBillingProductEnabled", () => ({ useBillingProductEnabled: () => true }));
 vi.mock("@/hooks/useOrganizationData", () => ({
@@ -100,7 +99,6 @@ beforeEach(() => {
   canManageBilling = true;
   featuresLoading = false;
   organizationReady = true;
-  newBilling = true;
   previewPurchase.mockReset().mockResolvedValue({
     data: {
       purchasedSeats: 10,
@@ -115,43 +113,27 @@ beforeEach(() => {
 });
 
 describe("billing purchase deep-link readiness", () => {
-  it.each(["permissions", "feature registry", "organization features"])(
-    "retains the link while %s loads, then consumes only buySeats",
-    async (pending) => {
-      if (pending === "permissions") {
-        permissionsLoading = true;
-        canManageBilling = false;
-      }
-      if (pending === "feature registry") {
-        featuresLoading = true;
-        newBilling = false;
-      }
-      if (pending === "organization features") {
-        organizationReady = false;
-        newBilling = false;
-      }
-      const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-      const view = render(<BillingRoute client={client} />);
-      expect(screen.getByLabelText("Current billing URL")).toHaveTextContent(initialUrl);
-      expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument();
-      expect(previewPurchase).not.toHaveBeenCalled();
-      expect(purchaseSeats).not.toHaveBeenCalled();
+  it("retains the link while permissions load, then consumes only buySeats", async () => {
+    permissionsLoading = true;
+    canManageBilling = false;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const view = render(<BillingRoute client={client} />);
+    expect(screen.getByLabelText("Current billing URL")).toHaveTextContent(initialUrl);
+    expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument();
+    expect(previewPurchase).not.toHaveBeenCalled();
+    expect(purchaseSeats).not.toHaveBeenCalled();
 
-      permissionsLoading = false;
-      canManageBilling = true;
-      featuresLoading = false;
-      organizationReady = true;
-      newBilling = true;
-      view.rerender(<BillingRoute client={client} />);
+    permissionsLoading = false;
+    canManageBilling = true;
+    view.rerender(<BillingRoute client={client} />);
 
-      expect(await screen.findByRole("dialog", { name: "Buy seats" })).toBeInTheDocument();
-      await waitFor(() => expect(previewPurchase).toHaveBeenCalledTimes(1));
-      expect(screen.getByLabelText("Current billing URL")).toHaveTextContent(
-        "/org-1/workspaces/WS/settings/organization/billing?tab=seats&tag=one&tag=two",
-      );
-      expect(purchaseSeats).not.toHaveBeenCalled();
-    },
-  );
+    expect(await screen.findByRole("dialog", { name: "Buy seats" })).toBeInTheDocument();
+    await waitFor(() => expect(previewPurchase).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText("Current billing URL")).toHaveTextContent(
+      "/org-1/workspaces/WS/settings/organization/billing?tab=seats&tag=one&tag=two",
+    );
+    expect(purchaseSeats).not.toHaveBeenCalled();
+  });
   it.each([
     { status: "succeeded", age: 23, visible: true, message: "Seats added." },
     { status: "succeeded", age: 25, visible: false, message: "Seats added." },
@@ -161,7 +143,7 @@ describe("billing purchase deep-link readiness", () => {
     { status: "pending", age: 25, visible: true, message: "Waiting for payment confirmation." },
     { status: "awaiting_confirmation", age: 25, visible: true, message: "Waiting for payment confirmation." },
   ])("filters a $status purchase aged $age hours", async ({ status, age, visible, message }) => {
-    newBilling = false;
+    canManageBilling = false;
     billing = {
       ...TEAM_ORGANIZATION_BILLING,
       lastSeatPurchase: {

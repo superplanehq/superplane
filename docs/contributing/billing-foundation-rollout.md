@@ -1,7 +1,7 @@
 # Billing foundation rollout
 
 Use this procedure for `codex/billing-foundation`. Deploy the admin and
-customer branches separately. Keep `new_billing` disabled during this release.
+customer branches separately.
 
 Foundation preserves the existing customer billing screens and checkout.
 Business subscriptions use the `business_legacy` catalog entry, named Business.

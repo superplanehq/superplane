@@ -92,7 +92,6 @@ const meta = {
   args: {
     mode: "app",
     pathSuffix: `workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`,
-    experimentalFeatures: ["new_billing"],
     factoriesFixture: fixture(),
   },
 } satisfies Meta<typeof FactoriesHarness>;
