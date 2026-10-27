@@ -199,13 +199,13 @@ func TestInvalidateUserAuthorizationKeepsReplacedGrant(t *testing.T) {
 		&GitHubUser{ID: 583231, Login: "octocat"},
 		&UserTokens{AccessToken: "ghu_second", AccessTokenExpiresAt: timeIn(time.Hour)},
 	))
-	require.NoError(t, InvalidateUserAuthorization(db, rejected))
+	require.NoError(t, InvalidateUserAuthorization(t.Context(), db, testEncryptor(), rejected))
 
 	current, err := ResolveUserAccessToken(t.Context(), db, testEncryptor(), &queuedHTTP{}, userAuthorizationConfig(), accountID)
 	require.NoError(t, err)
 	assert.Equal(t, "ghu_second", current.Token)
 
-	require.NoError(t, InvalidateUserAuthorization(db, current))
+	require.NoError(t, InvalidateUserAuthorization(t.Context(), db, testEncryptor(), current))
 	_, err = ResolveUserAccessToken(t.Context(), db, testEncryptor(), &queuedHTTP{}, userAuthorizationConfig(), accountID)
 	require.ErrorIs(t, err, ErrUserAuthorizationNotUsable)
 }

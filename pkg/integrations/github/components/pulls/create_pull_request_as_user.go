@@ -89,7 +89,7 @@ func createPullRequestAsUser(
 
 	pr, _, err := appClient.WithUserToken(ctx.HTTP, token.Token).CreatePullRequest(background, repository, request)
 	if common.StatusCode(err) == http.StatusUnauthorized {
-		if invalidateErr := githubapp.InvalidateUserAuthorization(database.DB(background), token); invalidateErr != nil {
+		if invalidateErr := githubapp.InvalidateUserAuthorization(background, database.DB(background), encryptor, token); invalidateErr != nil {
 			logOpenAsUser(ctx, user.ID.String(), invalidateErr)
 		}
 	}

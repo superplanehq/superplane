@@ -1,7 +1,6 @@
 package githubapp
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -25,8 +24,7 @@ type UserAccessToken struct {
 	Token string
 	Login string
 
-	accountID            uuid.UUID
-	encryptedAccessToken []byte
+	accountID uuid.UUID
 }
 
 // SaveUserAuthorization stores an encrypted grant for the account.
@@ -90,10 +88,9 @@ func ResolveUserAccessToken(
 				return fmt.Errorf("decrypt GitHub user access token: %w", err)
 			}
 			resolved = &UserAccessToken{
-				Token:                string(token),
-				Login:                authorization.GitHubLogin,
-				accountID:            accountID,
-				encryptedAccessToken: authorization.EncryptedAccessToken,
+				Token:     string(token),
+				Login:     authorization.GitHubLogin,
+				accountID: accountID,
 			}
 			return nil
 		}
@@ -104,10 +101,9 @@ func ResolveUserAccessToken(
 			return err
 		}
 		resolved = &UserAccessToken{
-			Token:                tokens.AccessToken,
-			Login:                authorization.GitHubLogin,
-			accountID:            accountID,
-			encryptedAccessToken: authorization.EncryptedAccessToken,
+			Token:     tokens.AccessToken,
+			Login:     authorization.GitHubLogin,
+			accountID: accountID,
 		}
 		return nil
 	})
@@ -168,7 +164,7 @@ func DeleteUserAuthorization(
 // InvalidateUserAuthorization stops using a grant after GitHub rejected its
 // token. The member sees that the option needs a new authorization. A grant
 // that a refresh or a new authorization replaced stays usable.
-func InvalidateUserAuthorization(db *gorm.DB, rejected *UserAccessToken) error {
+func InvalidateUserAuthorization(ctx context.Context, db *gorm.DB, encryptor crypto.Encryptor, rejected *UserAccessToken) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		authorization, err := models.LockAccountGitHubAuthorization(tx, rejected.accountID)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -177,7 +173,15 @@ func InvalidateUserAuthorization(db *gorm.DB, rejected *UserAccessToken) error {
 		if err != nil {
 			return err
 		}
-		if authorization.InvalidatedAt != nil || !bytes.Equal(authorization.EncryptedAccessToken, rejected.encryptedAccessToken) {
+		if authorization.InvalidatedAt != nil {
+			return nil
+		}
+
+		stored, err := encryption.ForDB(tx, encryptor).Decrypt(ctx, authorization.EncryptedAccessToken, userTokenAssociatedData(rejected.accountID))
+		if err != nil {
+			return fmt.Errorf("decrypt GitHub user access token: %w", err)
+		}
+		if string(stored) != rejected.Token {
 			return nil
 		}
 		return authorization.Invalidate(tx)
