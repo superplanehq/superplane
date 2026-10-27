@@ -1377,7 +1377,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "This task is closed as failed" })).toBeInTheDocument();
     expect(within(note).getByText("Reopen this task to start the line again.")).toBeInTheDocument();
-    expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("link", { name: "View run details" })).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Send to backlog" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
@@ -1457,7 +1457,7 @@ describe("WorkOrderSplitRunPopup", () => {
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
     );
-    expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("link", { name: "View run details" })).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
   });
 
@@ -1592,7 +1592,7 @@ describe("WorkOrderSplitRunPopup", () => {
     ).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
-    expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("link", { name: "View run details" })).not.toBeInTheDocument();
     expect(screen.queryByTestId(/split-run-phase-rerun-/)).not.toBeInTheDocument();
   });
 
