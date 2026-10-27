@@ -48,13 +48,12 @@ describe("OrganizationSettingsBillingPage top-up", () => {
     );
 
     const balance = await screen.findByTestId("billing-credit-balance");
-    const topup = within(balance).getByTestId("billing-credit-topup");
     await waitFor(() => {
-      expect(within(topup).getByRole("button", { name: "Top up" })).toBeEnabled();
+      expect(within(balance).getByRole("button", { name: "Top up" })).toBeEnabled();
     });
     expect(within(balance).queryByRole("button", { name: "Buy more" })).not.toBeInTheDocument();
-    expect(within(topup).queryByRole("button", { name: "$50" })).not.toBeInTheDocument();
-    await user.click(within(topup).getByRole("button", { name: "Top up" }));
+    expect(within(balance).queryByRole("button", { name: "$50" })).not.toBeInTheDocument();
+    await user.click(within(balance).getByRole("button", { name: "Top up" }));
     const dialog = await screen.findByRole("dialog", { name: "Add hosted credit" });
     await user.click(within(dialog).getByRole("button", { name: "$50" }));
     const confirm = within(dialog).getByRole("button", { name: "Continue to checkout" });
@@ -98,11 +97,10 @@ describe("OrganizationSettingsBillingPage top-up", () => {
     };
     client.interceptors.request.use(captureCheckout);
     const balance = await screen.findByTestId("billing-credit-balance");
-    const topup = within(balance).getByTestId("billing-credit-topup");
     await waitFor(() => {
-      expect(within(topup).getByRole("button", { name: "Top up" })).toBeEnabled();
+      expect(within(balance).getByRole("button", { name: "Top up" })).toBeEnabled();
     });
-    await user.click(within(topup).getByRole("button", { name: "Top up" }));
+    await user.click(within(balance).getByRole("button", { name: "Top up" }));
     const dialog = await screen.findByRole("dialog", { name: "Add hosted credit" });
     await user.click(within(dialog).getByRole("button", { name: "Custom" }));
     await user.type(within(dialog).getByRole("textbox", { name: "Credit amount in USD" }), "100");

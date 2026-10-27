@@ -184,3 +184,21 @@ it("offers a new card session when the embedded form rejects an expired session"
     expect((screen.getByTitle("Secure card setup") as HTMLIFrameElement).src).toContain("polar_cst_refreshed"),
   );
 });
+
+it("only advertises signup credit when this organization has the full amount", () => {
+  const balances = { welcomeCreditCents: 1000 };
+  const { rerender, props } = renderHost(cardStep({ ...balances }));
+  expect(screen.getByText("$10 in signup credit")).toBeInTheDocument();
+  for (const amount of [undefined, 0, 999]) {
+    const balance = { welcomeCreditCents: amount };
+    rerender(
+      <FirstRunCardScreenHost
+        {...props}
+        organizationId="another-org"
+        flow={{ ...props.flow, cardStep: cardStep({ ...balance }) }}
+      />,
+    );
+    expect(screen.queryByText("$10 in signup credit")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Starter" })).toBeEnabled();
+  }
+});

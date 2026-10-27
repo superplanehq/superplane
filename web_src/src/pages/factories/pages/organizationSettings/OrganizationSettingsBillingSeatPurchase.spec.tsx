@@ -94,7 +94,7 @@ describe("Organization billing seat purchases", () => {
     renderBilling({ ...TEAM_ORGANIZATION_BILLING }, { newBilling: true, query: "?buySeats=1" });
     const card = await screen.findByTestId("billing-seats");
     expect(card).toHaveTextContent("Ask an organization admin to buy seats.");
-    expect(screen.getByText("Ask an organization admin to set up payment or change plans.")).toBeInTheDocument();
+    expect(screen.getByText("Ask an organization admin to manage billing.")).toBeInTheDocument();
     expect(within(card).queryByRole("button", { name: "Buy seats" })).not.toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 350));
     expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument();

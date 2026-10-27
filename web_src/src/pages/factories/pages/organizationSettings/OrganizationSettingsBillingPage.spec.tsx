@@ -274,9 +274,8 @@ describe("OrganizationSettingsBillingPage", () => {
     );
 
     const balance = await screen.findByTestId("billing-credit-balance");
-    const topup = within(balance).getByTestId("billing-credit-topup");
     await waitFor(() => {
-      expect(within(topup).getByRole("button", { name: "Top up" })).toBeEnabled();
+      expect(within(balance).getByRole("button", { name: "Top up" })).toBeEnabled();
     });
     expect(screen.getByTestId("billing-current-plan")).toHaveTextContent("Current plan");
     expect(screen.getByTestId("billing-credit-included")).toHaveTextContent("Included usage");
@@ -296,7 +295,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(screen.queryByRole("link", { name: "View spending" })).not.toBeInTheDocument();
     expect(balance).not.toHaveTextContent("welcome credit");
 
-    await user.click(within(topup).getByRole("button", { name: "Top up" }));
+    await user.click(within(balance).getByRole("button", { name: "Top up" }));
     const dialog = await screen.findByRole("dialog", { name: "Add hosted credit" });
     expect(within(dialog).getByRole("button", { name: "$50" })).toBeEnabled();
     expect(within(dialog).getByRole("button", { name: "$100" })).toBeEnabled();
