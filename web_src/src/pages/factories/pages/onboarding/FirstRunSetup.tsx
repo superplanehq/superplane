@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { FirstRunHeading, FirstRunShell } from "./first-run/FirstRunShell";
+import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunShell } from "./first-run/FirstRunShell";
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
-import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { organizationMatchesRoute } from "@/lib/accountOrganizations";
 import { posthog } from "@/posthog";
 import { useNavigate } from "react-router";
@@ -10,22 +9,18 @@ import { useNavigate } from "react-router";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunAgentScreen } from "./first-run/FirstRunAgentScreen";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
-import { FirstRunBitbucketChooseScreen } from "./first-run/FirstRunBitbucketChooseScreen";
-import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
-import { FirstRunHostScreen } from "./first-run/FirstRunHostScreen";
-import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
-import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
-import { FIRST_RUN_STEP_COUNT } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { FirstRunVcsScreen } from "./first-run/FirstRunVcsScreen";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
-import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
+import { sphereFor } from "./first-run/firstRunSphereFor";
 import { ownerOfRepository, repositoriesInOrganization } from "./first-run/githubOrganizations";
 import { FirstRunCardScreenHost } from "./FirstRunCardScreenHost";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
+import { isFirstRunVcsScreen } from "./firstRunScreens";
 import {
   useFirstRunSetupFlow,
   type FirstRunScreen,
@@ -37,6 +32,7 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   welcome: 0,
   host: 1,
   connect: 1,
+  "ghe-host": 1,
   choose: 2,
   tickets: 3,
   card: 4,
@@ -50,6 +46,7 @@ const INITIAL_IMPORT_LIMIT = 3;
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   host: "welcome",
   connect: "host",
+  "ghe-host": "host",
   choose: "connect",
   tickets: "choose",
   card: "tickets",
@@ -90,11 +87,18 @@ function ticketsContinueLabel(flow: FirstRunSetupFlow, skipInitialImport: boolea
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
   const backScreen = BACK_SCREEN[target];
-  // Bitbucket has no separate connect screen.
-  if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
-    return () => flow.goToScreen("host");
+  // Bitbucket and GitHub Enterprise have no github.com connect screen.
+  if (
+    backScreen === "connect" &&
+    (flow.vcsHost === "bitbucket" || flow.githubEnterprise || !flow.accountConnectionRequired)
+  ) {
+    return () => flow.goToScreen(flow.githubEnterprise ? "ghe-host" : "host");
   }
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
+}
+
+function watchesGitHubInstallation(flow: FirstRunSetupFlow, hasDestination: boolean): boolean {
+  return flow.screen === "choose" && flow.vcsHost !== "bitbucket" && !flow.githubEnterprise && !hasDestination;
 }
 
 function TicketsScreenHost({
@@ -164,159 +168,6 @@ function TicketsScreenHost({
   );
 }
 
-function bitbucketForgePhase(
-  identityLinked: boolean,
-  repositoryCount: number,
-  installedWorkspaceCount: number,
-): "connect" | "grant" | "choose" {
-  if (!identityLinked) return "connect";
-  if (repositoryCount === 0 && installedWorkspaceCount === 0) return "grant";
-  return "choose";
-}
-
-function BitbucketChooseHost({
-  organizationId,
-  flow,
-  model,
-  chrome,
-}: {
-  organizationId: string;
-  flow: FirstRunSetupFlow;
-  model: OnboardingPageModel;
-  chrome: FirstRunChrome;
-}) {
-  const connected = model.setup.connected.has("bitbucket");
-  const resources = useIntegrationResources(organizationId, model.bitbucketIntegrationId, "repository", undefined, {
-    enabled: connected && !flow.bitbucketForgeConfigured,
-  });
-  const repositories = (resources.data ?? []).map((resource) => resource.name ?? "").filter(Boolean);
-  const sphere = connected ? repositorySphereFor(model.setup.selectedRepo) : sphereFor("connect", null);
-  if (flow.bitbucketOnboardingPending || flow.bitbucketForgeConfigured || flow.bitbucketLookupFailed) {
-    return (
-      <FirstRunBitbucketForgeScreen
-        phase={bitbucketForgePhase(
-          flow.bitbucketIdentityLinked,
-          flow.bitbucketRepositories.length,
-          flow.bitbucketInstalledWorkspaces.length,
-        )}
-        connectHref={flow.bitbucketConnectHref}
-        repositories={flow.bitbucketRepositories}
-        installedWorkspaces={flow.bitbucketInstalledWorkspaces}
-        selectedRepository={model.setup.selectedRepo}
-        granting={flow.blockingAction === "opening-bitbucket"}
-        saving={flow.blockingAction === "saving-repository"}
-        loading={flow.bitbucketOnboardingPending}
-        loadError={flow.bitbucketLoadError}
-        lookupFailed={flow.bitbucketLookupFailed}
-        retrying={flow.bitbucketLookupRetrying}
-        attemptActive={flow.bitbucketInstallationAttemptActive}
-        attemptTimedOut={flow.bitbucketInstallationAttemptTimedOut}
-        login={flow.bitbucketLogin}
-        providerUserId={flow.bitbucketProviderUserId}
-        identities={flow.bitbucketIdentities}
-        switchingAccount={flow.blockingAction === "switching-bitbucket-account"}
-        switchFailed={flow.bitbucketSwitchFailed}
-        chrome={chrome}
-        sphere={sphere}
-        onRetryLookup={flow.retryBitbucketLookup}
-        onGrantAccess={() => void flow.grantBitbucketAccess()}
-        installUrl={flow.bitbucketInstallUrl}
-        onCopyInstallLink={() => flow.copyBitbucketInstallLink()}
-        onSelectRepository={model.setup.selectRepo}
-        onClearRepository={model.setup.clearRepository}
-        onContinue={() => void flow.continueFromRepository()}
-        onSelectIdentity={(providerUserId) => void flow.selectBitbucketIdentity(providerUserId)}
-        onConnectAnotherAccount={() => window.location.assign(flow.bitbucketConnectHref)}
-      />
-    );
-  }
-  return (
-    <FirstRunBitbucketChooseScreen
-      connected={connected}
-      repositories={repositories}
-      selectedRepository={model.setup.selectedRepo}
-      loading={resources.isLoading}
-      loadError={resources.isError}
-      saving={flow.blockingAction === "saving-repository"}
-      chrome={chrome}
-      sphere={sphere}
-      onConnect={flow.connectBitbucket}
-      onSelectRepository={model.setup.selectRepo}
-      onContinue={() => void flow.continueFromRepository()}
-    />
-  );
-}
-
-/** The Git host choice, the connection, and the repository choice. */
-function VcsScreen({
-  screen,
-  organizationId,
-  flow,
-  model,
-  chrome,
-}: {
-  screen: "host" | "connect" | "choose";
-  organizationId: string;
-  flow: FirstRunSetupFlow;
-  model: OnboardingPageModel;
-  chrome: FirstRunChrome;
-}) {
-  const setup = model.setup;
-  if (screen === "host") {
-    return (
-      <FirstRunHostScreen
-        selectedHost={flow.vcsHost}
-        chrome={chrome}
-        sphere={sphereFor("host", setup.selectedRepo)}
-        onChooseHost={flow.chooseVcsHost}
-      />
-    );
-  }
-
-  if (screen === "connect") {
-    return (
-      <FirstRunConnectScreen
-        loading={flow.repositoriesLoading}
-        connecting={flow.blockingAction === "opening-github"}
-        createApp={!flow.appConfigured}
-        connectError={flow.connectError}
-        chrome={chrome}
-        sphere={sphereFor("connect", setup.selectedRepo)}
-        onConnectGitHub={() => void (flow.appConfigured ? flow.connectGitHub() : flow.createGitHubApp())}
-      />
-    );
-  }
-
-  if (flow.vcsHost === "bitbucket") {
-    return <BitbucketChooseHost organizationId={organizationId} flow={flow} model={model} chrome={chrome} />;
-  }
-
-  return (
-    <FirstRunChooseScreen
-      repositories={flow.repositories}
-      selectedRepository={setup.selectedRepo}
-      githubLogin={flow.githubLogin}
-      githubUserId={flow.githubUserId}
-      githubIdentities={flow.githubIdentities}
-      loading={flow.repositoriesLoading}
-      saving={flow.blockingAction === "saving-repository"}
-      grantingAccess={flow.blockingAction === "opening-github"}
-      switchingGitHubAccount={flow.blockingAction === "switching-github-account"}
-      synchronizing={flow.synchronizing}
-      pendingOrganizations={flow.pendingOrganizations}
-      appConfigured={flow.appConfigured}
-      chrome={chrome}
-      sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
-      onSelectRepository={setup.selectRepo}
-      onClearRepository={setup.clearRepository}
-      onSelectGitHubIdentity={(userId) => void flow.selectGitHubIdentity(userId)}
-      onConnectAnotherGitHubAccount={() => void flow.connectGitHub()}
-      onGrantAccess={() => void flow.grantGitHubAccess()}
-      onContinue={() => void flow.continueFromRepository()}
-    />
-  );
-}
-
 /**
  * Workspace setup, on the first-run screens. Each answer is saved through the
  * setup model. The last screen provisions the workspace and opens it.
@@ -327,7 +178,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
   const destination = model.provisionedDestination;
-  useGitHubInstallationChecks(organizationId, flow.screen === "choose" && flow.vcsHost !== "bitbucket" && !destination);
+  useGitHubInstallationChecks(organizationId, watchesGitHubInstallation(flow, Boolean(destination)));
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
   const initialWorkspace = factory?.onboarding?.initial === true;
@@ -383,9 +234,9 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     );
   }
 
-  if (flow.screen === "host" || flow.screen === "connect" || flow.screen === "choose") {
+  if (isFirstRunVcsScreen(flow.screen)) {
     return (
-      <VcsScreen
+      <FirstRunVcsScreen
         screen={flow.screen}
         organizationId={organizationId}
         flow={flow}

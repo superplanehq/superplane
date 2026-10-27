@@ -12,6 +12,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 const (
@@ -158,7 +159,7 @@ func (c *CreateRepositorySandbox) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "Repository URL to clone",
-			Placeholder: "https://github.com/owner/repository.git",
+			Placeholder: githubcommon.DotCom().CloneURL("owner/repository"),
 		},
 		{
 			Name:  "env",
