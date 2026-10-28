@@ -16,22 +16,20 @@ const copy = FIRST_RUN_COPY.host;
 export function FirstRunHostScreen({
   selectedHost,
   githubEnterpriseSelected = false,
-  showGitHubEnterprise = false,
+  githubEnterpriseLicensed = false,
   chrome,
   sphere,
   onChooseHost,
 }: {
   selectedHost: VcsHostId | null;
   githubEnterpriseSelected?: boolean;
-  showGitHubEnterprise?: boolean;
+  githubEnterpriseLicensed?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onChooseHost: (host: FirstRunHostChoice) => void;
 }) {
   const options: FirstRunHostOption[] = [...VCS_OPTIONS];
-  if (showGitHubEnterprise) {
-    options.splice(1, 0, GITHUB_ENTERPRISE_VCS_OPTION);
-  }
+  options.splice(1, 0, GITHUB_ENTERPRISE_VCS_OPTION);
 
   return (
     <FirstRunShell testId="first-run-host" chrome={chrome} sphere={sphere} visual="preview">
@@ -45,13 +43,21 @@ export function FirstRunHostScreen({
             <ConnectOptionRow
               icon={<IntegrationChoiceIcon name={option.id === "github-enterprise" ? "github" : option.id} />}
               title={option.label}
-              detail={option.detail}
+              detail={
+                option.id === "github-enterprise" && !githubEnterpriseLicensed
+                  ? copy.githubEnterpriseRequiresLicense
+                  : option.detail
+              }
               selected={
                 option.id === "github-enterprise"
                   ? githubEnterpriseSelected
                   : selectedHost === option.id && !githubEnterpriseSelected
               }
               soon={option.soon}
+              disabled={option.id === "github-enterprise" && !githubEnterpriseLicensed}
+              badge={
+                option.id === "github-enterprise" && !githubEnterpriseLicensed ? copy.githubEnterpriseBadge : undefined
+              }
               onSelect={() => onChooseHost(option.id)}
             />
           </div>

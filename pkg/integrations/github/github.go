@@ -31,6 +31,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/metadata"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/statuses"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -576,6 +577,11 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 }
 
 func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
+	if err := authorizeGitHubEnterpriseHost(common.HostFromIntegration(ctx.Integration)); err != nil {
+		http.Error(ctx.Response, licensing.ErrNotLicensed.Error(), http.StatusForbidden)
+		return
+	}
+
 	code := ctx.Request.URL.Query().Get("code")
 	state := ctx.Request.URL.Query().Get("state")
 
@@ -743,6 +749,13 @@ func (g *GitHub) afterAppCreationLegacy(ctx core.HTTPRequestContext, appData *Gi
 }
 
 func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
+	if !gitHubAppAlreadyCreated(ctx) {
+		if err := authorizeGitHubEnterpriseHost(common.HostFromIntegration(ctx.Integration)); err != nil {
+			http.Error(ctx.Response, licensing.ErrNotLicensed.Error(), http.StatusForbidden)
+			return
+		}
+	}
+
 	if ctx.Integration.LegacySetup() {
 		ctx.Logger.Infof("handling app installation for legacy integration")
 		g.afterAppInstallationLegacy(ctx)
@@ -1026,6 +1039,20 @@ func propertyOrMetadataOwner(ctx core.HTTPRequestContext) string {
 	metadata := common.Metadata{}
 	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	return strings.TrimSpace(metadata.Owner)
+}
+
+func gitHubAppAlreadyCreated(ctx core.HTTPRequestContext) bool {
+	if ctx.Integration == nil {
+		return false
+	}
+	if appID, err := ctx.Integration.Properties().GetString(common.PropertyAppID); err == nil && strings.TrimSpace(appID) != "" {
+		return true
+	}
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return false
+	}
+	return metadata.GitHubApp.ID != 0
 }
 
 // setupCallbackAccepted reports whether a GitHub App setup redirect may continue.

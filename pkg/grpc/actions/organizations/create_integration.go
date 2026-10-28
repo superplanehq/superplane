@@ -23,6 +23,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -89,6 +90,9 @@ func CreateIntegration(
 			var err error
 			configuration, err = github.WizardCreateConfiguration(org, configMap, registry.HTTPContext())
 			if err != nil {
+				if grpcerrors.Code(err) == codes.PermissionDenied {
+					return nil, err
+				}
 				return nil, grpcerrors.InvalidArgument(err, err.Error())
 			}
 		}

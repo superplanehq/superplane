@@ -7,8 +7,9 @@ The GitHub integration stays `github`. An empty host is github.com.
 
 ## Enable the feature
 
-Turn on the `github_enterprise` organization experimental feature. SuperPlane
-then accepts a GitHub Enterprise Cloud hostname during setup.
+GitHub Enterprise Cloud needs a SuperPlane Enterprise license that grants
+`github_enterprise`. SuperPlane then accepts a GitHub Enterprise Cloud
+hostname during setup.
 
 ## Hostname allowlist
 

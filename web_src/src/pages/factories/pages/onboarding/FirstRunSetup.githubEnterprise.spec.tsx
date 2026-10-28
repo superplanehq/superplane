@@ -70,7 +70,14 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
 }));
 
 vi.mock("@/contexts/useAccount", () => ({
-  useAccount: () => ({ account: { id: "account-1", name: "Ada Lovelace", email: "ada@example.com" } }),
+  useAccount: () => ({
+    account: {
+      id: "account-1",
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+      license: { edition: "enterprise", features: ["github_enterprise"] },
+    },
+  }),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({

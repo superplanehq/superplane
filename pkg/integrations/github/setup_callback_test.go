@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -141,4 +142,87 @@ func TestAfterAppInstallationHonorsSetupReturnPath(t *testing.T) {
 	assert.Equal(t, http.StatusSeeOther, response.Code)
 	assert.Equal(t, "https://app.example"+returnPath, response.Header().Get("Location"))
 	assert.NotContains(t, response.Header().Get("Location"), "/settings/integrations/")
+}
+
+func TestAfterAppCreationGitHubEnterpriseRequiresLicense(t *testing.T) {
+	t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
+	request := httptest.NewRequest(http.MethodGet, "/redirect?code=abc&state=s", nil)
+	response := httptest.NewRecorder()
+
+	(&GitHub{}).afterAppCreation(core.HTTPRequestContext{
+		Logger:   log.New().WithField("test", t.Name()),
+		Request:  request,
+		Response: response,
+		Integration: &contexts.IntegrationContext{
+			CurrentProperties: map[string]any{common.PropertyHost: "acme.ghe.com"},
+		},
+	})
+
+	assert.Equal(t, http.StatusForbidden, response.Code)
+	assert.Contains(t, response.Body.String(), licensing.ErrNotLicensed.Error())
+}
+
+func TestAfterAppCreationGitHubDotComDoesNotRequireLicense(t *testing.T) {
+	t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
+	request := httptest.NewRequest(http.MethodGet, "/redirect", nil)
+	response := httptest.NewRecorder()
+
+	(&GitHub{}).afterAppCreation(core.HTTPRequestContext{
+		Logger:   log.New().WithField("test", t.Name()),
+		Request:  request,
+		Response: response,
+		Integration: &contexts.IntegrationContext{
+			NewSetupFlow: true,
+		},
+	})
+
+	assert.NotEqual(t, http.StatusForbidden, response.Code)
+}
+
+func TestAfterAppInstallationExistingGitHubEnterpriseAppWithoutLicense(t *testing.T) {
+	t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
+	request := httptest.NewRequest(http.MethodGet, "/setup?installation_id=139366&setup_action=install&state=abc", nil)
+	response := httptest.NewRecorder()
+
+	(&GitHub{}).afterAppInstallation(core.HTTPRequestContext{
+		Logger:         log.New().WithField("test", t.Name()),
+		Request:        request,
+		Response:       response,
+		OrganizationID: "org-1",
+		BaseURL:        "https://app.example",
+		Integration: &contexts.IntegrationContext{
+			NewSetupFlow:  true,
+			IntegrationID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+			CurrentProperties: map[string]any{
+				common.PropertyHost:              "acme.ghe.com",
+				common.PropertyAppID:             "99",
+				common.PropertyAppInstallationID: "139366",
+			},
+		},
+	})
+
+	assert.Equal(t, http.StatusSeeOther, response.Code)
+}
+
+func TestAfterAppInstallationNewGitHubEnterpriseAppRequiresLicense(t *testing.T) {
+	t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
+	request := httptest.NewRequest(http.MethodGet, "/setup?installation_id=139366&setup_action=install&state=abc", nil)
+	response := httptest.NewRecorder()
+
+	(&GitHub{}).afterAppInstallation(core.HTTPRequestContext{
+		Logger:         log.New().WithField("test", t.Name()),
+		Request:        request,
+		Response:       response,
+		OrganizationID: "org-1",
+		BaseURL:        "https://app.example",
+		Integration: &contexts.IntegrationContext{
+			NewSetupFlow: true,
+			CurrentProperties: map[string]any{
+				common.PropertyHost: "acme.ghe.com",
+			},
+		},
+	})
+
+	assert.Equal(t, http.StatusForbidden, response.Code)
+	assert.Contains(t, response.Body.String(), licensing.ErrNotLicensed.Error())
 }

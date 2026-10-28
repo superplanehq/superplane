@@ -57,15 +57,15 @@ func PreferHostedInstall(orgID, integrationName string, config map[string]any) b
 
 // WizardCreateConfiguration is the subset of create-time GitHub configuration
 // the setup wizard persists. An empty host is github.com. Non-dotcom hosts
-// are rejected until GitHub Enterprise is enabled.
+// require the github_enterprise license.
 func WizardCreateConfiguration(orgID uuid.UUID, configMap map[string]any, httpCtx core.HTTPContext) (map[string]any, error) {
 	host, err := hostFromConfig(configMap)
 	if err != nil {
 		return nil, err
 	}
 	if !host.IsDotCom() {
-		if !orgHasGitHubEnterprise(orgID) {
-			return nil, fmt.Errorf(gitHubEnterpriseUnavailable)
+		if err := authorizeGitHubEnterpriseHost(host); err != nil {
+			return nil, err
 		}
 		if !hostAllowed(host) {
 			return nil, fmt.Errorf("GitHub host %s is not allowed", host.WebHostname())

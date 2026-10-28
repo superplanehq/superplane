@@ -23,6 +23,8 @@ export const FIRST_RUN_COPY = {
   host: {
     headline: "Where is your code?",
     body: "Choose the Git host of your repository. SuperPlane opens pull requests there.",
+    githubEnterpriseBadge: "Enterprise",
+    githubEnterpriseRequiresLicense: "This option needs a SuperPlane Enterprise license.",
   },
   githubEnterprise: {
     headline: "Where is your GitHub Enterprise Cloud?",

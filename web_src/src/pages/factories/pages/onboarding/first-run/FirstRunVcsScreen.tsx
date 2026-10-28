@@ -1,6 +1,6 @@
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useAccount } from "@/contexts/useAccount";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
-import { FEATURE_GITHUB_ENTERPRISE } from "@/lib/experimentalFeatures";
+import { FEATURE_GITHUB_ENTERPRISE } from "@/lib/license";
 
 import type { FirstRunSetupFlow, OnboardingPageModel } from "../useFirstRunSetupFlow";
 import { FirstRunBitbucketChooseScreen } from "./FirstRunBitbucketChooseScreen";
@@ -109,14 +109,15 @@ export function FirstRunVcsScreen({
   model: OnboardingPageModel;
   chrome: FirstRunChrome;
 }) {
-  const showGitHubEnterprise = useExperimentalFeature(organizationId).has(FEATURE_GITHUB_ENTERPRISE);
+  const { account } = useAccount();
+  const githubEnterpriseLicensed = Boolean(account?.license?.features?.includes(FEATURE_GITHUB_ENTERPRISE));
   const setup = model.setup;
   if (screen === "host") {
     return (
       <FirstRunHostScreen
         selectedHost={flow.vcsHost}
         githubEnterpriseSelected={flow.githubEnterprise}
-        showGitHubEnterprise={showGitHubEnterprise}
+        githubEnterpriseLicensed={githubEnterpriseLicensed}
         chrome={chrome}
         sphere={sphereFor("host", setup.selectedRepo)}
         onChooseHost={flow.chooseVcsHost}

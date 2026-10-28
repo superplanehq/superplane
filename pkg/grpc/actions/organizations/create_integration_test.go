@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/ee/githubenterprise"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -16,6 +17,8 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/licensing"
+	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
@@ -424,7 +427,8 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Equal(t, true, stored.Configuration.Data()["privateApp"])
 	})
 
-	t.Run("github wizard rejects a GitHub Enterprise host", func(t *testing.T) {
+	t.Run("github wizard rejects a GitHub Enterprise host in Community", func(t *testing.T) {
+		t.Cleanup(github.WithGitHubEnterpriseForTest(githubenterprise.NewService(licensing.Community)))
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
 		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
@@ -436,13 +440,16 @@ func Test__CreateIntegration(t *testing.T) {
 		name := support.RandomName("integration")
 		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, appConfig)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "GitHub Enterprise is not available")
+		assert.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+		assert.Equal(t, licensing.ErrNotLicensed.Error(), grpcerrors.StatusMessage(err))
 	})
 
-	t.Run("github wizard accepts GitHub Enterprise Cloud when the flag is on", func(t *testing.T) {
+	t.Run("github wizard accepts GitHub Enterprise Cloud when the license grants it", func(t *testing.T) {
+		t.Cleanup(github.WithGitHubEnterpriseForTest(githubenterprise.NewService(
+			licensingtest.EnterpriseService(licensing.FeatureGitHubEnterprise),
+		)))
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
-		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureGitHubEnterprise))
 
 		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "99")
 		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
@@ -471,6 +478,30 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Equal(t, true, stored.Configuration.Data()["privateApp"])
 		_, bindErr := models.FindVCSProviderIntegrationBinding(database.Conn(), stored.ID)
 		assert.ErrorIs(t, bindErr, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("github wizard deletes a GitHub Enterprise integration without a license", func(t *testing.T) {
+		t.Cleanup(github.WithGitHubEnterpriseForTest(githubenterprise.NewService(
+			licensingtest.EnterpriseService(licensing.FeatureGitHubEnterprise),
+		)))
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+		t.Cleanup(github.WithProbeGitHubHostForTest(func(core.HTTPContext, githubcommon.Host, uuid.UUID) error {
+			return nil
+		}))
+
+		appConfig, err := structpb.NewStruct(map[string]any{"host": "acme.ghe.com"})
+		require.NoError(t, err)
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, appConfig)
+		require.NoError(t, err)
+
+		t.Cleanup(github.WithGitHubEnterpriseForTest(githubenterprise.NewService(licensing.Community)))
+		_, err = DeleteIntegration(ctx, org.ID.String(), response.Integration.Metadata.Id)
+		require.NoError(t, err)
+		_, err = models.FindIntegrationByName(database.Conn(), org.ID, name)
+		assert.Error(t, err)
 	})
 
 	t.Run("smtp host does not force the GitHub wizard", func(t *testing.T) {

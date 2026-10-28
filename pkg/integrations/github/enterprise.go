@@ -13,26 +13,48 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
 )
-
-const gitHubEnterpriseUnavailable = "GitHub Enterprise is not available"
 
 type gitHubMetaResponse struct {
 	InstalledVersion string `json:"installed_version"`
 }
 
 var (
-	orgHasGitHubEnterprise       = githubEnterpriseEnabled
+	gitHubEnterprise             enterprise.GitHubEnterprise
 	orgHasGitHubEnterpriseServer = githubEnterpriseServerEnabled
 	probeGitHubHost              = ProbeGitHubHost
 )
 
-func githubEnterpriseEnabled(orgID uuid.UUID) bool {
-	ok, err := models.HasExperimentalFeature(orgID, features.FeatureGitHubEnterprise)
-	return err == nil && ok
+// SetGitHubEnterprise installs the Enterprise capability that authorizes
+// connections to a GitHub host other than github.com. A nil value is
+// Community mode.
+func SetGitHubEnterprise(impl enterprise.GitHubEnterprise) {
+	gitHubEnterprise = impl
+}
+
+func authorizeGitHubEnterpriseHost(host common.Host) error {
+	if host.IsDotCom() {
+		return nil
+	}
+	impl := gitHubEnterprise
+	if impl == nil {
+		return grpcerrors.PermissionDenied(licensing.ErrNotLicensed, licensing.ErrNotLicensed.Error())
+	}
+	return impl.AuthorizeHost(host.WebHostname())
+}
+
+func gitHubEnterpriseLicensed() bool {
+	impl := gitHubEnterprise
+	if impl == nil {
+		return false
+	}
+	return impl.AuthorizeHost("acme.ghe.com") == nil
 }
 
 func githubEnterpriseServerEnabled(orgID uuid.UUID) bool {
@@ -40,18 +62,15 @@ func githubEnterpriseServerEnabled(orgID uuid.UUID) bool {
 	return err == nil && ok
 }
 
-func githubEnterpriseEnabledForOrg(orgID string) bool {
-	id, err := uuid.Parse(orgID)
-	if err != nil {
-		return false
-	}
-	return orgHasGitHubEnterprise(id)
+func withGitHubEnterpriseForTest(impl enterprise.GitHubEnterprise) func() {
+	previous := gitHubEnterprise
+	gitHubEnterprise = impl
+	return func() { gitHubEnterprise = previous }
 }
 
-func withGitHubEnterpriseForTest(fn func(uuid.UUID) bool) func() {
-	previous := orgHasGitHubEnterprise
-	orgHasGitHubEnterprise = fn
-	return func() { orgHasGitHubEnterprise = previous }
+// WithGitHubEnterpriseForTest replaces the GitHub Enterprise capability.
+func WithGitHubEnterpriseForTest(impl enterprise.GitHubEnterprise) func() {
+	return withGitHubEnterpriseForTest(impl)
 }
 
 func withGitHubEnterpriseServerForTest(fn func(uuid.UUID) bool) func() {

@@ -73,9 +73,10 @@ The AWS integration uses OpenID Connect. When running locally, AWS IAM needs an 
 
 ## GitHub Enterprise Cloud (local)
 
-Turn on the `github_enterprise` organization feature. Set
-`SUPERPLANE_GITHUB_ENTERPRISE_ALLOWED_HOSTS` in `.env` if you want to limit
-hostnames. Empty allows any hostname that SuperPlane accepts.
+GitHub Enterprise Cloud needs a SuperPlane Enterprise license that grants
+`github_enterprise`. Local development grants every Enterprise feature by
+default. Set `SUPERPLANE_GITHUB_ENTERPRISE_ALLOWED_HOSTS` in `.env` if you
+want to limit hostnames. Empty allows any hostname that SuperPlane accepts.
 
 First-run then offers GitHub Enterprise Cloud. Create a GitHub App on the
 enterprise organization. SuperPlane does not use the hosted GitHub App for

@@ -13,8 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/test/support/contexts"
+	"google.golang.org/grpc/codes"
 )
 
 func TestHostAllowed(t *testing.T) {
@@ -138,15 +141,23 @@ func TestWizardCreateConfigurationEnterprise(t *testing.T) {
 		assert.Equal(t, "", got[common.ConfigHost])
 	})
 
-	t.Run("rejects GitHub Enterprise hosts when the flag is off", func(t *testing.T) {
+	t.Run("rejects GitHub Enterprise hosts in Community", func(t *testing.T) {
+		t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
 		_, err := WizardCreateConfiguration(orgID, map[string]any{"host": "acme.ghe.com"}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "GitHub Enterprise is not available")
+		assert.Equal(t, licensing.ErrNotLicensed.Error(), grpcerrors.StatusMessage(err))
+		assert.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
 	})
 
-	t.Run("accepts ghe.com when the flag is on", func(t *testing.T) {
-		restoreFlag := withGitHubEnterpriseForTest(func(uuid.UUID) bool { return true })
-		t.Cleanup(restoreFlag)
+	t.Run("accepts github.com in Community", func(t *testing.T) {
+		t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
+		got, err := WizardCreateConfiguration(orgID, map[string]any{"host": "github.com"}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "", got[common.ConfigHost])
+	})
+
+	t.Run("accepts ghe.com when the license grants GitHub Enterprise", func(t *testing.T) {
+		withLicensedGitHubEnterprise(t)
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		}}
@@ -159,8 +170,7 @@ func TestWizardCreateConfigurationEnterprise(t *testing.T) {
 	})
 
 	t.Run("rejects a host outside the allowlist", func(t *testing.T) {
-		restoreFlag := withGitHubEnterpriseForTest(func(uuid.UUID) bool { return true })
-		t.Cleanup(restoreFlag)
+		withLicensedGitHubEnterprise(t)
 		t.Setenv(config.EnvGitHubEnterpriseAllowedHosts, "allowed.ghe.com")
 		_, err := WizardCreateConfiguration(orgID, map[string]any{"host": "acme.ghe.com"}, &contexts.HTTPContext{})
 		require.Error(t, err)
