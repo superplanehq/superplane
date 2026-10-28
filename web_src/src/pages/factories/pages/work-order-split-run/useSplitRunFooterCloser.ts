@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useWorkOrderEvents } from "@/hooks/useFactoryData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
+import { githubWebHostFromUrl } from "@/lib/githubHost";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -26,12 +27,13 @@ export function useSplitRunFooterCloser(
     () => footerCloserFromEvents(events, displayStatus, resolveUser),
     [displayStatus, events, resolveUser],
   );
-  const apiHref = useMemo(() => {
+  const latestMerged = useMemo(() => {
     if (displayStatus !== "completed" || fromEvents.actor || fromEvents.automationHref) {
       return undefined;
     }
-    return githubPullRequestApiHref(latestMergedGitHubPullRequest(order.pullRequests)?.url);
+    return latestMergedGitHubPullRequest(order.pullRequests);
   }, [displayStatus, fromEvents.actor, fromEvents.automationHref, order.pullRequests]);
+  const apiHref = githubPullRequestApiHref(latestMerged?.url);
   const githubQuery = useQuery({
     queryKey: ["github-pull-request-merged-by", apiHref],
     queryFn: () => fetchGitHubMergedBy(apiHref ?? ""),
@@ -40,12 +42,12 @@ export function useSplitRunFooterCloser(
     retry: false,
   });
   return useMemo(() => {
-    const fromGitHub = closerFromGitHubMergedBy(githubQuery.data);
+    const fromGitHub = closerFromGitHubMergedBy(githubQuery.data, githubWebHostFromUrl(latestMerged?.url));
     if (!fromGitHub.automationName) {
       return fromEvents;
     }
     return { ...fromEvents, ...fromGitHub };
-  }, [fromEvents, githubQuery.data]);
+  }, [fromEvents, githubQuery.data, latestMerged?.url]);
 }
 
 async function fetchGitHubMergedBy(

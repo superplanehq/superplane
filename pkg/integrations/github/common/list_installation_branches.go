@@ -35,9 +35,16 @@ func ListInstallationBranchNames(
 		return nil, err
 	}
 
+	host := DotCom()
+	ApplyHostToInstallationTransport(installationTransport, host)
+	underlying, err := ApplyHostToGitHubClient(github.NewClient(&http.Client{Transport: installationTransport}), host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure GitHub API host: %w", err)
+	}
 	client := &Client{
 		authMethod: AuthMethodApp,
-		underlying: github.NewClient(&http.Client{Transport: installationTransport}),
+		host:       host,
+		underlying: underlying,
 	}
 	return client.branchNames(context.Background(), repository)
 }

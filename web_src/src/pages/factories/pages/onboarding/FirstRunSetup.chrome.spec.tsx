@@ -10,7 +10,6 @@ import { unmockedPackage } from "@/test/unmockedModule";
 
 import { billingState, defaultBillingState, refetchBilling } from "./FirstRunSetup.chrome.spec.billing";
 import { hostedVcsModel, pageModel, setupState } from "./FirstRunSetup.chrome.spec.fixtures";
-
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
@@ -52,7 +51,9 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
-
+vi.mock("./useFirstRunGitHubEnterprise", () => ({
+  useFirstRunGitHubEnterprise: () => ({ connect: vi.fn(), resume: vi.fn(), ready: false }),
+}));
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({
     data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },

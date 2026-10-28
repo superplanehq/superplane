@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -13,6 +14,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
@@ -414,5 +417,64 @@ func Test__CreateIntegration(t *testing.T) {
 		require.NotNil(t, response.Integration.Status.SetupState)
 		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
 		assert.Nil(t, response.Integration.Status.BrowserAction)
+
+		stored, err := models.FindIntegrationByName(database.Conn(), org.ID, name)
+		require.NoError(t, err)
+		assert.Equal(t, "", stored.Configuration.Data()["host"])
+		assert.Equal(t, true, stored.Configuration.Data()["privateApp"])
+	})
+
+	t.Run("github wizard rejects a GitHub Enterprise host", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+
+		appConfig, err := structpb.NewStruct(map[string]any{"privateApp": true, "host": "acme.ghe.com"})
+		require.NoError(t, err)
+
+		name := support.RandomName("integration")
+		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, appConfig)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "GitHub Enterprise is not available")
+	})
+
+	t.Run("github wizard accepts GitHub Enterprise Cloud when the flag is on", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureGitHubEnterprise))
+
+		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "99")
+		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
+		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+
+		restore := github.WithProbeGitHubHostForTest(func(core.HTTPContext, githubcommon.Host, uuid.UUID) error {
+			return nil
+		})
+		t.Cleanup(restore)
+
+		appConfig, err := structpb.NewStruct(map[string]any{"host": "acme.ghe.com"})
+		require.NoError(t, err)
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		require.NotNil(t, response.Integration.Status.SetupState)
+		assert.Nil(t, response.Integration.Status.BrowserAction)
+
+		stored, err := models.FindIntegrationByName(database.Conn(), org.ID, name)
+		require.NoError(t, err)
+		assert.Equal(t, "acme.ghe.com", stored.Configuration.Data()["host"])
+		assert.Equal(t, true, stored.Configuration.Data()["privateApp"])
+		_, bindErr := models.FindVCSProviderIntegrationBinding(database.Conn(), stored.ID)
+		assert.ErrorIs(t, bindErr, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("smtp host does not force the GitHub wizard", func(t *testing.T) {
+		assert.False(t, usesSetupWizard(r.Registry, r.Organization.ID, "smtp", map[string]any{"host": "smtp.gmail.com"}))
+		assert.True(t, usesSetupWizard(r.Registry, r.Organization.ID, "github", map[string]any{"host": "acme.ghe.com"}))
 	})
 }
