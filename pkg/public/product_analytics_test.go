@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -68,6 +69,32 @@ func useAnalytics(t *testing.T) *analyticsRecorder {
 		productanalytics.SetCurrent(previous)
 	})
 	return recorder
+}
+
+func TestAccountDeletionAnalyticsWithoutOrganizations(t *testing.T) {
+	r := support.Setup(t)
+	account, err := models.CreateAccount("No workspace", support.RandomName("account")+"@example.com")
+	require.NoError(t, err)
+	r.Account = account
+	server, _, token := setupTestServer(r, t)
+	recorder := useAnalytics(t)
+	body, err := json.Marshal(map[string]string{"email": account.Email})
+	require.NoError(t, err)
+	request := httptest.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	request.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	response := httptest.NewRecorder()
+	server.Router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusNoContent, response.Code)
+	events := recorder.snapshot()
+	require.Len(t, events, 1)
+	assert.Equal(t, productanalytics.EventAccountDeleted, events[0].Name)
+	assert.Empty(t, events[0].OrganizationID)
+	assert.Empty(t, events[0].Properties["deleted_organization_ids"])
+	assert.Equal(t, account.ID.String(), events[0].DistinctID)
+	assert.Equal(t, productanalytics.StableEventID(productanalytics.EventAccountDeleted, account.ID.String()), events[0].EventID)
+	deletedAt, err := time.Parse(time.RFC3339Nano, events[0].Properties["deleted_at"].(string))
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now(), deletedAt, time.Minute)
 }
 
 func TestOrganizationCreationAnalytics(t *testing.T) {

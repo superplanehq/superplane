@@ -2,6 +2,7 @@ package polar
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"time"
@@ -11,46 +12,94 @@ import (
 	"gorm.io/gorm"
 )
 
-// HasPaymentMethod reads saved cards from Polar, so removing a card blocks the next start.
+// PaymentMethodSnapshot contains only fields needed to assess availability.
+// Complete is false for a missing customer. Failed lists return an error.
+type PaymentMethodSnapshot struct {
+	ReadStartedAt time.Time
+	ObservedAt    time.Time
+	Complete      bool
+	Methods       []PaymentMethodAvailability
+}
+
+type PaymentMethodAvailability struct {
+	ID      string
+	Usable  bool
+	Expired bool
+}
+
+func (s PaymentMethodSnapshot) HasUsableMethod() bool {
+	for _, method := range s.Methods {
+		if method.Usable {
+			return true
+		}
+	}
+	return false
+}
+
+// HasPaymentMethod remains a read-only execution guard.
 func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
+	snapshot, err := c.PaymentMethods(ctx, externalID)
+	return snapshot.HasUsableMethod(), err
+}
+
+// PaymentMethods reads every page before accepting a complete observation.
+func (c *Client) PaymentMethods(ctx context.Context, externalID string) (PaymentMethodSnapshot, error) {
+	snapshot := PaymentMethodSnapshot{ReadStartedAt: time.Now().UTC()}
 	for page := 1; ; page++ {
 		var result struct {
 			Items []struct {
-				ID       string `json:"id"`
-				Type     string `json:"type"`
-				Metadata struct {
-					Month int `json:"exp_month"`
-					Year  int `json:"exp_year"`
-				} `json:"method_metadata"`
+				ID       string          `json:"id"`
+				Type     string          `json:"type"`
+				Metadata json.RawMessage `json:"method_metadata"`
 			} `json:"items"`
 			Pagination struct {
-				MaxPage int `json:"max_page"`
+				MaxPage *int `json:"max_page"`
 			} `json:"pagination"`
 		}
 		path := fmt.Sprintf("/customers/external/%s/payment-methods?limit=100&page=%d", url.PathEscape(externalID), page)
 		if err := c.get(ctx, path, &result); err != nil {
 			if IsNotFound(err) {
-				return false, nil
+				return PaymentMethodSnapshot{ReadStartedAt: snapshot.ReadStartedAt}, nil
 			}
-			return false, err
+			return PaymentMethodSnapshot{}, err
 		}
-		now := time.Now().UTC()
+		if result.Pagination.MaxPage == nil || *result.Pagination.MaxPage < 0 {
+			return PaymentMethodSnapshot{}, fmt.Errorf("payment method list has invalid pagination")
+		}
 		for _, method := range result.Items {
 			if method.ID == "" {
 				continue
 			}
-			if method.Type == "kr_card" {
-				return true, nil
-			}
-			if method.Type == "card" && method.Metadata.Month >= 1 && method.Metadata.Month <= 12 &&
-				(method.Metadata.Year > now.Year() || method.Metadata.Year == now.Year() && method.Metadata.Month >= int(now.Month())) {
-				return true, nil
-			}
+			snapshot.Methods = append(snapshot.Methods, paymentMethodAvailability(method.ID, method.Type, method.Metadata, snapshot.ReadStartedAt))
 		}
-		if page >= result.Pagination.MaxPage || len(result.Items) == 0 {
-			return false, nil
+		if page >= *result.Pagination.MaxPage {
+			snapshot.Complete = true
+			snapshot.ObservedAt = time.Now().UTC()
+			return snapshot, nil
 		}
 	}
+}
+
+func paymentMethodAvailability(id, methodType string, raw json.RawMessage, now time.Time) PaymentMethodAvailability {
+	method := PaymentMethodAvailability{ID: id}
+	if methodType == "kr_card" {
+		method.Usable = true
+		return method
+	}
+	if methodType != "card" {
+		return method
+	}
+	var metadata struct {
+		Month int `json:"exp_month"`
+		Year  int `json:"exp_year"`
+	}
+	if json.Unmarshal(raw, &metadata) != nil || metadata.Month < 1 || metadata.Month > 12 || metadata.Year < 1 || metadata.Year > 9999 {
+		return method
+	}
+	now = now.UTC()
+	method.Expired = metadata.Year < now.Year() || metadata.Year == now.Year() && metadata.Month < int(now.Month())
+	method.Usable = !method.Expired
+	return method
 }
 
 func AssertOrganizationPaymentMethod(tx *gorm.DB, orgID uuid.UUID) error {

@@ -26,6 +26,7 @@ import (
 
 func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	r := support.Setup(t)
+	recorder := recordPaymentAnalytics(t)
 	defer r.Close()
 	db := database.DB(t.Context())
 	plan := billingmodels.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: "Pay as you go", Category: "paid", Visibility: "public", RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
@@ -64,6 +65,13 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
 	hasCard = false
 	require.ErrorIs(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID), billingmodels.ErrPaymentMethodRequired)
+	require.Empty(t, recorder.snapshot(), "execution guards do not record observations")
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), req, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	require.Len(t, recorder.snapshot(), 1, "plan rejection does not undo the accepted observation")
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), req, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	require.Len(t, recorder.snapshot(), 1)
 	plan.RequirePaymentMethod = false
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))

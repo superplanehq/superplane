@@ -62,6 +62,31 @@ func TestClientCaptureAddsFactoryEnvelope(t *testing.T) {
 	assert.Equal(t, "manual", capture.Properties["creation_source"])
 }
 
+func TestDeletionAndPaymentEnvelopes(t *testing.T) {
+	for _, name := range []EventName{"account_deleted", "organization_deleted", "factory_deleted", "payment_method_removed"} {
+		t.Run(string(name), func(t *testing.T) {
+			queue := &recordingQueue{}
+			client := newClient(queue)
+			event := Event{Name: name, EventID: StableEventID(name, "entity"), DistinctID: "actor", ActorType: ActorUser, Source: SourceAPI}
+			client.Capture(event)
+			if name == "account_deleted" {
+				require.Len(t, queue.messages, 1)
+				capture := queue.messages[0].(posthog.Capture)
+				assert.Empty(t, capture.Groups)
+				assert.NotContains(t, capture.Properties, "organization_id")
+			} else {
+				assert.Empty(t, queue.messages)
+			}
+			event.OrganizationID = "organization"
+			client.Capture(event)
+			require.NotEmpty(t, queue.messages)
+			capture := queue.messages[len(queue.messages)-1].(posthog.Capture)
+			assert.Equal(t, "organization", capture.Groups[OrganizationGroup])
+			assert.Equal(t, StableEventID(name, "entity").String(), capture.Uuid)
+		})
+	}
+}
+
 func TestClientCaptureRejectsIncompleteEvents(t *testing.T) {
 	queue := &recordingQueue{}
 	client := newClient(queue)
