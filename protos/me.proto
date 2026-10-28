@@ -414,6 +414,7 @@ message NotificationSettings {
     TYPE_WORK_ORDER_STATUS_NOTE_OWNED = 2;
     TYPE_WORK_ORDER_AGENT_QUESTION = 3;
     TYPE_WORK_ORDER_PLAN_READY = 4;
+    TYPE_WORK_ORDER_OWNER_ASSIGNED = 5;
   }
 
   enum WorkspaceScope {

@@ -102,7 +102,12 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 const PLANNING_READONLY_TOOLS = "Read,Bash";
 
 function analysisAllowedTools() {
-  return ["mcp__superplane__propose_update", "mcp__superplane__inspect_attachment"];
+  return [
+    "mcp__superplane__propose_update",
+    "mcp__superplane__inspect_attachment",
+    "mcp__superplane__suggest_owners",
+    "mcp__superplane__assign_owner",
+  ];
 }
 const ARTIFACT_ALLOWED_TOOLS = [
   "mcp__superplane__inspect_screenshot",

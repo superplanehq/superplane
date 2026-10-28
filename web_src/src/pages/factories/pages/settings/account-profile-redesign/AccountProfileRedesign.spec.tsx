@@ -131,12 +131,12 @@ describe("AccountProfileRedesignPlayground", () => {
       "Link accounts from other services. Each account has its own use. This does not change how you sign in.",
     );
     expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
-      "Velocity uses your GitHub account to credit your pull requests.",
+      "Velocity uses your GitHub account to credit your pull requests. Task assignment uses it to find code that you changed.",
     );
 
     await user.click(screen.getByRole("button", { name: "Link GitHub" }));
     expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
-      "Linked as ada-lovelace. Velocity uses this account to credit your pull requests.",
+      "Linked as ada-lovelace. Velocity uses this account to credit your pull requests. Task assignment uses it to find code that you changed.",
     );
     expect(screen.queryByRole("button", { name: "Link another GitHub account" })).not.toBeInTheDocument();
 
@@ -145,7 +145,7 @@ describe("AccountProfileRedesignPlayground", () => {
     );
     expect(
       screen.getByText(
-        "Velocity reports will no longer credit pull requests from this GitHub account. Your sign-in methods do not change.",
+        "Velocity reports will no longer credit pull requests from this GitHub account. Task assignment will no longer use its code history. Your sign-in methods do not change.",
       ),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove account" }));

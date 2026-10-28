@@ -215,6 +215,8 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 			assert.Contains(t, joined, "developer_instructions")
 			assert.Contains(t, args, `mcp_servers.superplane.tools.propose_update.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"`)
+			assert.Contains(t, args, `mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"`)
+			assert.Contains(t, args, `mcp_servers.superplane.tools.assign_owner.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
 			assertForwardsMCPEnvVars(t, args,
 				"SUPERPLANE_BASE_URL",
@@ -227,7 +229,7 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 				"SUPERPLANE_ANALYSIS_SCORE_FILE",
 			)
 			assert.NotContains(t, joined, "run-token-secret")
-			assert.Equal(t, 2, strings.Count(joined, "approval_mode="))
+			assert.Equal(t, 4, strings.Count(joined, "approval_mode="))
 			assert.NotContains(t, joined, "default_tools_approval_mode")
 		})
 	}
