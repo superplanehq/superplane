@@ -256,13 +256,10 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 		if err := s.refuseAccountDeleteGuards(tx, account); err != nil {
 			return err
 		}
-		deletedOrganizations, err = models.ListOrganizationsPendingAccountDeletion(tx, account.ID)
-		if err != nil {
-			return err
-		}
 		// SoftDelete locks all affected organizations in ID order. Keep
 		// those locks before removing grants, as member removal does.
-		if err := account.SoftDelete(tx, time.Now(), clearances); err != nil {
+		deletedOrganizations, err = account.SoftDelete(tx, time.Now(), clearances)
+		if err != nil {
 			return err
 		}
 		if err := s.removeAccountOrganizationGrants(tx, users); err != nil {
