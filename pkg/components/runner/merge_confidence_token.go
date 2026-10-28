@@ -251,6 +251,18 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvir
 		return nil, fmt.Errorf("merge confidence requires a factory canvas")
 	}
 
+	factory, err := models.FindFactory(database.DB(context.Background()), orgID, *canvas.FactoryID)
+	if err != nil {
+		return nil, fmt.Errorf("merge confidence workspace: %w", err)
+	}
+	if factory.OnboardingConfigValue().CodexSubscription {
+		order, err := models.FindSubscriptionWorkOrderForRun(database.DB(context.Background()), orgID, factory.ID, ctx.RunID)
+		if err != nil {
+			return nil, err
+		}
+		workOrderID = order.ID
+	}
+
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
 	if baseURL == "" {
 		return nil, fmt.Errorf("merge confidence requires a SuperPlane URL")

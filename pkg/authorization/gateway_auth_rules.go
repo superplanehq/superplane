@@ -781,6 +781,14 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/owner-eligibility"}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/work-orders/{order_id}:resume-handoff"}: {
+			Resource: "work_orders", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
 			Resource:                     "factories",
 			Action:                       "read",
@@ -789,19 +797,19 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
 			Resource:                     "factories",
-			Action:                       "update",
+			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/codex-connection:cancel"}: {
 			Resource:                     "factories",
-			Action:                       "update",
+			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
 		},
 		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
 			Resource:                     "factories",
-			Action:                       "update",
+			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
 		},
