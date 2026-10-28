@@ -147,6 +147,24 @@ func TestRunnerPlanningUpdateAssignsFallbackOwner(t *testing.T) {
 		assert.Equal(t, models.TaskOwnerSourceFallback, latestOwnerEventSource(t, order))
 	})
 
+	t.Run("assigns a fallback owner when an intake check exists", func(t *testing.T) {
+		r := support.Setup(t)
+		server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+		db := database.DB(t.Context())
+		free := mustTaskOwnerMember(t, r, "free-dev")
+		order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+		require.NoError(t, err)
+		_, err = order.ReportCheck(db, models.FactoryWorkOrderCheckParams{Key: "sentry-severity", Name: "Severity", Score: 2, MaxScore: 3})
+		require.NoError(t, err)
+
+		rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/updates", `{`+scores+`, "spec": "# Plan"}`)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+		order, err = factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+		require.NoError(t, err)
+		assert.Equal(t, []uuid.UUID{free.ID}, order.AssigneeIDs())
+	})
+
 	t.Run("keeps the owner the agent chose", func(t *testing.T) {
 		r := support.Setup(t)
 		server, session, factoryModel, token := mustPlanningRunnerSession(t, r)

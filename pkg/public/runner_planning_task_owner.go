@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -162,6 +163,14 @@ func (s *Server) assignFallbackTaskOwner(r *http.Request, session *models.Factor
 	}
 }
 
+// planningReviewCheckKeys are the checks that planning reports. Checks from
+// other automations do not mean that planning already ran.
+var planningReviewCheckKeys = []string{
+	models.PlanningClarityCheckKey,
+	models.PlanningComplexityCheckKey,
+	models.PlanningVerifiabilityCheckKey,
+}
+
 // planningSessionHasScores reports whether planning already scored the task.
 // The first scored update ends the first planning turn, which is when the
 // task must have an owner.
@@ -174,7 +183,9 @@ func planningSessionHasScores(db *gorm.DB, session *models.FactoryPlanningSessio
 		log.WithError(err).Warnf("fallback task owner skipped for session %s", session.ID)
 		return true
 	}
-	return len(checks[*session.DraftWorkOrderID]) > 0
+	return slices.ContainsFunc(checks[*session.DraftWorkOrderID], func(check models.FactoryWorkOrderCheck) bool {
+		return slices.Contains(planningReviewCheckKeys, check.Key)
+	})
 }
 
 func assignPlanningTaskOwner(db *gorm.DB, order *models.FactoryWorkOrder, assignment models.TaskOwnerAssignment) (bool, error) {

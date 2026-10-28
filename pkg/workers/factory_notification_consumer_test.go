@@ -524,6 +524,32 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.Empty(t, *published)
 	})
 
+	t.Run("browser assignment alert includes the reason", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		consumer, published := capturingConsumer(newConsumer(services.NewNoopEmailService()))
+		consume(t, consumer, messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:   r.Organization.ID.String(),
+			FactoryID:        factoryModel.ID.String(),
+			OrderID:          order.ID.String(),
+			EventType:        factoryevents.EventTypeOrderAssigneesUpdated,
+			ActorName:        messages.TaskOwnerActorName,
+			AssignedUserIDs:  []string{owner.ID.String()},
+			AssignmentReason: "You changed pkg/auth most often.",
+		})
+
+		require.Len(t, *published, 1)
+		assert.Contains(t, (*published)[0].Body, "SuperPlane assigned")
+		assert.Contains(t, (*published)[0].Body, "You changed pkg/auth most often.")
+
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+	})
+
 	t.Run("browser channel off publishes nothing", func(t *testing.T) {
 		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope:        models.NotificationWorkspaceScopeAll,

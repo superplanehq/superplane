@@ -254,13 +254,22 @@ func (c *FactoryNotificationConsumer) publishBrowserNotifications(
 			OrderKey:       orderKey,
 			EventType:      recipient.notificationType,
 			Title:          content.Subject,
-			Body:           content.Data.Summary,
+			Body:           browserNotificationBody(message, content),
 			URLPath:        urlPath,
 		})
 		if err != nil {
 			log.Errorf("Failed to publish browser notification for user %s: %v", recipient.userID, err)
 		}
 	}
+}
+
+// browserNotificationBody adds the assignment reason, because a browser
+// alert has no detail section like the email.
+func browserNotificationBody(message messages.FactoryWorkOrderNotificationMessage, content workOrderNotificationContent) string {
+	if message.EventType != factory.EventTypeOrderAssigneesUpdated || content.Data.Detail == "" {
+		return content.Data.Summary
+	}
+	return content.Data.Summary + " " + content.Data.Detail
 }
 
 // resolveRecipients returns the email and browser recipients that should
