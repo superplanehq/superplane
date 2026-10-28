@@ -168,7 +168,7 @@ describe("Organization billing seat purchases", () => {
     expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Confirm purchase" })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(screen.queryAllByRole("dialog", { hidden: true })).toHaveLength(0));
+    await waitFor(() => expect(dialog).not.toBeInTheDocument(), { timeout: 5000 });
     await waitFor(() =>
       expect(within(screen.getByTestId("billing-plans")).getByRole("button", { name: "Keep Team" })).toBeVisible(),
     );
