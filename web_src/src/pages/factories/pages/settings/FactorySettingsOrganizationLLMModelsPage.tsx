@@ -20,6 +20,7 @@ import {
 import { ModelSourceBody } from "./llmModelSourceBody";
 import { byokProviderProductName, ORGANIZATION_LLM_MODELS_COPY as COPY } from "./organizationLLMModelsCopy";
 import { workspaceModelSource } from "./workspaceModelSource";
+import { FactoryCodexSubscriptionConnection } from "./FactoryCodexSubscriptionConnection";
 import { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
 
 type BYOKQuery = ReturnType<typeof useBYOKLLMModels>;
@@ -92,6 +93,7 @@ export function FactorySettingsOrganizationLLMModelsPage() {
   return (
     <FactorySettingsPageFrame title={COPY.pageTitle} subtitle={COPY.pageSubtitle}>
       <div data-testid="factory-settings-llm-models" className="flex flex-col gap-5">
+        {subscription.selected ? <FactoryCodexSubscriptionConnection codex={subscription.codex} /> : null}
         <FactorySettingsCard
           title={COPY.modelsTitle}
           data-testid="llm-models-list"
@@ -161,6 +163,7 @@ function useCodexSubscriptionCatalog(organizationId: string, factoryId: string, 
 
   return {
     selected,
+    codex,
     body: {
       subscriptionModels: selected ? models : undefined,
       subscriptionLoading: loading,

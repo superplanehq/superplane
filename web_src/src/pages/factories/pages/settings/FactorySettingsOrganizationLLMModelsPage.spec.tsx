@@ -1,23 +1,19 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, within } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
+  factoriesCancelFactoryCodexConnection,
   factoriesDescribeFactoryCodexConnection,
   factoriesStartFactoryCodexConnection,
-  type FactoriesFactory,
-  type FactoryOnboardingAgentHarness,
+  type FactoriesFactoryCodexConnection,
 } from "@/api-client";
-import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
-import { TooltipProvider } from "@/ui/tooltip";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
-import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
-import { FactorySettingsOrganizationLLMModelsPage } from "./FactorySettingsOrganizationLLMModelsPage";
+import { renderPage } from "./organizationLLMModels.spec.render";
 import { factoryCodexConnectionKey } from "../onboarding/useFactoryCodexConnection";
 
 const saveModels = vi.fn();
@@ -28,13 +24,7 @@ let enabledFeatures: string[] = ["organization_byok"];
 let productAllowed = true;
 let hostedModels: Array<{ key: string; label: string; provider: string }> = [];
 let selectedHostedModels: typeof hostedModels = [];
-let codexConnection:
-  | {
-      status?: string;
-      reservationHeld?: boolean;
-      availableModels?: string[];
-    }
-  | undefined;
+let codexConnection: FactoriesFactoryCodexConnection | undefined;
 
 type BYOKQuery = {
   data: {
@@ -147,32 +137,10 @@ function setConnected(provider: string, candidateIds: string[], selectedIds = ca
   };
 }
 
-function renderPage(agentHarness?: FactoryOnboardingAgentHarness, codexSubscription = false, client?: QueryClient) {
-  const factory: FactoriesFactory = {
-    ...REFUND_FACTORY,
-    onboarding: { ...REFUND_FACTORY.onboarding, agentHarness, codexSubscription },
-  };
-  return render(
-    <QueryClientProvider client={client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter>
-        <TooltipProvider>
-          <IntegrationsBasePathProvider basePath="/org-1/workspaces/RF/settings/organization/integrations">
-            <FactorySettingsLayoutContext.Provider
-              value={{ organizationId: "org-1", factoryId: REFUND_FACTORY.id ?? "factory-1", factory }}
-            >
-              <FactorySettingsOrganizationLLMModelsPage />
-            </FactorySettingsLayoutContext.Provider>
-          </IntegrationsBasePathProvider>
-        </TooltipProvider>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-}
-
 describe("FactorySettingsOrganizationLLMModelsPage", () => {
   beforeEach(() => {
     canUpdate = true;
-    enabledFeatures = ["organization_byok"];
+    enabledFeatures = ["organization_byok", "codex_subscriptions"];
     productAllowed = true;
     hostedModels = [
       { key: "hosted::anthropic::claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6", provider: "anthropic" },
@@ -183,6 +151,9 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
       .mockReset()
       .mockImplementation(async () => ({ data: { connection: codexConnection } }) as never);
     vi.mocked(factoriesStartFactoryCodexConnection)
+      .mockReset()
+      .mockResolvedValue({ data: {} } as never);
+    vi.mocked(factoriesCancelFactoryCodexConnection)
       .mockReset()
       .mockResolvedValue({ data: {} } as never);
     saveHostedModels.mockReset();
@@ -208,6 +179,36 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("SuperPlane");
     expect(screen.getByTestId("llm-models-hosted")).toHaveTextContent("anthropic/claude-sonnet-4-6");
     expect(screen.queryByText("claude-opus-4-6")).not.toBeInTheDocument();
+  });
+
+  it("starts ChatGPT reconnection from completed workspace settings", async () => {
+    codexConnection = { status: "reconnect_required", eligible: true };
+    renderPage("AGENT_HARNESS_CODEX", true);
+    const connect = await screen.findByRole("button", { name: "Connect ChatGPT" });
+    await waitFor(() => expect(connect).toBeEnabled());
+    await userEvent.setup().click(connect);
+    expect(factoriesStartFactoryCodexConnection).toHaveBeenCalledTimes(1);
+    expect(switchSource).not.toHaveBeenCalled();
+  });
+
+  it("shows the ChatGPT device code and can cancel sign-in from settings", async () => {
+    codexConnection = {
+      status: "pending",
+      eligible: true,
+      verificationUrl: "https://auth.openai.com/codex/device",
+      verificationCode: "ABCD-1234",
+    };
+    renderPage("AGENT_HARNESS_CODEX", true);
+    expect(await screen.findByText("ABCD-1234")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cancel sign-in" }));
+    expect(factoriesCancelFactoryCodexConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables ChatGPT reconnection for readers", async () => {
+    canUpdate = false;
+    codexConnection = { status: "reconnect_required", eligible: true };
+    renderPage("AGENT_HARNESS_CODEX", true);
+    expect(await screen.findByRole("button", { name: "Connect ChatGPT" })).toBeDisabled();
   });
 
   it("keeps the organization hosted model list when the workspace uses its own key", () => {
