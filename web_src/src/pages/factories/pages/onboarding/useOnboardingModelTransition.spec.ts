@@ -22,7 +22,14 @@ vi.mock("./useOnboardingCardStep", () => ({ useOnboardingCardStep: () => ({ ...c
 beforeEach(() => {
   verify.mockReset().mockResolvedValue(true);
   toast.mockClear();
-  Object.assign(cardStep, { ready: true, failed: false, available: false, required: false, plans: [], planActive: false });
+  Object.assign(cardStep, {
+    ready: true,
+    failed: false,
+    available: false,
+    required: false,
+    plans: [],
+    planActive: false,
+  });
 });
 function mount(
   saving = false,
