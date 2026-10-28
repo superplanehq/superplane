@@ -186,7 +186,8 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = s.softDeleteAccount(r.Context(), account)
+	actorID := account.ID
+	deletedOrganizations, err := s.softDeleteAccount(r.Context(), account)
 	if errors.Is(err, billing.ErrOrganizationSubscriptionLive) {
 		log.WithError(err).WithField("account_id", account.ID.String()).Info("account deletion blocked by a live subscription")
 		http.Error(w, billing.ErrOrganizationSubscriptionLive.Error(), http.StatusConflict)
@@ -218,6 +219,7 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	authentication.ClearAccountCookie(w, r)
+	captureAccountDeletion(r.Context(), actorID, account.ID, account.DeletedAt.Time, deletedOrganizations, "self_service")
 	w.WriteHeader(http.StatusNoContent)
 }
 

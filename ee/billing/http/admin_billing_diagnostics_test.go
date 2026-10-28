@@ -113,7 +113,7 @@ func TestAdminBillingDiagnosticsManualCheck(t *testing.T) {
 						}
 						items = append(items, map[string]any{"id": "card", "type": "card", "method_metadata": map[string]any{"exp_month": int(expiry.Month()), "exp_year": expiry.Year()}})
 					}
-					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": items}))
+					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"items": items, "pagination": map[string]int{"max_page": 1}}))
 				case "/subscriptions/":
 					assert.Equal(t, orgID.String(), req.URL.Query().Get("external_customer_id"))
 					if tc.subscriptionCode != 0 {
