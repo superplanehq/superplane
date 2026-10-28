@@ -16,6 +16,8 @@ import {
 import { FactorySettingsCard } from "../FactorySettingsCard";
 import { SettingsActionRow } from "./accountProfileRedesignParts";
 
+const GITHUB_TASK_ASSIGNMENT_USE = "Task assignment uses it to find code that you changed.";
+
 export function AccountProfileAssociatedAccountsCard({
   githubAccounts,
   bitbucketAccounts = [],
@@ -50,7 +52,7 @@ export function AccountProfileAssociatedAccountsCard({
                     GitHub
                   </span>
                 }
-                description={`Linked as ${account.username}. Velocity uses this account to credit your pull requests.`}
+                description={`Linked as ${account.username}. Velocity uses this account to credit your pull requests. ${GITHUB_TASK_ASSIGNMENT_USE}`}
                 testId={
                   index === 0
                     ? "account-redesign-associated-github"
@@ -73,7 +75,7 @@ export function AccountProfileAssociatedAccountsCard({
                     GitHub
                   </span>
                 }
-                description="Velocity uses your GitHub account to credit your pull requests."
+                description={`Velocity uses your GitHub account to credit your pull requests. ${GITHUB_TASK_ASSIGNMENT_USE}`}
                 testId="account-redesign-associated-github"
                 action={
                   <Button type="button" size="sm" variant="outline" onClick={onLinkGithub}>
@@ -223,8 +225,8 @@ function RemoveAssociatedGithubDialog({
         <DialogHeader>
           <DialogTitle>Remove {username}?</DialogTitle>
           <DialogDescription>
-            Velocity reports will no longer credit pull requests from this GitHub account. Your sign-in methods do not
-            change.
+            Velocity reports will no longer credit pull requests from this GitHub account. Task assignment will no
+            longer use its code history. Your sign-in methods do not change.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

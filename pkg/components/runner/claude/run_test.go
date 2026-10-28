@@ -74,6 +74,8 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__propose_update")
 	assert.Contains(t, tools, "mcp__superplane__inspect_attachment")
+	assert.Contains(t, tools, "mcp__superplane__suggest_owners")
+	assert.Contains(t, tools, "mcp__superplane__assign_owner")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
 	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
 	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")

@@ -291,12 +291,16 @@ func (s *Server) handleRunnerPlanningUpdate(w http.ResponseWriter, r *http.Reque
 		update.Survey = &models.PlanningSessionSurvey{Questions: req.Survey.Questions}
 	}
 	hadSpec := messages.HasPlanningReadyPlan(db, session)
+	hadScores := planningSessionHasScores(db, session)
 	if err := session.ProposeUpdate(db, update); err != nil {
 		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
 	if update.Scores != nil {
 		publishPlanningScore(session)
+	}
+	if update.Scores != nil && !hadScores {
+		s.assignFallbackTaskOwner(r, session)
 	}
 	if strings.TrimSpace(update.Spec) != "" && !hadSpec {
 		messages.PublishPlanningPlanReady(db, session)
