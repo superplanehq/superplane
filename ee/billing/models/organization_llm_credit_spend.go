@@ -6,6 +6,8 @@ import (
 )
 
 type hostedCreditSpend struct {
+	TrialGrantedMicros       int64
+	TrialSpentMicros         int64
 	RemainingMicros          int64
 	IncludedRemainingMicros  int64
 	PurchasedRemainingMicros int64
@@ -67,10 +69,13 @@ func allocateHostedCreditSpend(
 	now time.Time,
 ) hostedCreditSpend {
 	var welcomeExpiresAt *time.Time
-	var superplane, purchased int64
+	var superplane, purchased, trialGranted int64
 	for _, grant := range grants {
 		if grant.Kind == LLMCreditGrantKindWelcome {
 			welcomeExpiresAt = grant.ExpiresAt
+		}
+		if grantCreditBucket(grant.Kind) == creditBucketWelcome && grant.AmountMicros > 0 {
+			trialGranted += grant.AmountMicros
 		}
 		switch grantCreditBucket(grant.Kind) {
 		case creditBucketWelcome, creditBucketIncluded, creditBucketAdmin:
@@ -83,7 +88,8 @@ func allocateHostedCreditSpend(
 	expired, live := splitCreditGrantsForSpend(grants, now)
 	consumedExpired := consumedExpiredGrantSpend(expired, billedAtOrBefore)
 
-	spend := billedMicros - consumedExpired
+	trialSpent := consumedExpired.TrialMicros
+	spend := billedMicros - consumedExpired.TotalMicros
 	if spend < 0 {
 		spend = 0
 	}
@@ -98,6 +104,9 @@ func allocateHostedCreditSpend(
 			}
 			left -= take
 			spend -= take
+			if grantCreditBucket(grant.Kind) == creditBucketWelcome {
+				trialSpent += take
+			}
 		}
 		switch grantCreditBucket(grant.Kind) {
 		case creditBucketWelcome:
@@ -124,6 +133,8 @@ func allocateHostedCreditSpend(
 	}
 
 	return hostedCreditSpend{
+		TrialGrantedMicros:       trialGranted,
+		TrialSpentMicros:         trialSpent,
 		RemainingMicros:          welcomeRemaining + includedRemaining + purchasedRemaining + adminRemaining,
 		IncludedRemainingMicros:  includedRemaining,
 		PurchasedRemainingMicros: purchasedRemaining,
@@ -150,14 +161,16 @@ func splitCreditGrantsForSpend(grants []OrganizationLLMCreditGrant, now time.Tim
 	return expired, live
 }
 
-func consumedExpiredGrantSpend(expired []OrganizationLLMCreditGrant, billedAtOrBefore map[int64]int64) int64 {
-	consumed := int64(0)
+type expiredCreditSpend struct{ TotalMicros, TrialMicros int64 }
+
+func consumedExpiredGrantSpend(expired []OrganizationLLMCreditGrant, billedAtOrBefore map[int64]int64) expiredCreditSpend {
+	consumed := expiredCreditSpend{}
 	for _, grant := range expired {
 		if grant.AmountMicros <= 0 || grant.ExpiresAt == nil {
 			continue
 		}
 		billed := billedAtOrBefore[grant.ExpiresAt.UTC().UnixNano()]
-		available := billed - consumed
+		available := billed - consumed.TotalMicros
 		if available < 0 {
 			available = 0
 		}
@@ -165,14 +178,17 @@ func consumedExpiredGrantSpend(expired []OrganizationLLMCreditGrant, billedAtOrB
 		if take > available {
 			take = available
 		}
-		consumed += take
+		consumed.TotalMicros += take
+		if grantCreditBucket(grant.Kind) == creditBucketWelcome {
+			consumed.TrialMicros += take
+		}
 	}
 	return consumed
 }
 
 func liveHostedSpendMicros(grants []OrganizationLLMCreditGrant, billedMicros int64, billedAtOrBefore map[int64]int64, now time.Time) int64 {
 	expired, _ := splitCreditGrantsForSpend(grants, now)
-	spend := billedMicros - consumedExpiredGrantSpend(expired, billedAtOrBefore)
+	spend := billedMicros - consumedExpiredGrantSpend(expired, billedAtOrBefore).TotalMicros
 	if spend < 0 {
 		return 0
 	}

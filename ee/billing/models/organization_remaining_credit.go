@@ -14,45 +14,43 @@ import (
 // allocateHostedCreditSpend, including expired welcome credit and negative
 // adjustments.
 func RemainingHostedCreditMicros(tx *gorm.DB, organizationIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
-	remaining := make(map[uuid.UUID]int64, len(organizationIDs))
-	if len(organizationIDs) == 0 {
-		return remaining, nil
-	}
-	for _, id := range organizationIDs {
-		remaining[id] = 0
-	}
-
-	var grants []OrganizationLLMCreditGrant
-	err := tx.Where("organization_id IN ?", organizationIDs).Find(&grants).Error
+	credits, err := hostedCreditSpendByOrganization(tx, organizationIDs)
 	if err != nil {
 		return nil, err
 	}
-
-	billed, err := sumHostedBilledMicrosByOrganization(tx, organizationIDs, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	billedAtExpiry, err := billedMicrosAtExpiredGrantExpiries(tx, grants, now)
-	if err != nil {
-		return nil, err
-	}
-
-	grantsByOrganization := make(map[uuid.UUID][]OrganizationLLMCreditGrant)
-	for _, grant := range grants {
-		grantsByOrganization[grant.OrganizationID] = append(grantsByOrganization[grant.OrganizationID], grant)
-	}
-
-	for _, id := range organizationIDs {
-		orgGrants := grantsByOrganization[id]
-		if len(orgGrants) == 0 {
-			continue
-		}
-		spend := allocateHostedCreditSpend(orgGrants, billed[id], billedAtExpiry[id], now)
-		remaining[id] = spend.RemainingMicros
+	remaining := make(map[uuid.UUID]int64, len(credits))
+	for id, credit := range credits {
+		remaining[id] = credit.RemainingMicros
 	}
 	return remaining, nil
+}
+
+func hostedCreditSpendByOrganization(tx *gorm.DB, ids []uuid.UUID) (map[uuid.UUID]hostedCreditSpend, error) {
+	credits := make(map[uuid.UUID]hostedCreditSpend, len(ids))
+	if len(ids) == 0 {
+		return credits, nil
+	}
+	var grants []OrganizationLLMCreditGrant
+	if err := tx.Where("organization_id IN ?", ids).Find(&grants).Error; err != nil {
+		return nil, err
+	}
+	billed, err := sumHostedBilledMicrosByOrganization(tx, ids, nil)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	atExpiry, err := billedMicrosAtExpiredGrantExpiries(tx, grants, now)
+	if err != nil {
+		return nil, err
+	}
+	byOrganization := map[uuid.UUID][]OrganizationLLMCreditGrant{}
+	for _, grant := range grants {
+		byOrganization[grant.OrganizationID] = append(byOrganization[grant.OrganizationID], grant)
+	}
+	for _, id := range ids {
+		credits[id] = allocateHostedCreditSpend(byOrganization[id], billed[id], atExpiry[id], now)
+	}
+	return credits, nil
 }
 
 type organizationHostedSpend struct {
