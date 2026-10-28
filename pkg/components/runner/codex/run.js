@@ -735,17 +735,18 @@ function codexErrorText(event) {
     .join("\n");
 }
 
-function codexModelCallOutcomes({ failed, errorText, model }) {
+function codexModelCallOutcomes({ failed, errorText, model, occurredAt }) {
   const id = String(model || "").trim();
   if (!id) {
     return [];
   }
+  const stamp = String(occurredAt || "").trim() || new Date().toISOString();
   if (!failed) {
-    return [{ model: id, outcome: "attempt_1" }];
+    return [{ model: id, outcome: "attempt_1", occurredAt: stamp }];
   }
   const kind = classifyCodexProviderError(errorText);
   if (kind === "rate_limit" || kind === "retryable") {
-    return [{ model: id, outcome: "error" }];
+    return [{ model: id, outcome: "error", occurredAt: stamp }];
   }
   return [];
 }

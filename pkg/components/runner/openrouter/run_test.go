@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -570,9 +571,33 @@ func TestRunPromptRetriesSelectedModelAfterRateLimit(t *testing.T) {
 	assert.Regexp(t, `✓ done · \d+ turns`, result.output)
 	payload := resultPayload(t, result.resultFile)
 	assert.Equal(t, "working", payload["result"])
-	assert.Equal(t, []any{
-		map[string]any{"model": "x-ai/grok-4.6", "outcome": "attempt_2"},
-	}, payload["modelCallOutcomes"])
+	assert.Equal(t, []map[string]string{
+		{"model": "x-ai/grok-4.6", "outcome": "attempt_2"},
+	}, modelCallOutcomePairs(t, payload["modelCallOutcomes"]))
+}
+
+func TestRunPromptScoresLaterRoundtripsAsFirstAttemptAfterRetry(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6-20260810. Please retry shortly."),
+			{
+				ExitCode: 0,
+				Stdout: []string{
+					`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"one"}}`,
+					`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+					`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"two"}}`,
+					`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+				},
+			},
+		},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assert.Equal(t, []map[string]string{
+		{"model": "x-ai/grok-4.6", "outcome": "attempt_2"},
+		{"model": "x-ai/grok-4.6", "outcome": "attempt_1"},
+	}, modelCallOutcomePairs(t, payload["modelCallOutcomes"]))
 }
 
 func TestRunPromptRecordsErrorAfterFourRateLimitAttempts(t *testing.T) {
@@ -587,9 +612,9 @@ func TestRunPromptRecordsErrorAfterFourRateLimitAttempts(t *testing.T) {
 	})
 	assert.Equal(t, 1, result.exitCode)
 	payload := resultPayload(t, result.resultFile)
-	assert.Equal(t, []any{
-		map[string]any{"model": "x-ai/grok-4.6", "outcome": "error"},
-	}, payload["modelCallOutcomes"])
+	assert.Equal(t, []map[string]string{
+		{"model": "x-ai/grok-4.6", "outcome": "error"},
+	}, modelCallOutcomePairs(t, payload["modelCallOutcomes"]))
 }
 
 func TestRunPromptOmitsModelCallOutcomesForHardAuthenticationErrors(t *testing.T) {
@@ -1928,6 +1953,26 @@ func requireNoTypedLiveLogLine(t *testing.T, output, needle string) {
 			require.Failf(t, "found typed live-log line", "wanted %q as plain stdout, not a type=line record; got %q", needle, liveLogLineTexts(t, output))
 		}
 	}
+}
+
+func modelCallOutcomePairs(t *testing.T, raw any) []map[string]string {
+	t.Helper()
+	rows, ok := raw.([]any)
+	require.True(t, ok)
+	out := make([]map[string]string, 0, len(rows))
+	for _, item := range rows {
+		row, ok := item.(map[string]any)
+		require.True(t, ok)
+		occurredAt, _ := row["occurredAt"].(string)
+		require.NotEmpty(t, occurredAt)
+		_, err := time.Parse(time.RFC3339Nano, occurredAt)
+		require.NoError(t, err)
+		out = append(out, map[string]string{
+			"model":   fmt.Sprint(row["model"]),
+			"outcome": fmt.Sprint(row["outcome"]),
+		})
+	}
+	return out
 }
 
 func resultPayload(t *testing.T, path string) map[string]any {

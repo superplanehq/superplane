@@ -18,12 +18,23 @@ func TestParseRunnerModelCallOutcomesSkipsEmptyModels(t *testing.T) {
 	inputs := parseRunnerModelCallOutcomes(
 		models.UsageProviderOpenRouter,
 		"task-1",
-		json.RawMessage(`{"modelCallOutcomes":[{"model":"openrouter/x-ai/grok-4.6","outcome":"attempt_2"},{"model":"","outcome":"error"}]}`),
+		json.RawMessage(`{"modelCallOutcomes":[{"model":"openrouter/x-ai/grok-4.6","outcome":"attempt_2","occurredAt":"2026-10-28T12:00:00.000Z"},{"model":"","outcome":"error"}]}`),
 	)
 	require.Len(t, inputs, 1)
 	assert.Equal(t, "x-ai/grok-4.6", inputs[0].Model)
 	assert.Equal(t, models.HostedModelCallOutcomeAttempt2, inputs[0].Outcome)
 	assert.Equal(t, 1, inputs[0].Sequence)
+	assert.Equal(t, time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC), inputs[0].OccurredAt.UTC())
+}
+
+func TestParseRunnerModelCallOutcomesLeavesMissingOccurredAtZero(t *testing.T) {
+	inputs := parseRunnerModelCallOutcomes(
+		models.UsageProviderAnthropic,
+		"task-1",
+		json.RawMessage(`{"modelCallOutcomes":[{"model":"claude-sonnet-4-6","outcome":"attempt_1"}]}`),
+	)
+	require.Len(t, inputs, 1)
+	assert.True(t, inputs[0].OccurredAt.IsZero())
 }
 
 func TestRecordRunnerModelCallOutcomesStoresHostedResultsOnce(t *testing.T) {
@@ -78,7 +89,7 @@ func TestProcessTaskStatusRecordsHostedModelCallOutcomes(t *testing.T) {
 		ID:       "task-finish-1",
 		State:    "succeeded",
 		ExitCode: &exit,
-		Result:   json.RawMessage(`{"modelCallOutcomes":[{"model":"gpt-5","outcome":"error"}]}`),
+		Result:   json.RawMessage(`{"modelCallOutcomes":[{"model":"gpt-5","outcome":"error","occurredAt":"2026-10-28T12:00:00.000Z"}]}`),
 	}
 	require.NoError(t, processTaskStatus(
 		&contexts.ExecutionStateContext{Finished: true},
@@ -99,5 +110,5 @@ func TestProcessTaskStatusRecordsHostedModelCallOutcomes(t *testing.T) {
 	assert.Equal(t, models.UsageProviderOpenAI, rows[0].Provider)
 	assert.Equal(t, "gpt-5", rows[0].Model)
 	assert.Equal(t, models.HostedModelCallOutcomeError, rows[0].Outcome)
-	assert.WithinDuration(t, time.Now(), rows[0].OccurredAt, 5*time.Second)
+	assert.Equal(t, time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC), rows[0].OccurredAt.UTC())
 }

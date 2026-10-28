@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { meListModelStatus, type MeModelStatusCell } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
@@ -68,8 +69,10 @@ export function FactorySettingsOrganizationModelStatusPage() {
       subtitle={COPY.pageSubtitle}
       wide
       actions={
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">{COPY.windowLabel}</span>
+        <div className="flex items-center gap-2 text-sm">
+          <Label htmlFor="model-status-window" className="text-muted-foreground font-normal">
+            {COPY.windowLabel}
+          </Label>
           <Select
             value={window}
             onValueChange={(value) => {
@@ -78,7 +81,12 @@ export function FactorySettingsOrganizationModelStatusPage() {
               }
             }}
           >
-            <SelectTrigger aria-label={COPY.windowLabel} className="w-[9.5rem]" data-testid="model-status-window">
+            <SelectTrigger
+              id="model-status-window"
+              aria-label={COPY.windowLabel}
+              className="w-[9.5rem]"
+              data-testid="model-status-window"
+            >
               <SelectValue>{modelStatusWindowLabel(window)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -89,7 +97,7 @@ export function FactorySettingsOrganizationModelStatusPage() {
               ))}
             </SelectContent>
           </Select>
-        </label>
+        </div>
       }
     >
       <FactorySettingsCard description={COPY.legend} data-testid="model-status-page">

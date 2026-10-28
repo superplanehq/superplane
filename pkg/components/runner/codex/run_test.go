@@ -24,18 +24,19 @@ func TestThinkingArgsMapsReasoningEffort(t *testing.T) {
 }
 
 func TestCodexModelCallOutcomesMapsSuccessAndProviderFailures(t *testing.T) {
+	stamp := "2026-10-28T12:00:00.000Z"
 	assert.Equal(t, []any{
-		map[string]any{"model": "gpt-5", "outcome": "attempt_1"},
+		map[string]any{"model": "gpt-5", "outcome": "attempt_1", "occurredAt": stamp},
 	}, codexModelCallOutcomesFromScript(t, map[string]any{
-		"failed": false, "model": "gpt-5",
+		"failed": false, "model": "gpt-5", "occurredAt": stamp,
 	}))
 	assert.Equal(t, []any{
-		map[string]any{"model": "gpt-5", "outcome": "error"},
+		map[string]any{"model": "gpt-5", "outcome": "error", "occurredAt": stamp},
 	}, codexModelCallOutcomesFromScript(t, map[string]any{
-		"failed": true, "errorText": "HTTP 429 Too Many Requests", "model": "gpt-5",
+		"failed": true, "errorText": "HTTP 429 Too Many Requests", "model": "gpt-5", "occurredAt": stamp,
 	}))
 	assert.Empty(t, codexModelCallOutcomesFromScript(t, map[string]any{
-		"failed": true, "errorText": "Invalid API key", "model": "gpt-5",
+		"failed": true, "errorText": "Invalid API key", "model": "gpt-5", "occurredAt": stamp,
 	}))
 }
 
