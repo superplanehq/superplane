@@ -513,7 +513,13 @@ function buildOpenCodeConfig({
       }
     }
   }
-  if ((planning || artifactEnabled(env) || mergeConfidenceEnabled(env)) && taskDir) {
+  if (
+    (planning ||
+      artifactEnabled(env) ||
+      mergeConfidenceEnabled(env) ||
+      envFlag(env, "SUPERPLANE_OWNER_TOKEN")) &&
+    taskDir
+  ) {
     config.mcp = {
       superplane: {
         type: "local",

@@ -6,7 +6,7 @@ import (
 )
 
 func TestTaskArtifactMCPNodeTests(t *testing.T) {
-	command := exec.Command("node", "--test", "task_artifact_mcp_test.js", "publish_link_test.js", "task_cli_test.js")
+	command := exec.Command("node", "--test", "task_artifact_mcp_test.js", "task_owner_mcp_test.js", "publish_link_test.js", "task_cli_test.js")
 	command.Dir = "."
 	output, err := command.CombinedOutput()
 	if err != nil {
