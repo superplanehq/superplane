@@ -661,6 +661,52 @@ func TestFormatStreamJsonLinesWithNoResultEventIsNotFailed(t *testing.T) {
 	assert.False(t, failed)
 }
 
+func TestClaudeModelCallOutcomesMapsRetriesAndProviderFailures(t *testing.T) {
+	assert.Equal(t, []any{
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_1"},
+	}, claudeModelCallOutcomesFromScript(t, map[string]any{
+		"failed": false, "apiRetryCount": 0, "model": "claude-sonnet-4-6",
+	}))
+	assert.Equal(t, []any{
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_3"},
+	}, claudeModelCallOutcomesFromScript(t, map[string]any{
+		"failed": false, "apiRetryCount": 2, "model": "claude-sonnet-4-6",
+	}))
+	assert.Equal(t, []any{
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "error"},
+	}, claudeModelCallOutcomesFromScript(t, map[string]any{
+		"failed": true, "sawRateLimit": true, "model": "claude-sonnet-4-6",
+	}))
+	assert.Empty(t, claudeModelCallOutcomesFromScript(t, map[string]any{
+		"failed":    true,
+		"errorText": "Failed to authenticate. API Error: 401 API key is invalid.",
+		"model":     "claude-sonnet-4-6",
+	}))
+}
+
+func claudeModelCallOutcomesFromScript(t *testing.T, input map[string]any) []any {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(input)
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { claudeModelCallOutcomes } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeModelCallOutcomes(JSON.parse(process.argv[2]))));`,
+		script,
+		string(payload),
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var outcomes []any
+	require.NoError(t, json.Unmarshal(out, &outcomes))
+	if outcomes == nil {
+		return []any{}
+	}
+	return outcomes
+}
+
 func claudePermissionModeFromScript(t *testing.T, env map[string]string) string {
 	t.Helper()
 	script, err := filepath.Abs("run.js")

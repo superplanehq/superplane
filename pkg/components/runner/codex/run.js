@@ -455,7 +455,10 @@ async function runPrompt(promptFile, model, thinking) {
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const stderrDone = pipeRedactedStderr(child.stderr);
+  let stderrText = "";
+  const stderrDone = pipeRedactedStderr(child.stderr, (line) => {
+    stderrText += `${line}\n`;
+  });
 
   let lastResult = {};
   const telemetry = loadTurnTelemetry();
@@ -523,6 +526,14 @@ async function runPrompt(promptFile, model, thinking) {
     thinkingLevel: rollout.effort || thinking,
     usage,
   };
+  const outcomes = codexModelCallOutcomes({
+    failed: exitCode !== 0,
+    errorText: `${codexErrorText(lastResult)}\n${stderrText}`,
+    model: payload.model,
+  });
+  if (outcomes.length > 0) {
+    payload.modelCallOutcomes = outcomes;
+  }
   telemetry.attachToResult(payload);
   const activityModule = loadActivityStreamModule();
   const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
@@ -688,12 +699,70 @@ function writeStderr(value) {
   process.stderr.write(redactSubscription(safe));
 }
 
-function pipeRedactedStderr(stream) {
+function pipeRedactedStderr(stream, onLine) {
   const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
   lines.on("line", (line) => {
+    if (onLine) {
+      onLine(line);
+    }
     writeStderr(`${line}\n`);
   });
   return new Promise((resolve) => lines.on("close", resolve));
+}
+
+function classifyCodexProviderError(text) {
+  const raw = String(text || "");
+  const lower = raw.toLowerCase();
+  if (
+    /invalid api key|incorrect api key|unauthorized|authentication|insufficient credit|insufficient credits|unknown model|model not found|context (length|window|overflow)|maximum context|prompt is too long/.test(
+      lower,
+    )
+  ) {
+    return "hard";
+  }
+  if (
+    /rate limit exceeded|rate limit reached|please retry shortly|\b429\b/.test(
+      lower,
+    ) ||
+    /too many requests/.test(lower)
+  ) {
+    return "rate_limit";
+  }
+  if (
+    /\b(502|503|504|529)\b/.test(lower) ||
+    /overloaded|unavailable|temporarily|capacity|timeout|econnreset|fetch failed|server error|bad gateway|service unavailable/.test(
+      lower,
+    )
+  ) {
+    return "retryable";
+  }
+  return "other";
+}
+
+function codexErrorText(event) {
+  if (!event || typeof event !== "object") {
+    return "";
+  }
+  const parts = [event.error, event.result, event.text, event.message];
+  return parts
+    .map((part) => (typeof part === "string" ? part : ""))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function codexModelCallOutcomes({ failed, errorText, model }) {
+  const id = String(model || "").trim();
+  if (!id) {
+    return [];
+  }
+  if (!failed) {
+    return [{ model: id, outcome: "attempt_1" }];
+  }
+  const kind = classifyCodexProviderError(errorText);
+  if (kind === "rate_limit" || kind === "retryable") {
+    return [{ model: id, outcome: "error" }];
+  }
+  return [];
 }
 
 function createCodexFormatter(telemetry, activityOverride) {
@@ -1106,6 +1175,7 @@ module.exports = {
   codexExecArgs,
   codexExecEnv,
   thinkingArgs,
+  codexModelCallOutcomes,
   codexSessionForPrompt,
   codexSessionIDFromEvent,
   planningEnabled,

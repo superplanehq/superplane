@@ -323,6 +323,22 @@ function isRetryableKind(kind) {
   return kind === "rate_limit" || kind === "retryable";
 }
 
+function attemptOutcome(attempt) {
+  const n = Math.min(MAX_ATTEMPTS, Math.max(1, Math.floor(Number(attempt) || 1)));
+  return `attempt_${n}`;
+}
+
+function appendModelCallOutcomes(outcomes, model, outcome, count) {
+  const id = catalogModelId(model);
+  const n = Math.max(0, Number(count) || 0);
+  if (!id || !outcome || n < 1) {
+    return;
+  }
+  for (let i = 0; i < n; i += 1) {
+    outcomes.push({ model: id, outcome });
+  }
+}
+
 function uniqueCatalogModels(ids) {
   const seen = new Set();
   const out = [];
@@ -812,6 +828,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let lastErrorText = "";
   let attempt = 1;
   let pendingSuccessfulRoundtrips = 0;
+  const modelCallOutcomes = [];
 
   while (true) {
     printLiveLogLine(callingOpenCodeLine(currentModel, attempt, env));
@@ -847,7 +864,14 @@ async function runPrompt(promptFile, model, helpers = {}) {
     }
     lastErrorText = spawnResult.errorText || "";
     const spawnFailed = spawnTurnFailed(spawnResult, formatter, planning);
-    pendingSuccessfulRoundtrips += Number(spawnResult.successfulRoundtrips) || 0;
+    const successfulRoundtrips = Number(spawnResult.successfulRoundtrips) || 0;
+    appendModelCallOutcomes(
+      modelCallOutcomes,
+      currentModel,
+      attemptOutcome(attempt),
+      successfulRoundtrips,
+    );
+    pendingSuccessfulRoundtrips += successfulRoundtrips;
     const resetHappened =
       pendingSuccessfulRoundtrips >= SUCCESSFUL_ROUNDTRIPS_TO_RESET;
     if (resetHappened) {
@@ -874,6 +898,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (attempt >= MAX_ATTEMPTS) {
       failed = true;
       exitCode = failedExit;
+      appendModelCallOutcomes(modelCallOutcomes, currentModel, "error", 1);
       printRetryOutcome(
         lastErrorText,
         stoppedAfterAttemptsLine(classKind, currentModel),
@@ -885,6 +910,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (remaining < waitMs || remaining <= 0) {
       failed = true;
       exitCode = 1;
+      appendModelCallOutcomes(modelCallOutcomes, currentModel, "error", 1);
       printRetryOutcome(lastErrorText, waitExceededTimeoutLine(classKind));
       break;
     }
@@ -927,6 +953,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
     model: catalogModelId(currentModel) || catalogModelId(model),
     usage,
   };
+  if (modelCallOutcomes.length > 0) {
+    payload.modelCallOutcomes = modelCallOutcomes;
+  }
   if (lastCost) {
     payload.total_cost_usd = lastCost;
   }
@@ -2209,6 +2238,8 @@ module.exports = {
   thinkingArgs,
   planningEnabled,
   classifyOpenRouterError,
+  attemptOutcome,
+  appendModelCallOutcomes,
   openRouterModelId,
   buildOpenCodeConfig,
   retryWaitMs,

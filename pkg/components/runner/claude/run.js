@@ -15,6 +15,7 @@ const { spawn, spawnSync } = require("child_process");
 const TOOL_RESULT_MAX_CHARS = 800;
 const TOOL_RESULT_MAX_LINES = 24;
 const SESSION_FILE = "claude_session";
+const MAX_STATUS_ATTEMPTS = 4;
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
@@ -496,7 +497,7 @@ async function runPrompt(promptFile, model, thinking) {
   formatter.flush(failed);
   activity.end(failed ? "failed" : "passed");
   await activity.flush();
-  const resultJSON = formatter.resultWithTelemetry();
+  const resultJSON = formatter.resultWithTelemetry({ failed, model });
   fs.writeFileSync(resultFile, `${resultJSON}\n`);
   accumulateLLMUsage(resultJSON, model);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
@@ -581,6 +582,9 @@ function createFormatter(promptFile, onSession, activityOverride) {
   let resultLine = "";
   let streamMessageId = "";
   let resultFailed = false;
+  let apiRetryCount = 0;
+  let sawRateLimit = false;
+  let errorText = "";
   const telemetry = loadTurnTelemetry();
   const tools = createToolTracker(telemetry);
   const activity =
@@ -615,6 +619,7 @@ function createFormatter(promptFile, onSession, activityOverride) {
         case "system":
           formatSystem(event);
           if (event.subtype === "api_retry") {
+            apiRetryCount += 1;
             activity.notice("retry", "Claude API request retry");
           }
           break;
@@ -677,10 +682,12 @@ function createFormatter(promptFile, onSession, activityOverride) {
           telemetry.applyBilledUsage(event);
           resultLine = line;
           resultFailed = Boolean(event.is_error);
+          errorText = claudeErrorText(event);
           formatResult(event);
           break;
         }
         case "rate_limit_event":
+          sawRateLimit = true;
           activity.notice("rate_limit", "Claude rate limit notice");
           println("Rate limit notice — waiting to continue…");
           break;
@@ -702,7 +709,7 @@ function createFormatter(promptFile, onSession, activityOverride) {
       }
       return "{}";
     },
-    resultWithTelemetry() {
+    resultWithTelemetry(options) {
       let parsed;
       try {
         parsed = JSON.parse(this.resultJSON());
@@ -711,6 +718,18 @@ function createFormatter(promptFile, onSession, activityOverride) {
       }
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
         parsed = {};
+      }
+      const failed = Boolean(options && options.failed);
+      const model = (options && options.model) || parsed.model || "";
+      const outcomes = claudeModelCallOutcomes({
+        failed,
+        apiRetryCount,
+        sawRateLimit,
+        errorText,
+        model,
+      });
+      if (outcomes.length > 0) {
+        parsed.modelCallOutcomes = outcomes;
       }
       telemetry.attachToResult(parsed, { name: promptSeriesName(promptFile) });
       const activity = loadActivityStreamModule();
@@ -835,6 +854,73 @@ function createToolTracker(telemetry) {
       }
     },
   };
+}
+
+function classifyClaudeProviderError(text) {
+  const raw = String(text || "");
+  const lower = raw.toLowerCase();
+  if (
+    /invalid api key|incorrect api key|unauthorized|authentication|insufficient credit|insufficient credits|unknown model|model not found|context (length|window|overflow)|maximum context|prompt is too long/.test(
+      lower,
+    )
+  ) {
+    return "hard";
+  }
+  if (
+    /rate limit exceeded|rate limit reached|please retry shortly|\b429\b/.test(
+      lower,
+    ) ||
+    /too many requests/.test(lower)
+  ) {
+    return "rate_limit";
+  }
+  if (
+    /\b(502|503|504|529)\b/.test(lower) ||
+    /overloaded|unavailable|temporarily|capacity|timeout|econnreset|fetch failed|server error|bad gateway|service unavailable/.test(
+      lower,
+    )
+  ) {
+    return "retryable";
+  }
+  return "other";
+}
+
+function claudeErrorText(event) {
+  if (!event || typeof event !== "object") {
+    return "";
+  }
+  if (typeof event.result === "string" && event.result.trim()) {
+    return event.result;
+  }
+  if (typeof event.error === "string" && event.error.trim()) {
+    return event.error;
+  }
+  return "";
+}
+
+function claudeModelCallOutcomes({
+  failed,
+  apiRetryCount,
+  sawRateLimit,
+  errorText,
+  model,
+}) {
+  const id = String(model || "").trim();
+  if (!id) {
+    return [];
+  }
+  if (!failed) {
+    const attempt = Math.min(
+      MAX_STATUS_ATTEMPTS,
+      Math.max(1, (Number(apiRetryCount) || 0) + 1),
+    );
+    return [{ model: id, outcome: `attempt_${attempt}` }];
+  }
+  const kind = classifyClaudeProviderError(errorText);
+  if (sawRateLimit || kind === "rate_limit" || kind === "retryable") {
+    return [{ model: id, outcome: "error" }];
+  }
+  return [];
 }
 
 function formatSystem(event) {
@@ -1374,6 +1460,7 @@ module.exports = {
   claudeContinuationArgs,
   claudePermissionMode,
   claudeSessionIDFromEvent,
+  claudeModelCallOutcomes,
   formatStreamJsonLines,
   planningSystemPrompt,
   thinkingArgs,
