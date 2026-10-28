@@ -21,6 +21,7 @@ vi.mock("@/contexts/useAccount", () => ({
 
 const pageLinks = [
   { label: "Organizations", href: "/admin", icon: "lucide-building" },
+  { label: "Statistics", href: "/admin/stats", icon: "lucide-chart-no-axes-combined" },
   { label: "Accounts", href: "/admin/accounts", icon: "lucide-users" },
   { label: "Settings", href: "/admin/settings", icon: "lucide-network" },
   { label: "Encryption", href: "/admin/encryption", icon: "lucide-key-round" },

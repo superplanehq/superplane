@@ -937,6 +937,9 @@ func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPl
 	if err != nil {
 		return nil, err
 	}
+	if err := grantSubscriptionSignupCredit(tx, saved); err != nil {
+		return nil, err
+	}
 	if err := addInitialPlanTrialCredit(tx, existing, saved); err != nil {
 		return nil, err
 	}

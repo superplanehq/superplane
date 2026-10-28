@@ -146,10 +146,12 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		t.FailNow()
 	}
 
-	err = billing.GrantWelcomeCredit(tx, organization.ID, account.ID)
-	if !assert.NoError(t, err) {
-		tx.Rollback()
-		t.FailNow()
+	if billing.Enabled() {
+		err = billingmodels.GrantWelcomeCredit(tx, organization.ID, account.ID)
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
 	}
 
 	organization, err = models.FindOrganizationByIDInTransaction(tx, organization.ID.String())
@@ -233,10 +235,12 @@ func CreateOrganization(t require.TestingT, r *ResourceRegistry, userID uuid.UUI
 			tx.Rollback()
 			t.FailNow()
 		}
-		err = billing.GrantWelcomeCredit(tx, organization.ID, r.Account.ID)
-		if !assert.NoError(t, err) {
-			tx.Rollback()
-			t.FailNow()
+		if billing.Enabled() {
+			err = billingmodels.GrantWelcomeCredit(tx, organization.ID, r.Account.ID)
+			if !assert.NoError(t, err) {
+				tx.Rollback()
+				t.FailNow()
+			}
 		}
 	}
 

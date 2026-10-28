@@ -7,6 +7,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  ChartNoAxesCombined,
   BookOpen,
   Building,
   CreditCard,
@@ -29,6 +30,7 @@ type AdminPageLink = {
 
 const adminPageLinks: AdminPageLink[] = [
   { label: "Organizations", to: "/admin", icon: Building, end: true },
+  { label: "Statistics", to: "/admin/stats", icon: ChartNoAxesCombined },
   { label: "Accounts", to: "/admin/accounts", icon: Users },
   { label: "Settings", to: "/admin/settings", icon: Network },
   { label: "Encryption", to: "/admin/encryption", icon: KeyRound },
