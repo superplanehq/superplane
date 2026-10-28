@@ -9,6 +9,22 @@ vi.mock("@/hooks/useBillingProductEnabled", () => ({ useBillingProductEnabled: (
 afterEach(() => vi.unstubAllGlobals());
 
 describe("OrgLLMCreditSection Polar verification", () => {
+  it("places billing diagnostics after credit history and keeps them collapsed until opened", async () => {
+    mockOrgCreditFetch({ plan: billingPlan(true) });
+    const user = userEvent.setup();
+    render(<OrgLLMCreditSection orgId="org-1" />);
+    const toggle = screen.getByRole("button", { name: "Billing diagnostics" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Stored billing data")).not.toBeInTheDocument();
+    const history = await screen.findByTestId("admin-org-credit-history");
+    expect(history.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByText("Stored billing data")).toBeVisible();
+    await user.click(toggle);
+    expect(screen.queryByText("Stored billing data")).not.toBeInTheDocument();
+  });
+
   it.each([
     ["usable", "Usable card found"],
     ["absent", "No usable card (absent or expired)"],
@@ -42,6 +58,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
       },
     });
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     const panel = within(screen.getByRole("region", { name: "Billing diagnostics" }));
     expect(await panel.findByText("No billing-plan record")).toBeVisible();
     const card = panel.getByText("Usable saved card").parentElement!;
@@ -95,6 +112,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
     });
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeDisabled();
     expect(checks).toBe(0);
     const panel = within(screen.getByRole("region", { name: "Billing diagnostics" }));
@@ -133,9 +151,11 @@ describe("OrgLLMCreditSection Polar verification", () => {
     });
     const user = userEvent.setup();
     const view = render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     await user.click(await screen.findByRole("button", { name: "Check Polar" }));
     expect(screen.getByRole("button", { name: "Checking Polar..." })).toBeDisabled();
     view.rerender(<OrgLLMCreditSection orgId="org-2" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     finishCheck(
       jsonResponse({
         ...initial,
@@ -168,6 +188,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
     });
     const user = userEvent.setup();
     const view = render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeEnabled();
     const warning = "No active Polar subscription";
     expect(screen.getByText(warning)).toBeInTheDocument();
@@ -183,6 +204,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
     await waitFor(() => expect(screen.queryByText(warning)).not.toBeInTheDocument());
     view.unmount();
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeEnabled();
     expect(screen.queryByText(warning)).not.toBeInTheDocument();
   });
@@ -197,6 +219,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
       plan: { ...billingPlan(false), catalog_key: key, polar_subscription_verification: "none" },
     });
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     await screen.findByTestId("admin-org-billing-plan");
     const warning = "No active Polar subscription";
     if (warns) {
@@ -209,6 +232,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
   it("locks editing when verification fails even for a local plan", async () => {
     mockOrgCreditFetch({ plan: { ...billingPlan(false), polar_subscription_verification: "failed" } });
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeDisabled();
     expect(
       screen.getByText("SuperPlane could not verify the Polar subscription. Select Check Polar to try again."),
@@ -221,6 +245,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
       plan: { ...billingPlan(false), polar_subscription_status: "canceled", polar_subscription_id: "sub_canceled" },
     });
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     expect((await screen.findAllByText("sub_canceled")).length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "View subscription in Polar" })).not.toBeInTheDocument();
   });
@@ -233,6 +258,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
       },
     });
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     await screen.findByTestId("admin-org-billing-plan");
     expect(screen.queryByRole("link", { name: "View subscription in Polar" })).not.toBeInTheDocument();
   });

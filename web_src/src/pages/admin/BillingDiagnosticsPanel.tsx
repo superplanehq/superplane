@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BillingPolarDiagnostics, OrganizationBillingPlan } from "./billingDiagnostics";
 
@@ -29,45 +30,61 @@ export function BillingDiagnosticsPanel({
   onCheck,
   onSync,
 }: BillingDiagnosticsPanelProps) {
+  const [open, setOpen] = useState(false);
   const polar = plan?.polar;
-  const busy = loading || checking || syncing || saving;
+  const busy = [loading, checking, syncing, saving].some(Boolean);
   return (
     <section
       aria-label="Billing diagnostics"
       aria-busy={busy}
-      className="mb-5 space-y-4 rounded-md border border-gray-200 bg-white p-4 text-sm dark:border-gray-700 dark:bg-gray-900"
+      className="mt-5 rounded-md border border-gray-200 bg-white p-4 text-sm dark:border-gray-700 dark:bg-gray-900"
     >
-      <h3 className="font-semibold">Billing diagnostics</h3>
-      {!enabled ? (
-        <p>Billing diagnostics are disabled on this installation.</p>
-      ) : (
-        <>
-          {loading && <p role="status">Loading stored billing data...</p>}
-          {error && (
-            <div role="alert">
-              <p>{error}</p>
-              <Button variant="outline" size="sm" onClick={polar?.configured ? onCheck : onRetry} disabled={busy}>
-                Try again
-              </Button>
-            </div>
-          )}
-          {!plan && !loading && !error && <p>Stored billing data is unavailable.</p>}
-          {plan && (
+      <h3>
+        <Button
+          type="button"
+          variant="ghost"
+          className="flex h-auto w-full items-center justify-between p-0 font-semibold"
+          aria-expanded={open}
+          onClick={() => setOpen((current) => !current)}
+        >
+          Billing diagnostics
+          <ChevronDown aria-hidden="true" className={open ? "rotate-180" : ""} />
+        </Button>
+      </h3>
+      {open && (
+        <div className="mt-4 space-y-4">
+          {!enabled ? (
+            <p>Billing diagnostics are disabled on this installation.</p>
+          ) : (
             <>
-              <StoredBillingData plan={plan} />
-              <PolarBillingData
-                polar={polar}
-                busy={busy}
-                checking={checking}
-                syncing={syncing}
-                syncError={syncError}
-                onCheck={onCheck}
-                onSync={onSync}
-              />
-              <RecordedBillingEvidence plan={plan} />
+              {loading && <p role="status">Loading stored billing data...</p>}
+              {error && (
+                <div role="alert">
+                  <p>{error}</p>
+                  <Button variant="outline" size="sm" onClick={polar?.configured ? onCheck : onRetry} disabled={busy}>
+                    Try again
+                  </Button>
+                </div>
+              )}
+              {!plan && !loading && !error && <p>Stored billing data is unavailable.</p>}
+              {plan && (
+                <>
+                  <StoredBillingData plan={plan} />
+                  <PolarBillingData
+                    polar={polar}
+                    busy={busy}
+                    checking={checking}
+                    syncing={syncing}
+                    syncError={syncError}
+                    onCheck={onCheck}
+                    onSync={onSync}
+                  />
+                  <RecordedBillingEvidence plan={plan} />
+                </>
+              )}
             </>
           )}
-        </>
+        </div>
       )}
     </section>
   );

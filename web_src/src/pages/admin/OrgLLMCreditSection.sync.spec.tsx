@@ -63,6 +63,7 @@ describe("OrgLLMCreditSection customer sync", () => {
     );
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     const panel = within(screen.getByRole("region", { name: "Billing diagnostics" }));
     expect(await panel.findByRole("button", { name: "Sync customer from Polar" })).toBeDisabled();
     await user.click(panel.getByRole("button", { name: "Check Polar" }));
@@ -108,6 +109,7 @@ describe("OrgLLMCreditSection customer sync", () => {
     );
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     const sync = await screen.findByRole("button", { name: "Sync customer from Polar" });
     expect(sync).toBeDisabled();
     await user.click(sync);
@@ -130,6 +132,7 @@ describe("OrgLLMCreditSection customer sync", () => {
     );
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     await user.click(await screen.findByRole("button", { name: "Sync customer from Polar" }));
     const panel = within(screen.getByRole("region", { name: "Billing diagnostics" }));
     expect(await panel.findByText("No usable saved card found in Polar.")).toBeVisible();
@@ -156,6 +159,7 @@ describe("OrgLLMCreditSection customer sync", () => {
     });
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     await user.click(await screen.findByRole("button", { name: "Sync customer from Polar" }));
     const panel = within(screen.getByRole("region", { name: "Billing diagnostics" }));
     expect(await panel.findByText("Could not sync the Polar customer. Try again.")).toBeVisible();
@@ -181,9 +185,11 @@ describe("OrgLLMCreditSection customer sync", () => {
     );
     const user = userEvent.setup();
     const view = render(<OrgLLMCreditSection orgId="org-1" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     await user.click(await screen.findByRole("button", { name: "Sync customer from Polar" }));
     const sync = fetchMock.mock.calls.find(([input]) => String(input).endsWith("/billing-customer/sync"));
     view.rerender(<OrgLLMCreditSection orgId="org-2" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     expect(sync?.[1]?.signal?.aborted).toBe(true);
     finishSync(jsonResponse({ billing_plan: { ...checked, polar_customer_id: "old-org-customer" } }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Sync customer from Polar" })).toBeEnabled());

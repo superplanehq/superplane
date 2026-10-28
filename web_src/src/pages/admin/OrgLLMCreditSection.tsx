@@ -55,19 +55,6 @@ function OrganizationCredit({ orgId }: { orgId: string }) {
           Hosted credit
         </Heading>
       </div>
-      <BillingDiagnosticsPanel
-        enabled={billingProductEnabled}
-        plan={credit.plan}
-        loading={credit.diagnosticsLoading}
-        checking={credit.checkingPolar}
-        syncing={credit.syncingCustomer}
-        saving={credit.savingPlan}
-        error={credit.diagnosticsError}
-        syncError={credit.customerSyncError}
-        onRetry={() => void credit.loadDiagnostics()}
-        onCheck={() => void credit.loadDiagnostics(true)}
-        onSync={() => void credit.syncCustomer()}
-      />
       {credit.loading && !credit.credit ? (
         <Text className="text-gray-500 text-sm dark:text-gray-400">Loading hosted credit...</Text>
       ) : credit.credit ? (
@@ -81,6 +68,19 @@ function OrganizationCredit({ orgId }: { orgId: string }) {
           showPlanControls={billingProductEnabled}
         />
       ) : null}
+      <BillingDiagnosticsPanel
+        enabled={billingProductEnabled}
+        plan={credit.plan}
+        loading={credit.diagnosticsLoading}
+        checking={credit.checkingPolar}
+        syncing={credit.syncingCustomer}
+        saving={credit.savingPlan}
+        error={credit.diagnosticsError}
+        syncError={credit.customerSyncError}
+        onRetry={() => void credit.loadDiagnostics()}
+        onCheck={() => void credit.loadDiagnostics(true)}
+        onSync={() => void credit.syncCustomer()}
+      />
     </div>
   );
 }
