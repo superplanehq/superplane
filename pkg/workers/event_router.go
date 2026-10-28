@@ -309,6 +309,10 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, uuid.Nil, fmt.Errorf("link custom automation run %s: %w", run.ID, err)
 	}
 
+	if err := models.MaybeLinkMergeConfidenceRun(tx, canvas, event, run); err != nil {
+		return nil, uuid.Nil, fmt.Errorf("link merge confidence run %s: %w", run.ID, err)
+	}
+
 	var queueItems []models.CanvasNodeQueueItem
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)

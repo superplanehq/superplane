@@ -31,6 +31,11 @@ func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEven
 	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
 }
 
+// MaybeLinkMergeConfidenceRun records task authority before agent admission.
+func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
+	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, "risk-score", "Merge confidence")
+}
+
 func maybeLinkFactoryColumnAppRun(
 	tx *gorm.DB,
 	canvas *Canvas,
@@ -64,6 +69,16 @@ func maybeLinkFactoryColumnAppRun(
 		return err
 	}
 
+	order, err := factoryModel.FindWorkOrder(tx, pullRequest.WorkOrderID)
+	if err != nil {
+		return err
+	}
+	if err := order.RequireExecutionOwner(tx, true); err != nil {
+		return err
+	}
+	if err := order.ValidateSubscriptionCanvasModels(tx, canvas.ID, ""); err != nil {
+		return err
+	}
 	_, err = pullRequest.CreateActivity(tx, FactoryPullRequestActivityParams{
 		RunID:  run.ID,
 		Title:  title,
