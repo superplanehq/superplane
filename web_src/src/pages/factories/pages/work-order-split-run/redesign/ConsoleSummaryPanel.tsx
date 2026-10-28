@@ -1,6 +1,8 @@
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/reui/alert";
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@/components/reui/frame";
 import { Button } from "@/components/ui/button";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { overlayHeaderSpend } from "@/lib/overlayHeaderSpend";
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
@@ -12,7 +14,10 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/
 import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
 import { consoleCheckList, isMergeConfidenceMetric } from "../../../lib/mergeConfidenceScore";
 import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
-import { workOrderCardPullRequestShowsMergeable } from "../../../lib/workOrderCardPullRequest";
+import {
+  workOrderCardPullRequestHasConflicts,
+  workOrderCardPullRequestShowsMergeable,
+} from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
@@ -20,7 +25,11 @@ import { pullRequestLabel } from "../../../lib/workOrderPullRequest";
 import { OrgUserReference, EmptyOwnerMark } from "../../../OrgUserReference";
 import { OwnerAssignTrigger } from "../../../WorkOrderAssigneesPopover";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
-import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
+import {
+  WorkOrderConflictsChip,
+  WorkOrderMergeableChip,
+  WorkOrderPullRequestChip,
+} from "../../../workOrders/WorkOrderPullRequestChip";
 import { OwnerSpendValue } from "../../work-order-popup-redesign/popupShared";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
 import { ConsoleCheckRows } from "./consoleCheckRows";
@@ -75,6 +84,8 @@ export function ConsoleSummaryPanel({
   onOwnerSave,
 }: ConsoleSummaryPanelProps) {
   const liveSpend = useLiveHeaderSpendOverlay();
+  const { has } = useExperimentalFeature(organizationId);
+  const showPullRequestMerge = has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
   const panel = consolePanelFacts({ fixture, outcome, stages, pullRequests, artifacts, source, panelReview });
   const shownOwner = owner ?? outcome.owner;
@@ -109,6 +120,7 @@ export function ConsoleSummaryPanel({
                 key={pullRequest.id ?? pullRequest.url ?? index}
                 pullRequest={pullRequest}
                 checks={fixture.checks}
+                showPullRequestMerge={showPullRequestMerge}
               />
             ))}
           </FramePanel>
@@ -344,9 +356,11 @@ function isBranchArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
 function PanelPullRequest({
   pullRequest,
   checks,
+  showPullRequestMerge,
 }: {
   pullRequest: FactoriesFactoryPullRequest;
   checks: SplitRunFixture["checks"];
+  showPullRequestMerge: boolean;
 }) {
   const href = safeExternalUrl(pullRequest.url);
   const title = pullRequest.title?.trim() || pullRequestLabel(pullRequest);
@@ -366,6 +380,7 @@ function PanelPullRequest({
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         <WorkOrderPullRequestChip pullRequest={pullRequest} />
+        {showPullRequestMerge && workOrderCardPullRequestHasConflicts(pullRequest) ? <WorkOrderConflictsChip /> : null}
         {workOrderCardPullRequestShowsMergeable(pullRequest, checks) ? <WorkOrderMergeableChip /> : null}
       </div>
     </div>

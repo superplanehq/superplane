@@ -175,19 +175,42 @@ func isPrFeedbackWaitComponent(component string) bool {
 	return component == prFeedbackWaitChecksComponent || component == "bitbucket.waitForBuilds"
 }
 
+func (request prFeedbackBuildRequest) fixMergeConflictsEnabled() bool {
+	if request.FixMergeConflicts == nil {
+		return true
+	}
+	return *request.FixMergeConflicts
+}
+
+func (request prFeedbackBuildRequest) mergeConflictHours() int {
+	if request.MergeConflictHours <= 0 {
+		return prFeedbackDefaultMergeConflictHours
+	}
+	return request.MergeConflictHours
+}
+
 func prFeedbackWaitChecksConfiguration(request prFeedbackBuildRequest) map[string]any {
+	configuration := map[string]any{
+		"repository":         request.Repository,
+		"ref":                prFeedbackPRHeadSHAExpression(),
+		"fixMergeConflicts":  request.fixMergeConflictsEnabled(),
+		"mergeConflictHours": request.mergeConflictHours(),
+	}
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
-		return map[string]any{
-			"repository": request.Repository,
-			"ref":        prFeedbackPRHeadSHAExpression(),
-			"buildKeys":  checkNamesNodeValue(request.CheckNames),
-		}
+		configuration["buildKeys"] = checkNamesNodeValue(request.CheckNames)
+		return configuration
 	}
-	return map[string]any{
-		"repository": request.Repository,
-		"ref":        prFeedbackPRHeadSHAExpression(),
-		"checkNames": checkNamesNodeValue(request.CheckNames),
+	configuration["checkNames"] = checkNamesNodeValue(request.CheckNames)
+	return configuration
+}
+
+func prFeedbackChecksTaskInstruction(bitbucket bool) string {
+	conflict := "This run resolves merge conflicts with the base branch. Update the branch so it merges cleanly. Do not change anything else."
+	normal := "Failed checks are in FAILED_CHECKS. Address every failed check in that list in this run."
+	if bitbucket {
+		normal = "Failed builds are in FAILED_CHECKS. Address every failed build in that list in this run."
 	}
+	return `{{ (root().data.conflict_fix ?? false) ? "` + conflict + `" : "` + normal + `" }}`
 }
 
 func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[string]any {
@@ -314,8 +337,7 @@ func prFeedbackChecksPrompt(request prFeedbackBuildRequest) string {
 			"Pull request: #{{ root().data.pull_request.number }}",
 			"Revision: {{ root().data.pull_request.head.sha }}",
 			"",
-			"Failed builds are in FAILED_CHECKS.",
-			"Address every failed build in that list in this run.",
+			prFeedbackChecksTaskInstruction(true),
 			"Read logs from Bitbucket Pipelines or from the build URL in FAILED_CHECKS.",
 			"Use the Bitbucket token in BITBUCKET_TOKEN.",
 			"When BITBUCKET_EMAIL is set, send HTTP basic authentication with that email and BITBUCKET_TOKEN.",
@@ -336,8 +358,7 @@ func prFeedbackChecksPrompt(request prFeedbackBuildRequest) string {
 		"Pull request: #{{ root().data.pull_request.number }}",
 		"Revision: {{ root().data.pull_request.head.sha }}",
 		"",
-		"Failed checks are in FAILED_CHECKS.",
-		"Address every failed check in that list in this run.",
+		prFeedbackChecksTaskInstruction(false),
 		"Read logs from GitHub or from an available external integration.",
 		"Use the GitHub token in GITHUB_TOKEN.",
 		"",

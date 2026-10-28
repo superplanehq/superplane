@@ -51,6 +51,10 @@ export function workOrderCardPullRequestIsMergeable(pullRequest: FactoriesFactor
   return Boolean(pullRequest?.mergeable) && pullRequestState(pullRequest?.state) === "open";
 }
 
+export function workOrderCardPullRequestHasConflicts(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
+  return pullRequestState(pullRequest?.state) === "open" && pullRequest?.mergeBlockedReason === "CONFLICTING";
+}
+
 type MergeConfidenceScore = {
   key?: string;
   score?: number;
@@ -67,7 +71,7 @@ export function workOrderCardPullRequestShowsMergeable(
   pullRequest: FactoriesFactoryPullRequest | undefined,
   checks: readonly MergeConfidenceScore[] | undefined,
 ): boolean {
-  if (!workOrderCardPullRequestIsMergeable(pullRequest)) {
+  if (workOrderCardPullRequestHasConflicts(pullRequest) || !workOrderCardPullRequestIsMergeable(pullRequest)) {
     return false;
   }
   return !(checks ?? []).some(isCriticalMergeConfidenceCheck);

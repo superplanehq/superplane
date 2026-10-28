@@ -11,6 +11,7 @@ import {
 import {
   selectWorkOrderCardPullRequest,
   visibleWorkOrderCardAttentionReasons,
+  workOrderCardPullRequestHasConflicts,
   workOrderCardPullRequestShowsMergeable,
 } from "../lib/workOrderCardPullRequest";
 import { workOrderCardSource } from "../lib/workOrderCardSource";
@@ -21,7 +22,7 @@ import type { MergeConfidenceCardCheck } from "../lib/mergeConfidenceScore";
 import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
 import { CardScoreBadges, MergeConfidenceChip } from "./ReadinessMark";
 import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
-import { WorkOrderPullRequestChip, WorkOrderMergeableChip } from "./WorkOrderPullRequestChip";
+import { WorkOrderConflictsChip, WorkOrderMergeableChip, WorkOrderPullRequestChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderSourceIcon } from "./WorkOrderSourceIcon";
 import { WorkOrderStatusIcon } from "./WorkOrderStatusIcon";
@@ -373,6 +374,9 @@ function WorkOrderCardStatusRow({
       {cardPullRequest ? (
         <>
           <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
+          {showPullRequestMerge && workOrderCardPullRequestHasConflicts(cardPullRequest.pullRequest) ? (
+            <WorkOrderConflictsChip />
+          ) : null}
           {showPullRequestMerge &&
           workOrderCardPullRequestShowsMergeable(cardPullRequest.pullRequest, mergeConfidenceChecks) ? (
             <WorkOrderMergeableChip />

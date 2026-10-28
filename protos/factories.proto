@@ -473,6 +473,20 @@ service Factories {
     };
   }
 
+  rpc FixFactoryPullRequestConflicts(
+    FixFactoryPullRequestConflictsRequest
+  ) returns (FixFactoryPullRequestConflictsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/fix-conflicts"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Fix factory pull request conflicts";
+      description: "Starts Address PR feedback to resolve merge conflicts. Does not post a pull request comment";
+      tags: "Factory";
+    };
+  }
+
   rpc ContinueFactoryPullRequestFixes(
     ContinueFactoryPullRequestFixesRequest
   ) returns (ContinueFactoryPullRequestFixesResponse) {
@@ -1720,6 +1734,10 @@ message FactoryPRFeedbackHandler {
     repeated string names = 1;
     optional int32 maximum_attempts = 2;
     repeated string runner_integration_ids = 3;
+    // Absent means merge conflicts are fixed. An explicit false stays off.
+    optional bool fix_merge_conflicts = 4;
+    // Absent means 24 hours after SuperPlane tracks the pull request.
+    optional int32 merge_conflict_hours = 5;
   }
 
   // Settings stored in the canvas graph. This block is a read/write facade
@@ -1848,6 +1866,8 @@ message FactoryPullRequest {
   optional FactoryPullRequestRevision current_revision = 17;
   repeated FactoryPullRequestActivity activities = 18;
   bool mergeable = 19;
+  // Stored merge gate reason, such as CONFLICTING. Empty when no snapshot is stored.
+  string merge_blocked_reason = 20;
 }
 
 message DescribeFactoryPullRequestRequest {
@@ -1936,6 +1956,15 @@ message MergeFactoryPullRequestRequest {
 }
 
 message MergeFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
+}
+
+message FixFactoryPullRequestConflictsRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+}
+
+message FixFactoryPullRequestConflictsResponse {
   FactoryPullRequest pull_request = 1;
 }
 

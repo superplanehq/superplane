@@ -409,9 +409,11 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 				t.Run(model+"/"+provider+"/"+source, func(t *testing.T) {
 					r, factory := resetTestFactory(t)
 					require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
+					mergeConflictsOff := false
 					request := prFeedbackBuildRequest{
 						Repository: "acme/app", Mention: "@review", IgnoreBots: false, AddressAllBots: true, AllowedBots: []string{},
 						CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
+						FixMergeConflicts: &mergeConflictsOff, MergeConflictHours: 12,
 						Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent},
 					}
 					doc := buildDiscussionPRFeedbackCanvas(request)
@@ -471,6 +473,8 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 						assert.Contains(t, prompt, "Ignore comments SuperPlane already wrote.")
 					} else {
 						assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
+						assert.False(t, actual.FixMergeConflicts)
+						assert.Equal(t, 12, actual.MergeConflictHours)
 					}
 					reloaded, err := models.FindPRFeedbackHandlerByCanvasID(database.DB(t.Context()), canvas.ID)
 					require.NoError(t, err)

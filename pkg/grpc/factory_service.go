@@ -236,6 +236,11 @@ func (s *FactoryService) MergeFactoryPullRequest(ctx context.Context, req *pb.Me
 	return actions.MergeFactoryPullRequest(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) FixFactoryPullRequestConflicts(ctx context.Context, req *pb.FixFactoryPullRequestConflictsRequest) (*pb.FixFactoryPullRequestConflictsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.FixFactoryPullRequestConflicts(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ContinueFactoryPullRequestFixes(ctx context.Context, req *pb.ContinueFactoryPullRequestFixesRequest) (*pb.ContinueFactoryPullRequestFixesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ContinueFactoryPullRequestFixes(ctx, organizationID, req)

@@ -18,6 +18,10 @@ import {
   suggestedIntegrationsForChecks,
 } from "./checksPRFeedbackSetup";
 import {
+  isPRFeedbackMergeConflictHoursValid,
+  PR_FEEDBACK_DEFAULT_MERGE_CONFLICT_HOURS,
+} from "./prFeedbackConflictSettings";
+import {
   isPRFeedbackMaximumAttemptsValid,
   PR_FEEDBACK_SETTINGS_COPY,
   toggleUniqueString,
@@ -32,6 +36,8 @@ export function useChecksPRFeedbackSetup(
 ) {
   const [step, setStep] = useState<"checks" | "tools">("checks");
   const [maximumAttempts, setMaximumAttempts] = useState(3);
+  const [fixMergeConflicts, setFixMergeConflicts] = useState(true);
+  const [mergeConflictHours, setMergeConflictHours] = useState(PR_FEEDBACK_DEFAULT_MERGE_CONFLICT_HOURS);
   const [connectName, setConnectName] = useState<string | null>(null);
   const [error, setError] = useState<string>();
   const resources = useChecksSetupResources(organizationId, factoryId, githubIntegrationId, repository);
@@ -52,6 +58,8 @@ export function useChecksPRFeedbackSetup(
       source,
       checkNames: resources.checkNames,
       maximumAttempts,
+      fixMergeConflicts,
+      mergeConflictHours,
       runnerIntegrationIds: resources.runnerIntegrationIds,
       createHandler: resources.createHandler,
       setError,
@@ -67,9 +75,16 @@ export function useChecksPRFeedbackSetup(
     catalogLoading: resources.catalogLoading,
     catalogEmpty: resources.catalogEmpty,
     canContinue:
-      !resources.catalogLoading && resources.checkNames.length > 0 && isPRFeedbackMaximumAttemptsValid(maximumAttempts),
+      !resources.catalogLoading &&
+      isPRFeedbackMaximumAttemptsValid(maximumAttempts) &&
+      isPRFeedbackMergeConflictHoursValid(mergeConflictHours) &&
+      (fixMergeConflicts || resources.checkNames.length > 0),
     maximumAttempts,
     setMaximumAttempts,
+    fixMergeConflicts,
+    setFixMergeConflicts,
+    mergeConflictHours,
+    setMergeConflictHours,
     usesGitHubActions,
     toolsAccess,
     runnerIntegrationIds: resources.runnerIntegrationIds,
@@ -161,6 +176,8 @@ async function finishChecksSetup({
   source,
   checkNames,
   maximumAttempts,
+  fixMergeConflicts,
+  mergeConflictHours,
   runnerIntegrationIds,
   createHandler,
   setError,
@@ -169,12 +186,18 @@ async function finishChecksSetup({
   source: PRFeedbackSource;
   checkNames: string[];
   maximumAttempts: number;
+  fixMergeConflicts: boolean;
+  mergeConflictHours: number;
   runnerIntegrationIds: string[];
   createHandler: ReturnType<typeof useCreateFactoryPRFeedbackHandler>;
   setError: (error: string | undefined) => void;
 }) {
-  if (checkNames.length === 0) {
+  if (!fixMergeConflicts && checkNames.length === 0) {
     setError(PR_FEEDBACK_SETTINGS_COPY.checkNamesNone);
+    return undefined;
+  }
+  if (!isPRFeedbackMergeConflictHoursValid(mergeConflictHours)) {
+    setError(PR_FEEDBACK_SETTINGS_COPY.mergeConflictHoursHelper);
     return undefined;
   }
   setError(undefined);
@@ -187,6 +210,8 @@ async function finishChecksSetup({
         checks: {
           names: checkNames,
           maximumAttempts,
+          fixMergeConflicts,
+          mergeConflictHours,
           runnerIntegrationIds,
         },
       },

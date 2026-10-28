@@ -138,6 +138,7 @@ func createPRFeedbackCanvas(
 		VCSProvider:            factory.OnboardingConfigValue().EffectiveVCSProvider(),
 		OmitCommitIdentity:     true,
 	}
+	applyPRFeedbackConflictSettings(&request, settings)
 	var canvasDoc *yaml.Canvas
 	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
 		canvasDoc = buildChecksPRFeedbackCanvas(request)

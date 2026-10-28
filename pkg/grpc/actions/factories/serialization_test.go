@@ -461,6 +461,17 @@ func TestSerializeFactoryPullRequest_HidesMergeableDuringActiveMutationRun(t *te
 	openMergeable.ActiveMutationRunID = nil
 	shown := serializeFactoryPullRequest(openMergeable, 1, nil, nil, nil)
 	assert.True(t, shown.GetMergeable())
+
+	openMergeable.Mergeable = false
+	openMergeable.MergeBlockedReason = "CONFLICTING"
+	conflicting := serializeFactoryPullRequest(openMergeable, 1, nil, nil, nil)
+	assert.False(t, conflicting.GetMergeable())
+	assert.Equal(t, "CONFLICTING", conflicting.GetMergeBlockedReason())
+
+	openMergeable.ActiveMutationRunID = &runID
+	duringRun := serializeFactoryPullRequest(openMergeable, 1, nil, nil, nil)
+	assert.False(t, duringRun.GetMergeable())
+	assert.Equal(t, "CONFLICTING", duringRun.GetMergeBlockedReason())
 }
 
 func TestAllocateCostCents_GivesTruncatedRemaindersToTheHeader(t *testing.T) {

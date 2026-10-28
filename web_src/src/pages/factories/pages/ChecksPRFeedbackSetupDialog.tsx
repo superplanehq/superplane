@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { cn } from "@/lib/utils";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
@@ -13,7 +12,9 @@ import {
   isChecksHandlerCIIntegration,
   type ChecksHandlerIntegrationRow,
 } from "./checksPRFeedbackSetup";
+import { MaximumAttemptsField, MergeConflictHoursField, SetupFooter } from "./checksPRFeedbackSetupControls";
 import { ChecksPRFeedbackSetupPreview } from "./ChecksPRFeedbackSetupPreview";
+import { MergeConflictsOption } from "./PRFeedbackSettingsFields";
 import { StatusCheckPicker } from "./StatusCheckPicker";
 import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
 import { PRFeedbackSetupWizardShell } from "./PRFeedbackSetupWizardChrome";
@@ -23,7 +24,6 @@ import {
   type ChecksPRFeedbackSetupModel,
 } from "./useChecksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackSource } from "./prFeedbackSettingsModel";
-import { writeDeferredWorkspaceNextStep } from "./workspaceNextStepDeferral";
 
 interface ChecksPRFeedbackSetupDialogProps {
   organizationId: string;
@@ -191,31 +191,6 @@ function SetupHeaderHelper({
   return null;
 }
 
-function MaximumAttemptsField({ value, onChange }: { value: number; onChange: (value: number) => void }) {
-  return (
-    <section className="space-y-6">
-      <div>
-        <h2 className={factoryPageTitleClassName}>
-          <label htmlFor="checks-setup-maximum-attempts">{PR_FEEDBACK_SETTINGS_COPY.wizardMaximumAttempts}</label>
-        </h2>
-        <p className="workspace-body-text mt-2 text-muted-foreground">
-          {PR_FEEDBACK_SETTINGS_COPY.maximumAttemptsHelper}
-        </p>
-      </div>
-      <Input
-        id="checks-setup-maximum-attempts"
-        type="number"
-        min={1}
-        max={10}
-        step={1}
-        value={String(value)}
-        onChange={(event) => onChange(Number(event.target.value))}
-        data-testid="checks-setup-maximum-attempts"
-      />
-    </section>
-  );
-}
-
 function EmptyChecksMessage() {
   return (
     <div className="workspace-body-text space-y-2 text-muted-foreground" data-testid="checks-setup-empty">
@@ -227,21 +202,29 @@ function EmptyChecksMessage() {
 
 function SetupStepBody({ setup }: { setup: ChecksPRFeedbackSetupModel }) {
   if (setup.step === "checks") {
-    if (setup.catalogEmpty) {
-      return <EmptyChecksMessage />;
-    }
     return (
       <div className="space-y-6">
-        <StatusCheckPicker
-          names={setup.checkNames}
-          catalog={setup.catalog}
-          loading={setup.catalogLoading}
-          loadError={setup.catalogQuery.isError}
-          onToggle={setup.toggleCheckName}
-          hideHeading
+        <MergeConflictsOption
+          selected={setup.fixMergeConflicts}
+          onToggle={() => setup.setFixMergeConflicts(!setup.fixMergeConflicts)}
         />
-        {setup.catalog.length > 0 ? (
-          <MaximumAttemptsField value={setup.maximumAttempts} onChange={setup.setMaximumAttempts} />
+        {setup.catalogEmpty ? (
+          <EmptyChecksMessage />
+        ) : (
+          <StatusCheckPicker
+            names={setup.checkNames}
+            catalog={setup.catalog}
+            loading={setup.catalogLoading}
+            loadError={setup.catalogQuery.isError}
+            onToggle={setup.toggleCheckName}
+            hideHeading
+          />
+        )}
+        {!setup.catalogLoading && (setup.fixMergeConflicts || !setup.catalogEmpty) ? (
+          <>
+            <MergeConflictHoursField value={setup.mergeConflictHours} onChange={setup.setMergeConflictHours} />
+            <MaximumAttemptsField value={setup.maximumAttempts} onChange={setup.setMaximumAttempts} />
+          </>
         ) : null}
       </div>
     );
@@ -425,73 +408,5 @@ function IntegrationChoiceRow({
         </span>
       </div>
     </li>
-  );
-}
-
-function SetupFooter({
-  setup,
-  factoryId,
-  source,
-  onClose,
-  onCreated,
-}: {
-  setup: ChecksPRFeedbackSetupModel;
-  factoryId: string;
-  source: PRFeedbackSource;
-  onClose: () => void;
-  onCreated: (handlerId: string) => void;
-}) {
-  if (setup.step === "checks" && setup.catalogEmpty) {
-    return (
-      <footer className="flex items-center justify-end gap-3 pt-2">
-        <Button
-          type="button"
-          onClick={() => {
-            writeDeferredWorkspaceNextStep(factoryId, "pr-checks-handler");
-            onClose();
-          }}
-          data-testid="checks-setup-finish"
-        >
-          {PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
-        </Button>
-      </footer>
-    );
-  }
-
-  if (setup.step === "checks") {
-    return (
-      <footer className="flex items-center justify-end gap-3 pt-2">
-        <Button
-          type="button"
-          disabled={!setup.canContinue}
-          onClick={() => setup.setStep("tools")}
-          data-testid="checks-setup-continue"
-        >
-          {PR_FEEDBACK_SETTINGS_COPY.wizardContinue}
-        </Button>
-      </footer>
-    );
-  }
-
-  return (
-    <footer className="flex items-center justify-end gap-3 pt-2">
-      <Button
-        type="button"
-        disabled={setup.createHandler.isPending}
-        onClick={() => {
-          void setup.finish(source).then((handler) => {
-            if (handler?.id) {
-              onCreated(handler.id);
-              onClose();
-            }
-          });
-        }}
-        data-testid="checks-setup-finish"
-      >
-        {setup.createHandler.isPending
-          ? PR_FEEDBACK_SETTINGS_COPY.wizardFinishing
-          : PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
-      </Button>
-    </footer>
   );
 }

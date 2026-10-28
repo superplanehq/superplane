@@ -206,7 +206,7 @@ func (c *WaitForBuilds) Configuration() []configuration.Field {
 			Name:        "buildKeys",
 			Label:       "Build Keys",
 			Type:        configuration.FieldTypeList,
-			Required:    true,
+			Required:    false,
 			Description: "Exact build keys to require.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -401,6 +401,27 @@ func evaluateWaitForBuilds(ctx waitBuildsRuntime, now time.Time) error {
 	metadata, err := decodeWaitBuildsMetadata(ctx.Metadata.Get())
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+	if len(ctx.Configuration.BuildKeys) == 0 {
+		metadata.Repository = ctx.Configuration.Repository
+		metadata.SHA = strings.TrimSpace(ctx.Configuration.Ref)
+		metadata.Outcome = waitBuildsOutcomePassed
+		completedAt := now
+		metadata.CompletedAt = &completedAt
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return err
+		}
+		if err := ctx.ExecutionState.SetKV(waitBuildsRefKV, waitBuildsRefValue(metadata.Repository, metadata.SHA)); err != nil {
+			return err
+		}
+		return ctx.ExecutionState.Emit(waitBuildsPassedChannel, waitBuildsPayloadType, []any{
+			WaitForBuildsOutput{
+				Repository:  metadata.Repository,
+				SHA:         metadata.SHA,
+				StartedAt:   metadata.StartedAt,
+				CompletedAt: completedAt,
+			},
+		})
 	}
 
 	var integrationMetadata Metadata
@@ -708,9 +729,6 @@ func decodeWaitBuildsConfig(raw any) (WaitForBuildsConfiguration, error) {
 		return config, fmt.Errorf("ref is required")
 	}
 	config.BuildKeys = normalizeWaitBuildKeys(config.BuildKeys)
-	if len(config.BuildKeys) == 0 {
-		return config, fmt.Errorf("buildKeys is required")
-	}
 	return config, nil
 }
 

@@ -228,6 +228,8 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		assert.Equal(t, "acme/app", handler.GetSettings().GetSubject().GetRepository())
 		assert.Equal(t, []string{"lint"}, handler.GetSettings().GetChecks().GetNames())
 		assert.Equal(t, int32(prFeedbackDefaultMaximumAttempts), handler.GetSettings().GetChecks().GetMaximumAttempts())
+		assert.True(t, handler.GetSettings().GetChecks().GetFixMergeConflicts())
+		assert.Equal(t, int32(prFeedbackDefaultMergeConflictHours), handler.GetSettings().GetChecks().GetMergeConflictHours())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 		require.NoError(t, err)
