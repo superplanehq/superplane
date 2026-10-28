@@ -153,6 +153,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	environment = runner.AttachTaskOwnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {

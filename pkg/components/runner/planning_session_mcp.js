@@ -8,6 +8,12 @@ const {
   isCompactStatusText,
 } = require("./analysis_protocol");
 const { MAX_ATTACHMENT_BYTES } = require("./attachment_limit");
+const {
+  suggestOwners,
+  assignOwner,
+  SUGGEST_OWNERS_TOOL,
+  ASSIGN_OWNER_TOOL,
+} = require("./task_owner_tools");
 
 const MAX_INSPECTABLE_ATTACHMENT_BYTES = MAX_ATTACHMENT_BYTES;
 
@@ -421,70 +427,6 @@ const UPDATE_TOOL = {
         required: ["questions"],
       },
     },
-  },
-};
-
-const MAX_OWNER_PATHS = 10;
-
-async function suggestOwners(input) {
-  const raw = input && Array.isArray(input.paths) ? input.paths : [];
-  const paths = raw
-    .map((value) => String(value || "").trim())
-    .filter(Boolean)
-    .slice(0, MAX_OWNER_PATHS);
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/suggest-owners", {
-    paths,
-  });
-}
-
-async function assignOwner(input) {
-  const user = String((input && input.user) || "").trim();
-  if (!user) {
-    throw new Error("user is required");
-  }
-  const reason = String((input && input.reason) || "").trim();
-  if (!reason) {
-    throw new Error("reason is required");
-  }
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/owner", {
-    user,
-    reason,
-  });
-}
-
-const SUGGEST_OWNERS_TOOL = {
-  name: "suggest_owners",
-  description:
-    "Find the people who can review or own this task. Returns members of the organization with name, roles, GitHub login, and open_tasks (the open tasks they own in this factory), fewest first, and the current owners of the task. Pass the repository paths the change touches to also get code_owners: members ranked by their recent commits on those paths. Only members with a linked GitHub account can appear in code_owners.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      paths: {
-        type: "array",
-        maxItems: MAX_OWNER_PATHS,
-        items: { type: "string" },
-        description:
-          "Optional. Repository-relative files or directories, most specific first, for example pkg/payments or web_src/src/pages/checkout.tsx.",
-      },
-    },
-  },
-};
-
-const ASSIGN_OWNER_TOOL = {
-  name: "assign_owner",
-  description:
-    "Set the selected person as the only owner of this task. Replaces all current owners, including manually assigned owners. Returns assigned with the selected owner. Pass user as a user_id or github_login from suggest_owners.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      user: { type: "string", description: "user_id or github_login from suggest_owners." },
-      reason: {
-        type: "string",
-        description:
-          "One sentence that SuperPlane shows on the task timeline, for example: You changed pkg/payments/charge.go 3 times in the last 30 days.",
-      },
-    },
-    required: ["user", "reason"],
   },
 };
 
