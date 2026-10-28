@@ -1499,6 +1499,20 @@ CREATE TABLE public.organization_llm_settings (
 
 
 --
+-- Name: organization_payment_method_observations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_payment_method_observations (
+    organization_id uuid NOT NULL,
+    usable boolean NOT NULL,
+    read_started_at bigint NOT NULL,
+    observed_at timestamp with time zone NOT NULL,
+    usable_method_hashes text[] DEFAULT '{}'::text[] NOT NULL,
+    transition_id uuid
+);
+
+
+--
 -- Name: organization_seat_limit_overrides; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3111,6 +3125,14 @@ ALTER TABLE ONLY public.organization_llm_credit_grants
 
 ALTER TABLE ONLY public.organization_llm_settings
     ADD CONSTRAINT organization_llm_settings_pkey PRIMARY KEY (organization_id);
+
+
+--
+-- Name: organization_payment_method_observations organization_payment_method_observations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_payment_method_observations
+    ADD CONSTRAINT organization_payment_method_observations_pkey PRIMARY KEY (organization_id);
 
 
 --
@@ -5899,6 +5921,14 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
+-- Name: organization_payment_method_observations organization_payment_method_observations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_payment_method_observations
+    ADD CONSTRAINT organization_payment_method_observations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_seat_limit_overrides organization_seat_limit_overrides_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6450,7 +6480,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261027163500	f
+20261028182820	f
 \.
 
 
