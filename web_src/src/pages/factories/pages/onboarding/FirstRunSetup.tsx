@@ -507,11 +507,14 @@ function CompleteSetupScreen({
           {flow.accessError
             ? "SuperPlane could not verify model access. Try again."
             : flow.cardStep.requiresAdmin
-              ? "Ask an organization admin to select a billing plan. You can complete workspace setup now."
+              ? "Ask an organization admin to select a billing plan before you complete workspace setup."
               : "Continue with the models available to your organization."}
         </p>
       </FirstRunHeading>
-      <Button disabled={flow.busy || !flow.cardStep.ready} onClick={() => void flow.finishSetup()}>
+      <Button
+        disabled={flow.busy || !flow.cardStep.ready || flow.cardStep.requiresAdmin}
+        onClick={() => void flow.finishSetup()}
+      >
         Continue
       </Button>
     </FirstRunShell>
