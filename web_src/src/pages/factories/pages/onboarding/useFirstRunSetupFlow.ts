@@ -246,6 +246,7 @@ function useFirstRunCommands(args: {
   setGitHubEnterprise: (enabled: boolean, host?: string) => void;
   setGitHubEnterpriseError: (message: string | undefined) => void;
   connectGitHubEnterpriseApp: (host: string, returnTo: string) => Promise<boolean>;
+  resumeGitHubEnterpriseApp: (returnTo: string) => boolean;
 }) {
   const { model, connection, navigation, blocking, forgeConfigured, installScope } = args;
   const location = useLocation();
@@ -265,6 +266,10 @@ function useFirstRunCommands(args: {
       setGitHubEnterprise: args.setGitHubEnterprise,
       goToScreen: navigation.goToScreen,
     });
+  const resumeGitHubEnterpriseSetup = () =>
+    args.blocking.runUntilNavigation("opening-github", async () =>
+      args.resumeGitHubEnterpriseApp(onboardingStepPath(location.pathname + location.search, "repo")),
+    );
   const connectGitHubEnterprise = connectGitHubEnterpriseAction({
     blocking,
     locationPath: `${location.pathname}${location.search}`,
@@ -330,6 +335,7 @@ function useFirstRunCommands(args: {
     chooseVcsHost,
     connectBitbucket,
     connectGitHubEnterprise,
+    resumeGitHubEnterpriseSetup,
     connectGitHub,
     connectGitHubIssues,
     createGitHubApp,
@@ -353,6 +359,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const githubEnterpriseApp = useFirstRunGitHubEnterprise({
     organizationId,
     factoryId,
+    integrationId: githubEnterpriseIntegrationId,
     onCreated: model.bindGitHubEnterpriseIntegration,
   });
   const { connection, githubReady, githubReturned, installScope, checkingGitHub } = useFirstRunGitHub({
@@ -368,7 +375,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     {
       ready: githubReady,
       returned: githubReturned,
-      enterpriseReady: Boolean(githubEnterpriseIntegrationId),
+      enterpriseReady: githubEnterpriseApp.ready,
     },
     githubEnterprise,
   );
@@ -386,6 +393,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setGitHubEnterprise: enterprise.setGitHubEnterprise,
     setGitHubEnterpriseError: enterprise.setGitHubEnterpriseError,
     connectGitHubEnterpriseApp: githubEnterpriseApp.connect,
+    resumeGitHubEnterpriseApp: githubEnterpriseApp.resume,
   });
   const [bitbucketSwitchFailed, setBitbucketSwitchFailed] = useState(false);
   const selectBitbucketIdentity = (providerUserId: string) =>
@@ -409,6 +417,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     githubEnterpriseHost,
     githubEnterpriseError,
     githubEnterpriseIntegrationId,
+    githubEnterpriseReady: githubEnterpriseApp.ready,
     bitbucketForgeConfigured: bitbucketConnect.configured,
     bitbucketOnboardingPending: bitbucketConnect.pending,
     bitbucketRepositories: bitbucketConnect.repositories,

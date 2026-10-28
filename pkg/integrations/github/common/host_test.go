@@ -141,6 +141,15 @@ func TestHostURLs(t *testing.T) {
 			assert.Equal(t, test.repo, test.host.RepoURL("acme/app"))
 			assert.Equal(t, test.create, test.host.CreateAppURL(OwnerTypeOrganization, "acme"))
 			assert.Equal(t, test.install, test.host.InstallAppURL("superplane", "abc/def"))
+			if test.host.IsGHECom() {
+				assert.Equal(
+					t,
+					"https://acme.ghe.com/apps/acme/superplane/installations/new?state=abc%2Fdef",
+					test.host.InstallAppURLForOwner("acme", "superplane", "abc/def"),
+				)
+			} else {
+				assert.Equal(t, test.install, test.host.InstallAppURLForOwner("acme", "superplane", "abc/def"))
+			}
 			assert.Equal(t, test.manifest, test.host.ManifestConversionURL("code1"))
 			assert.Equal(t, test.perms, test.host.AppPermissionsURL(OwnerTypeOrganization, "acme", "superplane"))
 			assert.Equal(t, test.settings, test.host.InstallationSettingsURL(OwnerTypeOrganization, "acme", "101"))

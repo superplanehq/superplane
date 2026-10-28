@@ -513,7 +513,7 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 		Label:        "Install the GitHub app",
 		Instructions: buf.String(),
 		RedirectPrompt: &core.RedirectPrompt{
-			URL:    common.HostFromIntegration(ctx.Integration).InstallAppURL(appSlug, state),
+			URL:    privateAppInstallURL(ctx, appSlug, state),
 			Method: "GET",
 		},
 	})
@@ -682,7 +682,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 	http.Redirect(
 		ctx.Response,
 		ctx.Request,
-		common.HostFromIntegration(ctx.Integration).InstallAppURL(appData.Slug, state),
+		privateAppInstallURL(ctx, appData.Slug, state),
 		http.StatusSeeOther,
 	)
 }
@@ -737,7 +737,7 @@ func (g *GitHub) afterAppCreationLegacy(ctx core.HTTPRequestContext, appData *Gi
 	http.Redirect(
 		ctx.Response,
 		ctx.Request,
-		common.HostFromIntegration(ctx.Integration).InstallAppURL(metadata.GitHubApp.Slug, state),
+		privateAppInstallURL(ctx, metadata.GitHubApp.Slug, state),
 		http.StatusSeeOther,
 	)
 }
@@ -789,7 +789,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 		redirectToIntegrationSettingsRequested(ctx)
 		return
 	}
-	if installationID == "" || requestState != state {
+	if installationID == "" || !setupCallbackAccepted(ctx, requestState, state, installationID) {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 		return
@@ -925,7 +925,7 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		redirectToIntegrationSettingsRequested(ctx)
 		return
 	}
-	if installationID == "" || state != metadata.State {
+	if installationID == "" || !setupCallbackAccepted(ctx, state, metadata.State, installationID) {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 		return
@@ -1030,6 +1030,99 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, host common.Hos
 	}
 
 	return &appData, nil
+}
+
+func privateAppInstallURL(ctx core.HTTPRequestContext, slug, state string) string {
+	host := common.HostFromIntegration(ctx.Integration)
+	return host.InstallAppURLForOwner(propertyOrMetadataOwner(ctx), slug, state)
+}
+
+func propertyOrMetadataOwner(ctx core.HTTPRequestContext) string {
+	if ctx.Integration == nil {
+		return ""
+	}
+	if owner, err := ctx.Integration.Properties().GetString(common.PropertyOwner); err == nil {
+		return strings.TrimSpace(owner)
+	}
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	return strings.TrimSpace(metadata.Owner)
+}
+
+// setupCallbackAccepted reports whether a GitHub App setup redirect may continue.
+// A present state must match. A missing state is accepted only for a private App
+// whose installation belongs to this integration's App.
+func setupCallbackAccepted(ctx core.HTTPRequestContext, requestState, expectedState, installationID string) bool {
+	if strings.TrimSpace(requestState) != "" {
+		return requestState == expectedState
+	}
+	if hostedGitHubApp(ctx.Integration) {
+		return false
+	}
+	return privateAppOwnsInstallation(ctx, installationID)
+}
+
+func setupCallbackStateAccepted(requestState, expectedState string, hosted bool, integrationAppID, installationAppID int64) bool {
+	if strings.TrimSpace(requestState) != "" {
+		return requestState == expectedState
+	}
+	if hosted {
+		return false
+	}
+	return integrationAppID != 0 && integrationAppID == installationAppID
+}
+
+func privateAppOwnsInstallation(ctx core.HTTPRequestContext, installationID string) bool {
+	appID := integrationAppID(ctx)
+	if appID == 0 || strings.TrimSpace(installationID) == "" {
+		return false
+	}
+	got, err := lookupInstallationAppID(ctx, appID, installationID)
+	if err != nil {
+		return false
+	}
+	return setupCallbackStateAccepted("", "", false, appID, got)
+}
+
+var lookupInstallationAppID = lookupInstallationAppIDFromGitHub
+
+func integrationAppID(ctx core.HTTPRequestContext) int64 {
+	if ctx.Integration == nil {
+		return 0
+	}
+	if raw, err := ctx.Integration.Properties().GetString(common.PropertyAppID); err == nil {
+		if id, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64); err == nil {
+			return id
+		}
+	}
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return 0
+	}
+	return metadata.GitHubApp.ID
+}
+
+func lookupInstallationAppIDFromGitHub(ctx core.HTTPRequestContext, appID int64, installationID string) (int64, error) {
+	client, err := newAppJWTClient(ctx.Integration, appID)
+	if err != nil {
+		return 0, err
+	}
+	return installationAppIDFromClient(context.Background(), client, installationID)
+}
+
+func installationAppIDFromClient(ctx context.Context, client *github.Client, installationID string) (int64, error) {
+	id, err := strconv.ParseInt(installationID, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid installation ID: %w", err)
+	}
+	installation, _, err := client.Apps.GetInstallation(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	if installation == nil {
+		return 0, fmt.Errorf("GitHub installation %s was not found", installationID)
+	}
+	return installation.GetAppID(), nil
 }
 
 func isPendingInstallationSetupAction(setupAction string) bool {

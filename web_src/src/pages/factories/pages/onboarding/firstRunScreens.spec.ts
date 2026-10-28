@@ -17,7 +17,7 @@ describe("screenWithVcsConnection GitHub Enterprise", () => {
     expect(screenWithVcsConnection("choose", "github", github, true)).toBe("ghe-host");
   });
 
-  it("opens repository choice after the GitHub App is created", () => {
+  it("opens repository choice after the GitHub App is installed", () => {
     const connected = { ...github, ready: true, appConfigured: true, accountConnectionRequired: false };
     expect(screenWithVcsConnection("welcome", "github", connected, true)).toBe("choose");
     expect(screenWithVcsConnection("connect", "github", connected, true)).toBe("choose");

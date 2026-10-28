@@ -341,7 +341,19 @@ func (h Host) CreateAppURL(ownerType, owner string) string {
 }
 
 func (h Host) InstallAppURL(slug, state string) string {
-	install := h.WebURL() + "/apps/" + strings.TrimSpace(slug) + "/installations/new"
+	return h.InstallAppURLForOwner("", slug, state)
+}
+
+// InstallAppURLForOwner is the browser install page for a GitHub App.
+// ghe.com tenants require the owning account in the path.
+func (h Host) InstallAppURLForOwner(owner, slug, state string) string {
+	slug = strings.TrimSpace(slug)
+	owner = strings.TrimSpace(owner)
+	path := "/apps/" + slug + "/installations/new"
+	if h.IsGHECom() && owner != "" {
+		path = "/apps/" + owner + "/" + slug + "/installations/new"
+	}
+	install := h.WebURL() + path
 	if strings.TrimSpace(state) == "" {
 		return install
 	}

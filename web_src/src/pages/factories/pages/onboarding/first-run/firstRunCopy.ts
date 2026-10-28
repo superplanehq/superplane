@@ -34,6 +34,10 @@ export const FIRST_RUN_COPY = {
     ipAllowListHref: "https://docs.superplane.com/components/github#github-enterprise-cloud",
     continue: "Create GitHub App",
     opening: "Opening GitHub…",
+    finishHeadline: "Finish setting up the GitHub App",
+    finishBody:
+      "Create and install the GitHub App on your GitHub Enterprise Cloud. SuperPlane then lists the repositories.",
+    finishAction: "Continue GitHub App setup",
     invalidHost: "Enter a GitHub hostname, for example acme.ghe.com.",
     connectError: "SuperPlane could not connect to GitHub Enterprise. Check the hostname and try again.",
     repositoryHelper: "SuperPlane opens pull requests in this GitHub repository for review.",

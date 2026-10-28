@@ -45,7 +45,7 @@ vi.mock("@/hooks/useIntegrations", () => ({
 }));
 
 vi.mock("./useFirstRunGitHubEnterprise", () => ({
-  useFirstRunGitHubEnterprise: () => ({ connect: vi.fn() }),
+  useFirstRunGitHubEnterprise: () => ({ connect: vi.fn(), resume: vi.fn(), ready: false }),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({

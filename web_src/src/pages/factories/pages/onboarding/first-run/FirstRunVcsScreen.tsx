@@ -129,10 +129,12 @@ export function FirstRunVcsScreen({
       <FirstRunGitHubEnterpriseHostScreen
         initialHost={flow.githubEnterpriseHost}
         connecting={flow.blockingAction === "opening-github"}
+        pendingSetup={Boolean(flow.githubEnterpriseIntegrationId) && !flow.githubEnterpriseReady}
         connectError={flow.githubEnterpriseError}
         chrome={chrome}
         sphere={sphereFor("connect", setup.selectedRepo)}
         onContinue={(host) => void flow.connectGitHubEnterprise(host)}
+        onResumeSetup={() => void flow.resumeGitHubEnterpriseSetup()}
       />
     );
   }

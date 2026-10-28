@@ -1,5 +1,6 @@
 import { useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
-import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
+import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+import { connectPrivateGitHubApp, githubPrivateAppSetupPath } from "@/lib/privateGitHubApp";
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
 
@@ -8,6 +9,7 @@ import { writeOnboardingGithubEnterprise } from "./onboardingGithubEnterprise";
 export function useFirstRunGitHubEnterprise(args: {
   organizationId: string;
   factoryId: string;
+  integrationId?: string;
   onCreated?: (integrationId: string) => Promise<void> | void;
 }) {
   const navigate = useNavigate();
@@ -23,6 +25,9 @@ export function useFirstRunGitHubEnterprise(args: {
       ),
     [connected],
   );
+  const integrationId = args.integrationId?.trim() ?? "";
+  const instance = connected.find((integration) => integration.metadata?.id === integrationId);
+  const ready = instance?.status?.state === "ready";
 
   const connect = async (host: string, returnTo: string) => {
     writeOnboardingGithubEnterprise(args.factoryId, true, host);
@@ -43,5 +48,14 @@ export function useFirstRunGitHubEnterprise(args: {
     });
   };
 
-  return { connect };
+  const resume = (returnTo: string) => {
+    if (!integrationId) {
+      return false;
+    }
+    rememberIntegrationSetupReturn(args.organizationId, returnTo);
+    navigate(`${githubPrivateAppSetupPath(args.organizationId)}?integrationId=${integrationId}`);
+    return true;
+  };
+
+  return { connect, resume, ready };
 }

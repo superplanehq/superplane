@@ -26,6 +26,19 @@ describe("FirstRunGitHubEnterpriseHostScreen", () => {
     );
   });
 
+  it("sends a pending App back to the setup wizard", async () => {
+    const user = userEvent.setup();
+    const onResumeSetup = vi.fn();
+    render(<FirstRunGitHubEnterpriseHostScreen pendingSetup onContinue={vi.fn()} onResumeSetup={onResumeSetup} />);
+
+    expect(screen.queryByTestId("first-run-github-enterprise-hostname")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-enterprise-host")).toHaveTextContent(
+      FIRST_RUN_COPY.githubEnterprise.finishHeadline,
+    );
+    await user.click(screen.getByTestId("first-run-github-enterprise-finish"));
+    expect(onResumeSetup).toHaveBeenCalled();
+  });
+
   it("shows a connection error so the user can retry", () => {
     render(
       <FirstRunGitHubEnterpriseHostScreen

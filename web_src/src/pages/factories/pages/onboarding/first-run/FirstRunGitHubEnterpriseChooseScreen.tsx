@@ -26,7 +26,7 @@ export function GitHubEnterpriseChooseHost({
 }) {
   const integrationId = flow.githubEnterpriseIntegrationId || model.githubIntegrationId;
   const resources = useIntegrationResources(organizationId, integrationId, "repository", undefined, {
-    enabled: Boolean(integrationId),
+    enabled: Boolean(integrationId) && flow.githubEnterpriseReady,
   });
   const repositories = (resources.data ?? []).map((resource) => resource.name ?? "").filter(Boolean);
   return (

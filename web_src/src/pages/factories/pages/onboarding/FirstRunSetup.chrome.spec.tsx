@@ -52,7 +52,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 vi.mock("./useFirstRunGitHubEnterprise", () => ({
-  useFirstRunGitHubEnterprise: () => ({ connect: vi.fn() }),
+  useFirstRunGitHubEnterprise: () => ({ connect: vi.fn(), resume: vi.fn(), ready: false }),
 }));
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({

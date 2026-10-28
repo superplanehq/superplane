@@ -21,21 +21,44 @@ function looksLikeGitHubHost(value: string): boolean {
 export function FirstRunGitHubEnterpriseHostScreen({
   initialHost = "",
   connecting = false,
+  pendingSetup = false,
   connectError,
   chrome,
   sphere,
   onContinue,
+  onResumeSetup,
 }: {
   initialHost?: string;
   connecting?: boolean;
+  pendingSetup?: boolean;
   connectError?: string;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onContinue: (host: string) => void;
+  onResumeSetup?: () => void;
 }) {
   const [host, setHost] = useState(initialHost);
   const trimmed = host.trim();
   const valid = looksLikeGitHubHost(trimmed);
+
+  if (pendingSetup) {
+    return (
+      <FirstRunShell testId="first-run-github-enterprise-host" chrome={chrome} sphere={sphere} visual="preview">
+        <FirstRunHeading headline={copy.finishHeadline}>
+          <p className="text-[15px] leading-6 text-muted-foreground">{copy.finishBody}</p>
+        </FirstRunHeading>
+        <LoadingButton
+          type="button"
+          className="mt-8 w-full"
+          loading={connecting}
+          data-testid="first-run-github-enterprise-finish"
+          onClick={() => onResumeSetup?.()}
+        >
+          {connecting ? copy.opening : copy.finishAction}
+        </LoadingButton>
+      </FirstRunShell>
+    );
+  }
 
   return (
     <FirstRunShell testId="first-run-github-enterprise-host" chrome={chrome} sphere={sphere} visual="preview">

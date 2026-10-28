@@ -11,10 +11,18 @@ import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
-const connectGitHubEnterprise = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+const gheApp = vi.hoisted(() => ({
+  ready: false,
+  connect: vi.fn().mockResolvedValue(true),
+  resume: vi.fn().mockReturnValue(true),
+}));
 
 vi.mock("./useFirstRunGitHubEnterprise", () => ({
-  useFirstRunGitHubEnterprise: () => ({ connect: connectGitHubEnterprise }),
+  useFirstRunGitHubEnterprise: () => ({
+    connect: gheApp.connect,
+    resume: gheApp.resume,
+    ready: gheApp.ready,
+  }),
 }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
@@ -159,7 +167,9 @@ function renderSetup(setup: OnboardingSetupApi, path: string) {
 describe("FirstRunSetup GitHub Enterprise Cloud", () => {
   beforeEach(() => {
     sessionStorage.clear();
-    connectGitHubEnterprise.mockClear();
+    gheApp.ready = false;
+    gheApp.connect.mockClear();
+    gheApp.resume.mockClear();
   });
 
   it("clears a github.com repository when switching to Enterprise", async () => {
@@ -177,6 +187,7 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
   });
 
   it("does not continue with a repository missing from the Enterprise list", () => {
+    gheApp.ready = true;
     writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
     const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
     const connected = new Set<IntegrationId>(["github"]);
@@ -211,11 +222,12 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
     await user.type(screen.getByTestId("first-run-github-enterprise-hostname"), "acme.ghe.com");
     await user.click(screen.getByTestId("first-run-github-enterprise-continue"));
 
-    await waitFor(() => expect(connectGitHubEnterprise).toHaveBeenCalled());
-    expect(connectGitHubEnterprise).toHaveBeenCalledWith("acme.ghe.com", expect.stringContaining("step=repo"));
+    await waitFor(() => expect(gheApp.connect).toHaveBeenCalled());
+    expect(gheApp.connect).toHaveBeenCalledWith("acme.ghe.com", expect.stringContaining("step=repo"));
   });
 
   it("lists repositories from the GitHub Enterprise integration", () => {
+    gheApp.ready = true;
     writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
     const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
     const connected = new Set<IntegrationId>(["github"]);
@@ -228,7 +240,7 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
     expect(screen.getByText("acme/api")).toBeInTheDocument();
   });
 
-  it("resumes repository choice after GitHub App setup before GitHub is marked ready", () => {
+  it("keeps a pending GitHub App on the finish-setup screen", () => {
     writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
     const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
     hook.result.current.selectVcsHost("github");
@@ -239,11 +251,13 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("first-run-github-enterprise-choose")).toBeInTheDocument();
-    expect(screen.getByText("acme/api")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-enterprise-choose")).not.toBeInTheDocument();
+    expect(screen.queryByText("SuperPlane cannot see repositories for this GitHub App.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-enterprise-finish")).toBeInTheDocument();
   });
 
   it("resumes Enterprise from the saved integration host after the tab is closed", () => {
+    gheApp.ready = true;
     const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
     hook.result.current.selectVcsHost("github");
 
