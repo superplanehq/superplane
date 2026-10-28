@@ -11,8 +11,8 @@ import { useState } from "react";
 import { FlowBadge } from "./customAutomationSetupFlow";
 import { ImplementSettingRow } from "./ImplementSettingRow";
 import { mergeCheckPromptBody, withMergeCheckHeader } from "./mergeConfidenceSteps";
-import { PlanningReviewStepBody } from "./PlanningReviewStepBody";
 import type { PlanningReviewStep } from "./planningReviewMockup";
+import { PlanningReviewStepBody } from "./PlanningReviewStepBody";
 
 export function StepEditor({
   step,
@@ -84,9 +84,7 @@ export function StepEditor({
         <div className="flex flex-col gap-1.5">
           <Label>{step.type === "prompt" ? "Prompt" : "Commands"}</Label>
           <p className="text-xs text-muted-foreground">
-            {step.type === "prompt"
-              ? "Tell the agent what to do in this step. It can attach a link to the task."
-              : "Add shell commands for the runner. To attach a link, run superplane publish-link."}
+            {step.type === "prompt" ? "Tell the agent what to do in this step." : "Add shell commands for the runner."}
           </p>
         </div>
         <PlanningReviewStepBody

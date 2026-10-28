@@ -64,51 +64,8 @@ async function publishLink(input, env = process.env, fetchImpl = fetch) {
   return result;
 }
 
-function usage() {
-  return "usage: superplane publish-link --url URL [--title TITLE] [--key KEY]";
-}
-
-function parseArgs(argv) {
-  const args = Array.isArray(argv) ? argv : [];
-  if (args[0] !== "publish-link") {
-    throw new Error(usage());
-  }
-  const input = {};
-  for (let index = 1; index < args.length; index += 1) {
-    const flag = args[index];
-    const value = args[index + 1];
-    if (!value || value.startsWith("--")) {
-      throw new Error(usage());
-    }
-    if (flag === "--url") input.url = value;
-    else if (flag === "--title") input.title = value;
-    else if (flag === "--key") input.key = value;
-    else throw new Error(usage());
-    index += 1;
-  }
-  return input;
-}
-
-async function main(argv, env = process.env, fetchImpl = fetch, stdout = process.stdout, stderr = process.stderr) {
-  try {
-    const result = await publishLink(parseArgs(argv), env, fetchImpl);
-    const url = String(result.url || "").trim();
-    stdout.write(`${url}\n`);
-  } catch (error) {
-    stderr.write(`${error && error.message ? error.message : error}\n`);
-    return 1;
-  }
-  return 0;
-}
-
-if (require.main === module) {
-  main(process.argv.slice(2)).then((code) => process.exit(code));
-}
-
 module.exports = {
   PUBLISH_LINK_TOOL,
   linkTarget,
-  main,
-  parseArgs,
   publishLink,
 };

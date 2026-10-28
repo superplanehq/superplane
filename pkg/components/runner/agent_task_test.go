@@ -112,7 +112,7 @@ func TestAppendPublishLinkProtocolAddsCommandToFirstPromptOnly(t *testing.T) {
 	require.Len(t, got, len(steps))
 	assert.Equal(t, firstPrompt, *steps[1].Prompt, "the original prompt must not change")
 	assert.Contains(t, *got[1].Prompt, firstPrompt)
-	assert.Contains(t, *got[1].Prompt, "superplane publish-link")
+	assert.Contains(t, *got[1].Prompt, "superplane task artifact add")
 	assert.Contains(t, *got[1].Prompt, "publish_link")
 	assert.Equal(t, secondPrompt, *got[2].Prompt)
 	assert.Equal(t, command, *got[0].Command)

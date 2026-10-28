@@ -1,11 +1,9 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { spawnSync } = require("node:child_process");
-const path = require("node:path");
 const test = require("node:test");
 
-const { linkTarget, main, publishLink } = require("./publish_link");
+const { linkTarget, publishLink } = require("./publish_link");
 
 const env = {
   SUPERPLANE_BASE_URL: "https://app.example",
@@ -51,29 +49,4 @@ test("publishLink rejects a non-http url before the request", async () => {
     /http or https/,
   );
   assert.throws(() => linkTarget("https://"), /http or https/);
-});
-
-test("publish-link command prints the attached url", async () => {
-  let stdout = "";
-  const code = await main(
-    ["publish-link", "--url", "https://staging.example.com/pr-42", "--title", "Staging", "--key", "staging"],
-    env,
-    async () => ({
-      ok: true,
-      status: 201,
-      text: async () => JSON.stringify({ url: "https://staging.example.com/pr-42" }),
-    }),
-    { write: (chunk) => { stdout += chunk; } },
-    { write() {} },
-  );
-  assert.equal(code, 0);
-  assert.equal(stdout, "https://staging.example.com/pr-42\n");
-});
-
-test("publish-link command requires a url", () => {
-  const result = spawnSync(process.execPath, [path.join(__dirname, "publish_link.js"), "publish-link"], {
-    encoding: "utf8",
-  });
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /url is required/);
 });

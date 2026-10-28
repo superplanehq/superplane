@@ -87,7 +87,8 @@ func TestAppendTaskArtifactMCPRequiresArtifactToken(t *testing.T) {
 		{Name: EnvSuperplaneArtifactToken, Value: "token"},
 		{Name: EnvSuperplanePublishLinks, Value: "yes"},
 	}, files)
-	require.Len(t, withLink, 4)
-	assert.Equal(t, "bin/superplane", withLink[3].Path)
-	assert.Equal(t, "0755", withLink[3].Mode)
+	require.Len(t, withLink, 5)
+	assert.Equal(t, "task_cli.js", withLink[3].Path)
+	assert.Equal(t, "bin/superplane", withLink[4].Path)
+	assert.Equal(t, "0755", withLink[4].Mode)
 }

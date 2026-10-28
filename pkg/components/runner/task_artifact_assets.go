@@ -8,13 +8,16 @@ var taskArtifactMCPScript string
 //go:embed publish_link.js
 var publishLinkScript string
 
-const publishLinkCommand = `#!/bin/sh
+//go:embed task_cli.js
+var taskCLIScript string
+
+const taskCommand = `#!/bin/sh
 set -eu
 if [ -z "${SUPERPLANE_TASK_DIR:-}" ]; then
   echo "SUPERPLANE_TASK_DIR is required" >&2
   exit 1
 fi
-exec node "$SUPERPLANE_TASK_DIR/publish_link.js" "$@"
+exec node "$SUPERPLANE_TASK_DIR/task_cli.js" "$@"
 `
 
 func TaskArtifactMCPScript() string { return taskArtifactMCPScript }
@@ -31,7 +34,7 @@ func AppendTaskArtifactMCP(environment []TaskEnvironmentVariable, files []TaskFi
 	// evidence runs that do not publish links.
 	files = append(files, TaskArtifactMCPFile(), PublishLinkScriptFile())
 	if HasPublishLinks(environment) {
-		files = append(files, PublishLinkCommandFile())
+		files = append(files, TaskCLIScriptFile(), PublishLinkCommandFile())
 	}
 	return files
 }
@@ -40,6 +43,10 @@ func PublishLinkScriptFile() TaskFile {
 	return TaskFile{Path: "publish_link.js", Content: publishLinkScript, Mode: "0644"}
 }
 
+func TaskCLIScriptFile() TaskFile {
+	return TaskFile{Path: "task_cli.js", Content: taskCLIScript, Mode: "0644"}
+}
+
 func PublishLinkCommandFile() TaskFile {
-	return TaskFile{Path: "bin/superplane", Content: publishLinkCommand, Mode: "0755"}
+	return TaskFile{Path: "bin/superplane", Content: taskCommand, Mode: "0755"}
 }
