@@ -387,10 +387,10 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 	// Member changes enqueue the repository again after the previous job is
 	// complete so cached push access is refreshed.
 	claimAt := time.Now().Add(time.Minute)
-	job, err := models.ClaimVCSProviderRepositorySync(db, models.ProviderGitHub, claimAt, claimAt.Add(-time.Minute))
+	jobs, err := models.ClaimVCSProviderRepositorySyncs(db, models.ProviderGitHub, claimAt, claimAt.Add(-time.Minute), 1)
 	require.NoError(t, err)
-	require.NotNil(t, job)
-	require.NoError(t, models.CompleteVCSProviderRepositorySync(db, models.ProviderGitHub, repositoryID, *job.LockedAt))
+	require.Len(t, jobs, 1)
+	require.NoError(t, models.CompleteVCSProviderRepositorySync(db, models.ProviderGitHub, repositoryID, *jobs[0].LockedAt))
 	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.MemberEvent{
 		Action:       gh.Ptr("edited"),
 		Repo:         repository,

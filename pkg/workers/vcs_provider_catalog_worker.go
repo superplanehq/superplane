@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
 
@@ -384,32 +385,45 @@ func (w *VCSProviderCatalogWorker) processClaimedInstallationJob(
 }
 
 func (w *VCSProviderCatalogWorker) processJobs(ctx context.Context) {
-	availableSlots := cap(w.repositorySlots) - len(w.repositorySlots)
-	for range availableSlots {
-		select {
-		case w.repositorySlots <- struct{}{}:
-		default:
-			return
-		}
+	reserved := w.reserveRepositorySlots()
+	if reserved == 0 {
+		return
+	}
 
-		now := time.Now()
-		job, err := models.ClaimVCSProviderRepositorySync(database.Conn(), w.provider, now, now.Add(-vcsProviderClaimTimeout))
-		if err != nil {
-			<-w.repositorySlots
-			w.logger.WithError(err).Error("failed to claim a VCS collaborator synchronization job")
-			return
-		}
-		if job == nil {
-			<-w.repositorySlots
-			return
-		}
+	now := time.Now()
+	jobs, err := models.ClaimVCSProviderRepositorySyncs(database.Conn(), w.provider, now, now.Add(-vcsProviderClaimTimeout), reserved)
+	if err != nil {
+		w.releaseRepositorySlots(reserved)
+		w.logger.WithError(err).Error("failed to claim VCS collaborator synchronization jobs")
+		return
+	}
+	w.releaseRepositorySlots(reserved - len(jobs))
 
+	for i := range jobs {
 		w.repositoryJobs.Add(1)
-		go func(job *models.VCSProviderRepositorySyncJob, claimedAt time.Time) {
+		go func(job *models.VCSProviderRepositorySyncJob) {
 			defer w.repositoryJobs.Done()
 			defer func() { <-w.repositorySlots }()
-			w.processClaimedJob(ctx, job, claimedAt)
-		}(job, now)
+			w.processClaimedJob(ctx, job, now)
+		}(&jobs[i])
+	}
+}
+
+func (w *VCSProviderCatalogWorker) reserveRepositorySlots() int {
+	reserved := 0
+	for {
+		select {
+		case w.repositorySlots <- struct{}{}:
+			reserved++
+		default:
+			return reserved
+		}
+	}
+}
+
+func (w *VCSProviderCatalogWorker) releaseRepositorySlots(count int) {
+	for range count {
+		<-w.repositorySlots
 	}
 }
 
@@ -429,6 +443,7 @@ func (w *VCSProviderCatalogWorker) processClaimedJob(
 		),
 	}
 	err := w.catalog.SyncRepositoryCollaborators(ctx, job.RepositoryID)
+	telemetry.RecordVCSCatalogRepositorySync(ctx, w.provider, time.Since(startedAt), vcsProviderSyncOutcome(err))
 	if err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
 		if completeErr := models.CompleteVCSProviderRepositorySync(
 			database.Conn(),
@@ -459,6 +474,17 @@ func (w *VCSProviderCatalogWorker) processClaimedJob(
 		return
 	}
 	w.logger.WithFields(fields).WithError(err).Warn("VCS repository collaborator synchronization will retry")
+}
+
+func vcsProviderSyncOutcome(err error) string {
+	switch {
+	case err == nil:
+		return "synced"
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		return "not_found"
+	default:
+		return "failed"
+	}
 }
 
 func vcsProviderRetryDelay(attempts int) time.Duration {
