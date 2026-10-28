@@ -94,6 +94,7 @@ import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
 import { isNotFoundError } from "./pages/app/workflowPageHelpers";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
+import { RegistrationStats } from "./pages/admin/RegistrationStats";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
@@ -283,6 +284,7 @@ function AppRouter() {
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<OrganizationsListAdmin />} />
+                <Route path="stats" element={<RegistrationStats />} />
                 <Route path="accounts" element={<AccountsListAdmin />} />
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
                 <Route path="credits" element={<CreditsAdmin />} />

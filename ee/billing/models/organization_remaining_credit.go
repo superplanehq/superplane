@@ -14,45 +14,57 @@ import (
 // allocateHostedCreditSpend, including expired welcome credit and negative
 // adjustments.
 func RemainingHostedCreditMicros(tx *gorm.DB, organizationIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
-	remaining := make(map[uuid.UUID]int64, len(organizationIDs))
-	if len(organizationIDs) == 0 {
-		return remaining, nil
-	}
-	for _, id := range organizationIDs {
-		remaining[id] = 0
-	}
-
-	var grants []OrganizationLLMCreditGrant
-	err := tx.Where("organization_id IN ?", organizationIDs).Find(&grants).Error
+	credits, err := hostedCreditSpendByOrganization(tx, organizationIDs)
 	if err != nil {
 		return nil, err
 	}
-
-	billed, err := sumHostedBilledMicrosByOrganization(tx, organizationIDs, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	billedAtExpiry, err := billedMicrosAtExpiredGrantExpiries(tx, grants, now)
-	if err != nil {
-		return nil, err
-	}
-
-	grantsByOrganization := make(map[uuid.UUID][]OrganizationLLMCreditGrant)
-	for _, grant := range grants {
-		grantsByOrganization[grant.OrganizationID] = append(grantsByOrganization[grant.OrganizationID], grant)
-	}
-
-	for _, id := range organizationIDs {
-		orgGrants := grantsByOrganization[id]
-		if len(orgGrants) == 0 {
-			continue
-		}
-		spend := allocateHostedCreditSpend(orgGrants, billed[id], billedAtExpiry[id], now)
-		remaining[id] = spend.RemainingMicros
+	remaining := make(map[uuid.UUID]int64, len(credits))
+	for id, credit := range credits {
+		remaining[id] = credit.RemainingMicros
 	}
 	return remaining, nil
+}
+
+func hostedCreditSpendByOrganization(tx *gorm.DB, ids []uuid.UUID) (map[uuid.UUID]hostedCreditSpend, error) {
+	return loadHostedCreditSpend(tx, ids, false)
+}
+
+// hostedCreditSpendWithTrialHistory also loads the billed amount at each grant
+// creation time, which lifetime trial spend needs.
+func hostedCreditSpendWithTrialHistory(tx *gorm.DB, ids []uuid.UUID) (map[uuid.UUID]hostedCreditSpend, error) {
+	return loadHostedCreditSpend(tx, ids, true)
+}
+
+func loadHostedCreditSpend(tx *gorm.DB, ids []uuid.UUID, withTrialHistory bool) (map[uuid.UUID]hostedCreditSpend, error) {
+	credits := make(map[uuid.UUID]hostedCreditSpend, len(ids))
+	if len(ids) == 0 {
+		return credits, nil
+	}
+	var grants []OrganizationLLMCreditGrant
+	if err := tx.Where("organization_id IN ?", ids).Find(&grants).Error; err != nil {
+		return nil, err
+	}
+	billed, err := sumHostedBilledMicrosByOrganization(tx, ids, nil)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	pairs := expiredGrantSpendPairs(grants, now)
+	if withTrialHistory {
+		pairs = append(pairs, trialGrantCreationPairs(grants, pairs)...)
+	}
+	atExpiry, err := billedMicrosAtSpendPairs(tx, pairs)
+	if err != nil {
+		return nil, err
+	}
+	byOrganization := map[uuid.UUID][]OrganizationLLMCreditGrant{}
+	for _, grant := range grants {
+		byOrganization[grant.OrganizationID] = append(byOrganization[grant.OrganizationID], grant)
+	}
+	for _, id := range ids {
+		credits[id] = allocateHostedCreditSpend(byOrganization[id], billed[id], atExpiry[id], now)
+	}
+	return credits, nil
 }
 
 type organizationHostedSpend struct {
@@ -103,8 +115,7 @@ type hostedSpendAtExpiryRow struct {
 	CostMicros     int64     `gorm:"column:cost_micros"`
 }
 
-func billedMicrosAtExpiredGrantExpiries(tx *gorm.DB, grants []OrganizationLLMCreditGrant, now time.Time) (map[uuid.UUID]map[int64]int64, error) {
-	pairs := expiredGrantSpendPairs(grants, now)
+func billedMicrosAtSpendPairs(tx *gorm.DB, pairs []hostedCreditExpiry) (map[uuid.UUID]map[int64]int64, error) {
 	billedAtExpiry := map[uuid.UUID]map[int64]int64{}
 	for start := 0; start < len(pairs); start += hostedSpendAtExpiryBatchSize {
 		end := start + hostedSpendAtExpiryBatchSize
@@ -147,6 +158,38 @@ func expiredGrantSpendPairs(grants []OrganizationLLMCreditGrant, now time.Time) 
 			At:             at,
 			Nanos:          key.nanos,
 		})
+	}
+	return pairs
+}
+
+// trialGrantCreationPairs returns the creation time of each grant of an
+// organization that has trial credit, except times that are already in known.
+// Lifetime trial spend splits usage at these times. Usage at the creation time
+// itself belongs to the new grant, so the billed amount covers usage strictly
+// before it: the query time is one microsecond (the database precision) earlier.
+func trialGrantCreationPairs(grants []OrganizationLLMCreditGrant, known []hostedCreditExpiry) []hostedCreditExpiry {
+	hasTrial := map[uuid.UUID]bool{}
+	for _, grant := range grants {
+		if grantCreditBucket(grant.Kind) == creditBucketWelcome {
+			hasTrial[grant.OrganizationID] = true
+		}
+	}
+	seen := map[expirySpendKey]struct{}{}
+	for _, pair := range known {
+		seen[expirySpendKey{organizationID: pair.OrganizationID, nanos: pair.Nanos}] = struct{}{}
+	}
+	pairs := make([]hostedCreditExpiry, 0)
+	for _, grant := range grants {
+		if !hasTrial[grant.OrganizationID] {
+			continue
+		}
+		at := grant.CreatedAt.UTC()
+		key := expirySpendKey{organizationID: grant.OrganizationID, nanos: at.UnixNano()}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		pairs = append(pairs, hostedCreditExpiry{OrganizationID: grant.OrganizationID, At: at.Add(-time.Microsecond), Nanos: key.nanos})
 	}
 	return pairs
 }
