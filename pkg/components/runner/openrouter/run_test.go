@@ -570,6 +570,42 @@ func TestRunPromptRetriesSelectedModelAfterRateLimit(t *testing.T) {
 	assert.Regexp(t, `✓ done · \d+ turns`, result.output)
 	payload := resultPayload(t, result.resultFile)
 	assert.Equal(t, "working", payload["result"])
+	assert.Equal(t, []any{
+		map[string]any{"model": "x-ai/grok-4.6", "outcome": "attempt_2"},
+	}, payload["modelCallOutcomes"])
+}
+
+func TestRunPromptRecordsErrorAfterFourRateLimitAttempts(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+			rateLimitSpawn("Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."),
+		},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assert.Equal(t, []any{
+		map[string]any{"model": "x-ai/grok-4.6", "outcome": "error"},
+	}, payload["modelCallOutcomes"])
+}
+
+func TestRunPromptOmitsModelCallOutcomesForHardAuthenticationErrors(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model: "x-ai/grok-4.6",
+		spawns: []spawnScript{
+			{
+				ExitCode: 1,
+				Stderr:   "Invalid API key",
+				Stdout:   []string{`{"type":"error","error":{"data":{"message":"Invalid API key"}}}`},
+			},
+		},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	payload := resultPayload(t, result.resultFile)
+	assert.NotContains(t, payload, "modelCallOutcomes")
 }
 
 func TestRunPromptRetriesSelectedModelAfterTemporaryProviderError(t *testing.T) {

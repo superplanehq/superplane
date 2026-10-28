@@ -407,6 +407,12 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_HOSTED_MODEL_CALL_OUTCOME_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Hosted Model Call Outcome Cleanup Worker")
+		w := workers.NewHostedModelCallOutcomeCleanupWorker()
+		go w.Start(context.Background())
+	}
+
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
