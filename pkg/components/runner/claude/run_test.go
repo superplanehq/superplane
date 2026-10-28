@@ -663,7 +663,7 @@ func TestFormatStreamJsonLinesWithNoResultEventIsNotFailed(t *testing.T) {
 }
 
 func TestClaudeModelCallOutcomesMapsRetriesAndProviderFailures(t *testing.T) {
-	stamp := "2026-10-28T12:00:00.000Z"
+	stamp := time.Now().UTC().Truncate(time.Millisecond).Format(time.RFC3339Nano)
 	assert.Equal(t, []any{
 		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_1", "occurredAt": stamp},
 	}, claudeModelCallOutcomesFromScript(t, map[string]any{
