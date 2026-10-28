@@ -67,7 +67,6 @@ type Runtime interface {
 	ValidatePastDueGraceDays(int) error
 	Initialize(*gorm.DB) error
 	InitializeOrganization(*gorm.DB, uuid.UUID) error
-	GrantWelcomeCredit(*gorm.DB, uuid.UUID, uuid.UUID) error
 	PrepareDeletion(context.Context, uuid.UUID) (DeletionGuard, error)
 	LocalDeletionGuard(*gorm.DB, uuid.UUID) (DeletionGuard, error)
 	PrepareAdmission(context.Context, uuid.UUID) error

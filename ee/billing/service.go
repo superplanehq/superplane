@@ -42,13 +42,6 @@ func (*Service) InitializeOrganization(tx *gorm.DB, organizationID uuid.UUID) er
 	return err
 }
 
-func (*Service) GrantWelcomeCredit(tx *gorm.DB, organizationID, accountID uuid.UUID) error {
-	if !billing.Enabled() {
-		return nil
-	}
-	return billingmodels.GrantWelcomeCredit(tx, organizationID, accountID)
-}
-
 func (*Service) LocalDeletionGuard(tx *gorm.DB, organizationID uuid.UUID) (billing.DeletionGuard, error) {
 	plan, err := billingmodels.FindOrganizationBillingPlan(tx, organizationID)
 	if err != nil {

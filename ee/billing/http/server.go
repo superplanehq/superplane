@@ -29,6 +29,7 @@ func (s *Server) RegisterPublic(publicRoute *mux.Router) {
 }
 
 func (s *Server) RegisterAdmin(adminRoute *mux.Router) {
+	adminRoute.HandleFunc("/stats", s.adminRegistrationStats).Methods("GET")
 	adminRoute.HandleFunc("/billing-plans", s.adminListBillingPlans).Methods("GET")
 	adminRoute.HandleFunc("/credit-packs", s.adminListCreditPacks).Methods("GET")
 	adminRoute.HandleFunc("/credit-packs", s.adminSaveCreditPack).Methods("POST")
