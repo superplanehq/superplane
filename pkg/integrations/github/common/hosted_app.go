@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -129,7 +128,7 @@ func hostedAppFromConfig(cfg config.GitHubHostedAppConfig) (HostedApp, bool) {
 }
 
 func HostedAppInstallURL(slug, state string) string {
-	return fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", slug, url.QueryEscape(state))
+	return DotCom().InstallAppURL(slug, state)
 }
 
 func SignHostedAppInstallState(secret string, organizationID uuid.UUID) (string, error) {

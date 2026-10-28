@@ -611,6 +611,7 @@ func deriveFactoryTemplateInput(
 	if template.id == scheduledIntakeTemplateID {
 		config := factory.OnboardingConfigValue()
 		input.installParams["appRepository"] = config.AppRepository
+		input.installParams["githubHost"] = githubHostForFactory(tx, factory)
 		if settings != nil {
 			input.installParams["prompt"] = scheduledIntakePromptFromSteps(settings.agentSteps["scheduled-agent"])
 		}

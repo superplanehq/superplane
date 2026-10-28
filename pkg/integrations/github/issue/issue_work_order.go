@@ -28,7 +28,7 @@ func (r Ref) valid() bool {
 
 // RefFromEventData reads the issue from a canvas root event envelope:
 //
-//	{ "type": "github.issue", "data": { "issue": { "html_url": "https://github.com/acme/app/issues/12" } } }
+//	{ "type": "github.issue", "data": { "issue": { "html_url": "<github-issue-url>" } } }
 func RefFromEventData(eventData any) (Ref, bool) {
 	envelope, ok := eventData.(map[string]any)
 	if !ok {
