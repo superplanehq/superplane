@@ -463,16 +463,19 @@ func TestApplyGitHubCatalogWebhookRefreshesTeamAndOrganizationAccess(t *testing.
 		name  string
 		event any
 		want  map[int64]models.VCSProviderRepositorySyncPriority
+		delay time.Duration
 	}{
 		{
 			name:  "team added to a repository",
 			event: &gh.TeamAddEvent{Repo: repository},
 			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: interactive},
+			delay: githubRepositoryAccessChangeDelay,
 		},
 		{
 			name:  "team removed from a repository",
 			event: &gh.TeamEvent{Action: gh.Ptr("removed_from_repository"), Repo: repository},
 			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: interactive},
+			delay: githubRepositoryAccessChangeDelay,
 		},
 		{
 			name:  "team repository outside the catalog",
@@ -483,6 +486,7 @@ func TestApplyGitHubCatalogWebhookRefreshesTeamAndOrganizationAccess(t *testing.
 			name:  "team deleted",
 			event: &gh.TeamEvent{Action: gh.Ptr("deleted")},
 			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: background, 202: background},
+			delay: githubInstallationAccessChangeDelay,
 		},
 		{
 			name:  "team renamed",
@@ -493,11 +497,13 @@ func TestApplyGitHubCatalogWebhookRefreshesTeamAndOrganizationAccess(t *testing.
 			name:  "team member removed",
 			event: &gh.MembershipEvent{Action: gh.Ptr("removed")},
 			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: background, 202: background},
+			delay: githubInstallationAccessChangeDelay,
 		},
 		{
 			name:  "organization member removed",
 			event: &gh.OrganizationEvent{Action: gh.Ptr("member_removed")},
 			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: background, 202: background},
+			delay: githubInstallationAccessChangeDelay,
 		},
 		{
 			name:  "organization member invited",
@@ -508,13 +514,18 @@ func TestApplyGitHubCatalogWebhookRefreshesTeamAndOrganizationAccess(t *testing.
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			clearJobs(t)
-			receivedAt := time.Now()
+			before := time.Now()
 			require.NoError(t, applyGitHubCatalogWebhook(db, tc.event, installationID))
+			after := time.Now()
 
 			assert.Equal(t, tc.want, queuedJobs(t))
-			var job models.VCSProviderRepositorySyncJob
-			if err := db.First(&job).Error; err == nil {
-				assert.True(t, job.RunAt.After(receivedAt), "access syncs wait for GitHub to publish the change")
+			var jobs []models.VCSProviderRepositorySyncJob
+			require.NoError(t, db.Find(&jobs).Error)
+			for _, job := range jobs {
+				assert.False(t, job.RunAt.Before(before.Add(tc.delay).Truncate(time.Microsecond)),
+					"repository %d must wait for GitHub to publish the change", job.RepositoryID)
+				assert.False(t, job.RunAt.After(after.Add(tc.delay)),
+					"repository %d must not wait longer than the access change delay", job.RepositoryID)
 			}
 		})
 	}
