@@ -532,6 +532,11 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	err = registerVCSCatalogMetrics()
+	if err != nil {
+		return err
+	}
+
 	StartPeriodicMetricsReporter()
 
 	metricsReady.Store(true)
