@@ -31,5 +31,8 @@ export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
 /** Organization experimental feature: public workspace MCP server for Cursor and other MCP clients. */
 export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
 
+/** Organization experimental feature: ChatGPT subscription for factory Codex runs. */
+export const FEATURE_CODEX_SUBSCRIPTIONS = "codex_subscriptions";
+
 /** Organization experimental feature: scheduled task proposals in Backlog. */
 export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";

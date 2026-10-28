@@ -25,11 +25,13 @@ const (
 
 	spendingOtherSeriesID = "other"
 
-	spendingFundingSourceHostedLabel = "SuperPlane-hosted"
-	spendingFundingSourceBYOKLabel   = "Bring your own key"
+	spendingFundingSourceHostedLabel       = "SuperPlane-hosted"
+	spendingFundingSourceBYOKLabel         = "Bring your own key"
+	spendingFundingSourceSubscriptionLabel = "ChatGPT subscription"
 
-	// Blank or unknown funding_source values count as bring your own key, matching the KPI split.
-	spendingFundingSourceGroupExpr = "CASE WHEN workspace_usage_events.funding_source = '" + coremodels.UsageFundingSourceHosted + "' THEN '" + coremodels.UsageFundingSourceHosted + "' ELSE '" + coremodels.UsageFundingSourceBYOK + "' END"
+	// Blank or unknown funding_source values count as bring your own key.
+	// Subscription stays in its own group so it is not hosted spend or an API key.
+	spendingFundingSourceGroupExpr = "CASE WHEN workspace_usage_events.funding_source = '" + coremodels.UsageFundingSourceHosted + "' THEN '" + coremodels.UsageFundingSourceHosted + "' WHEN workspace_usage_events.funding_source = '" + coremodels.UsageFundingSourceSubscription + "' THEN '" + coremodels.UsageFundingSourceSubscription + "' ELSE '" + coremodels.UsageFundingSourceBYOK + "' END"
 )
 
 const spendingReportMaxSpan = 366 * 24 * time.Hour
@@ -130,8 +132,8 @@ func scanSpendingKPITotals(query *gorm.DB, totals *SpendingKPITotals) error {
 			COALESCE(SUM(total_tokens), 0) AS total_tokens,
 			COALESCE(SUM(duration_seconds), 0) AS duration_seconds,
 			COALESCE(SUM(CASE WHEN funding_source = ? THEN cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
-			COALESCE(SUM(CASE WHEN funding_source IS DISTINCT FROM ? THEN cost_micros ELSE 0 END), 0) AS byok_cost_micros`,
-			coremodels.UsageFundingSourceHosted, coremodels.UsageFundingSourceHosted).
+			COALESCE(SUM(CASE WHEN funding_source IS DISTINCT FROM ? AND funding_source IS DISTINCT FROM ? THEN cost_micros ELSE 0 END), 0) AS byok_cost_micros`,
+			coremodels.UsageFundingSourceHosted, coremodels.UsageFundingSourceHosted, coremodels.UsageFundingSourceSubscription).
 		Scan(totals).Error
 }
 
@@ -599,8 +601,9 @@ func monthSeriesLabel(value time.Time) string {
 func spendingLabelMap(catalogs SpendingCatalogs, groupBy string) map[string]string {
 	if groupBy == SpendingGroupByFundingSource {
 		return map[string]string{
-			coremodels.UsageFundingSourceHosted: spendingFundingSourceHostedLabel,
-			coremodels.UsageFundingSourceBYOK:   spendingFundingSourceBYOKLabel,
+			coremodels.UsageFundingSourceHosted:       spendingFundingSourceHostedLabel,
+			coremodels.UsageFundingSourceBYOK:         spendingFundingSourceBYOKLabel,
+			coremodels.UsageFundingSourceSubscription: spendingFundingSourceSubscriptionLabel,
 		}
 	}
 	items := catalogs.Workspaces

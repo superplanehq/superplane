@@ -780,6 +780,30 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
+			Resource:                     "factories",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/codex-connection:cancel"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+		},
+		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"}: {
 			Resource:                     "work_orders",
 			Action:                       "read",

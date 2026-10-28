@@ -12,9 +12,10 @@ const (
 	AgentStepPrompt = "prompt"
 	AgentStepBash   = "bash"
 
-	CredentialsSourceSecret      = "secret"
-	CredentialsSourceIntegration = "integration"
-	CredentialsSourceHosted      = "hosted"
+	CredentialsSourceSecret       = "secret"
+	CredentialsSourceIntegration  = "integration"
+	CredentialsSourceHosted       = "hosted"
+	CredentialsSourceSubscription = "subscription"
 )
 
 var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
@@ -142,8 +143,12 @@ func IsHostedCredentials(source string) bool {
 }
 
 func FundingSourceForCredentials(source string) string {
-	if IsHostedCredentials(source) {
+	switch strings.TrimSpace(source) {
+	case CredentialsSourceHosted:
 		return "hosted"
+	case CredentialsSourceSubscription:
+		return "subscription"
+	default:
+		return "byok"
 	}
-	return "byok"
 }

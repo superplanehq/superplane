@@ -591,7 +591,7 @@ func (r *Runner) MarkProviderDeleted(tx *gorm.DB, now time.Time) error {
 	}
 	r.ProviderDeletedAt = &now
 	r.UpdatedAt = now
-	return nil
+	return ReleaseConfirmedCodexReservations(tx, now)
 }
 
 func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {
