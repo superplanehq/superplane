@@ -15,16 +15,20 @@ import (
 )
 
 func TestParseRunnerModelCallOutcomesSkipsEmptyModels(t *testing.T) {
-	inputs := parseRunnerModelCallOutcomes(
-		models.UsageProviderOpenRouter,
-		"task-1",
-		json.RawMessage(`{"modelCallOutcomes":[{"model":"openrouter/x-ai/grok-4.6","outcome":"attempt_2","occurredAt":"2026-10-28T12:00:00.000Z"},{"model":"","outcome":"error"}]}`),
-	)
+	occurredAt, stamp := rfc3339Stamp(t, -time.Minute)
+	payload, err := json.Marshal(map[string]any{
+		"modelCallOutcomes": []map[string]any{
+			{"model": "openrouter/x-ai/grok-4.6", "outcome": "attempt_2", "occurredAt": stamp},
+			{"model": "", "outcome": "error"},
+		},
+	})
+	require.NoError(t, err)
+	inputs := parseRunnerModelCallOutcomes(models.UsageProviderOpenRouter, "task-1", payload)
 	require.Len(t, inputs, 1)
 	assert.Equal(t, "x-ai/grok-4.6", inputs[0].Model)
 	assert.Equal(t, models.HostedModelCallOutcomeAttempt2, inputs[0].Outcome)
 	assert.Equal(t, 1, inputs[0].Sequence)
-	assert.Equal(t, time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC), inputs[0].OccurredAt.UTC())
+	assert.True(t, inputs[0].OccurredAt.UTC().Equal(occurredAt))
 }
 
 func TestParseRunnerModelCallOutcomesLeavesMissingOccurredAtZero(t *testing.T) {
@@ -85,11 +89,18 @@ func TestProcessTaskStatusRecordsHostedModelCallOutcomes(t *testing.T) {
 	})
 
 	exit := 0
+	occurredAt, stamp := rfc3339Stamp(t, -time.Minute)
+	payload, err := json.Marshal(map[string]any{
+		"modelCallOutcomes": []map[string]any{
+			{"model": "gpt-5", "outcome": "error", "occurredAt": stamp},
+		},
+	})
+	require.NoError(t, err)
 	task := &core.RunnerTask{
 		ID:       "task-finish-1",
 		State:    "succeeded",
 		ExitCode: &exit,
-		Result:   json.RawMessage(`{"modelCallOutcomes":[{"model":"gpt-5","outcome":"error","occurredAt":"2026-10-28T12:00:00.000Z"}]}`),
+		Result:   payload,
 	}
 	require.NoError(t, processTaskStatus(
 		&contexts.ExecutionStateContext{Finished: true},
@@ -110,5 +121,11 @@ func TestProcessTaskStatusRecordsHostedModelCallOutcomes(t *testing.T) {
 	assert.Equal(t, models.UsageProviderOpenAI, rows[0].Provider)
 	assert.Equal(t, "gpt-5", rows[0].Model)
 	assert.Equal(t, models.HostedModelCallOutcomeError, rows[0].Outcome)
-	assert.Equal(t, time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC), rows[0].OccurredAt.UTC())
+	assert.True(t, rows[0].OccurredAt.UTC().Equal(occurredAt))
+}
+
+func rfc3339Stamp(t *testing.T, delta time.Duration) (time.Time, string) {
+	t.Helper()
+	stamp := time.Now().UTC().Add(delta).Truncate(time.Millisecond)
+	return stamp, stamp.Format(time.RFC3339Nano)
 }
