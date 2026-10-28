@@ -8,7 +8,7 @@ import { FirstRunBitbucketForgeScreen } from "./FirstRunBitbucketForgeScreen";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./FirstRunConnectScreen";
 import { GitHubEnterpriseChooseHost } from "./FirstRunGitHubEnterpriseChooseScreen";
-import { FirstRunGitHubEnterpriseHostScreen } from "./FirstRunGitHubEnterpriseHostScreen";
+import { FirstRunGitHubEnterpriseHostScreen, githubEnterpriseHostPhase } from "./FirstRunGitHubEnterpriseHostScreen";
 import { FirstRunHostScreen } from "./FirstRunHostScreen";
 import type { FirstRunChrome } from "./firstRunTypes";
 import { repositorySphereFor, sphereFor } from "./firstRunSphereFor";
@@ -126,15 +126,23 @@ export function FirstRunVcsScreen({
   }
 
   if (screen === "ghe-host") {
+    const phase = githubEnterpriseHostPhase({
+      integrationId: flow.githubEnterpriseIntegrationId,
+      ready: flow.githubEnterpriseReady,
+      currentStepName: flow.githubEnterpriseCurrentStepName,
+      showHost: flow.showGitHubEnterpriseHost,
+    });
+    const hostChrome = phase === "organization" ? { ...chrome, onBack: flow.returnToGitHubEnterpriseHost } : chrome;
     return (
       <FirstRunGitHubEnterpriseHostScreen
         initialHost={flow.githubEnterpriseHost}
         connecting={flow.blockingAction === "opening-github"}
-        pendingSetup={Boolean(flow.githubEnterpriseIntegrationId) && !flow.githubEnterpriseReady}
+        phase={phase}
         connectError={flow.githubEnterpriseError}
-        chrome={chrome}
+        chrome={hostChrome}
         sphere={sphereFor("connect", setup.selectedRepo)}
-        onContinue={(host) => void flow.connectGitHubEnterprise(host)}
+        onContinueHost={(host) => void flow.connectGitHubEnterprise(host)}
+        onContinueOrganization={(owner) => void flow.connectGitHubEnterpriseOrganization(owner)}
         onResumeSetup={() => void flow.resumeGitHubEnterpriseSetup()}
       />
     );

@@ -10,6 +10,20 @@ import type { FirstRunChrome } from "./firstRunTypes";
 
 const copy = FIRST_RUN_COPY.githubEnterprise;
 
+export type GitHubEnterpriseHostPhase = "host" | "organization" | "app";
+
+export function githubEnterpriseHostPhase(args: {
+  integrationId?: string;
+  ready?: boolean;
+  currentStepName?: string;
+  showHost?: boolean;
+}): GitHubEnterpriseHostPhase {
+  if (args.showHost || args.ready) return "host";
+  if (args.currentStepName === "createApp") return "app";
+  if (args.integrationId?.trim()) return "organization";
+  return "host";
+}
+
 function looksLikeGitHubHost(value: string): boolean {
   const host = value.trim().toLowerCase();
   if (!host || host.includes("/") || host.includes(" ")) {
@@ -18,30 +32,38 @@ function looksLikeGitHubHost(value: string): boolean {
   return host.includes(".");
 }
 
+function looksLikeGitHubOwner(value: string): boolean {
+  const owner = value.trim();
+  return Boolean(owner) && !owner.includes("/") && !owner.includes(" ");
+}
+
 export function FirstRunGitHubEnterpriseHostScreen({
   initialHost = "",
   connecting = false,
-  pendingSetup = false,
+  phase = "host",
   connectError,
   chrome,
   sphere,
-  onContinue,
+  onContinueHost,
+  onContinueOrganization,
   onResumeSetup,
 }: {
   initialHost?: string;
   connecting?: boolean;
-  pendingSetup?: boolean;
+  phase?: GitHubEnterpriseHostPhase;
   connectError?: string;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  onContinue: (host: string) => void;
+  onContinueHost: (host: string) => void;
+  onContinueOrganization: (owner: string) => void;
   onResumeSetup?: () => void;
 }) {
   const [host, setHost] = useState(initialHost);
-  const trimmed = host.trim();
-  const valid = looksLikeGitHubHost(trimmed);
+  const [owner, setOwner] = useState("");
+  const trimmedHost = host.trim();
+  const trimmedOwner = owner.trim();
 
-  if (pendingSetup) {
+  if (phase === "app") {
     return (
       <FirstRunShell testId="first-run-github-enterprise-host" chrome={chrome} sphere={sphere} visual="preview">
         <FirstRunHeading headline={copy.finishHeadline}>
@@ -60,6 +82,54 @@ export function FirstRunGitHubEnterpriseHostScreen({
     );
   }
 
+  if (phase === "organization") {
+    const valid = looksLikeGitHubOwner(trimmedOwner);
+    return (
+      <FirstRunShell testId="first-run-github-enterprise-host" chrome={chrome} sphere={sphere} visual="preview">
+        <FirstRunHeading headline={copy.organizationHeadline}>
+          <p className="text-[15px] leading-6 text-muted-foreground">{copy.organizationBody}</p>
+        </FirstRunHeading>
+        <form
+          className="mt-8 space-y-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!valid || connecting) return;
+            onContinueOrganization(trimmedOwner);
+          }}
+        >
+          <div className="space-y-2">
+            <Label htmlFor="first-run-github-enterprise-organization">{copy.organizationLabel}</Label>
+            <Input
+              id="first-run-github-enterprise-organization"
+              value={owner}
+              onChange={(event) => setOwner(event.target.value)}
+              placeholder={copy.organizationPlaceholder}
+              autoComplete="off"
+              spellCheck={false}
+              disabled={connecting}
+              data-testid="first-run-github-enterprise-organization"
+            />
+          </div>
+          {connectError ? (
+            <p className="text-[13px] text-destructive" role="alert">
+              {connectError}
+            </p>
+          ) : null}
+          <LoadingButton
+            type="submit"
+            className="w-full"
+            loading={connecting}
+            disabled={!valid}
+            data-testid="first-run-github-enterprise-create-app"
+          >
+            {connecting ? copy.opening : copy.organizationContinue}
+          </LoadingButton>
+        </form>
+      </FirstRunShell>
+    );
+  }
+
+  const valid = looksLikeGitHubHost(trimmedHost);
   return (
     <FirstRunShell testId="first-run-github-enterprise-host" chrome={chrome} sphere={sphere} visual="preview">
       <FirstRunHeading headline={copy.headline}>
@@ -71,7 +141,7 @@ export function FirstRunGitHubEnterpriseHostScreen({
         onSubmit={(event) => {
           event.preventDefault();
           if (!valid || connecting) return;
-          onContinue(trimmed);
+          onContinueHost(trimmedHost);
         }}
       >
         <div className="space-y-2">
@@ -111,7 +181,7 @@ export function FirstRunGitHubEnterpriseHostScreen({
           disabled={!valid}
           data-testid="first-run-github-enterprise-continue"
         >
-          {connecting ? copy.opening : copy.continue}
+          {connecting ? copy.checking : copy.continue}
         </LoadingButton>
       </form>
     </FirstRunShell>

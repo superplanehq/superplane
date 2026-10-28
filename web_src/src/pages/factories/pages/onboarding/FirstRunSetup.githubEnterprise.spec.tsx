@@ -17,15 +17,19 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
 const gheApp = vi.hoisted(() => ({
   ready: false,
+  currentStepName: "",
   connect: vi.fn().mockResolvedValue(true),
+  submitOwner: vi.fn().mockResolvedValue(true),
   resume: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock("./useFirstRunGitHubEnterprise", () => ({
   useFirstRunGitHubEnterprise: () => ({
     connect: gheApp.connect,
+    submitOwner: gheApp.submitOwner,
     resume: gheApp.resume,
     ready: gheApp.ready,
+    currentStepName: gheApp.currentStepName,
   }),
 }));
 
@@ -187,7 +191,9 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
   beforeEach(() => {
     sessionStorage.clear();
     gheApp.ready = false;
+    gheApp.currentStepName = "";
     gheApp.connect.mockClear();
+    gheApp.submitOwner.mockClear();
     gheApp.resume.mockClear();
   });
 
@@ -243,6 +249,46 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
 
     await waitFor(() => expect(gheApp.connect).toHaveBeenCalled());
     expect(gheApp.connect).toHaveBeenCalledWith("acme.ghe.com", expect.stringContaining("step=repo"));
+    expect(screen.getByTestId("first-run-github-enterprise-host")).toBeInTheDocument();
+    expect(screen.queryByText(/settings\/organization\/integrations/)).not.toBeInTheDocument();
+  });
+
+  it("asks for the GitHub organization after the hostname is accepted", () => {
+    writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
+    const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+    hook.result.current.selectVcsHost("github");
+
+    renderSetup(hook.result.current, "/org-1/workspaces/PAY/setup?step=ghe-host");
+
+    expect(screen.getByTestId("first-run-github-enterprise-organization")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-enterprise-hostname")).not.toBeInTheDocument();
+  });
+
+  it("creates the GitHub App from the organization step", async () => {
+    const user = userEvent.setup();
+    writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
+    const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+    hook.result.current.selectVcsHost("github");
+
+    renderSetup(hook.result.current, "/org-1/workspaces/PAY/setup?step=ghe-host");
+
+    await user.type(screen.getByTestId("first-run-github-enterprise-organization"), "acme");
+    await user.click(screen.getByTestId("first-run-github-enterprise-create-app"));
+
+    expect(gheApp.submitOwner).toHaveBeenCalledWith("acme", expect.stringContaining("step=repo"));
+  });
+
+  it("returns to the hostname from the organization step", async () => {
+    const user = userEvent.setup();
+    writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
+    const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+    hook.result.current.selectVcsHost("github");
+
+    renderSetup(hook.result.current, "/org-1/workspaces/PAY/setup?step=ghe-host");
+
+    expect(screen.getByTestId("first-run-github-enterprise-organization")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(await screen.findByTestId("first-run-github-enterprise-hostname")).toBeInTheDocument();
   });
 
   it("returns to the hostname screen from repository selection", async () => {
@@ -276,12 +322,13 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
   });
 
   it("keeps a pending GitHub App on the finish-setup screen", () => {
+    gheApp.currentStepName = "createApp";
     writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
     const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
     hook.result.current.selectVcsHost("github");
 
     render(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=repo"]}>
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=ghe-host"]}>
         <FirstRunSetup model={pageModel(hook.result.current, { githubIntegrationId: "" })} />
       </MemoryRouter>,
     );

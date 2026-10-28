@@ -8,8 +8,8 @@ import { FirstRunGitHubEnterpriseHostScreen } from "./FirstRunGitHubEnterpriseHo
 describe("FirstRunGitHubEnterpriseHostScreen", () => {
   it("asks for the GitHub Enterprise Cloud hostname", async () => {
     const user = userEvent.setup();
-    const onContinue = vi.fn();
-    render(<FirstRunGitHubEnterpriseHostScreen onContinue={onContinue} />);
+    const onContinueHost = vi.fn();
+    render(<FirstRunGitHubEnterpriseHostScreen onContinueHost={onContinueHost} onContinueOrganization={vi.fn()} />);
 
     expect(screen.getByTestId("first-run-github-enterprise-host")).toHaveTextContent(
       FIRST_RUN_COPY.githubEnterprise.headline,
@@ -19,19 +19,50 @@ describe("FirstRunGitHubEnterpriseHostScreen", () => {
     await user.type(screen.getByTestId("first-run-github-enterprise-hostname"), "acme.ghe.com");
     await user.click(screen.getByTestId("first-run-github-enterprise-continue"));
 
-    expect(onContinue).toHaveBeenCalledWith("acme.ghe.com");
+    expect(onContinueHost).toHaveBeenCalledWith("acme.ghe.com");
     expect(screen.getByRole("link", { name: FIRST_RUN_COPY.githubEnterprise.ipAllowListLink })).toHaveAttribute(
       "href",
       FIRST_RUN_COPY.githubEnterprise.ipAllowListHref,
     );
   });
 
-  it("sends a pending App back to the setup wizard", async () => {
+  it("asks for the GitHub organization after the hostname is accepted", async () => {
     const user = userEvent.setup();
-    const onResumeSetup = vi.fn();
-    render(<FirstRunGitHubEnterpriseHostScreen pendingSetup onContinue={vi.fn()} onResumeSetup={onResumeSetup} />);
+    const onContinueOrganization = vi.fn();
+    render(
+      <FirstRunGitHubEnterpriseHostScreen
+        phase="organization"
+        onContinueHost={vi.fn()}
+        onContinueOrganization={onContinueOrganization}
+      />,
+    );
 
     expect(screen.queryByTestId("first-run-github-enterprise-hostname")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-enterprise-host")).toHaveTextContent(
+      FIRST_RUN_COPY.githubEnterprise.organizationHeadline,
+    );
+    expect(screen.getByTestId("first-run-github-enterprise-create-app")).toBeDisabled();
+
+    await user.type(screen.getByTestId("first-run-github-enterprise-organization"), "acme");
+    await user.click(screen.getByTestId("first-run-github-enterprise-create-app"));
+
+    expect(onContinueOrganization).toHaveBeenCalledWith("acme");
+  });
+
+  it("keeps a pending App on the finish-setup screen", async () => {
+    const user = userEvent.setup();
+    const onResumeSetup = vi.fn();
+    render(
+      <FirstRunGitHubEnterpriseHostScreen
+        phase="app"
+        onContinueHost={vi.fn()}
+        onContinueOrganization={vi.fn()}
+        onResumeSetup={onResumeSetup}
+      />,
+    );
+
+    expect(screen.queryByTestId("first-run-github-enterprise-hostname")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-enterprise-organization")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-enterprise-host")).toHaveTextContent(
       FIRST_RUN_COPY.githubEnterprise.finishHeadline,
     );
@@ -43,7 +74,8 @@ describe("FirstRunGitHubEnterpriseHostScreen", () => {
     render(
       <FirstRunGitHubEnterpriseHostScreen
         connectError={FIRST_RUN_COPY.githubEnterprise.connectError}
-        onContinue={vi.fn()}
+        onContinueHost={vi.fn()}
+        onContinueOrganization={vi.fn()}
       />,
     );
 

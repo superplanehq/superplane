@@ -65,6 +65,7 @@ export async function connectPrivateGitHubApp(args: {
     configuration?: Record<string, unknown>;
   }) => Promise<OrganizationsCreateIntegrationResponse>;
   onCreated?: (integrationId: string) => Promise<void> | void;
+  stayAfterCreate?: boolean;
 }): Promise<boolean> {
   const host = args.host?.trim();
   if (args.useWizard && !host) {
@@ -93,6 +94,7 @@ export async function connectPrivateGitHubApp(args: {
     organizationId: args.organizationId,
     integrationsBasePath: args.integrationsBasePath,
     useWizard: args.useWizard,
+    stayAfterCreate: args.stayAfterCreate,
     integration: result.integration,
     goTo: args.goTo,
     onCreated: args.onCreated,
@@ -103,6 +105,7 @@ async function openCreatedPrivateGitHubApp(args: {
   organizationId: string;
   integrationsBasePath?: string;
   useWizard: boolean;
+  stayAfterCreate?: boolean;
   integration: OrganizationsCreateIntegrationResponse["integration"];
   goTo: (path: string) => void;
   onCreated?: (integrationId: string) => Promise<void> | void;
@@ -110,6 +113,9 @@ async function openCreatedPrivateGitHubApp(args: {
   const integrationId = args.integration?.metadata?.id?.trim() ?? "";
   if (integrationId && args.onCreated) {
     await args.onCreated(integrationId);
+  }
+  if (args.stayAfterCreate) {
+    return Boolean(integrationId);
   }
   if (args.useWizard && integrationId) {
     args.goTo(

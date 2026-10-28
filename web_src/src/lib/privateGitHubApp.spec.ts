@@ -146,4 +146,30 @@ describe("connectPrivateGitHubApp", () => {
     expect(onCreated).toHaveBeenCalledWith("int-ghe");
     expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/github/setup?integrationId=int-ghe");
   });
+
+  it("stays on the caller after factory onboarding creates the connection", async () => {
+    const goTo = vi.fn();
+    const onCreated = vi.fn();
+    const create = vi.fn().mockResolvedValue({
+      integration: { metadata: { id: "int-ghe" } },
+    });
+
+    const opened = await connectPrivateGitHubApp({
+      useWizard: true,
+      stayAfterCreate: true,
+      organizationId: "org-1",
+      host: "acme.ghe.com",
+      factoryOnboarding: true,
+      returnTo: "/org-1/workspaces/ws/setup?step=repo",
+      goTo,
+      existingNames: new Set(),
+      connected: [],
+      create,
+      onCreated,
+    });
+
+    expect(opened).toBe(true);
+    expect(onCreated).toHaveBeenCalledWith("int-ghe");
+    expect(goTo).not.toHaveBeenCalled();
+  });
 });

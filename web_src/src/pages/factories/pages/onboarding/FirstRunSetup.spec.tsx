@@ -49,7 +49,13 @@ vi.mock("@/lib/githubAppManifest", () => ({
 }));
 
 vi.mock("./useFirstRunGitHubEnterprise", () => ({
-  useFirstRunGitHubEnterprise: () => ({ connect: vi.fn(), resume: vi.fn(), ready: false }),
+  useFirstRunGitHubEnterprise: () => ({
+    connect: vi.fn(),
+    submitOwner: vi.fn(),
+    resume: vi.fn(),
+    ready: false,
+    currentStepName: "",
+  }),
 }));
 
 vi.mock("./useBitbucketOnboarding", () => ({
