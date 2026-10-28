@@ -12,6 +12,7 @@ import (
 	gh "github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
 
@@ -338,6 +339,9 @@ func listCollaborators(ctx context.Context, client *gh.Client, owner, name strin
 	options := &gh.ListCollaboratorsOptions{ListOptions: gh.ListOptions{PerPage: 100}}
 	for {
 		page, response, err := client.Repositories.ListCollaborators(ctx, owner, name, options)
+		if response != nil {
+			telemetry.RecordGitHubCatalogRateLimit(ctx, response.Rate.Remaining, response.Rate.Limit)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("list collaborators for %s/%s: %w", owner, name, err)
 		}

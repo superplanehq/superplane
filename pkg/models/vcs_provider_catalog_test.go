@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 )
 
 func TestVCSProviderCatalogListsRepositoriesByCollaborator(t *testing.T) {
@@ -189,26 +190,61 @@ func TestVCSProviderRepositorySyncJobClaim(t *testing.T) {
 
 	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
 	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
-		{RepositoryID: 201, InstallationID: 101, FullName: "acme/api"},
+		{RepositoryID: 201, FullName: "acme/oldest"},
+		{RepositoryID: 202, FullName: "acme/newer"},
+		{RepositoryID: 203, FullName: "acme/interactive"},
+		{RepositoryID: 204, FullName: "acme/future"},
 	}))
-	require.NoError(t, EnqueueVCSProviderRepositorySync(
-		db,
-		ProviderGitHub,
-		201,
-		now.Add(-time.Second),
-		VCSProviderRepositorySyncPriorityBackground,
-	))
+	for repositoryID, job := range map[int64]struct {
+		runAt    time.Time
+		priority VCSProviderRepositorySyncPriority
+	}{
+		201: {now.Add(-time.Minute), VCSProviderRepositorySyncPriorityBackground},
+		202: {now.Add(-time.Second), VCSProviderRepositorySyncPriorityBackground},
+		203: {now, VCSProviderRepositorySyncPriorityInteractive},
+		204: {now.Add(time.Minute), VCSProviderRepositorySyncPriorityInteractive},
+	} {
+		require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, repositoryID, job.runAt, job.priority))
+	}
 
-	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now, now.Add(-time.Minute))
+	claimed, err := ClaimVCSProviderRepositorySyncs(db, ProviderGitHub, now, now.Add(-time.Minute), 2)
 	require.NoError(t, err)
-	require.NotNil(t, job)
-	assert.Equal(t, int64(201), job.RepositoryID)
+	require.Len(t, claimed, 2)
+	assert.ElementsMatch(t, []int64{203, 201}, []int64{claimed[0].RepositoryID, claimed[1].RepositoryID})
+	for _, job := range claimed {
+		require.NotNil(t, job.LockedAt)
+		assert.Equal(t, 1, job.Attempts)
+	}
 
-	none, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now, now.Add(-time.Minute))
+	rest, err := ClaimVCSProviderRepositorySyncs(db, ProviderGitHub, now, now.Add(-time.Minute), 8)
 	require.NoError(t, err)
-	assert.Nil(t, none)
+	require.Len(t, rest, 1, "locked and future jobs must not be claimed")
+	assert.Equal(t, int64(202), rest[0].RepositoryID)
 
-	require.NoError(t, CompleteVCSProviderRepositorySync(db, ProviderGitHub, 201, *job.LockedAt))
+	reclaimAt := now.Add(2 * time.Minute)
+	reclaimed, err := ClaimVCSProviderRepositorySyncs(db, ProviderGitHub, reclaimAt, reclaimAt.Add(-time.Minute), 8)
+	require.NoError(t, err)
+	reclaimedAttempts := map[int64]int{}
+	for _, job := range reclaimed {
+		reclaimedAttempts[job.RepositoryID] = job.Attempts
+	}
+	assert.Equal(t, map[int64]int{201: 2, 202: 2, 203: 2, 204: 1}, reclaimedAttempts,
+		"jobs whose lock expired must be claimed again")
+
+	for _, job := range reclaimed {
+		require.NoError(t, CompleteVCSProviderRepositorySync(db, ProviderGitHub, job.RepositoryID, *job.LockedAt))
+	}
+	var remaining int64
+	require.NoError(t, db.Model(&VCSProviderRepositorySyncJob{}).Count(&remaining).Error)
+	assert.Zero(t, remaining)
+}
+
+func claimVCSProviderRepositorySync(t *testing.T, db *gorm.DB, now, claimableBefore time.Time) *VCSProviderRepositorySyncJob {
+	t.Helper()
+	jobs, err := ClaimVCSProviderRepositorySyncs(db, ProviderGitHub, now, claimableBefore, 1)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	return &jobs[0]
 }
 
 func TestVCSProviderRepositorySyncKeepsRefreshEnqueuedDuringClaim(t *testing.T) {
@@ -228,9 +264,7 @@ func TestVCSProviderRepositorySyncKeepsRefreshEnqueuedDuringClaim(t *testing.T) 
 		VCSProviderRepositorySyncPriorityBackground,
 	))
 
-	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now, now.Add(-time.Minute))
-	require.NoError(t, err)
-	require.NotNil(t, job)
+	job := claimVCSProviderRepositorySync(t, db, now, now.Add(-time.Minute))
 	require.NotNil(t, job.LockedAt)
 
 	refreshAt := now.Add(time.Second)
@@ -277,9 +311,7 @@ func TestVCSProviderRepositorySyncClaimsInteractiveJobsFirst(t *testing.T) {
 		VCSProviderRepositorySyncPriorityInteractive,
 	))
 
-	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now.Add(time.Second), now.Add(-time.Minute))
-	require.NoError(t, err)
-	require.NotNil(t, job)
+	job := claimVCSProviderRepositorySync(t, db, now.Add(time.Second), now.Add(-time.Minute))
 	assert.Equal(t, int64(202), job.RepositoryID)
 	assert.Equal(t, VCSProviderRepositorySyncPriorityInteractive, job.Priority)
 }
@@ -333,9 +365,7 @@ func TestVCSProviderRepositorySyncReenqueueDuringRunKeepsUrgency(t *testing.T) {
 		now.Add(-time.Second),
 		VCSProviderRepositorySyncPriorityInteractive,
 	))
-	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now, now.Add(-time.Minute))
-	require.NoError(t, err)
-	require.NotNil(t, job)
+	claimVCSProviderRepositorySync(t, db, now, now.Add(-time.Minute))
 
 	require.NoError(t, EnqueueVCSProviderRepositorySync(
 		db,
