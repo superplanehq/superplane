@@ -245,6 +245,22 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
     expect(gheApp.connect).toHaveBeenCalledWith("acme.ghe.com", expect.stringContaining("step=repo"));
   });
 
+  it("returns to the hostname screen from repository selection", async () => {
+    const user = userEvent.setup();
+    gheApp.ready = true;
+    writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
+    const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+    const connected = new Set<IntegrationId>(["github"]);
+    Object.defineProperty(hook.result.current, "connected", { get: () => connected });
+    hook.result.current.selectVcsHost("github");
+
+    renderSetup(hook.result.current, "/org-1/workspaces/PAY/setup?step=repo");
+
+    expect(screen.getByTestId("first-run-github-enterprise-choose")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(await screen.findByTestId("first-run-github-enterprise-host")).toBeInTheDocument();
+  });
+
   it("lists repositories from the GitHub Enterprise integration", () => {
     gheApp.ready = true;
     writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");

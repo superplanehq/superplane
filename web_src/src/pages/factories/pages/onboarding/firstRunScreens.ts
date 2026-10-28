@@ -11,7 +11,13 @@ export type FirstRunScreen =
   | "agent"
   | "complete";
 
-export const URL_ONLY_SCREENS: ReadonlySet<string> = new Set<FirstRunScreen>(["welcome", "host", "card", "complete"]);
+export const URL_ONLY_SCREENS: ReadonlySet<string> = new Set<FirstRunScreen>([
+  "welcome",
+  "host",
+  "ghe-host",
+  "card",
+  "complete",
+]);
 export const FINAL_SCREENS: ReadonlySet<FirstRunScreen> = new Set<FirstRunScreen>(["card", "agent", "complete"]);
 export const VCS_SCREENS: ReadonlySet<FirstRunScreen> = new Set(["host", "connect", "ghe-host", "choose"]);
 
