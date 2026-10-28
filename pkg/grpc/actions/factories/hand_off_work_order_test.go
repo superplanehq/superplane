@@ -785,6 +785,44 @@ func TestSubscriptionHandOffWaitsForAssignmentAndExplicitStart(t *testing.T) {
 	}
 }
 
+func TestResumeHandOffDiscardsVerifyHandOffWhenPullRequestIsNoLongerOpen(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	f := seedHandOffFactory(t, r, db)
+	subscription := true
+	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	addHandOffLine(t, r, db, f)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID: f.ID.String(), Title: "Stale handoff", Description: "Description", Plan: "The saved plan", Column: HandOffColumnVerify, PullRequestURL: "https://github.com/acme/app/pull/42", MCPClientName: "Codex",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Order.PendingHandoff)
+	order, err := f.FindWorkOrder(db, uuid.MustParse(result.Order.Id))
+	require.NoError(t, err)
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	require.NoError(t, order.UpdateAssignees(db, []uuid.UUID{r.User}, r.User))
+	merged := openHandOffPullRequest("acme/app", 42, "feature")
+	merged.State = github.Ptr("closed")
+	useGitHub(t, merged)
+
+	resumed, err := ResumeHandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ResumeHandOffWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
+	require.NoError(t, err)
+	assert.Equal(t, "backlog", resumed.Column)
+	assert.Equal(t, pb.WorkOrder_STATE_DRAFT, resumed.Order.State)
+	assert.Nil(t, resumed.Order.PendingHandoff)
+	assert.Empty(t, resumed.Order.PullRequests)
+	stored, err := f.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Nil(t, stored.PendingHandOff)
+	artifact, err := stored.FindArtifactByKey(db, models.PlanningSpecArtifactKey+":"+stored.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, "The saved plan", planningSpecBody(t, artifact))
+}
+
 func TestSubscriptionHandOffRejectsInvalidPullRequestURLBeforeSaving(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

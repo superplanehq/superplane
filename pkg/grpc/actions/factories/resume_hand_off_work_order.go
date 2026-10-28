@@ -4,9 +4,12 @@ import (
 	"context"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -38,6 +41,9 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		pullRequest, err = loadHandOffPullRequest(ctx, db, deps, factory, intent.PullRequestURL)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to load pull request")
+		}
+		if !strings.EqualFold(strings.TrimSpace(pullRequest.State), models.FactoryPullRequestStateOpen) {
+			return discardStaleHandOff(ctx, factory, order, intent)
 		}
 	}
 	var dispatched *workOrderLineDispatchResult
@@ -105,6 +111,32 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		return nil, factoryErrorToStatus(err, "failed to load task")
 	}
 	return &pb.ResumeHandOffWorkOrderResponse{Order: serialized, Column: intent.Column}, nil
+}
+
+// discardStaleHandOff clears a saved verify handoff whose pull request is no
+// longer open. The task stays in the backlog with its plan, so a member can
+// start it on any line.
+func discardStaleHandOff(ctx context.Context, factory *models.Factory, order *models.FactoryWorkOrder, intent models.PendingHandOff) (*pb.ResumeHandOffWorkOrderResponse, error) {
+	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := order.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if order.PendingHandOff == nil || !order.IsDispatchable() || order.PendingHandOff.Data() != intent {
+			return grpcFailedPrecondition("This handoff changed. Reload the task and try again.")
+		}
+		return order.SetPendingHandOff(tx, nil)
+	})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to discard handoff")
+	}
+	if err := messages.PublishFactoryWorkOrderUpdated(factory.ID.String(), order.ID.String(), factoryevents.EventTypeOrderUpdated); err != nil {
+		log.WithError(err).Warn("Failed to publish discarded handoff")
+	}
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to load task")
+	}
+	return &pb.ResumeHandOffWorkOrderResponse{Order: serialized, Column: "backlog"}, nil
 }
 
 func validateHandOffOverrides(tx *gorm.DB, f *models.Factory, o *models.FactoryWorkOrder, line *models.FactoryLine, model, thinking string) error {
