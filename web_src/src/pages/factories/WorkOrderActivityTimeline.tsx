@@ -410,17 +410,16 @@ function UserActionEventDescription({
   const hasSourceRun = Boolean(event.sourceRunId) && !automationActor;
   const showSomeoneFallback =
     !actorDisplay && !hasSourceRun && !automationActor && SOMEONE_FALLBACK_KINDS.includes(event.kind);
+  const attribution = userActionAttribution(event, actorDisplay?.name);
 
   return (
     <div>
       <p className={cn(inlineParagraphClassName, "flex flex-wrap items-baseline gap-x-1 gap-y-0.5")}>
-        {actorDisplay ? (
-          <span className={inlineActorClassName}>{actorDisplay.name}</span>
-        ) : automationActor ? (
-          <TimelineAutomationActor actor={automationActor} />
-        ) : showSomeoneFallback ? (
-          <span className={inlineActorClassName}>Someone</span>
-        ) : null}
+        <UserActionEventActor
+          name={attribution.actorName}
+          automationActor={automationActor}
+          showSomeoneFallback={showSomeoneFallback}
+        />
         {event.kind === "assigned" && event.assigneeChange ? (
           <AssigneeChangeDescription
             actorUserId={event.actorUserId}
@@ -442,11 +441,50 @@ function UserActionEventDescription({
           {timeLabel}
         </span>
       </p>
-      {event.kind === "created" && actorDisplay ? (
-        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">Create task form</p>
-      ) : null}
+      <UserActionEventSubline text={attribution.subline} />
     </div>
   );
+}
+
+function UserActionEventActor({
+  name,
+  automationActor,
+  showSomeoneFallback,
+}: {
+  name?: string;
+  automationActor?: WorkOrderTimelineEvent["actorAutomation"];
+  showSomeoneFallback: boolean;
+}) {
+  if (name) {
+    return <span className={inlineActorClassName}>{name}</span>;
+  }
+  if (automationActor) {
+    return <TimelineAutomationActor actor={automationActor} />;
+  }
+  if (showSomeoneFallback) {
+    return <span className={inlineActorClassName}>Someone</span>;
+  }
+  return null;
+}
+
+function userActionAttribution(
+  event: WorkOrderTimelineEvent,
+  actorName: string | undefined,
+): { actorName?: string; subline?: string } {
+  if (actorName) {
+    return { actorName, subline: event.kind === "created" ? "Create task form" : undefined };
+  }
+  if (event.kind === "assigned" && event.assigneeChange?.assignedBySuperPlane) {
+    return { actorName: "SuperPlane", subline: event.assigneeChange.reason };
+  }
+  return {};
+}
+
+function UserActionEventSubline({ text }: { text?: string }) {
+  if (!text) {
+    return null;
+  }
+  return <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{text}</p>;
 }
 
 function SourceRunAttribution({
