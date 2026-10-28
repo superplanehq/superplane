@@ -146,6 +146,7 @@ affinity:
   "START_PLANNING_SESSION_CLEANUP_WORKER"
   "START_EVENT_RETENTION_WORKER"
   "START_NODE_REQUEST_CLEANUP_WORKER"
+  "START_VCS_PROVIDER_CATALOG_WORKER"
 }}
 - name: {{ $flag }}
   value: {{ ternary "yes" "no" (has $flag $enabled) | quote }}

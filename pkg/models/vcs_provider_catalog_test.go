@@ -629,6 +629,106 @@ func TestVCSProviderReconciliationJobClaim(t *testing.T) {
 	require.NoError(t, CompleteVCSProviderReconciliation(db, ProviderGitHub, *job.LockedAt))
 }
 
+func TestVCSProviderCatalogScheduleHasOneWinnerPerInterval(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+
+	claimed, err := ClaimVCSProviderCatalogSchedule(db, ProviderGitHub, VCSProviderCatalogScheduleReconcile, now, 5*time.Minute)
+	require.NoError(t, err)
+	assert.True(t, claimed)
+
+	claimed, err = ClaimVCSProviderCatalogSchedule(db, ProviderGitHub, VCSProviderCatalogScheduleReconcile, now.Add(time.Minute), 5*time.Minute)
+	require.NoError(t, err)
+	assert.False(t, claimed, "a second replica must not run the reconcile inside the interval")
+
+	claimed, err = ClaimVCSProviderCatalogSchedule(db, ProviderGitHub, VCSProviderCatalogScheduleSweep, now.Add(time.Minute), 10*time.Minute)
+	require.NoError(t, err)
+	assert.True(t, claimed, "the sweep schedule is independent of the reconcile schedule")
+
+	claimed, err = ClaimVCSProviderCatalogSchedule(db, ProviderGitHub, VCSProviderCatalogScheduleReconcile, now.Add(5*time.Minute), 5*time.Minute)
+	require.NoError(t, err)
+	assert.True(t, claimed)
+}
+
+func TestEnqueueUnsyncedVCSProviderRepositoriesSkipsSyncedRepositories(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
+	repositories := []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/synced"},
+		{RepositoryID: 202, FullName: "acme/new"},
+		{RepositoryID: 203, FullName: "acme/queued"},
+	}
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, repositories))
+	require.NoError(t, ReplaceVCSProviderRepositoryCollaborators(db, ProviderGitHub, 201, []VCSProviderRepositoryCollaborator{
+		{ProviderUserID: 42, ProviderLogin: "octocat"},
+	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 203, now, VCSProviderRepositorySyncPriorityBackground))
+
+	// A later reconcile rewrites the repository list. It must keep the sync time.
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, repositories))
+	require.NoError(t, EnqueueUnsyncedVCSProviderRepositories(db, ProviderGitHub, 101, now, VCSProviderRepositorySyncPriorityInteractive))
+
+	var jobs []VCSProviderRepositorySyncJob
+	require.NoError(t, db.Order("repository_id").Find(&jobs).Error)
+	require.Len(t, jobs, 2)
+	assert.Equal(t, int64(202), jobs[0].RepositoryID)
+	assert.Equal(t, VCSProviderRepositorySyncPriorityInteractive, jobs[0].Priority)
+	assert.Equal(t, int64(203), jobs[1].RepositoryID)
+	assert.Equal(t, VCSProviderRepositorySyncPriorityInteractive, jobs[1].Priority, "a requested reconcile raises the priority of a queued job")
+}
+
+func TestEnqueueStaleVCSProviderRepositorySyncsQueuesOldestFirst(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+	suspendedAt := now.Add(-time.Hour)
+
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{
+		Provider:       ProviderGitHub,
+		InstallationID: 102,
+		SuspendedAt:    &suspendedAt,
+	}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/oldest"},
+		{RepositoryID: 202, FullName: "acme/older"},
+		{RepositoryID: 203, FullName: "acme/old"},
+		{RepositoryID: 204, FullName: "acme/fresh"},
+		{RepositoryID: 205, FullName: "acme/already-queued"},
+	}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 102, []VCSProviderRepository{
+		{RepositoryID: 301, FullName: "suspended/api"},
+	}))
+	for repositoryID, age := range map[int64]time.Duration{
+		201: 72 * time.Hour,
+		202: 48 * time.Hour,
+		203: 30 * time.Hour,
+		204: time.Hour,
+		205: 96 * time.Hour,
+		301: 96 * time.Hour,
+	} {
+		require.NoError(t, db.Model(&VCSProviderRepository{}).
+			Where("provider = ? AND repository_id = ?", ProviderGitHub, repositoryID).
+			UpdateColumn("collaborators_synced_at", now.Add(-age)).Error)
+	}
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 205, now, VCSProviderRepositorySyncPriorityInteractive))
+
+	queued, err := EnqueueStaleVCSProviderRepositorySyncs(db, ProviderGitHub, now.Add(-24*time.Hour), 2, now)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), queued)
+
+	var jobs []VCSProviderRepositorySyncJob
+	require.NoError(t, db.Order("repository_id").Find(&jobs).Error)
+	require.Len(t, jobs, 3)
+	assert.Equal(t, []int64{201, 202, 205}, []int64{jobs[0].RepositoryID, jobs[1].RepositoryID, jobs[2].RepositoryID})
+	assert.Equal(t, VCSProviderRepositorySyncPriorityBackground, jobs[0].Priority)
+	assert.Equal(t, VCSProviderRepositorySyncPriorityInteractive, jobs[2].Priority, "the sweep must not lower a queued job")
+}
+
 func int64Pointer(value int64) *int64 {
 	return &value
 }

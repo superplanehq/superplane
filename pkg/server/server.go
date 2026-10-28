@@ -241,7 +241,9 @@ func startWorkers(
 		panic(err)
 	}
 
-	go startGitHubAppCatalogWorker(context.Background())
+	if os.Getenv("START_VCS_PROVIDER_CATALOG_WORKER") == "yes" {
+		go startGitHubAppCatalogWorker(context.Background())
+	}
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
