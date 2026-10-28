@@ -43,7 +43,9 @@ describe("FactorySettingsOrganizationModelStatusPage", () => {
         headers: expect.objectContaining({ "x-organization-id": "org-1" }),
       }),
     );
-    expect(screen.getByLabelText("Window")).toHaveTextContent("5 minutes");
+    const windowControl = screen.getByLabelText("Window");
+    expect(windowControl).toHaveTextContent("5 minutes");
+    expect(windowControl).toHaveAttribute("id", "model-status-window");
     expect(
       screen.getByText("No SuperPlane-hosted models and no hosted agent calls in this window."),
     ).toBeInTheDocument();
