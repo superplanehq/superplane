@@ -6,6 +6,8 @@ import (
 )
 
 type hostedCreditSpend struct {
+	TrialGrantedMicros       int64
+	TrialSpentMicros         int64
 	RemainingMicros          int64
 	IncludedRemainingMicros  int64
 	PurchasedRemainingMicros int64
@@ -67,10 +69,13 @@ func allocateHostedCreditSpend(
 	now time.Time,
 ) hostedCreditSpend {
 	var welcomeExpiresAt *time.Time
-	var superplane, purchased int64
+	var superplane, purchased, trialGranted int64
 	for _, grant := range grants {
 		if grant.Kind == LLMCreditGrantKindWelcome {
 			welcomeExpiresAt = grant.ExpiresAt
+		}
+		if grantCreditBucket(grant.Kind) == creditBucketWelcome && grant.AmountMicros > 0 {
+			trialGranted += grant.AmountMicros
 		}
 		switch grantCreditBucket(grant.Kind) {
 		case creditBucketWelcome, creditBucketIncluded, creditBucketAdmin:
@@ -83,7 +88,7 @@ func allocateHostedCreditSpend(
 	expired, live := splitCreditGrantsForSpend(grants, now)
 	consumedExpired := consumedExpiredGrantSpend(expired, billedAtOrBefore)
 
-	spend := billedMicros - consumedExpired
+	spend := billedMicros - consumedExpired.TotalMicros
 	if spend < 0 {
 		spend = 0
 	}
@@ -124,6 +129,8 @@ func allocateHostedCreditSpend(
 	}
 
 	return hostedCreditSpend{
+		TrialGrantedMicros:       trialGranted,
+		TrialSpentMicros:         lifetimeTrialSpentMicros(grants, billedMicros, billedAtOrBefore, now),
 		RemainingMicros:          welcomeRemaining + includedRemaining + purchasedRemaining + adminRemaining,
 		IncludedRemainingMicros:  includedRemaining,
 		PurchasedRemainingMicros: purchasedRemaining,
@@ -150,14 +157,77 @@ func splitCreditGrantsForSpend(grants []OrganizationLLMCreditGrant, now time.Tim
 	return expired, live
 }
 
-func consumedExpiredGrantSpend(expired []OrganizationLLMCreditGrant, billedAtOrBefore map[int64]int64) int64 {
-	consumed := int64(0)
+// lifetimeTrialSpentMicros returns how much usage the trial (welcome) grants
+// paid for. It replays usage in the periods between grant expiries and spends
+// the grants that were live in each period in spend order. Usage that happened
+// while a trial grant was live therefore stays trial spend after other grants
+// expire.
+func lifetimeTrialSpentMicros(grants []OrganizationLLMCreditGrant, billedMicros int64, billedAtOrBefore map[int64]int64, now time.Time) int64 {
+	capacity := applyNegativeCreditAdjustments(grants)
+	sortGrantsBySpendOrder(capacity)
+
+	expiries := make([]time.Time, 0, len(billedAtOrBefore))
+	seen := map[int64]struct{}{}
+	for _, grant := range capacity {
+		if grant.ExpiresAt == nil || !grant.IsExpired(now) {
+			continue
+		}
+		key := grant.ExpiresAt.UTC().UnixNano()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		expiries = append(expiries, *grant.ExpiresAt)
+	}
+	sort.Slice(expiries, func(i, j int) bool { return expiries[i].Before(expiries[j]) })
+
+	var trialSpent, billedBefore int64
+	spendPeriod := func(billedUntil int64, live func(OrganizationLLMCreditGrant) bool) {
+		spend := billedUntil - billedBefore
+		if spend <= 0 {
+			return
+		}
+		billedBefore = billedUntil
+		for i := range capacity {
+			grant := &capacity[i]
+			if grant.AmountMicros <= 0 {
+				continue
+			}
+			if !live(*grant) {
+				continue
+			}
+			take := min(grant.AmountMicros, spend)
+			grant.AmountMicros -= take
+			spend -= take
+			if grantCreditBucket(grant.Kind) == creditBucketWelcome {
+				trialSpent += take
+			}
+			if spend == 0 {
+				return
+			}
+		}
+	}
+	for _, expiry := range expiries {
+		spendPeriod(billedAtOrBefore[expiry.UTC().UnixNano()], func(grant OrganizationLLMCreditGrant) bool {
+			return grant.ExpiresAt == nil || !grant.ExpiresAt.Before(expiry)
+		})
+	}
+	spendPeriod(billedMicros, func(grant OrganizationLLMCreditGrant) bool {
+		return !grant.IsExpired(now)
+	})
+	return trialSpent
+}
+
+type expiredCreditSpend struct{ TotalMicros int64 }
+
+func consumedExpiredGrantSpend(expired []OrganizationLLMCreditGrant, billedAtOrBefore map[int64]int64) expiredCreditSpend {
+	consumed := expiredCreditSpend{}
 	for _, grant := range expired {
 		if grant.AmountMicros <= 0 || grant.ExpiresAt == nil {
 			continue
 		}
 		billed := billedAtOrBefore[grant.ExpiresAt.UTC().UnixNano()]
-		available := billed - consumed
+		available := billed - consumed.TotalMicros
 		if available < 0 {
 			available = 0
 		}
@@ -165,14 +235,14 @@ func consumedExpiredGrantSpend(expired []OrganizationLLMCreditGrant, billedAtOrB
 		if take > available {
 			take = available
 		}
-		consumed += take
+		consumed.TotalMicros += take
 	}
 	return consumed
 }
 
 func liveHostedSpendMicros(grants []OrganizationLLMCreditGrant, billedMicros int64, billedAtOrBefore map[int64]int64, now time.Time) int64 {
 	expired, _ := splitCreditGrantsForSpend(grants, now)
-	spend := billedMicros - consumedExpiredGrantSpend(expired, billedAtOrBefore)
+	spend := billedMicros - consumedExpiredGrantSpend(expired, billedAtOrBefore).TotalMicros
 	if spend < 0 {
 		return 0
 	}
