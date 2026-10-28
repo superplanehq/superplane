@@ -18,6 +18,7 @@ func TestOnboardingRetryChangesSubscriptionCredentials(t *testing.T) {
 	for _, target := range []string{"subscription", "subscription-from-key", "hosted", "openai"} {
 		t.Run(target, func(t *testing.T) {
 			r := support.Setup(t)
+			support.AssignOpenSystemTrial(t, r.Organization.ID)
 			db := database.DB(t.Context())
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))

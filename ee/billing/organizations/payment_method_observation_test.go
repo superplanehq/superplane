@@ -57,12 +57,12 @@ func TestBillingReadObservesSavedCardLoss(t *testing.T) {
 		name, reason   string
 		initial, final []map[string]any
 	}{
-		{"removed", "removed", []map[string]any{card("private_method", now.Year()+1)}, nil},
+		{"removed", "removed", []map[string]any{card("private_method", now.Year()+1)}, []map[string]any{}},
 		{"expired", "expired", []map[string]any{card("private_method", now.Year()+1)}, []map[string]any{card("private_method", now.Year()-1)}},
 		{"mixed", "unknown", []map[string]any{card("private_method", now.Year()+1), card("second_method", now.Year()+1)}, []map[string]any{card("private_method", now.Year()-1)}},
 		{"invalid metadata", "unknown", []map[string]any{card("private_method", now.Year()+1)}, []map[string]any{{"id": "private_method", "type": "card", "method_metadata": map[string]int{"exp_month": 0}}}},
 		{"another usable card", "", []map[string]any{card("private_method", now.Year()+1), card("second_method", now.Year()+1)}, []map[string]any{card("second_method", now.Year()+1)}},
-		{"initially empty", "", nil, nil},
+		{"initially empty", "", []map[string]any{}, []map[string]any{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := support.Setup(t)

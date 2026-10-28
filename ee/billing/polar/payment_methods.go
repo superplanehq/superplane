@@ -38,12 +38,17 @@ func (s PaymentMethodSnapshot) HasUsableMethod() bool {
 
 // HasPaymentMethod returns as soon as a usable card is confirmed.
 func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
+	hasCard, err := c.hasPaymentMethod(ctx, externalID)
+	if IsNotFound(err) {
+		return false, nil
+	}
+	return hasCard, err
+}
+
+func (c *Client) hasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
 	now := time.Now().UTC()
 	for page := 1; ; page++ {
 		methods, maxPage, err := c.paymentMethodsPage(ctx, externalID, page, now)
-		if IsNotFound(err) {
-			return false, nil
-		}
 		if err != nil {
 			return false, err
 		}
@@ -92,6 +97,9 @@ func (c *Client) paymentMethodsPage(ctx context.Context, externalID string, page
 	path := fmt.Sprintf("/customers/external/%s/payment-methods?limit=100&page=%d", url.PathEscape(externalID), page)
 	if err := c.get(ctx, path, &result); err != nil {
 		return nil, 0, err
+	}
+	if result.Items == nil {
+		return nil, 0, fmt.Errorf("polar payment methods response is missing items")
 	}
 	if result.Pagination.MaxPage == nil || *result.Pagination.MaxPage < 0 {
 		return nil, 0, fmt.Errorf("payment method list has invalid pagination")

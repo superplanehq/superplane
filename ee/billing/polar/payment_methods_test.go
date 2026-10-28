@@ -20,7 +20,7 @@ func TestHasPaymentMethod(t *testing.T) {
 		want      bool
 		wantError bool
 	}{
-		{name: "customer without a card", status: 200},
+		{name: "customer without a card", status: 200, items: []map[string]any{}},
 		{name: "missing customer", status: 404},
 		{name: "confirmed saved card", status: 200, items: []map[string]any{{"id": "pm_card", "type": "card", "method_metadata": map[string]int{"exp_year": now.Year() + 1, "exp_month": 1}}}, want: true},
 		{name: "expired card", status: 200, items: []map[string]any{{"id": "pm_old", "type": "card", "method_metadata": map[string]int{"exp_year": now.Year() - 1, "exp_month": 1}}}},
@@ -87,6 +87,28 @@ func TestHasPaymentMethodPagination(t *testing.T) {
 			require.Equal(t, tc.wantError, err != nil)
 			require.Equal(t, tc.usablePage != "", hasCard)
 			require.Equal(t, tc.wantPages, pages)
+		})
+	}
+}
+
+func TestPaymentMethodsRejectsMissingItems(t *testing.T) {
+	for _, body := range []string{
+		`{"pagination":{"max_page":1}}`,
+		`{"items":null,"pagination":{"max_page":1}}`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set(apiVersionHeader, APIVersion())
+				_, _ = w.Write([]byte(body))
+			}))
+			defer server.Close()
+			client := NewClient(server.URL, "token", server.Client())
+			hasCard, err := client.HasPaymentMethod(t.Context(), "org")
+			require.ErrorContains(t, err, "missing items")
+			require.False(t, hasCard)
+			snapshot, err := client.PaymentMethods(t.Context(), "org")
+			require.ErrorContains(t, err, "missing items")
+			require.False(t, snapshot.Complete, "malformed lists cannot establish card loss")
 		})
 	}
 }

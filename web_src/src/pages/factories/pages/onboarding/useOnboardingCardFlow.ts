@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getApiErrorMessage } from "@/lib/errors";
 import {
   activateOnboardingPlan,
@@ -26,8 +26,16 @@ export function useOnboardingCardFlow(organizationId: string, flow: CardStepFlow
   const checkoutReturn = useRef(returnParams.get("subscribed") === "1");
   const inFlight = useRef(false);
   const { cardStep } = flow;
-  const [selectedPlanKey, setSelectedPlanKey] = useState(() => returnParams.get("plan") ?? "pay_as_you_go");
-  const plan = cardStep.plans.find((candidate) => candidate.key === selectedPlanKey);
+  const [chosenPlanKey, setSelectedPlanKey] = useState(() => returnParams.get("plan") ?? "pay_as_you_go");
+  const selectedPlanKey = cardStep.planActive ? (cardStep.activePlanKey ?? chosenPlanKey) : chosenPlanKey;
+  // An organization on a plan outside the starter list, for example Team, can
+  // still restore its card. The active plan key is enough to resume setup.
+  const plan = useMemo(
+    () =>
+      cardStep.plans.find((candidate) => candidate.key === selectedPlanKey) ??
+      (cardStep.planActive && selectedPlanKey ? { key: selectedPlanKey } : undefined),
+    [cardStep.plans, cardStep.planActive, selectedPlanKey],
+  );
 
   const continueSetup = useCallback(
     async (resume: boolean) => {
@@ -40,8 +48,8 @@ export function useOnboardingCardFlow(organizationId: string, flow: CardStepFlow
         const returnPath = onboardingCardReturnPath(plan.key);
         if (resume) {
           if (await resumeOnboardingPlan(organizationId, plan.key, returnPath, checkoutReturn.current)) return;
-        } else if (!cardStep.planActive) {
-          if (!plan.subscriptionRequired && !cardStep.hasPaymentMethod) {
+        } else if (!cardStep.planActive || cardStep.required) {
+          if (!cardStep.hasPaymentMethod && (cardStep.planActive || !plan.subscriptionRequired)) {
             setSession(await createOnboardingCardSession(organizationId));
             return;
           }
