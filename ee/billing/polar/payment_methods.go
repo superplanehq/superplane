@@ -2,14 +2,32 @@ package polar
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"gorm.io/gorm"
 )
+
+type paymentMethodPage struct {
+	Items []struct {
+		ID       string `json:"id"`
+		Type     string `json:"type"`
+		Metadata struct {
+			Month int `json:"exp_month"`
+			Year  int `json:"exp_year"`
+		} `json:"method_metadata"`
+	} `json:"items"`
+	Pagination struct {
+		MaxPage int `json:"max_page"`
+	} `json:"pagination"`
+}
 
 // HasPaymentMethod reads saved cards from Polar, so removing a card blocks the next start.
 func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
@@ -21,22 +39,14 @@ func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool,
 }
 
 func (c *Client) hasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
+	// Pagination and retry waits share one budget, bounded by the caller's deadline.
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+
 	for page := 1; ; page++ {
-		var result struct {
-			Items []struct {
-				ID       string `json:"id"`
-				Type     string `json:"type"`
-				Metadata struct {
-					Month int `json:"exp_month"`
-					Year  int `json:"exp_year"`
-				} `json:"method_metadata"`
-			} `json:"items"`
-			Pagination struct {
-				MaxPage int `json:"max_page"`
-			} `json:"pagination"`
-		}
 		path := fmt.Sprintf("/customers/external/%s/payment-methods?limit=100&page=%d", url.PathEscape(externalID), page)
-		if err := c.get(ctx, path, &result); err != nil {
+		result, err := c.readPaymentMethodPage(ctx, path)
+		if err != nil {
 			return false, err
 		}
 		if result.Items == nil {
@@ -59,6 +69,43 @@ func (c *Client) hasPaymentMethod(ctx context.Context, externalID string) (bool,
 			return false, nil
 		}
 	}
+}
+
+func (c *Client) readPaymentMethodPage(ctx context.Context, path string) (paymentMethodPage, error) {
+	for attempt := 1; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return paymentMethodPage{}, classified(err, ErrOutcomeUnknown)
+		}
+		// Never carry state from an interrupted response into a later attempt.
+		var result paymentMethodPage
+		err := c.get(ctx, path, &result)
+		if ctx.Err() != nil {
+			return paymentMethodPage{}, classified(errors.Join(err, ctx.Err()), ErrOutcomeUnknown)
+		}
+		if err == nil {
+			return result, nil
+		}
+		if attempt >= 3 || !isDroppedPaymentMethodConnection(err) {
+			return paymentMethodPage{}, err
+		}
+
+		timer := time.NewTimer(time.Duration(attempt) * 100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return paymentMethodPage{}, classified(errors.Join(err, ctx.Err()), ErrOutcomeUnknown)
+		case <-timer.C:
+		}
+	}
+}
+
+func isDroppedPaymentMethodConnection(err error) bool {
+	var bodyErr *responseBodyReadError
+	if errors.As(err, &bodyErr) && (bodyErr.statusCode < http.StatusOK || bodyErr.statusCode >= http.StatusMultipleChoices) {
+		return false
+	}
+	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
 }
 
 func AssertOrganizationPaymentMethod(tx *gorm.DB, orgID uuid.UUID) error {
