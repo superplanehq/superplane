@@ -254,6 +254,7 @@ function useFirstRunCommands(args: {
   resumeGitHubEnterpriseApp: (returnTo: string) => boolean;
   currentHost?: string;
   integrationId?: string;
+  githubEnterpriseReady?: boolean;
   setShowGitHubEnterpriseHost: (show: boolean) => void;
 }) {
   const { model, connection, navigation, blocking, forgeConfigured, installScope } = args;
@@ -283,9 +284,11 @@ function useFirstRunCommands(args: {
     locationPath: `${location.pathname}${location.search}`,
     currentHost: args.currentHost,
     integrationId: args.integrationId,
+    ready: args.githubEnterpriseReady,
     setGitHubEnterprise: args.setGitHubEnterprise,
     setGitHubEnterpriseError: args.setGitHubEnterpriseError,
     setShowHost: args.setShowGitHubEnterpriseHost,
+    goToChoose: () => navigation.goToScreen("choose"),
     connectGitHubEnterpriseApp: args.connectGitHubEnterpriseApp,
   });
   const connectGitHubEnterpriseOrganization = submitGitHubEnterpriseOwnerAction({
@@ -424,6 +427,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     resumeGitHubEnterpriseApp: githubEnterpriseApp.resume,
     currentHost: githubEnterpriseHost,
     integrationId: githubEnterpriseIntegrationId,
+    githubEnterpriseReady: githubEnterpriseApp.ready,
     setShowGitHubEnterpriseHost,
   });
   const [bitbucketSwitchFailed, setBitbucketSwitchFailed] = useState(false);

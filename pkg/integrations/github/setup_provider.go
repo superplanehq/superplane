@@ -794,7 +794,13 @@ func (g *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 }
 
 func (g *SetupProvider) onSelectOwnerRevert(ctx core.SetupStepContext) error {
-	return ctx.Properties.Delete(common.PropertyOwnerType, common.PropertyOwner, common.PropertyHost)
+	return ctx.Properties.Delete(
+		common.PropertyOwnerType,
+		common.PropertyOwner,
+		common.PropertyHost,
+		common.PropertyAuthMethod,
+		common.PropertyAppState,
+	)
 }
 
 func (g *SetupProvider) onCapabilitySelectionRevert(ctx core.SetupStepContext) error {

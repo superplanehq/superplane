@@ -380,6 +380,47 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 		assert.Equal(t, "https://acme.ghe.com/organizations/acme/settings/apps/new", next.RedirectPrompt.URL)
 	})
 
+	t.Run("factory onboarding selectOwner can be submitted again after revert", func(t *testing.T) {
+		withLicensedGitHubEnterprise(t)
+		intCtx := &contexts.IntegrationContext{}
+		capCtx := &contexts.CapabilityContext{}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{}`))},
+			{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{}`))},
+		}}
+		submit := func() (*core.SetupStep, error) {
+			return g.OnStepSubmit(core.SetupStepContext{
+				Step: core.StepInfo{Name: SetupStepSelectOwner, Inputs: map[string]any{
+					common.PropertyGitHubLocation: common.GitHubLocationEnterpriseCloud,
+					common.PropertyOwnerType:      common.OwnerTypeOrganization,
+					common.PropertyOwner:          "acme",
+					common.PropertyHost:           "acme.ghe.com",
+				}},
+				Logger:          log,
+				OrganizationID:  "11111111-1111-1111-1111-111111111111",
+				HTTP:            httpCtx,
+				Properties:      intCtx.Properties(),
+				Capabilities:    capCtx,
+				Configuration:   map[string]any{"factoryOnboarding": true},
+				IntegrationID:   uuid.New(),
+				BaseURL:         "https://app.superplane.test",
+				WebhooksBaseURL: "https://hooks.superplane.test",
+			})
+		}
+		first, err := submit()
+		require.NoError(t, err)
+		require.Equal(t, SetupStepCreateApp, first.Name)
+		require.NoError(t, g.OnStepRevert(core.SetupStepContext{
+			Step:       core.StepInfo{Name: SetupStepSelectOwner},
+			Logger:     log,
+			Properties: intCtx.Properties(),
+		}))
+		next, err := submit()
+		require.NoError(t, err)
+		require.NotNil(t, next)
+		assert.Equal(t, SetupStepCreateApp, next.Name)
+	})
+
 	t.Run("selectOwner rejects a user account on GitHub Enterprise Cloud", func(t *testing.T) {
 		withLicensedGitHubEnterprise(t)
 		intCtx := &contexts.IntegrationContext{}
@@ -644,6 +685,9 @@ func Test__GitHub__SetupProvider__OnStepRevert(t *testing.T) {
 		require.NoError(t, intCtx.Properties().CreateMany([]core.IntegrationPropertyDefinition{
 			{Name: common.PropertyOwnerType, Value: common.OwnerTypeUser},
 			{Name: common.PropertyOwner, Value: "acme"},
+			{Name: common.PropertyHost, Value: "acme.ghe.com"},
+			{Name: common.PropertyAuthMethod, Value: common.AuthMethodApp},
+			{Name: common.PropertyAppState, Value: "state-token"},
 		}))
 
 		require.NoError(t, g.OnStepRevert(core.SetupStepContext{
@@ -652,6 +696,10 @@ func Test__GitHub__SetupProvider__OnStepRevert(t *testing.T) {
 			Properties: intCtx.Properties(),
 		}))
 		_, err := intCtx.Properties().GetString(common.PropertyOwner)
+		require.Error(t, err)
+		_, err = intCtx.Properties().GetString(common.PropertyAuthMethod)
+		require.Error(t, err)
+		_, err = intCtx.Properties().GetString(common.PropertyAppState)
 		require.Error(t, err)
 	})
 

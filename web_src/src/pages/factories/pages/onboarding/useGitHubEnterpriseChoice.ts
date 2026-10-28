@@ -11,9 +11,11 @@ export function connectGitHubEnterpriseAction(args: {
   locationPath: string;
   currentHost?: string;
   integrationId?: string;
+  ready?: boolean;
   setGitHubEnterprise: (enabled: boolean, host?: string) => void;
   setGitHubEnterpriseError: (message: string | undefined) => void;
   setShowHost: (show: boolean) => void;
+  goToChoose: () => void;
   connectGitHubEnterpriseApp: (host: string, returnTo: string) => Promise<boolean>;
 }) {
   return (host: string) =>
@@ -22,6 +24,7 @@ export function connectGitHubEnterpriseAction(args: {
       args.setGitHubEnterprise(true, host);
       if (args.integrationId && host === args.currentHost) {
         args.setShowHost(false);
+        if (args.ready) args.goToChoose();
         return;
       }
       const returnPath = onboardingStepPath(args.locationPath, "repo");
