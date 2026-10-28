@@ -1,6 +1,9 @@
 package github
 
 import (
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -8,10 +11,43 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"github.com/superplanehq/superplane/test/support/logger"
+	"google.golang.org/grpc/codes"
 )
+
+func Test__GitHub__SetupProvider__FirstStep(t *testing.T) {
+	g := &SetupProvider{}
+
+	t.Run("hides the GitHub Enterprise host in Community", func(t *testing.T) {
+		step := g.FirstStep(core.SetupStepContext{})
+		assert.Equal(t, SetupStepSelectOwner, step.Name)
+		names := make([]string, 0, len(step.Inputs))
+		for _, field := range step.Inputs {
+			names = append(names, field.Name)
+		}
+		assert.NotContains(t, names, common.PropertyGitHubLocation)
+		assert.NotContains(t, names, common.PropertyHost)
+		assert.Contains(t, names, common.PropertyOwnerType)
+	})
+
+	t.Run("shows the GitHub Enterprise host when the license grants it", func(t *testing.T) {
+		withLicensedGitHubEnterprise(t)
+		step := g.FirstStep(core.SetupStepContext{
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			Configuration:  map[string]any{"host": "acme.ghe.com"},
+		})
+		require.GreaterOrEqual(t, len(step.Inputs), 2)
+		assert.Equal(t, common.PropertyGitHubLocation, step.Inputs[0].Name)
+		assert.Equal(t, common.GitHubLocationEnterpriseCloud, step.Inputs[0].Default)
+		assert.Equal(t, common.PropertyHost, step.Inputs[1].Name)
+		assert.Equal(t, "acme.ghe.com", step.Inputs[1].Default)
+		assert.Equal(t, common.OwnerTypeOrganization, step.Inputs[2].Default)
+	})
+}
 
 func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 	g := &SetupProvider{}
@@ -258,6 +294,109 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 		owner, err := intCtx.Properties().GetString(common.PropertyOwner)
 		require.NoError(t, err)
 		assert.Equal(t, "superplanehq", owner)
+		host, err := intCtx.Properties().GetString(common.PropertyHost)
+		require.NoError(t, err)
+		assert.Equal(t, "", host)
+	})
+
+	t.Run("selectOwner rejects a GitHub Enterprise host in Community", func(t *testing.T) {
+		t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
+		intCtx := &contexts.IntegrationContext{}
+		_, err := g.OnStepSubmit(core.SetupStepContext{
+			Step: core.StepInfo{Name: SetupStepSelectOwner, Inputs: map[string]any{
+				common.PropertyOwnerType: common.OwnerTypeUser,
+				common.PropertyOwner:     "superplanehq",
+				common.PropertyHost:      "acme.ghe.com",
+			}},
+			Logger:     log,
+			Properties: intCtx.Properties(),
+		})
+		require.Error(t, err)
+		assert.Equal(t, licensing.ErrNotLicensed.Error(), grpcerrors.StatusMessage(err))
+		assert.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+	})
+
+	t.Run("selectOwner accepts GitHub Enterprise Cloud when the license grants it", func(t *testing.T) {
+		withLicensedGitHubEnterprise(t)
+		intCtx := &contexts.IntegrationContext{}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{}`))},
+		}}
+		next, err := g.OnStepSubmit(core.SetupStepContext{
+			Step: core.StepInfo{Name: SetupStepSelectOwner, Inputs: map[string]any{
+				common.PropertyGitHubLocation: common.GitHubLocationEnterpriseCloud,
+				common.PropertyOwnerType:      common.OwnerTypeOrganization,
+				common.PropertyOwner:          "acme",
+				common.PropertyHost:           "acme.ghe.com",
+			}},
+			Logger:         log,
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			HTTP:           httpCtx,
+			Properties:     intCtx.Properties(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, next)
+		host, err := intCtx.Properties().GetString(common.PropertyHost)
+		require.NoError(t, err)
+		assert.Equal(t, "acme.ghe.com", host)
+		ownerType, err := intCtx.Properties().GetString(common.PropertyOwnerType)
+		require.NoError(t, err)
+		assert.Equal(t, common.OwnerTypeOrganization, ownerType)
+	})
+
+	t.Run("factory onboarding requests factory capabilities and opens the GitHub App", func(t *testing.T) {
+		withLicensedGitHubEnterprise(t)
+		intCtx := &contexts.IntegrationContext{}
+		capCtx := &contexts.CapabilityContext{}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{}`))},
+		}}
+		next, err := g.OnStepSubmit(core.SetupStepContext{
+			Step: core.StepInfo{Name: SetupStepSelectOwner, Inputs: map[string]any{
+				common.PropertyGitHubLocation: common.GitHubLocationEnterpriseCloud,
+				common.PropertyOwnerType:      common.OwnerTypeOrganization,
+				common.PropertyOwner:          "acme",
+				common.PropertyHost:           "acme.ghe.com",
+			}},
+			Logger:          log,
+			OrganizationID:  "11111111-1111-1111-1111-111111111111",
+			HTTP:            httpCtx,
+			Properties:      intCtx.Properties(),
+			Capabilities:    capCtx,
+			Configuration:   map[string]any{"factoryOnboarding": true},
+			IntegrationID:   uuid.New(),
+			BaseURL:         "https://app.superplane.test",
+			WebhooksBaseURL: "https://hooks.superplane.test",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, next)
+		assert.Equal(t, SetupStepCreateApp, next.Name)
+		assert.Contains(t, capCtx.RequestedCapabilties, "github.getIssue")
+		assert.Contains(t, capCtx.RequestedCapabilties, "github.createPullRequest")
+		assert.Contains(t, capCtx.RequestedCapabilties, "github.listCheckRunsForRef")
+		assert.Contains(t, capCtx.RequestedCapabilties, "github.getCombinedCommitStatus")
+		assert.Contains(t, capCtx.RequestedCapabilties, "github.onDependabotAlert")
+		require.NotNil(t, next.RedirectPrompt)
+		assert.Equal(t, "https://acme.ghe.com/organizations/acme/settings/apps/new", next.RedirectPrompt.URL)
+	})
+
+	t.Run("selectOwner rejects a user account on GitHub Enterprise Cloud", func(t *testing.T) {
+		withLicensedGitHubEnterprise(t)
+		intCtx := &contexts.IntegrationContext{}
+		_, err := g.OnStepSubmit(core.SetupStepContext{
+			Step: core.StepInfo{Name: SetupStepSelectOwner, Inputs: map[string]any{
+				common.PropertyGitHubLocation: common.GitHubLocationEnterpriseCloud,
+				common.PropertyOwnerType:      common.OwnerTypeUser,
+				common.PropertyOwner:          "octocat",
+				common.PropertyHost:           "acme.ghe.com",
+			}},
+			Logger:         log,
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			HTTP:           &contexts.HTTPContext{},
+			Properties:     intCtx.Properties(),
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "organization owner")
 	})
 
 	t.Run("capabilitySelection leads to auth method step", func(t *testing.T) {

@@ -19,7 +19,8 @@ import {
 } from "@/hooks/useFactoryData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useFactoryCustomAutomations } from "@/hooks/useFactoryCustomAutomationData";
-import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
+import { githubHostFromIntegration, isGitHubEnterpriseServerHost } from "@/lib/githubHost";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
@@ -387,12 +388,18 @@ export function LinesPage() {
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
     [configuredIntakes],
   );
-  const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const githubIntegration = useIntegration(organizationId, githubIntegrationId);
+  const githubHost = githubHostFromIntegration(githubIntegration.data);
+  const hideDependabot = isGitHubEnterpriseServerHost(githubHost);
+  const addIntakeTemplates = useMemo(
+    () => addIntakeTemplatesForOrg(hasExperimentalFeature, { hideDependabot }),
+    [hasExperimentalFeature, hideDependabot],
+  );
   const vcsProvider = factory?.onboarding?.vcsProvider;
   const supportsReviewBots = vcsProvider !== "bitbucket";
   const catalogParameters = appRepository ? { repository: appRepository } : undefined;
@@ -783,6 +790,7 @@ export function LinesPage() {
                 key={intake.intakeId}
                 message={intake.healthMessage}
                 repository={intake.resourceId}
+                host={githubHost}
                 retrying={intakeWebhookRetry.retrying}
                 onRetry={() => intakeWebhookRetry.retryIntake(intake)}
               />

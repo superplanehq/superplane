@@ -9,7 +9,6 @@ import { unmockedPackage } from "@/test/unmockedModule";
 
 import { billingState, defaultBillingState, refetchBilling } from "./FirstRunSetup.chrome.spec.billing";
 import { hostedVcsModel, pageModel, setupState } from "./FirstRunSetup.chrome.spec.fixtures";
-
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { NavigableSetup, StatefulSetup } from "./firstRunSetupComponents.test-support";
@@ -52,7 +51,6 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
-
 const openCardSetup = vi.fn(async () => {});
 const activateOnboardingPlan = vi.fn(async () => {
   billingState.planActive = true;
