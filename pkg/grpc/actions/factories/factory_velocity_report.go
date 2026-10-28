@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -130,12 +131,23 @@ func collectVelocityOrders(rows []models.FactoryVelocityPullRequest, window velo
 	return orders
 }
 
+func originHost(origin string) string {
+	origin = strings.TrimSpace(origin)
+	if i := strings.Index(origin, "://"); i >= 0 {
+		origin = origin[i+3:]
+	}
+	if i := strings.IndexAny(origin, "/:?#"); i >= 0 {
+		origin = origin[:i]
+	}
+	return origin
+}
+
 func classifyVelocityIntake(row *models.FactoryVelocityPullRequest) string {
 	if _, ok := velocityIntakeLabels[row.IntakeSource]; ok {
 		return row.IntakeSource
 	}
 	if origin := strings.TrimSpace(row.OriginURL); origin != "" {
-		if strings.Contains(strings.ToLower(origin), "github.com") {
+		if githubcommon.IsKnownGitHubHostname(originHost(origin)) {
 			return models.FactoryIntakeSourceGitHubIssues
 		}
 		return velocityIntakeKeyImported

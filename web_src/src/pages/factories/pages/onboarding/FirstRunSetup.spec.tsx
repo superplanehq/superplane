@@ -48,6 +48,10 @@ vi.mock("@/lib/githubAppManifest", () => ({
   startPublicGitHubAppCreate: (...args: unknown[]) => startPublicGitHubAppCreate(...args),
 }));
 
+vi.mock("./useFirstRunGitHubEnterprise", () => ({
+  useFirstRunGitHubEnterprise: () => ({ connect: vi.fn(), resume: vi.fn(), ready: false }),
+}));
+
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({
     data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
@@ -139,6 +143,10 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
+    selectGitHubEnterpriseRepository: vi.fn().mockResolvedValue(true),
+    bindGitHubEnterpriseIntegration: vi.fn(),
+    githubIntegrationId: "",
+    githubHost: "",
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,

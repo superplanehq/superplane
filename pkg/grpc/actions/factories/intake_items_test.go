@@ -14,10 +14,29 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func TestGitHubOriginItemID_RequiresMatchingHost(t *testing.T) {
+	id, ok := gitHubOriginItemID(common.DotCom(), "acme/app", "https://github.com/acme/app/issues/42")
+	require.True(t, ok)
+	assert.Equal(t, "42", id)
+
+	_, ok = gitHubOriginItemID(common.DotCom(), "acme/app", "https://acme.ghe.com/acme/app/issues/42")
+	assert.False(t, ok)
+
+	enterprise, err := common.ParseHost("acme.ghe.com")
+	require.NoError(t, err)
+	id, ok = gitHubOriginItemID(enterprise, "acme/app", "https://acme.ghe.com/acme/app/issues/42")
+	require.True(t, ok)
+	assert.Equal(t, "42", id)
+
+	_, ok = gitHubOriginItemID(enterprise, "acme/app", "https://github.com/acme/app/issues/42")
+	assert.False(t, ok)
+}
 
 func TestGitHubIssueItem_UsesNumberKeyAndHTMLURL(t *testing.T) {
 	createdAt := time.Now().UTC()

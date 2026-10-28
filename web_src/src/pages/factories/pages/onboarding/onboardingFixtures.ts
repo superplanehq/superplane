@@ -22,11 +22,27 @@ export type IntegrationOption = {
   soon?: boolean;
 };
 
+export type FirstRunHostChoice = VcsHostId | "github-enterprise";
+
+export type FirstRunHostOption = {
+  id: FirstRunHostChoice;
+  label: string;
+  detail: string;
+  /** When true, shown but not connectable in this wireframe. */
+  soon?: boolean;
+};
+
 export const VCS_OPTIONS: (IntegrationOption & { id: VcsHostId })[] = [
   { id: "github", label: "GitHub", detail: "Connect GitHub to list repositories and open pull requests." },
   { id: "bitbucket", label: "Bitbucket", detail: "Connect Bitbucket to list repositories and open pull requests." },
   { id: "gitlab", label: "GitLab", detail: "Connect GitLab to list repositories and open merge requests.", soon: true },
 ];
+
+export const GITHUB_ENTERPRISE_VCS_OPTION: FirstRunHostOption = {
+  id: "github-enterprise",
+  label: "GitHub Enterprise Cloud",
+  detail: "Connect a GitHub Enterprise Cloud organization and create a GitHub App there.",
+};
 
 export const AGENT_OPTIONS: IntegrationOption[] = [
   {
