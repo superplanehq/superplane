@@ -69,6 +69,49 @@ func Test__Build__OverlaysLineDispatchModelOnMatchingRunner(t *testing.T) {
 	assert.Equal(t, "claude-opus-4-6", resolved["model"])
 }
 
+func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factoryModel.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}}, time.Now()))
+	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-4.1"})
+	require.NoError(t, err)
+
+	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerCodex")
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
+	execution, err := models.FindWorkOrderExecutionByRunID(db, run.ID)
+	require.NoError(t, err)
+	dispatch, err := models.FindWorkOrderLineDispatch(db, execution.LineDispatchID)
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name     string
+		model    string
+		source   string
+		expected string
+	}{
+		{"subscription catalog model", "gpt-5.4", "subscription", "gpt-5.4"},
+		{"API key model excluded from subscription catalog", "gpt-4.1", "subscription", "gpt-5-codex"},
+		{"subscription model excluded from API key allowlist", "gpt-5.4", "integration", "gpt-5-codex"},
+		{"automatic model", "", "subscription", "gpt-5-codex"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, db.Model(dispatch).Update("model", tc.model).Error)
+			resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).
+				WithNodeID("agent").WithRootEvent(&rootEvent.ID).
+				Build(map[string]any{"model": "gpt-5-codex", "credentials": map[string]any{"source": tc.source}})
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, resolved["model"])
+		})
+	}
+}
+
 func Test__Build__OverlaysLineDispatchThinkingOnMatchingRunner(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
