@@ -511,11 +511,32 @@ async function runPrompt(promptFile, model, thinking) {
     thinkingLevel: rollout.effort || thinking,
     usage,
   };
-  const outcomes = codexModelCallOutcomes({
-    failed: exitCode !== 0,
-    errorText: `${codexErrorText(lastResult)}\n${stderrText}`,
-    model: payload.model,
-  });
+  const outcomes = [];
+  for (const occurredAt of formatter.modelCallTimes()) {
+    outcomes.push(
+      ...codexModelCallOutcomes({
+        failed: false,
+        model: payload.model,
+        occurredAt,
+      }),
+    );
+  }
+  if (exitCode !== 0) {
+    outcomes.push(
+      ...codexModelCallOutcomes({
+        failed: true,
+        errorText: `${codexErrorText(lastResult)}\n${stderrText}`,
+        model: payload.model,
+      }),
+    );
+  } else if (outcomes.length === 0) {
+    outcomes.push(
+      ...codexModelCallOutcomes({
+        failed: false,
+        model: payload.model,
+      }),
+    );
+  }
   if (outcomes.length > 0) {
     payload.modelCallOutcomes = outcomes;
   }
@@ -764,6 +785,8 @@ function createCodexFormatter(telemetry, activityOverride) {
   let contentSeq = 0;
   let roundOpen = false;
   let lastText = "";
+  let lastRecordedMessageId = "";
+  const modelCallTimes = [];
 
   function itemType(item) {
     return String((item && (item.type || item.item_type)) || "").toLowerCase();
@@ -938,6 +961,13 @@ function createCodexFormatter(telemetry, activityOverride) {
               writeStdout(`${lastText}\n`);
             }
           }
+          if (type !== "reasoning") {
+            const messageId = String(item.id || id || "");
+            if (!messageId || messageId !== lastRecordedMessageId) {
+              lastRecordedMessageId = messageId;
+              modelCallTimes.push(new Date().toISOString());
+            }
+          }
         }
         return;
       }
@@ -983,6 +1013,9 @@ function createCodexFormatter(telemetry, activityOverride) {
     },
     lastText() {
       return lastText;
+    },
+    modelCallTimes() {
+      return modelCallTimes.slice();
     },
   };
 }
