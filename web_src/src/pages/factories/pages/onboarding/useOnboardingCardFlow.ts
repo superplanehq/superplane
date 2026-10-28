@@ -26,7 +26,8 @@ export function useOnboardingCardFlow(organizationId: string, flow: CardStepFlow
   const checkoutReturn = useRef(returnParams.get("subscribed") === "1");
   const inFlight = useRef(false);
   const { cardStep } = flow;
-  const [selectedPlanKey, setSelectedPlanKey] = useState(() => returnParams.get("plan") ?? "pay_as_you_go");
+  const [chosenPlanKey, setSelectedPlanKey] = useState(() => returnParams.get("plan") ?? "pay_as_you_go");
+  const selectedPlanKey = cardStep.planActive ? (cardStep.activePlanKey ?? chosenPlanKey) : chosenPlanKey;
   const plan = cardStep.plans.find((candidate) => candidate.key === selectedPlanKey);
 
   const continueSetup = useCallback(
@@ -40,8 +41,8 @@ export function useOnboardingCardFlow(organizationId: string, flow: CardStepFlow
         const returnPath = onboardingCardReturnPath(plan.key);
         if (resume) {
           if (await resumeOnboardingPlan(organizationId, plan.key, returnPath, checkoutReturn.current)) return;
-        } else if (!cardStep.planActive) {
-          if (!plan.subscriptionRequired && !cardStep.hasPaymentMethod) {
+        } else if (!cardStep.planActive || cardStep.required) {
+          if (!cardStep.hasPaymentMethod && (cardStep.planActive || !plan.subscriptionRequired)) {
             setSession(await createOnboardingCardSession(organizationId));
             return;
           }

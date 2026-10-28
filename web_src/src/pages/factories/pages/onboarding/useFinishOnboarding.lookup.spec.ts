@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import type { OrganizationsDescribeOrganizationBillingResponse } from "@/api-client";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 const { organizationsDescribeIntegration } = vi.hoisted(() => ({
@@ -23,6 +24,11 @@ import { showErrorToast } from "@/lib/toast";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useFinishOnboarding } from "./useFinishOnboarding";
 import { CODEX_SUBSCRIPTION_PLAN, resolveOnboardingAgent } from "./onboardingAgentReadiness";
+
+const refetchBilling = vi.fn<() => Promise<{ data: OrganizationsDescribeOrganizationBillingResponse; error: null }>>(
+  async () => ({ data: { billingEnabled: false }, error: null }),
+);
+vi.mock("@/hooks/useOrganizationBilling", () => ({ useOrganizationBilling: () => ({ refetch: refetchBilling }) }));
 
 let byokAllowed = true;
 vi.mock("@/hooks/useBYOKAccess", () => ({ useBYOKAccess: () => ({ verify: async () => byokAllowed }) }));
@@ -58,6 +64,7 @@ function setup(): OnboardingSetupApi {
 describe("useFinishOnboarding", () => {
   beforeEach(() => {
     byokAllowed = true;
+    refetchBilling.mockReset().mockResolvedValue({ data: { billingEnabled: false }, error: null });
     organizationsDescribeIntegration.mockReset();
     vi.mocked(showErrorToast).mockReset();
   });
@@ -163,54 +170,74 @@ describe("useFinishOnboarding", () => {
     },
   );
 
-  it("resolves the installation name before it treats an unready saved GitHub selection as blocked", async () => {
-    organizationsDescribeIntegration.mockResolvedValue({
-      data: { integration: { metadata: { name: "github-acme" } } },
-    });
-    const updateOnboarding = vi.fn().mockResolvedValue({});
-    const installFactory = vi.fn().mockResolvedValue({ canvasId: "canvas-1", canvasName: "canvas-1" });
-    const onProvisioned = vi.fn();
+  it.each(["disabled", "ready", "no-plan", "no-card", "unavailable"] as const)(
+    "checks current billing before provisioning with billing %s",
+    async (billing) => {
+      if (billing === "unavailable") refetchBilling.mockRejectedValue(new Error("Billing unavailable"));
+      else if (billing !== "disabled")
+        refetchBilling.mockResolvedValue({
+          data: {
+            billingEnabled: true,
+            planCategory: billing === "no-plan" ? "none" : "paid",
+            requirePaymentMethod: true,
+            hasPaymentMethod: billing !== "no-card",
+          },
+          error: null,
+        });
+      organizationsDescribeIntegration.mockResolvedValue({
+        data: { integration: { metadata: { name: "github-acme" } } },
+      });
+      const updateOnboarding = vi.fn().mockResolvedValue({});
+      const installFactory = vi.fn().mockResolvedValue({ canvasId: "canvas-1", canvasName: "canvas-1" });
+      const onProvisioned = vi.fn();
 
-    const { result } = renderHook(
-      () =>
-        useFinishOnboarding({
-          organizationId: "org-1",
-          factoryId: "factory-1",
-          factoryKey: "web",
-          factory: null,
-          setup: setup(),
-          selections: { github: { id: "int-1", name: "int-1", ready: false } },
-          setSaving: vi.fn(),
-          updateFactory: vi.fn().mockResolvedValue({}),
-          updateOnboarding,
-          installFactory,
-          createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
-          listIntakes: vi.fn().mockResolvedValue([]),
-          createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
-          updateIntake: vi.fn(),
-          deleteIntake: vi.fn().mockResolvedValue({}),
-          listApps: vi.fn().mockResolvedValue([]),
-          resolveDefaultBranch: vi.fn().mockResolvedValue("main"),
-          takenNames: [],
-          remainingCreditCents: 5000,
-          hostedModelsLoading: false,
-          plan: readyPlan,
-          onProvisioned,
+      const { result } = renderHook(
+        () =>
+          useFinishOnboarding({
+            organizationId: "org-1",
+            factoryId: "factory-1",
+            factoryKey: "web",
+            factory: null,
+            setup: setup(),
+            selections: { github: { id: "int-1", name: "int-1", ready: false } },
+            setSaving: vi.fn(),
+            updateFactory: vi.fn().mockResolvedValue({}),
+            updateOnboarding,
+            installFactory,
+            createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
+            listIntakes: vi.fn().mockResolvedValue([]),
+            createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
+            updateIntake: vi.fn(),
+            deleteIntake: vi.fn().mockResolvedValue({}),
+            listApps: vi.fn().mockResolvedValue([]),
+            resolveDefaultBranch: vi.fn().mockResolvedValue("main"),
+            takenNames: [],
+            remainingCreditCents: 5000,
+            hostedModelsLoading: false,
+            plan: readyPlan,
+            onProvisioned,
+          }),
+        { wrapper },
+      );
+
+      await result.current();
+
+      if (["no-plan", "no-card", "unavailable"].includes(billing)) {
+        expect(showErrorToast).toHaveBeenCalled();
+        expect(updateOnboarding).not.toHaveBeenCalled();
+        expect(installFactory).not.toHaveBeenCalled();
+        return;
+      }
+      expect(organizationsDescribeIntegration).toHaveBeenCalled();
+      expect(showErrorToast).not.toHaveBeenCalled();
+      expect(updateOnboarding).toHaveBeenCalled();
+      expect(installFactory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          integrations: expect.objectContaining({
+            github: { id: "int-1", name: "github-acme", ready: true },
+          }),
         }),
-      { wrapper },
-    );
-
-    await result.current();
-
-    expect(organizationsDescribeIntegration).toHaveBeenCalled();
-    expect(showErrorToast).not.toHaveBeenCalled();
-    expect(updateOnboarding).toHaveBeenCalled();
-    expect(installFactory).toHaveBeenCalledWith(
-      expect.objectContaining({
-        integrations: expect.objectContaining({
-          github: { id: "int-1", name: "github-acme", ready: true },
-        }),
-      }),
-    );
-  });
+      );
+    },
+  );
 });

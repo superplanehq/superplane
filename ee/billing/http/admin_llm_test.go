@@ -142,6 +142,8 @@ func TestAdminOrganizationBillingPlanHiddenWhenBillingDisabled(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+	sync := execRequest(server, requestParams{method: http.MethodPost, path: "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-customer/sync", authCookie: token})
+	assert.Equal(t, http.StatusNotFound, sync.Code)
 
 	for _, method := range []string{http.MethodGet, http.MethodPut} {
 		response := execRequest(server, requestParams{
@@ -273,7 +275,10 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		periodStart := time.Now().UTC().Truncate(time.Second)
 		periodEnd := periodStart.AddDate(0, 1, 0)
 		polarServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			assert.Equal(t, "/subscriptions/", req.URL.Path)
+			if req.URL.Path != "/subscriptions/" {
+				http.NotFound(w, req)
+				return
+			}
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"items": []map[string]any{
 					{
@@ -300,7 +305,7 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 
 		response := execRequest(server, requestParams{
 			method:     "GET",
-			path:       path,
+			path:       path + "?check_polar=true",
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
@@ -607,6 +612,10 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 			saving := false
 			calls := 0
 			polarServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if req.URL.Path != "/subscriptions/" {
+					http.NotFound(w, req)
+					return
+				}
 				calls++
 				assert.Equal(t, r.Organization.ID.String(), req.URL.Query().Get("external_customer_id"))
 				assert.Empty(t, req.URL.Query().Get("product_id"))
@@ -639,7 +648,7 @@ func TestAdminPlanPolarVerification(t *testing.T) {
 			t.Setenv("POLAR_DASHBOARD_ORGANIZATION_SLUG", "superplane-inc")
 			path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
 			get := func() organizationBillingPlanResponse {
-				response := execRequest(server, requestParams{method: "GET", path: path, authCookie: token})
+				response := execRequest(server, requestParams{method: "GET", path: path + "?check_polar=true", authCookie: token})
 				require.Equal(t, 200, response.Code, response.Body.String())
 				var plan organizationBillingPlanResponse
 				require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))

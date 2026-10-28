@@ -13,6 +13,14 @@ import (
 
 // HasPaymentMethod reads saved cards from Polar, so removing a card blocks the next start.
 func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
+	hasCard, err := c.hasPaymentMethod(ctx, externalID)
+	if IsNotFound(err) {
+		return false, nil
+	}
+	return hasCard, err
+}
+
+func (c *Client) hasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
 	for page := 1; ; page++ {
 		var result struct {
 			Items []struct {
@@ -29,10 +37,10 @@ func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool,
 		}
 		path := fmt.Sprintf("/customers/external/%s/payment-methods?limit=100&page=%d", url.PathEscape(externalID), page)
 		if err := c.get(ctx, path, &result); err != nil {
-			if IsNotFound(err) {
-				return false, nil
-			}
 			return false, err
+		}
+		if result.Items == nil {
+			return false, fmt.Errorf("polar payment methods response is missing items")
 		}
 		now := time.Now().UTC()
 		for _, method := range result.Items {
