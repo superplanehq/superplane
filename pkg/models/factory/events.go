@@ -102,11 +102,16 @@ const (
 
 // Events
 
+// WorkOrderAssigneesUpdated records an owner change. User is empty when
+// the planning agent chose the owner; Source is then "agent" and Reason says
+// why.
 type WorkOrderAssigneesUpdated struct {
 	Order      *WorkOrderRef `json:"order,omitempty"`
 	User       *UserRef      `json:"user,omitempty"`
 	Assigned   []UserRef     `json:"assigned,omitempty"`
 	Unassigned []UserRef     `json:"unassigned,omitempty"`
+	Source     string        `json:"source,omitempty"`
+	Reason     string        `json:"reason,omitempty"`
 }
 
 // WorkOrderStatusUpdated is the authoritative lifecycle event: emitted for

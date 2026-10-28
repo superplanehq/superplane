@@ -277,6 +277,10 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
           'mcp_servers.superplane.tools.propose_update.approval_mode="approve"',
           "-c",
           'mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"',
+          "-c",
+          'mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"',
+          "-c",
+          'mcp_servers.superplane.tools.assign_owner.approval_mode="approve"',
         ]
       : []),
     ...workspaceMCPConfigOverrides(env),
