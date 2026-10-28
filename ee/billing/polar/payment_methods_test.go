@@ -52,6 +52,45 @@ func TestHasPaymentMethod(t *testing.T) {
 	}
 }
 
+func TestHasPaymentMethodPagination(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		usablePage string
+		wantPages  []string
+		wantError  bool
+	}{
+		{name: "usable card on first page", usablePage: "1", wantPages: []string{"1"}},
+		{name: "usable card on later page", usablePage: "2", wantPages: []string{"1", "2"}},
+		{name: "failure before a usable card", wantPages: []string{"1", "2", "3"}, wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var pages []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				page := r.URL.Query().Get("page")
+				pages = append(pages, page)
+				w.Header().Set(apiVersionHeader, APIVersion())
+				if page == "3" {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					return
+				}
+				methodType := "unknown"
+				if page == tc.usablePage {
+					methodType = "kr_card"
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"items":      []map[string]any{{"id": "pm_" + page, "type": methodType}},
+					"pagination": map[string]int{"max_page": 3},
+				})
+			}))
+			defer server.Close()
+			hasCard, err := NewClient(server.URL, "token", server.Client()).HasPaymentMethod(t.Context(), "org")
+			require.Equal(t, tc.wantError, err != nil)
+			require.Equal(t, tc.usablePage != "", hasCard)
+			require.Equal(t, tc.wantPages, pages)
+		})
+	}
+}
+
 func TestPaymentMethodsRequiresCompletePagination(t *testing.T) {
 	for _, tc := range []struct {
 		name                    string

@@ -66,10 +66,35 @@ func Test__DeleteOrganization(t *testing.T) {
 		event := recorder.events[0]
 		assert.Equal(t, "organization_deleted", string(event.Name))
 		assert.Equal(t, r.Account.ID.String(), event.DistinctID)
+		assert.Equal(t, productanalytics.ActorUser, event.ActorType)
+		assert.Equal(t, r.Account.ID.String(), event.Properties["actor_account_id"])
 		assert.Equal(t, r.Organization.ID.String(), event.OrganizationID)
 		assert.Equal(t, "direct", event.Properties["deletion_source"])
 		assert.Equal(t, productanalytics.StableEventID(productanalytics.EventOrganizationDeleted, r.Organization.ID.String()), event.EventID)
 	})
+}
+
+func TestDeleteOrganizationAPIKeyAnalytics(t *testing.T) {
+	r := support.Setup(t)
+	key, err := models.CreateAPIKey(database.DB(t.Context()), r.Organization.ID, "admin-key", nil, r.User, nil, nil)
+	require.NoError(t, err)
+	recorder := &deletionAnalyticsRecorder{}
+	previous := productanalytics.SetCurrent(recorder)
+	t.Cleanup(func() { productanalytics.SetCurrent(previous) })
+	ctx := authentication.SetUserIdInMetadata(t.Context(), key.ID.String())
+
+	response, err := DeleteOrganization(ctx, r.AuthService, r.Organization.ID.String())
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	_, err = models.FindOrganizationByID(r.Organization.ID.String())
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	require.Len(t, recorder.events, 1)
+	event := recorder.events[0]
+	assert.Equal(t, productanalytics.EventOrganizationDeleted, event.Name)
+	assert.Equal(t, productanalytics.SyntheticDistinctID(r.Organization.ID.String(), productanalytics.ActorSystem, "organization"), event.DistinctID)
+	assert.Equal(t, productanalytics.ActorSystem, event.ActorType)
+	assert.Equal(t, r.Organization.ID.String(), event.OrganizationID)
+	assert.NotContains(t, event.Properties, "actor_account_id")
 }
 
 type deletionAnalyticsRecorder struct{ events []productanalytics.Event }

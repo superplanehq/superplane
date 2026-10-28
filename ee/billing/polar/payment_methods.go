@@ -36,48 +36,74 @@ func (s PaymentMethodSnapshot) HasUsableMethod() bool {
 	return false
 }
 
-// HasPaymentMethod remains a read-only execution guard.
+// HasPaymentMethod returns as soon as a usable card is confirmed.
 func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
-	snapshot, err := c.PaymentMethods(ctx, externalID)
-	return snapshot.HasUsableMethod(), err
+	now := time.Now().UTC()
+	for page := 1; ; page++ {
+		methods, maxPage, err := c.paymentMethodsPage(ctx, externalID, page, now)
+		if IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		for _, method := range methods {
+			if method.Usable {
+				return true, nil
+			}
+		}
+		if page >= maxPage {
+			return false, nil
+		}
+	}
 }
 
 // PaymentMethods reads every page before accepting a complete observation.
 func (c *Client) PaymentMethods(ctx context.Context, externalID string) (PaymentMethodSnapshot, error) {
 	snapshot := PaymentMethodSnapshot{ReadStartedAt: time.Now().UTC()}
 	for page := 1; ; page++ {
-		var result struct {
-			Items []struct {
-				ID       string          `json:"id"`
-				Type     string          `json:"type"`
-				Metadata json.RawMessage `json:"method_metadata"`
-			} `json:"items"`
-			Pagination struct {
-				MaxPage *int `json:"max_page"`
-			} `json:"pagination"`
-		}
-		path := fmt.Sprintf("/customers/external/%s/payment-methods?limit=100&page=%d", url.PathEscape(externalID), page)
-		if err := c.get(ctx, path, &result); err != nil {
+		methods, maxPage, err := c.paymentMethodsPage(ctx, externalID, page, snapshot.ReadStartedAt)
+		if err != nil {
 			if IsNotFound(err) {
 				return PaymentMethodSnapshot{ReadStartedAt: snapshot.ReadStartedAt}, nil
 			}
 			return PaymentMethodSnapshot{}, err
 		}
-		if result.Pagination.MaxPage == nil || *result.Pagination.MaxPage < 0 {
-			return PaymentMethodSnapshot{}, fmt.Errorf("payment method list has invalid pagination")
-		}
-		for _, method := range result.Items {
-			if method.ID == "" {
-				continue
-			}
-			snapshot.Methods = append(snapshot.Methods, paymentMethodAvailability(method.ID, method.Type, method.Metadata, snapshot.ReadStartedAt))
-		}
-		if page >= *result.Pagination.MaxPage {
+		snapshot.Methods = append(snapshot.Methods, methods...)
+		if page >= maxPage {
 			snapshot.Complete = true
 			snapshot.ObservedAt = time.Now().UTC()
 			return snapshot, nil
 		}
 	}
+}
+
+func (c *Client) paymentMethodsPage(ctx context.Context, externalID string, page int, now time.Time) ([]PaymentMethodAvailability, int, error) {
+	var result struct {
+		Items []struct {
+			ID       string          `json:"id"`
+			Type     string          `json:"type"`
+			Metadata json.RawMessage `json:"method_metadata"`
+		} `json:"items"`
+		Pagination struct {
+			MaxPage *int `json:"max_page"`
+		} `json:"pagination"`
+	}
+	path := fmt.Sprintf("/customers/external/%s/payment-methods?limit=100&page=%d", url.PathEscape(externalID), page)
+	if err := c.get(ctx, path, &result); err != nil {
+		return nil, 0, err
+	}
+	if result.Pagination.MaxPage == nil || *result.Pagination.MaxPage < 0 {
+		return nil, 0, fmt.Errorf("payment method list has invalid pagination")
+	}
+	methods := make([]PaymentMethodAvailability, 0, len(result.Items))
+	for _, method := range result.Items {
+		if method.ID == "" {
+			continue
+		}
+		methods = append(methods, paymentMethodAvailability(method.ID, method.Type, method.Metadata, now))
+	}
+	return methods, *result.Pagination.MaxPage, nil
 }
 
 func paymentMethodAvailability(id, methodType string, raw json.RawMessage, now time.Time) PaymentMethodAvailability {

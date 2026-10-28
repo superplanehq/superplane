@@ -65,13 +65,24 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 		organization.ID.String(),
 		userID,
 	)
+	distinctID := actorID
+	actorType := productanalytics.ActorUser
+	properties := productanalytics.Properties{
+		"deletion_source": "direct",
+		"deleted_at":      organization.DeletedAt.Time.UTC().Format(time.RFC3339Nano),
+	}
+	if actorID == "" {
+		distinctID = productanalytics.SyntheticDistinctID(organization.ID.String(), productanalytics.ActorSystem, "organization")
+		actorType = productanalytics.ActorSystem
+	} else {
+		properties["actor_account_id"] = actorID
+	}
 	productanalytics.Capture(productanalytics.Event{
 		Name:       productanalytics.EventOrganizationDeleted,
 		EventID:    productanalytics.StableEventID(productanalytics.EventOrganizationDeleted, organization.ID.String()),
-		DistinctID: actorID, OrganizationID: organization.ID.String(), ActorType: productanalytics.ActorUser,
-		Source: productanalytics.SourceFromContext(ctx, productanalytics.SourceAPI),
-		Properties: productanalytics.Properties{"actor_account_id": actorID, "deletion_source": "direct",
-			"deleted_at": organization.DeletedAt.Time.UTC().Format(time.RFC3339Nano)},
+		DistinctID: distinctID, OrganizationID: organization.ID.String(), ActorType: actorType,
+		Source:     productanalytics.SourceFromContext(ctx, productanalytics.SourceAPI),
+		Properties: properties,
 	})
 
 	return &pb.DeleteOrganizationResponse{}, nil
