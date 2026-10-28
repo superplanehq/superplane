@@ -74,16 +74,44 @@ The target requires the Docker `db` service and the Polar sandbox.
 | Plan | Monthly price | Maximum seats | Sandbox product ID |
 | --- | --- | --- | --- |
 | Team | $50 per seat | 50 | `633e8026-988b-44de-8d65-31829948c975` |
-| Starter | $20 | Unlimited | `abc9ef98-20c0-48b5-8204-1448df733737` |
-| Pay-as-you-go | Usage-based | Existing setting | None |
+| Starter | $20 | 10 | `abc9ef98-20c0-48b5-8204-1448df733737` |
+| Pay-as-you-go | Usage-based | 10 | None |
 
 All three plans are public and require a payment card. Team includes every
-defined feature. Starter and Pay-as-you-go include only BYOS.
+defined feature. Starter and Pay-as-you-go include only BYOS. The seed
+creates Pay-as-you-go with no monthly subscription. Both starter plans allow
+10 members. Pay-as-you-go allows five tasks at once; Starter has no task limit.
 The seed enables local gating for features other than BYOS to enforce plan access.
-Repeated runs refresh these settings and preserve existing prices, product links,
-seat limits, and credit policies.
+Repeated runs refresh these settings and preserve existing prices and product links.
 The seed does not assign plans to organizations or change subscriptions.
 Production migrations do not run this seed.
+
+## Onboarding plan selection
+
+Workspace onboarding shows Pay-as-you-go and Starter after ticket-source
+setup. Pay-as-you-go is selected initially. The choices come from the public
+billing catalog. Team is not an onboarding choice. The step is skipped when
+billing is off, a paid plan already exists, or starter plans are unavailable.
+
+Pay-as-you-go collects a card in an embedded Polar form, then activates
+without a subscription charge. Starter opens subscription checkout directly.
+After checkout, onboarding synchronizes billing with Polar before continuing.
+Organizations with an existing paid plan skip this step.
+There is no admin setting for a default onboarding plan.
+
+In Polar **Settings → Preferences → Embedding**, allow each host that serves
+onboarding. For local testing, add `localhost:8000` and your HTTPS tunnel
+host to the sandbox organization. Use host names without a URL scheme.
+Configure production hosts in the live organization separately. Without this
+setting, Polar blocks the card form with its `frame-ancestors` policy.
+
+Each account receives $10 in signup credit after plan activation, valid for 365 days.
+Creating an organization or opening subscription checkout does not grant credit.
+Pay-as-you-go grants credit when plan selection succeeds. Subscriptions grant
+credit when the subscription becomes active. The grant is limited to one per account.
+Selecting another plan does not add a second signup grant.
+Credit alone does not permit runs. An existing trial company keeps its stored
+credit balance and trial dates.
 
 ## Credit policy and follow-up work
 
@@ -119,9 +147,9 @@ production cards or production tokens. The $20 monthly seat price below is
 an example. Use your catalog price for the actual estimates.
 
 1. Configure the sandbox product and public Team plan as described above.
-2. Enable **New Billing** for a new Trial organization with an owner and one active teammate.
-3. Complete workspace onboarding without selecting a plan or entering payment details.
-4. Confirm that the organization remains on Trial with the original trial expiration.
+2. Create a new company with an owner and one active teammate. The company starts on None.
+3. Complete workspace onboarding and select Pay-as-you-go. Confirm that card setup activates that plan.
+4. Confirm that the organization has one signup credit grant.
 5. Open **Settings → Billing → Payment method** as a billing manager.
 6. Confirm that Team starts at two seats and shows the effective plan maximum.
 7. Select three seats. At $20 per seat, confirm a $60 initial estimate and $60 monthly total.
@@ -134,11 +162,14 @@ an example. Use your catalog price for the actual estimates.
 14. Confirm that the stored organization plan is Team and `purchased_seats` equals 3.
 15. Resolve seat usage. Confirm purchased 3, occupied 2, and available 1.
 16. Confirm that stored period dates match the webhook's supplied monthly start and end dates.
-17. Repeat the flow with a separate two-member Trial organization, then abandon checkout before payment.
-18. Confirm that this organization remains on Trial and its purchased capacity and expiration stay unchanged.
+17. Repeat the flow with a separate two-member company, then abandon checkout before payment.
+18. Confirm that this company remains on None and its purchased capacity stays unchanged.
 
-Team checkout sends `allow_discount_codes: false`. Legacy Business checkout omits
-this field.
+Team checkout accepts Polar discount codes. The request omits
+`allow_discount_codes`, so the Polar default applies. Legacy Business checkout
+also omits this field. In-app amounts, previews, and estimates show catalog
+prices, not discounted prices. Manage the eligible products, redemption limits,
+and amounts of a code in Polar.
 
 Each organization has at most one pending subscription checkout. The table
 `organization_billing_checkouts` stores its plan, seat count, and Polar status.
@@ -149,8 +180,10 @@ It fails when they differ. Polar is the only source of an end state:
   creates a new checkout.
 - Polar reports `succeeded`: the request records the state. It reads the
   subscription from Polar before it creates another checkout.
-- A subscription that becomes live for the plan product resolves the pending
-  checkout.
+- A subscription that becomes live resolves the pending checkout only when its
+  `checkout_id` names the Polar checkout of the intent. The product or the
+  seat count alone never resolves an intent. An intent that no subscription
+  names stays pending until the request reads the checkout from Polar.
 - Polar reports `open` or `confirmed`: the checkout stays pending. A past local
   expiry and a closed browser do not cancel it. `confirmed` does not show that
   the payment succeeded.
@@ -162,6 +195,24 @@ It fails when they differ. Polar is the only source of an end state:
 On the first request of an organization without intents, SuperPlane adopts a
 payable Polar checkout that was opened before this table existed. The migration
 creates no rows.
+
+While a checkout can still activate, membership cannot exceed its seat count.
+The claim checks that the seats cover the current members, and invitation
+acceptance checks that one more member still fits. Both run under the
+organization lock. An `ambiguous` or `creating` intent counts as payable.
+Before the lock, acceptance reads the pending checkout from Polar, so a
+verified `expired` or `failed` status releases the restriction. A rejected
+acceptance returns `CHECKOUT_SEAT_LIMIT`, keeps the invitation pending, and
+charges nothing. When Polar cannot answer, the stored restriction stays. For
+an organization with a Polar customer and no intent rows, acceptance first
+looks for a payable checkout from before intents, and it returns
+`BILLING_UNVERIFIED` when Polar cannot answer.
+
+Organization deletion and sole-owner account deletion read the pending
+checkout from Polar first. A checkout that can still activate stops the
+deletion with `ORGANIZATION_CHECKOUT_PENDING`. A paid checkout applies its
+subscription before the subscription check. The deletion transaction checks
+again under the organization lock that no checkout intent is pending.
 
 Checkout creation does not activate a plan or grant capacity. Only subscription
 activation stores the purchased quantity. The monthly total describes purchased
@@ -180,7 +231,7 @@ prorated amount at once and does not change the renewal date. SuperPlane adds
 capacity only from the Polar subscription snapshot that follows a successful
 payment. The $20 monthly seat price below is an example. Use your catalog price.
 
-The API has two routes. Both need `org:update` and **New Billing**:
+The API has two routes. Both need `org:update`:
 
 - `POST /api/v1/organizations/{id}/billing/seats/preview` with `additional_seats`.
   It estimates the charge and makes no change.
@@ -254,148 +305,93 @@ does not remove seats that were added elsewhere.
 
 If Polar does not answer, the purchase has the status `awaiting_confirmation`.
 Capacity does not change. A `subscription.updated` webhook, a billing sync, the
-renewal seat schedule, or the next preview or purchase reads the subscription
-from Polar and settles the purchase.
-Only one purchase can be pending or unconfirmed for an organization at a time.
-A purchase that Polar never applied fails five minutes after it started, when the
-next preview, purchase, or renewal seat schedule checks Polar. The same rule
-applies when Polar reports fewer seats than the target after an outside change.
+reconciliation worker, or the next preview or purchase reads the subscription
+from Polar. Only one purchase can be pending or unconfirmed for an
+organization at a time.
 
-Only a Polar snapshot from the billing period in which the purchase started can
-settle it. After a renewal, the seat count can return to the original count
-because of a scheduled reduction, so it proves nothing. An unconfirmed purchase
-that crosses a renewal stays `awaiting_confirmation` and blocks new purchases
-for the organization. SuperPlane does not retry the charge. A person must check
-the Polar orders of the subscription and set the purchase status by hand.
+SuperPlane records an outcome only from evidence about that purchase:
+
+- The response to the purchase request records success, or the rejection
+  that Polar returned. A success response must name the purchase
+  subscription, the purchase period, and the target seats. Other success
+  responses leave the purchase unconfirmed.
+- A subscription snapshot records success only when all of these are true:
+  it is for the purchase subscription, it is from the billing period in which
+  the purchase started, it has exactly the target seats, and Polar modified
+  the subscription after SuperPlane recorded the purchase.
+- No snapshot records a failure. A snapshot with fewer seats can come from
+  another update, for example a legacy renewal seat schedule that Polar
+  processed before the purchase and that arrived late. The time since the purchase also
+  proves nothing.
+
+A snapshot that proves nothing still updates the capacity. The purchase keeps
+its status. A duplicate, late, or reordered event never changes a recorded
+outcome.
+
+After a renewal, the seat count can return to the original count because of a
+legacy scheduled reduction, so it proves nothing. A purchase that Polar never applied,
+or that crosses a renewal without evidence, stays `awaiting_confirmation` and
+blocks new purchases for the organization. SuperPlane does not retry the
+charge and does not settle the purchase because time passed. The worker
+reports the purchase after one hour. An operator repairs it from Polar
+evidence. See
+[Repair unresolved seat purchases](#repair-unresolved-seat-purchases).
 A purchase from before operation keys has no stored period. Only a snapshot
 whose period started before the purchase can settle it.
+
+An unresolved purchase does not block renewal or reconciliation. SuperPlane
+sends no automatic seat change that the purchase could race. The purchase
+keeps its ID, its operation key, and its unresolved status, and it continues
+to block new purchases.
 
 The table `organization_seat_purchases` is the marker for seat changes that
 SuperPlane started. Use `models.FindExpectedSeatCount` with the current period
 start to tell them from outside changes in Polar.
 
-## Renew only occupied seats
+## Renewal keeps paid seats
 
 Polar renews a subscription with the seat count of the subscription.
-SuperPlane schedules the next-period seat count so that Polar renews only
-occupied seats. The target comes from `entitlements.ResolveRenewalSeats`:
-the number of active human members, owner included, with a minimum of 1,
-and never more than the paid seats (`purchased_seats`). Pending invitations,
-removed members, and service accounts do not count. SuperPlane never
-increases seats automatically.
-
-The target depends only on the paid seats and the members. It does not use
-the payment lock, the admission limits, or the catalog maximum. A payment
-failure can move the plan row to a fallback catalog (None or Trial) that is
-not per seat. The row keeps `purchased_seats`, so the target stays the same.
-A seat-based plan without paid seats (`purchased_seats` missing or 0) is
-invalid. Schedule returns an error for it and sends nothing. Repair the plan
-from Polar.
-
-SuperPlane sends `PATCH /subscriptions/{id}` with
-`{"seats": <target>, "proration_behavior": "next_period"}`. Polar does not
-change the current period. It charges and credits nothing now, and `seats`
-keeps the current count. The subscription shows the scheduled count in
-`pending_update.seats`. The next-period count is `pending_update.seats`, or
-`seats` when no seat change is pending. SuperPlane never sends a target above
-the current `seats`, and never uses `invoice`, `prorate`, or `reset` for this
-request.
+SuperPlane does not change that count automatically. A member removal, an
+invitation acceptance, an account deletion, a purchase preview, a billing
+sync, a resume, and a subscription webhook send no seat change to Polar. Only
+an explicit seat purchase changes the count, and it uses the `invoice`
+proration. Paid seats that no member occupies stay paid and reusable until an
+Admin changes them.
 
 Example: an organization has 10 seats, and the period ends on December 1.
-An admin removes a member on November 10. SuperPlane schedules 9 seats for
-December 1. The freed seat stays usable until December 1. When a member joins
-before December 1, SuperPlane schedules 10 seats again.
+An admin removes a member on November 10. The freed seat stays usable, and
+Polar renews 10 seats on December 1.
 
-`seatrenewal.Schedule` in `pkg/billing/seatrenewal` does the work. It first
-settles or expires an old seat purchase from Polar, so an abandoned purchase
-cannot keep its organization unchecked forever. It then does nothing when one
-of these conditions is true:
+The retired automatic scheduler sent next-period reductions before this
+change. Polar can still hold such a reduction in `pending_update`. SuperPlane
+leaves it unchanged. The columns
+`organization_billing_plans.renewal_seats_scheduled` and
+`renewal_seats_scheduled_at` keep the last count that the retired scheduler
+sent. Nothing writes them now. Legacy cleanup uses them to tell verified
+automatic reductions from schedules that an Admin made.
 
-- The plan is not seat-based: the catalog plan is not per seat and the plan has no purchased seats.
-- Billing is off.
-- An admin assigned the plan.
-- The plan has no Polar subscription.
-- The subscription is `paused` (`subscription_paused`), or it is `unpaid`, `canceled`, `revoked`, or in a different state that does not renew (`subscription_not_active`).
-- The subscription is set to cancel (`subscription_canceling`), also when it is past due.
-- The verified Polar snapshot is not `active` or `past_due`, or it is set to cancel (`polar_subscription_not_active`).
-- A seat purchase is still inside its confirmation window. The purchase
-  replaces any scheduled count when it settles, and SuperPlane schedules the
-  count again after that.
-
-### Past-due subscriptions
-
-Polar keeps a `past_due` subscription and continues to renew it while it
-retries the payment. Schedule therefore keeps the next-period count of an
-`active` or a `past_due` subscription. It sends only the `next_period`
-update, so nothing changes in the current period and Polar charges nothing
-now.
-
-The scheduled count grants no access. Invitations, invitation acceptance,
-and seat purchases stay blocked while the subscription is past due or
-paused. The past-due grace period does not change.
-
-When Polar rejects the update, Schedule returns the error and does not
-store `renewal_seats_scheduled`. The background retry and the
-reconciliation worker log the failure and try again on the next run. When
-the payment recovers, the next run keeps the reduced count.
-
-Schedule holds a per-organization PostgreSQL session advisory lock across the
-local reads, Polar requests, and record write. API processes and workers use
-the same lock. Each schedule reads its target after it acquires this lock, so
-an older job cannot overwrite a newer scheduled target.
-
-Each process admits at most two schedules before it reserves database
-connections. API schedules and reconciliation workers share this limit.
-Other schedules wait without a database connection, and cancellation ends
-that wait. This leaves three connections in the default five-connection pool
-available for foreground requests, even when Polar is slow.
-
-Schedule reads local state under the organization row lock. It releases the
-row lock before it calls Polar. Membership changes do not wait for HTTP.
-After each update, it stores the target in
-`organization_billing_plans.renewal_seats_scheduled` and the send time in
-`renewal_seats_scheduled_at`. Subscription snapshots do not change these
-columns. Outside-change detection can compare them with the Polar count.
-
-These columns record only counts that SuperPlane sent. When Polar already
-renews with the target but the record is missing or names a different count
-(for example, because the record write failed after Polar accepted an
-update), Schedule sends the target again and repairs the record. A matching
-Polar count alone never repairs it. The send is idempotent: Polar keeps the
-current period, and the scheduled count stays the target.
-
-### Live updates
-
-These actions schedule the count after their transaction commits:
-
-- Remove a member (`RemoveUser`).
-- Accept an invitation with the status `joined`. This includes a former member that the invitation restores.
-- Buy seats (`PurchaseSeats`), after SuperPlane applies the Polar snapshot. An
-  `invoice` update replaces the scheduled count, so SuperPlane schedules it again.
-- Recover a successful seat purchase through a subscription webhook, billing
-  sync, or purchase reconciliation. After the settlement commits, SuperPlane
-  schedules the count again. A lost purchase response does not leave the
-  reduction dependent on the next worker pass.
-
-After a successful subscription apply or sync, SuperPlane checks the latest
-purchase. A succeeded purchase starts a background schedule. Duplicate
-snapshots can start another schedule, but an unchanged provider count and
-stored record require no update.
-
-The update runs in the background. The action does not wait for Polar and does
-not fail because of Polar. The update tries 3 times in about 10 seconds when
-Polar rate-limits the request, reports `SubscriptionLocked`, or does not answer.
-The worker fixes other failures.
+Member removal and account deletion never call Polar, so they work while
+Polar is unavailable.
 
 ### Reconciliation worker
 
 `SeatRenewalSyncWorker` runs when `START_SEAT_RENEWAL_SYNC_WORKER=yes`. Every 5
 minutes it checks each organization on a seat-based Polar subscription that
 is not canceled or revoked. Organizations with the earliest `current_period_end`
-go first. The worker uses `seatrenewal.Schedule`, so the same rules apply. It
-fixes counts after a Polar outage, a lost update, a race between a purchase and
-a removal, and membership changes without a live update, such as account
-deletion.
+go first. `seatrenewal.Reconcile` in `pkg/billing/seatrenewal` does the work.
+It only reads Polar:
+
+1. It settles an old seat purchase when a Polar snapshot proves its success.
+   When Polar cannot return the subscription of a purchase on a different
+   subscription than the stored plan, for example a replaced subscription, it
+   writes `billing.seat_purchase_reconcile_failed` (warning) and continues
+   with the current subscription.
+2. It reads the stored Polar subscription and applies it. This repairs a
+   missed renewal, payment failure, or recovery. Polar is the source of truth
+   for the paid seats, the status, and the period. The apply ignores a
+   snapshot that is older than the stored plan.
+
+An admin plan and a plan without a Polar subscription need no Polar request.
 
 When Polar rate-limits a request, the run stops and keeps its position. The
 next run continues at the organization where the rate limit stopped it, so a
@@ -403,17 +399,39 @@ request budget smaller than the list cannot keep later organizations
 unchecked. A run that reaches the end of the list clears the position, and the
 next run starts again with the organizations that renew first.
 
-The worker writes these log entries. Each entry has `organization_id`,
-`polar_subscription_id`, `renewal_target_seats`, `next_period_seats`, and
-`current_seats` when they are known.
+The worker writes this log entry. It has `organization_id`,
+`polar_subscription_id`, and `current_seats` when they are known.
 
-- `billing.seat_renewal_mismatch_fixed` (warning): the worker found a different next-period count and scheduled the target.
-- `billing.seat_renewal_sync_failed` (error): a fix failed, and the period ends in 24 hours or less.
+- `billing.seat_renewal_sync_failed` (error): a reconciliation failed, and the
+  period ends in 24 hours or less. Earlier failures are warnings, and the next
+  run tries again.
 
-### Sandbox checks (run before merge)
+At the start of each run, before it reads the candidate list, the worker also
+reports each purchase that stayed `pending` or `unknown` for more than one
+hour. The report covers all organizations that are not deleted, also
+organizations that the candidate list excludes. A failure in the report does
+not stop the reconciliation, and a failure in the reconciliation does not
+stop the report. The report changes no purchase.
 
-A person must do these checks in the Polar sandbox before merge. Record each
-observed result here. Until then, each result is pending. To watch a renewal
+- `billing.seat_purchase_unresolved` (error): one entry for each unresolved
+  purchase on each run. See
+  [Repair unresolved seat purchases](#repair-unresolved-seat-purchases).
+
+### Capacity alerts and transactions
+
+The over-capacity lines describe committed state only. A subscription apply
+that runs in its own transaction writes its lines after the commit. A caller
+that applies a snapshot inside its own transaction, for example the seat
+purchase settlement, gets the staged transitions and writes them after its
+commit. A rollback, a failed commit, or the end of a nested transaction
+writes nothing. A replay of an unchanged state writes nothing.
+
+### Sandbox checks for manual removal and legacy cleanup
+
+SuperPlane does not send these requests now. Manual seat removal and legacy
+cleanup will send them. A person must do these checks in the Polar sandbox
+before that work ships. Record each observed result here. Until then, each
+result is pending. To watch a renewal
 soon, move the period end a few minutes ahead with `PATCH /v1/subscriptions/{id}`
 and `{"current_billing_period_end": "<time>"}`.
 
@@ -425,7 +443,7 @@ and `{"current_billing_period_end": "<time>"}`.
    - Observed result: pending.
 2. Shape of `pending_update`.
    - Step: schedule a reduction. Read the PATCH response, `GET /v1/subscriptions/{id}`, and the `subscription.updated` webhook.
-   - Expected result: each one has `pending_update` with `seats` (integer) and `applies_at` (date-time), as `SubscriptionPendingUpdate` parses it.
+   - Expected result: each one has `pending_update` with `seats` (integer) and `applies_at` (date-time).
    - Observed result: pending.
 3. Renewal after a scheduled reduction.
    - Step: schedule a reduction from 10 to 9 seats. Move the period end a few minutes ahead and wait for `subscription.cycled`.
@@ -459,11 +477,12 @@ Polar and never buys seats.
 
 ### Causes
 
-- **Checkout race.** Members join on the old plan while a Team checkout is open.
-  The activation snapshot then has fewer seats than members. The log cause is
-  `activation`.
-- **Renewal after a late join.** A member joins before renewal and the renewal
-  keeps the older seat count. The log cause is `cycle`.
+- **Activation below the members.** A checkout cannot admit more members than
+  its seats while it can still activate, but a checkout from before these
+  rules can. The activation snapshot then has fewer seats than members. The
+  log cause is `activation`.
+- **Renewal with a legacy reduction.** A reduction that the retired automatic
+  scheduler left in Polar applies at renewal. The log cause is `cycle`.
 - **Outside reduction.** Someone lowers the seats in the Polar dashboard. The log
   cause is `update`.
 - **Recovery from past due.** The payment recovers while members exceed seats. The
@@ -500,6 +519,144 @@ jsonPayload.component="billing.seats" AND jsonPayload.message="billing.seats_ove
 Renewal never adds seats automatically. The renewal keeps the seats that Polar
 holds. Until someone buys seats or removes members, the organization stays over
 capacity and admission stays blocked.
+
+## Repair unresolved seat purchases
+
+A seat purchase is unresolved when its row in `organization_seat_purchases`
+has the status `pending` or `unknown`. The API shows both as
+`awaiting_confirmation`. A purchase with a lost response stays unresolved
+when no evidence proves its success: for example, Polar did not apply it, or
+it crossed a renewal. No subscription snapshot can record a failure.
+SuperPlane never settles a purchase because time passed and never repeats a
+charge. An operator settles it from Polar evidence.
+
+An unresolved purchase blocks new purchases for the organization until it is
+repaired. It does not block renewal or reconciliation.
+
+### Detection and alerting
+
+- **Detection threshold:** 1 hour after the purchase `created_at`.
+- **Signal:** `SeatRenewalSyncWorker` writes the Error log
+  `billing.seat_purchase_unresolved` on every run (every 5 minutes) while the
+  purchase stays unresolved. The worker keeps no state, so the signal
+  continues after a restart.
+- **Alert owner:** the SuperPlane billing on-call engineer.
+- **Routing:** a log-based alert policy with severity Error sends the alert
+  to the billing on-call notification channel. Task 16 binds the concrete
+  channel to the policy and runs the drill before gate G13 sign-off.
+- **Duplicate suppression:** the alert policy opens one incident for each
+  `seat_purchase_id`. It uses a notification rate limit, and it closes the
+  incident when the line stops.
+
+With `LOG_FORMAT=json`, find the signal in Cloud Logging with this query:
+
+```text
+jsonPayload.message="billing.seat_purchase_unresolved"
+```
+
+Do not filter only on `jsonPayload.component="billing.seats"`. This line does
+not use that component.
+
+Each line has these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `organization_id` | The organization of the purchase. |
+| `seat_purchase_id` | The ID of the purchase row. |
+| `operation_key` | The operation key of the purchase. Purchases from before operation keys do not have it. |
+| `seat_purchase_status` | `pending` or `unknown`. |
+| `polar_subscription_id` | The Polar subscription of the purchase. |
+| `current_polar_subscription_id` | The subscription of the stored plan. |
+| `current_period_start` | The period start of the stored plan. |
+| `purchase_period_start`, `purchase_period_end` | The billing period of the purchase. Purchases from before operation keys do not have them. |
+| `age_seconds` | The time since the purchase started. |
+
+### Collect the evidence
+
+Read the purchase row:
+
+```sql
+SELECT id, organization_id, polar_subscription_id, from_seats, to_seats,
+       status, error_code, operation_key, period_start, period_end,
+       created_at, updated_at
+FROM organization_seat_purchases
+WHERE id = '<seat_purchase_id>';
+```
+
+In the correct Polar environment, collect this evidence for the purchase
+subscription (`polar_subscription_id`), not for the current subscription:
+
+1. The orders and invoices of the subscription that Polar created from the
+   purchase `created_at` through the confirmation window, five minutes later.
+2. An order for `to_seats - from_seats` seats with a proration charge, and its
+   payment status.
+3. The seats of the subscription in the purchase period, from
+   `purchase_period_start` to `purchase_period_end`.
+
+Use the evidence to select one outcome:
+
+| Evidence | Outcome |
+| --- | --- |
+| A paid order for `to_seats - from_seats` seats with a proration charge, and the subscription had `to_seats` seats or more in the purchase period. | `succeeded` with an empty error code. |
+| No order or invoice in the window, and the subscription never had `to_seats` seats in the purchase period. | `failed` with the error code `not_applied`. |
+| Any other result, for example an unpaid or refunded order, a missing period, or seat counts that do not agree with the orders. | Insufficient evidence. Do not repair. |
+
+### Repair the purchase
+
+Do these steps only when the evidence selects `succeeded` or `failed`.
+
+1. Open an incident ticket. Attach the evidence before you change the row.
+2. Run one guarded update for the outcome. The status condition makes sure
+   that the update does not overwrite an outcome that SuperPlane recorded
+   after you read the row.
+
+   For a purchase that succeeded:
+
+   ```sql
+   UPDATE organization_seat_purchases
+   SET status = 'succeeded', error_code = '', updated_at = now()
+   WHERE id = '<seat_purchase_id>' AND status IN ('pending', 'unknown');
+   ```
+
+   For a purchase that Polar did not apply:
+
+   ```sql
+   UPDATE organization_seat_purchases
+   SET status = 'failed', error_code = 'not_applied', updated_at = now()
+   WHERE id = '<seat_purchase_id>' AND status IN ('pending', 'unknown');
+   ```
+
+3. Confirm that the update changed exactly one row. If it changed no row, read
+   the row again. SuperPlane settled it, so do not run another update.
+4. Do not send a request to Polar. The repair does not charge, refund, or
+   change seats. Seat capacity changes only from a Polar snapshot.
+
+### Record the audit trail
+
+Record these items in the incident ticket:
+
+- The `seat_purchase_id` and the organization ID.
+- The Polar order ID or invoice ID that is the evidence, or a statement that
+  no order exists in the window.
+- The operator and the time of the update.
+- The status and error code before and after the update.
+- Links to the Polar orders, invoices, and subscription.
+
+### Verify the repair
+
+1. Sync organization billing. Confirm the plan, the purchased seats, and the
+   period from Polar.
+2. Confirm that `billing.seat_purchase_unresolved` stops for the
+   `seat_purchase_id` after the next worker run.
+3. Confirm that a new purchase is allowed: the seat purchase preview for the
+   organization succeeds.
+
+### Insufficient evidence
+
+When the evidence does not prove one outcome, leave the status unresolved.
+Escalate the incident to the billing on-call owner with the evidence that you
+collected. Do not set a status to clear the block. A repair never repeats a
+charge, and SuperPlane never retries a charge for an unresolved purchase.
 
 ## Resolve subscription identity conflicts
 

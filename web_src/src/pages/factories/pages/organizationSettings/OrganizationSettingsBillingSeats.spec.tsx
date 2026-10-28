@@ -16,16 +16,16 @@ let canManageBilling = true;
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: (resource: string, action: string) => resource !== "org" || action !== "update" || canManageBilling,
+    hasPermission: (resource: string, action: string) => resource !== "org" || action !== "update" || canManageBilling,
     isLoading: false,
   }),
 }));
 
-function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse, newBilling = false) {
+function renderBilling(billing: OrganizationsDescribeOrganizationBillingResponse, buySeats = false) {
   return render(
     <FactoriesHarness
-      experimentalFeatures={newBilling ? ["new_billing"] : []}
       pathSuffix={
-        "workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing" + (newBilling ? "?buySeats=1" : "")
+        "workspaces/" + PRIMARY_FACTORY_KEY + "/settings/organization/billing" + (buySeats ? "?buySeats=1" : "")
       }
       factoriesFixture={{ ...defaultFactoriesFixture, organizationBilling: billing }}
     />,
@@ -194,38 +194,112 @@ describe("Organization billing seats", () => {
     { name: "billing off", billing: { ...TEAM_ORGANIZATION_BILLING, billingEnabled: false } },
   ])("hides seats for $name", async ({ billing }) => {
     renderBilling(billing);
-    await screen.findByTestId("billing-plans");
+    await screen.findByTestId("billing-credit-balance");
     expect(screen.queryByTestId("billing-seats")).not.toBeInTheDocument();
   });
 
-  it.each([
-    { name: "past due after the grace period", status: "past_due", planPerSeat: false },
-    { name: "past due during the grace period", status: "past_due", planPerSeat: true },
-    { name: "paused", status: "paused", planPerSeat: true },
-  ])("keeps a seats summary and blocks new members while $name", async ({ status, planPerSeat }) => {
-    renderBilling(
-      {
-        ...TEAM_ORGANIZATION_BILLING,
-        polarSubscriptionStatus: status,
-        planPerSeat,
-        purchasedSeats: 8,
-        availableSeats: undefined,
-        planMaximumSeats: undefined,
-        purchasableSeats: undefined,
+  describe("while payment is blocked", () => {
+    // After the fallback, the plan row is on the access plan. The renewal
+    // estimate still uses the paid seat price from the server.
+    const pastDue = {
+      ...TEAM_ORGANIZATION_BILLING,
+      polarSubscriptionStatus: "past_due",
+      planPerSeat: false,
+      planPriceCents: "0",
+      availableSeats: undefined,
+      planMaximumSeats: undefined,
+      purchasableSeats: undefined,
+      currentMonthlyTotalCents: undefined,
+    };
+    const date = new Date(ACTIVE_BILLING_PERIOD_ENDS_AT).toLocaleDateString();
+
+    function expectNoSeatPurchase() {
+      expect(screen.queryByRole("button", { name: "Buy seats" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument();
+    }
+
+    it.each([
+      { name: "during the grace period", planPerSeat: true },
+      { name: "after the grace period", planPerSeat: false },
+    ])("shows the renewal and blocks new members $name", async ({ planPerSeat }) => {
+      renderBilling({ ...pastDue, planPerSeat }, true);
+      const card = await screen.findByTestId("billing-seats");
+      expect(card).toHaveTextContent("9 of 10 seats used");
+      expect(card).toHaveTextContent("No one can join until the payment is updated.");
+      expect(detail(card, "Next renewal")).toHaveTextContent(date);
+      expect(detail(card, "Expected renewal")).toHaveTextContent(
+        "9 seats, $261.00 on " + date + ", based on current members.",
+      );
+      expect(within(card).queryByRole("status")).not.toBeInTheDocument();
+      expectNoSeatPurchase();
+    });
+
+    it("shows an unavailable amount and date instead of zero", async () => {
+      renderBilling({ ...pastDue, expectedRenewalCents: undefined, currentPeriodEnd: undefined }, true);
+      const card = await screen.findByTestId("billing-seats");
+      expect(detail(card, "Next renewal")).toHaveTextContent("Not available");
+      expect(detail(card, "Expected renewal")).toHaveTextContent("9 seats, Not available, based on current members.");
+      expect(card).not.toHaveTextContent("$0.00");
+    });
+
+    it("shows the repair text without paid seats", async () => {
+      renderBilling({
+        ...pastDue,
+        purchasedSeats: 0,
         expectedRenewalSeats: undefined,
-        currentMonthlyTotalCents: undefined,
         expectedRenewalCents: undefined,
+      });
+      const card = await screen.findByTestId("billing-seats");
+      expect(detail(card, "Expected renewal")).toHaveTextContent(
+        "Not available. The paid seat count needs repair. Contact support.",
+      );
+      expect(detail(card, "Expected renewal")).not.toHaveTextContent("seats,");
+    });
+
+    it.each([true, false])(
+      "shows members above the paid seats with payment recovery steps (can manage billing: %s)",
+      async (canManage) => {
+        canManageBilling = canManage;
+        renderBilling(
+          { ...pastDue, purchasedSeats: 1, occupiedSeats: 3, expectedRenewalSeats: 1, expectedRenewalCents: "2900" },
+          true,
+        );
+        const card = await screen.findByTestId("billing-seats");
+        expect(within(card).getByRole("status")).toHaveTextContent(
+          canManage
+            ? "3 members, 1 paid seat. Update the payment method before you add seats or members."
+            : "Ask an organization admin to update the payment.",
+        );
+        expect(card).not.toHaveTextContent("Buy seats");
+        expect(within(card).getByTestId("billing-seats-renewal-cap")).toHaveTextContent(
+          "Renewal bills 1 paid seat. Renewal does not add seats.",
+        );
+        expect(detail(card, "Expected renewal")).toHaveTextContent("1 seat, $29.00 on " + date);
+        expectNoSeatPurchase();
       },
-      true,
     );
-    const card = await screen.findByTestId("billing-seats");
-    expect(card).toHaveTextContent("9 of 8 seats used");
-    expect(card).toHaveTextContent("No one can join until the payment is updated.");
-    expect(within(card).queryByRole("status")).not.toBeInTheDocument();
-    expect(within(card).queryByText("Expected renewal")).not.toBeInTheDocument();
-    expect(within(card).queryByText("Not available", { selector: "dd" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Buy seats" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument();
+
+    it("shows only a conditional estimate without a date while paused", async () => {
+      renderBilling({ ...pastDue, polarSubscriptionStatus: "paused" }, true);
+      const card = await screen.findByTestId("billing-seats");
+      expect(card).toHaveTextContent("No one can join until the payment is updated.");
+      expect(detail(card, "Renewal estimate if the subscription resumes")).toHaveTextContent(
+        "9 seats, $261.00, based on current members.",
+      );
+      expect(within(card).queryByText("Expected renewal")).not.toBeInTheDocument();
+      expect(within(card).queryByText("Next renewal")).not.toBeInTheDocument();
+      expect(card).not.toHaveTextContent(date);
+      expectNoSeatPurchase();
+    });
+
+    it("shows only a conditional estimate when the subscription is set to end", async () => {
+      renderBilling({ ...pastDue, cancelAtPeriodEnd: true }, true);
+      const card = await screen.findByTestId("billing-seats");
+      expect(detail(card, "Subscription ends")).toHaveTextContent(date);
+      expect(detail(card, "Renewal estimate if you keep the subscription")).toHaveTextContent("9 seats, $261.00 on ");
+      expect(within(card).queryByText("Expected renewal")).not.toBeInTheDocument();
+      expectNoSeatPurchase();
+    });
   });
 
   it("shows a conditional estimate after cancellation and normal copy after resuming", async () => {

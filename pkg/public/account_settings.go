@@ -16,14 +16,12 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/billing/polar"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 const maxAccountNameLength = 80
@@ -60,8 +58,8 @@ func (s *Server) updateAccount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if hasActiveImpersonation(r) {
-		http.Error(w, "Account updates are not allowed while impersonating", http.StatusForbidden)
+	if hasActiveSupportSession(r) {
+		http.Error(w, "Account updates are not allowed in a read-only support session", http.StatusForbidden)
 		return
 	}
 
@@ -130,8 +128,8 @@ func (s *Server) disconnectAccountProvider(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if hasActiveImpersonation(r) {
-		http.Error(w, "Sign-in methods cannot change while impersonating", http.StatusForbidden)
+	if hasActiveSupportSession(r) {
+		http.Error(w, "Sign-in methods cannot change in a read-only support session", http.StatusForbidden)
 		return
 	}
 
@@ -167,8 +165,8 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if hasActiveImpersonation(r) {
-		http.Error(w, "Account deletion is not allowed while impersonating", http.StatusForbidden)
+	if hasActiveSupportSession(r) {
+		http.Error(w, "Account deletion is not allowed in a read-only support session", http.StatusForbidden)
 		return
 	}
 
@@ -189,17 +187,22 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = s.softDeleteAccount(r.Context(), account)
-	if errors.Is(err, models.ErrOrganizationSubscriptionLive) {
+	if errors.Is(err, billing.ErrOrganizationSubscriptionLive) {
 		log.WithError(err).WithField("account_id", account.ID.String()).Info("account deletion blocked by a live subscription")
-		http.Error(w, models.ErrOrganizationSubscriptionLive.Error(), http.StatusConflict)
+		http.Error(w, billing.ErrOrganizationSubscriptionLive.Error(), http.StatusConflict)
 		return
 	}
-	if errors.Is(err, models.ErrOrganizationSubscriptionUnverified) {
+	if errors.Is(err, billing.ErrOrganizationCheckoutPending) {
+		log.WithError(err).WithField("account_id", account.ID.String()).Info("account deletion blocked by a pending checkout")
+		http.Error(w, billing.ErrOrganizationCheckoutPending.Error(), http.StatusConflict)
+		return
+	}
+	if errors.Is(err, billing.ErrOrganizationSubscriptionUnverified) {
 		log.WithError(err).WithField("account_id", account.ID.String()).Warn("account deletion could not verify subscription termination")
-		http.Error(w, models.ErrOrganizationSubscriptionUnverified.Error(), http.StatusServiceUnavailable)
+		http.Error(w, billing.ErrOrganizationSubscriptionUnverified.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	if errors.Is(err, models.ErrBillingPlanChanged) {
+	if errors.Is(err, billing.ErrBillingPlanChanged) {
 		log.WithField("account_id", account.ID.String()).Info("account deletion stopped by a billing change")
 		http.Error(w, "The billing record changed during deletion. Try again.", http.StatusConflict)
 		return
@@ -220,6 +223,11 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 
 // softDeleteAccount deletes the account and every organization where it is
 // the only owner. It returns the organizations that were deleted.
+//
+// The account row lock comes first, before any organization lock. Invitation
+// acceptance takes the locks in the same order, so the two never deadlock and
+// one of them always sees the result of the other. Membership, grants, and
+// capacity change in one transaction, and no Polar call holds a lock.
 func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account) ([]models.Organization, error) {
 	// Ask Polar before the transaction: the requests must not hold the
 	// organization locks. An organization that becomes sole-owner after this
@@ -229,16 +237,17 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 		return nil, err
 	}
 
-	var users []models.User
 	var deletedOrganizations []models.Organization
-	var survivingOrganizations []uuid.UUID
-	var capacityChecks []polar.SeatCapacityCheck
+	var capacityAlerts billing.CapacityAlerts
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(account, "id = ?", account.ID).Error; err != nil {
+		locked, err := models.LockAccount(tx, account.ID)
+		if err != nil {
 			return err
 		}
-		var err error
-		users, err = models.ListActiveHumanUsersForAccount(tx, account.ID)
+		*account = *locked
+		// A membership that an acceptance committed before this lock is in
+		// the list, so the deletion removes it too.
+		users, err := models.ListActiveHumanUsersForAccount(tx, account.ID)
 		if err != nil {
 			return err
 		}
@@ -249,40 +258,34 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 		if err != nil {
 			return err
 		}
+		// SoftDelete locks all affected organizations in ID order. Keep
+		// those locks before removing grants, as member removal does.
 		if err := account.SoftDelete(tx, time.Now(), clearances); err != nil {
 			return err
 		}
-		survivingOrganizations = survivingOrganizationIDs(users, deletedOrganizations)
-		capacityChecks, err = recheckSeatCapacityAfterAccountDeletion(tx, survivingOrganizations)
+		if err := s.removeAccountOrganizationGrants(tx, users); err != nil {
+			return err
+		}
+		capacityAlerts, err = recheckSeatCapacityAfterAccountDeletion(tx, survivingOrganizationIDs(users, deletedOrganizations))
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	for _, check := range capacityChecks {
-		check.Log()
-	}
-	// Each surviving organization lost a human member, so its renewal seat
-	// count can go down. Schedule only after the commit, outside the locks.
-	for _, organizationID := range survivingOrganizations {
-		seatrenewal.ScheduleAsync(ctx, organizationID)
-	}
-
-	if err := s.removeAccountOrganizationRoles(ctx, users); err != nil {
-		log.Errorf("Error removing organization roles for deleted account %s: %v", account.ID, err)
-	}
-
+	// The alerts describe committed state only. Each surviving organization
+	// keeps its paid seats: account deletion never changes a Polar seat count.
+	capacityAlerts.Emit()
 	return deletedOrganizations, nil
 }
 
-func verifyAccountOrganizationDeletions(ctx context.Context, account *models.Account) (map[uuid.UUID]*models.OrganizationDeletionClearance, error) {
+func verifyAccountOrganizationDeletions(ctx context.Context, account *models.Account) (map[uuid.UUID]billing.DeletionGuard, error) {
 	pending, err := models.ListOrganizationsPendingAccountDeletion(database.DB(ctx), account.ID)
 	if err != nil {
 		return nil, err
 	}
-	clearances := make(map[uuid.UUID]*models.OrganizationDeletionClearance, len(pending))
+	clearances := make(map[uuid.UUID]billing.DeletionGuard, len(pending))
 	for _, organization := range pending {
-		clearance, err := polar.VerifyOrganizationDeletion(ctx, organization.ID)
+		clearance, err := billing.PrepareDeletion(ctx, organization.ID)
 		if err != nil {
 			return nil, fmt.Errorf("organization %s: %w", organization.ID, err)
 		}
@@ -293,10 +296,10 @@ func verifyAccountOrganizationDeletions(ctx context.Context, account *models.Acc
 
 // recheckSeatCapacityAfterAccountDeletion updates the over-capacity record of
 // each organization that keeps running after the account left it.
-func recheckSeatCapacityAfterAccountDeletion(tx *gorm.DB, organizationIDs []uuid.UUID) ([]polar.SeatCapacityCheck, error) {
-	checks := make([]polar.SeatCapacityCheck, 0, len(organizationIDs))
+func recheckSeatCapacityAfterAccountDeletion(tx *gorm.DB, organizationIDs []uuid.UUID) (billing.CapacityAlerts, error) {
+	checks := make(billing.CapacityAlerts, 0, len(organizationIDs))
 	for _, organizationID := range organizationIDs {
-		check, err := polar.RecheckSeatCapacity(tx, organizationID, polar.SeatCapacityCauseAccountDeleted)
+		check, err := billing.RecheckSeatCapacity(tx, organizationID, "account_deletion")
 		if err != nil {
 			return nil, err
 		}
@@ -339,16 +342,13 @@ func (s *Server) refuseAccountDeleteGuards(tx *gorm.DB, account *models.Account)
 	return nil
 }
 
-func (s *Server) removeAccountOrganizationRoles(ctx context.Context, users []models.User) error {
+// removeAccountOrganizationGrants removes the direct roles and the group
+// memberships of each membership in the deletion transaction, so a deleted
+// account keeps no organization authority.
+func (s *Server) removeAccountOrganizationGrants(tx *gorm.DB, users []models.User) error {
 	for _, user := range users {
-		roles, err := s.authService.GetUserRolesForOrg(ctx, user.ID.String(), user.OrganizationID.String())
-		if err != nil {
-			return err
-		}
-		for _, role := range roles {
-			if err := s.authService.RemoveRole(user.ID.String(), role.Name, user.OrganizationID.String(), models.DomainTypeOrganization); err != nil {
-				return err
-			}
+		if err := s.authService.RemoveUserFromOrganizationInTransaction(tx, user.ID.String(), user.OrganizationID.String()); err != nil {
+			return fmt.Errorf("remove organization grants of user %s: %w", user.ID, err)
 		}
 	}
 	return nil

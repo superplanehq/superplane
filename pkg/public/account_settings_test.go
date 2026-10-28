@@ -15,16 +15,16 @@ import (
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/ee/billing/testsupport/polarfake"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/billing/seatrenewal"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-	"github.com/superplanehq/superplane/test/support/polarfake"
 	"gorm.io/gorm"
 )
 
@@ -324,9 +324,9 @@ func TestDeleteAccount_LeavesCreatedOrgWhenOtherOwnerRemains(t *testing.T) {
 	otherUser, err := models.CreateUserInTransaction(database.Conn(), r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
 	require.NoError(t, err)
 	require.NoError(t, models.SetUserIsOwner(database.Conn(), otherUser.ID, true))
-	require.NoError(t, models.BindLegacyBillingProduct(database.Conn(), "prod_business"))
-	_, err = models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
-		ID: "sub_other_owner", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive,
+	require.NoError(t, billingmodels.BindLegacyBillingProduct(database.Conn(), "prod_business"))
+	_, err = billingmodels.ApplyPolarSubscription(database.Conn(), r.Organization.ID, billingmodels.PolarSubscriptionApply{
+		ID: "sub_other_owner", ProductID: "prod_business", Status: billingmodels.PolarSubscriptionStatusActive,
 	}, nil)
 	require.NoError(t, err)
 
@@ -366,11 +366,11 @@ func TestDeleteAccount_ResolvesSeatsOverCapacityInRemainingOrganization(t *testi
 	require.NoError(t, models.SetUserIsOwner(db, otherUser.ID, true))
 
 	product := "prod_team_" + uuid.NewString()
-	team := models.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: new(50), PriceCents: 2000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
-	require.NoError(t, models.SaveBillingPlan(db, &team))
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
-		"plan_id": team.ID, "plan": team.Key, "plan_source": models.BillingPlanSourcePolar,
-		"polar_subscription_id": "sub_" + uuid.NewString(), "polar_subscription_status": models.PolarSubscriptionStatusActive,
+	team := billingmodels.BillingPlan{Key: "team_" + uuid.NewString()[:8], Name: "Team", Category: "paid", Visibility: "public", PerSeat: true, SeatLimit: new(50), PriceCents: 2000, PolarProductID: &product, CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &team))
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Updates(map[string]any{
+		"plan_id": team.ID, "plan": team.Key, "plan_source": billingmodels.BillingPlanSourcePolar,
+		"polar_subscription_id": "sub_" + uuid.NewString(), "polar_subscription_status": billingmodels.PolarSubscriptionStatusActive,
 		"purchased_seats": 1, "over_capacity_since": time.Now().Add(-time.Hour),
 	}).Error)
 
@@ -399,13 +399,13 @@ func TestDeleteAccount_ResolvesSeatsOverCapacityInRemainingOrganization(t *testi
 	assert.Equal(t, "account_deletion", resolved[0].Data["cause"])
 	assert.Equal(t, r.Organization.ID.String(), resolved[0].Data["organization_id"])
 	assert.Equal(t, 1, resolved[0].Data["occupied"])
-	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	plan, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Nil(t, plan.OverCapacitySince)
 }
 
 func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) {
-	for _, status := range []string{models.PolarSubscriptionStatusActive, models.PolarSubscriptionStatusPaused} {
+	for _, status := range []string{billingmodels.PolarSubscriptionStatusActive, billingmodels.PolarSubscriptionStatusPaused} {
 		t.Run(status, func(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
@@ -417,8 +417,8 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 			if second.ID.String() > protected.ID.String() {
 				protected = second
 			}
-			require.NoError(t, models.BindLegacyBillingProduct(db, "prod_business"))
-			_, err := models.ApplyPolarSubscription(db, protected.ID, models.PolarSubscriptionApply{
+			require.NoError(t, billingmodels.BindLegacyBillingProduct(db, "prod_business"))
+			_, err := billingmodels.ApplyPolarSubscription(db, protected.ID, billingmodels.PolarSubscriptionApply{
 				ID: "sub_account_delete", ProductID: "prod_business", Status: status,
 			}, nil)
 			require.NoError(t, err)
@@ -433,7 +433,7 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 			require.NoError(t, err)
 			beforeProviders, err := account.GetAccountProviders(db)
 			require.NoError(t, err)
-			beforePlan, err := models.FindOrganizationBillingPlan(db, protected.ID)
+			beforePlan, err := billingmodels.FindOrganizationBillingPlan(db, protected.ID)
 			require.NoError(t, err)
 			body, err := json.Marshal(map[string]string{"email": account.Email})
 			require.NoError(t, err)
@@ -457,7 +457,7 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 			afterProviders, err := account.GetAccountProviders(db)
 			require.NoError(t, err)
 			assert.ElementsMatch(t, beforeProviders, afterProviders)
-			afterPlan, err := models.FindOrganizationBillingPlan(db, protected.ID)
+			afterPlan, err := billingmodels.FindOrganizationBillingPlan(db, protected.ID)
 			require.NoError(t, err)
 			assert.Equal(t, beforePlan, afterPlan)
 			for _, organization := range []*models.Organization{r.Organization, second} {
@@ -466,8 +466,8 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 				assert.False(t, stored.DeletedAt.Valid)
 			}
 
-			_, err = models.ApplyPolarSubscription(db, protected.ID, models.PolarSubscriptionApply{
-				ID: "sub_account_delete", ProductID: "prod_business", Status: models.PolarSubscriptionStatusCanceled,
+			_, err = billingmodels.ApplyPolarSubscription(db, protected.ID, billingmodels.PolarSubscriptionApply{
+				ID: "sub_account_delete", ProductID: "prod_business", Status: billingmodels.PolarSubscriptionStatusCanceled,
 			}, nil)
 			require.NoError(t, err)
 			require.Equal(t, http.StatusNoContent, deleteAccount().Code)
@@ -487,11 +487,11 @@ func TestDeleteAccount_AsksPolarAboutElapsedScheduledCancellation(t *testing.T) 
 		r := support.Setup(t)
 		db := database.DB(t.Context())
 		require.NoError(t, db.Model(r.Account).Update("installation_admin", false).Error)
-		require.NoError(t, models.BindLegacyBillingProduct(db, "prod_business"))
+		require.NoError(t, billingmodels.BindLegacyBillingProduct(db, "prod_business"))
 		end := time.Now().Add(-time.Hour)
 		start := end.AddDate(0, -1, 0)
-		_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
-			ID: "sub_elapsed", ProductID: "prod_business", Status: models.PolarSubscriptionStatusActive,
+		_, err := billingmodels.ApplyPolarSubscription(db, r.Organization.ID, billingmodels.PolarSubscriptionApply{
+			ID: "sub_elapsed", ProductID: "prod_business", Status: billingmodels.PolarSubscriptionStatusActive,
 			PeriodStart: &start, PeriodEnd: &end, CancelAtPeriodEnd: true,
 		}, nil)
 		require.NoError(t, err)
@@ -536,7 +536,7 @@ func TestDeleteAccount_AsksPolarAboutElapsedScheduledCancellation(t *testing.T) 
 		res := deleteAccount()
 
 		require.Equal(t, http.StatusServiceUnavailable, res.Code)
-		assert.Contains(t, res.Body.String(), models.ErrOrganizationSubscriptionUnverified.Error())
+		assert.Contains(t, res.Body.String(), billing.ErrOrganizationSubscriptionUnverified.Error())
 		requireAccountAndOrganizationKept(t, r)
 	})
 
@@ -794,15 +794,13 @@ func newAccountDeletionRenewalFixture(t *testing.T) *accountDeletionRenewalFixtu
 	t.Helper()
 	r := support.Setup(t)
 	t.Cleanup(r.Close)
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	require.NoError(t, db.Model(r.Account).Update("installation_admin", false).Error)
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
 	addOrganizationMember(t, r.Organization.ID, true)
 	addOrganizationMember(t, r.Organization.ID, false)
 
 	provider := polarfake.NewServer(t)
-	t.Cleanup(seatrenewal.Wait)
 	// Five paid seats, three members, and a renewal in one hour.
 	sub := provider.AddSeatPlan(db, r.Organization.ID, 5, time.Now().Add(time.Hour))
 	return &accountDeletionRenewalFixture{r: r, provider: provider, sub: sub}
@@ -826,43 +824,28 @@ func (f *accountDeletionRenewalFixture) deleteAccount(t *testing.T) *httptest.Re
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 	res := httptest.NewRecorder()
 	server.Router.ServeHTTP(res, req)
-	seatrenewal.Wait()
 	return res
 }
 
-func (f *accountDeletionRenewalFixture) plan(t *testing.T) *models.OrganizationBillingPlan {
+func (f *accountDeletionRenewalFixture) plan(t *testing.T) *billingmodels.OrganizationBillingPlan {
 	t.Helper()
-	plan, err := models.FindOrganizationBillingPlan(database.Conn(), f.r.Organization.ID)
+	plan, err := billingmodels.FindOrganizationBillingPlan(database.Conn(), f.r.Organization.ID)
 	require.NoError(t, err)
 	return plan
 }
 
-func requestsFor(requests []polarfake.Request, subscriptionID string) []polarfake.Request {
-	var matching []polarfake.Request
-	for _, request := range requests {
-		if request.SubscriptionID == subscriptionID {
-			matching = append(matching, request)
-		}
-	}
-	return matching
-}
-
-func TestDeleteAccount_SchedulesRenewalForSurvivingOrganization(t *testing.T) {
+func TestDeleteAccount_KeepsThePaidSeatsOfASurvivingOrganization(t *testing.T) {
 	f := newAccountDeletionRenewalFixture(t)
 
 	res := f.deleteAccount(t)
 
 	require.Equal(t, http.StatusNoContent, res.Code)
-	assert.Equal(t, []polarfake.Request{{
-		Method: http.MethodPatch, SubscriptionID: f.sub.ID,
-		Body: map[string]any{"seats": float64(2), "proration_behavior": "next_period"},
-	}}, f.provider.Patches())
-	assert.Equal(t, new(2), f.provider.Subscription(f.sub.ID).PendingSeats)
-	assert.Equal(t, 5, f.provider.Subscription(f.sub.ID).Seats, "the current period keeps every paid seat")
-	assert.Equal(t, new(2), f.plan(t).RenewalSeatsScheduled)
+	assert.Empty(t, f.provider.Requests(), "account deletion never changes a Polar seat count")
+	assert.Nil(t, f.provider.Subscription(f.sub.ID).PendingSeats)
+	assert.Equal(t, new(5), f.plan(t).PurchasedSeats, "the surviving organization keeps every paid seat")
 }
 
-func TestDeleteAccount_DoesNotScheduleRenewalForDeletedOrganization(t *testing.T) {
+func TestDeleteAccount_DoesNotReadTheEndedSubscriptionOfADeletedOrganization(t *testing.T) {
 	f := newAccountDeletionRenewalFixture(t)
 	db := database.Conn()
 	deleted, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), "")
@@ -872,24 +855,23 @@ func TestDeleteAccount_DoesNotScheduleRenewalForDeletedOrganization(t *testing.T
 	require.NoError(t, err)
 	require.NoError(t, models.SetUserIsOwner(db, user.ID, true))
 	// The subscription of the deleted organization ended, so deletion needs
-	// no Polar check. A schedule for it would still read it from Polar.
+	// no Polar check.
 	ended := f.provider.AddSeatPlan(db, deleted.ID, 2, time.Now().Add(time.Hour))
-	f.provider.Update(ended.ID, func(sub *polarfake.Subscription) { sub.Status = models.PolarSubscriptionStatusCanceled })
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", deleted.ID).
-		Update("polar_subscription_status", models.PolarSubscriptionStatusCanceled).Error)
+	f.provider.Update(ended.ID, func(sub *polarfake.Subscription) { sub.Status = billingmodels.PolarSubscriptionStatusCanceled })
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", deleted.ID).
+		Update("polar_subscription_status", billingmodels.PolarSubscriptionStatusCanceled).Error)
 
 	res := f.deleteAccount(t)
 
 	require.Equal(t, http.StatusNoContent, res.Code)
 	_, err = models.FindOrganizationByID(deleted.ID.String())
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	assert.Empty(t, requestsFor(f.provider.Requests(), ended.ID))
-	assert.Len(t, requestsFor(f.provider.Patches(), f.sub.ID), 1, "the surviving organization still gets its schedule")
+	assert.Empty(t, f.provider.Requests())
 }
 
-func TestDeleteAccount_SucceedsWhenPolarRejectsTheRenewalSchedule(t *testing.T) {
+func TestDeleteAccount_SucceedsWhilePolarIsUnavailable(t *testing.T) {
 	f := newAccountDeletionRenewalFixture(t)
-	f.provider.FailNext(1, http.StatusUnprocessableEntity, "PolarRequestValidationError")
+	f.provider.FailNext(10, http.StatusServiceUnavailable, "")
 
 	res := f.deleteAccount(t)
 
@@ -898,7 +880,5 @@ func TestDeleteAccount_SucceedsWhenPolarRejectsTheRenewalSchedule(t *testing.T) 
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	_, err = models.FindActiveHumanUserByAccountAndOrganization(database.Conn(), f.r.Organization.ID, f.r.Account.ID)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	assert.Empty(t, f.provider.Patches())
-	assert.Nil(t, f.provider.Subscription(f.sub.ID).PendingSeats)
-	assert.Nil(t, f.plan(t).RenewalSeatsScheduled, "the seat renewal sync worker schedules it later")
+	assert.Empty(t, f.provider.Requests())
 }

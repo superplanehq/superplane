@@ -67,6 +67,46 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	assert.Equal(t, dispatch.Id, active.ID.String())
 }
 
+func TestDispatchThinkingLevelsRequireCompatibleLineRunners(t *testing.T) {
+	for _, components := range [][]string{
+		{runnerCodex}, {runnerClaudeCode}, {models.SuperPlaneRunnerComponent}, {runnerOpenRouter}, {runnerCodex, runnerClaudeCode},
+	} {
+		for _, level := range []string{"minimal", "xhigh", "high", "default"} {
+			t.Run(strings.Join(components, "+")+"/"+level, func(t *testing.T) {
+				r := support.Setup(t)
+				db := database.DB(t.Context())
+				factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+				require.NoError(t, err)
+				order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+				require.NoError(t, err)
+				var steps []models.FactoryLineStep
+				for _, component := range components {
+					app := createLineAppWithRunner(t, r, factory.ID, component, "integration", "")
+					steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"})
+				}
+				line, err := factory.CreateLine(db, "ship", steps)
+				require.NoError(t, err)
+				ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+				response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+					FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name, ThinkingLevel: level,
+				})
+				if level == "high" || level == "default" || len(components) == 1 && components[0] == runnerCodex {
+					require.NoError(t, err)
+					require.Len(t, response.Order.LineDispatches, 1)
+					assert.Equal(t, level, response.Order.LineDispatches[0].ThinkingLevel)
+					return
+				}
+				require.Error(t, err)
+				code, _, ok := grpcerrors.HandlerStatus(err)
+				require.True(t, ok)
+				assert.Equal(t, codes.InvalidArgument, code)
+				_, err = order.FindActiveLineDispatch(db)
+				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			})
+		}
+	}
+}
+
 func Test__DispatchWorkOrder__ClearsAutoStartLine(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

@@ -313,46 +313,58 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 }
 
 func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID string, group string) error {
-	domain := prefixDomain(domainType, domainID)
-	prefixedUserID := prefixUserID(userID)
+	return a.withWriteEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		domain := prefixDomain(domainType, domainID)
+		groupExists, err := a.groupExistsWithEnforcer(enforcer, group, domain)
+		if err != nil {
+			return fmt.Errorf("failed to check group existence: %w", err)
+		}
 
-	groupExists, err := a.groupExistsInDomain(group, domain)
-	if err != nil {
-		return fmt.Errorf("failed to check group existence: %w", err)
-	}
+		if !groupExists {
+			return fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
+		}
 
-	if !groupExists {
-		return fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
-	}
+		ruleAdded, err := enforcer.AddGroupingPolicy(prefixUserID(userID), prefixGroupName(group), domain)
+		if err != nil {
+			return fmt.Errorf("failed to add user to group: %w", err)
+		}
 
-	prefixedGroupName := prefixGroupName(group)
-	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
-	if err != nil {
-		return fmt.Errorf("failed to add user to group: %w", err)
-	}
+		if !ruleAdded {
+			log.Infof("user %s is already a member of group %s", userID, group)
+		}
 
-	if !ruleAdded {
-		log.Infof("user %s is already a member of group %s", userID, group)
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, userID string, group string) error {
-	domain := prefixDomain(domainType, domainID)
-	prefixedGroupName := prefixGroupName(group)
-	prefixedUserID := prefixUserID(userID)
+	return a.withWriteEnforcer(domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		domain := prefixDomain(domainType, domainID)
+		ruleRemoved, err := enforcer.RemoveGroupingPolicy(prefixUserID(userID), prefixGroupName(group), domain)
+		if err != nil {
+			return fmt.Errorf("failed to remove user from group: %w", err)
+		}
 
-	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
-	if err != nil {
-		return fmt.Errorf("failed to remove user from group: %w", err)
-	}
+		if !ruleRemoved {
+			return fmt.Errorf("user %s is not a member of group %s", userID, group)
+		}
 
-	if !ruleRemoved {
-		return fmt.Errorf("user %s is not a member of group %s", userID, group)
-	}
+		return nil
+	})
+}
 
-	return nil
+// Group membership is read and written through the database, not the
+// process-wide enforcer cache. Transactional cleanup, such as member
+// removal, changes these rows without updating that cache.
+func (a *AuthService) withWriteEnforcer(domainType, domainID string, fn func(casbin.IEnforcer) error) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		enforcer, err := a.newFilteredEnforcer(tx, policyFiltersForDomain(domainType, domainID))
+		if err != nil {
+			return err
+		}
+		enforcer.EnableAutoSave(true)
+		return fn(enforcer)
+	})
 }
 
 func (a *AuthService) GetGroupUsers(ctx context.Context, domainID string, domainType string, group string) ([]string, error) {
@@ -386,10 +398,6 @@ func (a *AuthService) GetGroupUsers(ctx context.Context, domainID string, domain
 	}
 
 	return users, nil
-}
-
-func (a *AuthService) groupExistsInDomain(group, domain string) (bool, error) {
-	return a.groupExistsWithEnforcer(a.enforcer, group, domain)
 }
 
 func (a *AuthService) groupExistsWithEnforcer(enforcer casbin.IEnforcer, group, domain string) (bool, error) {
@@ -580,6 +588,37 @@ func (a *AuthService) RemoveRoleInTransaction(tx *gorm.DB, userID, role, domainI
 	}
 	if !ruleRemoved {
 		log.Infof("role %s not found for user %s", role, userID)
+	}
+
+	return nil
+}
+
+// RemoveUserFromOrganizationInTransaction removes every direct role and
+// group membership of the user in the organization. Group definitions
+// and the grants of other users stay unchanged.
+func (a *AuthService) RemoveUserFromOrganizationInTransaction(tx *gorm.DB, userID, orgID string) error {
+	enforcer, err := a.newFilteredEnforcer(tx, policyFiltersForDomain(models.DomainTypeOrganization, orgID))
+	if err != nil {
+		return err
+	}
+	enforcer.EnableAutoSave(true)
+
+	domain := prefixDomain(models.DomainTypeOrganization, orgID)
+	prefixedUserID := prefixUserID(userID)
+	grants, err := enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
+	if err != nil {
+		return fmt.Errorf("failed to get organization grants for user: %w", err)
+	}
+
+	for _, grant := range grants {
+		target := grant[1]
+		if !strings.HasPrefix(target, "/roles/") && !strings.HasPrefix(target, "/groups/") {
+			continue
+		}
+
+		if _, err := enforcer.RemoveGroupingPolicy(prefixedUserID, target, domain); err != nil {
+			return fmt.Errorf("failed to remove grant %s for user %s: %w", target, userID, err)
+		}
 	}
 
 	return nil

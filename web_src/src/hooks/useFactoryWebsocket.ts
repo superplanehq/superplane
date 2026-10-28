@@ -447,7 +447,17 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
         return;
       }
       const orderId = data.payload?.orderId;
-      if (!orderId || (data.payload?.factoryId && data.payload.factoryId !== factoryId)) {
+      if (data.payload?.factoryId && data.payload.factoryId !== factoryId) {
+        return;
+      }
+      if (data.payload?.reason === "runner_capacity") {
+        invalidateOrdersList(queryClient, organizationId, factoryId);
+        void queryClient.invalidateQueries({
+          queryKey: factoryQueryKeys.planningSessions(organizationId, factoryId),
+        });
+        return;
+      }
+      if (!orderId) {
         return;
       }
       const version = (refreshVersion.current.get(orderId) ?? 0) + 1;

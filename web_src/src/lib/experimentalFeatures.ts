@@ -22,7 +22,7 @@ export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
 /** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
 export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_custom_provider";
 
-/** Organization experimental feature: blank custom automations on Verify, Done, and phase columns. */
+/** Organization experimental feature: custom automations on Verify, Done, and phase columns. */
 export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
 
 /** Organization experimental feature: Mergeable chip on task cards and Merge button on pull request review. */
@@ -31,8 +31,8 @@ export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
 /** Organization experimental feature: public workspace MCP server for Cursor and other MCP clients. */
 export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
 
+/** Organization experimental feature: ChatGPT subscription for factory Codex runs. */
+export const FEATURE_CODEX_SUBSCRIPTIONS = "codex_subscriptions";
+
 /** Organization experimental feature: scheduled task proposals in Backlog. */
 export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
-
-/** Organization experimental feature: catalog billing and payment setup. */
-export const FEATURE_NEW_BILLING = "new_billing";

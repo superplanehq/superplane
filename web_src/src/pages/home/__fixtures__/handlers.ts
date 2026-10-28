@@ -108,7 +108,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       pattern: re("/api/v1/organizations/[^/]+/selectable-llm-models"),
       resolve: () => ({ json: { models: storybookSelectableLlmModels() } }),
     },
-    { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
       resolve: () => ({
@@ -145,7 +144,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       resolve: () => ({
         json: {
           features: [
-            { id: "new_billing", label: "New billing", description: "Select a plan and set up a payment method" },
             {
               id: "claude_managed_agents",
               label: "Managed agents",

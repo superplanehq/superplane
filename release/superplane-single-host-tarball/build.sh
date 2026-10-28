@@ -46,9 +46,11 @@ inject() {
 echo "* Injecting docker-compose.yml"
 inject "${TEMPLATES_DIR}/docker-compose.yml" "${TARGET_DIR}/docker-compose.yml"
 
-echo "* Injecting install.sh"
-inject "${TEMPLATES_DIR}/install.sh" "${TARGET_DIR}/install.sh"
-chmod +x "${TARGET_DIR}/install.sh"
+for script in install.sh uninstall.sh; do
+  echo "* Injecting ${script}"
+  inject "${TEMPLATES_DIR}/${script}" "${TARGET_DIR}/${script}"
+  chmod +x "${TARGET_DIR}/${script}"
+done
 
 echo "* Injecting Caddyfile"
 cp "${TEMPLATES_DIR}/Caddyfile" "${TARGET_DIR}/Caddyfile"

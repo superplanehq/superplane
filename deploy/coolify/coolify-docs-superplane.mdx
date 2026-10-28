@@ -1,0 +1,48 @@
+---
+title: "SuperPlane"
+description: "Open source factory for one-shot engineering."
+og:
+  description: "Run SuperPlane on Coolify with PostgreSQL, RabbitMQ, Fleet Manager, and one Docker runner on a single VM."
+category: "Automation"
+icon: "/docs/images/services/superplane-logo.svg"
+---
+
+# SuperPlane
+
+![SuperPlane](/docs/images/services/superplane-logo.svg)
+
+## What is SuperPlane?
+
+SuperPlane is an open source factory for one-shot engineering.
+It turns high-confidence backlog issues into verified, review-ready pull
+requests.
+
+This Coolify service starts SuperPlane on one VM: the app, PostgreSQL, RabbitMQ,
+Fleet Manager, and one Docker runner.
+
+## Links
+
+- [Official website](https://superplane.com?utm_source=coolify.io)
+- [Documentation](https://docs.superplane.com/?utm_source=coolify.io)
+- [GitHub](https://github.com/superplanehq/superplane?utm_source=coolify.io)
+
+## After you deploy
+
+1. Attach the public domain to the **app** service on port **8000**.
+   OAuth callbacks use `https://your-domain` with no port.
+2. Open the SuperPlane URL.
+3. Complete owner setup.
+4. Wait until Fleet Manager starts. You do not paste an admin token.
+
+`SUPERPLANE_VERSION` defaults to `v1.0.0`. Set a newer published
+GHCR tag when you upgrade.
+
+Coolify generates `ENCRYPTION_MASTER_KEYS`. Keep that value.
+Do not replace it with a password.
+
+On an ARM VM, set `RUNNER_FLEET_ID=e1-large-arm64` and `RUNNER_ARCH=arm64`.
+
+## Limits
+
+- Fleet Manager mounts the Docker socket and starts one runner container on
+  the same host. Coolify does not manage that container.

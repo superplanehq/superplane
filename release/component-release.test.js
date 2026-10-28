@@ -16,7 +16,9 @@ const {
   parseVersion,
   publishGitHubRelease,
   stageGitHubRelease,
+  validateFinalization,
   verifyManifest,
+  verifyPublishedPrerelease,
 } = require("./component-release");
 
 function git(repository, args) {
@@ -89,6 +91,68 @@ test("accepts stable and prerelease versions", () => {
 test("rejects build metadata and malformed prereleases", () => {
   for (const version of ["1.2.3", "v1.2", "v1.2.3+build.1", "v1.2.3-"]) {
     assert.throws(() => parseVersion(version), /version/);
+  }
+});
+
+test("validates release candidate finalization pairs", () => {
+  assert.equal(validateFinalization("v1.0.0-rc8", "v1.0.0"), "v1.0.0");
+  assert.equal(
+    validateFinalization("v2.3.4-rc.12", "v2.3.4"),
+    "v2.3.4",
+  );
+
+  assert.throws(
+    () => validateFinalization("v1.0.0", "v1.0.0"),
+    /candidate version must be a prerelease/,
+  );
+  assert.throws(
+    () => validateFinalization("v1.0.0-rc8", "v1.0.1"),
+    /stable version must be v1.0.0/,
+  );
+  assert.throws(
+    () => validateFinalization("v1.0.0-rc8", "v1.0.0-final"),
+    /stable version must not be a prerelease/,
+  );
+});
+
+test("verifies a published release candidate at the expected commit", async () => {
+  const sha = "a".repeat(40);
+  let release = {
+    draft: false,
+    prerelease: true,
+    tag_name: "v1.0.0-rc8",
+    target_commitish: sha,
+  };
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify(release));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const options = {
+    apiURL: `http://127.0.0.1:${address.port}`,
+    repository: "superplanehq/superplane",
+    component: "superplane",
+    version: "v1.0.0-rc8",
+    sha,
+  };
+
+  try {
+    await verifyPublishedPrerelease(options);
+
+    release = { ...release, draft: true };
+    await assert.rejects(
+      verifyPublishedPrerelease(options),
+      /is not a published prerelease/,
+    );
+
+    release = { ...release, draft: false, target_commitish: "b".repeat(40) };
+    await assert.rejects(
+      verifyPublishedPrerelease(options),
+      /does not match source SHA/,
+    );
+  } finally {
+    server.close();
   }
 });
 
@@ -344,6 +408,19 @@ test("manifest verification rejects altered assets", () => {
     directory,
     assetNames: ["runner-linux-amd64.tar.gz", "checksums.txt"],
   });
+
+  assert.throws(
+    () =>
+      verifyManifest(manifest, {
+        component: "runner",
+        version: "v1.2.3",
+        sha: "a".repeat(40),
+        workflowID: "workflow-2",
+        directory,
+        assetNames: ["runner-linux-amd64.tar.gz", "checksums.txt"],
+      }),
+    /manifest identity/,
+  );
 
   fs.writeFileSync(
     path.join(directory, "runner-linux-amd64.tar.gz"),

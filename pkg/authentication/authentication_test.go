@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -578,6 +579,24 @@ func TestGetPostLogoutRedirectURL(t *testing.T) {
 
 		assert.Equal(t, "/login", getPostLogoutRedirectURL(req))
 	})
+}
+
+func TestHandleLogout_ClearsSupportSessionCookie(t *testing.T) {
+	handler := &Handler{}
+	req := httptest.NewRequest(http.MethodGet, "/logout", nil)
+	req.AddCookie(&http.Cookie{Name: supportsession.CookieName, Value: "session-token"})
+	res := httptest.NewRecorder()
+
+	handler.handleLogout(res, req)
+
+	var cleared *http.Cookie
+	for _, cookie := range res.Result().Cookies() {
+		if cookie.Name == supportsession.CookieName {
+			cleared = cookie
+		}
+	}
+	require.NotNil(t, cleared, "logout should clear the support session cookie")
+	assert.Equal(t, -1, cleared.MaxAge)
 }
 
 func TestHandler_completeProviderAuth(t *testing.T) {

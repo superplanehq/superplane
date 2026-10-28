@@ -18,6 +18,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
@@ -664,6 +665,12 @@ func Test__CreateInitialWorkspaceUsesAccountNameWithoutGitHub(t *testing.T) {
 
 	organization, err := models.FindOrganizationByName("Ada Lovelace")
 	require.NoError(t, err)
+	credit, err := billingmodels.DescribeOrganizationLLMCredit(database.DB(t.Context()), organization.ID)
+	require.NoError(t, err)
+	require.Zero(t, credit.GrantMicros)
+	reloaded, err := models.FindAccountByID(account.ID.String())
+	require.NoError(t, err)
+	require.False(t, reloaded.HasReceivedWelcomeCredit())
 	workspaces, err := models.ListFactories(database.DB(t.Context()), organization.ID)
 	require.NoError(t, err)
 	require.Len(t, workspaces, 1)
@@ -787,13 +794,13 @@ func Test__CreateOrganization(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, roles)
 
-		credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), org.ID)
+		credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), org.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), credit.GrantMicros)
+		assert.Zero(t, credit.GrantMicros)
 
 		reloaded, err := models.FindAccountByID(account.ID.String())
 		require.NoError(t, err)
-		assert.True(t, reloaded.HasReceivedWelcomeCredit())
+		assert.False(t, reloaded.HasReceivedWelcomeCredit())
 	})
 
 	t.Run("organizations with a duplicate name are both created and get distinct slugs", func(t *testing.T) {
@@ -859,11 +866,11 @@ func Test__CreateOrganization(t *testing.T) {
 		assert.NotEqual(t, firstOrg.ID, secondOrg.ID)
 		assert.NotEqual(t, firstOrg.Slug, secondOrg.Slug)
 
-		firstCredit, err := models.DescribeOrganizationLLMCredit(database.Conn(), firstOrg.ID)
+		firstCredit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), firstOrg.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), firstCredit.GrantMicros)
+		assert.Zero(t, firstCredit.GrantMicros)
 
-		secondCredit, err := models.DescribeOrganizationLLMCredit(database.Conn(), secondOrg.ID)
+		secondCredit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), secondOrg.ID)
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), secondCredit.GrantMicros)
 	})

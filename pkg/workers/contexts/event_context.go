@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,6 +27,14 @@ func NewEventContext(tx *gorm.DB, node *models.CanvasNode, run *models.CanvasRun
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
+	return s.emit(payloadType, payload, "")
+}
+
+func (s *EventContext) EmitDeduplicated(payloadType string, payload any, dedupKey string) error {
+	return s.emit(payloadType, payload, dedupKey)
+}
+
+func (s *EventContext) emit(payloadType string, payload any, dedupKey string) error {
 	structuredPayload := map[string]any{
 		"type":      payloadType,
 		"timestamp": time.Now(),
@@ -69,7 +78,16 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	created := true
-	if payloadType == "github.pullRequest" && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.Ref.Data().Trigger != nil && s.node.Ref.Data().Trigger.Name == "github.onPullRequest" {
+	if dedupKey == "" {
+		var suppress bool
+		dedupKey, suppress = customAutomationWebhookPolicy(s.tx, s.node, payloadType, payload)
+		if suppress {
+			return nil
+		}
+	}
+	if dedupKey != "" && s.run == nil {
+		created, err = s.node.CreateDeduplicatedRootEvent(s.tx, &event, dedupKey)
+	} else if payloadType == "github.pullRequest" && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.Ref.Data().Trigger != nil && s.node.Ref.Data().Trigger.Name == "github.onPullRequest" {
 		created, err = s.node.CreateGitHubChecksEvent(s.tx, &event)
 	} else {
 		err = s.tx.Create(&event).Error
@@ -97,6 +115,68 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	return nil
+}
+
+func customAutomationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (string, bool) {
+	if node == nil || node.Type != models.NodeTypeTrigger ||
+		(payloadType != "github.pullRequest" && payloadType != "bitbucket.pullRequest") {
+		return "", false
+	}
+
+	template, _ := node.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
+	templateID, _ := template["id"].(string)
+	startMode, _ := template["startMode"].(string)
+	if templateID != models.FactoryAppTemplateCustomAutomationID {
+		return "", false
+	}
+	if startMode != "automatic" {
+		return "", true
+	}
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return "", true
+	}
+	var identity struct {
+		PullRequest struct {
+			ID string `json:"id"`
+		} `json:"pullRequest"`
+		WorkOrder struct {
+			ID string `json:"id"`
+		} `json:"workOrder"`
+		GitHub struct {
+			Head struct {
+				SHA string `json:"sha"`
+			} `json:"head"`
+		} `json:"pull_request"`
+		Bitbucket struct {
+			Source struct {
+				Commit struct {
+					Hash string `json:"hash"`
+				} `json:"commit"`
+			} `json:"source"`
+		} `json:"pullrequest"`
+	}
+	if err := json.Unmarshal(raw, &identity); err != nil {
+		return "", true
+	}
+	pullRequestID := strings.TrimSpace(identity.PullRequest.ID)
+	revision := strings.TrimSpace(identity.GitHub.Head.SHA)
+	if revision == "" {
+		revision = strings.TrimSpace(identity.Bitbucket.Source.Commit.Hash)
+	}
+	if pullRequestID == "" || revision == "" {
+		return "", true
+	}
+	workOrderID, err := uuid.Parse(strings.TrimSpace(identity.WorkOrder.ID))
+	if err != nil {
+		return "", true
+	}
+	inVerify, err := models.WorkOrderIsWaitingAfterPassedStage(tx, workOrderID)
+	if err != nil || !inVerify {
+		return "", true
+	}
+	return pullRequestID + "|" + revision, false
 }
 
 func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string, error) {

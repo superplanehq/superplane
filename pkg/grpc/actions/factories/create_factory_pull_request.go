@@ -73,6 +73,9 @@ func CreateFactoryPullRequest(
 			pullRequest.ID,
 		)
 	}
+	if err := StartAutomaticCustomAutomations(ctx, deps, factory, order); err != nil {
+		log.WithError(err).Warnf("Failed to start custom automation for order %s", order.ID)
+	}
 
 	serialized, err := serializeFactoryPullRequests(ctx, db, []models.FactoryPullRequest{*pullRequest}, nil)
 	if err != nil {

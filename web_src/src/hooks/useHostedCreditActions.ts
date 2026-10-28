@@ -5,7 +5,6 @@ import {
   useCreateHostedCreditCheckout,
   useHostedCreditProducts,
 } from "@/hooks/useLLMModelAllowlists";
-import { useCreateBusinessCheckout } from "@/hooks/useOrganizationBilling";
 import { getApiErrorMessage } from "@/lib/errors";
 import { clearHostedCreditGrantSnapshot, rememberHostedCreditGrantSnapshot } from "@/lib/hostedCredit";
 import { hostedCreditOwnerContactCopy } from "@/lib/hostedCreditOwnerContact";
@@ -22,14 +21,12 @@ export function useHostedCreditActions(
     Boolean(organizationId) && billingEnabled && creditPurchaseAllowed,
   );
   const checkout = useCreateHostedCreditCheckout(organizationId);
-  const businessCheckout = useCreateBusinessCheckout(organizationId);
   const portal = useCreateBillingPortalSession(organizationId);
 
   return {
     products: productsQuery.data?.products ?? [],
     productsLoading: productsQuery.isLoading,
     checkoutPending: checkout.isPending,
-    businessCheckoutPending: businessCheckout.isPending,
     portalPending: portal.isPending,
     startCheckout: async (input: OrganizationsCreateHostedCreditCheckoutBody) => {
       rememberHostedCreditGrantSnapshot(organizationId, grantTotalCents);
@@ -40,14 +37,6 @@ export function useHostedCreditActions(
         clearHostedCreditGrantSnapshot(organizationId);
         showErrorToast(getApiErrorMessage(checkoutError, "Unable to start checkout."));
         throw checkoutError;
-      }
-    },
-    startBusinessCheckout: async () => {
-      try {
-        const url = await businessCheckout.mutateAsync();
-        window.location.assign(url);
-      } catch (checkoutError) {
-        showErrorToast(getApiErrorMessage(checkoutError, "Unable to start checkout."));
       }
     },
     openInvoices: async () => {

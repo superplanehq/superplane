@@ -2,9 +2,11 @@ import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
+import type { ManualCustomAutomation } from "../../../lib/customAutomation";
+import { CustomAutomationRunAction } from "../../CustomAutomationRunAction";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import { AutomationCardBody } from "./AutomationCardBody";
 import {
@@ -29,6 +31,8 @@ export function ConsoleAutomationCard({
   phase,
   phases,
   organizationId,
+  factoryId,
+  orderId,
   factoryKey,
   orderNumber,
   expandIdle,
@@ -36,11 +40,14 @@ export function ConsoleAutomationCard({
   actionBusy,
   onStopRun,
   onRerunStep,
+  manualRun,
 }: {
   automation: ConsoleAutomation;
   phase?: SplitRunPhase;
   phases: SplitRunPhase[];
   organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
   factoryKey?: string;
   orderNumber?: string;
   /** True for the current-column card on a draft that has not started a run. */
@@ -49,6 +56,7 @@ export function ConsoleAutomationCard({
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
+  manualRun?: ManualCustomAutomation;
 }) {
   const { latest } = automation;
   const { queuedIds, timing, report } = useAgentQueueReports();
@@ -82,17 +90,15 @@ export function ConsoleAutomationCard({
     setOpen(next);
   };
   const stopPhase = phaseForStop(phases, automation.runs, queuedIds) ?? shownPhase;
-  const stopRun =
-    canStopRun &&
-    onStopRun &&
-    consoleCanStop(shownStatus, automation.runs, queuedIds) &&
-    stopPhase?.appId &&
-    stopPhase.runId
-      ? () => {
-          stopping.request();
-          onStopRun({ appId: stopPhase.appId ?? "", runId: stopPhase.runId ?? "" });
-        }
-      : undefined;
+  const stopRun = cardStopRun({
+    canStopRun,
+    onStopRun,
+    shownStatus,
+    runs: automation.runs,
+    queuedIds,
+    stopPhase,
+    requestStop: stopping.request,
+  });
   const rerunStep =
     canStopRun && onRerunStep && shownStatus === "failed" && shownPhase?.stepIndex != null
       ? () => onRerunStep(shownPhase)
@@ -116,6 +122,7 @@ export function ConsoleAutomationCard({
           shownPhase={shownPhase}
           timer={shownStatus === "queued" ? "" : runMetaLine(latest, automation.runs, timing, now)}
           queueSummary={mixedQueueSummary(automation.runs, queuedIds)}
+          runAction={logsRunAction(manualRun, organizationId, factoryId, orderId)}
         />
         <CollapsibleContent>
           <FramePanel className="space-y-3">
@@ -138,18 +145,72 @@ export function ConsoleAutomationCard({
   );
 }
 
+function logsRunAction(
+  manualRun: ManualCustomAutomation | undefined,
+  organizationId?: string,
+  factoryId?: string,
+  orderId?: string,
+) {
+  if (!manualRun || !organizationId || !factoryId || !orderId) {
+    return undefined;
+  }
+  return (
+    <CustomAutomationRunAction
+      organizationId={organizationId}
+      factoryId={factoryId}
+      workOrderId={orderId}
+      automations={[manualRun]}
+      placement="logs"
+    />
+  );
+}
+
+function cardStopRun({
+  canStopRun,
+  onStopRun,
+  shownStatus,
+  runs,
+  queuedIds,
+  stopPhase,
+  requestStop,
+}: {
+  canStopRun: boolean;
+  onStopRun?: (run: { appId: string; runId: string }) => void;
+  shownStatus: ConsoleDisplayStatus;
+  runs: ConsoleAutomation["runs"];
+  queuedIds: ReadonlySet<string>;
+  stopPhase?: SplitRunPhase;
+  requestStop: () => void;
+}) {
+  if (
+    !canStopRun ||
+    !onStopRun ||
+    !consoleCanStop(shownStatus, runs, queuedIds) ||
+    !stopPhase?.appId ||
+    !stopPhase.runId
+  ) {
+    return undefined;
+  }
+  return () => {
+    requestStop();
+    onStopRun({ appId: stopPhase.appId ?? "", runId: stopPhase.runId ?? "" });
+  };
+}
+
 function ConsoleCardHeader({
   automation,
   shownStatus,
   shownPhase,
   timer,
   queueSummary,
+  runAction,
 }: {
   automation: ConsoleAutomation;
   shownStatus: ConsoleDisplayStatus;
   shownPhase?: SplitRunPhase;
   timer: string;
   queueSummary: string;
+  runAction?: ReactNode;
 }) {
   return (
     <FrameHeader
@@ -173,11 +234,14 @@ function ConsoleCardHeader({
       ) : (
         <StepOutputCounts stage={automation.latest} phase={shownPhase} runs={automation.runs} />
       )}
-      <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{timer}</span>
-      <ChevronRight
-        className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
-        aria-hidden
-      />
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        {runAction}
+        {timer ? <span className={cn(META_TEXT_CLASSNAME, "px-1.5")}>{timer}</span> : null}
+        <ChevronRight
+          className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+          aria-hidden
+        />
+      </span>
     </FrameHeader>
   );
 }

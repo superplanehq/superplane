@@ -125,6 +125,14 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
+    codexSubscriptionOffered: false,
+    codexSubscriptionLoading: false,
+    codexConnection: undefined,
+    codexSubscriptionReady: false,
+    startCodexConnection: vi.fn(),
+    cancelCodexConnection: vi.fn(),
+    codexStarting: false,
+    codexCanceling: false,
     customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
@@ -197,15 +205,14 @@ describe("FirstRunSetup Jira intake", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).not.toBeInTheDocument();
-    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: FIRST_RUN_COPY.tickets.setupHeadline(FIRST_RUN_COPY.tickets.jira) }),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-jira-projects")).toBeInTheDocument();
     expect(setupRef.current?.issuesChoice).toBe("jira");
 
+    await user.click(screen.getByTestId("first-run-confirm-projects"));
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
@@ -229,9 +236,8 @@ describe("FirstRunSetup Jira intake", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-confirm-projects"));
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(setupRef.current?.issuesChoice).toBe("jira");
 
@@ -248,9 +254,9 @@ describe("FirstRunSetup Jira intake", () => {
     renderLiveSetup(pageModel(), { simulateDiscovery: false });
 
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Connect Jira" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Jira issues/ })).toBeEnabled();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Connect Linear" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Linear issues/ })).toBeEnabled();
     expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
   });
 
@@ -270,9 +276,8 @@ describe("FirstRunSetup Jira intake", () => {
       initial: { issuesChoice: "linear" },
     });
 
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-linear-choice-notice")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
     expect(setupRef.current?.issuesChoice).toBe("linear");
 
@@ -287,14 +292,16 @@ describe("FirstRunSetup Jira intake", () => {
 
     renderLiveSetup(model, { simulateDiscovery: false });
 
-    await user.click(screen.getByRole("button", { name: "Connect GitHub" }));
+    await user.click(screen.getByRole("button", { name: /GitHub issues/ }));
+    const connectGitHub = FIRST_RUN_COPY.tickets.stepConnect(FIRST_RUN_COPY.tickets.githubIssues);
+    await user.click(screen.getByRole("button", { name: connectGitHub }));
 
     await waitFor(() => {
       expect(requestConnect).toHaveBeenCalledWith("github");
       expect(screen.getByTestId("first-run-tickets")).not.toHaveAttribute("aria-busy");
     });
     expect(screen.getByTestId("first-run-back")).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Connect Jira" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: connectGitHub })).toBeEnabled();
   });
 
   it("keeps a saved Linear choice while the feature lookup is loading", () => {
@@ -315,7 +322,7 @@ describe("FirstRunSetup Jira intake", () => {
 
     expect(screen.queryByTestId("first-run-linear-choice-notice")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
+    expect(screen.getByTestId("first-run-confirm-projects")).toBeEnabled();
     expect(setupRef.current?.issuesChoice).toBe("linear");
   });
 });

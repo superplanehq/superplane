@@ -65,6 +65,9 @@ func serializeRunner(runner *models.Runner, fleetID string) *pb.Runner {
 	if runner.TerminatedAt != nil {
 		out.TerminatedAt = timestamppb.New(*runner.TerminatedAt)
 	}
+	if runner.ProviderDeletedAt != nil {
+		out.ProviderDeletedAt = timestamppb.New(*runner.ProviderDeletedAt)
+	}
 	return out
 }
 

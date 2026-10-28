@@ -1,0 +1,100 @@
+package supportsession
+
+import (
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/superplanehq/superplane/pkg/jwt"
+)
+
+const (
+	CookieName = "support_session_token"
+	TokenType  = "support_session"
+	TTL        = 1 * time.Hour
+
+	claimType    = "type"
+	claimAdmin   = "admin_account_id"
+	claimAccount = "target_account_id"
+	claimSub     = "sub"
+)
+
+type Claims struct {
+	AdminAccountID  string
+	TargetAccountID string
+	IssuedAt        int64
+}
+
+// GenerateToken creates a signed JWT for a support session.
+func GenerateToken(signer *jwt.Signer, adminAccountID, targetAccountID string) (string, error) {
+	return signer.GenerateWithClaims(TTL, map[string]string{
+		claimType:    TokenType,
+		claimAdmin:   adminAccountID,
+		claimAccount: targetAccountID,
+		claimSub:     adminAccountID,
+	})
+}
+
+// ValidateToken parses and validates a support session token, returning its claims.
+func ValidateToken(signer *jwt.Signer, tokenString string) (*Claims, error) {
+	jwtClaims, err := signer.ValidateAndGetClaims(tokenString)
+	if err != nil {
+		return nil, fmt.Errorf("invalid support session token: %w", err)
+	}
+
+	tokenType, _ := jwtClaims[claimType].(string)
+	if tokenType != TokenType {
+		return nil, fmt.Errorf("not a support session token")
+	}
+
+	adminID, _ := jwtClaims[claimAdmin].(string)
+	accountID, _ := jwtClaims[claimAccount].(string)
+
+	if adminID == "" || accountID == "" {
+		return nil, fmt.Errorf("incomplete support session claims")
+	}
+
+	iat, _ := jwtClaims["iat"].(float64)
+
+	return &Claims{
+		AdminAccountID:  adminID,
+		TargetAccountID: accountID,
+		IssuedAt:        int64(iat),
+	}, nil
+}
+
+// SetCookie writes the support session cookie to the response.
+func SetCookie(w http.ResponseWriter, r *http.Request, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(TTL.Seconds()),
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// ClearCookie deletes the support session cookie.
+func ClearCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// ReadCookie extracts the support session token from the request, if present.
+func ReadCookie(r *http.Request) (string, error) {
+	cookie, err := r.Cookie(CookieName)
+	if err != nil {
+		return "", err
+	}
+
+	return cookie.Value, nil
+}

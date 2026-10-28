@@ -22,6 +22,8 @@ import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
 import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
+import { ownerOfRepository, repositoriesInOrganization } from "./first-run/githubOrganizations";
+import { FirstRunCardScreenHost } from "./FirstRunCardScreenHost";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
 import {
@@ -37,27 +39,57 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   connect: 1,
   choose: 2,
   tickets: 3,
-  complete: 4,
-  agent: 4,
+  card: 4,
+  complete: 5,
+  agent: 5,
 };
+
+/** How many existing issues the first import takes. */
+const INITIAL_IMPORT_LIMIT = 3;
 
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   host: "welcome",
   connect: "host",
   choose: "connect",
   tickets: "choose",
+  card: "tickets",
   complete: "tickets",
   agent: "tickets",
 };
+
+// Steps that this flow does not show. The card step is absent when billing
+// has no starter plans or the organization already has a paid plan.
+function stepsSkipped(flow: FirstRunSetupFlow, target: FirstRunScreen): { before: number; total: number } {
+  const agent = Number(flow.skipAgentScreen);
+  const card = Number(!flow.hasCardStep);
+  return {
+    before:
+      Number(target === "complete") * agent + Number(STEP_INDEX_FOR_SCREEN[target] > STEP_INDEX_FOR_SCREEN.card) * card,
+    total: agent + card,
+  };
+}
 
 function firstNameOf(name: string | undefined): string | undefined {
   const first = name?.trim().split(/\s+/)[0];
   return first || undefined;
 }
 
+function modelSourceOffered(model: OnboardingPageModel): boolean {
+  return (model.bringYourOwnKey || model.codexSubscriptionOffered) && model.hostedModelsAvailable;
+}
+
 function signOut() {
   posthog.reset();
   window.location.href = "/logout";
+}
+
+// The last action on the tickets step scans the backlog. When the card step
+// or the model step follows, the button only continues.
+function ticketsContinueLabel(flow: FirstRunSetupFlow, skipInitialImport: boolean, initialWorkspace: boolean) {
+  const cardStepNext = !flow.cardStep.ready || flow.cardStep.required || flow.cardStep.requiresAdmin;
+  if (cardStepNext || !flow.skipAgentScreen) return FIRST_RUN_COPY.tickets.continue;
+  if (!initialWorkspace && skipInitialImport) return FIRST_RUN_COPY.finish.action;
+  return FIRST_RUN_COPY.tickets.analyze;
 }
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
@@ -82,22 +114,33 @@ function TicketsScreenHost({
   chrome: FirstRunChrome;
   sphere?: FirstRunSphereProps;
 }) {
+  const connecting =
+    flow.blockingAction === "opening-github" ||
+    flow.blockingAction === "connecting-jira" ||
+    flow.blockingAction === "connecting-linear";
+  // The backlog repository stays in the organization of the app repository,
+  // the same filter the Git host step applies.
+  const organization = ownerOfRepository(model.setup.selectedRepo);
+  const repositories = organization ? repositoriesInOrganization(flow.repositories, organization) : flow.repositories;
   return (
     <FirstRunTicketsScreen
-      initialImportLimit={initialWorkspace ? 3 : undefined}
+      initialImportLimit={INITIAL_IMPORT_LIMIT}
       skipInitialImport={model.setup.skipInitialImport}
+      // The first workspace always imports: that batch feeds the analysis.
       onSkipInitialImportChange={initialWorkspace ? undefined : model.setup.setSkipInitialImport}
+      automaticIntake={model.setup.automaticIntake}
+      onAutomaticIntakeChange={model.setup.setAutomaticIntake}
       githubAvailable={flow.vcsHost !== "bitbucket"}
       ticketSource={flow.ticketSource}
+      // GitHub is only a default until the user picks it on the list.
+      startOnSourceList={model.setup.issuesChoice == null}
+      repository={model.setup.issuesRepo ?? model.setup.selectedRepo ?? undefined}
+      repositories={repositories}
+      onSelectRepository={model.setup.selectIssuesRepo}
+      connecting={connecting}
       chrome={chrome}
       sphere={sphere}
-      continueLabel={
-        !flow.skipAgentScreen
-          ? FIRST_RUN_COPY.tickets.continue
-          : !initialWorkspace && model.setup.skipInitialImport
-            ? FIRST_RUN_COPY.finish.action
-            : FIRST_RUN_COPY.tickets.analyze
-      }
+      continueLabel={ticketsContinueLabel(flow, model.setup.skipInitialImport, initialWorkspace)}
       continuePending={false}
       saving={flow.busy}
       savingLabel={FIRST_RUN_COPY.tickets.saving}
@@ -291,6 +334,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   useGitHubInstallationChecks(organizationId, flow.screen === "choose" && flow.vcsHost !== "bitbucket" && !destination);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
+  const initialWorkspace = factory?.onboarding?.initial === true;
 
   // The placeholder workspace under setup is itself in `factories`, so
   // another workspace exists when any factory has a different id.
@@ -302,14 +346,15 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   );
 
   const chromeFor = (target: FirstRunScreen): FirstRunChrome => {
+    const skipped = stepsSkipped(flow, target);
     return {
       displayName: firstNameOf(account?.name),
       email: account?.email,
       onLogOut: signOut,
       organizationSwitch: otherOrganizations.length > 0 ? { currentOrganizationRouteId: organizationId } : undefined,
       workspaceSwitch: hasOtherWorkspace ? { organizationId, currentFactoryId: factoryId, factories } : undefined,
-      stepIndex: STEP_INDEX_FOR_SCREEN[target] - Number(target === "complete" && flow.skipAgentScreen),
-      stepCount: FIRST_RUN_STEP_COUNT - Number(flow.skipAgentScreen),
+      stepIndex: STEP_INDEX_FOR_SCREEN[target] - skipped.before,
+      stepCount: FIRST_RUN_STEP_COUNT - skipped.total,
       onBack: backActionFor(target, flow),
       busy: flow.busy,
     };
@@ -323,7 +368,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         chrome={{
           ...chromeFor("complete"),
           onBack: undefined,
-          stepIndex: FIRST_RUN_STEP_COUNT - 1 - Number(flow.skipAgentScreen),
+          stepIndex: FIRST_RUN_STEP_COUNT - 1 - stepsSkipped(flow, "complete").total,
         }}
         selectedRepo={setup.selectedRepo}
         onGoToBoard={() => navigate(afterOnboardingPath(destination), { replace: true })}
@@ -354,6 +399,17 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     );
   }
 
+  if (flow.screen === "card") {
+    return (
+      <FirstRunCardScreenHost
+        organizationId={organizationId}
+        flow={flow}
+        chrome={chromeFor("card")}
+        sphere={sphereFor("card", setup.selectedRepo, model.githubOwner)}
+      />
+    );
+  }
+
   if (flow.screen === "complete") {
     return (
       <CompleteSetupScreen
@@ -367,7 +423,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "tickets") {
     return (
       <TicketsScreenHost
-        initialWorkspace={factory?.onboarding?.initial === true}
+        initialWorkspace={initialWorkspace}
         flow={flow}
         model={model}
         chrome={chromeFor("tickets")}
@@ -377,19 +433,53 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   }
 
   return (
-    <FirstRunAgentScreen
+    <AgentScreenHost
       organizationId={organizationId}
-      setup={setup}
+      flow={flow}
+      model={model}
       chrome={chromeFor("agent")}
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
+    />
+  );
+}
+
+function AgentScreenHost({
+  organizationId,
+  flow,
+  model,
+  chrome,
+  sphere,
+}: {
+  organizationId: string;
+  flow: FirstRunSetupFlow;
+  model: OnboardingPageModel;
+  chrome: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
+}) {
+  return (
+    <FirstRunAgentScreen
+      organizationId={organizationId}
+      setup={model.setup}
+      chrome={chrome}
+      sphere={sphere}
       saving={flow.busy}
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}
+      providerKeysOffered={model.bringYourOwnKey}
       showCustomProvider={model.customProvider}
       modelSource={{
-        offered: model.bringYourOwnKey && model.hostedModelsAvailable,
+        offered: modelSourceOffered(model),
         choice: flow.credentialChoice,
         onSelect: flow.selectCredentialChoice,
+      }}
+      codex={{
+        offered: Boolean(model.codexSubscriptionOffered),
+        connection: model.codexConnection,
+        ready: Boolean(model.codexSubscriptionReady),
+        starting: Boolean(model.codexStarting),
+        canceling: Boolean(model.codexCanceling),
+        onStart: model.startCodexConnection,
+        onCancel: model.cancelCodexConnection,
       }}
       onRequestConnect={model.requestConnect}
       modelPicker={model.agentModelPicker}
@@ -416,10 +506,12 @@ function CompleteSetupScreen({
         <p>
           {flow.accessError
             ? "SuperPlane could not verify model access. Try again."
-            : "Continue with the models available to your organization."}
+            : flow.cardStep.requiresAdmin
+              ? "Ask an organization admin to select a billing plan. You can complete workspace setup now."
+              : "Continue with the models available to your organization."}
         </p>
       </FirstRunHeading>
-      <Button disabled={flow.busy} onClick={() => void flow.finishSetup()}>
+      <Button disabled={flow.busy || !flow.cardStep.ready} onClick={() => void flow.finishSetup()}>
         Continue
       </Button>
     </FirstRunShell>

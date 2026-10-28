@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"github.com/superplanehq/superplane/pkg/features"
 	"sync"
 	"testing"
 	"time"
@@ -10,17 +9,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	_ "github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-
-	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
 func Test__UpdateFactoryOnboarding(t *testing.T) {
@@ -122,11 +122,11 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 	})
 
 	t.Run("complete without agent integration succeeds when hosted credit remains", func(t *testing.T) {
-		t.Setenv(models.BillingEnabledEnv, "yes")
-		require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
-		before, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+		t.Setenv(billingmodels.BillingEnabledEnv, "yes")
+		before, err := billingmodels.ResolveOrganizationBillingPlan(db, r.Organization.ID)
 		require.NoError(t, err)
-		require.Equal(t, models.BillingPlanTrial, before.Catalog.Key)
+		require.Equal(t, billingmodels.BillingPlanNone, before.Catalog.Key)
+		require.Nil(t, before.TrialEndsAt)
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
@@ -142,7 +142,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
-		after, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
+		after, err := billingmodels.ResolveOrganizationBillingPlan(db, r.Organization.ID)
 		require.NoError(t, err)
 		require.Equal(t, before.PlanID, after.PlanID)
 		require.Equal(t, before.TrialEndsAt, after.TrialEndsAt)
@@ -151,7 +151,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 	t.Run("complete without agent integration succeeds when hosted credit is empty", func(t *testing.T) {
 		emptyOrg := support.CreateOrganization(t, r, r.User)
-		require.NoError(t, db.Where("organization_id = ?", emptyOrg.ID).Delete(&models.OrganizationLLMCreditGrant{}).Error)
+		require.NoError(t, db.Where("organization_id = ?", emptyOrg.ID).Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
 
 		factory, err := models.CreateFactory(db, emptyOrg.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)

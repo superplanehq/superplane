@@ -296,6 +296,11 @@ describe("agentFinishReady", () => {
     ).toBe(true);
   });
 
+  it("waits until ChatGPT sign-in is ready", () => {
+    expect(agentFinishReady({ ...ready, credentialChoice: "subscription", subscriptionReady: false })).toBe(false);
+    expect(agentFinishReady({ ...ready, credentialChoice: "subscription", subscriptionReady: true })).toBe(true);
+  });
+
   it("allows hosted models when no model source choice is offered", () => {
     expect(
       agentFinishReady({

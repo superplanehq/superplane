@@ -33,10 +33,10 @@ export const MERGE_CONFIDENCE_CHECK_COPY: ReadonlyArray<{
 ];
 
 export const MERGE_CONFIDENCE_SETTINGS_COPY = {
-  checksLabel: "Merge confidence checks",
+  checksLabel: "Scores",
   checksHelper: "Choose what the agent checks on each pull request.",
-  save: "Save checks",
-  saving: "Saving...",
+  save: "Save",
+  saving: "Saving",
 } as const;
 
 export const MERGE_CONFIDENCE_CONFIG_COPY = {

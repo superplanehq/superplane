@@ -63,12 +63,12 @@ export function BillingSeatCheckout({
         </Button>
       </div>
       <BillingSeatBounds occupied={occupied} bounds={bounds} maximum={maximum} />
-      <div className="text-sm">
-        <p>Initial payment estimate: {total}</p>
-        <p>Monthly total: {total}</p>
-        <p className="text-muted-foreground">Estimates exclude tax.</p>
+      <div className="flex items-center justify-between gap-3 rounded-md bg-muted/40 p-4">
+        <p className="text-sm">Monthly total</p>
+        <p className="text-xl font-semibold tabular-nums">{total}</p>
       </div>
-      <Button variant="outline" disabled={disabled || !valid} onClick={() => onSubscribe(seats)}>
+      <p className="text-xs text-muted-foreground">Estimates exclude tax.</p>
+      <Button className="w-full" disabled={disabled || !valid} onClick={() => onSubscribe(seats)}>
         Subscribe to {plan.name}
       </Button>
     </div>
@@ -98,8 +98,8 @@ function BillingSeatBounds({
       </p>
       {coveredInvitations > 0 && (
         <p className="text-muted-foreground">
-          Current members need at least {countOf(minimum, "seat")}. The default adds{" "}
-          {countOf(coveredInvitations, "seat")} for pending invitations. You can remove these seats.
+          The default includes {countOf(coveredInvitations, "seat")} for pending invitations. You can remove these
+          seats.
         </p>
       )}
       {maximum != null && invitationsWithoutSeat > 0 && (

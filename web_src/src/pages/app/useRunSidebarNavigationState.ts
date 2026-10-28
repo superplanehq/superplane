@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { getRunSidebarNavigation } from "@/components/CanvasToolSidebar/runsSidebarNavigation";
 import { useRunFilters } from "@/components/CanvasToolSidebar/useRunFilters";
-import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
+import type { CanvasRunsFilters } from "@/hooks/useCanvasData";
 
 interface UseRunSidebarNavigationStateParams {
   runs: CanvasesCanvasRun[];
@@ -10,7 +10,7 @@ interface UseRunSidebarNavigationStateParams {
   hasNextPage?: boolean;
   workflowNodes: ComponentsNode[];
   componentIconMap: Record<string, string>;
-  onStatusFiltersChange: (filters: RunStatusFilter[]) => void;
+  onFiltersChange: (filters: CanvasRunsFilters) => void;
 }
 
 export function useRunSidebarNavigationState({
@@ -19,9 +19,9 @@ export function useRunSidebarNavigationState({
   hasNextPage,
   workflowNodes,
   componentIconMap,
-  onStatusFiltersChange,
+  onFiltersChange,
 }: UseRunSidebarNavigationStateParams) {
-  const runFilterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const runFilterState = useRunFilters({ runs, workflowNodes, componentIconMap, onFiltersChange });
   const runNavigation = useMemo(
     () =>
       getRunSidebarNavigation(runFilterState.orderedRuns, selectedRunId, {

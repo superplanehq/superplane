@@ -1,7 +1,6 @@
 package models
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -9,76 +8,16 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 const OrganizationSortRemainingCreditCents = "remaining_credit_cents"
-
-// Preserve the instruction used by both deletion APIs.
-//
-//revive:disable-next-line:error-strings
-var ErrOrganizationSubscriptionLive = errors.New("Cancel the subscription in Billing before you delete the organization. You can delete it after the paid period ends.")
-
-// ErrOrganizationSubscriptionUnverified stops a deletion when Polar did not
-// confirm that the subscription ended. The organization stays.
-//
-//revive:disable-next-line:error-strings
-var ErrOrganizationSubscriptionUnverified = errors.New("SuperPlane could not confirm with Polar that the subscription ended. Try again later.")
-
-// OrganizationDeletionClearance records the billing row that a deletion check
-// read before it took any lock. Organization.SoftDelete compares it with the
-// locked row, so a subscription change between the check and the delete stops
-// the delete.
-//
-// Only NewLocalDeletionClearance and NewVerifiedDeletionClearance make a
-// clearance. Call NewVerifiedDeletionClearance only after Polar confirmed that
-// the stored subscription ended.
-type OrganizationDeletionClearance struct {
-	organizationID   uuid.UUID
-	hasBillingPlan   bool
-	subscriptionID   string
-	polarModifiedAt  *time.Time
-	planUpdatedAt    time.Time
-	providerVerified bool
-}
-
-// NewLocalDeletionClearance clears a deletion from the stored row alone. It
-// refuses a row that may still bill: only Polar can prove that such a
-// subscription ended. A nil plan means that the organization has no billing
-// row.
-func NewLocalDeletionClearance(orgID uuid.UUID, plan *OrganizationBillingPlan) (*OrganizationDeletionClearance, error) {
-	if plan.MayBeBillable(time.Now()) {
-		return nil, ErrOrganizationSubscriptionLive
-	}
-	return newDeletionClearance(orgID, plan, false), nil
-}
-
-// NewVerifiedDeletionClearance clears a deletion after Polar confirmed that
-// the stored subscription of plan ended. It returns nil for a nil plan, and
-// SoftDelete refuses a nil clearance.
-func NewVerifiedDeletionClearance(plan *OrganizationBillingPlan) *OrganizationDeletionClearance {
-	if plan == nil {
-		return nil
-	}
-	return newDeletionClearance(plan.OrganizationID, plan, true)
-}
-
-func newDeletionClearance(orgID uuid.UUID, plan *OrganizationBillingPlan, providerVerified bool) *OrganizationDeletionClearance {
-	clearance := &OrganizationDeletionClearance{organizationID: orgID, providerVerified: providerVerified}
-	if plan == nil {
-		return clearance
-	}
-	clearance.hasBillingPlan = true
-	clearance.subscriptionID = storedPolarSubscriptionID(plan)
-	clearance.polarModifiedAt = plan.PolarModifiedAt
-	clearance.planUpdatedAt = plan.UpdatedAt
-	return clearance
-}
+const OrganizationSortPlanName = "plan_name"
 
 type Organization struct {
 	ID uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
@@ -118,13 +57,14 @@ func (o *Organization) HasExperimentalFeature(id string) bool {
 
 type OrganizationWithCounts struct {
 	Organization
-	CanvasCount           int64  `gorm:"column:canvas_count"`
-	TaskCount             int64  `gorm:"column:task_count"`
-	DoneTaskCount         int64  `gorm:"column:done_task_count"`
-	MemberCount           int64  `gorm:"column:member_count"`
-	WorkspaceCount        int64  `gorm:"column:workspace_count"`
-	RepositoryCount       int64  `gorm:"column:repository_count"`
-	RemainingCreditMicros *int64 `gorm:"-"`
+	CanvasCount           int64                            `gorm:"column:canvas_count"`
+	TaskCount             int64                            `gorm:"column:task_count"`
+	DoneTaskCount         int64                            `gorm:"column:done_task_count"`
+	MemberCount           int64                            `gorm:"column:member_count"`
+	WorkspaceCount        int64                            `gorm:"column:workspace_count"`
+	RepositoryCount       int64                            `gorm:"column:repository_count"`
+	RemainingCreditMicros *int64                           `gorm:"-"`
+	PlanSummary           *billing.OrganizationPlanSummary `gorm:"-"`
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
@@ -139,6 +79,10 @@ func ListUnpinnedOrganizations(tx *gorm.DB, search string, limit, offset int, so
 
 	if sortBy == OrganizationSortRemainingCreditCents {
 		organizations, unpinnedTotal, err = listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection, excludeIDs)
+		return organizations, unpinnedTotal, matchTotal, err
+	}
+	if sortBy == OrganizationSortPlanName {
+		organizations, unpinnedTotal, err = listOrganizationsByPlanName(tx, search, limit, offset, sortDirection, excludeIDs)
 		return organizations, unpinnedTotal, matchTotal, err
 	}
 
@@ -183,15 +127,15 @@ func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offse
 	for i, organization := range organizations {
 		ids[i] = organization.ID
 	}
-	remaining, err := RemainingHostedCreditMicros(tx, ids)
+	remaining, err := billing.RemainingCreditMicros(tx, ids)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	descending := sortDirection != "asc"
 	sort.SliceStable(organizations, func(i, j int) bool {
-		left := pricebook.MicrosToCents(remaining[organizations[i].ID])
-		right := pricebook.MicrosToCents(remaining[organizations[j].ID])
+		left := billing.MicrosToCents(remaining[organizations[i].ID])
+		right := billing.MicrosToCents(remaining[organizations[j].ID])
 		if left != right {
 			if descending {
 				return left > right
@@ -220,6 +164,55 @@ func sliceOrganizations(organizations []OrganizationWithCounts, limit, offset in
 		organizations = organizations[:limit]
 	}
 	return organizations
+}
+
+// ResolveOrganizationPlans carries current plans with rows so callers can reuse resolved values.
+func ResolveOrganizationPlans(tx *gorm.DB, organizations []OrganizationWithCounts) error {
+	missing := make([]uuid.UUID, 0, len(organizations))
+	for _, org := range organizations {
+		if org.PlanSummary == nil {
+			missing = append(missing, org.ID)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	summaries, err := billing.ResolveOrganizationPlanSummaries(tx, missing)
+	if err != nil {
+		return err
+	}
+	for i := range organizations {
+		if organizations[i].PlanSummary == nil {
+			summary := summaries[organizations[i].ID]
+			organizations[i].PlanSummary = &summary
+		}
+	}
+	return nil
+}
+
+func listOrganizationsByPlanName(tx *gorm.DB, search string, limit, offset int, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc", excludeIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := ResolveOrganizationPlans(tx, organizations); err != nil {
+		return nil, 0, err
+	}
+	sort.Slice(organizations, func(i, j int) bool {
+		left, right := organizations[i], organizations[j]
+		leftPlan, rightPlan := strings.ToLower(left.PlanSummary.Name), strings.ToLower(right.PlanSummary.Name)
+		if leftPlan != rightPlan {
+			if sortDirection == "asc" {
+				return leftPlan < rightPlan
+			}
+			return leftPlan > rightPlan
+		}
+		if left.Name != right.Name {
+			return left.Name < right.Name
+		}
+		return left.ID.String() < right.ID.String()
+	})
+	return sliceOrganizations(organizations, limit, offset), total, nil
 }
 
 func FindOrganizationWithCounts(tx *gorm.DB, id uuid.UUID) (*OrganizationWithCounts, error) {
@@ -415,6 +408,9 @@ func CreateOrganization(name, description string) (*Organization, error) {
 }
 
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
+	if _, err := billing.Current(); err != nil {
+		return nil, err
+	}
 	slug, err := GenerateUniqueOrganizationSlug(tx, name, uuid.Nil)
 	if err != nil {
 		return nil, err
@@ -439,10 +435,8 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		Error
 
 	if err == nil {
-		if BillingEnabled() {
-			if _, planErr := EnsureOrganizationBillingPlan(tx, organization.ID); planErr != nil {
-				return nil, planErr
-			}
+		if err := billing.InitializeOrganization(tx, organization.ID); err != nil {
+			return nil, err
 		}
 
 		return &organization, nil
@@ -488,35 +482,25 @@ func SoftDeleteOrganizationInTransaction(tx *gorm.DB, id string) error {
 		if err != nil {
 			return err
 		}
-		plan, err := FindOrganizationBillingPlan(inner, organization.ID)
+		guard, err := billing.LocalDeletionGuard(inner, organization.ID)
 		if err != nil {
 			return err
 		}
-		clearance, err := NewLocalDeletionClearance(organization.ID, plan)
-		if err != nil {
-			return err
-		}
-		return organization.SoftDelete(inner, clearance)
+		return organization.SoftDelete(inner, guard)
 	})
 }
 
-// SoftDelete deletes under the same organization and billing row locks as
-// subscription updates. It also works within an account transaction.
-//
-// The clearance must come from a check that read the billing row before the
-// transaction took these locks. A Polar call must not hold the organization
-// lock. SoftDelete refuses a missing clearance, a row that may still bill
-// without Polar verification, and a row that changed after the check.
-func (o *Organization) SoftDelete(tx *gorm.DB, clearance *OrganizationDeletionClearance) error {
+// SoftDelete validates the prepared billing snapshot under the organization lock.
+// The caller prepares provider verification before it opens the transaction.
+func (o *Organization) SoftDelete(tx *gorm.DB, guard billing.DeletionGuard) error {
+	if guard == nil {
+		return billing.ErrOrganizationSubscriptionUnverified
+	}
 	return tx.Transaction(func(inner *gorm.DB) error {
 		if _, err := LockOrganization(inner, o.ID); err != nil {
 			return err
 		}
-		plan, err := lockOrganizationBillingPlan(inner, o.ID)
-		if err != nil {
-			return err
-		}
-		if err := clearance.permits(o.ID, plan, time.Now()); err != nil {
+		if err := guard.Validate(inner, o.ID); err != nil {
 			return err
 		}
 		return inner.Delete(o).Error
@@ -711,44 +695,4 @@ func excludeOrganizationIDs(query *gorm.DB, ids []uuid.UUID) *gorm.DB {
 	}
 
 	return query.Where("organizations.id NOT IN ?", ids)
-}
-
-// permits checks the locked billing row against the clearance. A row that may
-// still bill needs Polar verification, even when the row did not change. A
-// verified clearance stops being proof once the row changes.
-func (c *OrganizationDeletionClearance) permits(orgID uuid.UUID, locked *OrganizationBillingPlan, now time.Time) error {
-	if c == nil || c.organizationID != orgID {
-		return ErrOrganizationSubscriptionUnverified
-	}
-	if locked.MayBeBillable(now) && !c.providerVerified {
-		return ErrOrganizationSubscriptionLive
-	}
-	if !c.matches(locked) {
-		return ErrBillingPlanChanged
-	}
-	return nil
-}
-
-func (c *OrganizationDeletionClearance) matches(plan *OrganizationBillingPlan) bool {
-	if plan == nil {
-		return !c.hasBillingPlan
-	}
-	return c.hasBillingPlan &&
-		c.subscriptionID == storedPolarSubscriptionID(plan) &&
-		sameOptionalTime(c.polarModifiedAt, plan.PolarModifiedAt) &&
-		c.planUpdatedAt.Equal(plan.UpdatedAt)
-}
-
-func storedPolarSubscriptionID(plan *OrganizationBillingPlan) string {
-	if plan == nil || plan.PolarSubscriptionID == nil {
-		return ""
-	}
-	return strings.TrimSpace(*plan.PolarSubscriptionID)
-}
-
-func sameOptionalTime(a, b *time.Time) bool {
-	if a == nil || b == nil {
-		return a == nil && b == nil
-	}
-	return a.Equal(*b)
 }

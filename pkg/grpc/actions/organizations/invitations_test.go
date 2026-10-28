@@ -13,10 +13,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/ee/billing/entitlements"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/entitlements"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -33,7 +34,7 @@ import (
 func TestInvitationSeatReservations(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(10))
 	for i := 0; i < 8; i++ {
@@ -78,7 +79,7 @@ func TestInvitationSeatReservations(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, before.Available, after.Available)
 	require.Equal(t, before.RenewalQuantity, after.RenewalQuantity)
-	require.Equal(t, before.JoinLimit(), after.JoinLimit())
+	require.Equal(t, entitlements.JoinLimit(before), entitlements.JoinLimit(after))
 	require.Equal(t, 1, after.PendingInvitations)
 	require.Equal(t, 0, *after.Invitable)
 	resent, err := s.Resend(ctx, r.Organization.ID.String(), r.User.String(), first.Invitation.Id)
@@ -89,7 +90,7 @@ func TestInvitationSeatReservations(t *testing.T) {
 	require.NotEqual(t, crypto.HashToken(token), *stored.TokenHash)
 	require.Equal(t, crypto.HashToken(strings.TrimPrefix(resent.AcceptanceUrl, "https://example.com/invitations/")), *stored.TokenHash)
 	require.WithinDuration(t, time.Now().Add(7*24*time.Hour), stored.ExpiresAt, time.Minute)
-	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 11).Error)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", 11).Error)
 	_, err = create("second@example.com")
 	require.NoError(t, err)
 	_, err = s.Cancel(ctx, r.Organization.ID.String(), first.Invitation.Id)
@@ -116,7 +117,7 @@ func TestInvitationSeatReservations(t *testing.T) {
 func TestInvitationExpiryAndValidation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	db := database.Conn()
 	ctx := context.Background()
 	settings, err := models.GetInstallationMetadata(db)
@@ -187,7 +188,7 @@ func TestInvitationExpiryAndValidation(t *testing.T) {
 func TestInvitationFinalSeatConcurrent(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	setPurchasedSeatPlan(t, database.Conn(), r.Organization.ID, seatQuantity(2))
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 	start := make(chan struct{})
@@ -286,30 +287,30 @@ func TestInvitationCapacityPolicies(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
-			t.Setenv(models.BillingEnabledEnv, "yes")
+			t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 			if tc.disabled {
-				t.Setenv(models.BillingEnabledEnv, "no")
+				t.Setenv(billingmodels.BillingEnabledEnv, "no")
 			}
 			db := database.Conn()
-			plan := models.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Invitation plan", Category: "paid", Visibility: "private", PerSeat: tc.perSeat, SeatLimit: tc.maximum, CreditFrequency: "none", CreditExpiration: "never"}
+			plan := billingmodels.BillingPlan{Key: "invite_" + uuid.NewString()[:8], Name: "Invitation plan", Category: "paid", Visibility: "private", PerSeat: tc.perSeat, SeatLimit: tc.maximum, CreditFrequency: "none", CreditExpiration: "never"}
 			if tc.perSeat {
 				plan.PolarProductID = new("prod_" + uuid.NewString())
 			}
-			require.NoError(t, models.SaveBillingPlan(db, &plan))
+			require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 			if tc.perSeat {
-				_, err := models.ApplyPolarSubscription(db, r.Organization.ID, models.PolarSubscriptionApply{
+				_, err := billingmodels.ApplyPolarSubscription(db, r.Organization.ID, billingmodels.PolarSubscriptionApply{
 					ID: "sub_" + uuid.NewString(), ProductID: *plan.PolarProductID,
-					Status: models.PolarSubscriptionStatusActive, PurchasedSeats: new(1),
+					Status: billingmodels.PolarSubscriptionStatusActive, PurchasedSeats: new(1),
 				}, nil)
 				require.NoError(t, err)
 			}
 			if !tc.perSeat {
-				_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+				_, err := billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
 				require.NoError(t, err)
 			}
-			require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", tc.purchased).Error)
+			require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", r.Organization.ID).Update("purchased_seats", tc.purchased).Error)
 			if tc.override != nil || tc.unlimitedOverride {
-				require.NoError(t, models.SetOrganizationSeatLimitOverride(db, r.Organization.ID, tc.override))
+				require.NoError(t, billingmodels.SetOrganizationSeatLimitOverride(db, r.Organization.ID, tc.override))
 			}
 			s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 			for _, email := range []string{"first@example.com", "second@example.com"} {
@@ -348,7 +349,7 @@ func TestInvitationCapacityPolicies(t *testing.T) {
 func TestExpiredInvitationRequiresSeatOnResend(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "yes")
+	t.Setenv(billingmodels.BillingEnabledEnv, "yes")
 	db := database.Conn()
 	setPurchasedSeatPlan(t, db, r.Organization.ID, seatQuantity(2))
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
@@ -370,7 +371,7 @@ func (e invitationEntitlements) IsEntitled(feature licensing.Feature) bool {
 func TestInvitationCustomRoleEntitlement(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	require.NoError(t, r.AuthService.CreateCustomRole(r.Organization.ID.String(), &authorization.RoleDefinition{Name: "support", DomainType: models.DomainTypeOrganization, InheritsFrom: &authorization.RoleDefinition{Name: models.RoleOrgOperator}}))
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 	req := &pb.CreateInvitationRequest{Email: "custom@example.com", Role: "support"}
@@ -388,7 +389,7 @@ func TestInvitationCustomRoleEntitlement(t *testing.T) {
 func TestResendElevatedInvitationRequiresUpdatePermission(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv(billingmodels.BillingEnabledEnv, "no")
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 	adminInvite, err := s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.CreateInvitationRequest{Email: "admin-invite@example.com", Role: models.RoleOrgAdmin})
 	require.NoError(t, err)
@@ -444,7 +445,7 @@ func TestInvitationEmailRoleLabels(t *testing.T) {
 		t.Run(tc.role, func(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
-			t.Setenv(models.BillingEnabledEnv, "no")
+			t.Setenv(billingmodels.BillingEnabledEnv, "no")
 			if !r.AuthService.IsDefaultRole(tc.role, models.DomainTypeOrganization) {
 				require.NoError(t, r.AuthService.CreateCustomRole(r.Organization.ID.String(), &authorization.RoleDefinition{Name: tc.role, DisplayName: tc.displayName, DomainType: models.DomainTypeOrganization, InheritsFrom: &authorization.RoleDefinition{Name: models.RoleOrgOperator}}))
 				if tc.missing {

@@ -6,7 +6,8 @@ High-level steps to add a new integration to SuperPlane.
 
 ## 1. Pick an integration and claim a ticket
 
-Choose the integration you want to build and **claim the existing issue by commenting on it** so we know you’re working on it.
+Choose the integration you want to build. Comment on the existing issue, then
+wait until a maintainer assigns it to you before you start implementation.
 
 See: [Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/19).
 

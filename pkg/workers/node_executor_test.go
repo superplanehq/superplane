@@ -16,6 +16,7 @@ import (
 	logrus "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -390,19 +391,19 @@ func Test__NodeExecutor_RecordsHostedCreditFailureReasonOnFactoryStep(t *testing
 	}{
 		{
 			name:           "no hosted credit",
-			err:            models.ErrHostedCreditEmpty,
+			err:            billingmodels.ErrHostedCreditEmpty,
 			expectedReason: stringPointer(models.WorkOrderExecutionFailureReasonNoHostedCredit),
 			expectedResult: models.SuperPlaneRunnerNoCreditMessage,
 		},
 		{
 			name:           "no business subscription",
-			err:            models.ErrHostedSubscriptionRequired,
+			err:            billingmodels.ErrHostedSubscriptionRequired,
 			expectedReason: stringPointer(models.WorkOrderExecutionFailureReasonHostedSubscriptionRequired),
 			expectedResult: models.SuperPlaneRunnerSubscribeMessage,
 		},
 		{
 			name:           "no workspace budget",
-			err:            models.ErrFactoryHostedBudgetEmpty,
+			err:            billingmodels.ErrFactoryHostedBudgetEmpty,
 			expectedReason: stringPointer(models.WorkOrderExecutionFailureReasonWorkspaceBudgetEmpty),
 			expectedResult: models.SuperPlaneRunnerNoFactoryBudgetMessage,
 		},
@@ -455,7 +456,7 @@ func Test__NodeExecutor_HostedCreditFailureOutsideFactoryStep(t *testing.T) {
 	r.Registry.Actions[componentName] = impl.NewDummyAction(impl.DummyActionOptions{
 		Name: componentName,
 		ExecuteFunc: func(ctx core.ExecutionContext) error {
-			return models.ErrHostedCreditEmpty
+			return billingmodels.ErrHostedCreditEmpty
 		},
 	})
 
@@ -491,6 +492,33 @@ func Test__NodeExecutor_HostedCreditFailureOutsideFactoryStep(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedExecution.Result)
 	assert.Equal(t, models.SuperPlaneRunnerNoCreditMessage, updatedExecution.ResultMessage)
+}
+
+func TestNodeExecutorWaitsForCodexSubscriptionReservation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	step := dispatchFactoryExecutionForUsageTest(t, r)
+	busy := &models.CodexConnectionBusyError{TaskID: uuid.New()}
+	reserved := true
+	execution := createFactoryStepNodeExecution(t, r, step, func(ctx core.ExecutionContext) error {
+		if reserved {
+			return fmt.Errorf("reserve subscription: %w", busy)
+		}
+		return ctx.ExecutionState.Pass()
+	})
+	executor := newTestNodeExecutor(t, r)
+
+	require.ErrorIs(t, executor.LockAndProcessNodeExecution(execution.ID), busy)
+	pending, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, pending.State)
+	assert.Empty(t, pending.Result)
+
+	reserved = false
+	require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
+	finished, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionResultPassed, finished.Result)
 }
 
 // createFactoryStepNodeExecution creates a pending node execution that
@@ -555,13 +583,13 @@ func stringPointer(value string) *string {
 func assertRejectedHostedCredit(t *testing.T, failure map[string]any, orgID uuid.UUID, err error) {
 	t.Helper()
 
-	if !errors.Is(err, models.ErrHostedCreditEmpty) {
+	if !errors.Is(err, billingmodels.ErrHostedCreditEmpty) {
 		_, present := failure["remaining_micros"]
 		assert.False(t, present)
 		return
 	}
 
-	summary, describeErr := models.DescribeOrganizationLLMCredit(database.Conn(), orgID)
+	summary, describeErr := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), orgID)
 	require.NoError(t, describeErr)
 	assert.Equal(t, float64(summary.RemainingMicros), failure["remaining_micros"])
 	assert.Equal(t, float64(summary.WelcomeRemainingMicros), failure["welcome_remaining_micros"])
@@ -602,13 +630,12 @@ func TestNodeExecutorRejectsUsageWithoutRequiredCard(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
-	plan := models.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	plan := billingmodels.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	_, err := billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
 	plan.RequirePaymentMethod = true
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		require.Equal(t, "/customers/external/"+r.Organization.ID.String()+"/payment-methods", req.URL.Path)
 		_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "pagination": map[string]int{"max_page": 1}})
@@ -633,13 +660,12 @@ func TestNodeExecutorRetriesWhenPaymentMethodVerificationFails(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureNewBilling))
-	plan := models.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	plan := billingmodels.BillingPlan{Key: "card_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	_, err := billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
 	plan.RequirePaymentMethod = true
-	require.NoError(t, models.SaveBillingPlan(db, &plan))
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "polar unavailable", http.StatusInternalServerError)
 	}))
@@ -662,6 +688,7 @@ func TestNodeExecutorRetriesWhenPaymentMethodVerificationFails(t *testing.T) {
 // Saved configurations must be checked at execution time after a rollout is removed.
 func TestNodeExecutorBYOKRevocation(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.Conn()
 	settings, err := models.GetInstallationLLMSettings(db)
 	require.NoError(t, err)
@@ -776,9 +803,9 @@ func TestNodeExecutorBlocksAgentRunsWithoutActivePlan(t *testing.T) {
 				r := support.Setup(t)
 				defer r.Close()
 				t.Setenv("POLAR_ACCESS_TOKEN", polarToken)
-				_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanNone, nil)
+				_, err := billingmodels.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, billingmodels.BillingPlanNone, nil)
 				require.NoError(t, err)
-				credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), r.Organization.ID)
+				credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), r.Organization.ID)
 				require.NoError(t, err)
 				require.Greater(t, credit.RemainingMicros, int64(0), "the org must keep leftover credit")
 
@@ -799,6 +826,7 @@ func TestNodeExecutorRunsAgentsOnOpenTrial(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
 			t.Setenv("POLAR_ACCESS_TOKEN", "")
+			support.AssignOpenSystemTrial(t, r.Organization.ID)
 
 			execution, step, calls := processAgentRunnerStep(t, r, runner)
 
@@ -812,7 +840,7 @@ func TestNodeExecutorRunsAgentsOnOpenTrial(t *testing.T) {
 func TestNodeExecutorPlanGateSkipsOtherComponents(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanNone, nil)
+	_, err := billingmodels.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, billingmodels.BillingPlanNone, nil)
 	require.NoError(t, err)
 
 	step := dispatchFactoryExecutionForUsageTest(t, r)

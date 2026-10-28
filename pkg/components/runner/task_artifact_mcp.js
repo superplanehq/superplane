@@ -4,6 +4,7 @@
 const fs = require("node:fs");
 const crypto = require("node:crypto");
 const path = require("node:path");
+const { PUBLISH_LINK_TOOL, publishLink } = require("./publish_link");
 
 const MAX_ARTIFACT_BYTES = 100 * 1024 * 1024;
 const MAX_INSPECTABLE_SCREENSHOT_BYTES = 5 * 1024 * 1024;
@@ -346,7 +347,23 @@ function normalizeEvidenceAttempts(value) {
   return attempts;
 }
 
-const TOOLS = [
+function envFlag(name, env = process.env) {
+  return Boolean(String((env && env[name]) || "").trim());
+}
+
+function visualEvidenceToolsEnabled(env = process.env) {
+  if (envFlag("SUPERPLANE_VISUAL_EVIDENCE", env)) return true;
+  return envFlag("SUPERPLANE_ARTIFACT_TOKEN", env) && !envFlag("SUPERPLANE_PUBLISH_LINKS", env);
+}
+
+function listedTools(env = process.env) {
+  const tools = [];
+  if (visualEvidenceToolsEnabled(env)) tools.push(...VISUAL_EVIDENCE_TOOLS);
+  if (envFlag("SUPERPLANE_PUBLISH_LINKS", env)) tools.push(PUBLISH_LINK_TOOL);
+  return tools;
+}
+
+const VISUAL_EVIDENCE_TOOLS = [
   {
     name: "inspect_screenshot",
     description: "Inspect a screenshot before upload. Returns the image with its filename, MIME type, size, and SHA-256 hash.",
@@ -441,7 +458,7 @@ async function handleRequest(message) {
   if (method === "ping")
     return writeMessage({ jsonrpc: "2.0", id, result: {} });
   if (method === "tools/list")
-    return writeMessage({ jsonrpc: "2.0", id, result: { tools: TOOLS } });
+    return writeMessage({ jsonrpc: "2.0", id, result: { tools: listedTools() } });
   if (method !== "tools/call") {
     if (id != null)
       writeMessage({
@@ -459,6 +476,7 @@ async function handleRequest(message) {
     else if (name === "upload_artifact") result = await uploadArtifact(args);
     else if (name === "report_visual_evidence_unavailable")
       result = reportVisualEvidenceUnavailable(args);
+    else if (name === "publish_link") result = await publishLink(args);
     else throw new Error(`Unknown tool: ${name}`);
     const content = result.content || [{ type: "text", text: JSON.stringify(result) }];
     const structuredContent = result.structuredContent || result;

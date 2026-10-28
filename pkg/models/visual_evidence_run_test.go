@@ -102,3 +102,55 @@ func TestMaybeLinkVisualEvidenceRunIgnoresOtherCanvases(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, linked[pullRequest.ID])
 }
+
+func TestMaybeLinkCustomAutomationRunShowsTheRunOnThePullRequest(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Lint the pull request", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/app",
+		Number:     42,
+		URL:        "https://github.com/acme/app/pull/42",
+		Title:      "Lint the pull request",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "on-pull-request",
+		Name:   "On Pull Request",
+		Type:   models.NodeTypeTrigger,
+		Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(
+			models.FactoryAppTemplateCustomAutomationID,
+			1,
+		)),
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factoryModel.ID).Error)
+	require.NoError(t, db.Model(canvas).Update("name", "Fix Linter Issues").Error)
+	require.NoError(t, db.First(canvas, "id = ?", canvas.ID).Error)
+
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "on-pull-request", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	event := &models.CanvasEvent{
+		WorkflowID: canvas.ID,
+		NodeID:     "on-pull-request",
+		Data: models.NewJSONValue(map[string]any{
+			"data": map[string]any{
+				"pullRequest": map[string]any{"id": pullRequest.ID.String()},
+			},
+		}),
+	}
+
+	require.NoError(t, models.MaybeLinkCustomAutomationRun(db, canvas, event, run))
+	require.NoError(t, models.MaybeLinkCustomAutomationRun(db, canvas, event, run))
+
+	linked, err := models.ListPullRequestRuns(db, []uuid.UUID{pullRequest.ID})
+	require.NoError(t, err)
+	require.Len(t, linked[pullRequest.ID], 1)
+	assert.Equal(t, run.ID, linked[pullRequest.ID][0].Run.ID)
+	assert.Equal(t, "Fix Linter Issues", linked[pullRequest.ID][0].Title)
+}

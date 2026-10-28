@@ -38,6 +38,7 @@ import {
   CreateWorkOrderComposeRedirect,
   FactoriesIndexPage,
   FactoryAppCanvasPage,
+  FactoryAutomationRunPage,
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
@@ -65,6 +66,7 @@ import {
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
   RiskScoreSetupPage,
+  CustomAutomationSetupPage,
   SentryIntakeSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
@@ -92,6 +94,7 @@ import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
 import { isNotFoundError } from "./pages/app/workflowPageHelpers";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
+import { RegistrationStats } from "./pages/admin/RegistrationStats";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
@@ -106,7 +109,7 @@ import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
 import { BillingPlans } from "./pages/admin/BillingPlans";
 import { Features } from "./pages/admin/Features";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
-import ImpersonationBanner from "./components/ImpersonationBanner";
+import { SupportSessionBanner } from "./components/SupportSessionBanner";
 import LicenseExpiryBanner from "./components/LicenseExpiryBanner";
 import { usePageObservability } from "./hooks/usePageObservability";
 
@@ -191,6 +194,10 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/risk-score" element={<RiskScoreSetupPage />} />
+              <Route path=":lineId/setup/custom-automation" element={<CustomAutomationSetupPage />} />
+              <Route path=":lineId/setup/custom-automation/:automationId" element={<CustomAutomationSetupPage />} />
+              <Route path=":lineId/setup/custom-verification" element={<CustomAutomationSetupPage />} />
+              <Route path=":lineId/setup/custom-verification/:automationId" element={<CustomAutomationSetupPage />} />
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
               <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
@@ -205,6 +212,7 @@ function organizationScopedRouteTree() {
               <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
               <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
               <Route path=":appId" element={<FactoryCanvasConfigureGate />} />
+              <Route path=":appId/runs/:runId?" element={<FactoryAutomationRunPage />} />
               <Route path=":appId/split-run" element={<FactoryAppSplitRunPage />} />
             </Route>
             <Route path="apps/:appId" element={<LegacyFactoryAppRedirect />} />
@@ -262,7 +270,7 @@ function AppRouter() {
     <BrowserRouter>
       <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
-        <ImpersonationBanner />
+        <SupportSessionBanner />
         <LicenseExpiryBanner />
         {/* Phone shells read this region so a fixed shell stays below app banners. */}
         <div className="relative flex-1 overflow-auto" data-app-content-region="">
@@ -276,6 +284,7 @@ function AppRouter() {
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<OrganizationsListAdmin />} />
+                <Route path="stats" element={<RegistrationStats />} />
                 <Route path="accounts" element={<AccountsListAdmin />} />
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
                 <Route path="credits" element={<CreditsAdmin />} />
@@ -376,7 +385,7 @@ export function OrganizationScope() {
   useIdentifyOrganizationGroup({
     accountId: account?.id,
     organizationKey: segment,
-    impersonating: account?.impersonation?.active,
+    inSupportSession: account?.support_session?.active,
     refreshOrganization: organizationScopeQueryEnabled(segment, isReserved, guestLine)
       ? refreshOrganization
       : undefined,

@@ -7,6 +7,7 @@ import {
   meVerifyVcsProviderInstallations,
   type MeDescribeVcsProviderOnboardingResponse,
 } from "@/api-client";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -108,6 +109,7 @@ export function useGitHubOnboarding(organizationId: string, options: { poll?: bo
  */
 export function useGitHubInstallationChecks(organizationId: string, enabled: boolean) {
   const queryClient = useQueryClient();
+  const inSupportSession = useIsSupportSession();
   useQuery({
     queryKey: githubInstallationChecksKey(organizationId),
     queryFn: async () => {
@@ -117,7 +119,7 @@ export function useGitHubInstallationChecks(organizationId: string, enabled: boo
       await queryClient.invalidateQueries({ queryKey: githubOnboardingKey(organizationId) });
       return null;
     },
-    enabled: enabled && Boolean(organizationId),
+    enabled: enabled && Boolean(organizationId) && !inSupportSession,
     refetchInterval: githubInstallationCheckIntervalMs,
     retry: false,
     gcTime: 0,

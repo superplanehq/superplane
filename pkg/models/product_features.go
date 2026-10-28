@@ -2,48 +2,15 @@ package models
 
 import (
 	"errors"
-	"slices"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/gorm"
 )
 
 var ErrBYOKAccessDenied = errors.New("your organization does not have access to provider credentials; select a SuperPlane-hosted model or contact your administrator")
-
-// ResolveOrganizationProductFeatures resolves plan and organization grants.
-// A disabled grant cannot remove access included in a plan.
-func ResolveOrganizationProductFeatures(tx *gorm.DB, orgID uuid.UUID) (map[string]bool, error) {
-	plan, err := ResolveOrganizationBillingPlan(tx, orgID)
-	if err != nil {
-		return nil, err
-	}
-	return plan.ResolveProductFeatures(tx)
-}
-
-// ResolveProductFeatures uses the loaded plan to resolve organization grants.
-func (p *OrganizationBillingPlan) ResolveProductFeatures(tx *gorm.DB) (map[string]bool, error) {
-	definitions, err := ListPlanFeatureDefinitions(tx)
-	if err != nil {
-		return nil, err
-	}
-	grants, err := ListOrganizationFeatureGrants(tx, p.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
-	enabled := map[string]bool{}
-	for _, grant := range grants {
-		if grant.Enabled {
-			enabled[grant.FeatureKey] = true
-		}
-	}
-	resolved := make(map[string]bool, len(definitions))
-	for _, feature := range definitions {
-		resolved[feature.Key] = !BillingEnabled() || !feature.Gated || slices.Contains(p.Catalog.Features, feature.Key) || enabled[feature.Key]
-	}
-	return resolved, nil
-}
 
 // OrganizationBYOKAccess allows standard providers when no hosted default exists.
 // Otherwise, rollout and product permissions apply. Custom providers need both rollouts.
@@ -67,7 +34,7 @@ func OrganizationBYOKAccess(tx *gorm.DB, orgID uuid.UUID, provider string) (bool
 	if err != nil || !enabled {
 		return false, err
 	}
-	productFeatures, err := ResolveOrganizationProductFeatures(tx, orgID)
+	productFeatures, err := billing.ResolveProductFeatures(tx, orgID)
 	if err != nil {
 		return false, err
 	}

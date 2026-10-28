@@ -37,10 +37,11 @@ export function FirstRunFlow({
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>("github-issues");
+  const [ticketChosen, setTicketChosen] = useState(false);
   const [jiraConnected, setJiraConnected] = useState(false);
   const [jiraProjectId, setJiraProjectId] = useState("");
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
-  const [progress, setProgress] = useState<FirstRunAnalysisProgress>({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
+  const progress = useDemoAnalysisProgress(screen === "analysis");
 
   const chromeFor = (stepIndex: number, onBack?: () => void): FirstRunChrome => ({
     displayName: firstName,
@@ -49,19 +50,6 @@ export function FirstRunFlow({
     stepIndex,
     onBack,
   });
-
-  useEffect(() => {
-    if (screen !== "analysis") return;
-    const stageTimer = window.setInterval(() => {
-      setProgress((current) => {
-        const scored = Math.min(current.scored + 1, current.total);
-        // Roughly two of three demo tickets score above the threshold.
-        const ready = Math.ceil((scored * 2) / 3);
-        return { total: current.total, scored, ready, stageIndex: scored === current.total ? 2 : 1 };
-      });
-    }, STAGE_MS);
-    return () => window.clearInterval(stageTimer);
-  }, [screen]);
 
   const analysisSphere = analysisSphereFor(selectedRepository, progress.total);
 
@@ -111,13 +99,20 @@ export function FirstRunFlow({
     return (
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
+        startOnSourceList={!ticketChosen}
+        repository={selectedRepository ?? undefined}
+        repositories={FIRST_RUN_REPOSITORIES}
+        onSelectRepository={setSelectedRepository}
         githubConnected
         chrome={chromeFor(3, () => setScreen("choose"))}
         sphere={repositorySphereFor(selectedRepository)}
         jiraConnected={jiraConnected}
         jiraProjects={STORY_JIRA_PROJECTS}
         jiraProjectId={jiraProjectId}
-        onSelectTicketSource={setTicketSource}
+        onSelectTicketSource={(source) => {
+          setTicketChosen(true);
+          setTicketSource(source);
+        }}
         onConnectJira={() => {
           setTicketSource("jira");
           setJiraConnected(true);
@@ -125,7 +120,6 @@ export function FirstRunFlow({
         onSelectJiraProject={setJiraProjectId}
         onAnalyzeTickets={() => {
           if (!canAnalyzeTicketSource({ ticketSource, githubConnected: true, jiraConnected, jiraProjectId })) return;
-          setProgress({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
           setScreen("analysis");
         }}
       />
@@ -145,4 +139,27 @@ export function FirstRunFlow({
   }
 
   return board ?? <FirstRunBoardExit />;
+}
+
+const INITIAL_DEMO_PROGRESS: FirstRunAnalysisProgress = { total: 12, scored: 0, ready: 0, stageIndex: 1 };
+
+/** Restarts and scores one demo ticket per stage tick while the analysis screen is open. */
+function useDemoAnalysisProgress(running: boolean): FirstRunAnalysisProgress {
+  const [progress, setProgress] = useState(INITIAL_DEMO_PROGRESS);
+
+  useEffect(() => {
+    if (!running) return;
+    setProgress(INITIAL_DEMO_PROGRESS);
+    const stageTimer = window.setInterval(() => {
+      setProgress((current) => {
+        const scored = Math.min(current.scored + 1, current.total);
+        // Roughly two of three demo tickets score above the threshold.
+        const ready = Math.ceil((scored * 2) / 3);
+        return { total: current.total, scored, ready, stageIndex: scored === current.total ? 2 : 1 };
+      });
+    }, STAGE_MS);
+    return () => window.clearInterval(stageTimer);
+  }, [running]);
+
+  return progress;
 }
