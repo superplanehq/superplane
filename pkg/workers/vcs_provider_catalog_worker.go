@@ -16,7 +16,7 @@ const (
 	vcsProviderReconcileInterval             = 5 * time.Minute
 	vcsProviderScheduleCheckInterval         = 30 * time.Second
 	vcsProviderSweepInterval                 = 10 * time.Minute
-	vcsProviderCollaboratorsStaleAfter       = 24 * time.Hour
+	vcsProviderCollaboratorsFreshnessWindow  = 24 * time.Hour
 	vcsProviderSweepMinimumBatch             = 50
 	vcsProviderInstallRequestPollInterval    = 2 * time.Second
 	vcsProviderInstallRequestRefreshInterval = 15 * time.Second
@@ -178,7 +178,9 @@ func (w *VCSProviderCatalogWorker) runScheduledTasks(ctx context.Context, now ti
 
 // sweepStaleRepositories refreshes collaborators that no webhook changed. Each
 // sweep queues a share of the catalog, so every repository is refreshed within
-// vcsProviderCollaboratorsStaleAfter without one large burst.
+// vcsProviderCollaboratorsFreshnessWindow without one large burst. A repository
+// is queued one sweep interval before its window ends, because the next sweep
+// would run after the deadline.
 func (w *VCSProviderCatalogWorker) sweepStaleRepositories(now time.Time) {
 	db := database.Conn()
 	repositoryCount, err := models.CountVCSProviderRepositories(db, w.provider)
@@ -190,7 +192,7 @@ func (w *VCSProviderCatalogWorker) sweepStaleRepositories(now time.Time) {
 	queued, err := models.EnqueueStaleVCSProviderRepositorySyncs(
 		db,
 		w.provider,
-		now.Add(-vcsProviderCollaboratorsStaleAfter),
+		now.Add(vcsProviderSweepInterval-vcsProviderCollaboratorsFreshnessWindow),
 		vcsProviderSweepBatchSize(repositoryCount),
 		now,
 	)
@@ -206,7 +208,7 @@ func (w *VCSProviderCatalogWorker) sweepStaleRepositories(now time.Time) {
 // vcsProviderSweepBatchSize returns 1.5 times the even share per sweep, so the
 // sweep catches up after an outage.
 func vcsProviderSweepBatchSize(repositoryCount int64) int {
-	sweepsPerWindow := int64(vcsProviderCollaboratorsStaleAfter / vcsProviderSweepInterval)
+	sweepsPerWindow := int64(vcsProviderCollaboratorsFreshnessWindow / vcsProviderSweepInterval)
 	share := (repositoryCount*3 + sweepsPerWindow*2 - 1) / (sweepsPerWindow * 2)
 	return int(max(share, vcsProviderSweepMinimumBatch))
 }

@@ -509,10 +509,12 @@ func TestVCSProviderCatalogWorkerRunsScheduledTasksOnceAcrossReplicas(t *testing
 	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, 101, []models.VCSProviderRepository{
 		{RepositoryID: 201, FullName: "acme/stale"},
 		{RepositoryID: 202, FullName: "acme/fresh"},
+		{RepositoryID: 203, FullName: "acme/due-before-next-sweep"},
 	}))
 	for repositoryID, syncedAt := range map[int64]time.Time{
-		201: now.Add(-2 * vcsProviderCollaboratorsStaleAfter),
+		201: now.Add(-2 * vcsProviderCollaboratorsFreshnessWindow),
 		202: now.Add(-time.Hour),
+		203: now.Add(vcsProviderSweepInterval/2 - vcsProviderCollaboratorsFreshnessWindow),
 	} {
 		require.NoError(t, db.Model(&models.VCSProviderRepository{}).
 			Where("provider = ? AND repository_id = ?", models.ProviderGitHub, repositoryID).
@@ -528,7 +530,7 @@ func TestVCSProviderCatalogWorkerRunsScheduledTasksOnceAcrossReplicas(t *testing
 	assert.Empty(t, second.priorities(), "a second replica must not repeat the catalog reconcile")
 	var repositoryIDs []int64
 	require.NoError(t, db.Model(&models.VCSProviderRepositorySyncJob{}).Pluck("repository_id", &repositoryIDs).Error)
-	assert.Equal(t, []int64{201}, repositoryIDs)
+	assert.ElementsMatch(t, []int64{201, 203}, repositoryIDs)
 }
 
 func TestVCSProviderInstallationRetryDelay(t *testing.T) {
