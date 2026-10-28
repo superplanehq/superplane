@@ -19,8 +19,7 @@ it("paginates registrations, resets the page for a date filter, and retries fail
       return new Response(
         JSON.stringify({
           total: 6,
-          trial_granted_cents: 6000,
-          trial_spent_cents: 1200,
+          ...(offset ? {} : { trial_granted_cents: 6000, trial_spent_cents: 1200 }),
           items: Array.from({ length: offset ? 1 : 5 }, (_, i) => ({
             id: `org-${offset + i}`,
             name: `Organization ${offset + i}`,
@@ -48,6 +47,8 @@ it("paginates registrations, resets the page for a date filter, and retries fail
   await user.click(screen.getByRole("button", { name: "Next" }));
   expect(await screen.findByRole("link", { name: "Organization 5" })).toBeInTheDocument();
   expect(requests.at(-1)?.searchParams.get("offset")).toBe("5");
+  expect(screen.getByText("$60.00")).toBeInTheDocument();
+  expect(screen.getByText("$12.00")).toBeInTheDocument();
   await user.click(screen.getByRole("combobox", { name: "Registration period" }));
   await user.click(screen.getByRole("option", { name: "Custom" }));
   fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-03-01" } });

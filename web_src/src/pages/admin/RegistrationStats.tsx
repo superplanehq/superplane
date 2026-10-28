@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Heading } from "@/components/Heading/heading";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/Table/table";
@@ -29,6 +29,9 @@ export type RegistrationReport = {
   trial_spent_cents: number;
 };
 
+type RegistrationResponse = Omit<RegistrationReport, "trial_granted_cents" | "trial_spent_cents"> &
+  Partial<Pick<RegistrationReport, "trial_granted_cents" | "trial_spent_cents">>;
+
 function dateInputValue(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -39,6 +42,8 @@ export function RegistrationStats() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
+  // Only the first page returns credit totals. Keep them while the user pages.
+  const totals = useRef<{ key: string; granted: number; spent: number } | null>(null);
   useReportPageReady(!loading, { failed: error });
 
   useEffect(() => {
@@ -49,8 +54,19 @@ export function RegistrationStats() {
     void fetch(`/admin/api/stats?${params}`, { credentials: "include", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("Failed to load statistics");
-        const result: RegistrationReport = await response.json();
-        if (!controller.signal.aborted) setReport(result);
+        const result: RegistrationResponse = await response.json();
+        const key = `${query.start}|${query.end}`;
+        if (result.trial_granted_cents !== undefined && result.trial_spent_cents !== undefined) {
+          totals.current = { key, granted: result.trial_granted_cents, spent: result.trial_spent_cents };
+        }
+        const known = totals.current?.key === key ? totals.current : null;
+        if (!controller.signal.aborted) {
+          setReport({
+            ...result,
+            trial_granted_cents: known?.granted ?? 0,
+            trial_spent_cents: known?.spent ?? 0,
+          });
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted) setError(true);

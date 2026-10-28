@@ -9,13 +9,16 @@ import (
 	"gorm.io/gorm"
 )
 
-const RegistrationStatsPageSize = 5
+const (
+	RegistrationStatsPageSize   = 5
+	registrationCreditBatchSize = 200
+)
 
 type RegistrationStats struct {
 	Items             []RegisteredOrganization `json:"items"`
 	Total             int64                    `json:"total"`
-	TrialGrantedCents int64                    `json:"trial_granted_cents"`
-	TrialSpentCents   int64                    `json:"trial_spent_cents"`
+	TrialGrantedCents *int64                   `json:"trial_granted_cents,omitempty"`
+	TrialSpentCents   *int64                   `json:"trial_spent_cents,omitempty"`
 }
 
 type RegisteredOrganization struct {
@@ -28,6 +31,8 @@ type RegisteredOrganization struct {
 
 // DescribeRegistrationStats groups active organizations by registration time.
 // Credit totals are lifetime values for that cohort, independent of pagination.
+// They need every organization in the cohort, so only the first page (offset 0)
+// calculates them. Later pages load credit for their own rows only.
 func DescribeRegistrationStats(tx *gorm.DB, start, end time.Time, offset int) (RegistrationStats, error) {
 	report := RegistrationStats{Items: []RegisteredOrganization{}}
 	cohort := func() *gorm.DB {
@@ -41,21 +46,19 @@ func DescribeRegistrationStats(tx *gorm.DB, start, end time.Time, offset int) (R
 	if len(ids) == 0 {
 		return report, nil
 	}
-	credits, err := hostedCreditSpendByOrganization(tx, ids)
-	if err != nil {
-		return report, err
+	if offset == 0 {
+		if err := addTrialCreditTotals(tx, &report, ids); err != nil {
+			return report, err
+		}
 	}
-	var granted, spent int64
-	for _, credit := range credits {
-		granted += credit.TrialGrantedMicros
-		spent += credit.TrialSpentMicros
-	}
-	report.TrialGrantedCents = billing.MicrosToCents(granted)
-	report.TrialSpentCents = billing.MicrosToCents(spent)
 	if offset >= len(ids) {
 		return report, nil
 	}
 	pageIDs := ids[offset:min(offset+RegistrationStatsPageSize, len(ids))]
+	credits, err := hostedCreditSpendByOrganization(tx, pageIDs)
+	if err != nil {
+		return report, err
+	}
 	owners := tx.Model(&coremodels.User{}).
 		Select("organization_id, STRING_AGG(DISTINCT email, ', ' ORDER BY email) AS owner_email").
 		Where("organization_id IN ? AND is_owner = ? AND type = ?", pageIDs, true, coremodels.UserTypeHuman).Group("organization_id")
@@ -78,4 +81,23 @@ func DescribeRegistrationStats(tx *gorm.DB, start, end time.Time, offset int) (R
 		}
 	}
 	return report, nil
+}
+
+// addTrialCreditTotals sums trial credit in bounded batches of organizations.
+func addTrialCreditTotals(tx *gorm.DB, report *RegistrationStats, ids []uuid.UUID) error {
+	var granted, spent int64
+	for start := 0; start < len(ids); start += registrationCreditBatchSize {
+		credits, err := hostedCreditSpendByOrganization(tx, ids[start:min(start+registrationCreditBatchSize, len(ids))])
+		if err != nil {
+			return err
+		}
+		for _, credit := range credits {
+			granted += credit.TrialGrantedMicros
+			spent += credit.TrialSpentMicros
+		}
+	}
+	grantedCents, spentCents := billing.MicrosToCents(granted), billing.MicrosToCents(spent)
+	report.TrialGrantedCents = &grantedCents
+	report.TrialSpentCents = &spentCents
+	return nil
 }
