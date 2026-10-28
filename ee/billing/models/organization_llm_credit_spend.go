@@ -158,30 +158,19 @@ func splitCreditGrantsForSpend(grants []OrganizationLLMCreditGrant, now time.Tim
 }
 
 // lifetimeTrialSpentMicros returns how much usage the trial (welcome) grants
-// paid for. It replays usage in the periods between grant expiries and spends
-// the grants that were live in each period in spend order. Usage that happened
-// while a trial grant was live therefore stays trial spend after other grants
-// expire.
+// paid for. It replays usage in the periods between grant creation and expiry
+// times. Each period is spent, in spend order, by the grants that existed and
+// were live during it. Usage that a trial grant paid for therefore stays trial
+// spend after other grants expire, and a later grant does not take over past
+// usage. A grant whose creation time has no billed amount in billedAtOrBefore
+// counts as existing from the start.
 func lifetimeTrialSpentMicros(grants []OrganizationLLMCreditGrant, billedMicros int64, billedAtOrBefore map[int64]int64, now time.Time) int64 {
 	capacity := applyNegativeCreditAdjustments(grants)
 	sortGrantsBySpendOrder(capacity)
-
-	expiries := make([]time.Time, 0, len(billedAtOrBefore))
-	seen := map[int64]struct{}{}
-	for _, grant := range capacity {
-		if grant.ExpiresAt == nil || !grant.IsExpired(now) {
-			continue
-		}
-		key := grant.ExpiresAt.UTC().UnixNano()
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		expiries = append(expiries, *grant.ExpiresAt)
-	}
-	sort.Slice(expiries, func(i, j int) bool { return expiries[i].Before(expiries[j]) })
+	boundaries := trialSpendBoundaries(capacity, billedAtOrBefore, now)
 
 	var trialSpent, billedBefore int64
+	var periodStart time.Time
 	spendPeriod := func(billedUntil int64, live func(OrganizationLLMCreditGrant) bool) {
 		spend := billedUntil - billedBefore
 		if spend <= 0 {
@@ -193,7 +182,7 @@ func lifetimeTrialSpentMicros(grants []OrganizationLLMCreditGrant, billedMicros 
 			if grant.AmountMicros <= 0 {
 				continue
 			}
-			if !live(*grant) {
+			if !existedAt(*grant, periodStart, billedAtOrBefore) || !live(*grant) {
 				continue
 			}
 			take := min(grant.AmountMicros, spend)
@@ -207,15 +196,50 @@ func lifetimeTrialSpentMicros(grants []OrganizationLLMCreditGrant, billedMicros 
 			}
 		}
 	}
-	for _, expiry := range expiries {
-		spendPeriod(billedAtOrBefore[expiry.UTC().UnixNano()], func(grant OrganizationLLMCreditGrant) bool {
-			return grant.ExpiresAt == nil || !grant.ExpiresAt.Before(expiry)
+	for _, boundary := range boundaries {
+		spendPeriod(billedAtOrBefore[boundary.UTC().UnixNano()], func(grant OrganizationLLMCreditGrant) bool {
+			return grant.ExpiresAt == nil || !grant.ExpiresAt.Before(boundary)
 		})
+		periodStart = boundary
 	}
 	spendPeriod(billedMicros, func(grant OrganizationLLMCreditGrant) bool {
 		return !grant.IsExpired(now)
 	})
 	return trialSpent
+}
+
+// trialSpendBoundaries returns the sorted, unique expiry times of expired
+// grants and the creation times that have a billed amount.
+func trialSpendBoundaries(grants []OrganizationLLMCreditGrant, billedAtOrBefore map[int64]int64, now time.Time) []time.Time {
+	boundaries := make([]time.Time, 0, len(billedAtOrBefore))
+	seen := map[int64]struct{}{}
+	add := func(at time.Time) {
+		key := at.UTC().UnixNano()
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		boundaries = append(boundaries, at)
+	}
+	for _, grant := range grants {
+		if grant.ExpiresAt != nil && grant.IsExpired(now) {
+			add(*grant.ExpiresAt)
+		}
+		if _, ok := billedAtOrBefore[grant.CreatedAt.UTC().UnixNano()]; ok {
+			add(grant.CreatedAt)
+		}
+	}
+	sort.Slice(boundaries, func(i, j int) bool { return boundaries[i].Before(boundaries[j]) })
+	return boundaries
+}
+
+// existedAt reports whether the grant existed when a period starting at
+// periodStart began. Usage at the creation time itself is older than the grant.
+func existedAt(grant OrganizationLLMCreditGrant, periodStart time.Time, billedAtOrBefore map[int64]int64) bool {
+	if _, ok := billedAtOrBefore[grant.CreatedAt.UTC().UnixNano()]; !ok {
+		return true
+	}
+	return !grant.CreatedAt.After(periodStart)
 }
 
 type expiredCreditSpend struct{ TotalMicros int64 }

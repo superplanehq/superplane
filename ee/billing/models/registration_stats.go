@@ -32,7 +32,8 @@ type RegisteredOrganization struct {
 // DescribeRegistrationStats groups active organizations by registration time.
 // Credit totals are lifetime values for that cohort, independent of pagination.
 // They need every organization in the cohort, so only the first page (offset 0)
-// calculates them. Later pages load credit for their own rows only.
+// calculates them, and report zero totals when no organization matches. Later
+// pages load credit for their own rows only.
 func DescribeRegistrationStats(tx *gorm.DB, start, end time.Time, offset int) (RegistrationStats, error) {
 	report := RegistrationStats{Items: []RegisteredOrganization{}}
 	cohort := func() *gorm.DB {
@@ -43,9 +44,6 @@ func DescribeRegistrationStats(tx *gorm.DB, start, end time.Time, offset int) (R
 		return report, err
 	}
 	report.Total = int64(len(ids))
-	if len(ids) == 0 {
-		return report, nil
-	}
 	if offset == 0 {
 		if err := addTrialCreditTotals(tx, &report, ids); err != nil {
 			return report, err
@@ -87,7 +85,7 @@ func DescribeRegistrationStats(tx *gorm.DB, start, end time.Time, offset int) (R
 func addTrialCreditTotals(tx *gorm.DB, report *RegistrationStats, ids []uuid.UUID) error {
 	var granted, spent int64
 	for start := 0; start < len(ids); start += registrationCreditBatchSize {
-		credits, err := hostedCreditSpendByOrganization(tx, ids[start:min(start+registrationCreditBatchSize, len(ids))])
+		credits, err := hostedCreditSpendWithTrialHistory(tx, ids[start:min(start+registrationCreditBatchSize, len(ids))])
 		if err != nil {
 			return err
 		}
