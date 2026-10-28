@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -662,26 +663,98 @@ func TestFormatStreamJsonLinesWithNoResultEventIsNotFailed(t *testing.T) {
 }
 
 func TestClaudeModelCallOutcomesMapsRetriesAndProviderFailures(t *testing.T) {
+	stamp := "2026-10-28T12:00:00.000Z"
 	assert.Equal(t, []any{
-		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_1"},
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_1", "occurredAt": stamp},
 	}, claudeModelCallOutcomesFromScript(t, map[string]any{
-		"failed": false, "apiRetryCount": 0, "model": "claude-sonnet-4-6",
+		"failed": false, "apiRetryCount": 0, "model": "claude-sonnet-4-6", "occurredAt": stamp,
 	}))
 	assert.Equal(t, []any{
-		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_3"},
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_3", "occurredAt": stamp},
 	}, claudeModelCallOutcomesFromScript(t, map[string]any{
-		"failed": false, "apiRetryCount": 2, "model": "claude-sonnet-4-6",
+		"failed": false, "apiRetryCount": 2, "model": "claude-sonnet-4-6", "occurredAt": stamp,
 	}))
 	assert.Equal(t, []any{
-		map[string]any{"model": "claude-sonnet-4-6", "outcome": "error"},
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "error", "occurredAt": stamp},
 	}, claudeModelCallOutcomesFromScript(t, map[string]any{
-		"failed": true, "sawRateLimit": true, "model": "claude-sonnet-4-6",
+		"failed": true, "sawRateLimit": true, "model": "claude-sonnet-4-6", "occurredAt": stamp,
 	}))
 	assert.Empty(t, claudeModelCallOutcomesFromScript(t, map[string]any{
-		"failed":    true,
-		"errorText": "Failed to authenticate. API Error: 401 API key is invalid.",
-		"model":     "claude-sonnet-4-6",
+		"failed":     true,
+		"errorText":  "Failed to authenticate. API Error: 401 API key is invalid.",
+		"model":      "claude-sonnet-4-6",
+		"occurredAt": stamp,
 	}))
+}
+
+func TestClaudeResultRecordsOneOutcomePerAssistantCall(t *testing.T) {
+	payload := claudeResultFromStream(t, []string{
+		`{"type":"system","subtype":"init","model":"claude-sonnet-4-6"}`,
+		`{"type":"assistant","message":{"id":"msg_a","content":[{"type":"text","text":"one"}]}}`,
+		`{"type":"system","subtype":"api_retry","attempt":1,"max_retries":3}`,
+		`{"type":"assistant","message":{"id":"msg_b","content":[{"type":"text","text":"two"}]}}`,
+		`{"type":"result","is_error":false,"result":"done"}`,
+	}, "claude-sonnet-4-6")
+	assert.Equal(t, []map[string]string{
+		{"model": "claude-sonnet-4-6", "outcome": "attempt_1"},
+		{"model": "claude-sonnet-4-6", "outcome": "attempt_2"},
+	}, modelCallOutcomePairs(t, payload["modelCallOutcomes"]))
+}
+
+func TestClaudeResultSkipsDuplicateAssistantMessageIDs(t *testing.T) {
+	payload := claudeResultFromStream(t, []string{
+		`{"type":"assistant","message":{"id":"msg_1","content":[{"type":"text","text":"partial"}]}}`,
+		`{"type":"assistant","message":{"id":"msg_1","content":[{"type":"text","text":"full"}]}}`,
+		`{"type":"result","is_error":false,"result":"done"}`,
+	}, "claude-sonnet-4-6")
+	assert.Equal(t, []map[string]string{
+		{"model": "claude-sonnet-4-6", "outcome": "attempt_1"},
+	}, modelCallOutcomePairs(t, payload["modelCallOutcomes"]))
+}
+
+func claudeResultFromStream(t *testing.T, lines []string, model string) map[string]any {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(lines)
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { formatStreamJsonLines } = require(process.argv[1]);
+const result = formatStreamJsonLines(JSON.parse(process.argv[2]), { model: process.argv[3] });
+process.stderr.write(JSON.stringify(result.result || {}));`,
+		script,
+		string(payload),
+		model,
+	)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	require.NoError(t, cmd.Run(), stdout.String())
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal(stderr.Bytes(), &parsed), stderr.String())
+	return parsed
+}
+
+func modelCallOutcomePairs(t *testing.T, raw any) []map[string]string {
+	t.Helper()
+	rows, ok := raw.([]any)
+	require.True(t, ok)
+	out := make([]map[string]string, 0, len(rows))
+	for _, item := range rows {
+		row, ok := item.(map[string]any)
+		require.True(t, ok)
+		occurredAt, _ := row["occurredAt"].(string)
+		require.NotEmpty(t, occurredAt)
+		_, err := time.Parse(time.RFC3339Nano, occurredAt)
+		require.NoError(t, err)
+		out = append(out, map[string]string{
+			"model":   fmt.Sprint(row["model"]),
+			"outcome": fmt.Sprint(row["outcome"]),
+		})
+	}
+	return out
 }
 
 func claudeModelCallOutcomesFromScript(t *testing.T, input map[string]any) []any {

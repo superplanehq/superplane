@@ -132,6 +132,60 @@ func TestAccumulateLLMUsageMergesIntoResultFile(t *testing.T) {
 	assert.Equal(t, float64(4), usage["output_tokens"])
 }
 
+func TestAccumulateLLMUsageKeepsModelCallOutcomesAcrossPrompts(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+
+	runAccumulate(t, taskDir, map[string]any{
+		"model": "claude-sonnet-4-6",
+		"usage": map[string]any{"input_tokens": 1, "output_tokens": 1},
+		"modelCallOutcomes": []any{
+			map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_1", "occurredAt": "2026-10-28T12:00:00.000Z"},
+		},
+	}, resultFile)
+
+	require.NoError(t, os.WriteFile(resultFile, []byte(`{"result":"review","modelCallOutcomes":[{"model":"claude-sonnet-4-6","outcome":"attempt_2","occurredAt":"2026-10-28T12:04:00.000Z"}]}`+"\n"), 0o644))
+	runAccumulate(t, taskDir, map[string]any{
+		"model": "claude-sonnet-4-6",
+		"usage": map[string]any{"input_tokens": 2, "output_tokens": 1},
+		"modelCallOutcomes": []any{
+			map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_2", "occurredAt": "2026-10-28T12:04:00.000Z"},
+		},
+	}, resultFile)
+
+	merged := readJSONFile(t, resultFile)
+	assert.Equal(t, "review", merged["result"])
+	assert.Equal(t, []any{
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_1", "occurredAt": "2026-10-28T12:00:00.000Z"},
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_2", "occurredAt": "2026-10-28T12:04:00.000Z"},
+	}, merged["modelCallOutcomes"])
+}
+
+func TestMergeLLMUsageRestoresModelCallOutcomesAfterOverwrite(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+	runAccumulate(t, taskDir, map[string]any{
+		"modelCallOutcomes": []any{
+			map[string]any{"model": "gpt-5", "outcome": "attempt_1", "occurredAt": "2026-10-28T11:00:00.000Z"},
+		},
+	}, resultFile)
+
+	require.NoError(t, os.WriteFile(resultFile, []byte(`{"result":"title only"}`+"\n"), 0o644))
+	runMerge(t, taskDir, resultFile)
+
+	merged := readJSONFile(t, resultFile)
+	assert.Equal(t, "title only", merged["result"])
+	assert.Equal(t, []any{
+		map[string]any{"model": "gpt-5", "outcome": "attempt_1", "occurredAt": "2026-10-28T11:00:00.000Z"},
+	}, merged["modelCallOutcomes"])
+}
+
 func TestAccumulateLLMUsageCreatesResultFileWhenMissing(t *testing.T) {
 	t.Parallel()
 

@@ -539,6 +539,7 @@ function accumulateLLMUsage(raw, fallbackModel) {
     model: parsed.model || fallbackModel,
     usage: parsed.usage,
     total_cost_usd: parsed.total_cost_usd,
+    modelCallOutcomes: parsed.modelCallOutcomes,
   });
 }
 
@@ -585,6 +586,8 @@ function createFormatter(promptFile, onSession, activityOverride) {
   let apiRetryCount = 0;
   let sawRateLimit = false;
   let errorText = "";
+  let lastRecordedMessageId = "";
+  const successfulCalls = [];
   const telemetry = loadTurnTelemetry();
   const tools = createToolTracker(telemetry);
   const activity =
@@ -655,8 +658,9 @@ function createFormatter(promptFile, onSession, activityOverride) {
             event.message && typeof event.message === "object"
               ? event.message
               : {};
+          const messageId = String(message.id || event.uuid || "");
           telemetry.beginTurn(message.usage || event.usage, {
-            messageId: message.id || event.uuid || "",
+            messageId,
             message: assistantTextFromMessage(message),
             hasTools:
               Array.isArray(message.content) &&
@@ -664,6 +668,14 @@ function createFormatter(promptFile, onSession, activityOverride) {
                 (block) => block && block.type === "tool_use",
               ),
           });
+          if (!messageId || messageId !== lastRecordedMessageId) {
+            lastRecordedMessageId = messageId;
+            successfulCalls.push({
+              apiRetryCount,
+              occurredAt: new Date().toISOString(),
+            });
+            apiRetryCount = 0;
+          }
           formatAssistant(event, streamedText, tools, activity);
           streamedText = false;
           break;
@@ -721,13 +733,38 @@ function createFormatter(promptFile, onSession, activityOverride) {
       }
       const failed = Boolean(options && options.failed);
       const model = (options && options.model) || parsed.model || "";
-      const outcomes = claudeModelCallOutcomes({
-        failed,
-        apiRetryCount,
-        sawRateLimit,
-        errorText,
-        model,
-      });
+      const occurredAt = new Date().toISOString();
+      const outcomes = [];
+      for (const call of successfulCalls) {
+        outcomes.push(
+          ...claudeModelCallOutcomes({
+            failed: false,
+            apiRetryCount: call.apiRetryCount,
+            model,
+            occurredAt: call.occurredAt,
+          }),
+        );
+      }
+      if (failed) {
+        outcomes.push(
+          ...claudeModelCallOutcomes({
+            failed: true,
+            sawRateLimit,
+            errorText,
+            model,
+            occurredAt,
+          }),
+        );
+      } else if (outcomes.length === 0) {
+        outcomes.push(
+          ...claudeModelCallOutcomes({
+            failed: false,
+            apiRetryCount,
+            model,
+            occurredAt,
+          }),
+        );
+      }
       if (outcomes.length > 0) {
         parsed.modelCallOutcomes = outcomes;
       }
@@ -904,21 +941,23 @@ function claudeModelCallOutcomes({
   sawRateLimit,
   errorText,
   model,
+  occurredAt,
 }) {
   const id = String(model || "").trim();
   if (!id) {
     return [];
   }
+  const stamp = String(occurredAt || "").trim() || new Date().toISOString();
   if (!failed) {
     const attempt = Math.min(
       MAX_STATUS_ATTEMPTS,
       Math.max(1, (Number(apiRetryCount) || 0) + 1),
     );
-    return [{ model: id, outcome: `attempt_${attempt}` }];
+    return [{ model: id, outcome: `attempt_${attempt}`, occurredAt: stamp }];
   }
   const kind = classifyClaudeProviderError(errorText);
   if (sawRateLimit || kind === "rate_limit" || kind === "retryable") {
-    return [{ model: id, outcome: "error" }];
+    return [{ model: id, outcome: "error", occurredAt: stamp }];
   }
   return [];
 }
@@ -1440,14 +1479,25 @@ function truncateText(text) {
   return text;
 }
 
-function formatStreamJsonLines(rawLines) {
+function formatStreamJsonLines(rawLines, options) {
   const formatter = createFormatter();
   for (const line of rawLines) {
     formatter.handleLine(line);
   }
   const failed = formatter.resultFailed();
   formatter.flush(failed);
-  return { failed };
+  let result = {};
+  try {
+    result = JSON.parse(
+      formatter.resultWithTelemetry({
+        failed,
+        model: options && options.model,
+      }),
+    );
+  } catch (_err) {
+    result = {};
+  }
+  return { failed, result };
 }
 
 if (require.main === module) {
