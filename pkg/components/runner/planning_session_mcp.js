@@ -424,6 +424,73 @@ const UPDATE_TOOL = {
   },
 };
 
+const MAX_OWNER_PATHS = 10;
+
+async function suggestOwners(input) {
+  const raw = input && Array.isArray(input.paths) ? input.paths : [];
+  const paths = raw
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .slice(0, MAX_OWNER_PATHS);
+  if (paths.length === 0) {
+    throw new Error("paths is required");
+  }
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/suggest-owners", {
+    paths,
+  });
+}
+
+async function assignOwner(input) {
+  const user = String((input && input.user) || "").trim();
+  if (!user) {
+    throw new Error("user is required");
+  }
+  const reason = String((input && input.reason) || "").trim();
+  if (!reason) {
+    throw new Error("reason is required");
+  }
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/owner", {
+    user,
+    reason,
+  });
+}
+
+const SUGGEST_OWNERS_TOOL = {
+  name: "suggest_owners",
+  description:
+    "Rank the people who can own this task. Pass the repository paths the task touches. Returns code_owners ranked by recent commits on those paths, and members with their open task count, fewest first. Only members with a linked GitHub account appear.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      paths: {
+        type: "array",
+        minItems: 1,
+        maxItems: MAX_OWNER_PATHS,
+        items: { type: "string" },
+        description: "Repository-relative files or directories, for example pkg/payments or web_src/src/pages/checkout.tsx.",
+      },
+    },
+    required: ["paths"],
+  },
+};
+
+const ASSIGN_OWNER_TOOL = {
+  name: "assign_owner",
+  description:
+    "Set the owner of this task and notify that person. Does nothing when the task already has an owner. Pass user as a user_id or github_login from suggest_owners.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      user: { type: "string", description: "user_id or github_login from suggest_owners." },
+      reason: {
+        type: "string",
+        description: "One sentence for the owner that names the code, for example: You changed pkg/payments/charge.go 3 times in the last 30 days.",
+      },
+    },
+    required: ["user", "reason"],
+  },
+};
+
 const TOOLS = [
   {
     name: "inspect_attachment",
@@ -491,6 +558,10 @@ async function handleRequest(message) {
         result = await proposeUpdate(args);
       } else if (name === "inspect_attachment") {
         result = inspectAttachment(args);
+      } else if (name === "suggest_owners") {
+        result = await suggestOwners(args);
+      } else if (name === "assign_owner") {
+        result = await assignOwner(args);
       } else {
         sendError(id, -32601, `Unknown tool: ${name}`);
         return;
@@ -647,11 +718,18 @@ if (require.main === module) {
 }
 
 function planningTools() {
-  return [UPDATE_TOOL, TOOLS.find((tool) => tool.name === "inspect_attachment")];
+  return [
+    UPDATE_TOOL,
+    TOOLS.find((tool) => tool.name === "inspect_attachment"),
+    SUGGEST_OWNERS_TOOL,
+    ASSIGN_OWNER_TOOL,
+  ];
 }
 
 module.exports = {
   proposeUpdate,
+  suggestOwners,
+  assignOwner,
   proposeSpec,
   proposeClarity,
   proposeConfidence,

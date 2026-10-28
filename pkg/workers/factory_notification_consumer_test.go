@@ -166,7 +166,57 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.Contains(t, recipients, creator.GetEmail())
 	})
 
-	t.Run("comment assignee and artifact messages produce no recipients", func(t *testing.T) {
+	t.Run("assignment emails the new owner with the reason", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:   r.Organization.ID.String(),
+			FactoryID:        factoryModel.ID.String(),
+			OrderID:          order.ID.String(),
+			EventType:        factoryevents.EventTypeOrderAssigneesUpdated,
+			ActorName:        messages.TaskOwnerActorName,
+			AssignedUserIDs:  []string{owner.ID.String(), creator.ID.String()},
+			AssignmentReason: "You changed pkg/auth most often in the last 180 days.",
+		})
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		require.Len(t, sent, 1)
+		assert.Equal(t, owner.GetEmail(), sent[0].ToEmail)
+		assert.Contains(t, sent[0].Subject, "Task assigned to you")
+		assert.Contains(t, sent[0].Data.Summary, "SuperPlane assigned")
+		assert.Equal(t, "You changed pkg/auth most often in the last 180 days.", sent[0].Data.Detail)
+	})
+
+	t.Run("assignment skips the actor and users without the assigned type", func(t *testing.T) {
+		message := messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:  r.Organization.ID.String(),
+			FactoryID:       factoryModel.ID.String(),
+			OrderID:         order.ID.String(),
+			EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
+			ActorUserID:     owner.ID.String(),
+			AssignedUserIDs: []string{owner.ID.String()},
+		}
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), message)
+		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
+
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			EventTypes:     []string{models.NotificationTypeWorkOrderStatusOwned},
+		})
+		message.ActorUserID = creator.ID.String()
+		consume(t, newConsumer(emailService), message)
+		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
+
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+	})
+
+	t.Run("comment and artifact messages produce no recipients", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
@@ -181,13 +231,6 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 				OrderID:        order.ID.String(),
 				EventType:      factoryevents.EventTypeOrderCommentAdded,
 				CommentBody:    "Looks good to me",
-			},
-			{
-				OrganizationID:  r.Organization.ID.String(),
-				FactoryID:       factoryModel.ID.String(),
-				OrderID:         order.ID.String(),
-				EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
-				AssignedUserIDs: []string{owner.ID.String()},
 			},
 			{
 				OrganizationID: r.Organization.ID.String(),
@@ -479,6 +522,32 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		require.Len(t, sent, 1)
 		assert.Equal(t, creator.GetEmail(), sent[0].ToEmail)
 		assert.Empty(t, *published)
+	})
+
+	t.Run("browser assignment alert includes the reason", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeNone,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		consumer, published := capturingConsumer(newConsumer(services.NewNoopEmailService()))
+		consume(t, consumer, messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:   r.Organization.ID.String(),
+			FactoryID:        factoryModel.ID.String(),
+			OrderID:          order.ID.String(),
+			EventType:        factoryevents.EventTypeOrderAssigneesUpdated,
+			ActorName:        messages.TaskOwnerActorName,
+			AssignedUserIDs:  []string{owner.ID.String()},
+			AssignmentReason: "You changed pkg/auth most often.",
+		})
+
+		require.Len(t, *published, 1)
+		assert.Contains(t, (*published)[0].Body, "SuperPlane assigned")
+		assert.Contains(t, (*published)[0].Body, "You changed pkg/auth most often.")
+
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
 	})
 
 	t.Run("browser channel off publishes nothing", func(t *testing.T) {

@@ -23,6 +23,7 @@ const (
 	NotificationTypeWorkOrderStatusNoteOwned = "work_order_status_note_owned"
 	NotificationTypeWorkOrderAgentQuestion   = "work_order_agent_question"
 	NotificationTypeWorkOrderPlanReady       = "work_order_plan_ready"
+	NotificationTypeWorkOrderOwnerAssigned   = "work_order_owner_assigned"
 
 	// NotificationTypeNoneSelected is stored when an all-workspaces list has
 	// no current types. Delivery ignores unknown names, so every current
@@ -37,6 +38,7 @@ var NotificationTypes = []string{
 	NotificationTypeWorkOrderStatusNoteOwned,
 	NotificationTypeWorkOrderAgentQuestion,
 	NotificationTypeWorkOrderPlanReady,
+	NotificationTypeWorkOrderOwnerAssigned,
 }
 
 var ErrNotificationWorkspaceScopeInvalid = errors.New("workspace scope must be all, filtered, or none")

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 	"unicode/utf8"
 
@@ -253,13 +254,22 @@ func (c *FactoryNotificationConsumer) publishBrowserNotifications(
 			OrderKey:       orderKey,
 			EventType:      recipient.notificationType,
 			Title:          content.Subject,
-			Body:           content.Data.Summary,
+			Body:           browserNotificationBody(message, content),
 			URLPath:        urlPath,
 		})
 		if err != nil {
 			log.Errorf("Failed to publish browser notification for user %s: %v", recipient.userID, err)
 		}
 	}
+}
+
+// browserNotificationBody adds the assignment reason, because a browser
+// alert has no detail section like the email.
+func browserNotificationBody(message messages.FactoryWorkOrderNotificationMessage, content workOrderNotificationContent) string {
+	if message.EventType != factory.EventTypeOrderAssigneesUpdated || content.Data.Detail == "" {
+		return content.Data.Summary
+	}
+	return content.Data.Summary + " " + content.Data.Detail
 }
 
 // resolveRecipients returns the email and browser recipients that should
@@ -394,9 +404,26 @@ func workOrderNotificationCandidates(
 		addCreatorAndSessionStarter(add, order, message, models.NotificationTypeWorkOrderAgentQuestion)
 	case factory.EventTypeOrderPlanReady:
 		addCreatorAndSessionStarter(add, order, message, models.NotificationTypeWorkOrderPlanReady)
+	case factory.EventTypeOrderAssigneesUpdated:
+		addCurrentAssignees(add, order, message.AssignedUserIDs, models.NotificationTypeWorkOrderOwnerAssigned)
 	}
 
 	return candidates
+}
+
+// addCurrentAssignees adds the assigned users that still own the task,
+// so a quick reassignment does not notify the previous owner.
+func addCurrentAssignees(
+	add func(uuid.UUID, string),
+	order *models.FactoryWorkOrder,
+	assignedUserIDs []string,
+	notificationType string,
+) {
+	for _, assignee := range order.Assignees {
+		if slices.Contains(assignedUserIDs, assignee.UserID.String()) {
+			add(assignee.UserID, notificationType)
+		}
+	}
 }
 
 func addCreatorAndSessionStarter(
@@ -470,6 +497,10 @@ func buildWorkOrderNotificationContent(
 	case factory.EventTypeOrderPlanReady:
 		content.Subject = fmt.Sprintf("[%s] Plan is ready", orderKey)
 		content.Data.Summary = fmt.Sprintf("Refinement finished and the plan is ready for %s.", orderKey)
+	case factory.EventTypeOrderAssigneesUpdated:
+		content.Subject = fmt.Sprintf("[%s] Task assigned to you", orderKey)
+		content.Data.Summary = fmt.Sprintf("%s assigned %s to you.", actorName, orderKey)
+		content.Data.Detail = truncateNotificationDetail(message.AssignmentReason)
 	default:
 		content.Subject = fmt.Sprintf("[%s] Task update", orderKey)
 		content.Data.Summary = fmt.Sprintf("%s updated %s.", actorName, orderKey)
