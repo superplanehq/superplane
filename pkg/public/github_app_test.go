@@ -427,3 +427,95 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 	_, err = models.FindVCSProviderIntegrationBinding(db, binding.ID)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
+
+func TestApplyGitHubCatalogWebhookRefreshesTeamAndOrganizationAccess(t *testing.T) {
+	support.Setup(t)
+	db := database.DB(t.Context())
+	const installationID = int64(101)
+
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: installationID,
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, []models.VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api"},
+		{RepositoryID: 202, FullName: "acme/web"},
+	}))
+	queuedJobs := func(t *testing.T) map[int64]models.VCSProviderRepositorySyncPriority {
+		t.Helper()
+		var jobs []models.VCSProviderRepositorySyncJob
+		require.NoError(t, db.Find(&jobs).Error)
+		queued := make(map[int64]models.VCSProviderRepositorySyncPriority, len(jobs))
+		for _, job := range jobs {
+			queued[job.RepositoryID] = job.Priority
+		}
+		return queued
+	}
+	clearJobs := func(t *testing.T) {
+		t.Helper()
+		require.NoError(t, db.Where("1 = 1").Delete(&models.VCSProviderRepositorySyncJob{}).Error)
+	}
+	interactive := models.VCSProviderRepositorySyncPriorityInteractive
+	background := models.VCSProviderRepositorySyncPriorityBackground
+	repository := &gh.Repository{ID: gh.Ptr(int64(201))}
+
+	cases := []struct {
+		name  string
+		event any
+		want  map[int64]models.VCSProviderRepositorySyncPriority
+	}{
+		{
+			name:  "team added to a repository",
+			event: &gh.TeamAddEvent{Repo: repository},
+			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: interactive},
+		},
+		{
+			name:  "team removed from a repository",
+			event: &gh.TeamEvent{Action: gh.Ptr("removed_from_repository"), Repo: repository},
+			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: interactive},
+		},
+		{
+			name:  "team repository outside the catalog",
+			event: &gh.TeamAddEvent{Repo: &gh.Repository{ID: gh.Ptr(int64(999))}},
+			want:  map[int64]models.VCSProviderRepositorySyncPriority{},
+		},
+		{
+			name:  "team deleted",
+			event: &gh.TeamEvent{Action: gh.Ptr("deleted")},
+			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: background, 202: background},
+		},
+		{
+			name:  "team renamed",
+			event: &gh.TeamEvent{Action: gh.Ptr("edited")},
+			want:  map[int64]models.VCSProviderRepositorySyncPriority{},
+		},
+		{
+			name:  "team member removed",
+			event: &gh.MembershipEvent{Action: gh.Ptr("removed")},
+			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: background, 202: background},
+		},
+		{
+			name:  "organization member removed",
+			event: &gh.OrganizationEvent{Action: gh.Ptr("member_removed")},
+			want:  map[int64]models.VCSProviderRepositorySyncPriority{201: background, 202: background},
+		},
+		{
+			name:  "organization member invited",
+			event: &gh.OrganizationEvent{Action: gh.Ptr("member_invited")},
+			want:  map[int64]models.VCSProviderRepositorySyncPriority{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			clearJobs(t)
+			receivedAt := time.Now()
+			require.NoError(t, applyGitHubCatalogWebhook(db, tc.event, installationID))
+
+			assert.Equal(t, tc.want, queuedJobs(t))
+			var job models.VCSProviderRepositorySyncJob
+			if err := db.First(&job).Error; err == nil {
+				assert.True(t, job.RunAt.After(receivedAt), "access syncs wait for GitHub to publish the change")
+			}
+		})
+	}
+}
