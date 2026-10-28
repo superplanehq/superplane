@@ -5,6 +5,7 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { CopyButton } from "@/ui/CopyButton";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { GitHubAppInstallationLink } from "@/pages/organization/settings/GitHubAppInstallationLink";
+import { GitHubHostBadge } from "@/pages/organization/settings/GitHubHostBadge";
 import { ArrowLeft, Plug, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 
@@ -51,6 +52,9 @@ export function Header({
             title={integrationStatus.charAt(0).toUpperCase() + integrationStatus.slice(1)}
           ></span>
           <span>{integrationName}</span>
+          <span className="ml-2 inline-flex items-center">
+            <GitHubHostBadge integration={integration} />
+          </span>
         </h4>
         {integrationId ? (
           <div className="mt-1.5 flex max-w-full items-center gap-1.5">

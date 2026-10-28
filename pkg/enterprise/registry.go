@@ -14,6 +14,11 @@ const (
 	// custom_roles and groups are checked inside that implementation.
 	RBAC Key = "rbac"
 
+	// GitHubEnterpriseCapability is the GitHub Enterprise Cloud and Server
+	// connection check. The license feature github_enterprise is checked
+	// inside that implementation.
+	GitHubEnterpriseCapability Key = "github_enterprise"
+
 	// Billing is the backend billing capability. It has no runtime license check.
 	Billing Key = "billing"
 )
@@ -31,6 +36,7 @@ type Registry struct {
 func NewRegistry() *Registry {
 	registry := &Registry{values: map[Key]any{}}
 	registry.Register(RBAC, communityRbac{})
+	registry.Register(GitHubEnterpriseCapability, communityGitHubEnterprise{})
 	return registry
 }
 

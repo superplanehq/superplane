@@ -68,7 +68,7 @@ func (c *UpdatePullRequest) ExampleOutput() map[string]any {
 				"provider":   "github",
 				"repository": "acme/app",
 				"number":     42,
-				"url":        "https://github.com/acme/app/pull/42",
+				"url":        exampleGitHubHost().RepoURL("acme/app") + "/pull/42",
 				"state":      "merged",
 			},
 		},
