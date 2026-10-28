@@ -1,8 +1,11 @@
+import type { OrganizationBillingPlan } from "./billingDiagnostics";
+export type { OrganizationBillingPlan, BillingPolarDiagnostics } from "./billingDiagnostics";
 import { billingCatalogRequest, type BillingPlan } from "./billingPlansApi";
 import type { OrganizationsOrganizationCreditGrant } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { bpsToPercentInput, centsToDollarInput, parseDollarInputToCents, percentInputToBps } from "@/lib/hostedCredit";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useBillingCustomerSync } from "./useBillingCustomerSync";
 
 export type OrganizationLLMCredit = {
   remaining_credit_cents: number;
@@ -18,23 +21,6 @@ export type OrganizationLLMCredit = {
   markup_bps: number;
   markup_override_bps: number | null;
   warning: boolean;
-};
-
-export type OrganizationBillingPlan = {
-  plan: string;
-  catalog_key?: string;
-  catalog_name?: string;
-  catalog_category?: string;
-  credit_expiration?: string;
-  credit_validity_days?: number | null;
-  plan_source: string;
-  polar_subscription_status: string;
-  polar_managed: boolean;
-  polar_subscription_verification?: "active" | "none" | "failed" | "not_configured";
-  polar_subscription_id?: string;
-  polar_subscription_url?: string;
-  trial_ends_at: string | null;
-  current_period_end: string | null;
 };
 
 export type CreditBalanceBucket = "trial" | "topup" | "grant";
@@ -114,11 +100,16 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
   return text;
 }
 
-async function fetchOrganizationBillingPlan(orgId: string): Promise<OrganizationBillingPlan | null> {
-  const response = await fetch(`/admin/api/organizations/${orgId}/billing-plan`, { credentials: "include" });
-  if (!response.ok) {
-    return null;
-  }
+async function fetchOrganizationBillingPlan(
+  orgId: string,
+  checkPolar = false,
+  signal?: AbortSignal,
+): Promise<OrganizationBillingPlan> {
+  const response = await fetch(
+    `/admin/api/organizations/${orgId}/billing-plan${checkPolar ? "?check_polar=true" : ""}`,
+    { credentials: "include", signal },
+  );
+  if (!response.ok) throw new Error("Could not load billing diagnostics. Try again.");
   return (await response.json()) as OrganizationBillingPlan;
 }
 
@@ -171,34 +162,13 @@ async function putOrganizationCreditBalance(
   return (await response.json()) as OrganizationLLMCredit;
 }
 
-async function loadOrganizationCreditState(
-  orgId: string,
-  applyCredit: (data: OrganizationLLMCredit) => void,
-  applyPlan: (plan: OrganizationBillingPlan) => void,
-  clearPlan: () => void,
-  billingEnabled: boolean,
-) {
-  const [creditResponse, nextPlan] = await Promise.all([
-    fetch(`/admin/api/organizations/${orgId}/llm-credit`, { credentials: "include" }),
-    billingEnabled ? fetchOrganizationBillingPlan(orgId) : Promise.resolve(null),
-  ]);
-  if (!creditResponse.ok) {
-    throw new Error(await readErrorMessage(creditResponse, "Failed to load organization credit"));
-  }
-  applyCredit(await creditResponse.json());
-  if (!billingEnabled) {
-    clearPlan();
-    return;
-  }
-  if (nextPlan) {
-    applyPlan(nextPlan);
-    return;
-  }
-  clearPlan();
-  showErrorToast("Failed to load billing plan");
+async function loadOrganizationCreditState(orgId: string, applyCredit: (data: OrganizationLLMCredit) => void) {
+  const response = await fetch(`/admin/api/organizations/${orgId}/llm-credit`, { credentials: "include" });
+  if (!response.ok) throw new Error(await readErrorMessage(response, "Failed to load organization credit"));
+  applyCredit(await response.json());
 }
 
-function useOrgBillingPlan(orgId: string, enabled: boolean) {
+function useBillingPlanCatalog(enabled: boolean) {
   const [catalog, setCatalog] = useState<BillingPlan[]>([]);
   const [catalogError, setCatalogError] = useState("");
   useEffect(() => {
@@ -217,6 +187,11 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
       cancelled = true;
     };
   }, [enabled]);
+  return { catalog, catalogError };
+}
+
+function useOrgBillingPlan(orgId: string, enabled: boolean) {
+  const { catalog, catalogError } = useBillingPlanCatalog(enabled);
   const [plan, setPlan] = useState<OrganizationBillingPlan | null>(null);
   const [planValue, setPlanValue] = useState("trial");
   const [trialEndsOn, setTrialEndsOn] = useState("");
@@ -228,12 +203,66 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
     setTrialEndsOn(prefilledTrialEndDate(nextPlan.trial_ends_at));
   }, []);
 
-  const clearPlan = useCallback(() => setPlan(null), []);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(enabled);
+  const [diagnosticsError, setDiagnosticsError] = useState("");
+  const [checkingPolar, setCheckingPolar] = useState(false);
+  const request = useRef<AbortController | null>(null);
+  const customerSync = useBillingCustomerSync(orgId, {
+    enabled,
+    plan,
+    busy: savingPlan || diagnosticsLoading || checkingPolar,
+    applyPlan,
+    onStart: () => setDiagnosticsError(""),
+  });
+  const { isCustomerSyncing, clearCustomerSyncError } = customerSync;
+  const loadDiagnostics = useCallback(
+    async (checkPolar = false) => {
+      if (isCustomerSyncing()) return;
+      request.current?.abort();
+      const controller = new AbortController();
+      request.current = controller;
+      setDiagnosticsError("");
+      clearCustomerSyncError();
+      setDiagnosticsLoading(!checkPolar);
+      setCheckingPolar(checkPolar);
+      if (checkPolar)
+        setPlan((current) => (current ? { ...current, polar_subscription_verification: "not_checked" } : current));
+      try {
+        const next = await fetchOrganizationBillingPlan(orgId, checkPolar, controller.signal);
+        if (!controller.signal.aborted) applyPlan(next);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setDiagnosticsError(
+            error instanceof Error ? error.message : "Could not load billing diagnostics. Try again.",
+          );
+          if (checkPolar)
+            setPlan((current) => (current ? { ...current, polar_subscription_verification: "failed" } : current));
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setDiagnosticsLoading(false);
+          setCheckingPolar(false);
+        }
+      }
+    },
+    [orgId, applyPlan, isCustomerSyncing, clearCustomerSyncError],
+  );
+  useEffect(() => {
+    setPlan(null);
+    if (enabled) void loadDiagnostics();
+    return () => request.current?.abort();
+  }, [enabled, loadDiagnostics]);
 
   const selectedCategory = catalog.find((entry) => entry.key === planValue)?.category;
 
   const savePlan = async () => {
     if (
+      savingPlan ||
+      isCustomerSyncing() ||
+      checkingPolar ||
+      diagnosticsLoading ||
+      !plan ||
+      !["none", "not_configured"].includes(plan.polar_subscription_verification ?? "") ||
       catalogError ||
       !catalog.some(
         (entry) => entry.key === planValue && entry.key !== "business_legacy" && !entry.require_payment_method,
@@ -246,6 +275,7 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
     setSavingPlan(true);
     try {
       applyPlan(await putOrganizationBillingPlan(orgId, billingPlanRequest(planValue, selectedCategory, trialEndsOn)));
+      await loadDiagnostics();
       showSuccessToast("Billing plan updated");
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to set billing plan");
@@ -266,7 +296,11 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
     savingPlan,
     savePlan,
     applyPlan,
-    clearPlan,
+    diagnosticsLoading,
+    diagnosticsError,
+    checkingPolar,
+    loadDiagnostics,
+    ...customerSync,
   };
 }
 
@@ -316,7 +350,6 @@ export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolea
   const [savingBalance, setSavingBalance] = useState<CreditBalanceBucket | null>(null);
   const billingPlan = useOrgBillingPlan(orgId, options.billingEnabled);
   const markup = useOrgMarkupOverride(orgId, setCredit);
-  const { applyPlan, clearPlan } = billingPlan;
   const { resetMarkup } = markup;
 
   const applyCredit = useCallback(
@@ -348,16 +381,13 @@ export function useOrgLLMCredit(orgId: string, options: { billingEnabled: boolea
   const loadCredit = useCallback(async () => {
     setLoading(true);
     try {
-      await Promise.all([
-        loadOrganizationCreditState(orgId, applyCreditAndBalances, applyPlan, clearPlan, options.billingEnabled),
-        loadGrants(),
-      ]);
+      await Promise.all([loadOrganizationCreditState(orgId, applyCreditAndBalances), loadGrants()]);
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to load organization credit");
     } finally {
       setLoading(false);
     }
-  }, [applyCreditAndBalances, applyPlan, clearPlan, loadGrants, options.billingEnabled, orgId]);
+  }, [applyCreditAndBalances, loadGrants, orgId]);
 
   useEffect(() => {
     loadCredit();

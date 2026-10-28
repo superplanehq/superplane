@@ -72,21 +72,31 @@ type organizationLLMMarkupRequest struct {
 }
 
 type organizationBillingPlanResponse struct {
-	CreditExpiration              string    `json:"credit_expiration"`
-	CreditValidityDays            *int      `json:"credit_validity_days"`
-	CatalogID                     uuid.UUID `json:"catalog_id"`
-	CatalogKey                    string    `json:"catalog_key"`
-	CatalogName                   string    `json:"catalog_name"`
-	CatalogCategory               string    `json:"catalog_category"`
-	Plan                          string    `json:"plan"`
-	PlanSource                    string    `json:"plan_source"`
-	PolarSubscriptionVerification string    `json:"polar_subscription_verification"`
-	PolarSubscriptionID           string    `json:"polar_subscription_id"`
-	PolarSubscriptionURL          string    `json:"polar_subscription_url,omitempty"`
-	PolarSubscriptionStatus       string    `json:"polar_subscription_status"`
-	PolarManaged                  bool      `json:"polar_managed"`
-	TrialEndsAt                   *string   `json:"trial_ends_at"`
-	CurrentPeriodEnd              *string   `json:"current_period_end"`
+	RecordExists                  bool                       `json:"record_exists"`
+	UpdatedAt                     *string                    `json:"updated_at"`
+	PolarCustomerID               string                     `json:"polar_customer_id"`
+	PolarCustomerURL              string                     `json:"polar_customer_url,omitempty"`
+	PolarCustomerEventsURL        string                     `json:"polar_customer_events_url,omitempty"`
+	TrialStartedAt                *string                    `json:"trial_started_at"`
+	CurrentPeriodStart            *string                    `json:"current_period_start"`
+	Workspaces                    []billingWorkspaceEvidence `json:"workspaces"`
+	CheckoutAttempts              []billingCheckoutEvidence  `json:"checkout_attempts"`
+	Polar                         polar.BillingDiagnostics   `json:"polar"`
+	CreditExpiration              string                     `json:"credit_expiration"`
+	CreditValidityDays            *int                       `json:"credit_validity_days"`
+	CatalogID                     uuid.UUID                  `json:"catalog_id"`
+	CatalogKey                    string                     `json:"catalog_key"`
+	CatalogName                   string                     `json:"catalog_name"`
+	CatalogCategory               string                     `json:"catalog_category"`
+	Plan                          string                     `json:"plan"`
+	PlanSource                    string                     `json:"plan_source"`
+	PolarSubscriptionVerification string                     `json:"polar_subscription_verification"`
+	PolarSubscriptionID           string                     `json:"polar_subscription_id"`
+	PolarSubscriptionURL          string                     `json:"polar_subscription_url,omitempty"`
+	PolarSubscriptionStatus       string                     `json:"polar_subscription_status"`
+	PolarManaged                  bool                       `json:"polar_managed"`
+	TrialEndsAt                   *string                    `json:"trial_ends_at"`
+	CurrentPeriodEnd              *string                    `json:"current_period_end"`
 }
 
 type organizationBillingPlanRequest struct {
@@ -341,17 +351,16 @@ func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 	if !ok {
 		return
 	}
-	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
+	response, err := describeOrganizationBillingPlanJSON(database.DB(r.Context()), orgID)
 	if err != nil {
 		log.Errorf("admin: failed to load organization billing plan: %v", err)
 		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
 		return
 	}
-	verification, verifyErr := polar.VerifyOrganizationSubscription(r.Context(), orgID)
-	if verifyErr != nil {
-		log.WithError(verifyErr).Warn("admin: failed to verify Polar subscription")
+	if r.URL.Query().Get("check_polar") == "true" {
+		response.Polar = polar.CheckBillingDiagnostics(r.Context(), orgID, response.PolarCustomerID)
+		response.PolarSubscriptionVerification = response.Polar.SubscriptionVerification
 	}
-	response.PolarSubscriptionVerification = verification
 	respondJSON(w, response)
 }
 
@@ -409,7 +418,7 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		return
 	}
 
-	response, err := describeOrganizationBillingPlanJSON(database.Conn(), orgID)
+	response, err := describeOrganizationBillingPlanJSON(database.DB(r.Context()), orgID)
 	if err != nil {
 		log.Errorf("admin: failed to load organization billing plan: %v", err)
 		http.Error(w, "Failed to load organization billing plan", http.StatusInternalServerError)
@@ -420,30 +429,45 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 }
 
 func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organizationBillingPlanResponse, error) {
-	plan, err := billingmodels.ResolveOrganizationBillingPlan(tx, orgID)
+	plan, err := billingmodels.FindOrganizationBillingPlan(tx, orgID)
 	if err != nil {
 		return organizationBillingPlanResponse{}, err
 	}
+	response := organizationBillingPlanResponse{
+		Plan: billingmodels.BillingPlanNone, CatalogKey: billingmodels.BillingPlanNone,
+		Polar: polar.UncheckedBillingDiagnostics(),
+	}
+	response.PolarSubscriptionVerification = response.Polar.SubscriptionVerification
+	if err := loadStoredBillingEvidence(tx, orgID, &response); err != nil {
+		return response, err
+	}
+	if plan == nil {
+		return response, nil
+	}
+
 	subscriptionID := ""
 	if plan.PolarSubscriptionID != nil {
 		subscriptionID = *plan.PolarSubscriptionID
 	}
-	return organizationBillingPlanResponse{
-		PolarSubscriptionID:     subscriptionID,
-		PolarSubscriptionURL:    polar.SubscriptionDashboardURL(subscriptionID),
-		CatalogID:               plan.PlanID,
-		CatalogKey:              plan.Catalog.Key,
-		CatalogName:             plan.Catalog.Name,
-		CatalogCategory:         plan.Catalog.Category,
-		CreditExpiration:        plan.Catalog.CreditExpiration,
-		CreditValidityDays:      plan.Catalog.CreditValidityDays,
-		Plan:                    plan.Plan,
-		PlanSource:              plan.PlanSource,
-		PolarSubscriptionStatus: plan.PolarSubscriptionStatus,
-		PolarManaged:            billingmodels.OrganizationBillingIsPolarManaged(plan),
-		TrialEndsAt:             formatOptionalTime(plan.TrialEndsAt),
-		CurrentPeriodEnd:        formatOptionalTime(plan.CurrentPeriodEnd),
-	}, nil
+	response.RecordExists = true
+	response.UpdatedAt = formatOptionalTime(&plan.UpdatedAt)
+	response.TrialStartedAt = formatOptionalTime(plan.TrialStartedAt)
+	response.CurrentPeriodStart = formatOptionalTime(plan.CurrentPeriodStart)
+	response.PolarSubscriptionID = subscriptionID
+	response.PolarSubscriptionURL = polar.SubscriptionDashboardURL(subscriptionID)
+	response.CatalogID = plan.PlanID
+	response.CatalogKey = plan.Catalog.Key
+	response.CatalogName = plan.Catalog.Name
+	response.CatalogCategory = plan.Catalog.Category
+	response.CreditExpiration = plan.Catalog.CreditExpiration
+	response.CreditValidityDays = plan.Catalog.CreditValidityDays
+	response.Plan = plan.Plan
+	response.PlanSource = plan.PlanSource
+	response.PolarSubscriptionStatus = plan.PolarSubscriptionStatus
+	response.PolarManaged = billingmodels.OrganizationBillingIsPolarManaged(plan)
+	response.TrialEndsAt = formatOptionalTime(plan.TrialEndsAt)
+	response.CurrentPeriodEnd = formatOptionalTime(plan.CurrentPeriodEnd)
+	return response, nil
 }
 
 func trialEndForAdminPlan(tx *gorm.DB, planName string, raw *string) (*time.Time, error) {
