@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 func lodashAlert(number int, manifest string) *github.DependabotAlert {
@@ -94,12 +95,40 @@ func TestPackageRefOriginURL_RoundTrips(t *testing.T) {
 
 	parsed, ok := PackageRefFromURL(originURL)
 	require.True(t, ok)
-	assert.Equal(t, ref, parsed)
+	assert.Equal(t, ref.Repository, parsed.Repository)
+	assert.Equal(t, ref.Ecosystem, parsed.Ecosystem)
+	assert.Equal(t, ref.Name, parsed.Name)
+
+	ghe := PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash", host: common.Host{Kind: common.HostKindGHECom, Hostname: "acme.ghe.com"}}
+	gheURL := ghe.OriginURL()
+	assert.Contains(t, gheURL, "https://acme.ghe.com/acme/payments/security/dependabot")
+	parsedGHE, ok := PackageRefFromURL(gheURL)
+	require.True(t, ok)
+	assert.Equal(t, "acme.ghe.com", parsedGHE.Host().WebHostname())
 
 	_, ok = PackageRefFromURL("https://github.com/acme/payments/security/dependabot/7")
 	assert.False(t, ok)
 	_, ok = PackageRefFromURL("https://github.com/acme/payments/issues/7")
 	assert.False(t, ok)
+}
+
+func TestPackageRefMatches_RequiresSameHost(t *testing.T) {
+	dotcom := PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}
+	ghe := PackageRef{
+		Repository: "acme/payments",
+		Ecosystem:  "npm",
+		Name:       "lodash",
+		host:       common.Host{Kind: common.HostKindGHECom, Hostname: "acme.ghe.com"},
+	}
+
+	assert.True(t, dotcom.Matches(PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}))
+	assert.False(t, dotcom.Matches(ghe))
+	assert.True(t, ghe.Matches(PackageRef{
+		Repository: "acme/payments",
+		Ecosystem:  "npm",
+		Name:       "lodash",
+		host:       ghe.host,
+	}))
 }
 
 func TestPackageRefFromEventData(t *testing.T) {
@@ -116,7 +145,9 @@ func TestPackageRefFromEventData(t *testing.T) {
 		},
 	})
 	require.True(t, ok)
-	assert.Equal(t, PackageRef{Repository: "Acme/Payments", Ecosystem: "npm", Name: "lodash"}, ref)
+	assert.Equal(t, "Acme/Payments", ref.Repository)
+	assert.Equal(t, "npm", ref.Ecosystem)
+	assert.Equal(t, "lodash", ref.Name)
 	assert.True(t, ref.Matches(PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "lodash"}))
 	assert.False(t, ref.Matches(PackageRef{Repository: "acme/payments", Ecosystem: "npm", Name: "Lodash"}))
 

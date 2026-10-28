@@ -68,12 +68,19 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
+// FeatureGitHubEnterpriseServer is registered and off. GitHub Enterprise Server
+// setup answers that the server is not available yet. Connecting a GitHub
+// Enterprise Server host also requires the github_enterprise license.
+const FeatureGitHubEnterpriseServer = "github_enterprise_server"
+
 func released() *bool {
 	v := true
 	return &v
 }
 
 var registry = []Feature{
+	{ID: FeatureGitHubEnterpriseServer, Label: "GitHub Enterprise Server", Description: "Connect GitHub Enterprise Server. This option is not available yet"},
+
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},

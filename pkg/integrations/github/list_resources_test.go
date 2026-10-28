@@ -35,6 +35,9 @@ func TestListResourcesHostedBindingReturnsOnlyGrantedRepositories(t *testing.T) 
 		Integration: &contexts.IntegrationContext{
 			IntegrationID: integration.ID.String(),
 			Metadata:      common.Metadata{HostedApp: true},
+			CurrentProperties: map[string]any{
+				common.PropertyHost: "acme.ghe.com",
+			},
 		},
 	})
 

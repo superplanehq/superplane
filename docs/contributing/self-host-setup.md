@@ -51,6 +51,10 @@ Do not set `GITHUB_CLIENT_ID`. A self-hosted GitHub App does not offer
 Sign in with GitHub. Linear, Jira, and Sentry hosted apps are not part
 of this flow.
 
+For GitHub Enterprise Cloud (`ghe.com`), install an Enterprise license that
+grants `github_enterprise` and set the hostname allowlist. See
+[GitHub Enterprise](../self-hosting/github-enterprise.md).
+
 ## 5. Confirm the installation
 
 - The workspace wizard continues to tickets and the agent key.
