@@ -68,6 +68,7 @@ type Configuration struct {
 	Organization    string `mapstructure:"organization" json:"organization"`
 	PrivateApp      bool   `mapstructure:"privateApp" json:"privateApp"`
 	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath"`
+	Host            string `mapstructure:"host" json:"host"`
 }
 
 func (g *GitHub) Name() string {
@@ -97,6 +98,16 @@ func (g *GitHub) Configuration() []configuration.Field {
 			Label:       "Organization",
 			Type:        configuration.FieldTypeString,
 			Description: "Organization to install the app into. If not specified, the app will be installed into the user's account.",
+		},
+		{
+			Name:        common.ConfigHost,
+			Label:       "GitHub host",
+			Type:        configuration.FieldTypeString,
+			Description: "GitHub hostname. Empty means public GitHub.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				// Sentinel field name. The generic form has no "never" value, so this stays hidden.
+				{Field: "never", Values: []string{"shown"}},
+			},
 		},
 	}
 }
@@ -173,10 +184,21 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	}
 
 	if metadata.HostedApp {
+		if !common.HostFromIntegration(ctx.Integration).IsDotCom() {
+			return fmt.Errorf("GitHub Enterprise cannot use SuperPlane's public GitHub App")
+		}
 		if _, err := models.FindVCSProviderIntegrationBinding(database.Conn(), ctx.Integration.ID()); err != nil {
 			return fmt.Errorf("failed to resolve hosted GitHub App binding: %w", err)
 		}
 		return nil
+	}
+
+	host, err := common.ParseHost(config.Host)
+	if err != nil {
+		return err
+	}
+	if !host.IsDotCom() {
+		return fmt.Errorf("GitHub Enterprise uses the setup wizard")
 	}
 
 	//
@@ -252,6 +274,9 @@ func (g *GitHub) findWebhookSecret(ctx core.HTTPRequestContext) (string, error) 
 	if ctx.Integration.LegacySetup() {
 		var metadata common.Metadata
 		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil && metadata.HostedApp {
+			if !common.HostFromIntegration(ctx.Integration).IsDotCom() {
+				return "", fmt.Errorf("GitHub Enterprise cannot use SuperPlane's public GitHub App")
+			}
 			app, ok := common.ResolveHostedApp(context.Background())
 			if !ok {
 				return "", fmt.Errorf("hosted GitHub App is not configured")
@@ -488,7 +513,7 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 		Label:        "Install the GitHub app",
 		Instructions: buf.String(),
 		RedirectPrompt: &core.RedirectPrompt{
-			URL:    fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", appSlug, state),
+			URL:    privateAppInstallURL(ctx, appSlug, state),
 			Method: "GET",
 		},
 	})
@@ -560,7 +585,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	appData, err := g.createAppFromManifest(ctx.HTTP, code)
+	appData, err := g.createAppFromManifest(ctx.HTTP, common.HostFromIntegration(ctx.Integration), code)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create app from manifest: %v", err)
 		http.Error(ctx.Response, "failed to create app from manifest", http.StatusInternalServerError)
@@ -657,11 +682,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 	http.Redirect(
 		ctx.Response,
 		ctx.Request,
-		fmt.Sprintf(
-			"https://github.com/apps/%s/installations/new?state=%s",
-			appData.Slug,
-			state,
-		),
+		privateAppInstallURL(ctx, appData.Slug, state),
 		http.StatusSeeOther,
 	)
 }
@@ -716,11 +737,7 @@ func (g *GitHub) afterAppCreationLegacy(ctx core.HTTPRequestContext, appData *Gi
 	http.Redirect(
 		ctx.Response,
 		ctx.Request,
-		fmt.Sprintf(
-			"https://github.com/apps/%s/installations/new?state=%s",
-			metadata.GitHubApp.Slug,
-			state,
-		),
+		privateAppInstallURL(ctx, metadata.GitHubApp.Slug, state),
 		http.StatusSeeOther,
 	)
 }
@@ -772,7 +789,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 		redirectToIntegrationSettingsRequested(ctx)
 		return
 	}
-	if installationID == "" || requestState != state {
+	if installationID == "" || !setupCallbackAccepted(ctx, requestState, state, installationID) {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 		return
@@ -908,7 +925,7 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		redirectToIntegrationSettingsRequested(ctx)
 		return
 	}
-	if installationID == "" || state != metadata.State {
+	if installationID == "" || !setupCallbackAccepted(ctx, state, metadata.State, installationID) {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 		return
@@ -933,11 +950,12 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 }
 
 func (g *GitHub) browserActionURL(organization string) string {
+	host := common.DotCom()
 	if organization != "" {
-		return fmt.Sprintf("https://github.com/organizations/%s/settings/apps/new", organization)
+		return host.CreateAppURL(common.OwnerTypeOrganization, organization)
 	}
 
-	return "https://github.com/settings/apps/new"
+	return host.CreateAppURL(common.OwnerTypeUser, "")
 }
 
 func (g *GitHub) appManifest(ctx core.SyncContext) string {
@@ -986,8 +1004,8 @@ type GitHubAppData struct {
 	PEM           string `mapstructure:"pem" json:"pem"`
 }
 
-func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*GitHubAppData, error) {
-	URL := fmt.Sprintf("https://api.github.com/app-manifests/%s/conversions", code)
+func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, host common.Host, code string) (*GitHubAppData, error) {
+	URL := host.ManifestConversionURL(code)
 	req, err := http.NewRequest(http.MethodPost, URL, nil)
 	if err != nil {
 		return nil, err
@@ -1012,6 +1030,99 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 	}
 
 	return &appData, nil
+}
+
+func privateAppInstallURL(ctx core.HTTPRequestContext, slug, state string) string {
+	host := common.HostFromIntegration(ctx.Integration)
+	return host.InstallAppURLForOwner(propertyOrMetadataOwner(ctx), slug, state)
+}
+
+func propertyOrMetadataOwner(ctx core.HTTPRequestContext) string {
+	if ctx.Integration == nil {
+		return ""
+	}
+	if owner, err := ctx.Integration.Properties().GetString(common.PropertyOwner); err == nil {
+		return strings.TrimSpace(owner)
+	}
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	return strings.TrimSpace(metadata.Owner)
+}
+
+// setupCallbackAccepted reports whether a GitHub App setup redirect may continue.
+// A present state must match. A missing state is accepted only for a private App
+// whose installation belongs to this integration's App.
+func setupCallbackAccepted(ctx core.HTTPRequestContext, requestState, expectedState, installationID string) bool {
+	if strings.TrimSpace(requestState) != "" {
+		return requestState == expectedState
+	}
+	if hostedGitHubApp(ctx.Integration) {
+		return false
+	}
+	return privateAppOwnsInstallation(ctx, installationID)
+}
+
+func setupCallbackStateAccepted(requestState, expectedState string, hosted bool, integrationAppID, installationAppID int64) bool {
+	if strings.TrimSpace(requestState) != "" {
+		return requestState == expectedState
+	}
+	if hosted {
+		return false
+	}
+	return integrationAppID != 0 && integrationAppID == installationAppID
+}
+
+func privateAppOwnsInstallation(ctx core.HTTPRequestContext, installationID string) bool {
+	appID := integrationAppID(ctx)
+	if appID == 0 || strings.TrimSpace(installationID) == "" {
+		return false
+	}
+	got, err := lookupInstallationAppID(ctx, appID, installationID)
+	if err != nil {
+		return false
+	}
+	return setupCallbackStateAccepted("", "", false, appID, got)
+}
+
+var lookupInstallationAppID = lookupInstallationAppIDFromGitHub
+
+func integrationAppID(ctx core.HTTPRequestContext) int64 {
+	if ctx.Integration == nil {
+		return 0
+	}
+	if raw, err := ctx.Integration.Properties().GetString(common.PropertyAppID); err == nil {
+		if id, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64); err == nil {
+			return id
+		}
+	}
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return 0
+	}
+	return metadata.GitHubApp.ID
+}
+
+func lookupInstallationAppIDFromGitHub(ctx core.HTTPRequestContext, appID int64, installationID string) (int64, error) {
+	client, err := newAppJWTClient(ctx.Integration, appID)
+	if err != nil {
+		return 0, err
+	}
+	return installationAppIDFromClient(context.Background(), client, installationID)
+}
+
+func installationAppIDFromClient(ctx context.Context, client *github.Client, installationID string) (int64, error) {
+	id, err := strconv.ParseInt(installationID, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid installation ID: %w", err)
+	}
+	installation, _, err := client.Apps.GetInstallation(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	if installation == nil {
+		return 0, fmt.Errorf("GitHub installation %s was not found", installationID)
+	}
+	return installation.GetAppID(), nil
 }
 
 func isPendingInstallationSetupAction(setupAction string) bool {
@@ -1227,9 +1338,9 @@ func clearIntegrationSetupReturnCookie(response http.ResponseWriter) {
 }
 
 func ownerFromRepositories(repos []common.Repository) string {
+	host := common.DotCom()
 	for _, repo := range repos {
-		path := strings.TrimPrefix(repo.URL, "https://github.com/")
-		owner, _, ok := strings.Cut(path, "/")
+		owner, _, ok := host.ParseRepoURL(repo.URL)
 		if ok && owner != "" {
 			return owner
 		}
@@ -1332,7 +1443,9 @@ func newClientForApp(ctx core.IntegrationContext, appID int64) (*github.Client, 
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
 	}
 
-	return github.NewClient(&http.Client{Transport: itr}), nil
+	host := common.HostFromIntegration(ctx)
+	common.ApplyHostToAppsTransport(itr, host)
+	return common.ApplyHostToGitHubClient(github.NewClient(&http.Client{Transport: itr}), host)
 }
 
 func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, installationID string) (*github.Client, error) {
@@ -1357,7 +1470,9 @@ func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, insta
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
 	}
 
-	return github.NewClient(&http.Client{Transport: itr}), nil
+	host := common.HostFromIntegration(ctx)
+	common.ApplyHostToInstallationTransport(itr, host)
+	return common.ApplyHostToGitHubClient(github.NewClient(&http.Client{Transport: itr}), host)
 }
 
 func findAppPrivateKey(ctx core.IntegrationContext) (string, error) {
@@ -1378,10 +1493,18 @@ func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (core.Integra
 		return core.IntegrationSecrets{}, err
 	}
 
+	host := common.HostFromIntegration(ctx.Integration)
 	values := map[string][]byte{
 		integrationSecretGitHubToken: []byte(token),
+		"GITHUB_SERVER_URL":          []byte(host.ServerURLEnv()),
+		"GITHUB_API_URL":             []byte(host.APIURLEnv()),
+		"GITHUB_GRAPHQL_URL":         []byte(host.GraphQLURLEnv()),
 	}
-	usage := githubSecretUsage
+	if !host.IsDotCom() {
+		values["GH_HOST"] = []byte(host.GitHost())
+		values["GH_ENTERPRISE_TOKEN"] = []byte(token)
+	}
+	usage := githubSecretUsage(host)
 	contextToken, err := resolveContextAccessToken(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return core.IntegrationSecrets{}, err
@@ -1394,7 +1517,7 @@ func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (core.Integra
 	return core.IntegrationSecrets{
 		Values:    values,
 		Usage:     usage,
-		Setup:     githubSetupScript,
+		Setup:     githubSetupScript(host),
 		SetupName: githubSetupName,
 	}, nil
 }
