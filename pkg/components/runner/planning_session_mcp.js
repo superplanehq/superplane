@@ -473,7 +473,7 @@ const SUGGEST_OWNERS_TOOL = {
 const ASSIGN_OWNER_TOOL = {
   name: "assign_owner",
   description:
-    "Set the owner of this task when the task has no owner. Returns already_owned and changes nothing when the task has an owner. Pass user as a user_id or github_login from suggest_owners.",
+    "Set the selected person as the only owner of this task. Replaces all current owners, including manually assigned owners. Returns assigned with the selected owner. Pass user as a user_id or github_login from suggest_owners.",
   inputSchema: {
     type: "object",
     properties: {

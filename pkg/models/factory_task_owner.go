@@ -170,23 +170,24 @@ WHERE u.organization_id = ?
 ORDER BY u.id, l.active DESC, l.linked_at DESC
 `
 
-// AssignOwnerIfUnowned makes the person the only owner when the task has no
-// owner. It reports false and changes nothing when the task already has an
-// owner, so an automated choice never replaces a choice a person made.
-func (o *FactoryWorkOrder) AssignOwnerIfUnowned(tx *gorm.DB, assignment TaskOwnerAssignment) (bool, error) {
-	assigned := false
+// AssignOwner makes the selected person the only owner, replacing current
+// assignees. It reports whether ownership changed. The same sole owner is a no-op.
+func (o *FactoryWorkOrder) AssignOwner(tx *gorm.DB, assignment TaskOwnerAssignment) (bool, error) {
+	changed := false
 	err := tx.Transaction(func(tx *gorm.DB) error {
 		if err := lockFactoryWorkOrder(tx, o.ID); err != nil {
 			return err
 		}
 
-		var owners int64
-		if err := tx.Model(&FactoryWorkOrderAssignee{}).Where("work_order_id = ?", o.ID).Count(&owners).Error; err != nil {
+		owners, err := o.ListAssignees(tx)
+		if err != nil {
 			return err
 		}
-		if owners > 0 {
+		o.Assignees = owners
+		if len(owners) == 1 && owners[0].UserID == assignment.UserID {
 			return nil
 		}
+		assigned, unassigned := assigneeDiff(o.AssigneeIDs(), []uuid.UUID{assignment.UserID})
 
 		if err := o.ReplaceAssignees(tx, []uuid.UUID{assignment.UserID}); err != nil {
 			return err
@@ -198,15 +199,16 @@ func (o *FactoryWorkOrder) AssignOwnerIfUnowned(tx *gorm.DB, assignment TaskOwne
 		o.UpdatedAt = now
 		o.Assignees = []FactoryWorkOrderAssignee{{WorkOrderID: o.ID, UserID: assignment.UserID}}
 
-		assigned = true
+		changed = true
 		return o.recordEvent(tx, factory.EventTypeOrderAssigneesUpdated, factory.WorkOrderAssigneesUpdated{
-			Order:    o.Ref(),
-			Assigned: []factory.UserRef{{ID: assignment.UserID}},
-			Source:   assignment.Source,
-			Reason:   NormalizeTaskOwnerReason(assignment.Reason),
+			Order:      o.Ref(),
+			Assigned:   assigned,
+			Unassigned: unassigned,
+			Source:     assignment.Source,
+			Reason:     NormalizeTaskOwnerReason(assignment.Reason),
 		})
 	})
-	return assigned, err
+	return changed && err == nil, err
 }
 
 func normalizeTaskOwnerLogin(login string) string {

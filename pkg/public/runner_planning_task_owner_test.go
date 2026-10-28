@@ -8,12 +8,17 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestRunnerPlanningSuggestOwnersWithoutCodeHistory(t *testing.T) {
@@ -87,6 +92,26 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 	db := database.DB(t.Context())
 	owner := mustTaskOwnerMember(t, r, "payments-dev")
 	other := mustTaskOwnerMember(t, r, "other-dev")
+	amqpURL, err := config.RabbitMQURL()
+	require.NoError(t, err)
+	connection, err := amqp.Dial(amqpURL)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = connection.Close() })
+	channel, err := connection.Channel()
+	require.NoError(t, err)
+	require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+	queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderUpdatedRoutingKey, messages.CanvasExchange, false, nil))
+	assertUpdate := func() {
+		delivery, ok, err := channel.Get(queue.Name, true)
+		require.NoError(t, err)
+		require.True(t, ok, "ownership changes publish an update")
+		var update pb.FactoryWorkOrderUpdatedMessage
+		require.NoError(t, proto.Unmarshal(delivery.Body, &update))
+		assert.Equal(t, session.DraftWorkOrderID.String(), update.OrderId)
+		assert.Equal(t, factoryevents.EventTypeOrderAssigneesUpdated, update.Reason)
+	}
 
 	rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner",
 		`{"user":"`+uuid.NewString()+`","reason":"Owns the code."}`)
@@ -98,8 +123,8 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 
 	rec = postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner",
 		`{"user":"@Payments-Dev","reason":"Changed pkg/payments/charge.go 3 times in 30 days. See https://evil.example"}`)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), `"assigned"`)
+	assertAssignedOwner(t, rec, owner.ID)
+	assertUpdate()
 
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
@@ -117,12 +142,75 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 	assert.NotEmpty(t, body.Members)
 
 	rec = postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", `{"user":"other-dev","reason":"Owns the code."}`)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), `"already_owned"`)
+	assertAssignedOwner(t, rec, other.ID)
+	assertUpdate()
 	order, err = factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
-	assert.Equal(t, []uuid.UUID{owner.ID}, order.AssigneeIDs(), "a later call keeps the first owner")
-	assert.NotContains(t, order.AssigneeIDs(), other.ID)
+	assert.Equal(t, []uuid.UUID{other.ID}, order.AssigneeIDs(), "a later call replaces the first owner")
+	rec = postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/suggest-owners", `{}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	body = decodeSuggestOwners(t, rec)
+	require.Len(t, body.CurrentOwners, 1)
+	assert.Equal(t, other.ID, body.CurrentOwners[0].UserID)
+
+	t.Run("same owner succeeds without publishing", func(t *testing.T) {
+		rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", `{"user":"other-dev","reason":"Owns the code."}`)
+		assertAssignedOwner(t, rec, other.ID)
+		_, published, err := channel.Get(queue.Name, true)
+		require.NoError(t, err)
+		assert.False(t, published, "same-owner assignment does not publish another update")
+	})
+
+	t.Run("invalid replacements preserve ownership and history", func(t *testing.T) {
+		eventsBefore, err := order.ListEvents(db, 0, nil)
+		require.NoError(t, err)
+		for _, request := range []string{
+			`{"user":"` + uuid.NewString() + `","reason":"Owns the code."}`,
+			`{"user":"payments-dev","reason":"https://example.com"}`,
+		} {
+			rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", request)
+			require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+		}
+		persisted, err := factoryModel.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []uuid.UUID{other.ID}, persisted.AssigneeIDs())
+		eventsAfter, err := order.ListEvents(db, 0, nil)
+		require.NoError(t, err)
+		assert.Equal(t, eventsBefore, eventsAfter)
+		_, published, err := channel.Get(queue.Name, true)
+		require.NoError(t, err)
+		assert.False(t, published)
+	})
+
+	for _, existing := range []struct {
+		name   string
+		owners []uuid.UUID
+	}{
+		{"manual owner", []uuid.UUID{owner.ID}},
+		{"several owners", []uuid.UUID{owner.ID, r.User}},
+	} {
+		t.Run(existing.name, func(t *testing.T) {
+			require.NoError(t, order.UpdateAssignees(db, existing.owners, r.User))
+			rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", `{"user":"other-dev","reason":"Owns the code."}`)
+			assertAssignedOwner(t, rec, other.ID)
+			assertUpdate()
+			persisted, err := factoryModel.FindWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.Equal(t, []uuid.UUID{other.ID}, persisted.AssigneeIDs())
+		})
+	}
+}
+
+func assertAssignedOwner(t *testing.T, rec *httptest.ResponseRecorder, ownerID uuid.UUID) {
+	t.Helper()
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body struct {
+		Status string          `json:"status"`
+		Owner  suggestedMember `json:"owner"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "assigned", body.Status)
+	assert.Equal(t, ownerID, body.Owner.UserID)
 }
 
 func TestRunnerPlanningAssignOwnerWithoutGitHub(t *testing.T) {
@@ -139,21 +227,42 @@ func TestRunnerPlanningAssignOwnerWithoutGitHub(t *testing.T) {
 	assert.Equal(t, []uuid.UUID{unlinked.ID}, order.AssigneeIDs())
 }
 
-func TestRunnerPlanningOwnerRoutesRejectEndedSession(t *testing.T) {
-	r := support.Setup(t)
-	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
-	db := database.DB(t.Context())
-	mustTaskOwnerMember(t, r, "late-dev")
-	require.NoError(t, session.End(db))
+func TestRunnerPlanningOwnerRoutesRejectInactiveTarget(t *testing.T) {
+	for _, state := range []string{"ended session", "closed task", "archived task"} {
+		t.Run(state, func(t *testing.T) {
+			r := support.Setup(t)
+			server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+			db := database.DB(t.Context())
+			mustTaskOwnerMember(t, r, "late-dev")
+			order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+			require.NoError(t, err)
+			require.NoError(t, order.UpdateAssignees(db, []uuid.UUID{r.User}, r.User))
+			switch state {
+			case "ended session":
+				require.NoError(t, session.End(db))
+			case "closed task":
+				_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultManualRejected})
+				require.NoError(t, err)
+			case "archived task":
+				_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultArchived})
+				require.NoError(t, err)
+			}
+			eventsBefore, err := order.ListEvents(db, 0, nil)
+			require.NoError(t, err)
 
-	rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", `{"user":"late-dev","reason":"Owns the code."}`)
-	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
-	rec = postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/suggest-owners", `{"paths":["pkg"]}`)
-	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+			rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", `{"user":"late-dev","reason":"Owns the code."}`)
+			require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+			rec = postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/suggest-owners", `{"paths":["pkg"]}`)
+			require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
 
-	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
-	require.NoError(t, err)
-	assert.Empty(t, order.AssigneeIDs())
+			order, err = factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+			require.NoError(t, err)
+			assert.Equal(t, []uuid.UUID{r.User}, order.AssigneeIDs())
+			eventsAfter, err := order.ListEvents(db, 0, nil)
+			require.NoError(t, err)
+			assert.Equal(t, eventsBefore, eventsAfter)
+		})
+	}
 }
 
 func mustTaskOwnerMember(t *testing.T, r *support.ResourceRegistry, login string) *models.User {
