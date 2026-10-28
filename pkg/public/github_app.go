@@ -368,12 +368,74 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 			tx,
 			models.ProviderGitHub,
 			event.GetRepo().GetID(),
-			time.Now().Add(10*time.Second),
+			time.Now().Add(githubRepositoryAccessChangeDelay),
 			models.VCSProviderRepositorySyncPriorityInteractive,
 		)
+
+	case *gh.TeamAddEvent:
+		return delayGitHubRepositoryAccessSync(tx, event.GetRepo())
+
+	case *gh.TeamEvent:
+		if event.GetRepo().GetID() > 0 {
+			return delayGitHubRepositoryAccessSync(tx, event.GetRepo())
+		}
+		if event.GetAction() == "deleted" {
+			return delayGitHubInstallationAccessSync(tx, installationID)
+		}
+		return nil
+
+	case *gh.MembershipEvent:
+		return delayGitHubInstallationAccessSync(tx, installationID)
+
+	case *gh.OrganizationEvent:
+		switch event.GetAction() {
+		case "member_added", "member_removed":
+			return delayGitHubInstallationAccessSync(tx, installationID)
+		}
+		return nil
 	}
 
 	return nil
+}
+
+// GitHub can take a few seconds to publish access changes through the
+// collaborators API, so access syncs wait before they run.
+const (
+	githubRepositoryAccessChangeDelay   = 10 * time.Second
+	githubInstallationAccessChangeDelay = 30 * time.Second
+)
+
+func delayGitHubRepositoryAccessSync(tx *gorm.DB, repository *gh.Repository) error {
+	if repository.GetID() <= 0 {
+		return nil
+	}
+	if _, err := models.FindVCSProviderRepository(tx, models.ProviderGitHub, repository.GetID()); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	return models.DelayVCSProviderRepositorySync(
+		tx,
+		models.ProviderGitHub,
+		repository.GetID(),
+		time.Now().Add(githubRepositoryAccessChangeDelay),
+		models.VCSProviderRepositorySyncPriorityInteractive,
+	)
+}
+
+// Team and organization membership changes do not say which repositories
+// they affect, so every repository of the installation is refreshed. These
+// syncs use background priority, so a large organization does not delay
+// onboarding refreshes.
+func delayGitHubInstallationAccessSync(tx *gorm.DB, installationID int64) error {
+	return models.DelayVCSProviderInstallationRepositorySyncs(
+		tx,
+		models.ProviderGitHub,
+		installationID,
+		time.Now().Add(githubInstallationAccessChangeDelay),
+		models.VCSProviderRepositorySyncPriorityBackground,
+	)
 }
 
 func enqueueWebhookRepositories(tx *gorm.DB, repositories []models.VCSProviderRepository) error {

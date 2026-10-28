@@ -1060,6 +1060,37 @@ func DelayVCSProviderRepositorySync(
 	)
 }
 
+// DelayVCSProviderInstallationRepositorySyncs queues a delayed collaborator
+// sync for every repository of the installation, with the same debounce as
+// DelayVCSProviderRepositorySync.
+func DelayVCSProviderInstallationRepositorySyncs(
+	tx *gorm.DB,
+	provider string,
+	installationID int64,
+	runAt time.Time,
+	priority VCSProviderRepositorySyncPriority,
+) error {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+	var repositoryIDs []int64
+	if err := tx.Model(&VCSProviderRepository{}).
+		Where("provider = ? AND installation_id = ?", provider, installationID).
+		Pluck("repository_id", &repositoryIDs).
+		Error; err != nil {
+		return err
+	}
+	return enqueueVCSProviderRepositorySyncs(
+		tx,
+		provider,
+		repositoryIDs,
+		runAt,
+		priority,
+		vcsProviderRepositoryScheduleDelayed,
+	)
+}
+
 type vcsProviderRepositorySchedule int
 
 const (
@@ -1079,11 +1110,28 @@ func enqueueVCSProviderRepositorySync(
 	if err != nil {
 		return err
 	}
-	job := VCSProviderRepositorySyncJob{
-		Provider:     provider,
-		RepositoryID: repositoryID,
-		RunAt:        runAt,
-		Priority:     priority,
+	return enqueueVCSProviderRepositorySyncs(tx, provider, []int64{repositoryID}, runAt, priority, schedule)
+}
+
+func enqueueVCSProviderRepositorySyncs(
+	tx *gorm.DB,
+	provider string,
+	repositoryIDs []int64,
+	runAt time.Time,
+	priority VCSProviderRepositorySyncPriority,
+	schedule vcsProviderRepositorySchedule,
+) error {
+	if len(repositoryIDs) == 0 {
+		return nil
+	}
+	jobs := make([]VCSProviderRepositorySyncJob, 0, len(repositoryIDs))
+	for _, repositoryID := range repositoryIDs {
+		jobs = append(jobs, VCSProviderRepositorySyncJob{
+			Provider:     provider,
+			RepositoryID: repositoryID,
+			RunAt:        runAt,
+			Priority:     priority,
+		})
 	}
 	updatedAt := time.Now()
 	return tx.Clauses(clause.OnConflict{
@@ -1100,7 +1148,7 @@ func enqueueVCSProviderRepositorySync(
 				updatedAt,
 			),
 		}),
-	}).Create(&job).Error
+	}).CreateInBatches(&jobs, 500).Error
 }
 
 func repositorySyncRunAtExpression(schedule vcsProviderRepositorySchedule, runAt time.Time) clause.Expr {
