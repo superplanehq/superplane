@@ -3,9 +3,11 @@ package public
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -237,6 +239,117 @@ func organizationIDs(items []adminOrgItem) []string {
 		ids[i] = item.ID
 	}
 	return ids
+}
+
+func TestAdminListOrganizationPlans(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	db := database.DB(t.Context())
+	custom := billingmodels.BillingPlan{Key: "custom_admin_list_" + uuid.NewString()[:8], Name: "a Custom Plan", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &custom))
+	other := billingmodels.BillingPlan{Key: "other_admin_list_" + uuid.NewString()[:8], Name: "A CUSTOM PLAN", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &other))
+	create := func(name, key string) *models.Organization {
+		org, err := models.CreateOrganization("PlanSort "+name, "")
+		require.NoError(t, err)
+		if key != "" {
+			_, err = billingmodels.SetAdminOrganizationPlan(db, org.ID, key, nil)
+			require.NoError(t, err)
+		}
+		return org
+	}
+	zebra := create("Zebra", custom.Key)
+	alpha := create("Alpha", other.Key)
+	twinA := create("Twin", custom.Key)
+	twinB := create("Twin", other.Key)
+	none := create("Missing", "")
+	require.NoError(t, db.Where("organization_id = ?", none.ID).Delete(&billingmodels.OrganizationBillingPlan{}).Error)
+	trial := create("Trial", "trial")
+	expired := create("Expired", "trial")
+	past := time.Now().Add(-time.Hour)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", expired.ID).Update("trial_ends_at", past).Error)
+	ended := create("Ended", custom.Key)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", ended.ID).Updates(map[string]any{
+		"plan_source": billingmodels.BillingPlanSourcePolar, "cancel_at_period_end": true, "current_period_end": past,
+		"polar_subscription_status": billingmodels.PolarSubscriptionStatusCanceled,
+	}).Error)
+	pinCustom := create("Pinned Custom", custom.Key)
+	pinTrial := create("Pinned Trial", "trial")
+	require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, pinCustom.ID).Code)
+	require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, pinTrial.ID).Code)
+
+	twins := []string{twinA.ID.String(), twinB.ID.String()}
+	slices.Sort(twins)
+	paidIDs := append([]string{alpha.ID.String()}, twins...)
+	paidIDs = append(paidIDs, zebra.ID.String())
+	noneIDs := []string{ended.ID.String(), expired.ID.String(), none.ID.String()}
+	expectedPlans := map[string][2]string{
+		alpha.ID.String(): {other.Key, other.Name}, zebra.ID.String(): {custom.Key, custom.Name},
+		twinA.ID.String(): {custom.Key, custom.Name}, twinB.ID.String(): {other.Key, other.Name},
+		none.ID.String(): {"none", "None"}, expired.ID.String(): {"none", "None"}, ended.ID.String(): {"none", "None"},
+		trial.ID.String(): {"trial", "Trial"}, pinCustom.ID.String(): {custom.Key, custom.Name}, pinTrial.ID.String(): {"trial", "Trial"},
+	}
+	request := func(t *testing.T, query string) adminOrganizationListResponse {
+		t.Helper()
+		page := listAdminOrganizations(t, server, token, query)
+		for _, item := range append(append([]adminOrgItem{}, page.Items...), page.Pinned...) {
+			assert.Equal(t, expectedPlans[item.ID], [2]string{item.PlanKey, item.PlanName}, item.ID)
+		}
+		return page
+	}
+	for _, test := range []struct {
+		direction string
+		ids       []string
+	}{
+		{"asc", append(append(append([]string{}, paidIDs...), noneIDs...), trial.ID.String())},
+		{"desc", append(append([]string{trial.ID.String()}, noneIDs...), paidIDs...)},
+	} {
+		t.Run(test.direction, func(t *testing.T) {
+			for offset, id := range test.ids {
+				page := request(t, fmt.Sprintf("search=PlanSort&sort_by=plan_name&sort_direction=%s&limit=1&offset=%d", test.direction, offset))
+				require.Len(t, page.Items, 1)
+				assert.Equal(t, id, page.Items[0].ID)
+				assert.Equal(t, int64(8), page.Total)
+				assert.Equal(t, int64(10), page.MatchTotal)
+				require.Len(t, page.Pinned, 2)
+				assert.Equal(t, pinTrial.ID.String(), page.Pinned[0].ID)
+				assert.Equal(t, pinCustom.ID.String(), page.Pinned[1].ID)
+			}
+		})
+	}
+	page := request(t, "search=PlanSort%20Twin&sort_by=plan_name&sort_direction=desc&limit=1&offset=1")
+	require.Len(t, page.Items, 1)
+	assert.Equal(t, twins[1], page.Items[0].ID)
+	assert.Equal(t, int64(2), page.Total)
+	request(t, "search=PlanSort&sort_by=name&sort_direction=asc&limit=2")
+	for _, org := range []*models.Organization{none, expired, ended} {
+		stored, err := billingmodels.FindOrganizationBillingPlan(db, org.ID)
+		require.NoError(t, err)
+		require.NotNil(t, stored)
+		assert.Equal(t, "none", stored.Catalog.Key)
+	}
+}
+
+func TestAdminListOrganizationPlanResolutionErrors(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	db := database.DB(t.Context())
+	const callback = "test:fail_admin_plan_resolution"
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "organization_billing_plans" {
+			tx.AddError(errors.New("plan storage detail"))
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+	for _, query := range []string{"sort_by=name", "sort_by=plan_name"} {
+		response := execRequest(server, requestParams{method: http.MethodGet, path: "/admin/api/organizations?" + query, authCookie: token})
+		assert.Equal(t, http.StatusInternalServerError, response.Code)
+		assert.Equal(t, "Failed to list organizations\n", response.Body.String())
+	}
+	require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, r.Organization.ID).Code)
+	response := execRequest(server, requestParams{
+		method: http.MethodGet, path: "/admin/api/organizations?search=no-matching-organization", authCookie: token,
+	})
+	assert.Equal(t, http.StatusInternalServerError, response.Code)
+	assert.Equal(t, "Failed to list organizations\n", response.Body.String())
 }
 
 func insertHostedSpend(t *testing.T, db *gorm.DB, orgID uuid.UUID, costMicros int64, occurredAt time.Time) {

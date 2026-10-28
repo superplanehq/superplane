@@ -89,8 +89,8 @@ describe("OrganizationsList", () => {
       "fetch",
       vi.fn(async () =>
         jsonResponse({
-          items: [organization("org-1", "Acme")],
-          pinned: [organization("pinned-org", "Pinned Customer")],
+          items: [{ ...organization("org-1", "Acme"), plan_key: "trial", plan_name: "Trial" }],
+          pinned: [{ ...organization("pinned-org", "Pinned Customer"), plan_key: "custom", plan_name: "Custom Team" }],
           total: 1,
           match_total: 4,
         }),
@@ -109,6 +109,10 @@ describe("OrganizationsList", () => {
     expect(screen.getByRole("button", { name: "Pin organization" })).toBeInTheDocument();
     expect(screen.getByText("4 organizations across this installation")).toBeInTheDocument();
     const pinnedSection = screen.getByRole("region", { name: "Pinned" });
+    expect(within(pinnedSection).getByText("Custom Team")).toBeInTheDocument();
+    expect(within(pinnedSection).getByRole("columnheader", { name: "Plan" })).not.toHaveAttribute("aria-sort");
+    expect(within(pinnedSection).queryByRole("button", { name: "Plan" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /Acme/ })).getByText("Trial")).toBeInTheDocument();
     expect(within(pinnedSection).getByRole("columnheader", { name: "Name" })).not.toHaveAttribute("aria-sort");
     expect(within(pinnedSection).queryByRole("button", { name: "Name" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Name" })).toBeInTheDocument();
@@ -393,6 +397,43 @@ describe("OrganizationsList", () => {
     });
   });
 
+  it("sorts plans in both directions and retains the sort across search and pagination", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
+      jsonResponse({ items: [organization("org-1", "Acme")], pinned: [], total: 101, match_total: 101 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <MemoryRouter>
+        <OrganizationsList />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    expect(within(screen.getByRole("row", { name: /Acme/ })).getByText("—")).toBeInTheDocument();
+    const lastQuery = () => new URL(String(fetchMock.mock.calls.at(-1)?.[0]), "http://localhost").searchParams;
+    expect(lastQuery().get("offset")).toBe("50");
+
+    await user.click(screen.getByRole("button", { name: "Plan" }));
+    await waitFor(() => {
+      expect(lastQuery().get("sort_by")).toBe("plan_name");
+      expect(lastQuery().get("sort_direction")).toBe("asc");
+      expect(lastQuery().get("offset")).toBe("0");
+    });
+    expect(screen.getByRole("columnheader", { name: "Plan" })).toHaveAttribute("aria-sort", "ascending");
+
+    await user.click(screen.getByRole("button", { name: "Plan" }));
+    await waitFor(() => expect(lastQuery().get("sort_direction")).toBe("desc"));
+    expect(screen.getByRole("columnheader", { name: "Plan" })).toHaveAttribute("aria-sort", "descending");
+    await user.type(screen.getByPlaceholderText("Search by name or ID..."), "Acme");
+    await waitFor(() => expect(lastQuery().get("search")).toBe("Acme"));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(lastQuery().get("offset")).toBe("50");
+    expect(lastQuery().get("search")).toBe("Acme");
+    expect(lastQuery().get("sort_by")).toBe("plan_name");
+    expect(lastQuery().get("sort_direction")).toBe("desc");
+  });
+
   it("sorts by workspace and repository counts", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
@@ -424,6 +465,7 @@ describe("OrganizationsList", () => {
     const headers = await screen.findAllByRole("columnheader");
     expect(headers.map((header) => header.textContent)).toEqual([
       "Name",
+      "Plan",
       "Automations",
       "Tasks",
       "Done Tasks",
