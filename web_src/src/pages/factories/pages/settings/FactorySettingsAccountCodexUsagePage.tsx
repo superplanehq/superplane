@@ -5,13 +5,23 @@ import { meListCodexUsage, type MeCodexUsageConnection, type MeCodexUsageWindow 
 import { Button } from "@/components/ui/button";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
+import { usePermissions } from "@/contexts/usePermissions";
+import { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
+import { FactoryCodexSubscriptionConnection } from "./FactoryCodexSubscriptionConnection";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
+
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
 export function FactorySettingsAccountCodexUsagePage() {
-  const { organizationId } = useFactorySettingsLayout();
+  const { organizationId, factoryId } = useFactorySettingsLayout();
+  const { currentUserId } = usePermissions();
+  const features = useExperimentalFeature(organizationId);
+  const connectionEnabled = !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS);
+  const codex = useFactoryCodexConnection(organizationId, factoryId, connectionEnabled);
   const query = useQuery({
-    queryKey: ["me", organizationId, "codex-usage"],
+    queryKey: ["me", organizationId, "codex-usage", currentUserId],
     queryFn: async () => {
       const response = await meListCodexUsage(withOrganizationHeader({ organizationId }));
       if (!response.data) throw new Error("Could not load Codex usage.");
@@ -27,6 +37,7 @@ export function FactorySettingsAccountCodexUsagePage() {
       title="Codex usage"
       subtitle="Saved usage for your ChatGPT subscriptions. Usage outside SuperPlane can change the remaining quota."
     >
+      {connectionEnabled ? <FactoryCodexSubscriptionConnection codex={codex} /> : null}
       {query.isPending ? <p role="status">Loading Codex usage…</p> : null}
       {query.isError ? (
         <FactorySettingsCard title="Could not load Codex usage.">
@@ -45,7 +56,7 @@ export function CodexUsageConnections({ connections }: { connections: MeCodexUsa
     return (
       <FactorySettingsCard
         title="No ChatGPT subscription connected"
-        description="Connect ChatGPT during workspace setup to see Codex usage here."
+        description="Connect your ChatGPT subscription to see Codex usage here."
       />
     );
   }
@@ -60,7 +71,7 @@ export function CodexUsageConnections({ connections }: { connections: MeCodexUsa
     >
       <div className="space-y-4 text-[13px]">
         {connection.status === "reconnect_required" ? (
-          <p>Connect ChatGPT again in workspace setup to update usage.</p>
+          <p>Connect your ChatGPT subscription again to update usage.</p>
         ) : null}
         {connection.observedAt && connection.limits?.some((limit) => limit.primary || limit.secondary) ? (
           connection.limits.map((limit) => (
