@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -237,6 +238,37 @@ func TestVCSProviderRepositorySyncJobClaim(t *testing.T) {
 	var remaining int64
 	require.NoError(t, db.Model(&VCSProviderRepositorySyncJob{}).Count(&remaining).Error)
 	assert.Zero(t, remaining)
+}
+
+func TestVCSProviderRepositorySyncConcurrentClaimsSkipLockedJobs(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api"},
+		{RepositoryID: 202, FullName: "acme/web"},
+		{RepositoryID: 203, FullName: "acme/docs"},
+	}))
+	for _, repositoryID := range []int64{201, 202, 203} {
+		require.NoError(t, EnqueueVCSProviderRepositorySync(
+			db, ProviderGitHub, repositoryID, now.Add(-time.Second), VCSProviderRepositorySyncPriorityBackground,
+		))
+	}
+
+	held := db.Begin()
+	t.Cleanup(func() { held.Rollback() })
+	first, err := ClaimVCSProviderRepositorySyncs(held, ProviderGitHub, now, now.Add(-time.Minute), 2)
+	require.NoError(t, err)
+	require.Len(t, first, 2)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	second, err := ClaimVCSProviderRepositorySyncs(db.WithContext(ctx), ProviderGitHub, now, now.Add(-time.Minute), 8)
+	require.NoError(t, err, "a second replica must not wait for rows that another replica holds")
+	require.Len(t, second, 1)
+	assert.NotContains(t, []int64{first[0].RepositoryID, first[1].RepositoryID}, second[0].RepositoryID)
 }
 
 func claimVCSProviderRepositorySync(t *testing.T, db *gorm.DB, now, claimableBefore time.Time) *VCSProviderRepositorySyncJob {
