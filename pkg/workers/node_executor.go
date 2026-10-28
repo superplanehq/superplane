@@ -527,7 +527,8 @@ func (w *NodeExecutor) executeActionNode(
 			w.encryptor,
 			workflow.OrganizationID,
 		),
-		Logger: logger,
+		CodexSubscription: contexts.NewCodexSubscriptionContext(tx, workflow, w.encryptor),
+		Logger:            logger,
 	}
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
@@ -582,6 +583,11 @@ func (w *NodeExecutor) executeActionNode(
 		}
 	}
 	if err := action.Execute(ctx); err != nil {
+		var busy *models.CodexConnectionBusyError
+		if errors.As(err, &busy) {
+			// Keep the execution pending while ChatGPT sign-in holds the subscription.
+			return err
+		}
 		logger = withFactoryOrder(logger, tx, execution.RunID)
 		logger = withRejectedHostedCredit(logger, workflow.OrganizationID, err)
 		logger.Errorf("failed to execute action: %v", err)

@@ -105,6 +105,10 @@ func lineRunnerNodeUsesHostedFunding(node models.Node) bool {
 }
 
 func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node) ([]string, error) {
+	credentials, _ := node.Configuration["credentials"].(map[string]any)
+	if node.ComponentName() == runnerCodex && credentials["source"] == "subscription" {
+		return models.FactoryCodexSubscriptionModels(tx, orgID, factoryID)
+	}
 	if node.ComponentName() == models.SuperPlaneRunnerComponent {
 		return hostedSelectableLineRunnerModels(tx, orgID, factoryID, storedRunnerModel(node.Configuration))
 	}
@@ -206,7 +210,7 @@ func runnerFundingSource(configuration map[string]any) string {
 	credentials, _ := configuration["credentials"].(map[string]any)
 	source, _ := credentials["source"].(string)
 	switch strings.TrimSpace(source) {
-	case "secret", "integration":
+	case "secret", "integration", "subscription":
 		return models.UsageFundingSourceBYOK
 	default:
 		return models.UsageFundingSourceHosted

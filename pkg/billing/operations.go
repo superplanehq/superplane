@@ -96,6 +96,15 @@ func ResolveSeats(tx *gorm.DB, organizationID uuid.UUID) (*SeatUsage, error) {
 	return implementation.ResolveSeats(tx, organizationID)
 }
 
+// ResolveOrganizationPlanSummaries applies current-plan rules, including persisted plan transitions.
+func ResolveOrganizationPlanSummaries(tx *gorm.DB, organizationIDs []uuid.UUID) (map[uuid.UUID]OrganizationPlanSummary, error) {
+	implementation, err := Current()
+	if err != nil {
+		return nil, err
+	}
+	return implementation.ResolveOrganizationPlanSummaries(tx, organizationIDs)
+}
+
 func RecheckSeatCapacity(tx *gorm.DB, organizationID uuid.UUID, cause string) (CapacityAlert, error) {
 	implementation, err := Current()
 	if err != nil {

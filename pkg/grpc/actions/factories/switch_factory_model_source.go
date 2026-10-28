@@ -39,12 +39,13 @@ const (
 )
 
 type workspaceAgentRewrite struct {
-	Component       string
-	Model           string
-	PlanningModel   string
-	IntegrationName string
-	Harness         string
-	Provider        string
+	Component         string
+	Model             string
+	PlanningModel     string
+	IntegrationName   string
+	Harness           string
+	Provider          string
+	CredentialsSource string
 }
 
 func workspaceAgentRewriteFor(source, integrationName string, modelIDs []string) (workspaceAgentRewrite, error) {
@@ -136,6 +137,11 @@ func rewriteWorkspaceAgentNode(node *models.Node, rewrite workspaceAgentRewrite)
 		node.Configuration["llmProvider"] = models.UsageProviderCustom
 	} else {
 		delete(node.Configuration, "llmProvider")
+	}
+	if rewrite.CredentialsSource == "subscription" {
+		node.Configuration["credentials"] = map[string]any{"source": "subscription"}
+		node.Configuration["model"] = ""
+		return true
 	}
 	node.Configuration["credentials"] = map[string]any{
 		"source": "integration",
@@ -497,6 +503,9 @@ func switchFactoryModelSource(
 	baseURL string,
 	apiType string,
 ) ([]uuid.UUID, string, error) {
+	if factory.OnboardingConfigValue().CodexSubscription {
+		return nil, "", grpcerrors.FailedPrecondition(nil, "This workspace uses a ChatGPT subscription. Model source cannot change.")
+	}
 	var integration *models.Integration
 	if strings.TrimSpace(source) != modelSourceHosted {
 		provider := strings.TrimSpace(source)

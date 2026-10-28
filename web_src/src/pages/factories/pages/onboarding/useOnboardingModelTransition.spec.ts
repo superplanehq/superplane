@@ -23,12 +23,17 @@ beforeEach(() => {
   toast.mockClear();
   Object.assign(cardStep, { ready: true, available: false, required: false, plans: [], planActive: false });
 });
-function mount(saving = false, screen: "tickets" | "card" = "tickets") {
+function mount(saving = false, codexSubscriptionLoading = false, screen: "tickets" | "card" = "tickets") {
   const finish = vi.fn(async () => {});
   const goToScreen = vi.fn();
   const hook = renderHook(
-    ({ saving }) => useOnboardingModelTransition({ saving, finish }, { screen, goToScreen }, "org"),
-    { initialProps: { saving } },
+    ({ saving, codexSubscriptionLoading, codexSubscriptionOffered }) =>
+      useOnboardingModelTransition(
+        { saving, finish, codexSubscriptionLoading, codexSubscriptionOffered },
+        { screen, goToScreen },
+        "org",
+      ),
+    { initialProps: { saving, codexSubscriptionLoading, codexSubscriptionOffered: false } },
   );
   return { ...hook, finish, goToScreen };
 }
@@ -52,8 +57,18 @@ it("waits for saved ticket state before completing setup", async () => {
   const { result, rerender, finish } = mount(true);
   await act(async () => result.current.afterTickets());
   expect(finish).not.toHaveBeenCalled();
-  rerender({ saving: false });
+  rerender({ saving: false, codexSubscriptionLoading: false, codexSubscriptionOffered: false });
   await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
+});
+
+it("waits for ChatGPT eligibility before it continues saved intake", async () => {
+  const { result, rerender, finish, goToScreen } = mount(false, true);
+  await act(async () => result.current.afterTickets());
+  expect(verify).not.toHaveBeenCalled();
+  expect(finish).not.toHaveBeenCalled();
+  rerender({ saving: false, codexSubscriptionLoading: false, codexSubscriptionOffered: true });
+  await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("agent"));
+  expect(finish).not.toHaveBeenCalled();
 });
 
 it("keeps setup open when model access cannot be verified", async () => {
@@ -88,7 +103,7 @@ it("skips the card step for an organization that already has a paid plan", async
 });
 
 it("sends a restored card URL to the complete screen when the step is not available", async () => {
-  const { result, goToScreen } = mount(false, "card");
+  const { result, goToScreen } = mount(false, false, "card");
   expect(result.current.screen).toBe("complete");
   await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("complete"));
 });

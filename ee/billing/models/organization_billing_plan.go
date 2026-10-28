@@ -481,28 +481,78 @@ func ResolveOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*Organization
 	if err != nil {
 		return nil, err
 	}
+	resolver := organizationBillingPlanResolver{tx: tx, now: time.Now()}
+	return resolver.resolve(orgID, plan)
+}
+
+// ResolveOrganizationBillingPlans batch-loads billing rows and their catalogs.
+// Expired and missing rows use the same persistence rules as single-plan resolution.
+func ResolveOrganizationBillingPlans(tx *gorm.DB, orgIDs []uuid.UUID) (map[uuid.UUID]*OrganizationBillingPlan, error) {
+	plans := make(map[uuid.UUID]*OrganizationBillingPlan, len(orgIDs))
+	ids := make([]uuid.UUID, 0, len(orgIDs))
+	for _, id := range orgIDs {
+		if id == uuid.Nil {
+			return nil, fmt.Errorf("organization is required")
+		}
+		if _, exists := plans[id]; exists {
+			continue
+		}
+		plans[id] = nil
+		ids = append(ids, id)
+	}
+	// Bound the IN clauses below PostgreSQL's parameter limit.
+	const batchSize = 1000
+	for start := 0; start < len(ids); start += batchSize {
+		var batch []OrganizationBillingPlan
+		if err := tx.Preload("Catalog").Where("organization_id IN ?", ids[start:min(start+batchSize, len(ids))]).Find(&batch).Error; err != nil {
+			return nil, err
+		}
+		for i := range batch {
+			plans[batch[i].OrganizationID] = &batch[i]
+		}
+	}
+	resolver := organizationBillingPlanResolver{tx: tx, now: time.Now()}
+	for _, id := range ids {
+		plan, err := resolver.resolve(id, plans[id])
+		if err != nil {
+			return nil, err
+		}
+		plans[id] = plan
+	}
+	return plans, nil
+}
+
+type organizationBillingPlanResolver struct {
+	tx        *gorm.DB
+	now       time.Time
+	graceDays *int
+}
+
+func (r *organizationBillingPlanResolver) resolve(orgID uuid.UUID, plan *OrganizationBillingPlan) (*OrganizationBillingPlan, error) {
 	if plan == nil {
-		return persistNoneBillingPlan(tx, orgID)
+		return persistNoneBillingPlan(r.tx, orgID)
 	}
-	now := time.Now()
-	if plan.Catalog.Category == "trial" && !plan.IsOpenTrial(now) {
-		return lapseExpiredTrial(tx, plan)
+	if plan.Catalog.Category == "trial" && !plan.IsOpenTrial(r.now) {
+		return lapseExpiredTrial(r.tx, plan)
 	}
-	if plan.shouldLapseEndedPolarBusiness(now) {
-		return lapseEndedPolarBusiness(tx, plan)
+	if plan.shouldLapseEndedPolarBusiness(r.now) {
+		return lapseEndedPolarBusiness(r.tx, plan)
 	}
 	if plan.shouldLapsePaymentBlockedCatalog() {
-		return lapsePaymentBlockedCatalog(tx, plan)
+		return lapsePaymentBlockedCatalog(r.tx, plan)
 	}
 	if !plan.holdsPastDueGraceRow() {
 		return plan, nil
 	}
-	graceDays, err := installationPastDueGraceDays(tx)
-	if err != nil {
-		return nil, err
+	if r.graceDays == nil {
+		graceDays, err := installationPastDueGraceDays(r.tx)
+		if err != nil {
+			return nil, err
+		}
+		r.graceDays = &graceDays
 	}
-	if plan.pastDueGraceEnded(now, graceDays) {
-		return lapseEndedPastDueGrace(tx, plan, graceDays)
+	if plan.pastDueGraceEnded(r.now, *r.graceDays) {
+		return lapseEndedPastDueGrace(r.tx, plan, *r.graceDays)
 	}
 	return plan, nil
 }

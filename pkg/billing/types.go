@@ -2,6 +2,12 @@ package billing
 
 import "time"
 
+// OrganizationPlanSummary identifies the resolved current catalog plan.
+type OrganizationPlanSummary struct {
+	Key  string
+	Name string
+}
+
 // Rate contains cents per million tokens from a provider catalog.
 type Rate struct {
 	Input      int64
