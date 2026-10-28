@@ -20,7 +20,7 @@ func TestHasPaymentMethod(t *testing.T) {
 		want      bool
 		wantError bool
 	}{
-		{name: "customer without a card", status: 200},
+		{name: "customer without a card", status: 200, items: []map[string]any{}},
 		{name: "missing customer", status: 404},
 		{name: "confirmed saved card", status: 200, items: []map[string]any{{"id": "pm_card", "type": "card", "method_metadata": map[string]int{"exp_year": now.Year() + 1, "exp_month": 1}}}, want: true},
 		{name: "expired card", status: 200, items: []map[string]any{{"id": "pm_old", "type": "card", "method_metadata": map[string]int{"exp_year": now.Year() - 1, "exp_month": 1}}}},

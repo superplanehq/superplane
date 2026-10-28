@@ -394,6 +394,7 @@ func TestFactoryProductAnalytics(t *testing.T) {
 	})
 
 	t.Run("onboarding completion emits once", func(t *testing.T) {
+		support.AssignOpenSystemTrial(t, r.Organization.ID)
 		recorder.reset()
 		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 		factoryModel := newFactory(t)

@@ -2,6 +2,9 @@ package factories
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -25,6 +29,7 @@ import (
 
 func Test__UpdateFactoryOnboarding(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 
@@ -121,36 +126,9 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		assert.Equal(t, firstCompletedAt.UnixMicro(), response.Factory.Onboarding.CompletedAt.AsTime().UnixMicro())
 	})
 
-	t.Run("complete without agent integration succeeds when hosted credit remains", func(t *testing.T) {
-		t.Setenv(billingmodels.BillingEnabledEnv, "yes")
-		before, err := billingmodels.ResolveOrganizationBillingPlan(db, r.Organization.ID)
-		require.NoError(t, err)
-		require.Equal(t, billingmodels.BillingPlanNone, before.Catalog.Key)
-		require.Nil(t, before.TrialEndsAt)
-		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
-		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
-		appID, lineID := createOnboardingResources(t, r, factory)
-
-		req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
-		req.AgentIntegrationId = nil
-		complete := true
-		req.Complete = &complete
-
-		upsertHostedOnboardingProvider(t, db)
-		response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
-		require.NoError(t, err)
-		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
-		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
-		after, err := billingmodels.ResolveOrganizationBillingPlan(db, r.Organization.ID)
-		require.NoError(t, err)
-		require.Equal(t, before.PlanID, after.PlanID)
-		require.Equal(t, before.TrialEndsAt, after.TrialEndsAt)
-		require.Equal(t, before.PurchasedSeats, after.PurchasedSeats)
-	})
-
 	t.Run("complete without agent integration succeeds when hosted credit is empty", func(t *testing.T) {
 		emptyOrg := support.CreateOrganization(t, r, r.User)
+		support.AssignOpenSystemTrial(t, emptyOrg.ID)
 		require.NoError(t, db.Where("organization_id = ?", emptyOrg.ID).Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
 
 		factory, err := models.CreateFactory(db, emptyOrg.ID, support.RandomName("factory"), "", "")
@@ -304,6 +282,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 
@@ -629,4 +608,53 @@ func TestFactoryOnboardingRejectsBYOKAfterRevocation(t *testing.T) {
 	complete := true
 	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), Complete: &complete})
 	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+}
+
+func TestOnboardingRequiresBillingBeforeCompletion(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(billing.BillingEnabledEnv, "yes")
+	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	appID, lineID := createOnboardingResources(t, r, factory)
+	req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
+	req.AgentIntegrationId = nil
+	complete := true
+	req.Complete = &complete
+
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err), "welcome credit must not bypass plan selection")
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	require.False(t, reloaded.IsOnboardingComplete())
+
+	plan := billingmodels.BillingPlan{Key: "onboarding_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	_, err = billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	plan.RequirePaymentMethod = true
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	hasCard := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		require.Equal(t, "/customers/external/"+r.Organization.ID.String()+"/payment-methods", request.URL.Path)
+		if !hasCard {
+			_, _ = w.Write([]byte(`{"items":[],"pagination":{"max_page":1}}`))
+			return
+		}
+		_, _ = fmt.Fprintf(w, `{"items":[{"id":"card","type":"card","method_metadata":{"exp_month":1,"exp_year":%d}}],"pagination":{"max_page":1}}`, time.Now().Year()+1)
+	}))
+	defer server.Close()
+	t.Setenv("POLAR_ACCESS_TOKEN", "test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err), "an active plan must not bypass its card requirement")
+	reloaded, err = models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	require.False(t, reloaded.IsOnboardingComplete())
+	hasCard = true
+	response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+	require.NoError(t, err)
+	require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 }

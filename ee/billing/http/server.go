@@ -52,6 +52,7 @@ func (s *Server) RegisterAdmin(adminRoute *mux.Router) {
 	adminRoute.HandleFunc("/organizations/{orgId}/seat-limit", s.adminOrganizationSeatLimit).Methods("GET", "PUT", "DELETE")
 	adminRoute.HandleFunc("/organizations/{orgId}/features", s.adminOrganizationFeatures).Methods("GET", "PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/billing-customer/sync", s.adminSyncOrganizationBillingCustomer).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/spending-report", s.adminGetOrganizationSpendingReport).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
