@@ -256,6 +256,7 @@ func TruncateTables() error {
 			factories,
 			files,
 			hosted_llm_providers,
+			hosted_model_call_outcomes,
 			mcp_oauth_clients,
 			mcp_oauth_codes,
 			mcp_oauth_refresh_tokens
