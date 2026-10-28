@@ -3,6 +3,7 @@ package runner
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -11,8 +12,9 @@ import (
 )
 
 type parsedModelCallOutcome struct {
-	Model   string `json:"model"`
-	Outcome string `json:"outcome"`
+	Model      string `json:"model"`
+	Outcome    string `json:"outcome"`
+	OccurredAt string `json:"occurredAt"`
 }
 
 func RecordRunnerModelCallOutcomes(logger *log.Entry, taskID, finishedEventType string, configuration any, result json.RawMessage) {
@@ -52,11 +54,26 @@ func parseRunnerModelCallOutcomes(provider, taskID string, result json.RawMessag
 			Provider:     provider,
 			Model:        model,
 			Outcome:      strings.TrimSpace(row.Outcome),
+			OccurredAt:   parseOccurredAt(row.OccurredAt),
 			RunnerTaskID: taskID,
 			Sequence:     i + 1,
 		})
 	}
 	return inputs
+}
+
+func parseOccurredAt(raw string) time.Time {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return time.Time{}
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return parsed
+	}
+	if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+		return parsed
+	}
+	return time.Time{}
 }
 
 func isHostedModelStatusProvider(provider string) bool {
