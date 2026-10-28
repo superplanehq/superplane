@@ -469,7 +469,7 @@ describe("FirstRunSetup chrome", () => {
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
   });
 
-  it.each(["issues", "card"])("lets a maintainer finish unpaid workspace setup from %s", async (step) => {
+  it.each(["issues", "card"])("blocks unpaid setup for maintainers from %s", async (step) => {
     Object.assign(billingState, { enabled: true });
     billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
     canManageBilling = false;
@@ -484,12 +484,13 @@ describe("FirstRunSetup chrome", () => {
       if (step === "issues") await user.click(screen.getByRole("button", { name: "Continue" }));
 
       expect(await screen.findByTestId("first-run-complete")).toHaveTextContent(
-        "Ask an organization admin to select a billing plan. You can complete workspace setup now.",
+        "Ask an organization admin to select a billing plan before you complete workspace setup.",
       );
       expect(screen.queryByTestId("first-run-card")).not.toBeInTheDocument();
       expect(model.finish).not.toHaveBeenCalled();
       await user.click(screen.getByRole("button", { name: "Continue" }));
-      await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+      expect(model.finish).not.toHaveBeenCalled();
       expect(openCardSetup).not.toHaveBeenCalled();
       expect(activateOnboardingPlan).not.toHaveBeenCalled();
       expect(resumeOnboardingPlan).not.toHaveBeenCalled();

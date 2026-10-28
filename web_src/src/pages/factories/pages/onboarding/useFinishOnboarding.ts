@@ -1,3 +1,5 @@
+import { onboardingBillingError } from "./onboardingBilling";
+import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { resolveOnboardingAgent } from "./onboardingAgentReadiness";
@@ -314,6 +316,15 @@ async function verifyOnboardingPlan(
   }
 }
 
+async function verifyOnboardingBilling(billing: ReturnType<typeof useOrganizationBilling>): Promise<void> {
+  const currentBilling = await billing.refetch();
+  if (currentBilling.error || !currentBilling.data) {
+    throw new Error("SuperPlane could not verify billing. Try again.");
+  }
+  const error = onboardingBillingError(currentBilling.data);
+  if (error) throw new Error(error);
+}
+
 export function useFinishOnboarding(args: {
   organizationId: string;
   factoryId: string;
@@ -343,6 +354,7 @@ export function useFinishOnboarding(args: {
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
+  const billing = useOrganizationBilling(args.organizationId);
   const access = useBYOKAccess(args.organizationId);
   const usage = useOrganizationWorkspaceUsage(args.organizationId);
   const navigate = useNavigate();
@@ -395,6 +407,7 @@ export function useFinishOnboarding(args: {
 
     args.setSaving(true);
     try {
+      await verifyOnboardingBilling(billing);
       const selections = await selectionsWithVcsInstallation(args.organizationId, args.selections, vcsHost, vcs.id);
       const provisioned = await provisionWorkspace({
         ...args,
