@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	gh "github.com/google/go-github/v84/github"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -109,4 +110,35 @@ func TestInstallationAppIDFromClient(t *testing.T) {
 	appID, err := installationAppIDFromClient(context.Background(), client, "139366")
 	require.NoError(t, err)
 	assert.Equal(t, int64(99), appID)
+}
+
+func TestAfterAppInstallationHonorsSetupReturnPath(t *testing.T) {
+	integrationID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	returnPath := "/org-1/workspaces/pay/setup?step=repo"
+
+	request := httptest.NewRequest(http.MethodGet, "/setup", nil)
+	request.AddCookie(&http.Cookie{
+		Name:  integrationSetupReturnCookie,
+		Value: url.QueryEscape(returnPath),
+	})
+	response := httptest.NewRecorder()
+
+	(&GitHub{}).afterAppInstallation(core.HTTPRequestContext{
+		Logger:         log.New().WithField("test", t.Name()),
+		Request:        request,
+		Response:       response,
+		OrganizationID: "org-1",
+		BaseURL:        "https://app.example",
+		Integration: &contexts.IntegrationContext{
+			NewSetupFlow:  true,
+			IntegrationID: integrationID,
+			CurrentProperties: map[string]any{
+				common.PropertyAppInstallationID: "139366",
+			},
+		},
+	})
+
+	assert.Equal(t, http.StatusSeeOther, response.Code)
+	assert.Equal(t, "https://app.example"+returnPath, response.Header().Get("Location"))
+	assert.NotContains(t, response.Header().Get("Location"), "/settings/integrations/")
 }

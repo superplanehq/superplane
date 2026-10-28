@@ -138,11 +138,11 @@ export function githubOnboardingIntegrationId(args: {
   if (remembered) {
     return remembered;
   }
-  const selected = args.selectionId?.trim() ?? "";
-  if (selected) {
-    return selected;
+  const saved = args.vcsIntegrationId?.trim() ?? "";
+  if (saved) {
+    return saved;
   }
-  return args.vcsIntegrationId?.trim() ?? "";
+  return args.selectionId?.trim() ?? "";
 }
 
 export async function persistGitHubEnterpriseRepository(args: {
@@ -166,6 +166,7 @@ export async function bindGitHubEnterpriseOnboarding(args: {
   factoryId: string;
   integrationId: string;
   host: string;
+  updateOnboarding: UpdateOnboarding;
   rememberPreferredInstance: (integrationName: string, integrationId: string) => void;
   refetchConnections: () => Promise<unknown>;
   setSelections: (update: (current: IntegrationSelections) => IntegrationSelections) => void;
@@ -176,6 +177,7 @@ export async function bindGitHubEnterpriseOnboarding(args: {
     return;
   }
   args.rememberPreferredInstance("github", id);
+  await args.updateOnboarding({ vcsIntegrationId: id });
   await args.refetchConnections();
   const installationName = await describeInstallationName(args.organizationId, id);
   args.setSelections((current) => githubEnterpriseSelections(current, id, installationName));
@@ -217,6 +219,7 @@ export function githubEnterpriseOnboardingActions(args: {
         factoryId: args.factoryId,
         integrationId,
         host: readOnboardingGithubEnterprise(args.factoryId).host,
+        updateOnboarding: args.updateOnboarding,
         rememberPreferredInstance: args.rememberPreferredInstance,
         refetchConnections: args.refetchConnections,
         setSelections: args.setSelections,

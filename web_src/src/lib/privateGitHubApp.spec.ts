@@ -41,6 +41,12 @@ describe("githubPrivateAppSetupPath", () => {
   it("opens the GitHub setup wizard", () => {
     expect(githubPrivateAppSetupPath("org-1")).toBe("/org-1/settings/integrations/github/setup");
   });
+
+  it("opens the GitHub setup wizard under a workspace integrations path", () => {
+    expect(githubPrivateAppSetupPath("org-1", "/org-1/workspaces/pay/settings/organization/integrations")).toBe(
+      "/org-1/workspaces/pay/settings/organization/integrations/github/setup",
+    );
+  });
 });
 
 describe("startPrivateGitHubAppSetup", () => {

@@ -758,14 +758,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	installationID, err := ctx.Integration.Properties().GetString(common.PropertyAppInstallationID)
 	if err == nil && installationID != "" {
 		ctx.Logger.Infof("app installation %s already set up", installationID)
-		http.Redirect(
-			ctx.Response,
-			ctx.Request,
-			fmt.Sprintf(
-				"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
-			),
-			http.StatusSeeOther,
-		)
+		redirectToIntegrationSettings(ctx)
 		return
 	}
 
@@ -876,14 +869,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	ctx.Logger.Infof("Successfully installed GitHub App - installation=%s", installationID)
 	ctx.Logger.Infof("Repositories: %v", repos)
 
-	http.Redirect(
-		ctx.Response,
-		ctx.Request,
-		fmt.Sprintf(
-			"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
-		),
-		http.StatusSeeOther,
-	)
+	redirectToIntegrationSettings(ctx)
 }
 
 func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
@@ -905,14 +891,7 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	//
 	if metadata.InstallationID != "" {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
-		http.Redirect(
-			ctx.Response,
-			ctx.Request,
-			fmt.Sprintf(
-				"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
-			),
-			http.StatusSeeOther,
-		)
+		redirectToIntegrationSettings(ctx)
 		return
 	}
 	if isInstallationRequestSetupAction(setupAction) {

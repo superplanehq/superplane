@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { IntegrationId } from "./onboardingFixtures";
-import { writeOnboardingGithubEnterprise } from "./onboardingGithubEnterprise";
+import {
+  githubOnboardingIntegrationId,
+  resolvedOnboardingGithubEnterprise,
+  writeOnboardingGithubEnterprise,
+} from "./onboardingGithubEnterprise";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -258,17 +262,30 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
 
   it("resumes Enterprise from the saved integration host after the tab is closed", () => {
     gheApp.ready = true;
+    const githubIntegrationId = githubOnboardingIntegrationId({
+      selectionId: "int-github-com",
+      vcsIntegrationId: "int-ghe",
+    });
+    const restored = resolvedOnboardingGithubEnterprise({
+      factoryId: "factory-1",
+      vcsIntegrationId: githubIntegrationId,
+      hostFromIntegration: githubIntegrationId === "int-ghe" ? "acme.ghe.com" : "",
+    });
     const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
     hook.result.current.selectVcsHost("github");
 
     render(
       <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=repo"]}>
         <FirstRunSetup
-          model={pageModel(hook.result.current, { githubIntegrationId: "int-ghe", githubHost: "acme.ghe.com" })}
+          model={pageModel(hook.result.current, {
+            githubIntegrationId: restored.integrationId,
+            githubHost: restored.host,
+          })}
         />
       </MemoryRouter>,
     );
 
     expect(screen.getByTestId("first-run-github-enterprise-choose")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-organization-picker")).not.toBeInTheDocument();
   });
 });

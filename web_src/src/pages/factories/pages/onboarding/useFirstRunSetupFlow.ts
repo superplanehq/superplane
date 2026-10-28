@@ -351,7 +351,7 @@ function useFirstRunCommands(args: {
 }
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
-  const { organizationId, factoryId } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
   const enterprise = useGitHubEnterpriseChoice(factoryId, model.githubIntegrationId, model.githubHost);
   const { githubEnterprise, githubEnterpriseHost, githubEnterpriseError, githubEnterpriseIntegrationId } = enterprise;
   const setupFinished = model.provisionedDestination != null;
@@ -359,6 +359,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const githubEnterpriseApp = useFirstRunGitHubEnterprise({
     organizationId,
     factoryId,
+    factoryKey: routeSegment,
     integrationId: githubEnterpriseIntegrationId,
     onCreated: model.bindGitHubEnterpriseIntegration,
   });
