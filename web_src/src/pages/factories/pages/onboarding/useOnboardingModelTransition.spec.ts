@@ -23,7 +23,11 @@ beforeEach(() => {
   toast.mockClear();
   Object.assign(cardStep, { ready: true, available: false, required: false, plans: [], planActive: false });
 });
-function mount(saving = false, codexSubscriptionLoading = false, screen: "tickets" | "card" = "tickets") {
+function mount(
+  saving = false,
+  codexSubscriptionLoading = false,
+  screen: "tickets" | "card" | "agent" | "complete" = "tickets",
+) {
   const finish = vi.fn(async () => {});
   const goToScreen = vi.fn();
   const hook = renderHook(
@@ -106,4 +110,12 @@ it("sends a restored card URL to the complete screen when the step is not availa
   const { result, goToScreen } = mount(false, false, "card");
   expect(result.current.screen).toBe("complete");
   await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("complete"));
+});
+
+it.each(["agent", "complete"] as const)("resumes unpaid setup at plan selection instead of %s", async (screen) => {
+  Object.assign(cardStep, { available: true, required: true });
+  const { result, goToScreen, finish } = mount(false, false, screen);
+  expect(result.current.screen).toBe("card");
+  await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("card"));
+  expect(finish).not.toHaveBeenCalled();
 });
