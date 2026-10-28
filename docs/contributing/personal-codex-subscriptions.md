@@ -7,8 +7,9 @@ existing Codex subscriptions feature gate must remain enabled.
 Subscription tasks require one eligible owner. A member can start another
 member's task without a personal connection. Unassigned tasks remain in the
 backlog. Assignment does not resume a pending handoff. Use **Start** to resume it.
-If the saved pull request is no longer open, **Start** discards the pending
-handoff. The task stays in the backlog with its plan, and a member can start it
+If the saved pull request is no longer open, or the provider reports that it
+does not exist, **Start** discards the pending handoff. Temporary provider
+errors keep the handoff. The task stays in the backlog with its plan, and a member can start it
 on any line.
 
 An automatic Verify automation that cannot start because of an owner or model

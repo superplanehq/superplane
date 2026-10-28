@@ -2,12 +2,16 @@ package factories
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"strings"
 
+	"github.com/google/go-github/v84/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -39,6 +43,9 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 	var pullRequest *handOffPullRequest
 	if intent.Column == HandOffColumnVerify {
 		pullRequest, err = loadHandOffPullRequest(ctx, db, deps, factory, intent.PullRequestURL)
+		if isHandOffPullRequestGone(err) {
+			return discardStaleHandOff(ctx, factory, order, intent)
+		}
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to load pull request")
 		}
@@ -111,6 +118,31 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		return nil, factoryErrorToStatus(err, "failed to load task")
 	}
 	return &pb.ResumeHandOffWorkOrderResponse{Order: serialized, Column: intent.Column}, nil
+}
+
+// isHandOffPullRequestGone reports whether the provider confirmed that the
+// saved pull request no longer exists. Other load errors, such as timeouts or
+// rate limits, are temporary and must keep the saved handoff.
+func isHandOffPullRequestGone(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, errFactoryPullRequestMissing) {
+		return true
+	}
+	var githubErr *github.ErrorResponse
+	if errors.As(err, &githubErr) && githubErr.Response != nil {
+		return isGoneStatus(githubErr.Response.StatusCode)
+	}
+	var bitbucketErr *bitbucket.APIError
+	if errors.As(err, &bitbucketErr) {
+		return isGoneStatus(bitbucketErr.StatusCode)
+	}
+	return false
+}
+
+func isGoneStatus(status int) bool {
+	return status == http.StatusNotFound || status == http.StatusGone
 }
 
 // discardStaleHandOff clears a saved verify handoff whose pull request is no

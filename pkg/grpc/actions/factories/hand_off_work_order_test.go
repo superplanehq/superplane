@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -785,7 +787,8 @@ func TestSubscriptionHandOffWaitsForAssignmentAndExplicitStart(t *testing.T) {
 	}
 }
 
-func TestResumeHandOffDiscardsVerifyHandOffWhenPullRequestIsNoLongerOpen(t *testing.T) {
+func seedPendingVerifyHandOff(t *testing.T) (context.Context, *support.ResourceRegistry, *models.Factory, *models.FactoryWorkOrder) {
+	t.Helper()
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
@@ -805,12 +808,21 @@ func TestResumeHandOffDiscardsVerifyHandOffWhenPullRequestIsNoLongerOpen(t *test
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	require.NoError(t, order.UpdateAssignees(db, []uuid.UUID{r.User}, r.User))
-	merged := openHandOffPullRequest("acme/app", 42, "feature")
-	merged.State = github.Ptr("closed")
-	useGitHub(t, merged)
+	return ctx, r, f, order
+}
 
-	resumed, err := ResumeHandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ResumeHandOffWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
-	require.NoError(t, err)
+func useGitHubError(t *testing.T, err error) {
+	t.Helper()
+	original := newFactoryGitHubAPI
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+		return &fakeFactoryGitHub{getPullErr: err}, nil
+	}
+	t.Cleanup(func() { newFactoryGitHubAPI = original })
+}
+
+func requireHandOffDiscarded(t *testing.T, f *models.Factory, order *models.FactoryWorkOrder, resumed *pb.ResumeHandOffWorkOrderResponse) {
+	t.Helper()
+	db := database.DB(t.Context())
 	assert.Equal(t, "backlog", resumed.Column)
 	assert.Equal(t, pb.WorkOrder_STATE_DRAFT, resumed.Order.State)
 	assert.Nil(t, resumed.Order.PendingHandoff)
@@ -821,6 +833,43 @@ func TestResumeHandOffDiscardsVerifyHandOffWhenPullRequestIsNoLongerOpen(t *test
 	artifact, err := stored.FindArtifactByKey(db, models.PlanningSpecArtifactKey+":"+stored.ID.String())
 	require.NoError(t, err)
 	assert.Equal(t, "The saved plan", planningSpecBody(t, artifact))
+}
+
+func TestResumeHandOffDiscardsVerifyHandOffWhenPullRequestIsNoLongerOpen(t *testing.T) {
+	ctx, r, f, order := seedPendingVerifyHandOff(t)
+	merged := openHandOffPullRequest("acme/app", 42, "feature")
+	merged.State = github.Ptr("closed")
+	useGitHub(t, merged)
+
+	resumed, err := ResumeHandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ResumeHandOffWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
+	require.NoError(t, err)
+	requireHandOffDiscarded(t, f, order, resumed)
+}
+
+func TestResumeHandOffDiscardsVerifyHandOffWhenPullRequestIsGone(t *testing.T) {
+	ctx, r, f, order := seedPendingVerifyHandOff(t)
+	useGitHubError(t, &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusNotFound}, Message: "Not Found"})
+
+	resumed, err := ResumeHandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ResumeHandOffWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
+	require.NoError(t, err)
+	requireHandOffDiscarded(t, f, order, resumed)
+}
+
+func TestResumeHandOffKeepsVerifyHandOffWhenPullRequestLoadFailsTemporarily(t *testing.T) {
+	ctx, r, f, order := seedPendingVerifyHandOff(t)
+	useGitHubError(t, &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusBadGateway}, Message: "Bad Gateway"})
+
+	_, err := ResumeHandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ResumeHandOffWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
+	require.Error(t, err)
+	stored, err := f.FindWorkOrder(database.DB(t.Context()), order.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, stored.PendingHandOff)
+}
+
+func TestIsHandOffPullRequestGoneRecognizesBitbucketNotFound(t *testing.T) {
+	assert.True(t, isHandOffPullRequestGone(&bitbucket.APIError{StatusCode: http.StatusNotFound}))
+	assert.False(t, isHandOffPullRequestGone(&bitbucket.APIError{StatusCode: http.StatusInternalServerError}))
+	assert.False(t, isHandOffPullRequestGone(errors.New("timeout")))
 }
 
 func TestSubscriptionHandOffRejectsInvalidPullRequestURLBeforeSaving(t *testing.T) {
