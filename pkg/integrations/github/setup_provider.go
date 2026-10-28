@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	gh "github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -231,34 +232,83 @@ func (g *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.Setu
 }
 
 func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
-	return core.SetupStep{
-		Type:  core.SetupStepTypeInputs,
-		Name:  SetupStepSelectOwner,
-		Label: "Select the user account / organization",
-		Inputs: []configuration.Field{
-			{
-				Name:     common.PropertyOwnerType,
-				Label:    "Owner Type",
+	host := hostFromSetupConfiguration(ctx)
+	enterprise := gitHubEnterpriseLicensed() || !host.IsDotCom()
+	ownerDefault := common.OwnerTypeUser
+	locationDefault := common.GitHubLocationDotCom
+	if !host.IsDotCom() {
+		ownerDefault = common.OwnerTypeOrganization
+		locationDefault = common.GitHubLocationEnterpriseCloud
+	}
+
+	hostDefault := ""
+	if !host.IsDotCom() {
+		hostDefault = host.WebHostname()
+	}
+
+	inputs := []configuration.Field{}
+	if enterprise {
+		inputs = append(inputs,
+			configuration.Field{
+				Name:     common.PropertyGitHubLocation,
+				Label:    "Where is your GitHub?",
 				Type:     configuration.FieldTypeSelect,
 				Required: true,
-				Default:  common.OwnerTypeUser,
+				Default:  locationDefault,
 				TypeOptions: &configuration.TypeOptions{
 					Select: &configuration.SelectTypeOptions{
 						Options: []configuration.FieldOption{
-							{Label: "User Account", Value: common.OwnerTypeUser},
-							{Label: "Organization", Value: common.OwnerTypeOrganization},
+							{Label: "GitHub.com", Value: common.GitHubLocationDotCom},
+							{Label: "GitHub Enterprise Cloud", Value: common.GitHubLocationEnterpriseCloud},
 						},
 					},
 				},
 			},
-			{
-				Name:        common.PropertyOwner,
-				Label:       "User account / organization name",
+			configuration.Field{
+				Name:        common.PropertyHost,
+				Label:       "GitHub host",
 				Type:        configuration.FieldTypeString,
 				Required:    true,
-				Placeholder: "e.g. superplanehq",
+				Default:     hostDefault,
+				Placeholder: "acme.ghe.com",
+				Description: "Enter the GitHub Enterprise Cloud hostname. If the tenant uses an IP allow list, allow SuperPlane egress addresses.",
+				VisibilityConditions: []configuration.VisibilityCondition{
+					{Field: common.PropertyGitHubLocation, Values: []string{common.GitHubLocationEnterpriseCloud}},
+				},
+			},
+		)
+	}
+
+	inputs = append(inputs,
+		configuration.Field{
+			Name:     common.PropertyOwnerType,
+			Label:    "Owner Type",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  ownerDefault,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "User Account", Value: common.OwnerTypeUser},
+						{Label: "Organization", Value: common.OwnerTypeOrganization},
+					},
+				},
 			},
 		},
+		configuration.Field{
+			Name:        common.PropertyOwner,
+			Label:       "User account / organization name",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "e.g. superplanehq",
+		},
+	)
+
+	return core.SetupStep{
+		Type:   core.SetupStepTypeInputs,
+		Name:   SetupStepSelectOwner,
+		Label:  "Select the user account / organization",
+		Inputs: inputs,
 	}
 }
 
@@ -352,7 +402,43 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 		return nil, errors.New("owner is required")
 	}
 
-	err := ctx.Properties.CreateMany([]core.IntegrationPropertyDefinition{
+	location, _ := m[common.PropertyGitHubLocation].(string)
+	hostRaw, _ := m[common.PropertyHost].(string)
+	if location == common.GitHubLocationDotCom {
+		hostRaw = ""
+	}
+	host, err := common.ParseHost(hostRaw)
+	if err != nil {
+		return nil, err
+	}
+	if !host.IsDotCom() {
+		if err := authorizeGitHubEnterpriseHost(host); err != nil {
+			return nil, err
+		}
+		orgID, parseErr := uuid.Parse(ctx.OrganizationID)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid organization")
+		}
+		if ownerType != common.OwnerTypeOrganization {
+			return nil, fmt.Errorf("GitHub Enterprise Cloud requires an organization owner")
+		}
+		if !hostAllowed(host) {
+			return nil, fmt.Errorf("GitHub host %s is not allowed", host.WebHostname())
+		}
+		if ctx.HTTP == nil {
+			return nil, fmt.Errorf("could not reach GitHub host")
+		}
+		if err := probeGitHubHost(ctx.HTTP, host, orgID); err != nil {
+			return nil, err
+		}
+	}
+
+	hostValue := ""
+	if !host.IsDotCom() {
+		hostValue = host.WebHostname()
+	}
+
+	err = ctx.Properties.CreateMany([]core.IntegrationPropertyDefinition{
 		{
 			Name:     common.PropertyOwnerType,
 			Label:    "Owner Type",
@@ -367,10 +453,36 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 			Value:    owner,
 			Editable: false,
 		},
+		{
+			Name:     common.PropertyHost,
+			Label:    "GitHub host",
+			Type:     configuration.FieldTypeString,
+			Value:    hostValue,
+			Editable: false,
+		},
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("error creating parameter: %v", err)
+	}
+
+	if wantsFactoryOnboarding(ctx.Configuration) && !host.IsDotCom() {
+		mapper := NewCapabilityMapper()
+		names := mapper.NamesForPermissions(
+			PermissionIssues,
+			PermissionContents,
+			PermissionPullRequests,
+			PermissionMetadata,
+			PermissionChecks,
+			PermissionCommitStatuses,
+			PermissionVulnerabilityAlerts,
+		)
+		if ctx.Capabilities != nil {
+			ctx.Capabilities.Unavailable(mapper.AllNames()...)
+			ctx.Capabilities.Available(mapper.ForOwnerType(ownerType)...)
+			ctx.Capabilities.Request(names...)
+		}
+		return g.onSelectAuthMethodSubmit(map[string]any{common.PropertyAuthMethod: common.AuthMethodApp}, ctx)
 	}
 
 	return &core.SetupStep{
@@ -569,7 +681,7 @@ func (g *SetupProvider) generateNextStepForApp(ctx core.SetupStepContext, state 
 		Instructions: buf.String(),
 		RedirectPrompt: &core.RedirectPrompt{
 			Method: "POST",
-			URL:    g.createAppURL(ownerType, owner),
+			URL:    g.createAppURL(ownerType, owner, hostFromSetup(ctx)),
 			FormData: map[string]string{
 				"manifest": g.appManifest(ctx),
 				"state":    state,
@@ -578,12 +690,25 @@ func (g *SetupProvider) generateNextStepForApp(ctx core.SetupStepContext, state 
 	}, nil
 }
 
-func (g *SetupProvider) createAppURL(ownerType string, owner string) string {
-	if ownerType == common.OwnerTypeOrganization {
-		return fmt.Sprintf("https://github.com/organizations/%s/settings/apps/new", owner)
-	}
+func (g *SetupProvider) createAppURL(ownerType string, owner string, host common.Host) string {
+	return host.CreateAppURL(ownerType, owner)
+}
 
-	return "https://github.com/settings/apps/new"
+func hostFromSetup(ctx core.SetupStepContext) common.Host {
+	return common.HostFromProperties(ctx.Properties)
+}
+
+func hostFromSetupConfiguration(ctx core.SetupStepContext) common.Host {
+	raw, _ := ctx.Configuration[common.ConfigHost].(string)
+	host, err := common.ParseHost(raw)
+	if err != nil {
+		return common.DotCom()
+	}
+	return host
+}
+
+func hostFromProperties(properties core.IntegrationPropertyStorageReader) common.Host {
+	return common.HostFromProperties(properties)
 }
 
 func (g *SetupProvider) appManifest(ctx core.SetupStepContext) string {
@@ -669,7 +794,13 @@ func (g *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 }
 
 func (g *SetupProvider) onSelectOwnerRevert(ctx core.SetupStepContext) error {
-	return ctx.Properties.Delete(common.PropertyOwnerType, common.PropertyOwner)
+	return ctx.Properties.Delete(
+		common.PropertyOwnerType,
+		common.PropertyOwner,
+		common.PropertyHost,
+		common.PropertyAuthMethod,
+		common.PropertyAppState,
+	)
 }
 
 func (g *SetupProvider) onCapabilitySelectionRevert(ctx core.SetupStepContext) error {
@@ -686,12 +817,18 @@ func (g *SetupProvider) onEnterPATRevert(ctx core.SetupStepContext) error {
 }
 
 func validatePATConnection(properties core.IntegrationPropertyStorageReader, token string) ([]*github.Repository, error) {
+	host := common.HostFromProperties(properties)
 	client := gh.NewClient(
 		oauth2.NewClient(
 			context.Background(),
 			oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}),
 		),
 	)
+	var err error
+	client, err = common.ApplyHostToGitHubClient(client, host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure GitHub API host: %v", err)
+	}
 
 	ownerType, err := properties.GetString(common.PropertyOwnerType)
 	if err != nil {
@@ -736,7 +873,7 @@ func finishPATSetup(properties core.IntegrationPropertyStorageReader, repos []*g
 	}
 
 	data := map[string]any{
-		"ConnectionURL": fmt.Sprintf("https://github.com/%s", owner),
+		"ConnectionURL": hostFromProperties(properties).ProfileURL(owner),
 		"Repos":         repos,
 	}
 

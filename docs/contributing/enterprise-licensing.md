@@ -40,13 +40,16 @@ Usage costs remain recorded in that mode.
 
 The Enterprise features are:
 
-| Feature        | Operations that require the license                    |
-| -------------- | ------------------------------------------------------ |
-| `custom_roles` | Create or update a custom role. Assign a custom role.  |
-| `groups`       | Create or update a group. Add a user to a group.       |
+| Feature             | Operations that require the license                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `custom_roles`      | Create or update a custom role. Assign a custom role.                                                                        |
+| `groups`            | Create or update a group. Add a user to a group.                                                                             |
+| `github_enterprise` | Create or configure a GitHub integration with a host other than github.com. Create or install a private GitHub App on that host. |
 
 When a license expires, existing custom roles and groups continue to work,
-and administrators can still remove them.
+and administrators can still remove them. Existing GitHub Enterprise
+integrations continue to run: webhooks, API calls, and repository lists
+keep working, and administrators can still view and delete them.
 
 ## Feature registry
 

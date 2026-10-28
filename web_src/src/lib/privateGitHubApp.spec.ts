@@ -17,6 +17,21 @@ describe("privateGitHubAppCreateConfiguration", () => {
     expect(privateGitHubAppCreateConfiguration("github")).toEqual({ privateApp: true });
   });
 
+  it("sends the GitHub Enterprise host and factory onboarding flag", () => {
+    expect(
+      privateGitHubAppCreateConfiguration("github", {
+        host: "acme.ghe.com",
+        factoryOnboarding: true,
+        returnTo: "/org-1/workspaces/ws/setup?step=repo",
+      }),
+    ).toEqual({
+      privateApp: true,
+      host: "acme.ghe.com",
+      factoryOnboarding: true,
+      setupReturnPath: "/org-1/workspaces/ws/setup?step=repo",
+    });
+  });
+
   it("does not send privateApp for other integrations", () => {
     expect(privateGitHubAppCreateConfiguration("slack")).toBeUndefined();
   });
@@ -25,6 +40,12 @@ describe("privateGitHubAppCreateConfiguration", () => {
 describe("githubPrivateAppSetupPath", () => {
   it("opens the GitHub setup wizard", () => {
     expect(githubPrivateAppSetupPath("org-1")).toBe("/org-1/settings/integrations/github/setup");
+  });
+
+  it("opens the GitHub setup wizard under a workspace integrations path", () => {
+    expect(githubPrivateAppSetupPath("org-1", "/org-1/workspaces/pay/settings/organization/integrations")).toBe(
+      "/org-1/workspaces/pay/settings/organization/integrations/github/setup",
+    );
   });
 });
 
@@ -89,6 +110,66 @@ describe("connectPrivateGitHubApp", () => {
       name: "github",
       configuration: { privateApp: true },
     });
+    expect(goTo).not.toHaveBeenCalled();
+  });
+
+  it("creates a private app for GitHub Enterprise and opens the wizard", async () => {
+    const goTo = vi.fn();
+    const onCreated = vi.fn();
+    const create = vi.fn().mockResolvedValue({
+      integration: { metadata: { id: "int-ghe" }, status: { setupState: { currentStep: "selectOwner" } } },
+    });
+
+    await connectPrivateGitHubApp({
+      useWizard: true,
+      organizationId: "org-1",
+      host: "acme.ghe.com",
+      factoryOnboarding: true,
+      returnTo: "/org-1/workspaces/ws/setup?step=repo",
+      goTo,
+      existingNames: new Set(),
+      connected: [],
+      create,
+      onCreated,
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      integrationName: "github",
+      name: "github",
+      configuration: {
+        privateApp: true,
+        host: "acme.ghe.com",
+        factoryOnboarding: true,
+        setupReturnPath: "/org-1/workspaces/ws/setup?step=repo",
+      },
+    });
+    expect(onCreated).toHaveBeenCalledWith("int-ghe");
+    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/github/setup?integrationId=int-ghe");
+  });
+
+  it("stays on the caller after factory onboarding creates the connection", async () => {
+    const goTo = vi.fn();
+    const onCreated = vi.fn();
+    const create = vi.fn().mockResolvedValue({
+      integration: { metadata: { id: "int-ghe" } },
+    });
+
+    const opened = await connectPrivateGitHubApp({
+      useWizard: true,
+      stayAfterCreate: true,
+      organizationId: "org-1",
+      host: "acme.ghe.com",
+      factoryOnboarding: true,
+      returnTo: "/org-1/workspaces/ws/setup?step=repo",
+      goTo,
+      existingNames: new Set(),
+      connected: [],
+      create,
+      onCreated,
+    });
+
+    expect(opened).toBe(true);
+    expect(onCreated).toHaveBeenCalledWith("int-ghe");
     expect(goTo).not.toHaveBeenCalled();
   });
 });

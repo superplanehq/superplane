@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 // buildPrompt wraps the user's task in a deterministic operating procedure that
@@ -23,7 +24,7 @@ func buildRepositoryPrompt(spec Spec, branch string, attr commitAttribution, sch
 	writeIntro(&b)
 
 	fmt.Fprintf(&b, "1. Clone the repository and enter it:\n")
-	fmt.Fprintf(&b, "     git clone %s repo && cd repo\n", authenticatedCloneURL(spec.Repository))
+	fmt.Fprintf(&b, "     git clone %s repo && cd repo\n", authenticatedCloneURL(spec.Repository, githubHostFromSpec(spec)))
 	if base := strings.TrimSpace(spec.BaseBranch); base != "" {
 		fmt.Fprintf(&b, "     git checkout %s\n", base)
 	}
@@ -38,7 +39,9 @@ func buildRepositoryPrompt(spec Spec, branch string, attr commitAttribution, sch
 		}
 		fmt.Fprintf(&b, "5. Open a pull request from %s into %s (use the GitHub API with $GITHUB_TOKEN, or the gh CLI).\n", branch, target)
 		if ref := spec.ResolvesIssue; ref != nil {
-			fmt.Fprintf(&b, "   Include \"This resolves %s\" in the pull request description so GitHub closes the issue when the PR merges.\n", issueBacklinkReference(*ref, spec.Repository))
+			if backlink := issueBacklinkReference(*ref, spec.Repository, githubHostFromSpec(spec)); backlink != "" {
+				fmt.Fprintf(&b, "   Include \"This resolves %s\" in the pull request description so GitHub closes the issue when the PR merges.\n", backlink)
+			}
 		}
 	}
 	writeFinalMarker(&b, prEnabled(spec), schema)
@@ -51,7 +54,7 @@ func buildPRPrompt(spec Spec, pr *pullRequestInfo, attr commitAttribution, schem
 	fmt.Fprintf(&b, "You are updating the existing pull request %s.\n\n", pr.HTMLURL)
 
 	fmt.Fprintf(&b, "1. Clone the repository and switch to the pull request's branch (it already exists on origin):\n")
-	fmt.Fprintf(&b, "     git clone %s repo && cd repo\n", authenticatedCloneURL(pr.BaseRepo))
+	fmt.Fprintf(&b, "     git clone %s repo && cd repo\n", authenticatedCloneURL(pr.BaseRepo, pr.Host))
 	fmt.Fprintf(&b, "     git switch %s\n", pr.HeadRef)
 	writeIdentity(&b, attr)
 	fmt.Fprintf(&b, "2. Complete this task:\n%s\n", indent(spec.Task))
@@ -96,14 +99,15 @@ func writeFinalMarker(b *strings.Builder, prExpected bool, schema map[string]any
 	b.WriteString("     NO_PR   (if there were no changes to submit)\n")
 }
 
-func authenticatedCloneURL(repository string) string {
+func authenticatedCloneURL(repository string, host githubcommon.Host) string {
 	repository = strings.TrimSpace(repository)
 	if repoOwnerRepoPattern.MatchString(repository) {
-		return fmt.Sprintf("https://x-access-token:$GITHUB_TOKEN@github.com/%s.git", repository)
+		clone := host.CloneURL(repository)
+		return strings.Replace(clone, "https://", "https://x-access-token:$GITHUB_TOKEN@", 1)
 	}
-	// Only embed the token for github.com; anything else is returned unchanged
-	// (unauthenticated) so the credential can never reach a non-GitHub host.
-	if strings.HasPrefix(repository, "https://github.com/") {
+	fromURL := githubHostFromURL(repository)
+	if githubcommon.IsKnownGitHubWebHostname(fromURL.WebHostname()) &&
+		strings.HasPrefix(repository, fromURL.WebURL()+"/") {
 		return "https://x-access-token:$GITHUB_TOKEN@" + strings.TrimPrefix(repository, "https://")
 	}
 	return repository
