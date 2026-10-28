@@ -139,7 +139,8 @@ function AnalysisRequestChat({
             {state.active || analysis.view.machineStatus === "queued" ? (
               <AnalysisLiveWork
                 machineStatus={analysis.view.machineStatus}
-                queueReason={analysis.view.queueReason}
+                runnerState={analysis.view.runnerState}
+                blockedByParallelismLimit={analysis.view.blockedByParallelismLimit}
                 organizationId={analysis.organizationId}
                 canvasId={analysis.view.canvasId}
                 executionId={analysis.view.executionId}
