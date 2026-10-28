@@ -471,6 +471,10 @@ func (f *recordingFactory) VCSProvider() (string, error) {
 	return "", nil
 }
 
+func (f *recordingFactory) GitHubHost() (string, error) {
+	return "", nil
+}
+
 func Test__OnPullRequest__Setup(t *testing.T) {
 	trigger := OnPullRequest{}
 
