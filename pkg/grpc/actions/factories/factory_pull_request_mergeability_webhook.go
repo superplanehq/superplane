@@ -221,7 +221,7 @@ func refreshFactoryPullRequestMergeability(
 		return unavailableFactoryPullRequestMergeabilityError(pullRequest.ID, result.canRetry)
 	}
 	if result != nil && result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING {
-		maybeStartFactoryPullRequestConflictFix(db, factory, pullRequest)
+		maybeStartFactoryPullRequestConflictFix(db, factory, pullRequest, result.HeadRef, result.HeadSHA)
 	}
 	if storedFactoryPullRequestMergeability(pullRequest) == before {
 		return nil

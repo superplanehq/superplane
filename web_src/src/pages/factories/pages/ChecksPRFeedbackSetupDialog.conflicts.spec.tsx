@@ -73,7 +73,7 @@ describe("ChecksPRFeedbackSetupDialog conflict setup", () => {
       "Run CI on a recent pull request, then reopen Configure to select checks.",
     );
     expect(screen.getByRole("option", { name: /Merge conflicts/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("checks-setup-merge-conflict-hours")).toHaveValue(24);
+    expect(screen.getByTestId("checks-setup-merge-conflict-hours")).toHaveValue(1);
     expect(screen.getByTestId("checks-setup-maximum-attempts")).toHaveValue(3);
     expect(screen.queryByTestId("checks-setup-continue")).not.toBeInTheDocument();
 
@@ -89,7 +89,7 @@ describe("ChecksPRFeedbackSetupDialog conflict setup", () => {
             names: [],
             maximumAttempts: 3,
             fixMergeConflicts: true,
-            mergeConflictHours: 24,
+            mergeConflictHours: 1,
             runnerIntegrationIds: [],
           },
         },

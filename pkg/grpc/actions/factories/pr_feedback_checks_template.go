@@ -233,7 +233,7 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 			},
 			map[string]any{
 				"name":        "PR_HEAD",
-				"value":       "{{ root().data.pull_request.head.ref }}",
+				"value":       prFeedbackPRHeadExpression(),
 				"valueSource": "literal",
 			},
 			map[string]any{
@@ -335,7 +335,7 @@ func prFeedbackChecksPrompt(request prFeedbackBuildRequest) string {
 			"",
 			"Repository: {{ root().data.repository.full_name }}",
 			"Pull request: #{{ root().data.pull_request.number }}",
-			"Revision: {{ root().data.pull_request.head.sha }}",
+			"Revision: " + prFeedbackPRHeadSHAExpression(),
 			"",
 			prFeedbackChecksTaskInstruction(true),
 			"Read logs from Bitbucket Pipelines or from the build URL in FAILED_CHECKS.",
@@ -356,7 +356,7 @@ func prFeedbackChecksPrompt(request prFeedbackBuildRequest) string {
 		"",
 		"Repository: {{ root().data.repository.full_name }}",
 		"Pull request: #{{ root().data.pull_request.number }}",
-		"Revision: {{ root().data.pull_request.head.sha }}",
+		"Revision: " + prFeedbackPRHeadSHAExpression(),
 		"",
 		prFeedbackChecksTaskInstruction(false),
 		"Read logs from GitHub or from an available external integration.",
@@ -371,7 +371,7 @@ func prFeedbackChecksPrompt(request prFeedbackBuildRequest) string {
 }
 
 func prFeedbackPRHeadSHAExpression() string {
-	return "{{ root().data.pull_request.head.sha }}"
+	return "{{ root().data.pull_request?.head?.sha ?? \"\" }}"
 }
 
 func prFeedbackChecksWaitingTitleExpression() string {
@@ -449,7 +449,9 @@ func prFeedbackWaitChecksFailedSource() string {
 }
 
 func prFeedbackWaitChecksFailedSourceFor(provider string) string {
-	return `$["` + prFeedbackWaitChecksNodeName + `"].data.` + prFeedbackWaitFailedField(provider) + ` ?? []`
+	// A conflict fix emits on the repair node, so the wait node never runs.
+	// The message chain stores that name as nil. Optional access keeps the list empty.
+	return `$["` + prFeedbackWaitChecksNodeName + `"]?.data?.` + prFeedbackWaitFailedField(provider) + ` ?? []`
 }
 
 func prFeedbackWaitSelectedField(provider string) string {
@@ -516,7 +518,7 @@ func prFeedbackFailedChecksExpression() string {
 }
 
 func prFeedbackFailedChecksExpressionFor(provider string) string {
-	return `{{ join(map($["Wait For Pull Request Checks"].data.` + prFeedbackWaitFailedField(provider) + ` ?? [], .name + " " + .conclusion + " " + (.detailsUrl ?? "")), "\n") }}`
+	return `{{ join(map(` + prFeedbackWaitChecksFailedSourceFor(provider) + `, .name + " " + .conclusion + " " + (.detailsUrl ?? "")), "\n") }}`
 }
 
 func checkNamesNodeValue(names []string) []any {

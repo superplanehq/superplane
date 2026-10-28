@@ -39,7 +39,7 @@ function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFe
     checkNames: [],
     maximumAttempts: 3,
     fixMergeConflicts: true,
-    mergeConflictHours: 24,
+    mergeConflictHours: 1,
     runnerIntegrationIds: [],
     ...overrides,
   };
@@ -277,7 +277,7 @@ describe("prFeedbackDraftFromHandler", () => {
       checkNames: ["lint", "unit"],
       maximumAttempts: 4,
       fixMergeConflicts: true,
-      mergeConflictHours: 24,
+      mergeConflictHours: 1,
       runnerIntegrationIds: ["int-1"],
     });
   });
@@ -333,7 +333,7 @@ describe("prFeedbackSettingsToApi", () => {
         names: ["lint"],
         maximumAttempts: 4,
         fixMergeConflicts: true,
-        mergeConflictHours: 24,
+        mergeConflictHours: 1,
         runnerIntegrationIds: ["int-1"],
       },
     });

@@ -41,7 +41,7 @@ const (
 	prFeedbackDefaultMaximumAttempts    = 3
 	prFeedbackMaximumAttemptsMin        = 1
 	prFeedbackMaximumAttemptsMax        = 10
-	prFeedbackDefaultMergeConflictHours = 24
+	prFeedbackDefaultMergeConflictHours = 1
 	prFeedbackMergeConflictHoursMin     = 1
 	prFeedbackMergeConflictHoursMax     = 168
 

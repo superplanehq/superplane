@@ -445,6 +445,25 @@ func TestWorkspaceCheckoutScriptUsesBitbucketWhenGitHubTokenIsAbsent(t *testing.
 	assert.NoDirExists(t, filepath.Join(dir, "repo", ".git"))
 }
 
+func TestWorkspaceCheckoutScriptIgnoresNullPullRequestRevision(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	sha := pushCommit(t, remote, "refs/pull/4/head", "feature", "branch\n")
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
+		commitSetup: "1",
+		extraEnv: []string{
+			"PR_NUMBER=4",
+			"PR_HEAD=feature",
+			"PR_REVISION=null",
+		},
+	})
+	require.NoError(t, err, output)
+	assert.NotContains(t, output, "couldn't find remote ref")
+	repo := filepath.Join(dir, "repo")
+	assert.Equal(t, "feature", runGitQuiet(t, "", repo, "rev-parse", "--abbrev-ref", "HEAD"))
+	assert.Equal(t, sha, runGitQuiet(t, "", repo, "rev-parse", "HEAD"))
+}
+
 func TestWorkspaceCheckoutScriptChecksOutPullRequestBranch(t *testing.T) {
 	remote := initBareRepo(t, "main")
 	sha := pushCommit(t, remote, "refs/pull/4/head", "feature", "branch\n")

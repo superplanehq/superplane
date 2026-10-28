@@ -135,6 +135,7 @@ func mergeabilityToVCS(result *factoryPullRequestMergeability) vcs.Mergeability 
 		Message:        result.Message,
 		AllowedMethods: allowedMethodNames(result.AllowedMethods),
 		HeadSHA:        result.HeadSHA,
+		HeadRef:        result.HeadRef,
 		CanRetry:       result.canRetry,
 	}
 }
@@ -146,6 +147,7 @@ func mergeabilityFromVCS(pullRequest *models.FactoryPullRequest, read vcs.Mergea
 		Message:        read.Message,
 		AllowedMethods: mergeMethodsFromNames(read.AllowedMethods),
 		HeadSHA:        read.HeadSHA,
+		HeadRef:        read.HeadRef,
 		PullRequest:    pullRequest,
 		canRetry:       read.CanRetry,
 	}

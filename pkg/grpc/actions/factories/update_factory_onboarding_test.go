@@ -305,6 +305,7 @@ func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 			assertDiscussionHandler(t, db, factory, provider, 1)
+			assertOnboardingChecksHandler(t, db, factory, provider, 1)
 
 			response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 				Id:       factory.ID.String(),
@@ -313,6 +314,7 @@ func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, response.Factory.Onboarding.CompletedAt)
 			assertDiscussionHandler(t, db, factory, provider, 1)
+			assertOnboardingChecksHandler(t, db, factory, provider, 1)
 		})
 	}
 
@@ -344,6 +346,7 @@ func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 		}
 		require.Greater(t, successes, 0)
 		assertDiscussionHandler(t, db, factory, "github", 1)
+		assertOnboardingChecksHandler(t, db, factory, "github", 1)
 	})
 
 	t.Run("an already complete workspace is unchanged", func(t *testing.T) {
@@ -374,6 +377,7 @@ func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Zero(t, discussionHandlerCount(t, db, factory.ID))
+		assert.Zero(t, checksHandlerCount(t, db, factory.ID))
 	})
 
 	t.Run("completion does not request another connection", func(t *testing.T) {
@@ -401,6 +405,7 @@ func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 		_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		assertDiscussionHandler(t, db, factory, "github", 1)
+		assertOnboardingChecksHandler(t, db, factory, "github", 1)
 	})
 }
 
@@ -412,8 +417,8 @@ func assertDiscussionHandler(t *testing.T, db *gorm.DB, factory *models.Factory,
 	}
 	handlers, err := factory.ListPRFeedbackHandlers(db)
 	require.NoError(t, err)
-	require.Len(t, handlers, want)
-	canvas, err := models.FindCanvasInTransaction(db, factory.OrganizationID, handlers[0].CanvasID)
+	handler := prFeedbackHandlerBySource(t, handlers, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion)
+	canvas, err := models.FindCanvasInTransaction(db, factory.OrganizationID, handler.CanvasID)
 	require.NoError(t, err)
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
 	require.NoError(t, err)
@@ -439,11 +444,65 @@ func assertDiscussionHandler(t *testing.T, db *gorm.DB, factory *models.Factory,
 
 func discussionHandlerCount(t *testing.T, db *gorm.DB, factoryID uuid.UUID) int64 {
 	t.Helper()
+	return prFeedbackHandlerCount(t, db, factoryID, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion)
+}
+
+func checksHandlerCount(t *testing.T, db *gorm.DB, factoryID uuid.UUID) int64 {
+	t.Helper()
+	return prFeedbackHandlerCount(t, db, factoryID, models.FactoryPRFeedbackHandlerSourcePullRequestChecks)
+}
+
+func prFeedbackHandlerCount(t *testing.T, db *gorm.DB, factoryID uuid.UUID, source string) int64 {
+	t.Helper()
 	var count int64
 	require.NoError(t, db.Model(&models.FactoryPRFeedbackHandler{}).
-		Where("factory_id = ? AND source = ?", factoryID, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion).
+		Where("factory_id = ? AND source = ?", factoryID, source).
 		Count(&count).Error)
 	return count
+}
+
+func assertOnboardingChecksHandler(t *testing.T, db *gorm.DB, factory *models.Factory, provider string, want int) {
+	t.Helper()
+	require.Equal(t, int64(want), checksHandlerCount(t, db, factory.ID))
+	if want == 0 {
+		return
+	}
+	handlers, err := factory.ListPRFeedbackHandlers(db)
+	require.NoError(t, err)
+	handler := prFeedbackHandlerBySource(t, handlers, models.FactoryPRFeedbackHandlerSourcePullRequestChecks)
+	canvas, err := models.FindCanvasInTransaction(db, factory.OrganizationID, handler.CanvasID)
+	require.NoError(t, err)
+	assert.Equal(t, prFeedbackChecksDefaultName, canvas.Name)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+	settings := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
+	assert.Equal(t, "acme/api", settings.Repository)
+	assert.True(t, settings.FixMergeConflicts)
+	assert.Equal(t, prFeedbackDefaultMergeConflictHours, settings.MergeConflictHours)
+	assert.Empty(t, settings.CheckNames)
+	component := prFeedbackWaitChecksComponent
+	if provider == models.ProviderBitbucket {
+		component = "bitbucket.waitForBuilds"
+	}
+	wait := findIntakeNode(version.Nodes, prFeedbackWaitChecksNodeID)
+	require.NotNil(t, wait)
+	assert.Equal(t, component, wait.ComponentName())
+}
+
+func prFeedbackHandlerBySource(
+	t *testing.T,
+	handlers []models.FactoryPRFeedbackHandler,
+	source string,
+) models.FactoryPRFeedbackHandler {
+	t.Helper()
+	for _, handler := range handlers {
+		if handler.Source == source {
+			return handler
+		}
+	}
+	require.FailNow(t, "missing PR feedback handler", source)
+	return models.FactoryPRFeedbackHandler{}
 }
 
 func discussionRunnerPrompt(t *testing.T, nodes []models.Node) string {

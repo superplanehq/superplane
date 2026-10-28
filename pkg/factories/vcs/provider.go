@@ -50,6 +50,7 @@ type Mergeability struct {
 	Message        string
 	AllowedMethods []string
 	HeadSHA        string
+	HeadRef        string
 	CanRetry       bool
 }
 

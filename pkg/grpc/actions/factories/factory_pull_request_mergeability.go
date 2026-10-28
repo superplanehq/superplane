@@ -45,6 +45,7 @@ type factoryPullRequestMergeability struct {
 	Message        string
 	AllowedMethods []pb.FactoryPullRequestMergeability_MergeMethod
 	HeadSHA        string
+	HeadRef        string
 	PullRequest    *models.FactoryPullRequest
 	Client         factoryGitHubAPI
 	canRetry       bool
@@ -113,6 +114,7 @@ func evaluateFactoryPullRequestMergeability(
 		return nil, errFactoryPullRequestMissing
 	}
 	result.HeadSHA = githubPR.GetHead().GetSHA()
+	result.HeadRef = githubPR.GetHead().GetRef()
 
 	if githubPR.GetDraft() || strings.EqualFold(githubPR.GetMergeableState(), "draft") {
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_DRAFT, mergeBlockedDraft), nil

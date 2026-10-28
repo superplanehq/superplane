@@ -60,7 +60,10 @@ func TestFixFactoryPullRequestConflicts(t *testing.T) {
 				Mergeable:      github.Ptr(false),
 				MergeableState: github.Ptr("dirty"),
 				Draft:          github.Ptr(false),
-				Head:           &github.PullRequestBranch{SHA: github.Ptr("abc123")},
+				Head: &github.PullRequestBranch{
+					Ref: github.Ptr("feature"),
+					SHA: github.Ptr("abc123"),
+				},
 			},
 			repository: allMethodsRepository(),
 		}
@@ -101,7 +104,11 @@ func TestFixFactoryPullRequestConflicts(t *testing.T) {
 		data := payload["data"].(map[string]any)
 		assert.Equal(t, true, data["conflict_fix"])
 		assert.Equal(t, "acme/app", data["repository"].(map[string]any)["full_name"])
-		assert.Equal(t, json.Number("42"), data["pull_request"].(map[string]any)["number"])
+		pullRequestData := data["pull_request"].(map[string]any)
+		assert.Equal(t, json.Number("42"), pullRequestData["number"])
+		head := pullRequestData["head"].(map[string]any)
+		assert.Equal(t, "feature", head["ref"])
+		assert.Equal(t, "abc123", head["sha"])
 		assert.Equal(t, json.Number("42"), data["pullrequest"].(map[string]any)["id"])
 
 		nodes, edges, err := models.FindLiveCanvasSpecInTransaction(db, canvasID)

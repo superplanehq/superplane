@@ -63,7 +63,7 @@ func FixFactoryPullRequestConflicts(
 		return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(message)), "failed to start the conflict fix")
 	}
 
-	events, err := startFactoryPullRequestConflictFix(db, factory, pullRequest, true)
+	events, err := startFactoryPullRequestConflictFix(db, factory, pullRequest, true, result.HeadRef, result.HeadSHA)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to start the conflict fix")
 	}
@@ -96,6 +96,7 @@ func startFactoryPullRequestConflictFix(
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
 	manual bool,
+	headRef, headSHA string,
 ) ([]models.CanvasEvent, error) {
 	var events []models.CanvasEvent
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -113,7 +114,7 @@ func startFactoryPullRequestConflictFix(
 
 		if err := contexts.NewEventContext(tx, &repairNode, nil, func(created []models.CanvasEvent) {
 			events = append(events, created...)
-		}).Emit(factoryPullRequestConflictEventType, conflictFixEventData(pullRequest)); err != nil {
+		}).Emit(factoryPullRequestConflictEventType, conflictFixEventData(pullRequest, headRef, headSHA)); err != nil {
 			return err
 		}
 		if len(events) == 0 {
@@ -158,6 +159,7 @@ func maybeStartFactoryPullRequestConflictFix(
 	db *gorm.DB,
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
+	headRef, headSHA string,
 ) {
 	if factory == nil || pullRequest == nil || pullRequest.MergeBlockedReason != "CONFLICTING" {
 		return
@@ -171,7 +173,7 @@ func maybeStartFactoryPullRequestConflictFix(
 		return
 	}
 
-	events, err := startFactoryPullRequestConflictFix(db, factory, pullRequest, false)
+	events, err := startFactoryPullRequestConflictFix(db, factory, pullRequest, false, headRef, headSHA)
 	if err != nil {
 		if conflictFixStartQuiet(err) {
 			return
@@ -246,15 +248,22 @@ func checksConflictRepair(
 	return models.CanvasNode{}, models.FactoryPRFeedbackHandler{}, prFeedbackSettings{}, errFactoryPullRequestConflictHandlerMissing
 }
 
-func conflictFixEventData(pullRequest *models.FactoryPullRequest) map[string]any {
+func conflictFixEventData(pullRequest *models.FactoryPullRequest, headRef, headSHA string) map[string]any {
 	repository := map[string]any{"full_name": pullRequest.Repository}
+	head := map[string]any{"repo": repository}
+	if ref := strings.TrimSpace(headRef); ref != "" {
+		head["ref"] = ref
+	}
+	if sha := strings.TrimSpace(headSHA); sha != "" {
+		head["sha"] = sha
+	}
 	return map[string]any{
 		"conflict_fix": true,
 		"repository":   repository,
 		"pull_request": map[string]any{
 			"number":   pullRequest.Number,
 			"html_url": pullRequest.URL,
-			"head":     map[string]any{"repo": repository},
+			"head":     head,
 		},
 		"pullrequest": map[string]any{
 			"id": pullRequest.Number,

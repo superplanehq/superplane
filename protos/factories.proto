@@ -1736,7 +1736,7 @@ message FactoryPRFeedbackHandler {
     repeated string runner_integration_ids = 3;
     // Absent means merge conflicts are fixed. An explicit false stays off.
     optional bool fix_merge_conflicts = 4;
-    // Absent means 24 hours after SuperPlane tracks the pull request.
+    // Absent means 1 hour after SuperPlane tracks the pull request.
     optional int32 merge_conflict_hours = 5;
   }
 
