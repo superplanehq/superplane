@@ -504,15 +504,20 @@ function CompleteSetupScreen({
     <FirstRunShell testId="first-run-complete" chrome={chrome} busy={flow.busy} sphere={sphere} visual="preview">
       <FirstRunHeading headline="Complete workspace setup">
         <p>
-          {flow.accessError
-            ? "SuperPlane could not verify model access. Try again."
-            : flow.cardStep.requiresAdmin
-              ? "Ask an organization admin to select a billing plan. You can complete workspace setup now."
-              : "Continue with the models available to your organization."}
+          {flow.cardStep.failed
+            ? "SuperPlane could not verify billing. Try again."
+            : flow.accessError
+              ? "SuperPlane could not verify model access. Try again."
+              : flow.cardStep.requiresAdmin
+                ? "Ask an organization admin to select a billing plan before you complete workspace setup."
+                : "Continue with the models available to your organization."}
         </p>
       </FirstRunHeading>
-      <Button disabled={flow.busy || !flow.cardStep.ready} onClick={() => void flow.finishSetup()}>
-        Continue
+      <Button
+        disabled={flow.busy || (!flow.cardStep.ready && !flow.cardStep.failed) || flow.cardStep.requiresAdmin}
+        onClick={() => void (flow.cardStep.failed ? flow.cardStep.refetch() : flow.finishSetup())}
+      >
+        {flow.cardStep.failed ? "Try again" : "Continue"}
       </Button>
     </FirstRunShell>
   );
