@@ -1765,6 +1765,18 @@ function githubOnboardingRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+function modelStatusRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/me/model-status"),
+    resolve: (_match, method, _body, url) => {
+      if (method !== "GET") {
+        return null;
+      }
+      return { json: { window: url.searchParams.get("window") || "5m", cells: fixture.modelStatusCells ?? [] } };
+    },
+  };
+}
+
 function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
   const defaults = defaultNotificationSettings();
 
@@ -1786,6 +1798,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     factoriesCollectionRoute(fixture),
     ...githubOnboardingRoutes(fixture),
     meRoute(fixture.organizationId),
+    modelStatusRoute(fixture),
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     factoryVCSProviderRepositoryRoute(fixture),
