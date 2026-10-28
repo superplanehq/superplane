@@ -71,6 +71,32 @@ func TestClientCaptureRejectsIncompleteEvents(t *testing.T) {
 	assert.Empty(t, queue.messages)
 }
 
+func TestClientCaptureForwardsPersonProperties(t *testing.T) {
+	queue := &recordingQueue{}
+	client := newClient(queue)
+
+	client.Capture(Event{
+		Name:           EventOrganizationCreated,
+		EventID:        uuid.New(),
+		DistinctID:     "account-123",
+		OrganizationID: "organization-123",
+		ActorType:      ActorUser,
+		Source:         SourceUI,
+		Properties: Properties{
+			"email": "metrics@example.com",
+			"name":  "Metrics User",
+			"$set":  Properties{"email": "metrics@example.com", "name": "Metrics User"},
+		},
+	})
+
+	require.Len(t, queue.messages, 1)
+	capture, ok := queue.messages[0].(posthog.Capture)
+	require.True(t, ok)
+	assert.Equal(t, "metrics@example.com", capture.Properties["email"])
+	assert.Equal(t, "Metrics User", capture.Properties["name"])
+	assert.Equal(t, Properties{"email": "metrics@example.com", "name": "Metrics User"}, capture.Properties["$set"])
+}
+
 func TestNoopClientDoesNotEnableAnalytics(t *testing.T) {
 	client, err := New("")
 	require.NoError(t, err)

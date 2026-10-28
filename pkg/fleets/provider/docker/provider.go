@@ -13,21 +13,23 @@ import (
 )
 
 const (
-	labelManaged       = "superplane.managed-runner"
-	labelFleetID       = "superplane.fleet-id"
-	labelRunnerID      = "superplane.runner-id"
-	labelRunnerVersion = "superplane.runner-version"
+	labelManaged        = "superplane.managed-runner"
+	labelFleetManagerID = "superplane.fleet-manager-id"
+	labelFleetID        = "superplane.fleet-id"
+	labelRunnerID       = "superplane.runner-id"
+	labelRunnerVersion  = "superplane.runner-version"
 )
 
 type Config struct {
-	Image        string
-	RunnerAPIURL string
-	Network      string
-	Volumes      []string
-	ExtraHosts   []string
-	Init         bool
-	User         string
-	Entrypoint   []string
+	FleetManagerID string
+	Image          string
+	RunnerAPIURL   string
+	Network        string
+	Volumes        []string
+	ExtraHosts     []string
+	Init           bool
+	User           string
+	Entrypoint     []string
 }
 
 type commandRunner interface {
@@ -55,6 +57,7 @@ func newProvider(
 	docker commandRunner,
 	log *slog.Logger,
 ) (*Provider, error) {
+	config.FleetManagerID = strings.TrimSpace(config.FleetManagerID)
 	config.Image = strings.TrimSpace(config.Image)
 	config.RunnerAPIURL = strings.TrimRight(
 		strings.TrimSpace(config.RunnerAPIURL),
@@ -64,6 +67,9 @@ func newProvider(
 	config.Volumes = nonEmpty(config.Volumes)
 	config.ExtraHosts = nonEmpty(config.ExtraHosts)
 	config.User = strings.TrimSpace(config.User)
+	if config.FleetManagerID == "" {
+		return nil, fmt.Errorf("Fleet Manager ID is required")
+	}
 	if config.Image == "" {
 		return nil, fmt.Errorf("Docker runner image is required")
 	}
@@ -87,20 +93,59 @@ func (p *Provider) List(
 	ctx context.Context,
 	fleetID string,
 ) ([]provider.Resource, error) {
+	owned, err := p.listRunnerContainers(
+		ctx,
+		fleetID,
+		"label="+labelFleetManagerID+"="+p.config.FleetManagerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if p.config.Network == "" {
+		return owned, nil
+	}
+	onNetwork, err := p.listRunnerContainers(
+		ctx,
+		fleetID,
+		"network="+p.config.Network,
+	)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(owned))
+	for _, resource := range owned {
+		seen[resource.ID] = struct{}{}
+	}
+	for _, resource := range onNetwork {
+		if _, exists := seen[resource.ID]; exists {
+			continue
+		}
+		owned = append(owned, resource)
+	}
+	return owned, nil
+}
+
+func (p *Provider) listRunnerContainers(
+	ctx context.Context,
+	fleetID string,
+	extraFilter string,
+) ([]provider.Resource, error) {
 	format := strings.Join([]string{
 		"{{.ID}}",
 		`{{.Label "` + labelRunnerID + `"}}`,
 		`{{.Label "` + labelFleetID + `"}}`,
 		"{{.State}}",
+		`{{.Label "` + labelFleetManagerID + `"}}`,
 	}, "\t")
-	output, err := p.docker.Run(
-		ctx,
+	args := []string{
 		"ps",
 		"-a",
-		"--filter", "label="+labelManaged+"=true",
-		"--filter", "label="+labelFleetID+"="+fleetID,
+		"--filter", "label=" + labelManaged + "=true",
+		"--filter", "label=" + labelFleetID + "=" + fleetID,
+		"--filter", extraFilter,
 		"--format", format,
-	)
+	}
+	output, err := p.docker.Run(ctx, args...)
 	if err != nil {
 		return nil, dockerError("list runner containers", output, err)
 	}
@@ -111,7 +156,14 @@ func (p *Provider) List(
 			continue
 		}
 		fields := strings.Split(line, "\t")
-		if len(fields) != 4 || fields[0] == "" || fields[1] == "" {
+		if len(fields) != 5 || fields[0] == "" || fields[1] == "" {
+			continue
+		}
+		managerID := strings.TrimSpace(fields[4])
+		if managerID != "" && managerID != p.config.FleetManagerID {
+			continue
+		}
+		if managerID == "" && !strings.HasPrefix(extraFilter, "network=") {
 			continue
 		}
 		resources = append(resources, provider.Resource{
@@ -172,6 +224,7 @@ func (p *Provider) Create(
 		"run", "-d",
 		"--name", name,
 		"--label", labelManaged + "=true",
+		"--label", labelFleetManagerID + "=" + p.config.FleetManagerID,
 		"--label", labelFleetID + "=" + request.FleetID,
 		"--label", labelRunnerID + "=" + request.RunnerID,
 		"--label", labelRunnerVersion + "=" + request.RunnerVersion,

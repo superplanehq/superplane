@@ -1,5 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 describe("DialogContent accessibility", () => {
@@ -102,5 +104,31 @@ describe("DialogContent accessibility", () => {
     expect(dialog.className).toContain("bg-popover");
     expect(dialog.className).toContain("border-border");
     expect(dialog.className).not.toContain("dark:bg-gray-900");
+  });
+
+  it("unmounts after close when an exit animation does not finish", async () => {
+    const user = userEvent.setup();
+    const style = document.createElement("style");
+    style.textContent =
+      '[data-slot="dialog-content"][data-state="open"]{animation-name:fade-in !important;animation-duration:1s !important;}[data-slot="dialog-content"][data-state="closed"]{animation-name:fade-out !important;animation-duration:1s !important;}';
+    document.head.appendChild(style);
+    function CloseableDialog() {
+      const [open, setOpen] = useState(true);
+      return (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent showCloseButton={false}>
+            <DialogTitle>Buy seats</DialogTitle>
+            <button type="button" onClick={() => setOpen(false)}>
+              Close
+            </button>
+          </DialogContent>
+        </Dialog>
+      );
+    }
+
+    render(<CloseableDialog />);
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Buy seats" })).not.toBeInTheDocument());
+    style.remove();
   });
 });
