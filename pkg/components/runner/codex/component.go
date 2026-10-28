@@ -3,11 +3,16 @@ package codex
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -86,9 +91,10 @@ func (c *RunCodex) Configuration() []configuration.Field {
 	return []configuration.Field{
 		runner.MachineTypeField("machineType"),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
-			SecretLabel:      "OpenAI API Key",
-			IntegrationName:  "openai",
-			IntegrationLabel: "Integration",
+			SecretLabel:       "OpenAI API Key",
+			IntegrationName:   "openai",
+			IntegrationLabel:  "Integration",
+			AllowSubscription: true,
 		}),
 		runner.AgentModelField("openai"),
 		runner.AgentStepsField(
@@ -134,14 +140,15 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	environment, err := injectCodexCredentials(ctx, resolved.Variables, spec.Credentials)
+	taskID := uuid.New()
+
+	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
+	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
 	if err != nil {
 		return err
 	}
-
-	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
-	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
-	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
+	environment, err = injectCodexCredentials(ctx, environment, spec.Credentials, taskID, spec.ExecutionTimeoutSeconds)
 	if err != nil {
 		return err
 	}
@@ -163,7 +170,8 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps)
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
-	taskID, err := runner.CreateTask(ctx.RunnerTasks, runner.CreateTaskParams{
+	createdTaskID, err := runner.CreateTask(ctx.RunnerTasks, runner.CreateTaskParams{
+		TaskID:         taskID.String(),
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		Files:          task.Files,
@@ -174,10 +182,10 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID)
+	return runner.AfterRunnerTaskCreated(ctx, createdTaskID)
 }
 
-func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.TaskEnvironmentVariable, error) {
+func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials, taskID uuid.UUID, timeoutSeconds int) ([]runner.TaskEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenAIAPIKey, credentials.Secret)
@@ -185,9 +193,60 @@ func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.Task
 		return runner.InjectIntegrationKeys(ctx, environment, credentials.Integration)
 	case runner.CredentialsSourceHosted:
 		return nil, runner.RejectHostedCredentials(credentials)
+	case runner.CredentialsSourceSubscription:
+		return injectSubscriptionCredentials(ctx, environment, taskID, timeoutSeconds)
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}
+}
+
+func injectSubscriptionCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, taskID uuid.UUID, timeoutSeconds int) ([]runner.TaskEnvironmentVariable, error) {
+	if ctx.CodexSubscription == nil {
+		return nil, fmt.Errorf("connect ChatGPT before this task can run")
+	}
+	lease, err := ctx.CodexSubscription.Reserve(taskID)
+	if err != nil {
+		return nil, err
+	}
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	if secret == "" {
+		return nil, fmt.Errorf("chatgpt subscription token is not configured")
+	}
+	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
+	if err != nil {
+		return nil, fmt.Errorf("chatgpt subscription organization is missing")
+	}
+	token, err := runner.MintCodexSubscriptionToken(jwt.NewSigner(secret), runner.CodexSubscriptionScope{
+		OrganizationID: orgID,
+		FactoryID:      lease.FactoryID,
+		ConnectionID:   lease.ConnectionID,
+		TaskID:         taskID,
+		Generation:     lease.Generation,
+	}, time.Duration(timeoutSeconds)*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	baseURL := runner.RunnerSuperplaneBaseURL(ctx.BaseURL)
+	if baseURL == "" {
+		return nil, fmt.Errorf("chatgpt subscription endpoint is not configured")
+	}
+	environment = withoutCodexCredentials(environment)
+	return append(environment,
+		runner.TaskEnvironmentVariable{Name: runner.EnvCodexSubscriptionToken, Value: token},
+		runner.TaskEnvironmentVariable{Name: runner.EnvSuperplaneBaseURL, Value: baseURL},
+		runner.TaskEnvironmentVariable{Name: runner.EnvCodexRefreshTokenURL, Value: baseURL + runner.CodexSubscriptionRefreshPath},
+	), nil
+}
+
+func withoutCodexCredentials(environment []runner.TaskEnvironmentVariable) []runner.TaskEnvironmentVariable {
+	filtered := make([]runner.TaskEnvironmentVariable, 0, len(environment))
+	for _, item := range environment {
+		if item.Name == "CODEX_API_KEY" || item.Name == envOpenAIAPIKey || item.Name == envOpenAIBaseURL || item.Name == runner.EnvSuperplaneBaseURL || item.Name == runner.EnvCodexSubscriptionToken || item.Name == runner.EnvCodexRefreshTokenURL {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
 
 func (c *RunCodex) Hooks() []core.Hook {

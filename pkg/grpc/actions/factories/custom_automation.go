@@ -286,6 +286,10 @@ func customAutomationAgent(tx *gorm.DB, factory *models.Factory, input *pb.Facto
 	integrationName := strings.TrimSpace(input.GetCredentialIntegrationName())
 	switch source {
 	case "", runner.CredentialsSourceSecret, runner.CredentialsSourceIntegration, runner.CredentialsSourceHosted:
+	case runner.CredentialsSourceSubscription:
+		if agent.Component != "runnerCodex" {
+			return nil, invalidArgument("ChatGPT subscription uses Codex")
+		}
 	default:
 		return nil, invalidArgument("agent credential source is not supported")
 	}

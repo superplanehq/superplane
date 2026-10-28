@@ -71,6 +71,10 @@ function firstNameOf(name: string | undefined): string | undefined {
   return first || undefined;
 }
 
+function modelSourceOffered(model: OnboardingPageModel): boolean {
+  return (model.bringYourOwnKey || model.codexSubscriptionOffered) && model.hostedModelsAvailable;
+}
+
 function signOut() {
   posthog.reset();
   window.location.href = "/logout";
@@ -312,11 +316,21 @@ function AgentScreenHost({
       saving={flow.busy}
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}
+      providerKeysOffered={model.bringYourOwnKey}
       showCustomProvider={model.customProvider}
       modelSource={{
-        offered: model.bringYourOwnKey && model.hostedModelsAvailable,
+        offered: modelSourceOffered(model),
         choice: flow.credentialChoice,
         onSelect: flow.selectCredentialChoice,
+      }}
+      codex={{
+        offered: Boolean(model.codexSubscriptionOffered),
+        connection: model.codexConnection,
+        ready: Boolean(model.codexSubscriptionReady),
+        starting: Boolean(model.codexStarting),
+        canceling: Boolean(model.codexCanceling),
+        onStart: model.startCodexConnection,
+        onCancel: model.cancelCodexConnection,
       }}
       onRequestConnect={model.requestConnect}
       modelPicker={model.agentModelPicker}

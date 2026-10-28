@@ -206,6 +206,9 @@ func dispatchWorkOrderOnLineTx(
 	if err != nil {
 		return nil, invalidArgument(err.Error())
 	}
+	if err := validateLineThinkingLevel(tx, currentLine, normalizedThinking); err != nil {
+		return nil, err
+	}
 
 	fromState := order.State
 	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
@@ -260,6 +263,29 @@ func dispatchWorkOrderOnLineTx(
 		fromState:    fromState,
 		logger:       logger,
 	}, nil
+}
+
+func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {
+	if level != runner.ThinkingLevelMinimal && level != runner.ThinkingLevelXHigh {
+		return nil
+	}
+	for _, step := range line.Steps {
+		if step.AppID == uuid.Nil {
+			continue
+		}
+		version, err := models.FindLiveCanvasVersionInTransaction(tx, step.AppID)
+		if err != nil {
+			return err
+		}
+		for _, node := range version.Nodes {
+			component := node.ComponentName()
+			_, isRunner := runnerComponentProvider(component)
+			if component != runnerCodex && (isRunner || component == models.SuperPlaneRunnerComponent) {
+				return invalidArgument("minimal and xhigh thinking levels require a line with only Codex runners")
+			}
+		}
+	}
+	return nil
 }
 
 func publishDispatchedWorkOrder(

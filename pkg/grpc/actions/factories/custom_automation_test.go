@@ -7,10 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -98,6 +101,58 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	subscription := true
+	harness := models.FactoryOnboardingAgentHarnessCodex
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID:  &integrationID,
+		AgentHarness:      &harness,
+		CodexSubscription: &subscription,
+	}))
+	// GitHub setup is external to saving the agent configuration.
+	r.Registry.Integrations["github"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: "github.onPullRequest"})},
+	})
+	ctx := onboardingContext(r)
+	deps := onboardingDeps(r)
+	organizationID := r.Organization.ID.String()
+	created, err := CreateFactoryCustomAutomation(ctx, deps, organizationID, &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(),
+		Name:      "Review changes",
+		Settings: &pb.FactoryCustomAutomation_Settings{
+			StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+			Steps:     []*pb.FactoryCustomAutomation_Step{{Name: "Review", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Review the pull request."}},
+		},
+	})
+	require.NoError(t, err)
+	automationID := created.GetCustomAutomation().GetAutomation().GetId()
+	described, err := DescribeFactoryCustomAutomation(ctx, organizationID, &pb.DescribeFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	require.NoError(t, err)
+	settings := described.GetCustomAutomation().GetSettings()
+	require.Equal(t, "runnerCodex", settings.GetAgent().GetComponent())
+	require.Equal(t, runner.CredentialsSourceSubscription, settings.GetAgent().GetCredentialSource())
+	settings.Steps[0].Prompt = "Review the changed files."
+	_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Review changed files", Settings: settings,
+	})
+	require.NoError(t, err)
+	saved, err := DescribeFactoryCustomAutomation(ctx, organizationID, &pb.DescribeFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Review changed files", saved.GetCustomAutomation().GetAutomation().GetName())
+	assert.Equal(t, "Review the changed files.", saved.GetCustomAutomation().GetSettings().GetSteps()[0].GetPrompt())
+	assert.Equal(t, "runnerCodex", saved.GetCustomAutomation().GetSettings().GetAgent().GetComponent())
+	assert.Equal(t, runner.CredentialsSourceSubscription, saved.GetCustomAutomation().GetSettings().GetAgent().GetCredentialSource())
 }
 
 func environmentVars(t *testing.T, raw any) map[string]string {
