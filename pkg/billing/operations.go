@@ -48,14 +48,6 @@ func InitializeOrganization(tx *gorm.DB, organizationID uuid.UUID) error {
 	return implementation.InitializeOrganization(tx, organizationID)
 }
 
-func GrantWelcomeCredit(tx *gorm.DB, organizationID, accountID uuid.UUID) error {
-	implementation, err := Current()
-	if err != nil {
-		return err
-	}
-	return implementation.GrantWelcomeCredit(tx, organizationID, accountID)
-}
-
 func PrepareDeletion(ctx context.Context, organizationID uuid.UUID) (DeletionGuard, error) {
 	implementation, err := Current()
 	if err != nil {
