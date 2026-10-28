@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"syscall"
 	"time"
@@ -91,6 +92,10 @@ func (c *Client) readPaymentMethodPage(ctx context.Context, path string) (paymen
 }
 
 func isDroppedPaymentMethodConnection(err error) bool {
+	var bodyErr *responseBodyReadError
+	if errors.As(err, &bodyErr) && (bodyErr.statusCode < http.StatusOK || bodyErr.statusCode >= http.StatusMultipleChoices) {
+		return false
+	}
 	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) ||
 		errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
 }

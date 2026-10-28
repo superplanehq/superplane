@@ -190,11 +190,12 @@ func TestHasPaymentMethodExhaustsDroppedConnectionRetries(t *testing.T) {
 
 func TestHasPaymentMethodDoesNotRetryProviderRejections(t *testing.T) {
 	for _, test := range []struct {
-		name    string
-		status  int
-		version string
-		body    string
-		class   error
+		name      string
+		status    int
+		version   string
+		body      string
+		bodyError error
+		class     error
 	}{
 		{name: "unauthorized", status: 401, class: ErrUnauthorized},
 		{name: "rate limited", status: 429, class: ErrRateLimited},
@@ -202,6 +203,9 @@ func TestHasPaymentMethodDoesNotRetryProviderRejections(t *testing.T) {
 		{name: "invalid request", status: 422, class: ErrInvalidRequest},
 		{name: "unsupported version", status: 404, class: ErrUnsupportedAPIVersion},
 		{name: "malformed JSON", status: 200, version: APIVersion(), body: `{"items":`, class: ErrOutcomeUnknown},
+		{name: "interrupted rate limit", status: 429, bodyError: io.ErrUnexpectedEOF, class: ErrOutcomeUnknown},
+		{name: "interrupted unavailable provider", status: 503, bodyError: syscall.ECONNRESET, class: ErrOutcomeUnknown},
+		{name: "interrupted missing customer", status: 404, version: APIVersion(), bodyError: io.ErrUnexpectedEOF, class: ErrOutcomeUnknown},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			attempts := 0
@@ -211,6 +215,10 @@ func TestHasPaymentMethodDoesNotRetryProviderRejections(t *testing.T) {
 					response := paymentMethodResponse(test.body)
 					response.StatusCode = test.status
 					response.Header.Set(apiVersionHeader, test.version)
+					if test.bodyError != nil {
+						response.Header.Set("Retry-After", "60")
+						response.Body = &interruptedPaymentMethodBody{Reader: strings.NewReader(test.body), err: test.bodyError}
+					}
 					return response, nil
 				}),
 			})
@@ -218,6 +226,10 @@ func TestHasPaymentMethodDoesNotRetryProviderRejections(t *testing.T) {
 			require.False(t, hasCard)
 			require.ErrorIs(t, err, test.class)
 			require.Equal(t, 1, attempts)
+			if test.bodyError != nil {
+				require.ErrorIs(t, err, test.bodyError)
+				require.ErrorContains(t, err, fmt.Sprintf("%d", test.status))
+			}
 		})
 	}
 }
