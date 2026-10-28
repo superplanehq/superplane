@@ -137,18 +137,6 @@ sign-off, and the review process.
 - **[Using AI Agents](docs/contributing/ai-agents.md)** - Guide for using AI agents to help with development tasks
 - **[Quality Standards](docs/contributing/quality.md)** - High-level principles for building maintainable, user-focused products
 
-### Adding new integrations to SuperPlane
-
-- **[Building an Integration](docs/contributing/building-an-integration.md)** — High-level overview of the steps to add a new integration (get assigned, research, build, open a PR)
-- **[Opening PRs for integrations](docs/contributing/integration-prs.md)** — Checklist for opening and submitting integration PRs (title, description, video, frontend/backend/docs, CI, DCO)
-- **[Integrations](docs/contributing/integrations.md)** — Instructions for adding new third-party integrations to SuperPlane
-- **[Component Implementation](docs/contributing/component-implementations.md)** — Step-by-step instructions for creating new components or triggers
-- **[Component Customization](docs/contributing/component-customization.md)** — Guide for customizing existing components or building behaviors
-- **[Templates](docs/contributing/templates.md)** — Guide for creating and adding new workflow templates
-- **[Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/17)** — View all integration-related work on the SuperPlane Board
-- **[Integration bounties](docs/contributing/bounties.md)** — How to claim, work on, and get paid for bounties via BountyHub; review and dispute process
-- **[Connecting to Third-Party Services during Development](docs/contributing/connecting-to-3rdparty-services-from-development.md)**
-
 ## For maintainers
 
 Assume good intent. Thank the contributor. Be clear and kind.
