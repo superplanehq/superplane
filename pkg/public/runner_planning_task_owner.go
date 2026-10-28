@@ -219,6 +219,9 @@ func (s *Server) loadTaskOwnerTarget(ctx context.Context, orgID, factoryID, orde
 	if err != nil {
 		return target, err
 	}
+	if strings.TrimSpace(target.repository) == "" && order.Repository != nil {
+		target.repository = *order.Repository
+	}
 	candidates, err := models.ListTaskOwnerCandidates(db, orgID, factoryID)
 	if err != nil {
 		return target, err

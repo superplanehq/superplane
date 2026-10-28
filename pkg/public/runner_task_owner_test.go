@@ -2,6 +2,7 @@ package public
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -11,12 +12,16 @@ import (
 	runner "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/taskowner"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/datatypes"
 )
 
 // This boundary catches capability attachment accidentally gated on visual
@@ -57,6 +62,54 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 	assert.False(t, runner.HasArtifactUploadToken(env))
 	assert.False(t, runner.HasMergeConfidenceToken(env))
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
+	t.Run("code history follows the saved task repository", func(t *testing.T) {
+		integration := models.NewIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), nil)
+		integration.State = models.IntegrationStateReady
+		setupState := datatypes.NewJSONType(models.SetupState{})
+		integration.SetupState = &setupState
+		integration.Properties = datatypes.NewJSONSlice([]core.IntegrationPropertyDefinition{
+			{Name: common.PropertyAuthMethod, Value: common.AuthMethodPAT},
+			{Name: common.PropertyOwner, Value: "acme"},
+			{Name: common.PropertyOwnerType, Value: common.OwnerTypeOrganization},
+		})
+		require.NoError(t, db.Create(integration).Error)
+		secrets := contexts.NewIntegrationSecretStorage(db, r.Encryptor, integration)
+		require.NoError(t, secrets.Create(core.IntegrationSecretDefinition{Name: common.SecretPAT, Value: "test-token"}))
+		currentRepository := "acme/current"
+		integrationID := integration.ID.String()
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AppRepository: &currentRepository, VCSIntegrationID: &integrationID,
+		}))
+		originalRepository, emptyRepository, blankRepository := "acme/original", "", "  "
+		for _, test := range []struct {
+			name               string
+			savedRepository    *string
+			expectedRepository string
+		}{
+			{"saved repository", &originalRepository, "acme/original"},
+			{"no saved repository", nil, "acme/current"},
+			{"empty saved repository", &emptyRepository, "acme/current"},
+			{"blank saved repository", &blankRepository, "acme/current"},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				require.NoError(t, db.Model(order).Update("repository", test.savedRepository).Error)
+				req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/tasks/suggest-owners", nil)
+				req.Header.Set("Authorization", "Bearer "+token)
+				rec := httptest.NewRecorder()
+				target, ok := server.taskOwnerTarget(rec, req)
+				require.True(t, ok, rec.Body.String())
+				history, err := server.taskOwnerHistory(t.Context(), target.factory, target.repository)
+				require.NoError(t, err)
+				require.IsType(t, taskowner.GitHubHistory{}, history)
+				assert.Equal(t, test.expectedRepository, history.(taskowner.GitHubHistory).Repository)
+			})
+		}
+		empty := ""
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AppRepository: &empty, VCSIntegrationID: &empty,
+		}))
+		require.NoError(t, db.Model(order).Update("repository", "").Error)
+	})
 	owner := mustTaskOwnerMember(t, r, "implementation-dev")
 	rec := postPlanningRunner(t, server, token, "/api/v1/runner/tasks/suggest-owners", `{"paths":["./pkg/","../secret"]}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
