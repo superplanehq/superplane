@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"slices"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -54,15 +53,14 @@ func UpdateWorkOrderAssignees(
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
 	}
 
-	var newOwners []uuid.UUID
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err
 		}
 
-		// Lock before reading owners, so an automatic assignment that runs at
-		// the same time cannot add a second owner.
+		// Lock before reading owners, so an agent assignment that runs at the
+		// same time cannot add a second owner.
 		if err := models.LockFactoryWorkOrder(tx, orderID); err != nil {
 			return err
 		}
@@ -71,12 +69,6 @@ func UpdateWorkOrderAssignees(
 			return err
 		}
 
-		previous := order.AssigneeIDs()
-		for _, assigneeID := range assigneeIDs {
-			if !slices.Contains(previous, assigneeID) {
-				newOwners = append(newOwners, assigneeID)
-			}
-		}
 		return order.UpdateAssignees(tx, assigneeIDs, updatedBy)
 	})
 	if err != nil {
@@ -100,7 +92,6 @@ func UpdateWorkOrderAssignees(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
 	}
-	messages.PublishWorkOrderOwnersAssigned(order, &updatedBy, newOwners, "")
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {

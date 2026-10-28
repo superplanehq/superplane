@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -23,10 +22,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	taskOwnerHistoryUnavailable = "SuperPlane could not read the code history. Pick from members by open tasks."
-	taskOwnerFallbackReason     = "No owner was chosen during planning. SuperPlane picked the member with the fewest open tasks."
-)
+const taskOwnerHistoryUnavailable = "SuperPlane could not read the code history. Use the members list."
 
 type planningSuggestOwnersRequest struct {
 	Paths []string `json:"paths"`
@@ -35,12 +31,6 @@ type planningSuggestOwnersRequest struct {
 type planningAssignOwnerRequest struct {
 	User   string `json:"user"`
 	Reason string `json:"reason"`
-}
-
-type planningTaskOwnerRef struct {
-	UserID      uuid.UUID `json:"user_id"`
-	Name        string    `json:"name"`
-	GitHubLogin string    `json:"github_login"`
 }
 
 // planningTaskOwnerTarget is the session task and the members who can own it.
@@ -68,27 +58,43 @@ func (s *Server) handleRunnerPlanningSuggestOwners(w http.ResponseWriter, r *htt
 	}
 
 	paths := taskowner.NormalizePaths(req.Paths)
-	if len(target.order.Assignees) > 0 {
-		writeJSON(w, http.StatusOK, map[string]any{"task_has_owner": true, "paths": paths})
-		return
+	suggestion := taskowner.Suggestion{CodeOwners: []taskowner.CodeOwner{}, Members: taskowner.Members(target.candidates)}
+	if len(paths) > 0 {
+		suggestion = s.suggestCodeOwners(r.Context(), target, paths)
 	}
-	history, err := s.taskOwnerHistory(r.Context(), target.factory, target.session.Repository)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"paths":          paths,
+		"current_owners": currentTaskOwners(target),
+		"code_owners":    suggestion.CodeOwners,
+		"members":        suggestion.Members,
+		"history_note":   suggestion.HistoryNote,
+	})
+}
+
+func (s *Server) suggestCodeOwners(ctx context.Context, target *planningTaskOwnerTarget, paths []string) taskowner.Suggestion {
+	history, err := s.taskOwnerHistory(ctx, target.factory, target.session.Repository)
 	suggestion := taskowner.Suggestion{CodeOwners: []taskowner.CodeOwner{}, Members: taskowner.Members(target.candidates)}
 	if err == nil {
-		suggestion, err = taskowner.Suggest(r.Context(), history, paths, target.candidates, time.Now())
+		suggestion, err = taskowner.Suggest(ctx, history, paths, target.candidates, time.Now())
 	}
 	if err != nil {
 		log.WithError(err).Warnf("task owner history unavailable for order %s", target.order.ID)
 		suggestion.HistoryNote = taskOwnerHistoryUnavailable
 	}
+	return suggestion
+}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"task_has_owner": false,
-		"paths":          paths,
-		"code_owners":    suggestion.CodeOwners,
-		"members":        suggestion.Members,
-		"history_note":   suggestion.HistoryNote,
-	})
+func currentTaskOwners(target *planningTaskOwnerTarget) []taskowner.Member {
+	owners := []taskowner.Member{}
+	for _, assigneeID := range target.order.AssigneeIDs() {
+		owner, ok := models.FindTaskOwnerCandidate(target.candidates, assigneeID.String())
+		if !ok {
+			owner = models.TaskOwnerCandidate{UserID: assigneeID}
+		}
+		owners = append(owners, taskowner.MemberOf(owner))
+	}
+	return owners
 }
 
 func (s *Server) handleRunnerPlanningAssignOwner(w http.ResponseWriter, r *http.Request) {
@@ -133,58 +139,7 @@ func (s *Server) handleRunnerPlanningAssignOwner(w http.ResponseWriter, r *http.
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status": "assigned",
-		"owner":  planningTaskOwnerRef{UserID: owner.UserID, Name: owner.Name, GitHubLogin: owner.GitHubLogin},
-	})
-}
-
-// assignFallbackTaskOwner makes sure planning never leaves a task without an
-// owner. It assigns the member with the fewest open tasks when the agent did
-// not pick one. Errors are logged: the plan update already succeeded.
-func (s *Server) assignFallbackTaskOwner(r *http.Request, session *models.FactoryPlanningSession) {
-	target, err := s.loadPlanningTaskOwnerTargetForSession(database.DB(r.Context()), session)
-	if err != nil {
-		log.WithError(err).Warnf("fallback task owner skipped for session %s", session.ID)
-		return
-	}
-	if len(target.order.Assignees) > 0 {
-		return
-	}
-	owner, ok := models.LeastLoadedTaskOwner(target.candidates)
-	if !ok {
-		return
-	}
-	_, err = assignPlanningTaskOwner(database.DB(r.Context()), target.order, models.TaskOwnerAssignment{
-		UserID: owner.UserID,
-		Source: models.TaskOwnerSourceFallback,
-		Reason: taskOwnerFallbackReason,
-	})
-	if err != nil {
-		log.WithError(err).Warnf("fallback task owner failed for order %s", target.order.ID)
-	}
-}
-
-// planningReviewCheckKeys are the checks that planning reports. Checks from
-// other automations do not mean that planning already ran.
-var planningReviewCheckKeys = []string{
-	models.PlanningClarityCheckKey,
-	models.PlanningComplexityCheckKey,
-	models.PlanningVerifiabilityCheckKey,
-}
-
-// planningSessionHasScores reports whether planning already scored the task.
-// The first scored update ends the first planning turn, which is when the
-// task must have an owner.
-func planningSessionHasScores(db *gorm.DB, session *models.FactoryPlanningSession) bool {
-	if session.DraftWorkOrderID == nil {
-		return true
-	}
-	checks, err := models.ListChecksForWorkOrders(db, []uuid.UUID{*session.DraftWorkOrderID})
-	if err != nil {
-		log.WithError(err).Warnf("fallback task owner skipped for session %s", session.ID)
-		return true
-	}
-	return slices.ContainsFunc(checks[*session.DraftWorkOrderID], func(check models.FactoryWorkOrderCheck) bool {
-		return slices.Contains(planningReviewCheckKeys, check.Key)
+		"owner":  taskowner.MemberOf(owner),
 	})
 }
 
@@ -200,7 +155,6 @@ func assignPlanningTaskOwner(db *gorm.DB, order *models.FactoryWorkOrder, assign
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
-	messages.PublishWorkOrderOwnersAssigned(order, nil, []uuid.UUID{assignment.UserID}, models.NormalizeTaskOwnerReason(assignment.Reason))
 	return true, nil
 }
 
@@ -215,7 +169,7 @@ func (s *Server) loadPlanningTaskOwnerTarget(r *http.Request, scope *runneractio
 	if session.State == models.PlanningSessionStateEnded {
 		return &planningTaskOwnerTarget{session: session}, models.ErrFactoryPlanningSessionEnded
 	}
-	target, err := s.loadPlanningTaskOwnerTargetForSession(database.DB(r.Context()), session)
+	target, err := s.loadPlanningTaskOwnerTargetForSession(r.Context(), session)
 	if err != nil {
 		return target, err
 	}
@@ -225,7 +179,8 @@ func (s *Server) loadPlanningTaskOwnerTarget(r *http.Request, scope *runneractio
 	return target, nil
 }
 
-func (s *Server) loadPlanningTaskOwnerTargetForSession(db *gorm.DB, session *models.FactoryPlanningSession) (*planningTaskOwnerTarget, error) {
+func (s *Server) loadPlanningTaskOwnerTargetForSession(ctx context.Context, session *models.FactoryPlanningSession) (*planningTaskOwnerTarget, error) {
+	db := database.DB(ctx)
 	target := &planningTaskOwnerTarget{session: session}
 	if session.DraftWorkOrderID == nil {
 		return target, models.ErrFactoryWorkOrderNotFound
@@ -242,10 +197,62 @@ func (s *Server) loadPlanningTaskOwnerTargetForSession(db *gorm.DB, session *mod
 	if err != nil {
 		return target, err
 	}
+	s.addTaskOwnerRoles(ctx, session.OrganizationID, candidates)
 	target.factory = factoryModel
 	target.order = order
 	target.candidates = candidates
 	return target, nil
+}
+
+// addTaskOwnerRoles adds the organization roles that the Members page shows.
+// The agent can apply role rules from the instructions. A lookup error leaves
+// the roles empty: the members stay usable.
+func (s *Server) addTaskOwnerRoles(ctx context.Context, orgID uuid.UUID, candidates []models.TaskOwnerCandidate) {
+	rolesByUser, err := s.organizationRolesByUser(ctx, orgID.String())
+	if err != nil {
+		log.WithError(err).Warnf("task owner roles unavailable for organization %s", orgID)
+	}
+	for i := range candidates {
+		roles := []string{}
+		if candidates[i].IsOwner {
+			roles = append(roles, models.DisplayNameOwner)
+		}
+		candidates[i].Roles = append(roles, rolesByUser[candidates[i].UserID.String()]...)
+	}
+}
+
+func (s *Server) organizationRolesByUser(ctx context.Context, orgID string) (map[string][]string, error) {
+	if s.authService == nil {
+		return nil, errors.New("authorization service is unavailable")
+	}
+	definitions, err := s.authService.GetAllRoleDefinitions(ctx, models.DomainTypeOrganization, orgID)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(definitions))
+	for _, definition := range definitions {
+		names = append(names, definition.Name)
+	}
+	metadata, err := models.FindRoleMetadataByNames(names, models.DomainTypeOrganization, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	rolesByUser := map[string][]string{}
+	for _, definition := range definitions {
+		userIDs, err := s.authService.GetOrgUsersForRole(ctx, definition.Name, orgID)
+		if err != nil {
+			return nil, err
+		}
+		displayName := definition.Name
+		if roleMetadata, ok := metadata[definition.Name]; ok && roleMetadata.DisplayName != "" {
+			displayName = roleMetadata.DisplayName
+		}
+		for _, userID := range userIDs {
+			rolesByUser[userID] = append(rolesByUser[userID], displayName)
+		}
+	}
+	return rolesByUser, nil
 }
 
 // taskOwnerHistory reads code history through the GitHub integration of the

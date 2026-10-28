@@ -31,7 +31,6 @@ func Test__DescribeNotificationSettings(t *testing.T) {
 			pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_NOTE_OWNED,
 			pb.NotificationSettings_TYPE_WORK_ORDER_AGENT_QUESTION,
 			pb.NotificationSettings_TYPE_WORK_ORDER_PLAN_READY,
-			pb.NotificationSettings_TYPE_WORK_ORDER_OWNER_ASSIGNED,
 		}, resp.Settings.Workspaces.EventTypes)
 		require.NotNil(t, resp.Settings.Browser)
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_NONE, resp.Settings.Browser.Scope)

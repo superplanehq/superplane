@@ -134,13 +134,12 @@ describe("notificationSettings", () => {
 });
 
 describe("NOTIFICATION_TYPE_OPTIONS", () => {
-  it("lists the five events a person can see and act on", () => {
+  it("lists the four events a person can see and act on", () => {
     expect(NOTIFICATION_SETTINGS_TYPES).toEqual([
       "TYPE_WORK_ORDER_STATUS_OWNED",
       "TYPE_WORK_ORDER_STATUS_NOTE_OWNED",
       "TYPE_WORK_ORDER_AGENT_QUESTION",
       "TYPE_WORK_ORDER_PLAN_READY",
-      "TYPE_WORK_ORDER_OWNER_ASSIGNED",
     ]);
     expect(NOTIFICATION_TYPE_OPTIONS.map((option) => option.key)).toEqual([...NOTIFICATION_SETTINGS_TYPES]);
   });
@@ -153,7 +152,6 @@ describe("NOTIFICATION_TYPE_OPTIONS", () => {
       TYPE_WORK_ORDER_STATUS_NOTE_OWNED: "Review requests on your tasks",
       TYPE_WORK_ORDER_AGENT_QUESTION: "Agent questions on your tasks",
       TYPE_WORK_ORDER_PLAN_READY: "Ready plans on your tasks",
-      TYPE_WORK_ORDER_OWNER_ASSIGNED: "Tasks assigned to you",
     });
   });
 });

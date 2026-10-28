@@ -103,8 +103,8 @@ const (
 // Events
 
 // WorkOrderAssigneesUpdated records an owner change. User is empty when
-// SuperPlane chose the owner; Source then says how ("agent" or "fallback")
-// and Reason says why.
+// the planning agent chose the owner; Source is then "agent" and Reason says
+// why.
 type WorkOrderAssigneesUpdated struct {
 	Order      *WorkOrderRef `json:"order,omitempty"`
 	User       *UserRef      `json:"user,omitempty"`

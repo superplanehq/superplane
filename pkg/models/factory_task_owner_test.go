@@ -24,7 +24,7 @@ func TestListTaskOwnerCandidates(t *testing.T) {
 	linkTaskOwnerGitHub(t, busy, "Busy-Login")
 	free := createTaskOwnerMember(t, org.ID, "Free Person")
 	linkTaskOwnerGitHub(t, free, "free-login")
-	createTaskOwnerMember(t, org.ID, "No GitHub")
+	unlinked := createTaskOwnerMember(t, org.ID, "No GitHub")
 	removed := createTaskOwnerMember(t, org.ID, "Removed Person")
 	linkTaskOwnerGitHub(t, removed, "removed-login")
 	require.NoError(t, removed.Delete())
@@ -43,19 +43,25 @@ func TestListTaskOwnerCandidates(t *testing.T) {
 	for _, candidate := range candidates {
 		byName[candidate.Name] = candidate
 	}
-	require.Len(t, byName, 2, "only active members with a linked GitHub account can own tasks")
+	require.Len(t, candidates, 4, "the factory user and three members; removed members cannot own tasks")
 
 	assert.Equal(t, 1, byName["Busy Person"].OpenTasks, "closed tasks do not count as load")
 	assert.Equal(t, "Busy-Login", byName["Busy Person"].GitHubLogin)
 	assert.ElementsMatch(t, []string{"busy-login", "old-login"}, byName["Busy Person"].GitHubLogins)
 	assert.Len(t, byName["Busy Person"].GitHubIDs, 2)
 	assert.Equal(t, 0, byName["Free Person"].OpenTasks)
+	assert.Equal(t, free.ID, byName["Free Person"].UserID)
+	assert.Empty(t, byName["No GitHub"].GitHubLogin)
+	assert.Empty(t, byName["No GitHub"].GitHubLogins)
+	assert.Empty(t, byName["No GitHub"].GitHubIDs)
 
-	least, ok := LeastLoadedTaskOwner(candidates)
-	require.True(t, ok)
-	assert.Equal(t, free.ID, least.UserID)
+	found, ok := FindTaskOwnerCandidate(candidates, unlinked.ID.String())
+	require.True(t, ok, "a member without GitHub can own a task by user ID")
+	assert.Equal(t, unlinked.ID, found.UserID)
+	_, ok = FindTaskOwnerCandidate(candidates, "")
+	assert.False(t, ok, "an empty login does not match a member without GitHub")
 
-	found, ok := FindTaskOwnerCandidate(candidates, "@OLD-LOGIN")
+	found, ok = FindTaskOwnerCandidate(candidates, "@OLD-LOGIN")
 	require.True(t, ok)
 	assert.Equal(t, busy.ID, found.UserID)
 	_, ok = FindTaskOwnerCandidate(candidates, "removed-login")
@@ -97,7 +103,7 @@ func TestFactoryWorkOrder_AssignOwnerIfUnowned(t *testing.T) {
 		order, err := factoryModel.CreateWorkOrder(db, "Owned task", "", &userID, []uuid.UUID{userID}, nil)
 		require.NoError(t, err)
 
-		assigned, err := order.AssignOwnerIfUnowned(db, TaskOwnerAssignment{UserID: other.ID, Source: TaskOwnerSourceFallback})
+		assigned, err := order.AssignOwnerIfUnowned(db, TaskOwnerAssignment{UserID: other.ID, Source: TaskOwnerSourceAgent})
 		require.NoError(t, err)
 		assert.False(t, assigned)
 

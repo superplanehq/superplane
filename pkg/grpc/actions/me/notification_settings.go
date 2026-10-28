@@ -166,7 +166,6 @@ var notificationTypeProto = map[string]pb.NotificationSettings_Type{
 	models.NotificationTypeWorkOrderStatusNoteOwned: pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_NOTE_OWNED,
 	models.NotificationTypeWorkOrderAgentQuestion:   pb.NotificationSettings_TYPE_WORK_ORDER_AGENT_QUESTION,
 	models.NotificationTypeWorkOrderPlanReady:       pb.NotificationSettings_TYPE_WORK_ORDER_PLAN_READY,
-	models.NotificationTypeWorkOrderOwnerAssigned:   pb.NotificationSettings_TYPE_WORK_ORDER_OWNER_ASSIGNED,
 }
 
 func notificationTypeToProto(notificationType string) (pb.NotificationSettings_Type, bool) {

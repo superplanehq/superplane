@@ -13,21 +13,23 @@ import (
 )
 
 const (
-	TaskOwnerSourceAgent    = "agent"
-	TaskOwnerSourceFallback = "fallback"
+	TaskOwnerSourceAgent = "agent"
 
 	taskOwnerReasonMaxRunes = 280
 )
 
 // TaskOwnerCandidate is a member who can own a task: an active human member
-// with a GitHub account in Associated accounts. GitHubLogins and GitHubIDs
-// hold every associated GitHub identity, so commits from an older identity
-// still map to the member. GitHubLogin is the active one. GitHubIDs are the
-// numeric GitHub user IDs, which do not change when a login is renamed.
+// of the organization. GitHubLogins and GitHubIDs hold every GitHub identity
+// in Associated accounts, so commits from an older identity still map to the
+// member. They are empty when the member has no GitHub account. GitHubLogin
+// is the active one. GitHubIDs are the numeric GitHub user IDs, which do not
+// change when a login is renamed.
 type TaskOwnerCandidate struct {
 	UserID       uuid.UUID
 	Name         string
 	Email        string
+	IsOwner      bool
+	Roles        []string
 	GitHubLogin  string
 	GitHubLogins []string
 	GitHubIDs    []string
@@ -45,6 +47,7 @@ type taskOwnerCandidateScan struct {
 	UserID    uuid.UUID `gorm:"column:user_id"`
 	Name      string    `gorm:"column:name"`
 	Email     string    `gorm:"column:email"`
+	IsOwner   bool      `gorm:"column:is_owner"`
 	Login     string    `gorm:"column:login"`
 	GitHubID  string    `gorm:"column:github_id"`
 	Active    bool      `gorm:"column:active"`
@@ -89,28 +92,10 @@ func FindTaskOwnerCandidate(candidates []TaskOwnerCandidate, query string) (Task
 	return TaskOwnerCandidate{}, false
 }
 
-// LeastLoadedTaskOwner returns the candidate with the fewest open tasks. Ties
-// go to the name that sorts first, so the choice is stable.
-func LeastLoadedTaskOwner(candidates []TaskOwnerCandidate) (TaskOwnerCandidate, bool) {
-	if len(candidates) == 0 {
-		return TaskOwnerCandidate{}, false
-	}
-	best := candidates[0]
-	for _, candidate := range candidates[1:] {
-		if candidate.OpenTasks < best.OpenTasks {
-			best = candidate
-			continue
-		}
-		if candidate.OpenTasks == best.OpenTasks && strings.ToLower(candidate.Name) < strings.ToLower(best.Name) {
-			best = candidate
-		}
-	}
-	return best, true
-}
-
 // ListTaskOwnerCandidates returns the members who can own a task in the
 // factory, with the number of open tasks each one owns there. A draft or open
-// task counts as open.
+// task counts as open. Roles are not loaded: they live in the authorization
+// service.
 func ListTaskOwnerCandidates(tx *gorm.DB, orgID, factoryID uuid.UUID) ([]TaskOwnerCandidate, error) {
 	var rows []taskOwnerCandidateScan
 	err := tx.Raw(
@@ -128,20 +113,21 @@ func ListTaskOwnerCandidates(tx *gorm.DB, orgID, factoryID uuid.UUID) ([]TaskOwn
 	candidates := []TaskOwnerCandidate{}
 	indexByUser := map[uuid.UUID]int{}
 	for _, row := range rows {
-		login := normalizeTaskOwnerLogin(row.Login)
-		if login == "" {
-			continue
-		}
 		index, seen := indexByUser[row.UserID]
 		if !seen {
 			candidates = append(candidates, TaskOwnerCandidate{
 				UserID:    row.UserID,
 				Name:      row.Name,
 				Email:     row.Email,
+				IsOwner:   row.IsOwner,
 				OpenTasks: row.OpenTasks,
 			})
 			index = len(candidates) - 1
 			indexByUser[row.UserID] = index
+		}
+		login := normalizeTaskOwnerLogin(row.Login)
+		if login == "" {
+			continue
 		}
 		candidate := &candidates[index]
 		if !slices.Contains(candidate.GitHubLogins, login) {
@@ -170,12 +156,13 @@ SELECT
 	u.id AS user_id,
 	u.name,
 	COALESCE(u.email, '') AS email,
-	l.username AS login,
-	l.provider_id AS github_id,
-	l.active,
+	u.is_owner,
+	COALESCE(l.username, '') AS login,
+	COALESCE(l.provider_id, '') AS github_id,
+	COALESCE(l.active, false) AS active,
 	COALESCE(ot.open_tasks, 0) AS open_tasks
 FROM users u
-INNER JOIN account_linked_accounts l ON l.account_id = u.account_id AND l.provider = ?
+LEFT JOIN account_linked_accounts l ON l.account_id = u.account_id AND l.provider = ?
 LEFT JOIN open_tasks ot ON ot.user_id = u.id
 WHERE u.organization_id = ?
 	AND u.type = ?

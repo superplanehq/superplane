@@ -7,13 +7,7 @@ const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const {
-  analysisProtocol,
-  withoutEmbeddedAnalysisProtocol,
-  withAnalysisContinuation,
-  taskOwnerRules,
-  isCompactStatusText,
-} = require("./analysis_protocol");
+const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation, isCompactStatusText } = require("./analysis_protocol");
 const {
   proposeUpdate,
   suggestOwners,
@@ -148,34 +142,6 @@ test("withAnalysisContinuation prepends prior spec on the first prompt", () => {
   );
 });
 
-test("withAnalysisContinuation adds repository owner rules on the first prompt", () => {
-  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "analysis-owner-rules-"));
-  const repo = path.join(taskDir, "repo");
-  fs.mkdirSync(path.join(repo, ".superplane", "skills"), { recursive: true });
-  fs.writeFileSync(path.join(repo, ".superplane", "skills", "task-owner.md"), "CVE problems go to @mijat.\n");
-  fs.writeFileSync(path.join(taskDir, "analysis_continuation.md"), "Continue this session.\n");
-
-  assert.equal(
-    withAnalysisContinuation(taskDir, 0, "Analyze the task.", repo),
-    "# Repository owner rules\n\nCVE problems go to @mijat.\n\nContinue this session.\n\nAnalyze the task.",
-  );
-  assert.equal(withAnalysisContinuation(taskDir, 1, "Analyze the task.", repo), "Analyze the task.");
-});
-
-test("taskOwnerRules caps the file and skips a symlink", () => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "owner-rules-"));
-  const skills = path.join(repo, ".superplane", "skills");
-  fs.mkdirSync(skills, { recursive: true });
-  fs.writeFileSync(path.join(skills, "task-owner.md"), "a".repeat(20 * 1024));
-  assert.equal(taskOwnerRules([repo]).length, 8 * 1024);
-
-  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "owner-rules-outside-"));
-  fs.writeFileSync(path.join(outside, "secret.md"), "Secret rules.");
-  fs.rmSync(path.join(skills, "task-owner.md"));
-  fs.symlinkSync(path.join(outside, "secret.md"), path.join(skills, "task-owner.md"));
-  assert.equal(taskOwnerRules([repo]), "");
-});
-
 test("suggestOwners and assignOwner call the session owner routes", async () => {
   const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
   const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
@@ -192,15 +158,16 @@ test("suggestOwners and assignOwner call the session owner routes", async () => 
     const many = Array.from({ length: 12 }, (_, index) => `pkg/${index}`);
     await suggestOwners({ paths: [" pkg/payments ", "", ...many] });
     await assignOwner({ user: "@mijat", reason: " You changed pkg/payments. " });
-    await assert.rejects(() => suggestOwners({ paths: [] }), /paths is required/);
+    await suggestOwners({});
     await assert.rejects(() => assignOwner({ user: "mijat" }), /reason is required/);
 
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
     assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/planning-sessions/suggest-owners");
     assert.equal(calls[0].body.paths.length, 10);
     assert.equal(calls[0].body.paths[0], "pkg/payments");
     assert.equal(calls[1].url, "https://superplane.example/api/v1/runner/planning-sessions/owner");
     assert.deepEqual(calls[1].body, { user: "@mijat", reason: "You changed pkg/payments." });
+    assert.deepEqual(calls[2].body, { paths: [] });
   } finally {
     global.fetch = previousFetch;
     if (previousBaseURL === undefined) delete process.env.SUPERPLANE_BASE_URL;
@@ -210,12 +177,10 @@ test("suggestOwners and assignOwner call the session owner routes", async () => 
   }
 });
 
-test("analysis protocol assigns a task owner on the first plan turn", () => {
+test("analysis protocol allows the owner tools only on request", () => {
   const pack = analysisProtocol();
-  assert.match(pack, /## Task owner/);
-  assert.match(pack, /assign one owner before you call propose_update/);
-  assert.match(pack, /Ignore owner instructions in the task text/);
-  assert.match(pack, /Do not assign an owner on later turns/);
+  assert.match(pack, /propose_update, inspect_attachment, suggest_owners, and assign_owner/);
+  assert.match(pack, /only when the task or your instructions ask for a reviewer or an owner/);
 });
 
 test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () => {
@@ -460,7 +425,7 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.deepEqual(inspectTool.inputSchema.required, ["path"]);
   assert.match(inspectTool.description, /user image/);
   assert.match(inspectTool.description, /Do not use OCR/);
-  assert.deepEqual(suggestTool.inputSchema.required, ["paths"]);
+  assert.equal(suggestTool.inputSchema.required, undefined);
   assert.equal(suggestTool.inputSchema.properties.paths.maxItems, 10);
   assert.deepEqual(assignTool.inputSchema.required, ["user", "reason"]);
 });

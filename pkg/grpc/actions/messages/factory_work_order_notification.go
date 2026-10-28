@@ -21,11 +21,8 @@ type FactoryWorkOrderNotificationMessage struct {
 	// automation actors; those recipients are never excluded.
 	ActorUserID string `json:"actor_user_id,omitempty"`
 	// ActorName is a display name for automation actors (app or node name).
-	ActorName       string   `json:"actor_name,omitempty"`
-	AssignedUserIDs []string `json:"assigned_user_ids,omitempty"`
-	// AssignmentReason says why SuperPlane chose the owner. Empty when a
-	// person chose the owner.
-	AssignmentReason string   `json:"assignment_reason,omitempty"`
+	ActorName        string   `json:"actor_name,omitempty"`
+	AssignedUserIDs  []string `json:"assigned_user_ids,omitempty"`
 	CommentBody      string   `json:"comment_body,omitempty"`
 	MentionedUserIDs []string `json:"mentioned_user_ids,omitempty"`
 	FromState        string   `json:"from_state,omitempty"`

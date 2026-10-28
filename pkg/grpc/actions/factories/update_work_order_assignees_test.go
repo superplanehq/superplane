@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -97,38 +95,6 @@ func Test__UpdateWorkOrderAssignees(t *testing.T) {
 		require.Len(t, diff.Unassigned, 1)
 		assert.Equal(t, userB.ID, diff.Unassigned[0].ID)
 		assert.Empty(t, diff.Assigned)
-	})
-
-	t.Run("notifies only the people who became owners", func(t *testing.T) {
-		order, err := factoryModel.CreateWorkOrder(database.DB(t.Context()), "Ship it", "", &r.User, []uuid.UUID{userA.ID}, nil)
-		require.NoError(t, err)
-
-		published := []messages.FactoryWorkOrderNotificationMessage{}
-		restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
-			published = append(published, message)
-			return nil
-		})
-		defer restore()
-
-		_, err = UpdateWorkOrderAssignees(ctx, r.Organization.ID.String(), &pb.UpdateWorkOrderAssigneesRequest{
-			FactoryId:   factoryModel.ID.String(),
-			OrderId:     order.ID.String(),
-			AssigneeIds: []string{userA.ID.String(), userB.ID.String()},
-		})
-		require.NoError(t, err)
-
-		require.Len(t, published, 1)
-		assert.Equal(t, factory.EventTypeOrderAssigneesUpdated, published[0].EventType)
-		assert.Equal(t, []string{userB.ID.String()}, published[0].AssignedUserIDs)
-		assert.Equal(t, r.User.String(), published[0].ActorUserID)
-
-		_, err = UpdateWorkOrderAssignees(ctx, r.Organization.ID.String(), &pb.UpdateWorkOrderAssigneesRequest{
-			FactoryId:   factoryModel.ID.String(),
-			OrderId:     order.ID.String(),
-			AssigneeIds: []string{userA.ID.String()},
-		})
-		require.NoError(t, err)
-		assert.Len(t, published, 1, "removing an owner sends no assignment notification")
 	})
 
 	t.Run("rejects unknown assignee id", func(t *testing.T) {

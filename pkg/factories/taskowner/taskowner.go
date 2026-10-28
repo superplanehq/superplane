@@ -50,6 +50,7 @@ type CodeOwner struct {
 	UserID       uuid.UUID `json:"user_id"`
 	Name         string    `json:"name"`
 	GitHubLogin  string    `json:"github_login"`
+	Roles        []string  `json:"roles"`
 	Commits      int       `json:"commits"`
 	LastCommitAt time.Time `json:"last_commit_at"`
 	Paths        []string  `json:"paths"`
@@ -58,10 +59,13 @@ type CodeOwner struct {
 }
 
 // Member is a member who can own the task, with their open task count.
+// GitHubLogin is empty when the member has no GitHub account.
 type Member struct {
 	UserID      uuid.UUID `json:"user_id"`
 	Name        string    `json:"name"`
+	Email       string    `json:"email"`
 	GitHubLogin string    `json:"github_login"`
+	Roles       []string  `json:"roles"`
 	OpenTasks   int       `json:"open_tasks"`
 }
 
@@ -103,12 +107,7 @@ func NormalizePaths(paths []string) []string {
 func Members(candidates []models.TaskOwnerCandidate) []Member {
 	members := make([]Member, 0, len(candidates))
 	for _, candidate := range candidates {
-		members = append(members, Member{
-			UserID:      candidate.UserID,
-			Name:        candidate.Name,
-			GitHubLogin: candidate.GitHubLogin,
-			OpenTasks:   candidate.OpenTasks,
-		})
+		members = append(members, MemberOf(candidate))
 	}
 	slices.SortStableFunc(members, func(left, right Member) int {
 		if byLoad := cmp.Compare(left.OpenTasks, right.OpenTasks); byLoad != 0 {
@@ -117,6 +116,25 @@ func Members(candidates []models.TaskOwnerCandidate) []Member {
 		return cmp.Compare(strings.ToLower(left.Name), strings.ToLower(right.Name))
 	})
 	return members
+}
+
+// MemberOf describes one candidate.
+func MemberOf(candidate models.TaskOwnerCandidate) Member {
+	return Member{
+		UserID:      candidate.UserID,
+		Name:        candidate.Name,
+		Email:       candidate.Email,
+		GitHubLogin: candidate.GitHubLogin,
+		Roles:       nonNilRoles(candidate.Roles),
+		OpenTasks:   candidate.OpenTasks,
+	}
+}
+
+func nonNilRoles(roles []string) []string {
+	if roles == nil {
+		return []string{}
+	}
+	return roles
 }
 
 // Suggest ranks the candidates who changed the paths. A commit that changed
@@ -147,6 +165,7 @@ func Suggest(ctx context.Context, history History, paths []string, candidates []
 					UserID:      candidate.UserID,
 					Name:        candidate.Name,
 					GitHubLogin: candidate.GitHubLogin,
+					Roles:       nonNilRoles(candidate.Roles),
 					OpenTasks:   candidate.OpenTasks,
 					Paths:       []string{},
 				}

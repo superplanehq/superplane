@@ -11,7 +11,6 @@ export const NOTIFICATION_SETTINGS_TYPES = [
   "TYPE_WORK_ORDER_STATUS_NOTE_OWNED",
   "TYPE_WORK_ORDER_AGENT_QUESTION",
   "TYPE_WORK_ORDER_PLAN_READY",
-  "TYPE_WORK_ORDER_OWNER_ASSIGNED",
 ] as const satisfies readonly Exclude<MeNotificationSettingsType, "TYPE_UNSPECIFIED">[];
 
 export type ConfigurableNotificationType = (typeof NOTIFICATION_SETTINGS_TYPES)[number];
@@ -60,11 +59,6 @@ export const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
     key: "TYPE_WORK_ORDER_PLAN_READY",
     label: "Ready plans on your tasks",
     description: "Refinement finishes and the plan is ready.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_OWNER_ASSIGNED",
-    label: "Tasks assigned to you",
-    description: "A person or the agent makes you the owner of a task.",
   },
 ];
 

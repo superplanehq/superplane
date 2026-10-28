@@ -60,6 +60,27 @@ func TestSuggest(t *testing.T) {
 		assert.Equal(t, []uuid.UUID{bruno.UserID, carla.UserID, ana.UserID}, memberIDs(suggestion.Members))
 	})
 
+	t.Run("lists members without GitHub but never ranks them as code owners", func(t *testing.T) {
+		unlinked := models.TaskOwnerCandidate{UserID: uuid.New(), Name: "Dana", Roles: []string{"Operator"}}
+		linked := candidate("Eva", 2, "eva")
+		linked.Roles = []string{"Admin"}
+		history := fakeHistory{"pkg/payments": {
+			{SHA: "e1", AuthorLogin: "eva", CommittedAt: now},
+			{SHA: "u1", AuthorID: "123", CommittedAt: now},
+			{SHA: "u2", CommittedAt: now},
+		}}
+
+		suggestion, err := Suggest(context.Background(), history, []string{"pkg/payments"}, []models.TaskOwnerCandidate{unlinked, linked}, now)
+		require.NoError(t, err)
+
+		require.Len(t, suggestion.CodeOwners, 1)
+		assert.Equal(t, linked.UserID, suggestion.CodeOwners[0].UserID)
+		assert.Equal(t, []string{"Admin"}, suggestion.CodeOwners[0].Roles)
+		assert.Equal(t, []uuid.UUID{unlinked.UserID, linked.UserID}, memberIDs(suggestion.Members))
+		assert.Equal(t, []string{"Operator"}, suggestion.Members[0].Roles)
+		assert.Empty(t, suggestion.Members[0].GitHubLogin)
+	})
+
 	t.Run("breaks score ties with the fewest open tasks", func(t *testing.T) {
 		committedAt := now.Add(-time.Hour)
 		history := fakeHistory{"api": {

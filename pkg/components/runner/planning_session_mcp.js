@@ -432,9 +432,6 @@ async function suggestOwners(input) {
     .map((value) => String(value || "").trim())
     .filter(Boolean)
     .slice(0, MAX_OWNER_PATHS);
-  if (paths.length === 0) {
-    throw new Error("paths is required");
-  }
   return requestJSON("POST", "/api/v1/runner/planning-sessions/suggest-owners", {
     paths,
   });
@@ -458,33 +455,33 @@ async function assignOwner(input) {
 const SUGGEST_OWNERS_TOOL = {
   name: "suggest_owners",
   description:
-    "Rank the people who can own this task. Pass the repository paths the task touches. Returns code_owners ranked by recent commits on those paths, and members with their open task count, fewest first. Only members with a linked GitHub account appear.",
+    "Find the people who can review or own this task. Returns members of the organization with name, roles, GitHub login, and open_tasks (the open tasks they own in this factory), fewest first, and the current owners of the task. Pass the repository paths the change touches to also get code_owners: members ranked by their recent commits on those paths. Only members with a linked GitHub account can appear in code_owners.",
   inputSchema: {
     type: "object",
     properties: {
       paths: {
         type: "array",
-        minItems: 1,
         maxItems: MAX_OWNER_PATHS,
         items: { type: "string" },
-        description: "Repository-relative files or directories, for example pkg/payments or web_src/src/pages/checkout.tsx.",
+        description:
+          "Optional. Repository-relative files or directories, most specific first, for example pkg/payments or web_src/src/pages/checkout.tsx.",
       },
     },
-    required: ["paths"],
   },
 };
 
 const ASSIGN_OWNER_TOOL = {
   name: "assign_owner",
   description:
-    "Set the owner of this task and notify that person. Does nothing when the task already has an owner. Pass user as a user_id or github_login from suggest_owners.",
+    "Set the owner of this task when the task has no owner. Returns already_owned and changes nothing when the task has an owner. Pass user as a user_id or github_login from suggest_owners.",
   inputSchema: {
     type: "object",
     properties: {
       user: { type: "string", description: "user_id or github_login from suggest_owners." },
       reason: {
         type: "string",
-        description: "One sentence for the owner that names the code, for example: You changed pkg/payments/charge.go 3 times in the last 30 days.",
+        description:
+          "One sentence that SuperPlane shows on the task timeline, for example: You changed pkg/payments/charge.go 3 times in the last 30 days.",
       },
     },
     required: ["user", "reason"],

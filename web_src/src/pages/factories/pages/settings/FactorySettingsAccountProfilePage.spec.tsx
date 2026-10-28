@@ -65,7 +65,7 @@ describe("FactorySettingsAccountProfilePage associated accounts", () => {
       "Link accounts from other services. Each account has its own use. This does not change how you sign in.",
     );
     expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
-      "Velocity uses your GitHub account to credit your pull requests. Task assignment uses it to find code that you changed.",
+      "Velocity uses your GitHub account to credit your pull requests.",
     );
     expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent(
       "Velocity uses your Bitbucket account to credit your pull requests.",
