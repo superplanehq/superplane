@@ -237,7 +237,7 @@ function continueFromTicketSource(args: {
   });
 }
 
-function useFirstRunCommands(args: {
+type FirstRunCommandsArgs = {
   model: OnboardingPageModel;
   afterTickets: () => Promise<void>;
   connection: GitHubConnectionState;
@@ -256,7 +256,9 @@ function useFirstRunCommands(args: {
   integrationId?: string;
   githubEnterpriseReady?: boolean;
   setShowGitHubEnterpriseHost: (show: boolean) => void;
-}) {
+};
+
+function useFirstRunCommands(args: FirstRunCommandsArgs) {
   const { model, connection, navigation, blocking, forgeConfigured, installScope } = args;
   const location = useLocation();
   const saveRepository = () =>
