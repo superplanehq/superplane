@@ -9,8 +9,12 @@ import {
 
 export const SELECTABLE_LLM_SOURCE_HOSTED = "hosted";
 export const SELECTABLE_LLM_SOURCE_BYOK = "byok";
+export const SELECTABLE_LLM_SOURCE_SUBSCRIPTION = "subscription";
 
-export type SelectableLLMSourceID = typeof SELECTABLE_LLM_SOURCE_HOSTED | typeof SELECTABLE_LLM_SOURCE_BYOK;
+export type SelectableLLMSourceID =
+  | typeof SELECTABLE_LLM_SOURCE_HOSTED
+  | typeof SELECTABLE_LLM_SOURCE_BYOK
+  | typeof SELECTABLE_LLM_SOURCE_SUBSCRIPTION;
 
 export type SelectableLLMNamedID = {
   id: string;
