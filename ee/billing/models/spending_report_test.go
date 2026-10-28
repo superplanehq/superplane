@@ -310,6 +310,7 @@ func TestSpendingModelDisplayName(t *testing.T) {
 func TestSpendingBreakdownLabelUsesFundingSourceNames(t *testing.T) {
 	assert.Equal(t, "SuperPlane-hosted", billingmodels.SpendingBreakdownLabel("hosted", billingmodels.SpendingCatalogs{}, billingmodels.SpendingGroupByFundingSource))
 	assert.Equal(t, "Bring your own key", billingmodels.SpendingBreakdownLabel("byok", billingmodels.SpendingCatalogs{}, billingmodels.SpendingGroupByFundingSource))
+	assert.Equal(t, "ChatGPT subscription", billingmodels.SpendingBreakdownLabel("subscription", billingmodels.SpendingCatalogs{}, billingmodels.SpendingGroupByFundingSource))
 }
 
 func TestSpendingBreakdownLabelStripsOpenRouterPrefix(t *testing.T) {
@@ -326,6 +327,10 @@ func TestParseUsageFundingSource(t *testing.T) {
 	byok, err := models.ParseUsageFundingSource("byok")
 	require.NoError(t, err)
 	assert.Equal(t, models.UsageFundingSourceBYOK, byok)
+
+	subscription, err := models.ParseUsageFundingSource("subscription")
+	require.NoError(t, err)
+	assert.Equal(t, models.UsageFundingSourceSubscription, subscription)
 
 	_, err = models.ParseUsageFundingSource("")
 	require.Error(t, err)

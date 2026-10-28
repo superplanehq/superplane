@@ -119,6 +119,13 @@ function requireCodexAPIKey(env = process.env) {
 }
 
 function codexExecEnv(env = process.env) {
+  if (envValue(env, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN")) {
+    const subscription = loadSubscriptionModule(env);
+    if (!subscription) {
+      throw new Error("ChatGPT subscription helper is missing");
+    }
+    return subscription.subscriptionChildEnv(env);
+  }
   return {
     ...env,
     CODEX_API_KEY: requireCodexAPIKey(env),
@@ -165,7 +172,7 @@ function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
     .toLowerCase();
-  if (level === "low" || level === "medium" || level === "high") {
+  if (["low", "medium", "high"].includes(level)) {
     return ["-c", `model_reasoning_effort=${tomlString(level)}`];
   }
   return [];
@@ -374,7 +381,7 @@ async function runPrompt(promptFile, model, thinking) {
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
-  requireCodexAPIKey(process.env);
+  const childEnv = codexExecEnv(process.env);
 
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
@@ -421,7 +428,7 @@ async function runPrompt(promptFile, model, thinking) {
   codexArgs.push(prompt);
 
   const child = spawn("codex", codexArgs, {
-    env: codexExecEnv(process.env),
+    env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
   });
   const stderrDone = pipeRedactedStderr(child.stderr);
@@ -493,7 +500,10 @@ async function runPrompt(promptFile, model, thinking) {
   telemetry.attachToResult(payload);
   const activityModule = loadActivityStreamModule();
   const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
-  fs.writeFileSync(resultFile, `${JSON.stringify(safePayload)}\n`);
+  if (typeof safePayload.result === "string") {
+    safePayload.result = redactSubscription(safePayload.result);
+  }
+  fs.writeFileSync(resultFile, `${redactSubscription(JSON.stringify(safePayload))}\n`);
   accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
@@ -520,6 +530,7 @@ function tokenTotal(usage) {
     Number(usage.input_tokens || 0) +
     Number(usage.output_tokens || 0) +
     Number(usage.cache_read_input_tokens || 0) +
+    Number(usage.cache_creation_input_tokens || 0) +
     Number(usage.reasoning_tokens || 0)
   );
 }
@@ -555,12 +566,16 @@ function extractUsage(event) {
     cache_read_input_tokens: Number(
       source.cached_input_tokens || source.cache_read_input_tokens || 0,
     ),
-    reasoning_tokens: Number(source.reasoning_tokens || 0),
+    cache_creation_input_tokens: Number(source.cache_write_input_tokens || 0),
+    reasoning_tokens: Number(
+      source.reasoning_output_tokens || source.reasoning_tokens || 0,
+    ),
   };
   const cost = event.total_cost_usd ?? source.total_cost_usd;
   if (cost != null && Number.isFinite(Number(cost))) usage.total_cost_usd = Number(cost);
   return usage;
 }
+
 
 function accumulateLLMUsage(payload) {
   const taskDir = process.env.SUPERPLANE_TASK_DIR;
@@ -580,16 +595,33 @@ function writeLiveLogRecord(rec) {
   process.stdout.write(`${JSON.stringify(safe)}\n`);
 }
 
+function loadSubscriptionModule(env = process.env) {
+  const taskDir = env.SUPERPLANE_TASK_DIR || "";
+  const file = path.join(taskDir, "codex_subscription.js");
+  if (!taskDir || !fs.existsSync(file)) {
+    return null;
+  }
+  return require(file);
+}
+
+function redactSubscription(value) {
+  const helper = loadSubscriptionModule();
+  if (!helper || !helper.redactSecrets) {
+    return String(value);
+  }
+  return helper.redactSecrets(String(value));
+}
+
 function writeStdout(value) {
   const activity = loadActivityStreamModule();
   const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stdout.write(safe);
+  process.stdout.write(redactSubscription(safe));
 }
 
 function writeStderr(value) {
   const activity = loadActivityStreamModule();
   const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stderr.write(safe);
+  process.stderr.write(redactSubscription(safe));
 }
 
 function pipeRedactedStderr(stream) {

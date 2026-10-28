@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, FactoryOnboardingAgentHarness } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryCodexConnection, FactoryOnboardingAgentHarness } from "@/api-client";
 import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { TooltipProvider } from "@/ui/tooltip";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -16,6 +16,20 @@ import { FactorySettingsOrganizationLLMModelsPage } from "./FactorySettingsOrgan
 const saveModels = vi.fn();
 const saveHostedModels = vi.fn();
 const switchSource = vi.fn();
+const startCodex = vi.fn();
+const cancelCodex = vi.fn();
+let codexConnection: FactoriesFactoryCodexConnection | undefined;
+vi.mock("../onboarding/useFactoryCodexConnection", () => ({
+  useCodexSubscriptionModel: () => ({
+    codexSubscriptionOffered: true,
+    codexSubscriptionLoading: false,
+    codexConnection,
+    codexStarting: false,
+    codexCanceling: false,
+    startCodexConnection: startCodex,
+    cancelCodexConnection: cancelCodex,
+  }),
+}));
 let canUpdate = true;
 let enabledFeatures: string[] = ["organization_byok"];
 let productAllowed = true;
@@ -126,8 +140,11 @@ function setConnected(provider: string, candidateIds: string[], selectedIds = ca
   };
 }
 
-function renderPage(agentHarness?: FactoryOnboardingAgentHarness) {
-  const factory: FactoriesFactory = { ...REFUND_FACTORY, onboarding: { ...REFUND_FACTORY.onboarding, agentHarness } };
+function renderPage(agentHarness?: FactoryOnboardingAgentHarness, codexSubscription = false) {
+  const factory: FactoriesFactory = {
+    ...REFUND_FACTORY,
+    onboarding: { ...REFUND_FACTORY.onboarding, agentHarness, codexSubscription },
+  };
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -148,6 +165,9 @@ function renderPage(agentHarness?: FactoryOnboardingAgentHarness) {
 describe("FactorySettingsOrganizationLLMModelsPage", () => {
   beforeEach(() => {
     canUpdate = true;
+    codexConnection = undefined;
+    startCodex.mockReset();
+    cancelCodex.mockReset();
     enabledFeatures = ["organization_byok"];
     productAllowed = true;
     hostedModels = [
@@ -177,6 +197,34 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("SuperPlane");
     expect(screen.getByTestId("llm-models-hosted")).toHaveTextContent("anthropic/claude-sonnet-4-6");
     expect(screen.queryByText("claude-opus-4-6")).not.toBeInTheDocument();
+  });
+
+  it("starts ChatGPT reconnection from completed workspace settings", async () => {
+    codexConnection = { status: "reconnect_required", eligible: true };
+    renderPage("AGENT_HARNESS_CODEX", true);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Connect ChatGPT" }));
+    expect(startCodex).toHaveBeenCalledTimes(1);
+    expect(switchSource).not.toHaveBeenCalled();
+  });
+
+  it("shows the ChatGPT device code and can cancel sign-in from settings", async () => {
+    codexConnection = {
+      status: "pending",
+      eligible: true,
+      verificationUrl: "https://auth.openai.com/codex/device",
+      verificationCode: "ABCD-1234",
+    };
+    renderPage("AGENT_HARNESS_CODEX", true);
+    expect(screen.getByText("ABCD-1234")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cancel sign-in" }));
+    expect(cancelCodex).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables ChatGPT reconnection for readers", () => {
+    canUpdate = false;
+    codexConnection = { status: "reconnect_required", eligible: true };
+    renderPage("AGENT_HARNESS_CODEX", true);
+    expect(screen.getByRole("button", { name: "Connect ChatGPT" })).toBeDisabled();
   });
 
   it("keeps the organization hosted model list when the workspace uses its own key", () => {

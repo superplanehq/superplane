@@ -57,6 +57,18 @@ func ApplicationEncryptedStorage() []EncryptedStorageLocation {
 			Replace:  ReplaceRunnerTaskPayload,
 		},
 		{
+			Name:     "factory_codex_connections.bundle_ciphertext",
+			Format:   EncryptedStorageBytes,
+			ReadPage: ReadFactoryCodexConnectionBundlePage,
+			Replace:  ReplaceFactoryCodexConnectionBundle,
+		},
+		{
+			Name:     "factory_codex_leases.secret_ciphertext",
+			Format:   EncryptedStorageBytes,
+			ReadPage: ReadFactoryCodexLeaseSecretPage,
+			Replace:  ReplaceFactoryCodexLeaseSecret,
+		},
+		{
 			Name:     "factory_agent_resource_secrets.value",
 			Format:   EncryptedStorageBytes,
 			ReadPage: ReadFactoryAgentResourceSecretValuePage,
@@ -202,6 +214,36 @@ func ReadFactoryAgentResourceSecretValuePage(tx *gorm.DB, cursor string, limit i
 		query = query.Where("id > CAST(? AS uuid)", cursor)
 	}
 	return scanEncryptedStorageRows(query.Order("id").Limit(limit), limit)
+}
+
+func ReadFactoryCodexConnectionBundlePage(tx *gorm.DB, cursor string, limit int) ([]EncryptedStorageRow, error) {
+	query := tx.Table("factory_codex_connections").
+		Select("id::text, bundle_ciphertext, id::text, ''").
+		Where("bundle_ciphertext IS NOT NULL")
+	if cursor != "" {
+		query = query.Where("id > CAST(? AS uuid)", cursor)
+	}
+	return scanEncryptedStorageRows(query.Order("id").Limit(limit), limit)
+}
+
+func ReplaceFactoryCodexConnectionBundle(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
+	result := tx.Exec("UPDATE factory_codex_connections SET bundle_ciphertext = ? WHERE id = CAST(? AS uuid) AND bundle_ciphertext = ?", replacement, row.Cursor, row.Value)
+	return result.RowsAffected == 1, result.Error
+}
+
+func ReadFactoryCodexLeaseSecretPage(tx *gorm.DB, cursor string, limit int) ([]EncryptedStorageRow, error) {
+	query := tx.Table("factory_codex_leases").
+		Select("id::text, secret_ciphertext, connection_id::text, ''").
+		Where("secret_ciphertext IS NOT NULL")
+	if cursor != "" {
+		query = query.Where("id > CAST(? AS uuid)", cursor)
+	}
+	return scanEncryptedStorageRows(query.Order("id").Limit(limit), limit)
+}
+
+func ReplaceFactoryCodexLeaseSecret(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
+	result := tx.Exec("UPDATE factory_codex_leases SET secret_ciphertext = ? WHERE id = CAST(? AS uuid) AND secret_ciphertext = ?", replacement, row.Cursor, row.Value)
+	return result.RowsAffected == 1, result.Error
 }
 
 func ReplaceFactoryAgentResourceSecretValue(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {

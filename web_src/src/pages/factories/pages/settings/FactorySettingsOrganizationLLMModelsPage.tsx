@@ -20,6 +20,8 @@ import {
 import { ModelSourceBody } from "./llmModelSourceBody";
 import { byokProviderProductName, ORGANIZATION_LLM_MODELS_COPY as COPY } from "./organizationLLMModelsCopy";
 import { workspaceModelSource } from "./workspaceModelSource";
+import { useCodexSubscriptionModel } from "../onboarding/useFactoryCodexConnection";
+import { FirstRunCodexSubscription } from "../onboarding/first-run/FirstRunCodexSubscription";
 
 type BYOKQuery = ReturnType<typeof useBYOKLLMModels>;
 
@@ -55,6 +57,10 @@ export function FactorySettingsOrganizationLLMModelsPage() {
   const switchSource = useSwitchFactoryModelSource(organizationId, factoryId);
 
   usePageTitle([COPY.pageTitle, "Settings", factory.name ?? "Workspace"]);
+
+  if (factory.onboarding?.codexSubscription) {
+    return <FactoryCodexSubscriptionSettings />;
+  }
 
   const choose = (target: LLMModelsSwitchTarget) => {
     setDialog({ target, step: "warn" });
@@ -141,6 +147,34 @@ export function FactorySettingsOrganizationLLMModelsPage() {
           void saveSwitch("hosted");
         }}
       />
+    </FactorySettingsPageFrame>
+  );
+}
+
+function FactoryCodexSubscriptionSettings() {
+  const { organizationId, factoryId } = useFactorySettingsLayout();
+  const { canAct, isLoading } = usePermissions();
+  const codex = useCodexSubscriptionModel(organizationId, factoryId);
+  return (
+    <FactorySettingsPageFrame title={COPY.pageTitle} subtitle="Manage the ChatGPT subscription for this workspace.">
+      <FactorySettingsCard title="ChatGPT subscription">
+        {codex.codexSubscriptionLoading ? <p role="status">Loading ChatGPT connection...</p> : null}
+        <FirstRunCodexSubscription
+          selected
+          disabled={
+            !canAct("factories", "update") ||
+            isLoading ||
+            codex.codexSubscriptionLoading ||
+            !codex.codexSubscriptionOffered
+          }
+          connection={codex.codexConnection}
+          starting={codex.codexStarting}
+          canceling={codex.codexCanceling}
+          onSelect={() => {}}
+          onStart={codex.startCodexConnection}
+          onCancel={codex.cancelCodexConnection}
+        />
+      </FactorySettingsCard>
     </FactorySettingsPageFrame>
   );
 }
