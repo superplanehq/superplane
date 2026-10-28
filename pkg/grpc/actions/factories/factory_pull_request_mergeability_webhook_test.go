@@ -200,6 +200,132 @@ func TestRefreshFactoryPullRequestMergeabilityReportsUnavailable(t *testing.T) {
 	assert.Equal(t, headSHA, stored.MergeableHeadSHA)
 }
 
+func TestRefreshFactoryPullRequestMergeabilityRereadsUnknownMergeability(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 99)
+	useShortMergeabilityUnknownFollowUps(t)
+	githubAPI := &unknownThenReadyGitHub{
+		fakeFactoryGitHub: &fakeFactoryGitHub{
+			pullRequest: &github.PullRequest{
+				MergeableState: github.Ptr("unknown"),
+				Draft:          github.Ptr(false),
+				Head: &github.PullRequestBranch{
+					Ref: github.Ptr("feature"),
+					SHA: github.Ptr("abc123"),
+				},
+			},
+			repository: allMethodsRepository(),
+		},
+		ready: &github.PullRequest{
+			Mergeable:      github.Ptr(false),
+			MergeableState: github.Ptr("dirty"),
+			Draft:          github.Ptr(false),
+			Head: &github.PullRequestBranch{
+				Ref: github.Ptr("feature"),
+				SHA: github.Ptr("abc123"),
+			},
+		},
+	}
+	stubFactoryGitHub(t, githubAPI)
+
+	require.NoError(t, refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest))
+
+	require.Eventually(t, func() bool {
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+		return err == nil && stored.MergeBlockedReason == "CONFLICTING"
+	}, 2*time.Second, 5*time.Millisecond)
+	assert.Equal(t, 2, githubAPI.callCount())
+}
+
+func TestRefreshFactoryPullRequestMergeabilityLeavesRunningChecks(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 100)
+	useShortMergeabilityUnknownFollowUps(t)
+	githubAPI := &countingPullRequestGitHub{factoryGitHubAPI: &fakeFactoryGitHub{
+		pullRequest: &github.PullRequest{
+			Mergeable:      github.Ptr(true),
+			MergeableState: github.Ptr("unstable"),
+			Draft:          github.Ptr(false),
+			Head: &github.PullRequestBranch{
+				Ref: github.Ptr("feature"),
+				SHA: github.Ptr("abc123"),
+			},
+		},
+		combined: emptyCombinedStatus(),
+		checkRuns: &github.ListCheckRunsResults{CheckRuns: []*github.CheckRun{{
+			Status: github.Ptr("in_progress"),
+		}}},
+		repository: allMethodsRepository(),
+	}}
+	stubFactoryGitHub(t, githubAPI)
+
+	require.NoError(t, refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest))
+	time.Sleep(50 * time.Millisecond)
+
+	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	assert.Equal(t, "CHECKS_UNFINISHED", stored.MergeBlockedReason)
+	assert.Equal(t, 1, githubAPI.callCount())
+}
+
+func useShortMergeabilityUnknownFollowUps(t *testing.T) {
+	t.Helper()
+	original := append([]time.Duration(nil), factoryMergeabilityUnknownFollowUpDelays...)
+	factoryMergeabilityUnknownFollowUpDelays = []time.Duration{
+		time.Millisecond,
+		2 * time.Millisecond,
+		3 * time.Millisecond,
+		4 * time.Millisecond,
+		5 * time.Millisecond,
+	}
+	t.Cleanup(func() { factoryMergeabilityUnknownFollowUpDelays = original })
+}
+
+type unknownThenReadyGitHub struct {
+	*fakeFactoryGitHub
+	ready *github.PullRequest
+	mu    sync.Mutex
+	calls int
+}
+
+func (g *unknownThenReadyGitHub) GetPullRequest(context.Context, string, int) (*github.PullRequest, *github.Response, error) {
+	g.mu.Lock()
+	g.calls++
+	call := g.calls
+	g.mu.Unlock()
+	if call == 1 {
+		return g.pullRequest, nil, nil
+	}
+	return g.ready, nil, nil
+}
+
+func (g *unknownThenReadyGitHub) callCount() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.calls
+}
+
+type countingPullRequestGitHub struct {
+	factoryGitHubAPI
+	mu    sync.Mutex
+	calls int
+}
+
+func (g *countingPullRequestGitHub) GetPullRequest(ctx context.Context, repository string, number int) (*github.PullRequest, *github.Response, error) {
+	g.mu.Lock()
+	g.calls++
+	g.mu.Unlock()
+	return g.factoryGitHubAPI.GetPullRequest(ctx, repository, number)
+}
+
+func (g *countingPullRequestGitHub) callCount() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.calls
+}
+
 func TestRefreshFactoryPullRequestMergeabilitySkipsTemporarySentryReport(t *testing.T) {
 	for _, test := range []struct {
 		name       string

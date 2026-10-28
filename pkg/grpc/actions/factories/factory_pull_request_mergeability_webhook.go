@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +28,18 @@ const (
 	factoryMergeabilityRefreshAttempts = 3
 	factoryMergeabilityRefreshDelay    = 200 * time.Millisecond
 )
+
+// factoryMergeabilityUnknownFollowUpDelays are read times after a refresh
+// finds that GitHub has not calculated mergeability yet.
+var factoryMergeabilityUnknownFollowUpDelays = []time.Duration{
+	5 * time.Second,
+	15 * time.Second,
+	30 * time.Second,
+	60 * time.Second,
+	120 * time.Second,
+}
+
+var factoryMergeabilityUnknownFollowUps sync.Map
 
 var factoryMergeabilityGitHubEvents = []string{"check_run", "check_suite", "status", "pull_request", "push"}
 
@@ -184,17 +197,26 @@ func refreshFactoryPullRequestMergeabilityByID(
 	deps IntakeDependencies,
 	organizationID, factoryID, pullRequestID uuid.UUID,
 ) error {
+	_, err := refreshFactoryPullRequestMergeabilityByIDResult(ctx, deps, organizationID, factoryID, pullRequestID)
+	return err
+}
+
+func refreshFactoryPullRequestMergeabilityByIDResult(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID, factoryID, pullRequestID uuid.UUID,
+) (bool, error) {
 	db := database.DB(ctx)
 	factory, err := models.FindFactory(db, organizationID, factoryID)
 	if err != nil {
-		return fmt.Errorf("factory %s not found: %w", factoryID, err)
+		return false, fmt.Errorf("factory %s not found: %w", factoryID, err)
 	}
 	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequestID})
 	if err != nil {
-		return fmt.Errorf("pull request %s not found: %w", pullRequestID, err)
+		return false, fmt.Errorf("pull request %s not found: %w", pullRequestID, err)
 	}
 	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
-		return nil
+		return false, nil
 	}
 	if err := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository); err != nil {
 		log.WithError(err).Warnf(
@@ -202,7 +224,7 @@ func refreshFactoryPullRequestMergeabilityByID(
 			pullRequest.Repository,
 		)
 	}
-	return refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+	return refreshFactoryPullRequestMergeabilityResult(ctx, db, deps, factory, pullRequest)
 }
 
 func refreshFactoryPullRequestMergeability(
@@ -212,19 +234,40 @@ func refreshFactoryPullRequestMergeability(
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
 ) error {
+	_, err := refreshFactoryPullRequestMergeabilityResult(ctx, db, deps, factory, pullRequest)
+	return err
+}
+
+func refreshFactoryPullRequestMergeabilityResult(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (bool, error) {
 	before := storedFactoryPullRequestMergeability(pullRequest)
 	result, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
 	if err != nil {
-		return fmt.Errorf("failed to refresh pull request %s: %w", pullRequest.ID, err)
+		return false, fmt.Errorf("failed to refresh pull request %s: %w", pullRequest.ID, err)
 	}
 	if result != nil && result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE {
-		return unavailableFactoryPullRequestMergeabilityError(pullRequest.ID, result.canRetry)
+		return false, unavailableFactoryPullRequestMergeabilityError(pullRequest.ID, result.canRetry)
 	}
+	unknown := result != nil && result.MergeabilityUnknown
 	if result != nil && result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING {
 		maybeStartFactoryPullRequestConflictFix(db, factory, pullRequest, result.HeadRef, result.HeadSHA)
 	}
+	if unknown {
+		scheduleFactoryPullRequestMergeabilityUnknownFollowUp(
+			ctx,
+			deps,
+			factory.OrganizationID,
+			factory.ID,
+			pullRequest.ID,
+		)
+	}
 	if storedFactoryPullRequestMergeability(pullRequest) == before {
-		return nil
+		return unknown, nil
 	}
 	if err := publishFactoryWorkOrderUpdated(
 		factory.ID.String(),
@@ -233,7 +276,66 @@ func refreshFactoryPullRequestMergeability(
 	); err != nil {
 		log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
 	}
-	return nil
+	return unknown, nil
+}
+
+func scheduleFactoryPullRequestMergeabilityUnknownFollowUp(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID, factoryID, pullRequestID uuid.UUID,
+) {
+	if _, loaded := factoryMergeabilityUnknownFollowUps.LoadOrStore(pullRequestID, struct{}{}); loaded {
+		return
+	}
+	ctx = context.WithoutCancel(ctx)
+	started := time.Now()
+	go func() {
+		defer factoryMergeabilityUnknownFollowUps.Delete(pullRequestID)
+		followUpFactoryPullRequestMergeability(ctx, deps, organizationID, factoryID, pullRequestID, started)
+	}()
+}
+
+func followUpFactoryPullRequestMergeability(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID, factoryID, pullRequestID uuid.UUID,
+	started time.Time,
+) {
+	delays := append([]time.Duration(nil), factoryMergeabilityUnknownFollowUpDelays...)
+	for _, delay := range delays {
+		remaining := delay - time.Since(started)
+		if remaining > 0 && !waitForFactoryMergeabilityUnknownFollowUp(ctx, remaining) {
+			return
+		}
+		unknown, err := refreshFactoryPullRequestMergeabilityByIDResult(
+			ctx,
+			deps,
+			organizationID,
+			factoryID,
+			pullRequestID,
+		)
+		if err != nil {
+			if errors.Is(err, errFactoryPullRequestMergeabilityTemporary) {
+				continue
+			}
+			log.WithError(err).Warnf("factory mergeability: follow-up failed for pull request %s", pullRequestID)
+			return
+		}
+		if !unknown {
+			return
+		}
+	}
+}
+
+func waitForFactoryMergeabilityUnknownFollowUp(ctx context.Context, delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
 }
 
 func storedFactoryPullRequestMergeability(pullRequest *models.FactoryPullRequest) models.FactoryPullRequestMergeabilitySnapshot {
