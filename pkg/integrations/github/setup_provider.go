@@ -472,6 +472,7 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 			PermissionMetadata,
 			PermissionChecks,
 			PermissionCommitStatuses,
+			PermissionVulnerabilityAlerts,
 		)
 		if ctx.Capabilities != nil {
 			ctx.Capabilities.Unavailable(mapper.AllNames()...)
