@@ -10,6 +10,8 @@ const assert = require("node:assert/strict");
 const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation, isCompactStatusText } = require("./analysis_protocol");
 const {
   proposeUpdate,
+  suggestOwners,
+  assignOwner,
   proposeSpec,
   proposeClarity,
   proposeConfidence,
@@ -45,7 +47,7 @@ test("planningTools always exposes propose_update", () => {
   const { planningTools } = require("./planning_session_mcp");
   assert.deepEqual(
     planningTools().map((tool) => tool.name),
-    ["propose_update", "inspect_attachment"],
+    ["propose_update", "inspect_attachment", "suggest_owners", "assign_owner"],
   );
   assert.deepEqual(
     planningTools({
@@ -53,7 +55,7 @@ test("planningTools always exposes propose_update", () => {
       SUPERPLANE_PLANNING_CONFIDENCE: "false",
       SUPERPLANE_PLANNING_REVIEW: "false",
     }).map((tool) => tool.name),
-    ["propose_update", "inspect_attachment"],
+    ["propose_update", "inspect_attachment", "suggest_owners", "assign_owner"],
   );
 });
 
@@ -138,6 +140,47 @@ test("withAnalysisContinuation prepends prior spec on the first prompt", () => {
     withAnalysisContinuation(path.join(dir, "missing"), 0, "Analyze the task."),
     "Analyze the task.",
   );
+});
+
+test("suggestOwners and assignOwner call the session owner routes", async () => {
+  const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
+  const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
+  const previousFetch = global.fetch;
+  const calls = [];
+  process.env.SUPERPLANE_BASE_URL = "https://superplane.example/";
+  process.env.SUPERPLANE_RUN_TOKEN = "runner-token";
+  global.fetch = async (url, options) => {
+    calls.push({ url, body: JSON.parse(options.body) });
+    return { ok: true, text: async () => '{"status":"assigned"}' };
+  };
+
+  try {
+    const many = Array.from({ length: 12 }, (_, index) => `pkg/${index}`);
+    await suggestOwners({ paths: [" pkg/payments ", "", ...many] });
+    await assignOwner({ user: "@mijat", reason: " You changed pkg/payments. " });
+    await suggestOwners({});
+    await assert.rejects(() => assignOwner({ user: "mijat" }), /reason is required/);
+
+    assert.equal(calls.length, 3);
+    assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/planning-sessions/suggest-owners");
+    assert.equal(calls[0].body.paths.length, 10);
+    assert.equal(calls[0].body.paths[0], "pkg/payments");
+    assert.equal(calls[1].url, "https://superplane.example/api/v1/runner/planning-sessions/owner");
+    assert.deepEqual(calls[1].body, { user: "@mijat", reason: "You changed pkg/payments." });
+    assert.deepEqual(calls[2].body, { paths: [] });
+  } finally {
+    global.fetch = previousFetch;
+    if (previousBaseURL === undefined) delete process.env.SUPERPLANE_BASE_URL;
+    else process.env.SUPERPLANE_BASE_URL = previousBaseURL;
+    if (previousToken === undefined) delete process.env.SUPERPLANE_RUN_TOKEN;
+    else process.env.SUPERPLANE_RUN_TOKEN = previousToken;
+  }
+});
+
+test("analysis protocol allows the owner tools only on request", () => {
+  const pack = analysisProtocol();
+  assert.match(pack, /propose_update, inspect_attachment, suggest_owners, and assign_owner/);
+  assert.match(pack, /only when the task or your instructions ask for a reviewer or an owner/);
 });
 
 test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () => {
@@ -368,9 +411,9 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   const tools = replies[1].result.tools;
   assert.deepEqual(
     tools.map((tool) => tool.name),
-    ["propose_update", "inspect_attachment"],
+    ["propose_update", "inspect_attachment", "suggest_owners", "assign_owner"],
   );
-  const [updateTool, inspectTool] = tools;
+  const [updateTool, inspectTool, suggestTool, assignTool] = tools;
   const surveySchema = updateTool.inputSchema.properties.survey;
   assert.deepEqual(surveySchema.required, ["questions"]);
   assert.equal(surveySchema.properties.questions.minItems, 1);
@@ -382,6 +425,9 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.deepEqual(inspectTool.inputSchema.required, ["path"]);
   assert.match(inspectTool.description, /user image/);
   assert.match(inspectTool.description, /Do not use OCR/);
+  assert.equal(suggestTool.inputSchema.required, undefined);
+  assert.equal(suggestTool.inputSchema.properties.paths.maxItems, 10);
+  assert.deepEqual(assignTool.inputSchema.required, ["user", "reason"]);
 });
 
 test("lists planning tools over Content-Length JSON-RPC", async () => {
@@ -396,7 +442,7 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
   ]);
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_update", "inspect_attachment"],
+    ["propose_update", "inspect_attachment", "suggest_owners", "assign_owner"],
   );
 });
 

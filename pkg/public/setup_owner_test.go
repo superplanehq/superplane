@@ -77,11 +77,11 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 	require.NoError(t, err)
 	credit, err := billingmodels.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
 	require.NoError(t, err)
-	assert.Equal(t, billingmodels.CentsToMicros(billingmodels.SignupCreditCents), credit.GrantMicros)
+	assert.Zero(t, credit.GrantMicros)
 
 	owner, err := models.FindAccountByEmail("owner@example.com")
 	require.NoError(t, err)
-	assert.True(t, owner.HasReceivedWelcomeCredit())
+	assert.False(t, owner.HasReceivedWelcomeCredit())
 
 	var fleets []models.RunnerFleet
 	require.NoError(t, database.Conn().

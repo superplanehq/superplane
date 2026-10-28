@@ -446,9 +446,12 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/agent-messages", s.handleRunnerPlanningAgentMessage).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/suggest-owners", s.handleRunnerPlanningSuggestOwners).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/owner", s.handleRunnerPlanningAssignOwner).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", s.handleRunnerPlanningActivity).Methods("PUT")
 	s.Router.HandleFunc("/api/v1/runner/merge-confidence/checks", s.handleRunnerMergeConfidenceCheck).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/artifacts/links", s.handleRunnerArtifactLink).Methods(http.MethodPost)
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
@@ -1179,16 +1182,6 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if billing.Enabled() {
-		err = billing.GrantWelcomeCredit(tx, organization.ID, account.ID)
-		if err != nil {
-			tx.Rollback()
-			log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
-			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-			return
-		}
-	}
-
 	err = tx.Commit().Error
 	if err != nil {
 		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
@@ -1498,11 +1491,6 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	}
 	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
-	}
-	if billing.Enabled() {
-		if err := billing.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
-			return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
-		}
 	}
 
 	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")

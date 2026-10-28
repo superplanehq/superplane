@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
@@ -55,6 +56,15 @@ func UpdateFactoryOnboarding(
 			provider = models.UsageProviderCustom
 		}
 		if err := models.RequireOrganizationBYOKAccess(db, orgID, provider); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+	}
+
+	if req.GetComplete() && !wasComplete && billing.Enabled() {
+		if err := billing.AssertOrganizationPlanAllowsRuns(db, orgID); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+		if err := billing.AssertOrganizationPaymentMethod(db, orgID); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 		}
 	}

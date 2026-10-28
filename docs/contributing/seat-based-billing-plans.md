@@ -105,10 +105,11 @@ host to the sandbox organization. Use host names without a URL scheme.
 Configure production hosts in the live organization separately. Without this
 setting, Polar blocks the card form with its `frame-ancestors` policy.
 
-Every new account receives $10 in signup credit, valid for 365 days.
-The grant does not depend on the plan. The grant is limited to one per account.
-Selecting a plan does not add a second signup grant. Older accounts whose
-onboarding deferred credit receive the grant during plan selection.
+Each account receives $10 in signup credit after plan activation, valid for 365 days.
+Creating an organization or opening subscription checkout does not grant credit.
+Pay-as-you-go grants credit when plan selection succeeds. Subscriptions grant
+credit when the subscription becomes active. The grant is limited to one per account.
+Selecting another plan does not add a second signup grant.
 Credit alone does not permit runs. An existing trial company keeps its stored
 credit balance and trial dates.
 

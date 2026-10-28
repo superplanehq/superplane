@@ -1,3 +1,4 @@
+import { BillingDiagnosticsPanel } from "./BillingDiagnosticsPanel";
 import { OrganizationSeatLimit } from "./OrganizationSeatLimit";
 import type { BillingPlan } from "./billingPlansApi";
 import { OrganizationFeatureGrants } from "./OrganizationFeatureGrants";
@@ -39,6 +40,10 @@ const EDITABLE_BALANCES: Array<{ bucket: CreditBalanceBucket; label: string; act
 ];
 
 export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
+  return <OrganizationCredit key={orgId} orgId={orgId} />;
+}
+
+function OrganizationCredit({ orgId }: { orgId: string }) {
   const billingProductEnabled = useBillingProductEnabled();
   const credit = useOrgLLMCredit(orgId, { billingEnabled: billingProductEnabled });
 
@@ -63,6 +68,19 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
           showPlanControls={billingProductEnabled}
         />
       ) : null}
+      <BillingDiagnosticsPanel
+        enabled={billingProductEnabled}
+        plan={credit.plan}
+        loading={credit.diagnosticsLoading}
+        checking={credit.checkingPolar}
+        syncing={credit.syncingCustomer}
+        saving={credit.savingPlan}
+        error={credit.diagnosticsError}
+        syncError={credit.customerSyncError}
+        onRetry={() => void credit.loadDiagnostics()}
+        onCheck={() => void credit.loadDiagnostics(true)}
+        onSync={() => void credit.syncCustomer()}
+      />
     </div>
   );
 }
@@ -92,6 +110,9 @@ function OrgHostedCreditCard(args: {
   reloadGrants: () => void;
   savingMarkup: boolean;
   savingPlan: boolean;
+  diagnosticsLoading: boolean;
+  checkingPolar: boolean;
+  syncingCustomer: boolean;
   saveBalance: (bucket: CreditBalanceBucket) => void;
   saveMarkup: () => void;
   savePlan: () => void;
@@ -114,6 +135,7 @@ function OrgHostedCreditCard(args: {
           setTrialEndsOn={args.setTrialEndsOn}
           trialEndInvalid={args.trialEndInvalid}
           savingPlan={args.savingPlan}
+          busy={args.diagnosticsLoading || args.checkingPolar || args.syncingCustomer}
           savePlan={args.savePlan}
         />
       ) : null}

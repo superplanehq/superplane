@@ -194,3 +194,56 @@ func Test__AllocateHostedCreditSpendNegativeAdjustmentSkipsLaterGrants(t *testin
 	spend := allocateHostedCreditSpend(grants, 0, map[int64]int64{}, now)
 	assert.Equal(t, CentsToMicros(2000), spend.AdminRemainingMicros)
 }
+
+func Test__AllocateHostedCreditSpendKeepsTrialSpendAfterIncludedExpires(t *testing.T) {
+	now := time.Now()
+	welcomeEnd := now.Add(24 * time.Hour)
+	includedExpired := now.Add(-time.Hour)
+	created := now.Add(-20 * 24 * time.Hour)
+	grants := []OrganizationLLMCreditGrant{
+		{Kind: LLMCreditGrantKindWelcome, AmountMicros: CentsToMicros(1000), ExpiresAt: &welcomeEnd, CreatedAt: created},
+		{Kind: LLMCreditGrantKindIncluded, AmountMicros: CentsToMicros(5000), ExpiresAt: &includedExpired, CreatedAt: created},
+	}
+	billedBefore := map[int64]int64{includedExpired.UTC().UnixNano(): CentsToMicros(500)}
+
+	spend := allocateHostedCreditSpend(grants, CentsToMicros(500), billedBefore, now)
+	assert.Equal(t, CentsToMicros(1000), spend.TrialGrantedMicros)
+	assert.Equal(t, CentsToMicros(500), spend.TrialSpentMicros)
+}
+
+func Test__AllocateHostedCreditSpendTrialSpendAfterTrialExpires(t *testing.T) {
+	now := time.Now()
+	welcomeExpired := now.Add(-2 * time.Hour)
+	includedExpired := now.Add(-time.Hour)
+	created := now.Add(-20 * 24 * time.Hour)
+	grants := []OrganizationLLMCreditGrant{
+		{Kind: LLMCreditGrantKindWelcome, AmountMicros: CentsToMicros(1000), ExpiresAt: &welcomeExpired, CreatedAt: created},
+		{Kind: LLMCreditGrantKindIncluded, AmountMicros: CentsToMicros(5000), ExpiresAt: &includedExpired, CreatedAt: created},
+	}
+	billedBefore := map[int64]int64{
+		welcomeExpired.UTC().UnixNano():  CentsToMicros(400),
+		includedExpired.UTC().UnixNano(): CentsToMicros(2000),
+	}
+
+	spend := allocateHostedCreditSpend(grants, CentsToMicros(2500), billedBefore, now)
+	assert.Equal(t, CentsToMicros(400), spend.TrialSpentMicros)
+}
+
+func Test__AllocateHostedCreditSpendLaterTrialGrantDoesNotTakePastSpend(t *testing.T) {
+	now := time.Now()
+	includedCreated := now.Add(-20 * 24 * time.Hour)
+	includedExpired := now.Add(-2 * time.Hour)
+	welcomeCreated := now.Add(-time.Hour)
+	welcomeEnd := now.Add(24 * time.Hour)
+	grants := []OrganizationLLMCreditGrant{
+		{Kind: LLMCreditGrantKindIncluded, AmountMicros: CentsToMicros(5000), ExpiresAt: &includedExpired, CreatedAt: includedCreated},
+		{Kind: LLMCreditGrantKindWelcome, AmountMicros: CentsToMicros(1000), ExpiresAt: &welcomeEnd, CreatedAt: welcomeCreated},
+	}
+	billedBefore := map[int64]int64{
+		includedExpired.UTC().UnixNano(): CentsToMicros(500),
+		welcomeCreated.UTC().UnixNano():  CentsToMicros(500),
+	}
+
+	spend := allocateHostedCreditSpend(grants, CentsToMicros(700), billedBefore, now)
+	assert.Equal(t, CentsToMicros(200), spend.TrialSpentMicros)
+}

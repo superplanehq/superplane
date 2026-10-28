@@ -12,6 +12,7 @@ import {
 } from "./workOrderTimelineFromEvents.helpers";
 import type {
   UserNameLookup,
+  WorkOrderTimelineAssigneeChange,
   WorkOrderTimelineEvent,
   WorkOrderTimelineEventKind,
   WorkOrderTimelineStepComment,
@@ -73,6 +74,8 @@ interface EventPayload extends LineStepExecutionPayload {
   automation?: EventAutomationRefPayload;
   assigned?: EventUserRef[];
   unassigned?: EventUserRef[];
+  source?: string;
+  reason?: string;
   order?: {
     result?: string;
   };
@@ -229,6 +232,18 @@ function appendStepQueuedEvent(
   });
 }
 
+const TASK_OWNER_SOURCES = new Set(["agent", "fallback"]);
+
+function superPlaneAssignment(
+  payload: EventPayload,
+): Pick<WorkOrderTimelineAssigneeChange, "assignedBySuperPlane" | "reason"> {
+  if (payload.user?.id || !TASK_OWNER_SOURCES.has(payload.source ?? "")) {
+    return {};
+  }
+  const reason = payload.reason?.trim();
+  return reason ? { assignedBySuperPlane: true, reason } : { assignedBySuperPlane: true };
+}
+
 function appendAssigneesUpdatedEvent(
   events: WorkOrderTimelineEvent[],
   index: number,
@@ -245,6 +260,7 @@ function appendAssigneesUpdatedEvent(
     assigneeChange: {
       assignedUserIds: (payload.assigned ?? []).map((user) => user.id).filter((id): id is string => Boolean(id)),
       unassignedUserIds: (payload.unassigned ?? []).map((user) => user.id).filter((id): id is string => Boolean(id)),
+      ...superPlaneAssignment(payload),
     },
     title: describeAssigneesUpdated(payload, resolveUserName),
   });

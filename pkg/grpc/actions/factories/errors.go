@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
@@ -38,6 +39,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	}
 
 	switch {
+	case errors.Is(err, billing.ErrPaymentMethodRequired):
+		return grpcerrors.FailedPrecondition(err, "Add a payment method before you complete workspace setup.")
+	case errors.Is(err, billing.ErrHostedSubscriptionRequired), errors.Is(err, billing.ErrHostedPaymentPastDue), errors.Is(err, billing.ErrHostedSubscriptionPaused):
+		return grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
 	case errors.Is(err, models.ErrBYOKAccessDenied):
 		return grpcerrors.PermissionDenied(err, err.Error())
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):
