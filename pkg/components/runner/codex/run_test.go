@@ -23,6 +23,45 @@ func TestThinkingArgsMapsReasoningEffort(t *testing.T) {
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="xhigh"`}, thinkingArgsFromScript(t, "xhigh"))
 }
 
+func TestCodexModelCallOutcomesMapsSuccessAndProviderFailures(t *testing.T) {
+	assert.Equal(t, []any{
+		map[string]any{"model": "gpt-5", "outcome": "attempt_1"},
+	}, codexModelCallOutcomesFromScript(t, map[string]any{
+		"failed": false, "model": "gpt-5",
+	}))
+	assert.Equal(t, []any{
+		map[string]any{"model": "gpt-5", "outcome": "error"},
+	}, codexModelCallOutcomesFromScript(t, map[string]any{
+		"failed": true, "errorText": "HTTP 429 Too Many Requests", "model": "gpt-5",
+	}))
+	assert.Empty(t, codexModelCallOutcomesFromScript(t, map[string]any{
+		"failed": true, "errorText": "Invalid API key", "model": "gpt-5",
+	}))
+}
+
+func codexModelCallOutcomesFromScript(t *testing.T, input map[string]any) []any {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(input)
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { codexModelCallOutcomes } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexModelCallOutcomes(JSON.parse(process.argv[2]))));`,
+		script,
+		string(payload),
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var outcomes []any
+	require.NoError(t, json.Unmarshal(out, &outcomes))
+	if outcomes == nil {
+		return []any{}
+	}
+	return outcomes
+}
+
 func TestCodexRunReadsModelFromRolloutAndMapsUsage(t *testing.T) {
 	taskDir := t.TempDir()
 	prompt := filepath.Join(taskDir, "prompt.txt")
