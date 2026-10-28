@@ -514,6 +514,10 @@ func VerifyOrganizationSubscription(ctx context.Context, orgID uuid.UUID) (strin
 	if err != nil {
 		return "failed", err
 	}
+	return classifyOrganizationSubscriptions(orgID, items)
+}
+
+func classifyOrganizationSubscriptions(orgID uuid.UUID, items []SubscriptionData) (string, error) {
 	active := false
 	now := time.Now()
 	for _, item := range items {
@@ -541,6 +545,10 @@ func SubscriptionDashboardURL(subscriptionID string) string {
 	if strings.TrimSpace(subscriptionID) == "" {
 		return ""
 	}
+	return dashboardURL() + "/sales/subscriptions/" + url.PathEscape(subscriptionID)
+}
+
+func dashboardURL() string {
 	slug := strings.TrimSpace(os.Getenv("POLAR_DASHBOARD_ORGANIZATION_SLUG"))
 	if slug == "" {
 		slug = "superplane"
@@ -552,5 +560,5 @@ func SubscriptionDashboardURL(subscriptionID string) string {
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("POLAR_ENVIRONMENT")), "production") {
 		host = "https://polar.sh"
 	}
-	return host + "/dashboard/" + url.PathEscape(slug) + "/sales/subscriptions/" + url.PathEscape(subscriptionID)
+	return host + "/dashboard/" + url.PathEscape(slug)
 }

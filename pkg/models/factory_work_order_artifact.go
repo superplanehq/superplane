@@ -430,6 +430,11 @@ func newestMatchingArtifactID(titles []unkeyedArtifactTitle, title string) (uuid
 	return uuid.Nil, false
 }
 
+// LockFactoryWorkOrder locks the work order row until the transaction ends.
+func LockFactoryWorkOrder(tx *gorm.DB, id uuid.UUID) error {
+	return lockFactoryWorkOrder(tx, id)
+}
+
 func lockFactoryWorkOrder(tx *gorm.DB, id uuid.UUID) error {
 	var locked FactoryWorkOrder
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
