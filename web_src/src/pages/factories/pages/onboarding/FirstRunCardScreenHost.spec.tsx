@@ -20,6 +20,7 @@ const plans = [
 function cardStep(overrides: Partial<OnboardingCardStep> = {}): OnboardingCardStep {
   return {
     ready: true,
+    failed: false,
     available: true,
     required: true,
     requiresAdmin: false,
@@ -210,6 +211,15 @@ it("opens card setup for an active subscription without starting another checkou
   expect(screen.getByRole("radio", { name: "Starter" })).toBeChecked();
   await userEvent.setup().click(screen.getByTestId("first-run-card-continue"));
   await waitFor(() => expect(openCardSetup).toHaveBeenCalledTimes(1));
+  expect(activateOnboardingPlan).not.toHaveBeenCalled();
+  expect(finishSetup).not.toHaveBeenCalled();
+});
+
+it("opens card setup for an active plan outside the starter list", async () => {
+  const { finishSetup } = renderHost(cardStep({ planActive: true, activePlanKey: "team", hasPaymentMethod: false }));
+  await userEvent.setup().click(screen.getByTestId("first-run-card-continue"));
+  await waitFor(() => expect(openCardSetup).toHaveBeenCalledTimes(1));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(activateOnboardingPlan).not.toHaveBeenCalled();
   expect(finishSetup).not.toHaveBeenCalled();
 });

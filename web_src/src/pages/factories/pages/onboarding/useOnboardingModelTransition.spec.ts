@@ -9,6 +9,7 @@ const toast = vi.fn();
 vi.mock("@/lib/toast", () => ({ showErrorToast: toast }));
 const cardStep: OnboardingCardStep = {
   ready: true,
+  failed: false,
   available: false,
   required: false,
   requiresAdmin: false,
@@ -21,7 +22,7 @@ vi.mock("./useOnboardingCardStep", () => ({ useOnboardingCardStep: () => ({ ...c
 beforeEach(() => {
   verify.mockReset().mockResolvedValue(true);
   toast.mockClear();
-  Object.assign(cardStep, { ready: true, available: false, required: false, plans: [], planActive: false });
+  Object.assign(cardStep, { ready: true, failed: false, available: false, required: false, plans: [], planActive: false });
 });
 function mount(
   saving = false,
@@ -118,4 +119,18 @@ it.each(["agent", "complete"] as const)("resumes unpaid setup at plan selection 
   expect(result.current.screen).toBe("card");
   await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("card"));
   expect(finish).not.toHaveBeenCalled();
+});
+
+it.each(["agent", "complete"] as const)("stops waiting and shows a retry when billing fails on %s", async (screen) => {
+  Object.assign(cardStep, { ready: false, failed: true });
+  const { result, goToScreen } = mount(false, false, screen);
+  expect(result.current.pending).toBe(false);
+  expect(result.current.screen).toBe("complete");
+  if (screen === "agent") await waitFor(() => expect(goToScreen).toHaveBeenCalledWith("complete"));
+});
+
+it("keeps waiting while the billing lookup runs", () => {
+  Object.assign(cardStep, { ready: false, failed: false });
+  const { result } = mount(false, false, "complete");
+  expect(result.current.pending).toBe(true);
 });

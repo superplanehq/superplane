@@ -6,6 +6,8 @@ import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 export type OnboardingCardStep = {
   /** The billing and permission lookups have answers. */
   ready: boolean;
+  /** The billing lookup failed and no request is running. The user can retry. */
+  failed: boolean;
   /** The user can select one of the available starter plans. */
   available: boolean;
   /** The user must select a starter plan during workspace setup. */
@@ -42,6 +44,7 @@ export function useOnboardingCardStep(organizationId: string): OnboardingCardSte
   const billingRequired = Boolean(onboardingBillingError(billing.data));
   return {
     ready: billing.isSuccess && !permissionsLoading,
+    failed: billing.isError && !billing.isFetching,
     available,
     required: available && billingRequired,
     requiresAdmin: !permissionsLoading && hasStarterPlans && billingRequired && !canManageBilling,

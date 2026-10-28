@@ -28,7 +28,11 @@ export function useOnboardingCardFlow(organizationId: string, flow: CardStepFlow
   const { cardStep } = flow;
   const [chosenPlanKey, setSelectedPlanKey] = useState(() => returnParams.get("plan") ?? "pay_as_you_go");
   const selectedPlanKey = cardStep.planActive ? (cardStep.activePlanKey ?? chosenPlanKey) : chosenPlanKey;
-  const plan = cardStep.plans.find((candidate) => candidate.key === selectedPlanKey);
+  // An organization on a plan outside the starter list, for example Team, can
+  // still restore its card. The active plan key is enough to resume setup.
+  const plan =
+    cardStep.plans.find((candidate) => candidate.key === selectedPlanKey) ??
+    (cardStep.planActive && selectedPlanKey ? { key: selectedPlanKey } : undefined);
 
   const continueSetup = useCallback(
     async (resume: boolean) => {

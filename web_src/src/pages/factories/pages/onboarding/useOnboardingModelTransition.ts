@@ -63,7 +63,7 @@ export function useOnboardingModelTransition(
     screen,
     pending:
       pending ||
-      (["agent", "complete"].includes(navigation.screen) && !cardStep.ready) ||
+      (["agent", "complete"].includes(navigation.screen) && !cardStep.ready && !cardStep.failed) ||
       ((ticketsSaved || navigation.screen === "agent" || navigation.screen === "complete") &&
         model.codexSubscriptionLoading),
     skipAgentScreen: !agentOffered,
@@ -83,6 +83,7 @@ function screenWithOnboardingAccess(
   agentOffered: boolean,
   codexSubscriptionLoading: boolean,
 ): FirstRunScreen {
+  if ((screen === "agent" || screen === "complete") && cardStep.failed) screen = "complete";
   if ((screen === "agent" || screen === "complete") && cardStep.ready) {
     if (cardStep.required) screen = "card";
     if (cardStep.requiresAdmin) screen = "complete";
