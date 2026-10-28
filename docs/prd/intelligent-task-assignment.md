@@ -24,7 +24,7 @@ add an owner rule to the planning prompt.
 - Read rules from a repository file.
 - Assign a fallback owner from the server.
 - Send a new notification for the assignment.
-- Replace an owner that a person set.
+- Change manual assignment controls, owner ranking, or team routing rules.
 - Read Bitbucket code history.
 
 ## Example instructions
@@ -60,7 +60,8 @@ sequenceDiagram
   API-->>Agent: members, current owners, code owners
   Agent->>MCP: assign_owner with user and reason
   MCP->>API: POST owner
-  API-->>Agent: assigned or already_owned
+  API->>API: Replace current owners with selected person
+  API-->>Agent: assigned and selected owner
 ```
 
 The planning protocol names the two tools. It tells the agent to use them only
@@ -100,9 +101,17 @@ workspace.
 Input: `user` (a `user_id` or a GitHub login from `suggest_owners`) and
 `reason` (one sentence).
 
-The tool sets the owner only when the task has no owner. It returns
-`already_owned` and changes nothing when the task has an owner. The timeline
-shows "SuperPlane assigned" with the reason.
+The tool replaces all current assignees with the selected person, including
+owners that a person set manually. A successful call leaves exactly one owner.
+Replacement is the default and does not require a force option.
+
+Successful calls return `status: assigned` and `owner`, the selected member.
+The timeline records the assigned and unassigned users, the agent source, and
+the normalized reason. A subsequent `suggest_owners` call reports the new owner.
+
+Selecting the same sole owner succeeds without changing the task timestamp,
+adding history, or publishing an update. Selecting one of several assignees
+removes the others and records those removals.
 
 ## Ranking
 
@@ -119,13 +128,14 @@ integration of the factory. The server:
 
 - The server only accepts human members of the organization, so a bad pick
   cannot assign a stranger.
-- `assign_owner` does nothing when the task has an owner.
+- Assignment and history commit together. Invalid members, empty normalized
+  reasons, and inactive planning targets leave ownership and history unchanged.
 - The agent writes the reason while it reads untrusted text. The server keeps
   one line of plain text, removes links, and limits it to 280 characters.
 - The runner token outlives the session. The owner routes reject an ended
   session and a closed or archived task.
-- The manual owner update and `assign_owner` lock the task row, so they cannot
-  add two owners at the same time.
+- The manual owner update and `assign_owner` lock the task row. The assignment
+  reads current assignees inside the lock and replaces them with one owner.
 
 ## Endpoints
 
