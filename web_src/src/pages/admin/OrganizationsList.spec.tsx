@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
@@ -285,20 +285,19 @@ describe("OrganizationsList", () => {
     expect(acmePin).toBeDisabled();
     expect(betaPin).toBeDisabled();
 
-    releases.get("org-2")?.(jsonResponse({ pinned: true }));
-
-    await waitFor(() => {
-      const pins = screen.getAllByRole("button", { name: "Pin organization" });
-      expect(pins[0]).toBeDisabled();
-      expect(pins[1]).toBeEnabled();
+    await act(async () => {
+      releases.get("org-2")!(jsonResponse({ pinned: true }));
     });
+
+    expect(within(screen.getByRole("row", { name: /Acme/ })).getByRole("button")).toBeDisabled();
+    expect(within(screen.getByRole("row", { name: /Beta/ })).getByRole("button")).toBeEnabled();
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(2);
 
-    releases.get("org-1")?.(jsonResponse({ pinned: true }));
-    await waitFor(() => {
-      screen.getAllByRole("button", { name: "Pin organization" }).forEach((button) => {
-        expect(button).toBeEnabled();
-      });
+    await act(async () => {
+      releases.get("org-1")!(jsonResponse({ pinned: true }));
+    });
+    screen.getAllByRole("button", { name: "Pin organization" }).forEach((button) => {
+      expect(button).toBeEnabled();
     });
   });
 
