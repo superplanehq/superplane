@@ -376,7 +376,7 @@ const VISUAL_EVIDENCE_TOOLS = [
   {
     name: "upload_artifact",
     description:
-      "Upload a screenshot or video from the task evidence directory and attach it to the work order.",
+      "Upload a screenshot or video from the task evidence directory and attach it to the task.",
     inputSchema: {
       type: "object",
       properties: {
