@@ -20,8 +20,8 @@ import {
 import { ModelSourceBody } from "./llmModelSourceBody";
 import { byokProviderProductName, ORGANIZATION_LLM_MODELS_COPY as COPY } from "./organizationLLMModelsCopy";
 import { workspaceModelSource } from "./workspaceModelSource";
-import { useCodexSubscriptionModel } from "../onboarding/useFactoryCodexConnection";
-import { FirstRunCodexSubscription } from "../onboarding/first-run/FirstRunCodexSubscription";
+import { FactoryCodexSubscriptionConnection } from "./FactoryCodexSubscriptionConnection";
+import { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
 
 type BYOKQuery = ReturnType<typeof useBYOKLLMModels>;
 
@@ -50,21 +50,21 @@ export function FactorySettingsOrganizationLLMModelsPage() {
   });
   const byokLoading = providers.some((provider) => byokQueries[provider].isLoading);
 
+  const subscription = useCodexSubscriptionCatalog(
+    organizationId,
+    factoryId,
+    factory.onboarding?.codexSubscription === true,
+  );
+
   const source = workspaceModelSource(factory.onboarding?.agentHarness, connected.length > 0);
-  const currentProvider = resolveCurrentProvider(factory.onboarding, connected, byokQueries);
+  const currentProvider = subscription.selected
+    ? null
+    : resolveCurrentProvider(factory.onboarding, connected, byokQueries);
   const [dialog, setDialog] = useState<LLMModelsSwitchDialog>(null);
   const [switchedNotice, setSwitchedNotice] = useState<string | null>(null);
   const switchSource = useSwitchFactoryModelSource(organizationId, factoryId);
 
   usePageTitle([COPY.pageTitle, "Settings", factory.name ?? "Workspace"]);
-
-  if (factory.onboarding?.codexSubscription) {
-    return <FactoryCodexSubscriptionSettings />;
-  }
-
-  const choose = (target: LLMModelsSwitchTarget) => {
-    setDialog({ target, step: "warn" });
-  };
 
   const saveSwitch = async (
     target: LLMModelsSwitchTarget,
@@ -93,12 +93,13 @@ export function FactorySettingsOrganizationLLMModelsPage() {
   return (
     <FactorySettingsPageFrame title={COPY.pageTitle} subtitle={COPY.pageSubtitle}>
       <div data-testid="factory-settings-llm-models" className="flex flex-col gap-5">
+        {subscription.selected ? <FactoryCodexSubscriptionConnection codex={subscription.codex} /> : null}
         <FactorySettingsCard
           title={COPY.modelsTitle}
           data-testid="llm-models-list"
           action={
             <Badge variant="outline" data-testid="llm-models-source-badge">
-              {source === "hosted" ? COPY.hostedBadge : COPY.ownKeyBadge}
+              {modelSourceBadge(source, subscription.selected)}
             </Badge>
           }
         >
@@ -112,7 +113,8 @@ export function FactorySettingsOrganizationLLMModelsPage() {
             byokLoading={byokLoading}
             canUpdate={canUpdate}
             integrationsHref={integrationsHref}
-            onChoose={choose}
+            {...subscription.body}
+            onChoose={(target) => setDialog({ target, step: "warn" })}
           />
         </FactorySettingsCard>
       </div>
@@ -151,32 +153,28 @@ export function FactorySettingsOrganizationLLMModelsPage() {
   );
 }
 
-function FactoryCodexSubscriptionSettings() {
-  const { organizationId, factoryId } = useFactorySettingsLayout();
-  const { canAct, isLoading } = usePermissions();
-  const codex = useCodexSubscriptionModel(organizationId, factoryId);
-  return (
-    <FactorySettingsPageFrame title={COPY.pageTitle} subtitle="Manage the ChatGPT subscription for this workspace.">
-      <FactorySettingsCard title="ChatGPT subscription">
-        {codex.codexSubscriptionLoading ? <p role="status">Loading ChatGPT connection...</p> : null}
-        <FirstRunCodexSubscription
-          selected
-          disabled={
-            !canAct("factories", "update") ||
-            isLoading ||
-            codex.codexSubscriptionLoading ||
-            !codex.codexSubscriptionOffered
-          }
-          connection={codex.codexConnection}
-          starting={codex.codexStarting}
-          canceling={codex.codexCanceling}
-          onSelect={() => {}}
-          onStart={codex.startCodexConnection}
-          onCancel={codex.cancelCodexConnection}
-        />
-      </FactorySettingsCard>
-    </FactorySettingsPageFrame>
-  );
+function useCodexSubscriptionCatalog(organizationId: string, factoryId: string, selected: boolean) {
+  const codex = useFactoryCodexConnection(organizationId, factoryId, selected);
+  const connection = codex.query.data;
+  const models = connection?.availableModels ?? [];
+  const loading =
+    selected && (codex.query.isLoading || connection?.reservationHeld === true || codex.refreshCatalog.isPending);
+  const reconnectRequired = connection?.status === "reconnect_required" || connection?.status === "disconnected";
+
+  return {
+    selected,
+    codex,
+    body: {
+      subscriptionModels: selected ? models : undefined,
+      subscriptionLoading: loading,
+      subscriptionReconnectRequired: reconnectRequired,
+    },
+  };
+}
+
+function modelSourceBadge(source: "hosted" | "own-key", usesCodexSubscription: boolean): string {
+  if (usesCodexSubscription) return COPY.subscriptionBadge;
+  return source === "hosted" ? COPY.hostedBadge : COPY.ownKeyBadge;
 }
 
 function resolveCurrentProvider(
