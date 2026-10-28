@@ -124,7 +124,7 @@ func (s *Server) handleRunnerPlanningAssignOwner(w http.ResponseWriter, r *http.
 		return
 	}
 
-	assigned, err := assignPlanningTaskOwner(database.DB(r.Context()), target.order, models.TaskOwnerAssignment{
+	err = assignPlanningTaskOwner(database.DB(r.Context()), target.order, models.TaskOwnerAssignment{
 		UserID: owner.UserID,
 		Source: models.TaskOwnerSourceAgent,
 		Reason: reason,
@@ -133,20 +133,16 @@ func (s *Server) handleRunnerPlanningAssignOwner(w http.ResponseWriter, r *http.
 		writeRunnerPlanningError(w, r, target.session, err)
 		return
 	}
-	if !assigned {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "already_owned"})
-		return
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status": "assigned",
 		"owner":  taskowner.MemberOf(owner),
 	})
 }
 
-func assignPlanningTaskOwner(db *gorm.DB, order *models.FactoryWorkOrder, assignment models.TaskOwnerAssignment) (bool, error) {
-	assigned, err := order.AssignOwnerIfUnowned(db, assignment)
-	if err != nil || !assigned {
-		return assigned, err
+func assignPlanningTaskOwner(db *gorm.DB, order *models.FactoryWorkOrder, assignment models.TaskOwnerAssignment) error {
+	changed, err := order.AssignOwner(db, assignment)
+	if err != nil || !changed {
+		return err
 	}
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		order.FactoryID.String(),
@@ -155,7 +151,7 @@ func assignPlanningTaskOwner(db *gorm.DB, order *models.FactoryWorkOrder, assign
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
-	return true, nil
+	return nil
 }
 
 // loadPlanningTaskOwnerTarget loads the task of a runner session. The runner
