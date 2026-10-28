@@ -1629,8 +1629,9 @@ CREATE TABLE public.runner_tasks (
     finished_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    ready_at timestamp with time zone,
     CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
-    CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
+    CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
 );
 
 
@@ -4762,7 +4763,7 @@ CREATE INDEX runner_tasks_fleet_state_idx ON public.runner_tasks USING btree (fl
 -- Name: runner_tasks_organization_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING btree (organization_id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = ANY ((ARRAY['reserved'::character varying, 'running'::character varying])::text[])));
+CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING btree (organization_id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying])::text[])));
 
 
 --
@@ -4770,6 +4771,13 @@ CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING b
 --
 
 CREATE INDEX runner_tasks_organization_idx ON public.runner_tasks USING btree (organization_id, created_at);
+
+
+--
+-- Name: runner_tasks_organization_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_organization_pending_idx ON public.runner_tasks USING btree (organization_id, queued_at, id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = 'pending'::text));
 
 
 --
@@ -6316,7 +6324,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261027075507	f
+20261028012551	f
 \.
 
 

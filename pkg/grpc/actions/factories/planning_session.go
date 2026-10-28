@@ -429,7 +429,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	runtime := runtimeBySession[session.ID]
 	out.ExecutionId = runtime.executionID
 	out.RunnerState = runtime.runnerState
-	out.QueueReason = runtime.queueReason
+	out.BlockedByParallelismLimit = runtime.blockedByParallelismLimit
 	out.SelectableModelKey = session.SelectableModelKey
 	if draft := session.Draft(); strings.TrimSpace(draft.Title) != "" {
 		out.Draft = &pb.PlanningSessionDraft{
@@ -452,12 +452,12 @@ func serializePlanningSessionSummary(session *models.FactoryPlanningSession, run
 		return nil
 	}
 	out := &pb.PlanningSessionSummary{
-		Id:          session.ID.String(),
-		State:       session.State,
-		WaitState:   session.WaitState,
-		ExecutionId: runtime.executionID,
-		RunnerState: runtime.runnerState,
-		QueueReason: runtime.queueReason,
+		Id:                        session.ID.String(),
+		State:                     session.State,
+		WaitState:                 session.WaitState,
+		ExecutionId:               runtime.executionID,
+		RunnerState:               runtime.runnerState,
+		BlockedByParallelismLimit: runtime.blockedByParallelismLimit,
 	}
 	if survey := session.CurrentSurvey(); session.SurveyID != nil && len(survey.Questions) > 0 {
 		out.Survey = &pb.PlanningSessionSurvey{
@@ -557,9 +557,9 @@ func planningSessionSurveyQuestions(survey models.PlanningSessionSurvey) []*pb.P
 }
 
 type planningSessionRuntime struct {
-	executionID string
-	runnerState string
-	queueReason string
+	executionID               string
+	runnerState               string
+	blockedByParallelismLimit bool
 }
 
 func planningSessionRuntimes(tx *gorm.DB, sessions []*models.FactoryPlanningSession) (map[uuid.UUID]planningSessionRuntime, error) {
@@ -605,9 +605,9 @@ func planningSessionRuntimes(tx *gorm.DB, sessions []*models.FactoryPlanningSess
 		}
 		runner := runnerStatuses[executionID]
 		runtimeBySession[session.ID] = planningSessionRuntime{
-			executionID: executionID.String(),
-			runnerState: runner.State,
-			queueReason: runner.QueueReason,
+			executionID:               executionID.String(),
+			runnerState:               runner.State,
+			blockedByParallelismLimit: runner.BlockedByParallelismLimit,
 		}
 	}
 	return runtimeBySession, nil
