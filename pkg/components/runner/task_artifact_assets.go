@@ -8,6 +8,9 @@ var taskArtifactMCPScript string
 //go:embed publish_link.js
 var publishLinkScript string
 
+//go:embed publish_markdown.js
+var publishMarkdownScript string
+
 //go:embed task_cli.js
 var taskCLIScript string
 
@@ -34,13 +37,18 @@ func AppendTaskArtifactMCP(environment []TaskEnvironmentVariable, files []TaskFi
 	// evidence runs that do not publish links.
 	files = appendUniqueTaskFiles(files, TaskArtifactMCPFile(), PublishLinkScriptFile(), taskOwnerToolsFile())
 	if HasPublishLinks(environment) {
-		files = append(files, TaskCLIScriptFile(), PublishLinkCommandFile())
+		// task_cli.js loads publish_markdown.js at startup, including link-only calls.
+		files = append(files, TaskCLIScriptFile(), PublishMarkdownScriptFile(), PublishLinkCommandFile())
 	}
 	return files
 }
 
 func PublishLinkScriptFile() TaskFile {
 	return TaskFile{Path: "publish_link.js", Content: publishLinkScript, Mode: "0644"}
+}
+
+func PublishMarkdownScriptFile() TaskFile {
+	return TaskFile{Path: "publish_markdown.js", Content: publishMarkdownScript, Mode: "0644"}
 }
 
 func TaskCLIScriptFile() TaskFile {
