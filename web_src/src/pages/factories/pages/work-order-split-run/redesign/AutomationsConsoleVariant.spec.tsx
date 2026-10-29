@@ -4,7 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
 import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
-import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../../__fixtures__/lineMetricsBoardOrders";
+import {
+  BOARD_IMPLEMENT_FAILED_ORDER,
+  BOARD_IMPLEMENT_NOTIFY_ORDER,
+} from "../../../__fixtures__/lineMetricsBoardOrders";
 import { OPEN_WORK_ORDER_CHECKS } from "../../../__fixtures__/workOrderCheckFixtures";
 import { TWO_HOURS_AGO } from "../../../__fixtures__/factoryPageIds";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
@@ -13,6 +16,55 @@ import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "../splitRunMocks
 import { CREATED_MANUALLY } from "../splitRunSource";
 
 describe("AutomationsConsoleVariant timeline markers", () => {
+  it("offers only Backlog manual actions for a Backlog task", () => {
+    renderConsole(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, { demoArtifacts: false }), {
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      orderId: DRAFT_WORK_ORDER.id,
+      canStopRun: true,
+      manualCustomAutomations: [
+        { id: "backlog-custom", name: "Inspect task", columnKey: "backlog" },
+        { id: "verify-custom", name: "Inspect pull request", columnKey: "verify" },
+      ],
+    });
+    expect(within(screen.getByTestId("redesign-console-column-backlog")).getByText("Inspect task")).toBeInTheDocument();
+    expect(screen.queryByText("Inspect pull request")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Run/ })).toBeEnabled();
+  });
+
+  it("offers only Verify manual actions after implementation with an open pull request", () => {
+    const order = {
+      ...BOARD_IMPLEMENT_NOTIFY_ORDER,
+      id: "wo-verify-manual",
+      lineDispatches: BOARD_IMPLEMENT_NOTIFY_ORDER.lineDispatches?.map((dispatch) => ({
+        ...dispatch,
+        state: "STATE_FINISHED" as const,
+        result: "RESULT_PASSED" as const,
+      })),
+      pullRequests: [
+        {
+          id: "pr-1",
+          workOrderId: "wo-verify-manual",
+          state: "STATE_OPEN" as const,
+          url: "https://github.com/acme/app/pull/1",
+        },
+      ],
+    };
+    renderConsole(splitRunFixtureForWorkOrder(order, { demoArtifacts: false }), {
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      orderId: order.id,
+      canStopRun: true,
+      manualCustomAutomations: [
+        { id: "backlog-custom", name: "Inspect task", columnKey: "backlog" },
+        { id: "verify-custom", name: "Inspect pull request", columnKey: "verify" },
+      ],
+    });
+    expect(
+      within(screen.getByTestId("redesign-console-column-verify")).getByText("Inspect pull request"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Inspect task")).not.toBeInTheDocument();
+  });
   it("fills finished columns and spins the live column", () => {
     renderConsole(SPLIT_RUN_RUNNING);
 

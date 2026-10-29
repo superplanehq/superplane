@@ -22,6 +22,16 @@ function renderPicker(
 }
 
 describe("AddIntakePicker", () => {
+  it("finds and selects another custom automation", async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderPicker(vi.fn(), { takenSourceIds: ["custom-verification"] });
+    await user.type(screen.getByRole("textbox", { name: "Search intakes" }), "Bash");
+    const card = screen.getByRole("button", { name: /Custom automation/ });
+    expect(card).toBeEnabled();
+    expect(screen.queryByTestId("add-intake-template-github-issues")).not.toBeInTheDocument();
+    await user.click(card);
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "custom-verification" }));
+  });
   it("offers GitHub, Jira, Sentry, Productive.io, Datadog, and coming-soon Notion sources", () => {
     renderPicker();
 

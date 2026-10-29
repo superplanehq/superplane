@@ -88,7 +88,7 @@ func StartAutomaticCustomAutomations(
 	}
 	for i := range canvases {
 		canvas := &canvases[i]
-		if canvas.LiveVersionID == nil {
+		if canvas.LiveVersionID == nil || canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyVerify {
 			continue
 		}
 		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
@@ -121,6 +121,9 @@ func startCustomAutomation(
 	order *models.FactoryWorkOrder,
 	automatic bool,
 ) (*models.CanvasEvent, error) {
+	if canvas.ColumnKey != nil && *canvas.ColumnKey == models.CanvasColumnKeyBacklog {
+		return contexts.StartBacklogCustomAutomation(db, factory, canvas, order, automatic)
+	}
 	if err := requireWorkOrderInVerify(db, order); err != nil {
 		return nil, err
 	}
@@ -280,7 +283,7 @@ func customAutomationCanvasMode(tx *gorm.DB, canvas *models.Canvas) (pb.FactoryC
 func customAutomationCanvasModeFromVersion(version *models.CanvasVersion) (pb.FactoryCustomAutomation_StartMode, error) {
 	for i := range version.Nodes {
 		node := version.Nodes[i]
-		if node.ID != customAutomationTriggerID {
+		if node.ID != customAutomationTriggerID && node.ID != customAutomationTaskTriggerID {
 			continue
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
