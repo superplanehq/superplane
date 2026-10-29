@@ -11,7 +11,8 @@ the core maintainers first.
 For features, larger bug fixes, or architectural changes:
 
 1. Find or open an issue that describes the change.
-2. Discuss the approach with us on the issue or on [Discord](https://discord.gg/KC78eCNsnw).
+2. Discuss the approach with us on the issue or on
+   [Discord](https://discord.superplane.com).
 3. Wait until a maintainer assigns the issue to you before you start implementation.
 
 This helps us avoid duplicate work. It also makes sure we agree on the
@@ -127,7 +128,7 @@ sign-off, and the review process.
 
 ### Contributing
 
-- **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
+- **[Discord](https://discord.superplane.com)** - Join our Discord community for discussions, questions, and collaboration
 - **[Issue Tracking](docs/contributing/issue-tracking.md)** - How to report bugs, use the SuperPlane Board, and understand issue types
 - **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
