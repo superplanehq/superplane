@@ -7,6 +7,7 @@ export function IntakeSettingsRadioOption({
   title,
   helper,
   disabled = false,
+  variant = "card",
   onChange,
 }: {
   name: string;
@@ -15,14 +16,17 @@ export function IntakeSettingsRadioOption({
   title: string;
   helper?: string;
   disabled?: boolean;
+  variant?: "card" | "plain";
   onChange: () => void;
 }) {
   return (
     <label
       className={cn(
-        "flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+        "flex items-start gap-3",
+        variant === "card" && "rounded-lg border px-3 py-2.5 transition-colors",
         disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
-        checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
+        variant === "card" &&
+          (checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15"),
       )}
     >
       <input
@@ -35,7 +39,14 @@ export function IntakeSettingsRadioOption({
         className="mt-0.5 size-4 accent-gray-900"
       />
       <span className="min-w-0">
-        <span className="block text-[13px] font-medium tracking-[-0.01em] text-foreground">{title}</span>
+        <span
+          className={cn(
+            "block text-foreground",
+            variant === "plain" ? "text-sm leading-5" : "text-[13px] font-medium tracking-[-0.01em]",
+          )}
+        >
+          {title}
+        </span>
         {helper ? <span className="mt-0.5 block text-[12px] leading-5 text-muted-foreground">{helper}</span> : null}
       </span>
     </label>
