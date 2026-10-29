@@ -8,6 +8,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -80,18 +81,23 @@ func ListSelectableLLMModels(
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list selectable models")
 	}
-	return &pb.ListSelectableLLMModelsResponse{Models: serializeSelectableLLMModels(listed)}, nil
+	catalog, err := llmcatalog.LoadThinkingCatalog(tx)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load model capabilities")
+	}
+	return &pb.ListSelectableLLMModelsResponse{Models: serializeSelectableLLMModels(listed, catalog)}, nil
 }
 
-func serializeSelectableLLMModels(listed []models.SelectableLLMModel) []*pb.SelectableLLMModel {
+func serializeSelectableLLMModels(listed []models.SelectableLLMModel, catalog *llmcatalog.ThinkingCatalog) []*pb.SelectableLLMModel {
 	out := make([]*pb.SelectableLLMModel, 0, len(listed))
 	for _, model := range listed {
 		out = append(out, &pb.SelectableLLMModel{
-			Source:   &pb.SelectableLLMNamedID{Id: model.Source.ID, Name: model.Source.Name},
-			Provider: &pb.SelectableLLMNamedID{Id: model.Provider.ID, Name: model.Provider.Name},
-			Model:    &pb.SelectableLLMNamedID{Id: model.Model.ID, Name: model.Model.Name},
-			Key:      model.Key,
-			Label:    model.Label,
+			Source:         &pb.SelectableLLMNamedID{Id: model.Source.ID, Name: model.Source.Name},
+			Provider:       &pb.SelectableLLMNamedID{Id: model.Provider.ID, Name: model.Provider.Name},
+			Model:          &pb.SelectableLLMNamedID{Id: model.Model.ID, Name: model.Model.Name},
+			Key:            model.Key,
+			Label:          model.Label,
+			ThinkingLevels: catalog.ThinkingLevels(model.Provider.ID, model.Model.ID, model.Source.ID),
 		})
 	}
 	return out
