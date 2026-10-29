@@ -1,4 +1,4 @@
-import { resolveGithubDefaultBranch, useIntegrationResources } from "@/hooks/useIntegrations";
+import { resolveRepositoryDefaultBranch, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -75,8 +75,9 @@ export function useFactoryRepositoryDraft(args: {
   }, [args.integrationId, args.organizationId, savedBranch, savedRepository]);
 
   const listedBranchNames = useMemo(() => branchNames(branchResources.data), [branchResources.data]);
-  const branchChoices = useMemo(() => branchChoicesFor(listedBranchNames, branch), [branch, listedBranchNames]);
-  const isDirty = repository !== savedRepository || branch !== baselineBranch;
+  const branchChoices = useMemo(() => repositoryBranchChoices(listedBranchNames, branch), [branch, listedBranchNames]);
+  const isDirty =
+    repository !== savedRepository || branch !== baselineBranch || (savedBranch === "" && branch.trim() !== "");
   const isSaving = isResolvingDefaultBranch || updateRepository.isPending;
   const selectRepository = (next: string) => {
     setRepository(next);
@@ -106,6 +107,7 @@ export function useFactoryRepositoryDraft(args: {
   return {
     repository,
     branch,
+    savedBranch,
     setBranch,
     listedBranchNames,
     branchChoices,
@@ -127,7 +129,7 @@ function hostDefaultBranchFor(
     ?.defaultBranch?.trim();
   if (catalogBranch) return Promise.resolve(catalogBranch);
   if (!organizationId || !integrationId || !repositoryName) return Promise.resolve("");
-  return resolveGithubDefaultBranch(organizationId, integrationId, repositoryName);
+  return resolveRepositoryDefaultBranch(organizationId, integrationId, repositoryName);
 }
 
 function watchBranchLookup(isCurrent: () => boolean, request: Promise<string>, onBranch: (branch: string) => void) {
@@ -150,7 +152,7 @@ function branchNames(resources: { name?: string | null; id?: string | null }[] |
 const preferredDefaultBranches = ["main", "master", "develop", "dev", "development", "trunk"];
 const preferredDefaultBranchRank = new Map(preferredDefaultBranches.map((name, index) => [name, index]));
 
-function branchChoicesFor(listedBranchNames: string[], branch: string) {
+export function repositoryBranchChoices(listedBranchNames: string[], branch: string) {
   const names = new Set(listedBranchNames);
   if (branch) names.add(branch);
   return [...names].sort(compareBranchChoices);

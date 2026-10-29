@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -84,6 +85,17 @@ func SelectFactoryVCSProviderRepository(
 		if config := factory.OnboardingConfigValue(); config.BacklogRepository != "" && config.BacklogRepository != config.AppRepository {
 			backlogRepositoryID = nil
 		}
+		branch := defaultBranchFromCacheOrProvider(repository.DefaultBranch, func() (string, error) {
+			return common.InstallationRepositoryDefaultBranch(
+				providerHTTP(),
+				app.ID,
+				app.PrivateKey,
+				repository.InstallationID,
+				repository.RepositoryID,
+				repository.FullName,
+			)
+		})
+		branch = keepSavedDefaultBranch(factory.OnboardingConfigValue(), repository.FullName, branch)
 		if updateErr := factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:    &integrationID,
 			VCSProvider:         &provider,
@@ -91,7 +103,7 @@ func SelectFactoryVCSProviderRepository(
 			AppRepositoryID:     &repositoryID,
 			BacklogRepository:   onboardingBacklogRepository(factory, repository.FullName),
 			BacklogRepositoryID: backlogRepositoryID,
-			DefaultBranch:       &repository.DefaultBranch,
+			DefaultBranch:       &branch,
 		}); updateErr != nil {
 			return updateErr
 		}

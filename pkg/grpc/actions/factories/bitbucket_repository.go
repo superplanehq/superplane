@@ -54,6 +54,23 @@ func visibleBitbucketRepositories(ctx context.Context, db *gorm.DB, accountUUID 
 	})
 }
 
+func bitbucketLiveDefaultBranch(installationID, repository string) (string, error) {
+	token, _, err := bitbucketapp.CurrentSystemToken(installationID)
+	if err != nil {
+		return "", err
+	}
+	client := &bitbucket.Client{
+		AuthType: bitbucket.AuthTypeForgeApp,
+		Token:    token,
+		HTTP:     providerHTTP(),
+	}
+	branch, err := client.GetMainBranch(repository)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(branch), nil
+}
+
 func findVisibleBitbucketRepository(ctx context.Context, db *gorm.DB, accountUUID, repositoryName string) (*bitbucket.VisibleRepository, error) {
 	repositories, err := visibleBitbucketRepositories(ctx, db, accountUUID)
 	if err != nil {

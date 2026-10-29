@@ -874,6 +874,41 @@ func (f *Factory) SnapshotWorkOrderRepository(tx *gorm.DB, repository, defaultBr
 		Error
 }
 
+// RetargetUnfinishedWorkOrderBranches moves draft and open tasks that still
+// follow the previous workspace repository onto the repository and branch
+// just saved. Repository and branch change together. A task on another
+// repository keeps that pair. A task keeps a branch that is neither empty
+// nor the previous workspace branch. Closed tasks stay unchanged.
+func (f *Factory) RetargetUnfinishedWorkOrderBranches(
+	tx *gorm.DB,
+	previousRepository, nextRepository, previousBranch, nextBranch, nextProvider string,
+) error {
+	previousRepository = strings.TrimSpace(previousRepository)
+	nextRepository = strings.TrimSpace(nextRepository)
+	previousBranch = strings.TrimSpace(previousBranch)
+	nextBranch = strings.TrimSpace(nextBranch)
+	nextProvider = strings.TrimSpace(nextProvider)
+	if nextBranch == "" || nextBranch == previousBranch || nextRepository == "" {
+		return nil
+	}
+	if nextProvider == "" {
+		nextProvider = ProviderGitHub
+	}
+
+	return tx.Model(&FactoryWorkOrder{}).
+		Where("factory_id = ?", f.ID).
+		Where("state IN ?", []string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen}).
+		Where("default_branch IS NULL OR default_branch = '' OR default_branch = ?", previousBranch).
+		Where("repository IS NULL OR repository = '' OR LOWER(repository) = LOWER(?)", previousRepository).
+		Updates(map[string]any{
+			"repository":     nextRepository,
+			"default_branch": nextBranch,
+			"vcs_provider":   nextProvider,
+			"updated_at":     time.Now(),
+		}).
+		Error
+}
+
 func (f *Factory) CreateWorkOrderWithOrigin(
 	tx *gorm.DB,
 	title, description string,
