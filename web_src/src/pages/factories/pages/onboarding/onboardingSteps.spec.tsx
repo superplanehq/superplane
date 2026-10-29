@@ -100,7 +100,8 @@ describe("RepositoryStep", () => {
     );
 
     expect(screen.getByText("Choose the default branch for this repository.")).toBeInTheDocument();
-    await user.selectOptions(screen.getByTestId("onboarding-default-branch"), "master");
+    await user.click(screen.getByRole("combobox", { name: "Default branch" }));
+    await user.click(screen.getByRole("option", { name: "master" }));
     expect(onChange).toHaveBeenCalledWith("master");
   });
 
