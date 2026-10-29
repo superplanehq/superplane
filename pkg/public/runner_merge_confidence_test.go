@@ -61,7 +61,7 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	}, time.Hour)
 	require.NoError(t, err)
 	t.Setenv("JWT_SECRET", "test")
-	ownerToken := assertTaskOwnerRunAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://app.test"}, []runneraction.TaskEnvironmentVariable{{Name: runneraction.EnvSuperplaneMergeConfidenceToken, Value: token}}, order.ID)
+	ownerToken := assertRunnerOwnerAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://app.test"}, []runneraction.TaskEnvironmentVariable{{Name: runneraction.EnvSuperplaneMergeConfidenceToken, Value: token}}, order.ID)
 
 	unauthorized := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
 		`{"check":"risk","score":4,"summary":"Higher risk because the pull request raises the limit."}`,
@@ -113,7 +113,7 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	assert.Equal(t, "Assess risk", automation.NodeName)
 
 	require.NoError(t, db.Model(nodeExecution).Update("state", models.CanvasNodeExecutionStateFinished).Error)
-	ownerRec := postPlanningRunner(t, server, ownerToken, "/api/v1/runner/tasks/owner", `{"user":"`+r.User.String()+`","reason":"Owns pkg."}`)
+	ownerRec := assignRunnerOwner(t, server, ownerToken, `{"user":"`+r.User.String()+`","reason":"Owns pkg."}`)
 	assert.Equal(t, http.StatusForbidden, ownerRec.Code)
 	late := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
 		`{"check":"risk","score":1,"summary":"Lower risk because the pull request is introducing user interface changes only."}`,

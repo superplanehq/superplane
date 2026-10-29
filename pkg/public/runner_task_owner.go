@@ -3,6 +3,7 @@ package public
 import (
 	"net/http"
 
+	"github.com/google/uuid"
 	runner "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,7 +27,13 @@ func (s *Server) taskOwnerTarget(w http.ResponseWriter, r *http.Request) (*taskO
 		http.Error(w, "Task owner scope is invalid", http.StatusForbidden)
 		return nil, false
 	}
-	target, err := s.loadTaskOwnerTarget(r.Context(), scope.OrganizationID, scope.FactoryID, scope.WorkOrderID, "")
+	return s.openTaskOwnerTarget(w, r, scope.OrganizationID, scope.FactoryID, scope.WorkOrderID)
+}
+
+// openTaskOwnerTarget loads a task that an agent may still change. A closed or
+// archived task keeps its owners.
+func (s *Server) openTaskOwnerTarget(w http.ResponseWriter, r *http.Request, orgID, factoryID, orderID uuid.UUID) (*taskOwnerTarget, bool) {
+	target, err := s.loadTaskOwnerTarget(r.Context(), orgID, factoryID, orderID, "")
 	if err != nil {
 		writeMergeConfidenceLookupError(w, err)
 		return nil, false
