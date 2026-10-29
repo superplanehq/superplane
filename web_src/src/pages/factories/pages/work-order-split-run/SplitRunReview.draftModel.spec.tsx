@@ -189,6 +189,20 @@ describe("SplitRunReview draft model select", () => {
     expect(onChange).toHaveBeenNthCalledWith(4, { model: "claude-haiku-4-5", thinkingLevel: "" });
   });
 
+  it("clears a stored thinking level that the model does not support", () => {
+    const onChange = vi.fn();
+    renderDraftFooter(vi.fn(), "claude-sonnet-4-6", onChange, false, "max");
+
+    expect(onChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "" });
+  });
+
+  it("keeps a stored thinking level that the model supports", () => {
+    const onChange = vi.fn();
+    renderDraftFooter(vi.fn(), "claude-sonnet-4-6", onChange, false, "high");
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("disables the model chevron when Start is disabled", () => {
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, vi.fn(), true);
 

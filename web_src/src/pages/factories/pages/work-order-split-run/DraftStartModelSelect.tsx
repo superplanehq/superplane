@@ -1,4 +1,5 @@
 import { Bot, ChevronDown } from "lucide-react";
+import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -57,6 +58,14 @@ export function DraftStartModelSelect({
   const thinking = thinkingOptions(levels, { withDefault: false });
   const selectedThinking = supportedThinkingLevel(thinkingLevel, levels);
   const closedLabel = modelNameWithThinking(selectedName, selectedThinking);
+  const catalogLoaded = runnerModels !== undefined;
+
+  // A refreshed catalog can drop the chosen level. Clear it so Start never sends a hidden choice.
+  useEffect(() => {
+    if (catalogLoaded && thinkingLevel !== selectedThinking) {
+      onChange({ model, thinkingLevel: selectedThinking });
+    }
+  }, [catalogLoaded, model, thinkingLevel, selectedThinking, onChange]);
   const showName = appearance !== "icon";
 
   return (

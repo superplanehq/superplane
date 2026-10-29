@@ -258,11 +258,11 @@ func dispatchWorkOrderOnLineTx(
 
 // validateLineDispatchModel checks the Start model and thinking overrides.
 // A selected model must be available on the line and must support the
-// thinking level. With Auto, each runner keeps its own model, so the CLI of
-// each runner must accept the thinking level.
+// thinking level. The thinking level also reaches the runners that keep
+// their own model, so the CLI of every runner on the line must accept it.
 func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string) error {
 	if model == "" {
-		return validateAutoDispatchThinking(tx, line, thinking)
+		return validateDispatchThinkingForRunners(tx, line, thinking)
 	}
 	options, _, err := listLineRunnerModelOptions(tx, orgID, factoryID, line.Name)
 	if err != nil {
@@ -272,13 +272,13 @@ func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *mo
 	if index < 0 {
 		return invalidArgument("model is not available on this line")
 	}
-	if !dispatchThinkingOverridesLevel(thinking) || slices.Contains(options[index].ThinkingLevels, thinking) {
-		return nil
+	if dispatchThinkingOverridesLevel(thinking) && !slices.Contains(options[index].ThinkingLevels, thinking) {
+		return invalidArgument("thinking level is not available for this model")
 	}
-	return invalidArgument("thinking level is not available for this model")
+	return validateDispatchThinkingForRunners(tx, line, thinking)
 }
 
-func validateAutoDispatchThinking(tx *gorm.DB, line *models.FactoryLine, thinking string) error {
+func validateDispatchThinkingForRunners(tx *gorm.DB, line *models.FactoryLine, thinking string) error {
 	if !dispatchThinkingOverridesLevel(thinking) {
 		return nil
 	}

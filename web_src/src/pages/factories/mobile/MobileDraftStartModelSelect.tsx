@@ -1,4 +1,5 @@
 import { Check, ChevronDown } from "lucide-react";
+import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
@@ -47,6 +48,14 @@ export function MobileDraftStartModelSelect({
   const thinking = thinkingOptions(levelsFor(model), { withDefault: false });
   const selectedThinking = supportedThinkingLevel(thinkingLevel, levelsFor(model));
   const closedLabel = modelNameWithThinking(selectedName, selectedThinking);
+  const catalogLoaded = models.data?.models !== undefined;
+
+  // A refreshed catalog can drop the chosen level. Clear it so Start never sends a hidden choice.
+  useEffect(() => {
+    if (catalogLoaded && thinkingLevel !== selectedThinking) {
+      onChange({ model, thinkingLevel: selectedThinking });
+    }
+  }, [catalogLoaded, model, thinkingLevel, selectedThinking, onChange]);
 
   return (
     <DropdownMenu>

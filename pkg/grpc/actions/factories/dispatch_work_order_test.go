@@ -139,6 +139,38 @@ func TestDispatchThinkingLevelMustBeSupportedBySelectedModel(t *testing.T) {
 	assert.Equal(t, "max", response.Order.LineDispatches[0].ThinkingLevel)
 }
 
+func TestDispatchThinkingLevelWithModelMustBeAcceptedByEveryLineRunner(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-opus-5-5")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	claudeApp := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "hosted", "claude-opus-5-5")
+	codexApp := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "integration", "")
+	steps := []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: claudeApp.ID, Entrypoint: "start"},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: codexApp.ID, Entrypoint: "start"},
+	}
+	line, err := factory.CreateLine(db, "ship", steps)
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: "claude-opus-5-5", ThinkingLevel: "max",
+	})
+	assertDispatchRejected(t, db, order, err)
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: "claude-opus-5-5", ThinkingLevel: "high",
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+}
+
 func assertDispatchRejected(t *testing.T, db *gorm.DB, order *models.FactoryWorkOrder, err error) {
 	t.Helper()
 	require.Error(t, err)
