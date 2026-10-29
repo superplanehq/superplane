@@ -35,6 +35,7 @@ const models = [
     model: { id: "x-ai/grok-4.7", name: "x-ai/grok-4.7" },
     key: "hosted::openrouter::x-ai/grok-4.7",
     label: "x-ai/grok-4.7",
+    thinkingLevels: [],
   },
 ];
 const pullRequestAction: IntegrationsCapabilityDefinition = {
