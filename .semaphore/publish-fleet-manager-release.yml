@@ -63,16 +63,6 @@ blocks:
                 --sha "$SEMAPHORE_GIT_SHA" \
                 --output /tmp/fleet-manager-release-notes.md \
                 --github-authors
-            - |
-              set -euo pipefail
-              release_dir="build/fleet-manager/$RELEASE_VERSION"
-              node release/component-release.js stage-github-release \
-                --component fleet-manager \
-                --version "$RELEASE_VERSION" \
-                --sha "$SEMAPHORE_GIT_SHA" \
-                --directory "$release_dir" \
-                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,fleet-manager-chart-${RELEASE_VERSION#v}.tgz,checksums.txt \
-                --release-id-file /tmp/github-release-id
             - docker pull "$SKOPEO_CONTAINER_IMAGE"
             - mkdir -m 700 /tmp/ghcr-auth
             - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/fleet-manager/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
@@ -117,6 +107,17 @@ blocks:
               bash release/fleet-manager/publish-chart.sh \
                 "$RELEASE_VERSION" \
                 "build/fleet-manager/$RELEASE_VERSION/fleet-manager-chart-${RELEASE_VERSION#v}.tgz"
+            # The chart must be on ghcr before GitHub has a release to publish.
+            - |
+              set -euo pipefail
+              release_dir="build/fleet-manager/$RELEASE_VERSION"
+              node release/component-release.js stage-github-release \
+                --component fleet-manager \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --directory "$release_dir" \
+                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,fleet-manager-chart-${RELEASE_VERSION#v}.tgz,checksums.txt \
+                --release-id-file /tmp/github-release-id
             - |
               set -euo pipefail
               release_notes_args=()
