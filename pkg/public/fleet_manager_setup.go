@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -22,9 +23,10 @@ const (
 	// Fallback when the chart does not set a version and GitHub lookup fails.
 	// Keep these equal to componentReleases in the SuperPlane Helm values.
 	defaultStableRunnerVersion       = "v0.2.1"
-	defaultStableFleetManagerVersion = "v0.1.5"
+	defaultStableFleetManagerVersion = "v0.1.7"
 	fleetManagerReleaseTagPrefix     = "fleet-manager/"
-	fleetManagerChartRepository      = "oci://ghcr.io/superplanehq/fleet-manager-chart"
+	fleetManagerChartRepositoryName  = "superplanehq/fleet-manager-chart"
+	fleetManagerChartRepository      = "oci://ghcr.io/" + fleetManagerChartRepositoryName
 	fleetManagerImageRepository      = "ghcr.io/superplanehq/fleet-manager"
 	runnerReleaseURLTemplate         = "https://github.com/superplanehq/superplane/releases/download/runner%2F{version}"
 	runnerReleaseLookupTimeout       = 3 * time.Second
@@ -38,15 +40,16 @@ const (
 )
 
 var (
-	runnerReleaseAPIBase         = "https://api.github.com/repos/superplanehq/superplane"
-	stableRunnerVersionPattern   = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
-	runnerReleaseCacheMu         sync.Mutex
-	runnerReleaseRefreshMu       sync.Mutex
-	cachedRunnerReleaseVersions  []string
-	cachedRunnerReleaseFetchedAt time.Time
-	cachedRunnerReleaseOK        bool
-	cachedRunnerReleaseFailedAt  time.Time
-	cachedRunnerReleaseFailure   error
+	runnerReleaseAPIBase          = "https://api.github.com/repos/superplanehq/superplane"
+	fleetManagerChartRegistryBase = "https://ghcr.io"
+	stableRunnerVersionPattern    = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
+	runnerReleaseCacheMu          sync.Mutex
+	runnerReleaseRefreshMu        sync.Mutex
+	cachedRunnerReleaseVersions   []string
+	cachedRunnerReleaseFetchedAt  time.Time
+	cachedRunnerReleaseOK         bool
+	cachedRunnerReleaseFailedAt   time.Time
+	cachedRunnerReleaseFailure    error
 
 	fleetManagerReleaseCacheMu        sync.Mutex
 	cachedFleetManagerVersions        []string
@@ -216,6 +219,18 @@ func installationFleetManagerVersion(configured string) string {
 	if err != nil || len(published) == 0 {
 		return configured
 	}
+	// A configured pin is a candidate only when its chart exists.
+	// Lookup failure still returns the pin.
+	if slices.Contains(published, configured) {
+		return installationRunnerVersion(configured, published)
+	}
+	exists, chartErr := fleetManagerChartExists(configured)
+	if chartErr != nil {
+		return configured
+	}
+	if !exists {
+		return installationRunnerVersion(published[0], published)
+	}
 	return installationRunnerVersion(configured, published)
 }
 
@@ -262,6 +277,14 @@ func fetchPublishedFleetManagerVersions() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	token, err := fetchFleetManagerRegistryToken(ctx, client)
+	if err != nil {
+		return nil, err
+	}
 
 	published := make([]string, 0, len(candidates))
 	for _, version := range candidates {
@@ -276,9 +299,84 @@ func fetchPublishedFleetManagerVersions() ([]string, error) {
 		if !ok || !stableRunnerVersionPattern.MatchString(confirmed) || confirmed != version {
 			continue
 		}
+		exists, err := fleetManagerChartPublished(ctx, client, token, version)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			continue
+		}
 		published = append(published, version)
 	}
 	return published, nil
+}
+
+func fleetManagerChartExists(version string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), runnerReleaseLookupTimeout)
+	defer cancel()
+
+	client := &http.Client{Timeout: runnerReleaseLookupTimeout}
+	token, err := fetchFleetManagerRegistryToken(ctx, client)
+	if err != nil {
+		return false, err
+	}
+	return fleetManagerChartPublished(ctx, client, token, version)
+}
+
+func fetchFleetManagerRegistryToken(ctx context.Context, client *http.Client) (string, error) {
+	tokenURL := fleetManagerChartRegistryBase + "/token?scope=repository:" + fleetManagerChartRepositoryName + ":pull"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tokenURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "SuperPlane")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected registry token status %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", err
+	}
+	if payload.Token == "" {
+		return "", errors.New("registry token is empty")
+	}
+	return payload.Token, nil
+}
+
+func fleetManagerChartPublished(ctx context.Context, client *http.Client, token, version string) (bool, error) {
+	manifestURL := fleetManagerChartRegistryBase + "/v2/" + fleetManagerChartRepositoryName + "/manifests/" + url.PathEscape(strings.TrimPrefix(version, "v"))
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, manifestURL, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
+	req.Header.Set("User-Agent", "SuperPlane")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected chart status %d", resp.StatusCode)
+	}
 }
 
 func listStableTagVersions(ctx context.Context, client *http.Client, tagPrefix, refPrefix string) ([]string, error) {
