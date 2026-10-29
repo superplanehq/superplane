@@ -1362,6 +1362,7 @@ message CreateFactoryCustomAutomationRequest {
   string factory_id = 1;
   string name = 2;
   FactoryCustomAutomation.Settings settings = 3;
+  string column_key = 4;
 }
 
 message CreateFactoryCustomAutomationResponse {

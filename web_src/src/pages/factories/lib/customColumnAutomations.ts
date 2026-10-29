@@ -26,7 +26,7 @@ export function customColumnAutomations(
     if (!id || skipIds.has(id) || app.columnKey !== columnKey) {
       return [];
     }
-    if (columnKey === "verify" && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID) {
+    if (app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID) {
       const automation = customAutomationColumnAutomation(app, workOrders, runningCountForApp);
       return automation ? [automation] : [];
     }

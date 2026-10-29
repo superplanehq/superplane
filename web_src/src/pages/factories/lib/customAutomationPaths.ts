@@ -9,10 +9,12 @@ export function factoryCustomAutomationSetupPath(
   factoryKey: string,
   lineId: string,
   automationId?: string,
+  columnKey?: "backlog" | "verify",
 ) {
   const params = new URLSearchParams({
     [CUSTOM_AUTOMATION_PARAM]: automationId?.trim() || NEW_CUSTOM_AUTOMATION,
   });
+  if (columnKey) params.set("automationColumn", columnKey);
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}?${params.toString()}`;
 }
 

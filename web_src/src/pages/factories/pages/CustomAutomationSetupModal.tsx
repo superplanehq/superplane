@@ -11,10 +11,12 @@ import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
 export function CustomAutomationSetupModal({
   lineId,
   automationId,
+  columnKey,
   onClose,
 }: {
   lineId: string;
   automationId?: string;
+  columnKey?: "backlog" | "verify";
   onClose: () => void;
 }) {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
@@ -25,6 +27,7 @@ export function CustomAutomationSetupModal({
     factory: factory ?? undefined,
     lineId,
     automationId,
+    columnKey,
   });
   const editing = Boolean(automationId);
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
@@ -85,6 +88,7 @@ export function CustomAutomationSetupModal({
             name={model.name}
             icon={model.icon}
             mode={model.mode}
+            columnKey={model.columnKey}
             draft={model.draft}
             organizationId={organizationId}
             factoryId={factoryId}
