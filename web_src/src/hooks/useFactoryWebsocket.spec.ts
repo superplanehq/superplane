@@ -64,7 +64,7 @@ describe("useFactoryWebsocket", () => {
     const detailKey = factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1");
     const otherKey = factoryQueryKeys.workOrders("org-1", "other-factory");
     queryClient.setQueryData(listKey, [{ id: "order-1" }, { id: "order-2" }]);
-    queryClient.setQueryData(sessionKey, { runnerState: "queued", queueReason: "parallelism_limit" });
+    queryClient.setQueryData(sessionKey, { runnerState: "pending", blockedByParallelismLimit: true });
     queryClient.setQueryData(detailKey, { id: "order-1" });
     queryClient.setQueryData(otherKey, []);
 

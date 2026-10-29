@@ -3242,8 +3242,8 @@ message PlanningSessionSummary {
   PlanningSessionSurvey survey = 5;
   // Integrated runner task state, independent of the agent node state.
   string runner_state = 6;
-  // "parallelism_limit" while a queued task waits for organization capacity.
-  string queue_reason = 7;
+  // True when the organization parallelism limit blocks a pending task.
+  bool blocked_by_parallelism_limit = 7;
 }
 
 message PlanningSession {
@@ -3264,8 +3264,8 @@ message PlanningSession {
   repeated PlanningSessionActivity activities = 15;
   // Integrated runner task state, independent of the agent node state.
   string runner_state = 16;
-  // "parallelism_limit" while a queued task waits for organization capacity.
-  string queue_reason = 17;
+  // True when the organization parallelism limit blocks a pending task.
+  bool blocked_by_parallelism_limit = 17;
 }
 
 enum PlanningSessionKind {
