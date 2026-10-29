@@ -10,12 +10,17 @@ import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPag
 import { SplitRunReview } from "./SplitRunReview";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO, draftStartModelPayload } from "./draftStartModel";
-import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   useFactoryLineRunnerModels: () => ({
-    data: { models: [{ id: "claude-opus-4-6", name: "claude-opus-4-6" }] },
+    data: {
+      models: [
+        { id: "claude-haiku-4-5", name: "claude-haiku-4-5", thinkingLevels: [] },
+        { id: "claude-opus-4-6", name: "claude-opus-4-6", thinkingLevels: ["low", "medium", "high", "max"] },
+        { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6", thinkingLevels: ["low", "medium", "high"] },
+      ],
+    },
     isLoading: false,
   }),
 }));
@@ -46,7 +51,7 @@ function StatefulDraftModelSelect({
   onChange: (next: { model: string; thinkingLevel: string }) => void;
 }) {
   const [model, setModel] = useState(DRAFT_START_MODEL_AUTO);
-  const [thinkingLevel, setThinkingLevel] = useState(THINKING_LEVEL_MEDIUM);
+  const [thinkingLevel, setThinkingLevel] = useState("");
   return (
     <DraftStartModelSelect
       organizationId="org-1"
@@ -68,6 +73,7 @@ function renderDraftFooter(
   selectedModel = DRAFT_START_MODEL_AUTO,
   onChange = vi.fn(),
   startDisabled = false,
+  thinkingLevel = "",
 ) {
   const footer = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer;
   return render(
@@ -83,7 +89,7 @@ function renderDraftFooter(
               factoryId="factory-1"
               lineName="ship"
               model={selectedModel}
-              thinkingLevel={THINKING_LEVEL_MEDIUM}
+              thinkingLevel={thinkingLevel}
               onChange={onChange}
             />
           }
@@ -98,7 +104,7 @@ describe("SplitRunReview draft model select", () => {
     renderDraftFooter(vi.fn());
 
     const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
     expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
@@ -124,37 +130,44 @@ describe("SplitRunReview draft model select", () => {
     expect(draftStartModelPayload(DRAFT_START_MODEL_AUTO)).toBeUndefined();
   });
 
-  it("lists a runner model the user can pick", async () => {
+  it("lists a runner model the user can pick and hides Thinking for Auto", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
     expect(screen.getByTestId("split-run-draft-model-list")).toHaveTextContent("Auto");
-    expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Medium");
+    expect(screen.queryByTestId("split-run-draft-thinking")).not.toBeInTheDocument();
     await selectFlyoutOption(user, "split-run-draft-model-list", "claude-opus-4-6");
-    expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: THINKING_LEVEL_MEDIUM });
+    expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: "" });
   });
 
-  it("lists thinking levels the user can pick", async () => {
+  it("lists the thinking levels of the selected model", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
+    renderDraftFooter(vi.fn(), "claude-opus-4-6", onChange);
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
-    expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Medium");
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6" }));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     expect(await screen.findByRole("menuitem", { name: "Low" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Medium" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "High" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Auto" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Max" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Minimal" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Default" })).not.toBeInTheDocument();
-    await selectFlyoutOption(user, "split-run-draft-thinking", "High");
-    expect(onChange).toHaveBeenCalledWith({ model: DRAFT_START_MODEL_AUTO, thinkingLevel: "high" });
-    expect(screen.getByTestId("split-run-draft-model-list")).toBeInTheDocument();
+    await selectFlyoutOption(user, "split-run-draft-thinking", "Max");
+    expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: "max" });
   });
 
-  it("keeps the picked thinking level when the model changes", async () => {
+  it("hides Thinking for a model without thinking levels", async () => {
+    const user = userEvent.setup();
+    renderDraftFooter(vi.fn(), "claude-haiku-4-5", vi.fn(), false, "high");
+
+    await user.click(screen.getByRole("button", { name: "Model: claude-haiku-4-5" }));
+    expect(screen.queryByTestId("split-run-draft-thinking")).not.toBeInTheDocument();
+  });
+
+  it("keeps the picked thinking level only while the model supports it", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(
@@ -165,28 +178,27 @@ describe("SplitRunReview draft model select", () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
-    await selectFlyoutOption(user, "split-run-draft-thinking", "High");
+    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
     await selectFlyoutOption(user, "split-run-draft-model-list", "claude-opus-4-6");
-    expect(onChange).toHaveBeenNthCalledWith(1, { model: DRAFT_START_MODEL_AUTO, thinkingLevel: "high" });
+    await selectFlyoutOption(user, "split-run-draft-thinking", "High");
+    await selectFlyoutOption(user, "split-run-draft-model-list", "claude-sonnet-4-6");
+    await selectFlyoutOption(user, "split-run-draft-model-list", "claude-haiku-4-5");
+    expect(onChange).toHaveBeenNthCalledWith(1, { model: "claude-opus-4-6", thinkingLevel: "" });
     expect(onChange).toHaveBeenNthCalledWith(2, { model: "claude-opus-4-6", thinkingLevel: "high" });
+    expect(onChange).toHaveBeenNthCalledWith(3, { model: "claude-sonnet-4-6", thinkingLevel: "high" });
+    expect(onChange).toHaveBeenNthCalledWith(4, { model: "claude-haiku-4-5", thinkingLevel: "" });
   });
 
   it("disables the model chevron when Start is disabled", () => {
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, vi.fn(), true);
 
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeDisabled();
   });
 
   it("shows Medium after the model name on the closed ghost box", () => {
     render(
-      <DraftStartModelSelect
-        model="claude-opus-4-6"
-        thinkingLevel={THINKING_LEVEL_MEDIUM}
-        onChange={vi.fn()}
-        appearance="ghost"
-      />,
+      <DraftStartModelSelect model="claude-opus-4-6" thinkingLevel="medium" onChange={vi.fn()} appearance="ghost" />,
     );
 
     expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toHaveTextContent(
@@ -196,12 +208,7 @@ describe("SplitRunReview draft model select", () => {
 
   it("shows Medium after the model name on the closed labeled box", () => {
     render(
-      <DraftStartModelSelect
-        model="claude-opus-4-6"
-        thinkingLevel={THINKING_LEVEL_MEDIUM}
-        onChange={vi.fn()}
-        appearance="labeled"
-      />,
+      <DraftStartModelSelect model="claude-opus-4-6" thinkingLevel="medium" onChange={vi.fn()} appearance="labeled" />,
     );
 
     expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toHaveTextContent(
@@ -221,7 +228,7 @@ describe("SplitRunReview draft model select", () => {
   });
 
   it("keeps the icon control free of visible thinking text", () => {
-    render(<DraftStartModelSelect model="claude-opus-4-6" thinkingLevel={THINKING_LEVEL_MEDIUM} onChange={vi.fn()} />);
+    render(<DraftStartModelSelect model="claude-opus-4-6" thinkingLevel="medium" onChange={vi.fn()} />);
 
     const button = screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" });
     expect(button).not.toHaveTextContent("Medium");

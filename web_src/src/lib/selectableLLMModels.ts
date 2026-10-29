@@ -23,6 +23,8 @@ export type SelectableLLMModel = {
   model: SelectableLLMNamedID;
   key: string;
   label: string;
+  /** Thinking levels that the model supports. Empty means that the model has no thinking control. */
+  thinkingLevels: string[];
 };
 
 export function selectableLLMModelKey(source: string, provider: string, model: string): string {
@@ -135,13 +137,17 @@ export function defaultByokRunnerModel(current: string, provider: string, modelI
 export function byokRunnerModelOptions(
   models: SelectableLLMModel[],
   current: string,
-): Array<{ value: string; label: string }> {
-  const options = models.map((model) => ({ value: model.model.id, label: model.label }));
+): Array<{ value: string; label: string; thinkingLevels: string[] }> {
+  const options = models.map((model) => ({
+    value: model.model.id,
+    label: model.label,
+    thinkingLevels: model.thinkingLevels,
+  }));
   const selected = concreteClaudeModelId(current.trim());
   if (selected === "" || options.some((option) => option.value === selected)) {
     return options;
   }
-  return [{ value: selected, label: selected }, ...options];
+  return [{ value: selected, label: selected, thinkingLevels: [] }, ...options];
 }
 
 export function selectableLLMModelsFromResponse(
@@ -151,6 +157,7 @@ export function selectableLLMModelsFromResponse(
     model?: { id?: string; name?: string };
     key?: string;
     label?: string;
+    thinkingLevels?: string[];
   }>,
   sources?: SelectableLLMSourceID[],
 ): SelectableLLMModel[] {
@@ -182,6 +189,7 @@ function selectableLLMModelFromResponse(item: {
   model?: { id?: string; name?: string };
   key?: string;
   label?: string;
+  thinkingLevels?: string[];
 }): SelectableLLMModel | undefined {
   const key = item.key?.trim() ?? "";
   const source = selectableNamedID(item.source);
@@ -196,6 +204,7 @@ function selectableLLMModelFromResponse(item: {
     model,
     key,
     label: item.label?.trim() || model.id,
+    thinkingLevels: item.thinkingLevels ?? [],
   };
 }
 
