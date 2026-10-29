@@ -19,7 +19,11 @@ async function fakeRunnerAPI(t) {
       requests.push({ method: req.method, url: req.url, auth: req.headers.authorization, body });
       res.setHeader("Content-Type", "application/json");
       if (req.url === "/api/v1/runner/tools") {
-        res.end(JSON.stringify({ tools: ["suggest_owners", "assign_owner"] }));
+        res.end(
+          JSON.stringify({
+            tools: ["suggest_owners", "assign_owner", "list_tasks", "create_task", "close_task", "remove_artifact"],
+          }),
+        );
         return;
       }
       res.end(JSON.stringify({ ok: true, url: req.url }));
@@ -93,7 +97,7 @@ for (const [name, framing] of Object.entries(framings)) {
     const list = await request("tools/list", {});
     assert.deepEqual(
       list.result.tools.map((tool) => tool.name),
-      ["suggest_owners", "assign_owner"],
+      ["suggest_owners", "assign_owner", "list_tasks", "create_task", "close_task", "remove_artifact"],
     );
 
     const suggest = await request("tools/call", { name: "suggest_owners", arguments: { paths: ["pkg/a.go"] } });
@@ -102,12 +106,28 @@ for (const [name, framing] of Object.entries(framings)) {
     const assign = await request("tools/call", { name: "assign_owner", arguments: { user: "ana", reason: "Owns pkg" } });
     assert.equal(assign.result.structuredContent.url, "/api/v1/runner/task/owner");
 
+    const listed = await request("tools/call", { name: "list_tasks", arguments: { state: "open", limit: 5 } });
+    assert.equal(listed.result.structuredContent.url, "/api/v1/runner/tasks?state=open&limit=5");
+
+    const created = await request("tools/call", { name: "create_task", arguments: { title: "Ship it" } });
+    assert.equal(created.result.structuredContent.url, "/api/v1/runner/tasks");
+
+    const closed = await request("tools/call", { name: "close_task", arguments: { result: "rejected" } });
+    assert.equal(closed.result.structuredContent.url, "/api/v1/runner/task/close");
+
+    const removed = await request("tools/call", { name: "remove_artifact", arguments: { title: "PLAN.md" } });
+    assert.equal(removed.result.structuredContent.url, "/api/v1/runner/task/artifacts");
+
     const calls = api.requests.filter((req) => req.url !== "/api/v1/runner/tools");
     assert.deepEqual(
-      calls.map((req) => [req.method, req.url, req.auth, JSON.parse(req.body)]),
+      calls.map((req) => [req.method, req.url, req.auth, JSON.parse(req.body || "{}")]),
       [
         ["POST", "/api/v1/runner/task/suggest-owners", "Bearer runner-token", { paths: ["pkg/a.go"] }],
         ["PUT", "/api/v1/runner/task/owner", "Bearer runner-token", { user: "ana", reason: "Owns pkg" }],
+        ["GET", "/api/v1/runner/tasks?state=open&limit=5", "Bearer runner-token", {}],
+        ["POST", "/api/v1/runner/tasks", "Bearer runner-token", { title: "Ship it", description: "" }],
+        ["POST", "/api/v1/runner/task/close", "Bearer runner-token", { result: "rejected" }],
+        ["DELETE", "/api/v1/runner/task/artifacts", "Bearer runner-token", { title: "PLAN.md" }],
       ],
     );
   });
