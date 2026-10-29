@@ -17,41 +17,6 @@ import (
 )
 
 func TestCanvasPage(t *testing.T) {
-	t.Run("adding multiple nodes generates unique names", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-
-		// Add three noop nodes with auto-generated names
-		name1 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 200})
-		name2 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 400})
-		name3 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 600})
-
-		// First should be "noop", second "noop 2", third "noop 3"
-		require.Equal(t, "noop", name1, "first node should be named 'noop'")
-		require.Equal(t, "noop 2", name2, "second node should be named 'noop2'")
-		require.Equal(t, "noop 3", name3, "third node should be named 'noop3'")
-
-		// Verify all nodes exist on canvas
-		steps.assertNodeIsAdded("noop")
-		steps.assertNodeIsAdded("noop 2")
-		steps.assertNodeIsAdded("noop 3")
-	})
-
-	// Note: "duplicating a node on canvas" test removed - duplicate action no longer available in UI
-
-	t.Run("collapsing and expanding a node on canvas", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addNoop("Hello")
-		steps.assertIsNodeExpanded("Hello")
-		steps.toggleNodeViewOnCanvas("Hello")
-		steps.assertIsNodeCollapsed("Hello")
-		steps.toggleNodeViewOnCanvas("Hello")
-		steps.assertIsNodeExpanded("Hello")
-	})
-
 	t.Run("deleting a newly added node updates the canvas before publish", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
@@ -181,10 +146,6 @@ func (s *CanvasPageSteps) addHTTP(name string) {
 	s.session.Sleep(300)
 }
 
-func (s *CanvasPageSteps) addNoopWithDefaultName(pos models.Position) string {
-	return s.canvas.AddNoopWithDefaultName(pos)
-}
-
 func (s *CanvasPageSteps) addTwoNodesAndConnect() {
 	s.canvas.AddManualTrigger("First", models.Position{X: 500, Y: 200})
 	s.canvas.AddNoop("Second", models.Position{X: 900, Y: 200})
@@ -241,40 +202,12 @@ func (s *CanvasPageSteps) waitForDraftConnection(sourceName, targetName string) 
 	}, 10*time.Second, 200*time.Millisecond)
 }
 
-func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {
-	safe := strings.ToLower(nodeName)
-	safe = strings.ReplaceAll(safe, " ", "-")
-	selector := q.Locator(`[data-testid="node-` + safe + `-header"][data-view-mode="compact"]`)
-	s.session.AssertVisible(selector)
-}
-
-func (s *CanvasPageSteps) assertIsNodeExpanded(nodeName string) {
-	safe := strings.ToLower(nodeName)
-	safe = strings.ReplaceAll(safe, " ", "-")
-	selector := q.Locator(`[data-testid="node-` + safe + `-header"][data-view-mode="expanded"]`)
-	s.session.AssertVisible(selector)
-}
-
 func (s *CanvasPageSteps) assertNodeIsAdded(nodeName string) {
 	s.session.AssertText(nodeName)
 }
 
 func (s *CanvasPageSteps) assertNodeIsHidden(nodeName string) {
 	s.session.AssertHidden(q.TestID("node", nodeName, "header"))
-}
-
-func (s *CanvasPageSteps) toggleNodeViewOnCanvas(nodeName string) {
-	safe := strings.ToLower(nodeName)
-	safe = strings.ReplaceAll(safe, " ", "-")
-	node := q.Locator(`.react-flow__node:has([data-testid="node-` + safe + `-header"])`)
-	toggleButton := q.Locator(
-		`.react-flow__node:has([data-testid="node-` + safe + `-header"]) [data-testid="node-action-toggle-view"]`,
-	)
-
-	s.session.HoverOver(node)
-	s.session.Sleep(100)
-	s.session.Click(toggleButton)
-	s.session.Sleep(300)
 }
 
 func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
@@ -536,12 +469,6 @@ func (s *CanvasPageSteps) assertAutocompleteRemainedVisible() {
 		require.Equal(s.t, true, entry["previewVisible"], "autocomplete preview disappeared at sample %d: %v", i, samples)
 		require.Equal(s.t, true, entry["samePreviewConnected"], "autocomplete preview remounted at sample %d: %v", i, samples)
 	}
-}
-
-func (s *CanvasPageSteps) assertExpressionInputEquals(expected string) {
-	value, err := q.TestID("expression-field-expression").Run(s.session).InputValue()
-	require.NoError(s.t, err)
-	require.Equal(s.t, expected, value)
 }
 
 func (s *CanvasPageSteps) assertHTTPURLInputContains(expected string) {

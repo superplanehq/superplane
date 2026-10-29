@@ -20,7 +20,6 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
-	"gorm.io/datatypes"
 )
 
 type CanvasSteps struct {
@@ -613,63 +612,6 @@ func (s *CanvasSteps) Create() {
 	s.Visit()
 }
 
-func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
-	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
-	require.NoError(s.t, err)
-
-	startNodeID := "start-trigger"
-	outputNodeID := "noop-output"
-
-	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
-		{
-			NodeID: startNodeID,
-			Name:   "Start",
-			Type:   models.NodeTypeTrigger,
-			Ref: datatypes.NewJSONType(models.NodeRef{
-				Trigger: &models.TriggerRef{Name: "start"},
-			}),
-			Configuration: datatypes.NewJSONType(map[string]any{
-				"templates": []any{
-					map[string]any{
-						"name": "Hello World",
-						"payload": map[string]any{
-							"message": `{{ parameters["message"] }}`,
-						},
-						"parameters": []any{
-							map[string]any{
-								"name": "message",
-								"type": "string",
-							},
-						},
-					},
-				},
-			}),
-			Position: datatypes.NewJSONType(models.Position{X: 600, Y: 200}),
-		},
-		{
-			NodeID: outputNodeID,
-			Name:   "Output",
-			Type:   models.NodeTypeComponent,
-			Ref: datatypes.NewJSONType(models.NodeRef{
-				Component: &models.ComponentRef{Name: "noop"},
-			}),
-			Configuration: datatypes.NewJSONType(map[string]any{}),
-			Position:      datatypes.NewJSONType(models.Position{X: 1000, Y: 200}),
-		},
-	}, []models.Edge{
-		{SourceID: startNodeID, TargetID: outputNodeID, Channel: "default"},
-	})
-	s.WorkflowID = canvas.ID
-
-	err = database.Conn().
-		Model(&models.Canvas{}).
-		Where("id = ?", s.WorkflowID).
-		Update("name", s.CanvasName).Error
-	require.NoError(s.t, err)
-
-	s.Visit()
-}
-
 func (s *CanvasSteps) Visit() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.WorkflowID.String())
 }
@@ -786,27 +728,6 @@ func (s *CanvasSteps) AddNote() {
 	s.session.Sleep(300)
 }
 
-// AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
-func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
-	s.OpenBuildingBlockCategory("Debugging")
-
-	source := q.TestID("building-block-noop")
-	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(500)
-
-	s.selectLatestNoopNode()
-
-	// Get the auto-generated name from the input field
-	nameInput := q.TestID("node-name-input")
-	loc := nameInput.Run(s.session)
-	generatedName, err := loc.InputValue()
-	require.NoError(s.t, err)
-
-	s.session.Sleep(300)
-
-	return generatedName
-}
-
 func (s *CanvasSteps) Save() {
 	saveButton := q.TestID("save-canvas-button")
 	loc := saveButton.Run(s.session)
@@ -882,35 +803,6 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	s.openComponentSidebarForLatestBlock("building-block-filter")
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
-	s.session.Sleep(300)
-}
-
-func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
-	s.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-timeGate")
-	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(300)
-	s.openComponentSidebarForLatestBlock("building-block-timeGate")
-
-	s.session.FillIn(q.TestID("node-name-input"), name)
-}
-
-func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
-	s.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-timeGate")
-	s.addBlockFromSidebar(source, pos)
-	s.session.Sleep(300)
-	s.openComponentSidebarForLatestBlock("building-block-timeGate")
-
-	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.session.FillIn(q.TestID("time-field-timerange-start"), "00:00")
-	s.session.FillIn(q.TestID("time-field-timerange-end"), "23:59")
-
-	s.session.Click(q.TestID("field-timezone-select"))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
-
 	s.session.Sleep(300)
 }
 
@@ -1007,10 +899,6 @@ func (s *CanvasSteps) userStagingYAMLContainsNodeName(nodeName string) bool {
 	return false
 }
 
-func (s *CanvasSteps) draftStagingYAMLContainsNodeName(_ uuid.UUID, nodeName string) bool {
-	return s.userStagingYAMLContainsNodeName(nodeName)
-}
-
 func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {
 	sourceNodeID := s.waitForDraftNodeID(sourceName)
 	targetNodeID := s.waitForDraftNodeID(targetName)
@@ -1073,26 +961,6 @@ func (s *CanvasSteps) StartEditingNode(name string) {
 	s.session.Sleep(300)
 }
 
-func (s *CanvasSteps) RunManualTrigger(name string) {
-	// Use the Start node's template Run button (in the default payload template) instead of the removed header Run button
-	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
-	s.session.Click(startTemplateRun)
-	s.session.Click(q.TestID("emit-event-submit-button"))
-}
-
-func (s *CanvasSteps) RunParameterizedManualTrigger(name string, parameters map[string]string) {
-	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
-	s.session.Click(startTemplateRun)
-
-	for paramName, value := range parameters {
-		// The element id carries a React useId prefix (unique per rendered
-		// form), so target the stable data-testid hook instead.
-		s.session.FillIn(q.Locator(`[data-testid="start-run-param-`+paramName+`"]`), value)
-	}
-
-	s.session.Click(q.TestID("emit-event-submit-button"))
-}
-
 func (s *CanvasSteps) EmitManualTrigger(name string) {
 	node := s.GetNodeFromDB(name)
 	context := contexts.NewEventContext(database.Conn(), node, nil, func(events []models.CanvasEvent) {
@@ -1102,19 +970,6 @@ func (s *CanvasSteps) EmitManualTrigger(name string) {
 	})
 
 	require.NoError(s.t, context.Emit("manual.run", map[string]any{"message": "Hello, World!"}))
-}
-
-func (s *CanvasSteps) RenameNode(name string, newName string) {
-	node := s.GetNodeFromDB(name)
-
-	query := database.Conn().
-		Model(&models.CanvasNode{}).
-		Where("workflow_id = ?", s.WorkflowID).
-		Where("node_id = ?", node.NodeID).
-		Update("name", newName)
-
-	err := query.Error
-	require.NoError(s.t, err)
 }
 
 func (s *CanvasSteps) GetWorkflowFromDB() *models.Canvas {
@@ -1183,47 +1038,12 @@ func (s *CanvasSteps) GetExecutionsForNodeInState(name string, state string) []m
 	return executions
 }
 
-func (s *CanvasSteps) GetExecutionsForNodeInStates(name string, states []string) []models.CanvasNodeExecution {
-	node := s.GetNodeFromDB(name)
-
-	var executions []models.CanvasNodeExecution
-
-	query := database.Conn().
-		Where("workflow_id = ?", s.WorkflowID).
-		Where("node_id = ?", node.NodeID).
-		Where("state IN ?", states).
-		Order("created_at DESC")
-
-	err := query.Find(&executions).Error
-	require.NoError(s.t, err)
-
-	return executions
-}
-
 func (s *CanvasSteps) WaitForExecution(name string, state string, timeout time.Duration) {
 	found := false
 	start := time.Now()
 
 	for time.Since(start) < timeout {
 		executions := s.GetExecutionsForNodeInState(name, state)
-		if len(executions) > 0 {
-			found = true
-			break
-		}
-
-		s.t.Log("waiting for execution of node", name)
-		s.session.Sleep(1000)
-	}
-
-	require.True(s.t, found, "timed out waiting for execution of node %s", name)
-}
-
-func (s *CanvasSteps) WaitForExecutionInStates(name string, states []string, timeout time.Duration) {
-	found := false
-	start := time.Now()
-
-	for time.Since(start) < timeout {
-		executions := s.GetExecutionsForNodeInStates(name, states)
 		if len(executions) > 0 {
 			found = true
 			break
