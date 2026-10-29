@@ -150,11 +150,12 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		return nil, err
 	}
 	if catalog.RequirePaymentMethod {
-		hasCard, err := polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())
+		snapshot, err := polar.NewClientFromEnv().PaymentMethods(ctx, organizationID.String())
 		if err != nil {
 			return nil, polarBillingError(err, "Could not verify the payment method.")
 		}
-		if !hasCard {
+		polar.ObservePaymentMethods(ctx, organizationID, snapshot)
+		if !snapshot.HasUsableMethod() {
 			return nil, grpcerrors.FailedPrecondition(nil, "Add a payment method before selecting this plan.")
 		}
 	}

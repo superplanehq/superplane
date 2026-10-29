@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -192,7 +193,7 @@ func refreshBacklogOrder(
 	if anyFailure {
 		return false, newFailure
 	}
-	return archiveDraftWorkOrderIfCurrent(db, orgID, factory, order.ID, archivedBy)
+	return archiveDraftWorkOrderIfCurrent(ctx, db, orgID, factory, order.ID, archivedBy)
 }
 
 func itemAvailableFromSource(
@@ -212,6 +213,7 @@ func itemAvailableFromSource(
 }
 
 func archiveDraftWorkOrderIfCurrent(
+	ctx context.Context,
 	db *gorm.DB,
 	orgID uuid.UUID,
 	factory *models.Factory,
@@ -241,6 +243,9 @@ func archiveDraftWorkOrderIfCurrent(
 	if archivedOrder == nil {
 		return false, false
 	}
+	captureFactoryProductEvent(ctx, db, factory, orderID, productanalytics.EventFactoryTaskArchived,
+		productanalytics.StableEventID(productanalytics.EventFactoryTaskArchived, orderID.String(), models.FactoryWorkOrderResultArchived),
+		productanalytics.Properties{"archive_source": "backlog_refresh"})
 
 	publishWorkOrderClosed(
 		orgID,

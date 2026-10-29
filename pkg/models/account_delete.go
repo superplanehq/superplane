@@ -130,77 +130,90 @@ func ListOrganizationsPendingAccountDeletion(tx *gorm.DB, accountID uuid.UUID) (
 // owner. Each of those organizations needs a deletion clearance in
 // clearances. The caller makes them before the transaction, because Polar
 // verification must not hold the organization lock. An organization without a
-// clearance stops the deletion.
-func (a *Account) SoftDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]billing.DeletionGuard) error {
+// clearance stops the deletion. The result contains only organizations deleted
+// after checking their owners under lock. An error returns no deletion result.
+func (a *Account) SoftDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]billing.DeletionGuard) ([]Organization, error) {
 	if a == nil {
-		return errors.New("account is required")
+		return nil, errors.New("account is required")
 	}
-	return tx.Transaction(func(inner *gorm.DB) error {
-		return a.softDelete(inner, now, clearances)
+	var deletedOrganizations []Organization
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		var err error
+		deletedOrganizations, err = a.softDelete(inner, now, clearances)
+		return err
 	})
+	if err != nil {
+		return nil, err
+	}
+	return deletedOrganizations, nil
 }
 
-func (a *Account) softDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]billing.DeletionGuard) error {
+func (a *Account) softDelete(tx *gorm.DB, now time.Time, clearances map[uuid.UUID]billing.DeletionGuard) ([]Organization, error) {
 	candidates, err := listOrganizationsForAccountDeletion(tx, a.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	var deletedOrganizations []Organization
 	for _, organization := range candidates {
 		if _, err := LockOrganization(tx, organization.ID); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				continue
 			}
-			return err
+			return nil, err
 		}
 		owners, err := ListOrganizationOwners(tx, organization.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if organizationHasOtherHumanOwner(owners, a.ID) {
 			continue
 		}
 		if err := organization.SoftDelete(tx, clearances[organization.ID]); err != nil {
-			return err
+			return nil, err
 		}
 		if err := SoftDeleteOrganizationFactories(tx, organization.ID); err != nil {
-			return err
+			return nil, err
 		}
+		deletedOrganizations = append(deletedOrganizations, organization)
 	}
 
 	users, err := ListActiveHumanUsersForAccount(tx, a.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for i := range users {
 		email := tombstoneEmail(a.ID, now)
 		if err := users[i].SoftDelete(tx, now, email); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if err := tx.Where("account_id = ?", a.ID).Delete(&AccountProvider{}).Error; err != nil {
-		return err
+		return nil, err
 	}
 	if err := tx.Where("account_id = ?", a.ID).Delete(&AccountPasswordAuth{}).Error; err != nil {
-		return err
+		return nil, err
 	}
 	if err := a.MarkPasswordChangedInTransaction(tx, now); err != nil {
-		return err
+		return nil, err
 	}
 	if err := ClearTokenHashesForAccountInTransaction(tx, a.ID); err != nil {
-		return err
+		return nil, err
 	}
 	if err := ClearAPIKeyTokenHashesCreatedByAccount(tx, a.ID); err != nil {
-		return err
+		return nil, err
 	}
 	if err := DeleteUserAPITokensForAccount(tx, a.ID); err != nil {
-		return err
+		return nil, err
 	}
 
-	return tx.Model(a).Updates(map[string]any{
+	if err := tx.Model(a).Updates(map[string]any{
 		"email":      tombstoneEmail(a.ID, now),
 		"deleted_at": now,
-	}).Error
+	}).Error; err != nil {
+		return nil, err
+	}
+	return deletedOrganizations, nil
 }
 
 func organizationsTouchedByAccount(tx *gorm.DB, accountID uuid.UUID) *gorm.DB {
