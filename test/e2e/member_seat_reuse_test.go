@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -61,6 +62,7 @@ func (s *memberSeatReuseSteps) givenAFourSeatOrganizationIsFull() {
 	s.client.Timeout = 5 * time.Second
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
+	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactories))
 	db := database.DB(s.t.Context())
 	maximum, purchased := 50, 4
 	product := "product_" + uuid.NewString()
