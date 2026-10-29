@@ -937,6 +937,9 @@ func applyPolarSubscriptionSnapshot(tx *gorm.DB, existing *OrganizationBillingPl
 	if err != nil {
 		return nil, err
 	}
+	if err := recordPlanActivation(tx, existing, saved, now); err != nil {
+		return nil, err
+	}
 	if err := grantSubscriptionSignupCredit(tx, saved); err != nil {
 		return nil, err
 	}
@@ -1383,6 +1386,9 @@ func setOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID, catalog *BillingPl
 
 		saved, err = loadedOrganizationBillingPlan(inner, orgID)
 		if err != nil {
+			return err
+		}
+		if err := recordPlanActivation(inner, existing, saved, now); err != nil {
 			return err
 		}
 		if err := addInitialPlanTrialCredit(inner, existing, saved); err != nil {
