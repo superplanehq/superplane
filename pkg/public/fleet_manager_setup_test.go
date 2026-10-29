@@ -33,6 +33,51 @@ func useRunnerReleases(t *testing.T, base string) {
 	})
 }
 
+func useFleetManagerChartRegistry(t *testing.T, base string) {
+	t.Helper()
+	previous := fleetManagerChartRegistryBase
+	fleetManagerChartRegistryBase = base
+	t.Cleanup(func() {
+		fleetManagerChartRegistryBase = previous
+	})
+}
+
+func handleFleetManagerChartRequest(w http.ResponseWriter, r *http.Request, charts map[string]int) bool {
+	if r.URL.Path == "/token" {
+		if r.URL.Query().Get("scope") != "repository:"+fleetManagerChartRepositoryName+":pull" {
+			http.Error(w, "unexpected scope", http.StatusBadRequest)
+			return true
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"token": "registry-token"})
+		return true
+	}
+
+	version, ok := strings.CutPrefix(r.URL.Path, "/v2/"+fleetManagerChartRepositoryName+"/manifests/")
+	if !ok {
+		return false
+	}
+	if r.Method != http.MethodHead {
+		http.Error(w, "unexpected method", http.StatusMethodNotAllowed)
+		return true
+	}
+	if r.Header.Get("Authorization") != "Bearer registry-token" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return true
+	}
+	if r.Header.Get("Accept") != "application/vnd.oci.image.manifest.v1+json" {
+		http.Error(w, "unexpected accept", http.StatusBadRequest)
+		return true
+	}
+	status, found := charts[version]
+	if !found {
+		http.NotFound(w, r)
+		return true
+	}
+	w.WriteHeader(status)
+	return true
+}
+
 func runnerReleaseTagFromRequest(r *http.Request) string {
 	const marker = "/releases/tags/"
 	escaped := r.URL.EscapedPath()
@@ -113,6 +158,12 @@ func TestAdminGetFleetManagerSetupUsesNewestPublishedFleetManagerRelease(t *test
 		"fleet-manager/v0.1.4": {TagName: "fleet-manager/v0.1.4"},
 	}
 	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if handleFleetManagerChartRequest(w, r, map[string]int{
+			"0.1.0": http.StatusOK,
+			"0.1.4": http.StatusOK,
+		}) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		if strings.Contains(r.URL.Path, "matching-refs") {
 			if strings.Contains(r.URL.Path, "fleet-manager") {
@@ -137,6 +188,7 @@ func TestAdminGetFleetManagerSetupUsesNewestPublishedFleetManagerRelease(t *test
 	}))
 	t.Cleanup(releases.Close)
 	useRunnerReleases(t, releases.URL)
+	useFleetManagerChartRegistry(t, releases.URL)
 
 	server, _, token := setupAdminTestServer(t)
 	response := execRequest(server, requestParams{
@@ -152,6 +204,60 @@ func TestAdminGetFleetManagerSetupUsesNewestPublishedFleetManagerRelease(t *test
 	assert.Equal(t, "0.1.4", body.DefaultChartVersion)
 }
 
+func TestAdminGetFleetManagerSetupSkipsFleetManagerReleaseWithoutChart(t *testing.T) {
+	t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
+	t.Setenv("FLEET_MANAGER_STABLE_VERSION", "v0.1.17")
+
+	published := map[string]githubRunnerRelease{
+		"fleet-manager/v0.1.5":  {TagName: "fleet-manager/v0.1.5"},
+		"fleet-manager/v0.1.7":  {TagName: "fleet-manager/v0.1.7"},
+		"fleet-manager/v0.1.17": {TagName: "fleet-manager/v0.1.17"},
+	}
+	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if handleFleetManagerChartRequest(w, r, map[string]int{
+			"0.1.7": http.StatusOK,
+		}) {
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "matching-refs") {
+			if strings.Contains(r.URL.Path, "fleet-manager") {
+				_ = json.NewEncoder(w).Encode([]githubMatchingRef{
+					{Ref: "refs/tags/fleet-manager/v0.1.5"},
+					{Ref: "refs/tags/fleet-manager/v0.1.7"},
+					{Ref: "refs/tags/fleet-manager/v0.1.17"},
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode([]githubMatchingRef{})
+			return
+		}
+
+		release, ok := published[runnerReleaseTagFromRequest(r)]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(release)
+	}))
+	t.Cleanup(releases.Close)
+	useRunnerReleases(t, releases.URL)
+	useFleetManagerChartRegistry(t, releases.URL)
+
+	server, _, token := setupAdminTestServer(t)
+	response := execRequest(server, requestParams{
+		method:     http.MethodGet,
+		path:       "/admin/api/installation/fleet-manager/setup",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	var body fleetManagerSetupResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	assert.Equal(t, "v0.1.7", body.DefaultFleetManagerVersion)
+	assert.Equal(t, "0.1.7", body.DefaultChartVersion)
+}
+
 func TestPublishedFleetManagerVersionsSkipsRepeatLookupAfterFailure(t *testing.T) {
 	var fail atomic.Bool
 	var requests atomic.Int32
@@ -159,6 +265,11 @@ func TestPublishedFleetManagerVersionsSkipsRepeatLookupAfterFailure(t *testing.T
 		requests.Add(1)
 		if fail.Load() {
 			http.Error(w, "unavailable", http.StatusBadGateway)
+			return
+		}
+		if handleFleetManagerChartRequest(w, r, map[string]int{
+			"0.1.4": http.StatusOK,
+		}) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -174,6 +285,7 @@ func TestPublishedFleetManagerVersionsSkipsRepeatLookupAfterFailure(t *testing.T
 	}))
 	t.Cleanup(releases.Close)
 	useRunnerReleases(t, releases.URL)
+	useFleetManagerChartRegistry(t, releases.URL)
 
 	versions, err := publishedFleetManagerVersions()
 	require.NoError(t, err)
