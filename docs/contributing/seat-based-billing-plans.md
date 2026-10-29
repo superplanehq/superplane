@@ -681,3 +681,46 @@ SuperPlane does not cancel duplicate subscriptions or issue refunds automaticall
 Handle any required refund separately. If the refresh fails, retry webhook delivery
 or sync billing after Polar recovers. SuperPlane preserves local state until it
 can verify the stored subscription.
+
+## Cancel the subscription of a deleted organization
+
+SuperPlane blocks organization deletion while its Polar subscription is live.
+Live statuses include `active`, `trialing`, `past_due`, and `paused`.
+A scheduled cancellation with an open paid period is also live.
+An elapsed period alone does not prove that Polar ended the subscription.
+If the stored subscription can still bill, deletion requires Polar to confirm
+a terminal state. Admin-assigned plans and organizations without a Polar
+subscription do not trigger this subscription protection.
+
+Account deletion uses the same protection for organizations with no other owner.
+The subscription check and deletion share the organization lock and transaction
+with subscription updates. Polar HTTP requests run outside these row locks.
+
+Polar can still have a subscription for an organization deleted by an older
+release. A subscription can also start in Polar after deletion commits.
+Polar can keep charging for that subscription. SuperPlane does not apply
+subscription webhooks for the soft-deleted organization. It writes one error
+log for each such webhook and answers Polar with HTTP 202.
+These webhooks do not update the deleted organization's billing data.
+
+1. Search the application logs for `billing.subscription_for_deleted_organization`.
+   The entry has the `organization_id`, `polar_subscription_id`, and
+   `polar_subscription_status` fields.
+2. In the correct Polar environment, open **Customers**.
+   Find the customer whose external ID matches `organization_id`.
+   Open its subscription. Confirm that the subscription ID matches
+   `polar_subscription_id`.
+3. Cancel or revoke the matching subscription in Polar.
+   Cancel it to end it at the period end. Revoke it to end it now.
+   Refunds are a separate decision. Do not refund from this procedure.
+4. Wait for the `subscription.canceled` or `subscription.revoked` webhook.
+   The log entry appears again with the new `polar_subscription_status`.
+   Confirm that the status is `canceled` or `revoked`.
+   For cancellation at period end, wait until the paid period ends.
+   Confirm in Polar that the matching subscription is in a terminal state.
+   A `canceled` status with a scheduled cancellation and an open paid period
+   is not yet terminal.
+5. Confirm that Polar shows no later charge for the customer.
+
+To delete an organization with a live subscription, cancel the subscription first.
+Wait for the paid period to end and for Polar to confirm the subscription ended.
