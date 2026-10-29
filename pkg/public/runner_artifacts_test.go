@@ -188,6 +188,7 @@ func TestRunnerArtifactUploadFromPRDiscussion(t *testing.T) {
 	assert.Nil(t, runContext.LineExecution)
 
 	t.Setenv("JWT_SECRET", "test")
+	assertTaskOwnerRunAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
 	environment := runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
 		ID:         nodeExecution.ID,
 		RunID:      run.ID,
@@ -284,6 +285,7 @@ func TestRunnerArtifactUploadFromVisualEvidence(t *testing.T) {
 	assert.Nil(t, runContext.LineExecution)
 
 	t.Setenv("JWT_SECRET", "test")
+	assertTaskOwnerRunAccess(t, newRunnerArtifactTestServer(t, r, jwt.NewSigner("test")), core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
 	environment := runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
 		ID:         nodeExecution.ID,
 		RunID:      run.ID,
@@ -292,6 +294,8 @@ func TestRunnerArtifactUploadFromVisualEvidence(t *testing.T) {
 		BaseURL:    "http://files.test",
 	}, nil, 60, true)
 	assert.True(t, runneraction.HasArtifactUploadToken(environment))
+	assert.True(t, runneraction.HasVisualEvidence(environment))
+	assert.False(t, runneraction.HasPublishLinks(environment))
 
 	otherCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
 		NodeID: nodeID,
@@ -310,6 +314,130 @@ func TestRunnerArtifactUploadFromVisualEvidence(t *testing.T) {
 	createExecutionForCanvasRun(t, otherRun, otherEvent.ID, nodeID)
 	_, err = runneraction.ResolveArtifactRunContext(db, otherRun.ID)
 	assert.ErrorIs(t, err, runneraction.ErrArtifactRunScopeNotFound)
+}
+
+func TestRunnerPublishLinkFromCustomAutomation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BASE_URL", "http://files.test")
+	t.Setenv("JWT_SECRET", "test")
+	signer := jwt.NewSigner("test")
+	server := newRunnerArtifactTestServer(t, r, signer)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Deploy staging", "Publish the staging URL", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/app",
+		Number:     42,
+		URL:        "https://github.com/acme/app/pull/42",
+		Title:      "Deploy staging",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+
+	const nodeID = "verify"
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: nodeID,
+		Name:   "Verify",
+		Type:   models.NodeTypeComponent,
+		Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(
+			models.FactoryAppTemplateCustomAutomationID,
+			1,
+		)),
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factoryModel.ID).Error)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, map[string]any{
+		"type": "github.pullRequest",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	})
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
+	require.NoError(t, err)
+	nodeExecution := createExecutionForCanvasRun(t, run, rootEvent.ID, nodeID)
+
+	runContext, err := runneraction.ResolveArtifactRunContext(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, runContext.WorkOrderID)
+	assert.True(t, runContext.PublishLinks)
+	assertTaskOwnerRunAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
+
+	environment := runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
+		ID:         nodeExecution.ID,
+		RunID:      run.ID,
+		WorkflowID: canvas.ID.String(),
+		NodeID:     nodeID,
+		BaseURL:    "http://files.test",
+	}, nil, 60, false)
+	require.True(t, runneraction.HasArtifactUploadToken(environment))
+	assert.True(t, runneraction.HasPublishLinks(environment))
+	assert.False(t, runneraction.HasVisualEvidence(environment))
+	var token string
+	for _, variable := range environment {
+		if variable.Name == runneraction.EnvSuperplaneArtifactToken {
+			token = variable.Value
+			break
+		}
+	}
+	require.NotEmpty(t, token)
+
+	postLink := func(url string) *httptest.ResponseRecorder {
+		payload, err := json.Marshal(map[string]string{"url": url, "title": "Staging", "key": "staging"})
+		require.NoError(t, err)
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts/links", bytes.NewReader(payload))
+		request.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		return response
+	}
+
+	created := postLink("https://staging.example.com/pr-42")
+	require.Equal(t, http.StatusCreated, created.Code, created.Body.String())
+	updated := postLink("https://staging.example.com/pr-42-b")
+	require.Equal(t, http.StatusOK, updated.Code, updated.Body.String())
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	assert.Equal(t, models.FactoryWorkOrderArtifactTypeLink, artifacts[0].Type)
+	require.NotNil(t, artifacts[0].Key)
+	assert.Equal(t, order.ID.String()+":staging", *artifacts[0].Key)
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(artifacts[0].Data, &data))
+	assert.Equal(t, "https://staging.example.com/pr-42-b", data["url"])
+	assert.Equal(t, "Staging", data["title"])
+
+	events, err := order.ListEvents(db, 20, nil)
+	require.NoError(t, err)
+	added := 0
+	for _, event := range events {
+		if event.Type == factory.EventTypeOrderArtifactAdded {
+			added++
+		}
+	}
+	assert.Equal(t, 1, added)
+
+	rejected := postLink("javascript:alert(1)")
+	assert.Equal(t, http.StatusBadRequest, rejected.Code)
+
+	webhookEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, map[string]any{
+		"type": "github.pullRequest",
+		"data": map[string]any{
+			"repository":   map[string]any{"full_name": "acme/app"},
+			"pull_request": map[string]any{"number": 42},
+		},
+	})
+	webhookRun, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, webhookEvent)
+	require.NoError(t, err)
+	createExecutionForCanvasRun(t, webhookRun, webhookEvent.ID, nodeID)
+	webhookContext, err := runneraction.ResolveArtifactRunContext(db, webhookRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, webhookContext.WorkOrderID)
 }
 
 func newRunnerArtifactTestServer(

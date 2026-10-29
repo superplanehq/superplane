@@ -27,6 +27,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/billing"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -103,6 +104,7 @@ type Server struct {
 	authHandler           *authentication.Handler
 	isDev                 bool
 	licenseService        *licensing.Service
+	codexTokenRefresh     func(context.Context, string) (runner.CodexTokenSet, error)
 }
 
 // SetLicenseService connects the installation license. Without it, the server
@@ -433,6 +435,10 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/credentials", s.handleRunnerCodexSubscriptionCredentials).Methods("GET")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/checkpoint", s.handleRunnerCodexSubscriptionCheckpoint).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/progress", s.handleRunnerCodexSubscriptionProgress).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/refresh", s.handleRunnerCodexSubscriptionRefresh).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/updates", s.handleRunnerPlanningUpdate).Methods("POST")
@@ -440,9 +446,14 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/agent-messages", s.handleRunnerPlanningAgentMessage).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/suggest-owners", s.handleRunnerPlanningSuggestOwners).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/owner", s.handleRunnerPlanningAssignOwner).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", s.handleRunnerPlanningActivity).Methods("PUT")
 	s.Router.HandleFunc("/api/v1/runner/merge-confidence/checks", s.handleRunnerMergeConfidenceCheck).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tasks/suggest-owners", s.handleRunnerTaskSuggestOwners).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tasks/owner", s.handleRunnerTaskAssignOwner).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/artifacts/links", s.handleRunnerArtifactLink).Methods(http.MethodPost)
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
@@ -1173,16 +1184,6 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if billing.Enabled() {
-		err = billing.GrantWelcomeCredit(tx, organization.ID, account.ID)
-		if err != nil {
-			tx.Rollback()
-			log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
-			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-			return
-		}
-	}
-
 	err = tx.Commit().Error
 	if err != nil {
 		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
@@ -1492,11 +1493,6 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	}
 	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
-	}
-	if billing.Enabled() {
-		if err := billing.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
-			return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
-		}
 	}
 
 	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")

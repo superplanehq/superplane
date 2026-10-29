@@ -854,6 +854,8 @@ func TestRunnerPlanningSessionRejectsTaskCreationKind(t *testing.T) {
 		{name: "confidence", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/confidence", body: `{"score":4,"summary":"Clear"}`},
 		{name: "survey", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/surveys", body: `{"questions":[{"prompt":"Priority?","options":["High","Low"]}]}`},
 		{name: "agent message", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/agent-messages", body: `{"text":"Ready."}`},
+		{name: "suggest owners", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/suggest-owners", body: `{"paths":["pkg"]}`},
+		{name: "owner", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/owner", body: `{"user":"octocat","reason":"Owns the code."}`},
 		{name: "activity", method: http.MethodPut, path: "/api/v1/runner/planning-sessions/activities/" + uuid.New().String(), body: `{}`},
 	}
 	for _, request := range requests {
@@ -899,6 +901,8 @@ func TestRunnerPlanningSessionRejectsRunMismatch(t *testing.T) {
 	}{
 		{path: "/api/v1/runner/planning-sessions/specs", body: `{"body":"# Retry refunds"}`},
 		{path: "/api/v1/runner/planning-sessions/agent-messages", body: `{"text":"Ready."}`},
+		{path: "/api/v1/runner/planning-sessions/suggest-owners", body: `{"paths":["pkg"]}`},
+		{path: "/api/v1/runner/planning-sessions/owner", body: `{"user":"octocat","reason":"Owns the code."}`},
 	}
 	for _, request := range requests {
 		req := httptest.NewRequest(http.MethodPost, request.path, bytes.NewBufferString(request.body))

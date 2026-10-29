@@ -41,6 +41,7 @@ function pinActionLabel(pinned: boolean): string {
 
 const ORGANIZATION_COLUMN_LABELS = [
   "Name",
+  "Plan",
   "Automations",
   "Tasks",
   "Done Tasks",
@@ -77,6 +78,13 @@ function OrganizationTableHeader({
   return (
     <tr className="border-b border-slate-100 dark:border-gray-700/70">
       <SortableHeader label="Name" field="name" currentSort={sortBy} currentDirection={sortDirection} onSort={onSort} />
+      <SortableHeader
+        label="Plan"
+        field="plan_name"
+        currentSort={sortBy}
+        currentDirection={sortDirection}
+        onSort={onSort}
+      />
       <SortableHeader
         label="Automations"
         field="canvas_count"
@@ -192,6 +200,9 @@ function OrganizationRow({
           </Button>
         </div>
       </td>
+      <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap dark:text-gray-400">
+        {organization.plan_name || "—"}
+      </td>
       <td className="px-4 py-2.5">
         <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
           <Palette size={13} />
@@ -248,7 +259,7 @@ function OrganizationsTable({
   onTogglePin,
 }: OrganizationsTableProps) {
   return (
-    <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
+    <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-x-auto dark:bg-gray-900 dark:outline-gray-700/70">
       <table className="w-full text-sm">
         <thead>
           <OrganizationTableHeader sortable={!pinned} sortBy={sortBy} sortDirection={sortDirection} onSort={onSort} />

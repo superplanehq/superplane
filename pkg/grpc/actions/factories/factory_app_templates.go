@@ -194,6 +194,12 @@ func factoryTemplateAgentFromIntake(agent *intakeAgent) *factoryTemplateAgent {
 			credentialSource: "hosted",
 		}
 	}
+	if source, _ := agent.Credentials["source"].(string); source == runner.CredentialsSourceSubscription {
+		return &factoryTemplateAgent{
+			component:        "runnerCodex",
+			credentialSource: runner.CredentialsSourceSubscription,
+		}
+	}
 
 	integration, _ := agent.Credentials["integration"].(map[string]any)
 	name, _ := integration["name"].(string)
@@ -432,6 +438,22 @@ func applyFactoryVisualEvidence(node *yaml.Node, includeVisualEvidence *bool) {
 
 func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 	if agent == nil {
+		return
+	}
+	if agent.credentialSource == runner.CredentialsSourceSubscription {
+		switch node.Component {
+		case "runnerClaudeCode", models.SuperPlaneRunnerComponent, "runnerCodex", "runnerOpenRouter":
+		default:
+			return
+		}
+		if node.Configuration == nil {
+			node.Configuration = map[string]any{}
+		}
+		node.Component = "runnerCodex"
+		node.Configuration["credentials"] = map[string]any{"source": runner.CredentialsSourceSubscription}
+		delete(node.Configuration, "model")
+		delete(node.Configuration, "maxTurns")
+		delete(node.Configuration, "llmProvider")
 		return
 	}
 	if node.Component != "runnerClaudeCode" && node.Component != models.SuperPlaneRunnerComponent {

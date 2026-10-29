@@ -117,9 +117,8 @@ type OrganizationLLMCreditSummary struct {
 	WelcomeCreditExpiresAt   *time.Time
 }
 
-// GrantWelcomeCredit grants signup credit once per account. Every account
-// receives $10, valid for 365 days. The grant does not depend on the plan,
-// and credit alone does not permit execution.
+// GrantWelcomeCredit grants $10 once per account, valid for 365 days.
+// Production callers grant credit after plan activation.
 func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
 	return grantWelcomeCredit(tx, orgID, accountID, &BillingPlan{
 		TrialCreditCents: SignupCreditCents,
@@ -1094,4 +1093,29 @@ func stampWelcomeCreditGrantedAt(tx *gorm.DB, accountID uuid.UUID, grantedAt tim
 	return tx.Model(&coremodels.Account{}).
 		Where("id = ? AND welcome_credit_granted_at IS NULL", accountID).
 		Update("welcome_credit_granted_at", grantedAt).Error
+}
+
+func grantSubscriptionSignupCredit(tx *gorm.DB, plan *OrganizationBillingPlan) error {
+	if !BillingEnabled() || !plan.IsActiveBusiness() {
+		return nil
+	}
+	organization, err := coremodels.FindOrganizationByIDInTransaction(tx, plan.OrganizationID.String())
+	if err != nil {
+		return err
+	}
+	if organization.CreatedByAccountID == nil {
+		return nil
+	}
+	var account coremodels.Account
+	err = tx.Where("id = ?", *organization.CreatedByAccountID).First(&account).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if account.HasReceivedWelcomeCredit() {
+		return nil
+	}
+	return GrantWelcomeCredit(tx, organization.ID, account.ID)
 }

@@ -17,8 +17,9 @@ const (
 	UsageKindModel   = "model"
 	UsageKindCompute = "compute"
 
-	UsageFundingSourceBYOK   = "byok"
-	UsageFundingSourceHosted = "hosted"
+	UsageFundingSourceBYOK         = "byok"
+	UsageFundingSourceHosted       = "hosted"
+	UsageFundingSourceSubscription = "subscription"
 
 	UsageProviderAnthropic  = "anthropic"
 	UsageProviderOpenAI     = "openai"
@@ -251,10 +252,10 @@ func fundingSourceIsHosted(source string) bool {
 	return strings.TrimSpace(source) == UsageFundingSourceHosted
 }
 
-// ParseUsageFundingSource accepts hosted or byok. Empty input is an error.
+// ParseUsageFundingSource accepts hosted, byok, or subscription. Empty input is an error.
 func ParseUsageFundingSource(source string) (string, error) {
 	normalized := strings.ToLower(strings.TrimSpace(source))
-	if normalized == UsageFundingSourceHosted || normalized == UsageFundingSourceBYOK {
+	if normalized == UsageFundingSourceHosted || normalized == UsageFundingSourceBYOK || normalized == UsageFundingSourceSubscription {
 		return normalized, nil
 	}
 	return "", fmt.Errorf("unsupported usage funding source: %s", source)

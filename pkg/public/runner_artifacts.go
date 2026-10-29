@@ -176,6 +176,121 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+type runnerArtifactLinkRequest struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+	Key   string `json:"key"`
+}
+
+type runnerArtifactLinkResponse struct {
+	ArtifactID string `json:"artifact_id"`
+	URL        string `json:"url"`
+	Title      string `json:"title"`
+	Key        string `json:"key"`
+}
+
+func (s *Server) handleRunnerArtifactLink(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticateArtifactRunner(w, r)
+	if !ok {
+		return
+	}
+	logger := log.WithFields(log.Fields{
+		"artifact_type": "link",
+		"work_order_id": scope.WorkOrderID,
+		"run_id":        scope.CanvasRunID,
+	})
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	var body runnerArtifactLinkRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		logger.WithError(err).Warn("rejected runner link artifact")
+		http.Error(w, "Invalid link", http.StatusBadRequest)
+		return
+	}
+	linkURL := strings.TrimSpace(body.URL)
+	title := strings.TrimSpace(body.Title)
+	key := strings.TrimSpace(body.Key)
+	if linkURL == "" {
+		http.Error(w, "url is required", http.StatusBadRequest)
+		return
+	}
+	storedKey := scopedArtifactLinkKey(scope.WorkOrderID, key)
+	if len(storedKey) > models.MaxFactoryWorkOrderArtifactKeyBytes {
+		http.Error(w, "key is too long", http.StatusBadRequest)
+		return
+	}
+
+	db := database.DB(r.Context())
+	artifactContext, err := loadRunnerArtifactContext(db, scope)
+	if err != nil {
+		logger.WithError(err).Warn("rejected runner link artifact scope")
+		http.Error(w, "Artifact upload scope is invalid", http.StatusForbidden)
+		return
+	}
+	data := map[string]any{"url": linkURL}
+	if title != "" {
+		data["title"] = title
+	}
+	params := models.FactoryWorkOrderArtifactParams{
+		Type:       models.FactoryWorkOrderArtifactTypeLink,
+		Data:       data,
+		Key:        storedKey,
+		Automation: artifactAutomationRef(artifactContext),
+		Run:        &factory.RunRef{ID: scope.CanvasRunID},
+	}
+	artifact, created, err := artifactContext.Order.UpsertArtifact(db, params)
+	if err != nil {
+		logger.WithError(err).Warn("failed to attach runner link artifact")
+		writeArtifactLinkError(w, err)
+		return
+	}
+	reason := factory.EventTypeOrderArtifactUpdated
+	if created {
+		reason = factory.EventTypeOrderArtifactAdded
+	}
+	if err := messages.PublishFactoryWorkOrderUpdated(scope.FactoryID.String(), scope.WorkOrderID.String(), reason); err != nil {
+		log.WithError(err).Warn("failed to publish runner link artifact update")
+	}
+	logger.WithField("artifact_id", artifact.ID).Info("stored runner link artifact")
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(runnerArtifactLinkResponse{
+		ArtifactID: artifact.ID.String(),
+		URL:        linkURL,
+		Title:      title,
+		Key:        key,
+	}); err != nil {
+		log.WithError(err).Warn("failed to encode runner link artifact response")
+	}
+}
+
+func scopedArtifactLinkKey(workOrderID uuid.UUID, key string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ""
+	}
+	return workOrderID.String() + ":" + key
+}
+
+func writeArtifactLinkError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid) {
+		if strings.Contains(err.Error(), "url") {
+			http.Error(w, "Link URL must be http or https", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "Invalid link", http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactKeyAlreadyExists) {
+		http.Error(w, "Link key is already used", http.StatusConflict)
+		return
+	}
+	http.Error(w, "Failed to attach link", http.StatusInternalServerError)
+}
+
 func cleanupRunnerArtifact(provider blob.Provider, file *models.File, logger *log.Entry) {
 	cleanupContext, cancel := context.WithTimeout(context.Background(), artifactCleanupTTL)
 	defer cancel()

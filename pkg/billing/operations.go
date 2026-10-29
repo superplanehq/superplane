@@ -48,14 +48,6 @@ func InitializeOrganization(tx *gorm.DB, organizationID uuid.UUID) error {
 	return implementation.InitializeOrganization(tx, organizationID)
 }
 
-func GrantWelcomeCredit(tx *gorm.DB, organizationID, accountID uuid.UUID) error {
-	implementation, err := Current()
-	if err != nil {
-		return err
-	}
-	return implementation.GrantWelcomeCredit(tx, organizationID, accountID)
-}
-
 func PrepareDeletion(ctx context.Context, organizationID uuid.UUID) (DeletionGuard, error) {
 	implementation, err := Current()
 	if err != nil {
@@ -102,6 +94,15 @@ func ResolveSeats(tx *gorm.DB, organizationID uuid.UUID) (*SeatUsage, error) {
 		return nil, err
 	}
 	return implementation.ResolveSeats(tx, organizationID)
+}
+
+// ResolveOrganizationPlanSummaries applies current-plan rules, including persisted plan transitions.
+func ResolveOrganizationPlanSummaries(tx *gorm.DB, organizationIDs []uuid.UUID) (map[uuid.UUID]OrganizationPlanSummary, error) {
+	implementation, err := Current()
+	if err != nil {
+		return nil, err
+	}
+	return implementation.ResolveOrganizationPlanSummaries(tx, organizationIDs)
 }
 
 func RecheckSeatCapacity(tx *gorm.DB, organizationID uuid.UUID, cause string) (CapacityAlert, error) {

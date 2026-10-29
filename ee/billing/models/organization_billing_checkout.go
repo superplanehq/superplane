@@ -373,3 +373,10 @@ func optionalString(value string) *string {
 	}
 	return &trimmed
 }
+
+// ListRecentOrganizationBillingCheckouts reads the latest recorded attempts.
+func ListRecentOrganizationBillingCheckouts(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationBillingCheckout, error) {
+	attempts := []OrganizationBillingCheckout{}
+	err := tx.Where("organization_id = ?", orgID).Order("created_at DESC").Order("id DESC").Limit(20).Find(&attempts).Error
+	return attempts, err
+}

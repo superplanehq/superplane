@@ -5,6 +5,8 @@ import type { SortDirection } from "./SortableHeader";
 export interface AdminOrganization {
   id: string;
   name: string;
+  plan_key?: string;
+  plan_name?: string;
   canvas_count: number;
   task_count: number;
   done_task_count: number;
@@ -21,6 +23,7 @@ export type OrganizationSortField =
   | "done_task_count"
   | "member_count"
   | "name"
+  | "plan_name"
   | "remaining_credit_cents"
   | "repository_count"
   | "task_count"
@@ -177,7 +180,7 @@ export function useOrganizationsList() {
       return;
     }
     setSortBy(field);
-    setSortDirection(field === "name" ? "asc" : "desc");
+    setSortDirection(field === "name" || field === "plan_name" ? "asc" : "desc");
   };
 
   const changePage = (pageOffset: number) => {

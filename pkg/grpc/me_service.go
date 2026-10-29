@@ -38,6 +38,10 @@ func (s *MeService) ListTokens(ctx context.Context, req *pb.ListTokensRequest) (
 	return me.ListTokens(ctx)
 }
 
+func (s *MeService) ListCodexUsage(ctx context.Context, req *pb.ListCodexUsageRequest) (*pb.ListCodexUsageResponse, error) {
+	return me.ListCodexUsage(ctx)
+}
+
 func (s *MeService) CreateToken(ctx context.Context, req *pb.CreateTokenRequest) (*pb.CreateTokenResponse, error) {
 	return me.CreateToken(ctx, req)
 }
