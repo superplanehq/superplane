@@ -7,6 +7,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collap
 import { ChevronRight, CircleStop, RotateCw, X } from "lucide-react";
 import { useState } from "react";
 
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_STEP_ACTIONS } from "@/lib/experimentalFeatures";
 import { formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { formatCheckScore, workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { WorkOrderCheckAnalysis } from "../../../WorkOrderCheckDialog";
@@ -21,7 +23,9 @@ import { AgentRunsPage } from "./consoleAgentRuns";
 import { ArtifactsPage } from "./consoleArtifactRows";
 import { runFooterLine, runFooterSpendLabel } from "./consoleCardText";
 import { artifactsPageCount, consolePages, type ConsolePageId } from "./consolePages";
+import type { StepActionRow } from "./consoleStepActions";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
+import { useStepActions } from "./useStepActions";
 
 // Line tabs on the shadcn Tabs primitives, after ReUI c-tabs-2.
 const PANE_TABS_LIST =
@@ -35,9 +39,64 @@ const PAGE_LABEL: Record<ConsolePageId, string> = {
   agent: "Agent runs",
   artifacts: "Artifacts",
   checks: "Checks",
+  actions: "Actions",
 };
 
-export function AutomationCardBody({
+export function AutomationCardBody(props: {
+  queued?: boolean;
+  automation: ConsoleAutomation;
+  phase?: SplitRunPhase;
+  phases?: SplitRunPhase[];
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  onStop?: () => void;
+  onRetry?: () => void;
+  actionBusy: boolean;
+}) {
+  const { organizationId, factoryId, orderId } = props;
+  if (!organizationId || !factoryId || !orderId) {
+    return <AutomationCardBodyView {...props} actionRows={[]} />;
+  }
+  return (
+    <AutomationCardBodyWithActions {...props} organizationId={organizationId} factoryId={factoryId} orderId={orderId} />
+  );
+}
+
+function AutomationCardBodyWithActions(
+  props: Parameters<typeof AutomationCardBody>[0] & {
+    organizationId: string;
+    factoryId: string;
+    orderId: string;
+  },
+) {
+  const { has } = useExperimentalFeature(props.organizationId);
+  if (!has(FEATURE_FACTORY_STEP_ACTIONS)) {
+    return <AutomationCardBodyView {...props} actionRows={[]} />;
+  }
+  return <AutomationCardBodyActions {...props} />;
+}
+
+function AutomationCardBodyActions(
+  props: Parameters<typeof AutomationCardBody>[0] & {
+    organizationId: string;
+    factoryId: string;
+    orderId: string;
+  },
+) {
+  const actionRows = useStepActions(
+    props.organizationId,
+    props.factoryId,
+    props.orderId,
+    props.automation,
+    props.phases ?? [],
+  );
+  return <AutomationCardBodyView {...props} actionRows={actionRows} />;
+}
+
+function AutomationCardBodyView({
   automation,
   phase,
   organizationId,
@@ -48,6 +107,7 @@ export function AutomationCardBody({
   actionBusy,
   phases,
   queued = false,
+  actionRows,
 }: {
   queued?: boolean;
   automation: ConsoleAutomation;
@@ -59,9 +119,10 @@ export function AutomationCardBody({
   onStop?: () => void;
   onRetry?: () => void;
   actionBusy: boolean;
+  actionRows: StepActionRow[];
 }) {
   const { latest, runs } = automation;
-  const pages = consolePages(latest, phase, runs);
+  const pages = consolePages(latest, phase, runs, actionRows.length);
   const [chosen, setChosen] = useState<ConsolePageId>();
   const active = chosen && pages.includes(chosen) ? chosen : pages[0];
   if (compactQueuedRun(queued, runs.length, automation, pages)) {
@@ -72,7 +133,14 @@ export function AutomationCardBody({
       <div className="space-y-3">
         <QueuedRunNote show={queuedNoteWithoutAgentPage(queued, pages)} />
         {pages.includes("agent") ? null : <StageDescription stage={latest} />}
-        <CardPageTabs pages={pages} active={active} stage={latest} runCount={runs.length} onChange={setChosen} />
+        <CardPageTabs
+          pages={pages}
+          active={active}
+          stage={latest}
+          runCount={runs.length}
+          actionCount={actionRows.length}
+          onChange={setChosen}
+        />
         {/* The log stays mounted so live steps and spend keep streaming. */}
         {pages.includes("agent") ? (
           <div className={cn(active !== "agent" && "hidden")}>
@@ -89,6 +157,7 @@ export function AutomationCardBody({
         ) : null}
         {active === "artifacts" ? <ArtifactsPage stage={latest} /> : null}
         {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
+        {active === "actions" ? <ActionsPage rows={actionRows} /> : null}
         <CardRunFooter
           automation={automation}
           phases={phases ?? (phase ? [phase] : [])}
@@ -152,12 +221,14 @@ function CardPageTabs({
   active,
   stage,
   runCount,
+  actionCount,
   onChange,
 }: {
   pages: ConsolePageId[];
   active?: ConsolePageId;
   stage: AutomationStage;
   runCount: number;
+  actionCount: number;
   onChange: (page: ConsolePageId) => void;
 }) {
   // One page needs no chooser: the content renders bare and the header
@@ -171,7 +242,7 @@ function CardPageTabs({
         {pages.map((page) => (
           <TabsTrigger key={page} value={page} className={PANE_TAB}>
             {PAGE_LABEL[page]}
-            <PageTabDetail page={page} stage={stage} runCount={runCount} />
+            <PageTabDetail page={page} stage={stage} runCount={runCount} actionCount={actionCount} />
           </TabsTrigger>
         ))}
       </TabsList>
@@ -277,9 +348,39 @@ function CardFooterActions({
 }
 
 /** Type-specific tab detail: a count on Agent runs, Artifacts, and Checks. */
-function PageTabDetail({ page, stage, runCount }: { page: ConsolePageId; stage: AutomationStage; runCount: number }) {
-  const count = page === "agent" ? runCount : page === "artifacts" ? artifactsPageCount(stage) : stage.checks.length;
+function PageTabDetail({
+  page,
+  stage,
+  runCount,
+  actionCount,
+}: {
+  page: ConsolePageId;
+  stage: AutomationStage;
+  runCount: number;
+  actionCount: number;
+}) {
+  const count =
+    page === "agent"
+      ? runCount
+      : page === "artifacts"
+        ? artifactsPageCount(stage)
+        : page === "actions"
+          ? actionCount
+          : stage.checks.length;
   return <span className="tabular-nums opacity-60">{count}</span>;
+}
+
+function ActionsPage({ rows }: { rows: StepActionRow[] }) {
+  return (
+    <ul className="flex flex-col divide-y divide-border">
+      {rows.map((row) => (
+        <li key={row.id} className="py-2.5 first:pt-0 last:pb-0">
+          <p className="text-[12px] font-medium text-foreground">{row.title}</p>
+          {row.detail ? <p className="mt-1.5 text-[12px] leading-5 text-muted-foreground">{row.detail}</p> : null}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** The stage description always shows above the tabs. It is context, not a page. */

@@ -68,6 +68,10 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
+// FeatureFactoryStepActions shows the Actions timeline on a step card.
+// An organization must enable it.
+const FeatureFactoryStepActions = "factory_step_actions"
+
 func released() *bool {
 	v := true
 	return &v
@@ -88,6 +92,7 @@ var registry = []Feature{
 	{ID: FeatureCodexSubscriptions, Label: "ChatGPT Subscription", Description: "Sign in to ChatGPT once and reuse that subscription on factory Codex runs"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
+	{ID: FeatureFactoryStepActions, Label: "Step actions", Description: "Show agent action reasons on the step card"},
 }
 
 func All() []Feature {

@@ -36,3 +36,6 @@ export const FEATURE_CODEX_SUBSCRIPTIONS = "codex_subscriptions";
 
 /** Organization experimental feature: scheduled task proposals in Backlog. */
 export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
+
+/** Organization experimental feature: Actions timeline on a step card. Off until the organization enables it. */
+export const FEATURE_FACTORY_STEP_ACTIONS = "factory_step_actions";
