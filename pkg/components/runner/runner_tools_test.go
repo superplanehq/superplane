@@ -12,9 +12,10 @@ func TestAllowedRunnerTools(t *testing.T) {
 	assert.Empty(t, AllowedRunnerTools(nil))
 }
 
-func TestEveryFlowCanManageTaskOwners(t *testing.T) {
+func TestEveryFlowCanUseEveryGlobalTool(t *testing.T) {
+	want := []string{"suggest_owners", "assign_owner", "list_tasks", "create_task", "close_task", "remove_artifact"}
 	for _, flow := range []RunnerFlow{RunnerFlowPlanning, RunnerFlowTask, RunnerFlowMergeConfidence} {
-		assert.Equal(t, []string{"suggest_owners", "assign_owner"}, AllowedRunnerTools(ScopesForFlow(flow)), flow)
+		assert.Equal(t, want, AllowedRunnerTools(ScopesForFlow(flow)), flow)
 	}
 	assert.Empty(t, ScopesForFlow("deploy"))
 }
