@@ -51,6 +51,10 @@ func (p *FactoryPullRequest) CreateActivity(tx *gorm.DB, params FactoryPullReque
 		return nil, err
 	}
 
+	order := &FactoryWorkOrder{ID: p.WorkOrderID, OrganizationID: p.OrganizationID, FactoryID: p.FactoryID}
+	if err := order.RequireExecutionOwner(tx, true); err != nil {
+		return nil, err
+	}
 	if err := p.lock(tx); err != nil {
 		return nil, err
 	}

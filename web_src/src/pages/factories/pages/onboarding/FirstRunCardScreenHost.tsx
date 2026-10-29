@@ -65,6 +65,7 @@ export function FirstRunCardScreenHost({
       chrome={chrome}
       sphere={sphere}
       onContinue={() => void continueSetup(false)}
+      onRetryPlans={() => void cardStep.refetch()}
     />
   );
 }

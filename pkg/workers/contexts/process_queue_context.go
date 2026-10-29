@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -45,6 +46,7 @@ func BuildProcessQueueContext(
 	}
 
 	configBuilder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+		WithRunID(queueItem.RunID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
@@ -56,6 +58,10 @@ func BuildProcessQueueContext(
 
 	config, err := configBuilder.Build(node.Configuration.Data())
 	if err != nil {
+		var busy *models.CodexConnectionBusyError
+		if errors.As(err, &busy) {
+			return nil, err
+		}
 		return nil, &ConfigurationBuildError{
 			Err:         err,
 			QueueItem:   queueItem,
@@ -66,6 +72,7 @@ func BuildProcessQueueContext(
 	}
 
 	builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+		WithRunID(queueItem.RunID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithIncomingEventID(&event.ID).
@@ -264,6 +271,7 @@ func resolveQueueNameTemplate(tx *gorm.DB, node *models.CanvasNode, item *models
 	}
 
 	builder := NewNodeConfigurationBuilder(tx, item.WorkflowID).
+		WithRunID(item.RunID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&item.RootEventID).
 		WithIncomingEventID(&event.ID).

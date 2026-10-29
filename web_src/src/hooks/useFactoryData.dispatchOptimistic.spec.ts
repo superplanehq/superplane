@@ -1,17 +1,20 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import { buildLinePhaseBoard, collectLineBacklogOrders } from "@/pages/factories/lib/linePhaseRuns";
+import type { WorkOrdersPage } from "@/pages/factories/lib/workOrderListPagination";
 
-const { factoriesDispatchWorkOrder } = vi.hoisted(() => ({
+const { factoriesDispatchWorkOrder, factoriesResumeHandOffWorkOrder } = vi.hoisted(() => ({
   factoriesDispatchWorkOrder: vi.fn(),
+  factoriesResumeHandOffWorkOrder: vi.fn(),
 }));
 
 vi.mock("@/api-client", () => ({
   factoriesDispatchWorkOrder,
+  factoriesResumeHandOffWorkOrder,
 }));
 
 import { factoryQueryKeys, useDispatchWorkOrder } from "./useFactoryData";
@@ -48,9 +51,29 @@ function ordersInCache(queryClient: QueryClient): FactoriesWorkOrder[] {
   return queryClient.getQueryData<FactoriesWorkOrder[]>(factoryQueryKeys.workOrders(ORGANIZATION_ID, FACTORY_ID)) ?? [];
 }
 
+function seedPendingHandoff(source: "detail" | "list" | "page") {
+  const order = {
+    ...draftOrder(),
+    pendingHandoff: { lineId: LINE.id, column: "verify", pullRequestUrl: "https://github.com/acme/app/pull/42" },
+  };
+  const queryClient = seedClient(source === "list" ? [order] : []);
+  if (source === "detail") {
+    queryClient.setQueryData(factoryQueryKeys.workOrderDetail(ORGANIZATION_ID, FACTORY_ID, "wo-1"), order);
+  }
+  const pageKey = factoryQueryKeys.workOrdersPage(ORGANIZATION_ID, FACTORY_ID, ["STATE_DRAFT", "STATE_OPEN"]);
+  const page: InfiniteData<WorkOrdersPage> = {
+    pages: [{ orders: source === "page" ? [order] : [draftOrder()], hasNextPage: false, totalCount: 1 }],
+    pageParams: [undefined],
+  };
+  queryClient.setQueryData(pageKey, page);
+  return { queryClient, order, pageKey, page };
+}
+
 describe("useDispatchWorkOrder optimistic cache patch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    factoriesDispatchWorkOrder.mockReset();
+    factoriesResumeHandOffWorkOrder.mockReset();
   });
 
   it("moves the card to the first phase column before the dispatch request resolves", async () => {
@@ -80,6 +103,7 @@ describe("useDispatchWorkOrder optimistic cache patch", () => {
 
     expect(board[0]?.runs.map((run) => run.workOrderId)).toContain("wo-1");
     expect(factoriesDispatchWorkOrder).toHaveBeenCalledTimes(1);
+    expect(factoriesResumeHandOffWorkOrder).not.toHaveBeenCalled();
   });
 
   it("rolls the card back to Backlog when the dispatch request fails", async () => {
@@ -161,4 +185,77 @@ describe("useDispatchWorkOrder optimistic cache patch", () => {
     const orders = ordersInCache(queryClient);
     expect(orders).toEqual([draftOrder()]);
   });
+
+  it.each(["detail", "list", "page"] as const)("resumes a pending handoff from the %s cache", async (source) => {
+    const { queryClient, pageKey } = seedPendingHandoff(source);
+    const serverOrder: FactoriesWorkOrder = {
+      ...draftOrder(),
+      state: "STATE_OPEN",
+      lineDispatches: [{ id: "resumed-dispatch", line: { id: LINE.id, name: LINE.name }, state: "STATE_ACTIVE" }],
+    };
+    factoriesDispatchWorkOrder.mockResolvedValue({ data: { order: serverOrder } });
+    factoriesResumeHandOffWorkOrder.mockResolvedValue({ data: { order: serverOrder } });
+    const { result } = renderHook(() => useDispatchWorkOrder(ORGANIZATION_ID, FACTORY_ID), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        orderId: "wo-1",
+        lineName: "hotfix",
+        model: "codex/model-1",
+        thinkingLevel: "high",
+      });
+    });
+
+    expect(factoriesDispatchWorkOrder).not.toHaveBeenCalled();
+    expect(factoriesResumeHandOffWorkOrder).toHaveBeenCalledTimes(1);
+    expect(factoriesResumeHandOffWorkOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { factoryId: FACTORY_ID, orderId: "wo-1" },
+        body: { model: "codex/model-1", thinkingLevel: "high" },
+      }),
+    );
+    const detail = queryClient.getQueryData<FactoriesWorkOrder>(
+      factoryQueryKeys.workOrderDetail(ORGANIZATION_ID, FACTORY_ID, "wo-1"),
+    );
+    const pageOrder = queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(pageKey)?.pages[0]?.orders[0];
+    expect(detail).toEqual(serverOrder);
+    for (const cachedOrder of [pageOrder, ordersInCache(queryClient)[0]]) {
+      expect(cachedOrder).toMatchObject(serverOrder);
+      expect(cachedOrder?.pendingHandoff).toBeUndefined();
+    }
+  });
+
+  it.each(["detail", "list", "page"] as const)(
+    "restores caches and keeps the pending handoff from %s after resume fails",
+    async (source) => {
+      const { queryClient, order, pageKey, page } = seedPendingHandoff(source);
+      const previousOrders = ordersInCache(queryClient);
+      factoriesDispatchWorkOrder.mockRejectedValue(new Error("ordinary dispatch used"));
+      factoriesResumeHandOffWorkOrder.mockRejectedValue(new Error("connection unavailable"));
+      const { result } = renderHook(() => useDispatchWorkOrder(ORGANIZATION_ID, FACTORY_ID), {
+        wrapper: createWrapper(queryClient),
+      });
+
+      await act(async () => {
+        await expect(result.current.mutateAsync({ orderId: "wo-1", lineName: "hotfix" })).rejects.toThrow(
+          "connection unavailable",
+        );
+      });
+
+      expect(factoriesDispatchWorkOrder).not.toHaveBeenCalled();
+      expect(ordersInCache(queryClient)).toEqual(previousOrders);
+      expect(queryClient.getQueryData(pageKey)).toEqual(page);
+      const pendingOrder =
+        source === "detail"
+          ? queryClient.getQueryData<FactoriesWorkOrder>(
+              factoryQueryKeys.workOrderDetail(ORGANIZATION_ID, FACTORY_ID, "wo-1"),
+            )
+          : source === "list"
+            ? ordersInCache(queryClient)[0]
+            : queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(pageKey)?.pages[0]?.orders[0];
+      expect(pendingOrder?.pendingHandoff).toEqual(order.pendingHandoff);
+    },
+  );
 });

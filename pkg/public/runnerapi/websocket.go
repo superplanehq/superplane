@@ -325,6 +325,7 @@ func (s *Server) reconcileRunnerConnection(
 	var shouldShutdown bool
 	var shouldCancel bool
 	var reservedTask *models.RunnerTask
+	var reservation models.RunnerTaskReservationResult
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		current, err := models.FindRunner(tx, runner.ID)
@@ -385,14 +386,11 @@ func (s *Server) reconcileRunnerConnection(
 			if runner.State != models.RunnerStateIdle {
 				return errRunnerStateMismatch
 			}
-			task, err = runner.ReserveNextTask(tx)
-			if errors.Is(err, models.ErrRunnerTaskNotFound) {
-				task = nil
-				return nil
-			}
+			reservation, err = runner.ReserveNextTask(tx)
 			if err != nil {
 				return err
 			}
+			task = reservation.Task
 			reservedTask = task
 		default:
 			return activeErr
@@ -406,6 +404,24 @@ func (s *Server) reconcileRunnerConnection(
 	if reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug, fleetScope)
 		messages.PublishPlanningRunnerStatus(database.DB(ctx), reservedTask)
+	}
+	for _, failedTask := range reservation.FailedTasks {
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), failedTask)
+	}
+	publishedFactories := map[uuid.UUID]bool{}
+	for _, connection := range reservation.LoginConnections {
+		if publishedFactories[connection.FactoryID] {
+			continue
+		}
+		if err := messages.PublishFactoryCodexConnectionUpdated(connection.FactoryID.String()); err != nil {
+			log.WithError(err).Warn("Failed to publish ChatGPT connection change")
+		}
+		publishedFactories[connection.FactoryID] = true
+	}
+	if s.nodeRequestExecutor != nil {
+		for _, failedTask := range reservation.FailedTasks {
+			go s.waitForTaskExecutionRequest(context.WithoutCancel(ctx), failedTask)
+		}
 	}
 
 	if shouldStartTask {

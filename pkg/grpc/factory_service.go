@@ -446,3 +446,13 @@ func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.Rev
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
 }
+
+func (s *FactoryService) ListFactoryOwnerEligibility(ctx context.Context, req *pb.ListFactoryOwnerEligibilityRequest) (*pb.ListFactoryOwnerEligibilityResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryOwnerEligibility(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ResumeHandOffWorkOrder(ctx context.Context, req *pb.ResumeHandOffWorkOrderRequest) (*pb.ResumeHandOffWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ResumeHandOffWorkOrder(ctx, s.intakeDeps, organizationID, req)
+}
