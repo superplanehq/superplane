@@ -6,6 +6,7 @@ import {
   type InfiniteData,
   type QueryClient,
   type UseQueryResult,
+  replaceEqualDeep,
 } from "@tanstack/react-query";
 import {
   agentsGetCanvasAgentChat,
@@ -54,6 +55,27 @@ export function useCanvasAgentChat(
 
 export type AgentMessagesPage = { messages: AgentMessage[]; hasMore: boolean };
 
+// First pages that a refresh fetched and that the cache has not yet reconciled.
+// Each value is the first-page messages that the cache held when the request
+// started. Pages that upserts or reconciliation create are never in this map.
+const freshFirstPages = new WeakMap<AgentMessagesPage, AgentMessage[] | undefined>();
+
+function reconcileRefreshedHistory(
+  cachedData: InfiniteData<AgentMessagesPage> | undefined,
+  refreshedData: InfiniteData<AgentMessagesPage>,
+): InfiniteData<AgentMessagesPage> {
+  const firstPage = refreshedData.pages[0];
+  if (!firstPage || !freshFirstPages.has(firstPage)) return refreshedData;
+
+  const messagesAtRequestStart = freshFirstPages.get(firstPage);
+  freshFirstPages.delete(firstPage);
+  const messages = mergePendingOptimisticMessages(
+    mergeMessagesReceivedDuringFetch(firstPage.messages, messagesAtRequestStart, cachedData?.pages[0]?.messages),
+    cachedData,
+  );
+  return { ...refreshedData, pages: [{ ...firstPage, messages }, ...refreshedData.pages.slice(1)] };
+}
+
 export function useAgentChatMessages(chatId: string | null, organizationId: string | undefined, enabled: boolean) {
   const queryClient = useQueryClient();
 
@@ -75,18 +97,18 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
       const messages = (response.data?.messages ?? [])
         .map((message) => fromApiMessage(message, chatId ?? "", organizationId))
         .filter((m): m is AgentMessage => m !== null);
-      if (!pageParam && chatId) {
-        const currentData = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(chatId));
-        return {
-          messages: mergePendingOptimisticMessages(
-            mergeMessagesReceivedDuringFetch(messages, messagesAtRequestStart, currentData?.pages[0]?.messages),
-            currentData,
-          ),
-          hasMore: Boolean(response.data?.hasMore),
-        };
+      const page: AgentMessagesPage = { messages, hasMore: Boolean(response.data?.hasMore) };
+      if (!pageParam) {
+        // Reconcile when the whole refresh is saved, not now. Older pages can
+        // still be loading, and live events can arrive while they load.
+        freshFirstPages.set(page, messagesAtRequestStart);
       }
-
-      return { messages, hasMore: Boolean(response.data?.hasMore) };
+      return page;
+    },
+    structuralSharing: (cachedData, refreshedData) => {
+      const cached = cachedData as InfiniteData<AgentMessagesPage> | undefined;
+      const refreshed = refreshedData as InfiniteData<AgentMessagesPage>;
+      return replaceEqualDeep(cached, reconcileRefreshedHistory(cached, refreshed));
     },
     getNextPageParam: (lastPage) => {
       if (!lastPage.hasMore || lastPage.messages.length === 0) return undefined;
