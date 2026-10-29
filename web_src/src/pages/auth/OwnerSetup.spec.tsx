@@ -487,7 +487,11 @@ describe("OwnerSetup", () => {
     renderOwnerSetup();
 
     expect(await screen.findByRole("heading", { name: "Install the chart" })).toBeInTheDocument();
-    expect(screen.getByText(/helm upgrade --install fleet-manager/)).toBeInTheDocument();
+    expect(screen.queryByText(/helm upgrade --install fleet-manager/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Kubernetes context"), { target: { value: "aws-prod" } });
+    const helmCommand = await screen.findByText(/helm upgrade --install fleet-manager/);
+    expect(helmCommand).toHaveTextContent("--kube-context 'aws-prod'");
+    expect(helmCommand).not.toHaveTextContent("kubectl");
     expect(screen.getByRole("button", { name: "Finish later" })).toBeInTheDocument();
     expect(createToken).not.toHaveBeenCalled();
   });
