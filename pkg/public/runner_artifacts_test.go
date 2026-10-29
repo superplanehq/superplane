@@ -125,6 +125,55 @@ func TestRunnerArtifactUploadAndPublicDownload(t *testing.T) {
 	assert.Equal(t, http.StatusOK, download.Code)
 	assert.Equal(t, "image/png", download.Header().Get("Content-Type"))
 	assert.Equal(t, png, download.Body.Bytes())
+	assert.Equal(t, "Checkout", uploaded.Title)
+
+	postFile := func(body []byte, key string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts", bytes.NewReader(body))
+		request.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("Content-Type", "image/png")
+		request.Header.Set("Content-Disposition", `attachment; filename="checkout.png"`)
+		request.Header.Set("X-SuperPlane-Artifact-Title", "Checkout")
+		if key != "" {
+			request.Header.Set("X-SuperPlane-Artifact-Key", key)
+		}
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		return response
+	}
+
+	keyed := postFile(png, "checkout")
+	require.Equal(t, http.StatusCreated, keyed.Code, keyed.Body.String())
+	var first runnerArtifactResponse
+	require.NoError(t, json.Unmarshal(keyed.Body.Bytes(), &first))
+
+	replacedBody := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{1}, 16)...)
+	replaced := postFile(replacedBody, "checkout")
+	require.Equal(t, http.StatusOK, replaced.Code, replaced.Body.String())
+	var second runnerArtifactResponse
+	require.NoError(t, json.Unmarshal(replaced.Body.Bytes(), &second))
+	assert.Equal(t, first.ArtifactID, second.ArtifactID)
+	assert.NotEqual(t, first.FileID, second.FileID)
+	_, err = models.FindFile(database.Conn(), uuid.MustParse(first.FileID))
+	assert.ErrorIs(t, err, models.ErrFileNotFound)
+
+	artifacts, err = order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 2)
+
+	linkPayload, err := json.Marshal(map[string]string{"url": "https://staging.example.com", "title": "Staging", "key": "staging"})
+	require.NoError(t, err)
+	linkRequest := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts/links", bytes.NewReader(linkPayload))
+	linkRequest.Header.Set("Authorization", "Bearer "+token)
+	linkRequest.Header.Set("Content-Type", "application/json")
+	linkResponse := httptest.NewRecorder()
+	server.Router.ServeHTTP(linkResponse, linkRequest)
+	require.Equal(t, http.StatusCreated, linkResponse.Code, linkResponse.Body.String())
+
+	conflict := postFile(png, "staging")
+	assert.Equal(t, http.StatusBadRequest, conflict.Code)
+	artifacts, err = order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 3)
 }
 
 func TestRunnerArtifactUploadFromPRDiscussion(t *testing.T) {
@@ -424,6 +473,55 @@ func TestRunnerPublishLinkFromCustomAutomation(t *testing.T) {
 
 	rejected := postLink("javascript:alert(1)")
 	assert.Equal(t, http.StatusBadRequest, rejected.Code)
+
+	postMarkdown := func(body string, key string) *httptest.ResponseRecorder {
+		payload, err := json.Marshal(map[string]string{
+			"body":  body,
+			"title": "Preview login",
+			"key":   key,
+		})
+		require.NoError(t, err)
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts/markdown", bytes.NewReader(payload))
+		request.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		return response
+	}
+
+	login := "Email: demo@operately.dev\n\nPassword: preview-demo-1\n"
+	createdNote := postMarkdown(login, "preview-login")
+	require.Equal(t, http.StatusCreated, createdNote.Code, createdNote.Body.String())
+	updatedNote := postMarkdown("Email: demo@operately.dev\n\nPassword: preview-demo-2\n", "preview-login")
+	require.Equal(t, http.StatusOK, updatedNote.Code, updatedNote.Body.String())
+
+	artifacts, err = order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 2)
+	var note models.FactoryWorkOrderArtifact
+	var link models.FactoryWorkOrderArtifact
+	for _, artifact := range artifacts {
+		switch artifact.Type {
+		case models.FactoryWorkOrderArtifactTypeMarkdown:
+			note = artifact
+		case models.FactoryWorkOrderArtifactTypeLink:
+			link = artifact
+		}
+	}
+	require.NotNil(t, note.Key)
+	assert.Equal(t, order.ID.String()+":preview-login", *note.Key)
+	data = map[string]any{}
+	require.NoError(t, json.Unmarshal(note.Data, &data))
+	assert.Equal(t, "Email: demo@operately.dev\n\nPassword: preview-demo-2", data["body"])
+	assert.Equal(t, "Preview login", data["title"])
+	data = map[string]any{}
+	require.NoError(t, json.Unmarshal(link.Data, &data))
+	assert.Equal(t, "https://staging.example.com/pr-42-b", data["url"])
+
+	emptyNote := postMarkdown("  ", "preview-login")
+	assert.Equal(t, http.StatusBadRequest, emptyNote.Code)
+	conflictNote := postMarkdown(login, "staging")
+	assert.Equal(t, http.StatusBadRequest, conflictNote.Code)
 
 	webhookEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, map[string]any{
 		"type": "github.pullRequest",

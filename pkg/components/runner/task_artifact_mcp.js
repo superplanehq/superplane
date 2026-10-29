@@ -174,7 +174,7 @@ function resolveArtifactFile(inputPath, env = process.env) {
   };
 }
 
-async function uploadFile(file, title, env, fetchImpl) {
+async function uploadFile(file, title, env, fetchImpl, key) {
   const baseURL = requiredEnv("SUPERPLANE_BASE_URL", env).replace(/\/$/, "");
   const token = requiredEnv("SUPERPLANE_ARTIFACT_TOKEN", env);
   const headers = {
@@ -185,6 +185,8 @@ async function uploadFile(file, title, env, fetchImpl) {
     "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
   };
   if (title) headers["X-SuperPlane-Artifact-Title"] = encodeURIComponent(title);
+  const artifactKey = String(key || "").trim();
+  if (artifactKey) headers["X-SuperPlane-Artifact-Key"] = encodeURIComponent(artifactKey);
 
   const response = await fetchImpl(`${baseURL}/api/v1/runner/artifacts`, {
     method: "POST",
@@ -590,5 +592,6 @@ module.exports = {
   reportVisualEvidenceUnavailable,
   resolveArtifactFile,
   uploadArtifact,
+  uploadFile,
   writeManifest,
 };
