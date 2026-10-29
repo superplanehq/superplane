@@ -55,6 +55,7 @@ func (p *Periodic) report() {
 	p.reportRunnerCounts()
 	p.reportRunnerTaskCounts()
 	p.reportBitbucketForgeDeliveries()
+	p.reportVCSCatalogSyncQueue()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {
