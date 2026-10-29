@@ -34,6 +34,9 @@ WITH RECURSIVE scoped_runs AS (
  JOIN factory_planning_sessions s ON s.canvas_run_id = r.id
  WHERE s.draft_work_order_id IS NOT NULL
  UNION
+ SELECT f.work_order_id, r.id FROM scoped_runs r
+ JOIN factory_work_order_refinement_runs f ON f.run_id = r.id
+ UNION
  SELECT p.work_order_id, r.id FROM scoped_runs r
  JOIN factory_pull_request_runs a ON a.run_id = r.id
  JOIN factory_pull_requests p ON p.id = a.pull_request_id

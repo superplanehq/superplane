@@ -45,12 +45,25 @@ func ListPendingCodexRevocations(tx *gorm.DB) ([]FactoryCodexConnection, error) 
 // revoked runner has stopped. Each connection is processed in its own transaction.
 func (c *FactoryCodexConnection) CleanupRevocation(tx *gorm.DB, now time.Time) ([]*RunCancellationResult, error) {
 	var outcomes []*RunCancellationResult
+	// Claim the connection before cleanup. Another worker can hold it, or can
+	// finish the cleanup first. Then the saved snapshot is stale and must not
+	// cancel runs or leases that started after a reconnect.
+	var current FactoryCodexConnection
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ? AND revocation_pending_at IS NOT NULL", c.ID).First(&current).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	*c = current
 	var workspace Factory
 	if err := tx.Unscoped().Where("id = ? AND organization_id = ?", c.FactoryID, c.OrganizationID).First(&workspace).Error; err != nil {
 		return nil, err
 	}
 	var orders []FactoryWorkOrder
-	err := tx.Where("organization_id = ? AND factory_id = ?", c.OrganizationID, c.FactoryID).
+	err = tx.Where("organization_id = ? AND factory_id = ?", c.OrganizationID, c.FactoryID).
 		Where("?", workspace.OnboardingConfigValue().CodexSubscription).Where("id IN (?)", tx.Model(&FactoryWorkOrderAssignee{}).Select("work_order_id").Where("user_id = ?", c.OwnerUserID)).Order("id").Find(&orders).Error
 	if err != nil {
 		return nil, err

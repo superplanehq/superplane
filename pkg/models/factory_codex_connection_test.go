@@ -628,6 +628,31 @@ func TestMemberRemovalCleansQueuedWorkWithoutARunnerLease(t *testing.T) {
 	assert.Nil(t, reloadCodexConnection(t, db, connection.ID).RevocationPendingAt)
 }
 
+func TestStaleRevocationCleanupLeavesCurrentLeasesAlone(t *testing.T) {
+	db, connection, task, runner := newReadyCodexConnection(t)
+	require.NoError(t, clearProviderDeletion(db, runner))
+	require.NoError(t, markRunnerTask(db, task, models.RunnerTaskStateRunning, &runner.ID, time.Now()))
+	_, err := reserveCodexRun(t, db, connection, task.ID, time.Now())
+	require.NoError(t, err)
+	// A worker read this snapshot while the revocation was pending. Another
+	// worker then finished the cleanup, and the lease belongs to new work.
+	stale := reloadCodexConnection(t, db, connection.ID)
+	pendingAt := time.Now()
+	stale.RevocationPendingAt = &pendingAt
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		results, err := stale.CleanupRevocation(tx, time.Now())
+		assert.Empty(t, results)
+		return err
+	}))
+
+	current, err := models.FindRunnerTask(db, task.ID)
+	require.NoError(t, err)
+	assert.Nil(t, current.CancelRequestedAt)
+	assert.Len(t, codexLeases(t, db, connection.ID), 1)
+	assert.Nil(t, codexLeases(t, db, connection.ID)[0].RevokedAt)
+}
+
 func TestPersonalCodexMigrationPreservesCredentialsAndLeases(t *testing.T) {
 	db := database.DB(t.Context())
 	migration, err := os.ReadFile("../../db/migrations/20261029101500_personal-codex-connections.up.sql")

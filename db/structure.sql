@@ -1029,6 +1029,17 @@ CREATE TABLE public.factory_work_order_queue_items (
 
 
 --
+-- Name: factory_work_order_refinement_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_refinement_runs (
+    run_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_orders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2875,6 +2886,14 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 
 --
+-- Name: factory_work_order_refinement_runs factory_work_order_refinement_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_refinement_runs
+    ADD CONSTRAINT factory_work_order_refinement_runs_pkey PRIMARY KEY (run_id);
+
+
+--
 -- Name: factory_work_orders factory_work_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4253,6 +4272,13 @@ CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
+
+
+--
+-- Name: idx_factory_work_order_refinement_runs_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_refinement_runs_work_order ON public.factory_work_order_refinement_runs USING btree (work_order_id);
 
 
 --
@@ -5715,6 +5741,22 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 
 --
+-- Name: factory_work_order_refinement_runs factory_work_order_refinement_runs_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_refinement_runs
+    ADD CONSTRAINT factory_work_order_refinement_runs_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_work_order_refinement_runs factory_work_order_refinement_runs_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_refinement_runs
+    ADD CONSTRAINT factory_work_order_refinement_runs_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_work_orders factory_work_orders_auto_start_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6490,7 +6532,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261029101500	f
+20261029132752	f
 \.
 
 
