@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
@@ -18,7 +18,11 @@ import {
 const automationId = factoryHistoryStoryCanvasId("custom-verify");
 const api = `/api/v1/factories/${factoryHistoryStoryFactory}/custom-automations`;
 
-function customAutomationHandlers({ empty = false, automatic = false } = {}) {
+function customAutomationHandlers({
+  empty = false,
+  automatic = false,
+  runsState = "ready",
+}: { empty?: boolean; automatic?: boolean; runsState?: "ready" | "loading" | "error" } = {}) {
   return [
     http.get(`${api}/${automationId}`, () =>
       HttpResponse.json({
@@ -32,8 +36,14 @@ function customAutomationHandlers({ empty = false, automatic = false } = {}) {
         },
       }),
     ),
-    http.get(`/api/v1/canvases/${automationId}/runs`, () =>
-      HttpResponse.json({
+    http.get(`/api/v1/canvases/${automationId}/runs`, async () => {
+      if (runsState === "error") {
+        return new HttpResponse(null, { status: 500 });
+      }
+      if (runsState === "loading") {
+        await delay("infinite");
+      }
+      return HttpResponse.json({
         runs: empty
           ? []
           : [
@@ -48,8 +58,8 @@ function customAutomationHandlers({ empty = false, automatic = false } = {}) {
               },
             ],
         totalCount: empty ? 0 : 1,
-      }),
-    ),
+      });
+    }),
     ...factoryHistoryHandlers("custom-verify"),
   ];
 }
@@ -109,5 +119,13 @@ export const AutomaticHistory: Story = {
 export const EmptyHistory: Story = {
   args: { runs: true },
   parameters: { msw: { handlers: customAutomationHandlers({ empty: true }) } },
+};
+export const LoadingHistory: Story = {
+  args: { runs: true },
+  parameters: { msw: { handlers: customAutomationHandlers({ runsState: "loading" }) } },
+};
+export const ErrorHistory: Story = {
+  args: { runs: true },
+  parameters: { msw: { handlers: customAutomationHandlers({ runsState: "error" }) } },
 };
 export const NewConfiguration: Story = { args: { isNew: true } };
