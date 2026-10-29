@@ -707,6 +707,9 @@ message SelectableLLMModel {
   SelectableLLMNamedID model = 3;
   string key = 4;
   string label = 5;
+  // Thinking levels that the model supports, in display order. Empty means
+  // that the model has no thinking control.
+  repeated string thinking_levels = 6;
 }
 
 message ListSelectableLLMModelsResponse {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -54,11 +55,12 @@ func serializeSelectableLLMModels(listed []models.SelectableLLMModel) []*pb.Sele
 	out := make([]*pb.SelectableLLMModel, 0, len(listed))
 	for _, model := range listed {
 		out = append(out, &pb.SelectableLLMModel{
-			Source:   &pb.SelectableLLMNamedID{Id: model.Source.ID, Name: model.Source.Name},
-			Provider: &pb.SelectableLLMNamedID{Id: model.Provider.ID, Name: model.Provider.Name},
-			Model:    &pb.SelectableLLMNamedID{Id: model.Model.ID, Name: model.Model.Name},
-			Key:      model.Key,
-			Label:    model.Label,
+			Source:         &pb.SelectableLLMNamedID{Id: model.Source.ID, Name: model.Source.Name},
+			Provider:       &pb.SelectableLLMNamedID{Id: model.Provider.ID, Name: model.Provider.Name},
+			Model:          &pb.SelectableLLMNamedID{Id: model.Model.ID, Name: model.Model.Name},
+			Key:            model.Key,
+			Label:          model.Label,
+			ThinkingLevels: runner.ModelThinkingLevels(model.Provider.ID, model.Model.ID),
 		})
 	}
 	return out
