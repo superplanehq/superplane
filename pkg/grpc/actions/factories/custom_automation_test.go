@@ -43,9 +43,11 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
 			integrationID := uuid.NewString()
+			branch := "develop"
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 				VCSProvider:      &provider,
 				VCSIntegrationID: &integrationID,
+				DefaultBranch:    &branch,
 			}))
 			prompt := "Review the pull request."
 			command := "make test"
@@ -96,13 +98,39 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			assert.Equal(t, "acme/app", got["REPO"])
 			assert.Equal(t, "acme/app", got["SOURCE_REPO"])
 			assert.Equal(t, runner.WorkspaceContextRepoURL(provider, "acme/app"), got["REPO_URL"])
-			assert.Equal(t, "main", got["BASE"])
+			assert.Equal(t, "develop", got["BASE"])
 			assert.Equal(t, prFeedbackPRNumberExpression(), got["PR_NUMBER"])
 			assert.Equal(t, prFeedbackPRHeadExpression(), got["PR_HEAD"])
 			_, err = structpb.NewStruct(agent.Configuration)
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestCustomAutomationOmitsBaseWhenWorkspaceBranchIsEmpty(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	integrationID := uuid.NewString()
+	empty := ""
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID: &integrationID,
+		DefaultBranch:    &empty,
+	}))
+
+	settings, err := parseCustomAutomationSettings(db, factory, &pb.FactoryCustomAutomation_Settings{
+		StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+		Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+		Steps: []*pb.FactoryCustomAutomation_Step{
+			{Name: "Lint", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make lint"},
+		},
+	})
+	require.NoError(t, err)
+	doc, err := buildCustomAutomationCanvas(db, factory, "Verify changes", settings)
+	require.NoError(t, err)
+
+	_, hasBase := environmentVars(t, doc.Spec.Nodes[1].Configuration["environment"])["BASE"]
+	assert.False(t, hasBase)
 }
 
 func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
