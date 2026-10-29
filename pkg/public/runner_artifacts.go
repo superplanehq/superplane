@@ -41,6 +41,7 @@ type runnerArtifactResponse struct {
 	SizeBytes   int64  `json:"size_bytes"`
 	PublicURL   string `json:"public_url"`
 	Markdown    string `json:"markdown"`
+	Title       string `json:"title"`
 }
 
 type runnerArtifactContext struct {
@@ -75,6 +76,18 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		logger.WithError(err).Warn("rejected runner artifact scope")
 		http.Error(w, "Artifact upload scope is invalid", http.StatusForbidden)
+		return
+	}
+	key := decodeArtifactTitle(r.Header.Get("X-SuperPlane-Artifact-Key"))
+	storedKey := scopedArtifactLinkKey(scope.WorkOrderID, key)
+	if len(storedKey) > models.MaxFactoryWorkOrderArtifactKeyBytes {
+		http.Error(w, "key is too long", http.StatusBadRequest)
+		return
+	}
+	previousFileID, err := existingRunnerArtifactFileID(db, artifactContext.Order, storedKey)
+	if err != nil {
+		logger.WithError(err).Warn("rejected runner artifact key")
+		http.Error(w, "Artifact key is already used", http.StatusBadRequest)
 		return
 	}
 
@@ -133,26 +146,40 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		"url":         publicURL,
 	}
 	var artifact *models.FactoryWorkOrderArtifact
+	var created bool
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if readyErr := file.MarkReady(tx, upload.SizeBytes, upload.Checksum); readyErr != nil {
 			return readyErr
 		}
-		artifact, err = artifactContext.Order.CreateArtifact(tx, models.FactoryWorkOrderArtifactParams{
+		var upsertErr error
+		artifact, created, upsertErr = artifactContext.Order.UpsertArtifact(tx, models.FactoryWorkOrderArtifactParams{
 			Type:       models.FactoryWorkOrderArtifactTypeFile,
 			Data:       data,
+			Key:        storedKey,
 			Automation: artifactAutomationRef(artifactContext),
 			Run:        &factory.RunRef{ID: scope.CanvasRunID},
 		})
-		return err
+		return upsertErr
 	})
 	if err != nil {
 		cleanupRunnerArtifact(provider, file, logger)
 		logger.WithError(err).Error("failed to attach runner artifact")
+		if errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid) {
+			http.Error(w, "Artifact key is already used", http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Failed to attach artifact", http.StatusInternalServerError)
 		return
 	}
+	if previousFileID != uuid.Nil && previousFileID != file.ID {
+		removeReplacedArtifactFile(r.Context(), provider, previousFileID, logger)
+	}
 
-	if err := messages.PublishFactoryWorkOrderUpdated(scope.FactoryID.String(), scope.WorkOrderID.String(), factory.EventTypeOrderArtifactAdded); err != nil {
+	reason := factory.EventTypeOrderArtifactUpdated
+	if created {
+		reason = factory.EventTypeOrderArtifactAdded
+	}
+	if err := messages.PublishFactoryWorkOrderUpdated(scope.FactoryID.String(), scope.WorkOrderID.String(), reason); err != nil {
 		log.WithError(err).Warn("failed to publish runner artifact update")
 	}
 	response := runnerArtifactResponse{
@@ -163,14 +190,19 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		SizeBytes:   file.SizeBytes,
 		PublicURL:   publicURL,
 		Markdown:    artifactMarkdown(title, file.ContentType, publicURL),
+		Title:       title,
 	}
 	logger.WithFields(log.Fields{
 		"content_type": contentType,
 		"file_id":      file.ID,
 		"artifact_id":  artifact.ID,
 	}).Info("stored runner artifact")
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.WithError(err).Warn("failed to encode runner artifact response")
 	}
@@ -362,6 +394,50 @@ func scopedArtifactLinkKey(workOrderID uuid.UUID, key string) string {
 		return ""
 	}
 	return workOrderID.String() + ":" + key
+}
+
+func existingRunnerArtifactFileID(db *gorm.DB, order *models.FactoryWorkOrder, storedKey string) (uuid.UUID, error) {
+	if storedKey == "" {
+		return uuid.Nil, nil
+	}
+	existing, err := order.FindArtifactByKey(db, storedKey)
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
+		return uuid.Nil, nil
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if existing.Type != models.FactoryWorkOrderArtifactTypeFile {
+		return uuid.Nil, fmt.Errorf("%w: artifact key is already used", models.ErrFactoryWorkOrderArtifactInvalid)
+	}
+	return artifactStoredFileID(existing), nil
+}
+
+func artifactStoredFileID(artifact *models.FactoryWorkOrderArtifact) uuid.UUID {
+	if artifact == nil || len(artifact.Data) == 0 {
+		return uuid.Nil
+	}
+	var data map[string]any
+	if err := json.Unmarshal(artifact.Data, &data); err != nil {
+		return uuid.Nil
+	}
+	raw, _ := data["fileId"].(string)
+	id, err := uuid.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return uuid.Nil
+	}
+	return id
+}
+
+func removeReplacedArtifactFile(ctx context.Context, provider blob.Provider, fileID uuid.UUID, logger *log.Entry) {
+	previous, err := models.FindFile(database.DB(ctx), fileID)
+	if err != nil {
+		logger.WithError(err).Warn("failed to load replaced runner artifact file")
+		return
+	}
+	if err := storedfiles.DeleteObjectAndRow(ctx, database.DB(ctx), provider, previous); err != nil {
+		logger.WithError(err).Warn("failed to delete replaced runner artifact file")
+	}
 }
 
 func writeArtifactMarkdownError(w http.ResponseWriter, err error) {

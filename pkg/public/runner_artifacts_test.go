@@ -125,6 +125,55 @@ func TestRunnerArtifactUploadAndPublicDownload(t *testing.T) {
 	assert.Equal(t, http.StatusOK, download.Code)
 	assert.Equal(t, "image/png", download.Header().Get("Content-Type"))
 	assert.Equal(t, png, download.Body.Bytes())
+	assert.Equal(t, "Checkout", uploaded.Title)
+
+	postFile := func(body []byte, key string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts", bytes.NewReader(body))
+		request.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("Content-Type", "image/png")
+		request.Header.Set("Content-Disposition", `attachment; filename="checkout.png"`)
+		request.Header.Set("X-SuperPlane-Artifact-Title", "Checkout")
+		if key != "" {
+			request.Header.Set("X-SuperPlane-Artifact-Key", key)
+		}
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		return response
+	}
+
+	keyed := postFile(png, "checkout")
+	require.Equal(t, http.StatusCreated, keyed.Code, keyed.Body.String())
+	var first runnerArtifactResponse
+	require.NoError(t, json.Unmarshal(keyed.Body.Bytes(), &first))
+
+	replacedBody := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{1}, 16)...)
+	replaced := postFile(replacedBody, "checkout")
+	require.Equal(t, http.StatusOK, replaced.Code, replaced.Body.String())
+	var second runnerArtifactResponse
+	require.NoError(t, json.Unmarshal(replaced.Body.Bytes(), &second))
+	assert.Equal(t, first.ArtifactID, second.ArtifactID)
+	assert.NotEqual(t, first.FileID, second.FileID)
+	_, err = models.FindFile(database.Conn(), uuid.MustParse(first.FileID))
+	assert.ErrorIs(t, err, models.ErrFileNotFound)
+
+	artifacts, err = order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 2)
+
+	linkPayload, err := json.Marshal(map[string]string{"url": "https://staging.example.com", "title": "Staging", "key": "staging"})
+	require.NoError(t, err)
+	linkRequest := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts/links", bytes.NewReader(linkPayload))
+	linkRequest.Header.Set("Authorization", "Bearer "+token)
+	linkRequest.Header.Set("Content-Type", "application/json")
+	linkResponse := httptest.NewRecorder()
+	server.Router.ServeHTTP(linkResponse, linkRequest)
+	require.Equal(t, http.StatusCreated, linkResponse.Code, linkResponse.Body.String())
+
+	conflict := postFile(png, "staging")
+	assert.Equal(t, http.StatusBadRequest, conflict.Code)
+	artifacts, err = order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 3)
 }
 
 func TestRunnerArtifactUploadFromPRDiscussion(t *testing.T) {

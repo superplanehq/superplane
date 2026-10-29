@@ -4,14 +4,35 @@ const fs = require("node:fs");
 
 const { publishLink } = require("./publish_link");
 const { publishMarkdown } = require("./publish_markdown");
+const { publishFile } = require("./publish_file");
+
+const labelFlags = ["name", "title", "key"];
+const labelAlias = { name: "title" };
 
 const COMMANDS = [
   {
-    words: ["task", "artifact", "add"],
-    usage: "superplane task artifact add (--url URL | --file PATH) [--name NAME] [--title TITLE] [--key KEY]",
-    flags: ["url", "file", "name", "title", "key"],
-    alias: { name: "title" },
-    run: "publish",
+    words: ["task", "artifact", "add-link"],
+    usage: "superplane task artifact add-link --url URL [--name NAME] [--key KEY]",
+    flags: ["url", ...labelFlags],
+    alias: labelAlias,
+    required: ["url"],
+    run: "link",
+  },
+  {
+    words: ["task", "artifact", "add-markdown"],
+    usage: "superplane task artifact add-markdown --file PATH [--name NAME] [--key KEY]",
+    flags: ["file", ...labelFlags],
+    alias: labelAlias,
+    required: ["file"],
+    run: "markdown",
+  },
+  {
+    words: ["task", "artifact", "add-file"],
+    usage: "superplane task artifact add-file --file PATH [--poster PATH] [--name NAME] [--key KEY]",
+    flags: ["file", "poster", ...labelFlags],
+    alias: labelAlias,
+    required: ["file"],
+    run: "file",
   },
   {
     words: ["task", "artifact", "remove"],
@@ -102,13 +123,14 @@ function parseCommand(argv) {
 async function main(argv, env = process.env, fetchImpl = fetch, stdout = process.stdout, stderr = process.stderr) {
   try {
     const { command, input } = parseCommand(argv);
-    if (command.run !== "publish") {
-      throw new Error(`superplane ${command.words.join(" ")} is not available yet`);
-    }
-    if (input.file && input.url) {
-      throw new Error(`usage: ${command.usage}`);
-    }
-    if (input.file) {
+    if (command.run === "link") {
+      const result = await publishLink(
+        { url: input.url, title: input.title, key: input.key },
+        env,
+        fetchImpl,
+      );
+      stdout.write(`${String(result.url || "").trim()}\n`);
+    } else if (command.run === "markdown") {
       let body;
       try {
         body = fs.readFileSync(input.file, "utf8");
@@ -121,13 +143,15 @@ async function main(argv, env = process.env, fetchImpl = fetch, stdout = process
         fetchImpl,
       );
       stdout.write(`${String(result.title || "").trim()}\n`);
-    } else {
-      const result = await publishLink(
-        { url: input.url, title: input.title, key: input.key },
+    } else if (command.run === "file") {
+      const result = await publishFile(
+        { file: input.file, poster: input.poster, title: input.title, key: input.key },
         env,
         fetchImpl,
       );
-      stdout.write(`${String(result.url || "").trim()}\n`);
+      stdout.write(`${String(result.title || "").trim()}\n`);
+    } else {
+      throw new Error(`superplane ${command.words.join(" ")} is not available yet`);
     }
   } catch (error) {
     stderr.write(`${error && error.message ? error.message : error}\n`);
