@@ -103,7 +103,7 @@ func (o *FactoryWorkOrder) RequireExecutionOwner(tx *gorm.DB, nonblocking bool) 
 	return err
 }
 
-// SubscriptionOwnershipBlocked includes queued admissions, associated runs,
+// SubscriptionOwnershipBlocked includes pending and queued tasks, associated runs,
 // and runners whose cancellation or provider termination is incomplete.
 func (o *FactoryWorkOrder) SubscriptionOwnershipBlocked(tx *gorm.DB) (bool, error) {
 	var queued int64
@@ -141,7 +141,7 @@ func (o *FactoryWorkOrder) SubscriptionOwnershipBlocked(tx *gorm.DB) (bool, erro
 		Joins("JOIN workflow_node_executions e ON e.id = kv.execution_id AND e.workflow_id = kv.workflow_id AND e.node_id = kv.node_id").
 		Joins("LEFT JOIN runners r ON r.id = t.runner_id").
 		Where("e.run_id IN ?", ids).
-		Where("t.state IN ? OR (r.id IS NOT NULL AND r.provider_deleted_at IS NULL AND (t.cancel_requested_at IS NOT NULL OR t.state = ?))", []string{RunnerTaskStateQueued, RunnerTaskStateReserved, RunnerTaskStateRunning}, RunnerTaskStateLost).Count(&active).Error
+		Where("t.state IN ? OR (r.id IS NOT NULL AND r.provider_deleted_at IS NULL AND (t.cancel_requested_at IS NOT NULL OR t.state = ?))", []string{RunnerTaskStatePending, RunnerTaskStateQueued, RunnerTaskStateReserved, RunnerTaskStateRunning}, RunnerTaskStateLost).Count(&active).Error
 	return active > 0, err
 }
 

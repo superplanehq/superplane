@@ -16,7 +16,7 @@ func ListQueuedRunnerPlanningFactoryIDs(tx *gorm.DB, organizationID uuid.UUID) (
 		Joins("JOIN runner_tasks AS task ON task.id::text = kv.value AND task.organization_id = session.organization_id").
 		Where("session.organization_id = ? AND session.state = ?", organizationID, PlanningSessionStateRunning).
 		Where("session.kind = ? AND session.draft_work_order_id IS NOT NULL", PlanningSessionKindWorkOrderAnalysis).
-		Where("task.backend = ? AND task.state = ?", RunnerTaskBackendIntegrated, RunnerTaskStateQueued).
+		Where("task.backend = ? AND task.state IN ?", RunnerTaskBackendIntegrated, []string{RunnerTaskStatePending, RunnerTaskStateQueued}).
 		Pluck("session.factory_id", &factoryIDs).Error
 	return factoryIDs, err
 }
