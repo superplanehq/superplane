@@ -1784,6 +1784,7 @@ func TestAdminDeleteAccount(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Run("deletes the account, its organization, and its workspaces", func(t *testing.T) {
+		recorder := useAnalytics(t)
 		target, err := models.CreateAccount("Delete Target", "delete-target@example.com")
 		require.NoError(t, err)
 		organization, err := models.CreateOrganization(support.RandomName("org"), "")
@@ -1818,6 +1819,13 @@ func TestAdminDeleteAccount(t *testing.T) {
 		var remainingFactories int64
 		require.NoError(t, database.Conn().Model(&models.Factory{}).Where("id = ?", factory.ID).Count(&remainingFactories).Error)
 		assert.Zero(t, remainingFactories)
+		events := recorder.snapshot()
+		require.Len(t, events, 2)
+		assert.Equal(t, "account_deleted", string(events[0].Name))
+		assert.Equal(t, r.Account.ID.String(), events[0].DistinctID)
+		assert.Equal(t, target.ID.String(), events[0].Properties["account_id"])
+		assert.Equal(t, r.Account.ID.String(), events[0].Properties["actor_account_id"])
+		assert.Equal(t, "admin", events[0].Properties["deletion_source"])
 	})
 
 	t.Run("keeps organizations that have another owner", func(t *testing.T) {
@@ -1837,12 +1845,14 @@ func TestAdminDeleteAccount(t *testing.T) {
 	})
 
 	t.Run("rejects self-delete", func(t *testing.T) {
+		recorder := useAnalytics(t)
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
 			path:       "/admin/api/accounts/" + r.Account.ID.String(),
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Empty(t, recorder.snapshot())
 
 		_, err := models.FindAccountByID(r.Account.ID.String())
 		require.NoError(t, err)
@@ -1855,5 +1865,20 @@ func TestAdminDeleteAccount(t *testing.T) {
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("tracks a deleted account without organizations", func(t *testing.T) {
+		recorder := useAnalytics(t)
+		target, err := models.CreateAccount("No workspace", support.RandomName("account")+"@example.com")
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{method: "DELETE", path: "/admin/api/accounts/" + target.ID.String(), authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		events := recorder.snapshot()
+		require.Len(t, events, 1)
+		assert.Equal(t, "account_deleted", string(events[0].Name))
+		assert.Equal(t, r.Account.ID.String(), events[0].DistinctID)
+		assert.Equal(t, target.ID.String(), events[0].Properties["account_id"])
+		assert.Empty(t, events[0].OrganizationID)
+		assert.Empty(t, events[0].Properties["deleted_organization_ids"])
 	})
 }

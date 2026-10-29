@@ -2,6 +2,7 @@ package polar
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,19 +18,40 @@ import (
 
 type paymentMethodPage struct {
 	Items []struct {
-		ID       string `json:"id"`
-		Type     string `json:"type"`
-		Metadata struct {
-			Month int `json:"exp_month"`
-			Year  int `json:"exp_year"`
-		} `json:"method_metadata"`
+		ID       string          `json:"id"`
+		Type     string          `json:"type"`
+		Metadata json.RawMessage `json:"method_metadata"`
 	} `json:"items"`
 	Pagination struct {
-		MaxPage int `json:"max_page"`
+		MaxPage *int `json:"max_page"`
 	} `json:"pagination"`
 }
 
-// HasPaymentMethod reads saved cards from Polar, so removing a card blocks the next start.
+// PaymentMethodSnapshot contains only fields needed to assess availability.
+// Complete is false for a missing customer. Failed lists return an error.
+type PaymentMethodSnapshot struct {
+	ReadStartedAt time.Time
+	ObservedAt    time.Time
+	Complete      bool
+	Methods       []PaymentMethodAvailability
+}
+
+type PaymentMethodAvailability struct {
+	ID      string
+	Usable  bool
+	Expired bool
+}
+
+func (s PaymentMethodSnapshot) HasUsableMethod() bool {
+	for _, method := range s.Methods {
+		if method.Usable {
+			return true
+		}
+	}
+	return false
+}
+
+// HasPaymentMethod returns as soon as a usable card is confirmed.
 func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
 	hasCard, err := c.hasPaymentMethod(ctx, externalID)
 	if IsNotFound(err) {
@@ -43,29 +65,18 @@ func (c *Client) hasPaymentMethod(ctx context.Context, externalID string) (bool,
 	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
 	defer cancel()
 
+	now := time.Now().UTC()
 	for page := 1; ; page++ {
-		path := fmt.Sprintf("/customers/external/%s/payment-methods?limit=100&page=%d", url.PathEscape(externalID), page)
-		result, err := c.readPaymentMethodPage(ctx, path)
+		methods, maxPage, err := c.paymentMethodsPage(ctx, externalID, page, now)
 		if err != nil {
 			return false, err
 		}
-		if result.Items == nil {
-			return false, fmt.Errorf("polar payment methods response is missing items")
-		}
-		now := time.Now().UTC()
-		for _, method := range result.Items {
-			if method.ID == "" {
-				continue
-			}
-			if method.Type == "kr_card" {
-				return true, nil
-			}
-			if method.Type == "card" && method.Metadata.Month >= 1 && method.Metadata.Month <= 12 &&
-				(method.Metadata.Year > now.Year() || method.Metadata.Year == now.Year() && method.Metadata.Month >= int(now.Month())) {
+		for _, method := range methods {
+			if method.Usable {
 				return true, nil
 			}
 		}
-		if page >= result.Pagination.MaxPage || len(result.Items) == 0 {
+		if page >= maxPage {
 			return false, nil
 		}
 	}
@@ -99,6 +110,30 @@ func (c *Client) readPaymentMethodPage(ctx context.Context, path string) (paymen
 	}
 }
 
+// PaymentMethods reads every page before accepting a complete observation.
+func (c *Client) PaymentMethods(ctx context.Context, externalID string) (PaymentMethodSnapshot, error) {
+	// Complete observations use the same bounded read policy as availability checks.
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+
+	snapshot := PaymentMethodSnapshot{ReadStartedAt: time.Now().UTC()}
+	for page := 1; ; page++ {
+		methods, maxPage, err := c.paymentMethodsPage(ctx, externalID, page, snapshot.ReadStartedAt)
+		if err != nil {
+			if IsNotFound(err) {
+				return PaymentMethodSnapshot{ReadStartedAt: snapshot.ReadStartedAt}, nil
+			}
+			return PaymentMethodSnapshot{}, err
+		}
+		snapshot.Methods = append(snapshot.Methods, methods...)
+		if page >= maxPage {
+			snapshot.Complete = true
+			snapshot.ObservedAt = time.Now().UTC()
+			return snapshot, nil
+		}
+	}
+}
+
 func isDroppedPaymentMethodConnection(err error) bool {
 	var bodyErr *responseBodyReadError
 	if errors.As(err, &bodyErr) && (bodyErr.statusCode < http.StatusOK || bodyErr.statusCode >= http.StatusMultipleChoices) {
@@ -106,6 +141,50 @@ func isDroppedPaymentMethodConnection(err error) bool {
 	}
 	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) ||
 		errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
+}
+
+func (c *Client) paymentMethodsPage(ctx context.Context, externalID string, page int, now time.Time) ([]PaymentMethodAvailability, int, error) {
+	path := fmt.Sprintf("/customers/external/%s/payment-methods?limit=100&page=%d", url.PathEscape(externalID), page)
+	result, err := c.readPaymentMethodPage(ctx, path)
+	if err != nil {
+		return nil, 0, err
+	}
+	if result.Items == nil {
+		return nil, 0, fmt.Errorf("polar payment methods response is missing items")
+	}
+	if result.Pagination.MaxPage == nil || *result.Pagination.MaxPage < 0 {
+		return nil, 0, fmt.Errorf("payment method list has invalid pagination")
+	}
+	methods := make([]PaymentMethodAvailability, 0, len(result.Items))
+	for _, method := range result.Items {
+		if method.ID == "" {
+			continue
+		}
+		methods = append(methods, paymentMethodAvailability(method.ID, method.Type, method.Metadata, now))
+	}
+	return methods, *result.Pagination.MaxPage, nil
+}
+
+func paymentMethodAvailability(id, methodType string, raw json.RawMessage, now time.Time) PaymentMethodAvailability {
+	method := PaymentMethodAvailability{ID: id}
+	if methodType == "kr_card" {
+		method.Usable = true
+		return method
+	}
+	if methodType != "card" {
+		return method
+	}
+	var metadata struct {
+		Month int `json:"exp_month"`
+		Year  int `json:"exp_year"`
+	}
+	if json.Unmarshal(raw, &metadata) != nil || metadata.Month < 1 || metadata.Month > 12 || metadata.Year < 1 || metadata.Year > 9999 {
+		return method
+	}
+	now = now.UTC()
+	method.Expired = metadata.Year < now.Year() || metadata.Year == now.Year() && metadata.Month < int(now.Month())
+	method.Usable = !method.Expired
+	return method
 }
 
 func AssertOrganizationPaymentMethod(tx *gorm.DB, orgID uuid.UUID) error {

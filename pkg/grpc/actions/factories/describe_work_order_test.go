@@ -62,7 +62,8 @@ func Test__DescribeWorkOrder_KeepsRemovedMemberName(t *testing.T) {
 			if accountDeleted {
 				account, err := models.FindAccountByID(member.AccountID.String())
 				require.NoError(t, err)
-				require.NoError(t, account.SoftDelete(db, time.Now(), nil))
+				_, err = account.SoftDelete(db, time.Now(), nil)
+				require.NoError(t, err)
 			} else {
 				require.NoError(t, member.SoftDelete(db, time.Now(), ""))
 			}

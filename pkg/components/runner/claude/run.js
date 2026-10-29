@@ -145,12 +145,20 @@ function allowedClaudeTools(env = process.env) {
       "mcp__superplane",
       ...workspaceAllow,
       "mcp__superplane__report_merge_check",
+      ...(envFlag(env, "SUPERPLANE_OWNER_TOKEN")
+        ? ["mcp__superplane__suggest_owners", "mcp__superplane__assign_owner"]
+        : []),
     ].join(",");
   }
   if (taskToolsEnabled(env)) {
     const tools = [BASE_ALLOWED_TOOLS, "mcp__superplane", ...workspaceAllow];
     if (artifactMCPEnabled(env)) tools.push(...ARTIFACT_ALLOWED_TOOLS);
     if (publishLinksEnabled(env)) tools.push("mcp__superplane__publish_link");
+    if (envFlag(env, "SUPERPLANE_OWNER_TOKEN"))
+      tools.push(
+        "mcp__superplane__suggest_owners",
+        "mcp__superplane__assign_owner",
+      );
     return tools.join(",");
   }
   if (workspaceAllow.length === 0) {
@@ -189,7 +197,11 @@ function claudePermissionMode(env = process.env) {
 }
 
 function mcpToolsEnabled(env = process.env) {
-  return planningMCPEnabled(env) || taskToolsEnabled(env) || mergeConfidenceMCPEnabled(env);
+  return (
+    planningMCPEnabled(env) ||
+    taskToolsEnabled(env) ||
+    mergeConfidenceMCPEnabled(env)
+  );
 }
 
 function planningMCPEnabled(env = process.env) {
@@ -213,7 +225,11 @@ function artifactMCPEnabled(env = process.env) {
 }
 
 function taskToolsEnabled(env = process.env) {
-  return artifactMCPEnabled(env) || publishLinksEnabled(env);
+  return (
+    artifactMCPEnabled(env) ||
+    publishLinksEnabled(env) ||
+    envFlag(env, "SUPERPLANE_OWNER_TOKEN")
+  );
 }
 
 function mergeConfidenceMCPEnabled(env = process.env) {

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"gorm.io/gorm"
 )
 
 func TestListTaskOwnerCandidates(t *testing.T) {
@@ -68,20 +69,23 @@ func TestListTaskOwnerCandidates(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestFactoryWorkOrder_AssignOwnerIfUnowned(t *testing.T) {
+func TestFactoryWorkOrder_AssignOwner(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	db := database.DB(t.Context())
 
 	_, userID, factoryModel := setupFactoryWithUser(t, "assign-owner")
 
-	t.Run("assigns an unowned task and records the reason", func(t *testing.T) {
+	t.Run("records persisted assignee differences and normalized reason", func(t *testing.T) {
+		other := createTaskOwnerMember(t, factoryModel.OrganizationID, "Other Person")
 		order, err := factoryModel.CreateWorkOrder(db, "Intake task", "", nil, nil, nil)
 		require.NoError(t, err)
+		// Keep the loaded association stale to verify the locked read owns the diff.
+		require.NoError(t, order.ReplaceAssignees(db, []uuid.UUID{other.ID}))
 
-		assigned, err := order.AssignOwnerIfUnowned(db, TaskOwnerAssignment{
+		assigned, err := order.AssignOwner(db, TaskOwnerAssignment{
 			UserID: userID,
 			Source: TaskOwnerSourceAgent,
-			Reason: "Changed pkg/payments/charge.go 3 times in 30 days.",
+			Reason: "Changed pkg/payments/charge.go\n3 times in 30 days. https://example.com",
 		})
 		require.NoError(t, err)
 		assert.True(t, assigned)
@@ -96,21 +100,57 @@ func TestFactoryWorkOrder_AssignOwnerIfUnowned(t *testing.T) {
 		assert.Equal(t, TaskOwnerSourceAgent, payload.Source)
 		assert.Equal(t, "Changed pkg/payments/charge.go 3 times in 30 days.", payload.Reason)
 		assert.Equal(t, []factory.UserRef{{ID: userID}}, payload.Assigned)
+		assert.Equal(t, []factory.UserRef{{ID: other.ID}}, payload.Unassigned)
 	})
 
-	t.Run("keeps an owner that a person chose", func(t *testing.T) {
+	t.Run("selecting a current assignee records only removals and is then idempotent", func(t *testing.T) {
 		other := createTaskOwnerMember(t, factoryModel.OrganizationID, "Other Person")
-		order, err := factoryModel.CreateWorkOrder(db, "Owned task", "", &userID, []uuid.UUID{userID}, nil)
+		order, err := factoryModel.CreateWorkOrder(db, "Owned task", "", &userID, []uuid.UUID{userID, other.ID}, nil)
 		require.NoError(t, err)
 
-		assigned, err := order.AssignOwnerIfUnowned(db, TaskOwnerAssignment{UserID: other.ID, Source: TaskOwnerSourceAgent})
+		assigned, err := order.AssignOwner(db, TaskOwnerAssignment{UserID: userID, Source: TaskOwnerSourceAgent, Reason: "Owns pkg/payments."})
+		require.NoError(t, err)
+		assert.True(t, assigned)
+		payload := latestAssigneesUpdated(t, order)
+		assert.Empty(t, payload.Assigned)
+		assert.Equal(t, []factory.UserRef{{ID: other.ID}}, payload.Unassigned)
+		assert.Equal(t, []uuid.UUID{userID}, order.AssigneeIDs())
+
+		before, err := factoryModel.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		eventsBefore, err := order.ListEvents(db, 0, nil)
+		require.NoError(t, err)
+		assigned, err = order.AssignOwner(db, TaskOwnerAssignment{UserID: userID, Source: TaskOwnerSourceAgent, Reason: "Same owner."})
 		require.NoError(t, err)
 		assert.False(t, assigned)
-
-		owners, err := order.ListAssignees(db)
+		after, err := factoryModel.FindWorkOrder(db, order.ID)
 		require.NoError(t, err)
-		require.Len(t, owners, 1)
-		assert.Equal(t, userID, owners[0].UserID)
+		assert.Equal(t, before.UpdatedAt, after.UpdatedAt)
+		eventsAfter, err := order.ListEvents(db, 0, nil)
+		require.NoError(t, err)
+		assert.Equal(t, eventsBefore, eventsAfter)
+	})
+
+	t.Run("rolls assignment and history back with the transaction", func(t *testing.T) {
+		other := createTaskOwnerMember(t, factoryModel.OrganizationID, "Other Person")
+		order, err := factoryModel.CreateWorkOrder(db, "Rollback task", "", nil, []uuid.UUID{userID}, nil)
+		require.NoError(t, err)
+		eventsBefore, err := order.ListEvents(db, 0, nil)
+		require.NoError(t, err)
+		rollback := fmt.Errorf("abort assignment")
+		err = db.Transaction(func(tx *gorm.DB) error {
+			changed, err := order.AssignOwner(tx, TaskOwnerAssignment{UserID: other.ID, Source: TaskOwnerSourceAgent, Reason: "Owns the code."})
+			require.NoError(t, err)
+			require.True(t, changed)
+			return rollback
+		})
+		require.ErrorIs(t, err, rollback)
+		persisted, err := factoryModel.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []uuid.UUID{userID}, persisted.AssigneeIDs())
+		eventsAfter, err := order.ListEvents(db, 0, nil)
+		require.NoError(t, err)
+		assert.Equal(t, eventsBefore, eventsAfter)
 	})
 }
 

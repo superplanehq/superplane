@@ -22,6 +22,10 @@ const (
 type EventName string
 
 const (
+	EventAccountDeleted             EventName = "account_deleted"
+	EventOrganizationDeleted        EventName = "organization_deleted"
+	EventFactoryDeleted             EventName = "factory_deleted"
+	EventPaymentMethodRemoved       EventName = "payment_method_removed"
 	EventOrganizationCreated        EventName = "organization_created"
 	EventFactoryOnboardingCompleted EventName = "factory_onboarding_completed"
 	EventFactoryTaskCreated         EventName = "factory_task_created"
@@ -50,6 +54,7 @@ const (
 	SourceMCP           Source = "mcp"
 	SourceAutomation    Source = "automation"
 	SourceGitHubWebhook Source = "github_webhook"
+	SourcePolarAPI      Source = "polar_api"
 )
 
 type Properties map[string]any
@@ -188,9 +193,15 @@ func (c *client) Capture(event Event) {
 	}
 	properties.
 		Set("schema_version", schemaVersion).
-		Set("organization_id", event.OrganizationID).
 		Set("actor_type", string(event.ActorType)).
 		Set("source", string(event.Source))
+	groups := posthog.NewGroups()
+	if strings.TrimSpace(event.OrganizationID) != "" {
+		properties.Set("organization_id", event.OrganizationID)
+		groups.Set(OrganizationGroup, event.OrganizationID)
+	} else {
+		delete(properties, "organization_id")
+	}
 	if event.FactoryID != "" {
 		properties.Set("factory_id", event.FactoryID)
 	}
@@ -202,7 +213,7 @@ func (c *client) Capture(event Event) {
 		DistinctId: event.DistinctID,
 		Event:      string(event.Name),
 		Properties: properties,
-		Groups:     posthog.NewGroups().Set(OrganizationGroup, event.OrganizationID),
+		Groups:     groups,
 	})
 	if err != nil {
 		log.WithError(err).WithField("event", event.Name).Warn("Failed to enqueue product analytics event")
@@ -262,14 +273,15 @@ func validEvent(event Event) bool {
 	return knownEvent(event.Name) &&
 		event.EventID != uuid.Nil &&
 		strings.TrimSpace(event.DistinctID) != "" &&
-		strings.TrimSpace(event.OrganizationID) != "" &&
+		(event.Name == EventAccountDeleted || strings.TrimSpace(event.OrganizationID) != "") &&
 		event.ActorType != "" &&
 		event.Source != ""
 }
 
 func knownEvent(name EventName) bool {
 	switch name {
-	case EventOrganizationCreated,
+	case EventAccountDeleted, EventOrganizationDeleted, EventFactoryDeleted, EventPaymentMethodRemoved,
+		EventOrganizationCreated,
 		EventFactoryOnboardingCompleted,
 		EventFactoryTaskCreated,
 		EventFactoryTaskRefined,

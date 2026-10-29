@@ -65,8 +65,6 @@ describe("OrgLLMCreditSection customer sync", () => {
     render(<OrgLLMCreditSection orgId="org-1" />);
     await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
     const panel = within(screen.getByRole("region", { name: "Billing diagnostics" }));
-    expect(await panel.findByRole("button", { name: "Sync customer from Polar" })).toBeDisabled();
-    await user.click(panel.getByRole("button", { name: "Check Polar" }));
     await waitFor(() => expect(panel.getByRole("button", { name: "Sync customer from Polar" })).toBeEnabled());
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
 

@@ -249,7 +249,7 @@ function useOrgBillingPlan(orgId: string, enabled: boolean) {
   );
   useEffect(() => {
     setPlan(null);
-    if (enabled) void loadDiagnostics();
+    if (enabled) void loadDiagnostics(true);
     return () => request.current?.abort();
   }, [enabled, loadDiagnostics]);
 

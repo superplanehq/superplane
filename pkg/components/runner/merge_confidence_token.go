@@ -221,6 +221,7 @@ func HasMergeConfidenceToken(environment []TaskEnvironmentVariable) bool {
 // order id. Other agent runs are unchanged. The work order id is removed from
 // the task environment after the token is minted.
 func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, steps []AgentStep, timeoutSeconds int) ([]TaskEnvironmentVariable, error) {
+	environment = withoutEnvironmentName(environment, EnvSuperplaneMergeConfidenceToken)
 	orderID, ok := environmentValue(environment, EnvSuperplaneMergeConfidenceOrderID)
 	if !ok {
 		return environment, nil
