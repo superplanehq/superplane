@@ -262,6 +262,59 @@ func TestReplaceConfigurationValues(t *testing.T) {
 	assert.Equal(t, configuration["command"], replaced.(map[string]any)["command"])
 }
 
+func TestReplaceLiteralCheckoutBase(t *testing.T) {
+	nodes := []models.Node{
+		{
+			ID: "scheduled-agent",
+			Configuration: map[string]any{
+				"environment": []any{
+					map[string]any{"name": "REPO_URL", "value": "https://github.com/acme/api.git"},
+					map[string]any{"name": "BASE", "value": "main"},
+				},
+				"repository": "main",
+			},
+		},
+		{
+			ID: "other",
+			Configuration: map[string]any{
+				"environment": []any{map[string]any{"name": "BASE", "value": "release"}},
+			},
+		},
+	}
+
+	assert.False(t, replaceLiteralCheckoutBase(nodes, "main", "main"))
+	assert.True(t, replaceLiteralCheckoutBase(nodes, "main", "master"))
+	assert.Equal(t, "master", nodes[0].Configuration["environment"].([]any)[1].(map[string]any)["value"])
+	assert.Equal(t, "https://github.com/acme/api.git", nodes[0].Configuration["environment"].([]any)[0].(map[string]any)["value"])
+	assert.Equal(t, "main", nodes[0].Configuration["repository"])
+	assert.Equal(t, "release", nodes[1].Configuration["environment"].([]any)[0].(map[string]any)["value"])
+}
+
+func TestReplaceLegacyCheckoutBaseToken(t *testing.T) {
+	nodes := []models.Node{
+		{
+			ID: implementationAgentNodeID,
+			Configuration: map[string]any{
+				"steps": []any{
+					map[string]any{"command": "git clone --branch ${BASE:-main} https://github.com/acme/main-service.git"},
+					map[string]any{"prompt": "Keep the main branch name in this prompt."},
+				},
+			},
+		},
+		{
+			ID:            "custom-runner",
+			Configuration: map[string]any{"command": "git clone --branch ${BASE:-main} https://example.com/repo.git"},
+		},
+	}
+
+	assert.True(t, replaceLegacyCheckoutBaseToken(nodes, map[string]bool{implementationAgentNodeID: true}))
+	command := nodes[0].Configuration["steps"].([]any)[0].(map[string]any)["command"]
+	assert.Equal(t, "git clone --branch ${BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')} https://github.com/acme/main-service.git", command)
+	assert.Equal(t, "Keep the main branch name in this prompt.", nodes[0].Configuration["steps"].([]any)[1].(map[string]any)["prompt"])
+	assert.Contains(t, nodes[1].Configuration["command"], "${BASE:-main}")
+	assert.False(t, replaceLegacyCheckoutBaseToken(nodes, map[string]bool{implementationAgentNodeID: true}))
+}
+
 func TestReplaceTriggerRepository(t *testing.T) {
 	nodes := []models.Node{
 		{Ref: models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}}, Configuration: map[string]any{"repository": "acme/old"}},

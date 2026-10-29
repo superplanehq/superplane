@@ -797,6 +797,64 @@ func capturePublishedRunLogs(t *testing.T) *publishedRunLogHook {
 	return hook
 }
 
+func Test__DispatchWorkOrder__RequiresASavedBranchBeforeImplement(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+	require.NoError(t, app.StampFactoryAppTemplate(db, entrypoint, "line-implementation", 1))
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	pinnedRepo := "acme/api"
+	pinnedBranch := "develop"
+	pinned, err := factoryModel.CreateWorkOrder(db, "Pinned task", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(pinned).Updates(map[string]any{
+		"repository":     pinnedRepo,
+		"default_branch": pinnedBranch,
+	}).Error)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   pinned.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Needs a branch", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.ErrorContains(t, err, "Set the default branch in Workspace settings → Repository before you start Implement.")
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, code)
+
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
+	_, err = order.FindActiveLineDispatch(db)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	branch := "develop"
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+}
+
 func uuidField(value any) (uuid.UUID, bool) {
 	switch typed := value.(type) {
 	case uuid.UUID:

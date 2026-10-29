@@ -2,9 +2,13 @@ package factories
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -17,11 +21,25 @@ import (
 )
 
 type repositoryBranchResolver struct {
-	gitHubBranches func(repository string) ([]string, error)
-	bitbucketHead  func(repository, branch string) (string, error)
+	gitHubBranches       func(repository string) ([]string, error)
+	gitHubDefault        func(repository string) (string, error)
+	bitbucketHead        func(repository, branch string) (string, error)
+	bitbucketDefault     func(repository string) (string, error)
+	bitbucketHasBranches func(repository string) (bool, error)
 }
 
 type repositoryBranchResolverKey struct{}
+
+// onboardingBranchCheck is the provider result used to choose a saved branch.
+// verifyErr and liveErr stay on the result because a failed lookup is not
+// always a failed save: a branch already saved can be kept.
+type onboardingBranchCheck struct {
+	exists          bool
+	live            string
+	repositoryEmpty bool
+	verifyErr       error
+	liveErr         error
+}
 
 func withRepositoryBranchResolver(ctx context.Context, resolver repositoryBranchResolver) context.Context {
 	return context.WithValue(ctx, repositoryBranchResolverKey{}, resolver)
@@ -30,6 +48,52 @@ func withRepositoryBranchResolver(ctx context.Context, resolver repositoryBranch
 func repositoryBranchResolverFrom(ctx context.Context) repositoryBranchResolver {
 	resolver, _ := ctx.Value(repositoryBranchResolverKey{}).(repositoryBranchResolver)
 	return resolver
+}
+
+// chooseVerifiedDefaultBranch decides which branch to save.
+// keepSaved means the caller must leave the stored branch unchanged.
+// repositoryEmpty is true only when the provider listed no branches.
+// An empty repository accepts the requested name so checkout can create it.
+// A repository that has other branches still rejects a missing name.
+func chooseVerifiedDefaultBranch(
+	requested, saved string,
+	exists bool,
+	verifyErr error,
+	live string,
+	liveErr error,
+	repositoryEmpty bool,
+) (string, bool, error) {
+	requested = strings.TrimSpace(requested)
+	saved = strings.TrimSpace(saved)
+	live = strings.TrimSpace(live)
+	if requested == "" {
+		return "", true, nil
+	}
+	if verifyErr != nil {
+		if saved != "" {
+			return "", true, nil
+		}
+		return "", false, invalidArgument("could not verify the default branch")
+	}
+	if exists {
+		return requested, false, nil
+	}
+	if repositoryEmpty {
+		return requested, false, nil
+	}
+	if liveErr != nil {
+		if saved != "" {
+			return "", true, nil
+		}
+		return "", false, invalidArgument("could not verify the default branch")
+	}
+	if live != "" {
+		return live, false, nil
+	}
+	if saved != "" {
+		return "", true, nil
+	}
+	return "", false, invalidArgument("default branch is required")
 }
 
 func chooseSavedBranch(repositoryChanged bool, requested, hostDefault string) (string, error) {
@@ -201,4 +265,313 @@ func openBitbucketClient(db *gorm.DB, deps IntakeDependencies, integration *mode
 		return nil, errFactoryBitbucketNotConnected
 	}
 	return buildBitbucketClient(db, deps, integration)
+}
+
+type coreHTTPClient struct {
+	client *http.Client
+}
+
+func (c coreHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	client := c.client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	return client.Do(req)
+}
+
+func providerHTTP() coreHTTPClient {
+	return coreHTTPClient{client: &http.Client{Timeout: 15 * time.Second}}
+}
+
+// defaultBranchFromCacheOrProvider keeps a cached branch. An empty cache
+// uses the provider value, or stays empty when that call fails.
+// keepSavedDefaultBranch leaves a branch the user already saved when the
+// provider does not report one for the same repository.
+func keepSavedDefaultBranch(current models.FactoryOnboardingConfig, repository, resolved string) string {
+	if strings.TrimSpace(resolved) != "" {
+		return strings.TrimSpace(resolved)
+	}
+	if !sameRepository(current.AppRepository, repository) {
+		return ""
+	}
+	return strings.TrimSpace(current.DefaultBranch)
+}
+
+func defaultBranchFromCacheOrProvider(cached string, live func() (string, error)) string {
+	if branch := strings.TrimSpace(cached); branch != "" {
+		return branch
+	}
+	if live == nil {
+		return ""
+	}
+	branch, err := live()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(branch)
+}
+
+func verifiedOnboardingDefaultBranch(
+	ctx context.Context,
+	deps IntakeDependencies,
+	db *gorm.DB,
+	orgID uuid.UUID,
+	organizationID string,
+	factory *models.Factory,
+	patch models.FactoryOnboardingPatch,
+) (models.FactoryOnboardingPatch, error) {
+	if patch.DefaultBranch == nil || factory == nil {
+		return patch, nil
+	}
+	requested := strings.TrimSpace(*patch.DefaultBranch)
+	if requested == "" {
+		patch.DefaultBranch = nil
+		return patch, nil
+	}
+
+	merged, err := factory.OnboardingConfigAfter(patch)
+	if err != nil {
+		return patch, err
+	}
+	// A saved branch belongs to the current repository. A different
+	// repository must not keep that name when the provider lookup fails.
+	current := factory.OnboardingConfigValue()
+	saved := ""
+	if sameRepository(current.AppRepository, merged.AppRepository) {
+		saved = strings.TrimSpace(current.DefaultBranch)
+	}
+	check := onboardingBranchVerification(ctx, deps, db, orgID, organizationID, merged, requested)
+	chosen, keepSaved, err := chooseVerifiedDefaultBranch(
+		requested,
+		saved,
+		check.exists,
+		check.verifyErr,
+		check.live,
+		check.liveErr,
+		check.repositoryEmpty,
+	)
+	if err != nil {
+		return patch, err
+	}
+	if keepSaved {
+		patch.DefaultBranch = nil
+		return patch, nil
+	}
+	patch.DefaultBranch = &chosen
+	return patch, nil
+}
+
+func onboardingBranchVerification(
+	ctx context.Context,
+	deps IntakeDependencies,
+	db *gorm.DB,
+	orgID uuid.UUID,
+	organizationID string,
+	config models.FactoryOnboardingConfig,
+	requested string,
+) onboardingBranchCheck {
+	repository := strings.TrimSpace(config.AppRepository)
+	if repository == "" {
+		return onboardingBranchCheck{verifyErr: invalidArgument("could not verify the default branch")}
+	}
+	if config.EffectiveVCSProvider() == models.ProviderBitbucket {
+		return bitbucketOnboardingBranchVerification(ctx, deps, db, orgID, config, repository, requested)
+	}
+	return githubOnboardingBranchVerification(ctx, deps, db, orgID, organizationID, config, repository, requested)
+}
+
+func githubOnboardingBranchVerification(
+	ctx context.Context,
+	deps IntakeDependencies,
+	db *gorm.DB,
+	orgID uuid.UUID,
+	organizationID string,
+	config models.FactoryOnboardingConfig,
+	repository, requested string,
+) onboardingBranchCheck {
+	integration, err := readyOnboardingVCSIntegration(db, orgID, config.VCSIntegrationID)
+	if err != nil {
+		return onboardingBranchCheck{verifyErr: err}
+	}
+	installationID, repositoryID := githubInstallationForRepository(ctx, db, organizationID, integration, repository)
+	names, err := gitHubBranchNames(ctx, deps, integration, repository, installationID, repositoryID)
+	if err != nil {
+		return onboardingBranchCheck{verifyErr: err}
+	}
+	if slices.Contains(names, requested) {
+		return onboardingBranchCheck{exists: true}
+	}
+	if len(names) == 0 {
+		return onboardingBranchCheck{repositoryEmpty: true}
+	}
+	live, liveErr := gitHubRepositoryDefaultBranch(ctx, deps, integration, repository, installationID, repositoryID)
+	return onboardingBranchCheck{live: live, liveErr: liveErr}
+}
+
+func gitHubRepositoryDefaultBranch(
+	ctx context.Context,
+	deps IntakeDependencies,
+	integration *models.Integration,
+	repository string,
+	installationID, repositoryID int64,
+) (string, error) {
+	if resolver := repositoryBranchResolverFrom(ctx).gitHubDefault; resolver != nil {
+		branch, err := resolver(repository)
+		return strings.TrimSpace(branch), err
+	}
+	if installationID > 0 && repositoryID > 0 {
+		if deps.Registry == nil {
+			return "", invalidArgument("could not verify the default branch")
+		}
+		app, ok := common.ResolveHostedApp(ctx)
+		if !ok {
+			return "", invalidArgument("could not verify the default branch")
+		}
+		return common.InstallationRepositoryDefaultBranch(
+			deps.Registry.HTTPContext(),
+			app.ID,
+			app.PrivateKey,
+			installationID,
+			repositoryID,
+			repository,
+		)
+	}
+	if deps.Registry == nil || integration == nil || integration.AppName != models.ProviderGitHub {
+		return "", invalidArgument("could not verify the default branch")
+	}
+	client, err := common.NewClient(
+		contexts.NewIntegrationContext(database.DB(ctx), nil, integration, deps.Encryptor, deps.Registry, nil),
+		deps.Registry.HTTPContext(),
+	)
+	if err != nil {
+		return "", err
+	}
+	repo, err := client.FindRepository(repository)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(repo.GetDefaultBranch()), nil
+}
+
+func githubInstallationForRepository(
+	ctx context.Context,
+	db *gorm.DB,
+	organizationID string,
+	integration *models.Integration,
+	repository string,
+) (int64, int64) {
+	if integration == nil {
+		return 0, 0
+	}
+	if _, err := models.FindVCSProviderIntegrationBinding(db, integration.ID); err != nil {
+		return 0, 0
+	}
+	catalog, err := findGitHubCatalogRepositoryByName(ctx, db, organizationID, repository)
+	if err != nil || catalog == nil {
+		return 0, 0
+	}
+	return catalog.InstallationID, catalog.RepositoryID
+}
+
+func bitbucketOnboardingBranchVerification(
+	ctx context.Context,
+	deps IntakeDependencies,
+	db *gorm.DB,
+	orgID uuid.UUID,
+	config models.FactoryOnboardingConfig,
+	repository, requested string,
+) onboardingBranchCheck {
+	integration, err := readyOnboardingVCSIntegration(db, orgID, config.VCSIntegrationID)
+	if err != nil {
+		return onboardingBranchCheck{verifyErr: err}
+	}
+	exists, verifyErr := bitbucketBranchExists(ctx, db, deps, integration, repository, requested)
+	if verifyErr != nil || exists {
+		return onboardingBranchCheck{exists: exists, verifyErr: verifyErr}
+	}
+	live, liveErr := bitbucketRepositoryDefaultBranch(ctx, db, deps, integration, repository)
+	if liveErr != nil || strings.TrimSpace(live) != "" {
+		return onboardingBranchCheck{live: live, liveErr: liveErr}
+	}
+	hasBranches, hasErr := bitbucketRepositoryHasBranches(ctx, db, deps, integration, repository)
+	if hasErr != nil {
+		return onboardingBranchCheck{verifyErr: hasErr}
+	}
+	return onboardingBranchCheck{repositoryEmpty: !hasBranches}
+}
+
+func bitbucketBranchExists(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	integration *models.Integration,
+	repository, branch string,
+) (bool, error) {
+	if resolver := repositoryBranchResolverFrom(ctx).bitbucketHead; resolver != nil {
+		head, err := resolver(repository, branch)
+		if err != nil {
+			return false, err
+		}
+		return strings.TrimSpace(head) != "", nil
+	}
+	client, err := openBitbucketClient(db, deps, integration)
+	if err != nil {
+		return false, err
+	}
+	head, err := client.GetBranchHead(repository, branch)
+	if err != nil {
+		var apiErr *bitbucketintegration.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	return strings.TrimSpace(head) != "", nil
+}
+
+func bitbucketRepositoryDefaultBranch(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	integration *models.Integration,
+	repository string,
+) (string, error) {
+	if resolver := repositoryBranchResolverFrom(ctx).bitbucketDefault; resolver != nil {
+		branch, err := resolver(repository)
+		return strings.TrimSpace(branch), err
+	}
+	client, err := openBitbucketClient(db, deps, integration)
+	if err != nil {
+		return "", err
+	}
+	branch, err := client.GetMainBranch(repository)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(branch), nil
+}
+
+func bitbucketRepositoryHasBranches(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	integration *models.Integration,
+	repository string,
+) (bool, error) {
+	if resolver := repositoryBranchResolverFrom(ctx).bitbucketHasBranches; resolver != nil {
+		return resolver(repository)
+	}
+	client, err := openBitbucketClient(db, deps, integration)
+	if err != nil {
+		return false, err
+	}
+	return client.RepositoryHasBranches(repository)
+}
+
+func readyOnboardingVCSIntegration(db *gorm.DB, orgID uuid.UUID, integrationID string) (*models.Integration, error) {
+	integrationID = strings.TrimSpace(integrationID)
+	if integrationID == "" {
+		return nil, nil
+	}
+	return findReadyOnboardingIntegration(db, orgID, integrationID)
 }

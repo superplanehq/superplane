@@ -216,6 +216,9 @@ func dispatchWorkOrderOnLineTx(
 	if err := validateLineThinkingLevel(tx, currentLine, normalizedThinking); err != nil {
 		return nil, err
 	}
+	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
+		return nil, err
+	}
 
 	fromState := order.State
 	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
@@ -270,6 +273,47 @@ func dispatchWorkOrderOnLineTx(
 		fromState:    fromState,
 		logger:       logger,
 	}, nil
+}
+
+// requireSavedBranchForImplementation stops Implement when checkout would
+// discover a branch the later pull request cannot read. Create pull request
+// uses the saved task branch. An empty value fails after commits are pushed.
+// Read-only lines still start and follow the remote default.
+func requireSavedBranchForImplementation(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	line *models.FactoryLine,
+	startIndex int,
+) error {
+	if line == nil || startIndex < 0 || startIndex >= len(line.Steps) {
+		return nil
+	}
+	appID := line.Steps[startIndex].AppID
+	if appID == uuid.Nil {
+		return nil
+	}
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, []uuid.UUID{appID})
+	if err != nil {
+		return err
+	}
+	if models.FactoryAppTemplateID(specs[appID].Nodes) != lineImplementationTemplateID {
+		return nil
+	}
+	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
+		return nil
+	}
+	return invalidArgument("Set the default branch in Workspace settings → Repository before you start Implement.")
+}
+
+// resolvedWorkOrderDefaultBranch matches resolveOrderRepository. A task
+// snapshot is used only when it has both a repository and a branch.
+// Otherwise the workspace branch is the branch Implement will publish to.
+func resolvedWorkOrderDefaultBranch(order *models.FactoryWorkOrder, config models.FactoryOnboardingConfig) string {
+	if order != nil && strings.TrimSpace(derefString(order.Repository)) != "" && strings.TrimSpace(derefString(order.DefaultBranch)) != "" {
+		return strings.TrimSpace(derefString(order.DefaultBranch))
+	}
+	return strings.TrimSpace(config.DefaultBranch)
 }
 
 func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {

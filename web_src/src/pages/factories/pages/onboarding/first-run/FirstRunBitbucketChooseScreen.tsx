@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Loader2 } from "lucide-react";
 
-import { RepositoryPicker } from "../onboardingSteps";
+import { RepositoryDefaultBranchPicker, RepositoryPicker } from "../onboardingSteps";
+import { repositoryBranchChosen, type RepositoryBranchPrompt } from "../repositoryBranchPrompt";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
@@ -23,6 +24,7 @@ export function FirstRunBitbucketChooseScreen({
   onConnect,
   onSelectRepository,
   onContinue,
+  branchPrompt,
 }: {
   connected: boolean;
   repositories: string[];
@@ -35,6 +37,7 @@ export function FirstRunBitbucketChooseScreen({
   onConnect: () => void;
   onSelectRepository: (repository: string) => void;
   onContinue: () => void;
+  branchPrompt?: RepositoryBranchPrompt;
 }) {
   if (!connected) {
     return (
@@ -74,11 +77,12 @@ export function FirstRunBitbucketChooseScreen({
           disabled={busy}
           onSelectRepository={onSelectRepository}
         />
+        {branchPrompt ? <RepositoryDefaultBranchPicker prompt={branchPrompt} /> : null}
         <div className="space-y-2">
           <LoadingButton
             type="button"
             className="w-full"
-            disabled={!selectedRepository || busy}
+            disabled={!selectedRepository || busy || !repositoryBranchChosen(branchPrompt)}
             loading={saving}
             loadingText={chooseCopy.saving}
             onClick={onContinue}

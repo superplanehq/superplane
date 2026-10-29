@@ -1,4 +1,14 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/alertDialog";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
@@ -32,8 +42,16 @@ export function FactorySettingsRepositoryPage() {
     catalogRepositories: choices.catalogRepositories,
   });
   const canUpdate = canAct("factories", "update");
+  const [confirmTasks, setConfirmTasks] = useState(false);
 
   usePageTitle(["Repository", "Settings", factory.name ?? "Workspace"]);
+  const requestSave = () => {
+    if (draft.branch.trim() !== draft.savedBranch) {
+      setConfirmTasks(true);
+      return;
+    }
+    void draft.save();
+  };
 
   return (
     <FactorySettingsPageFrame title="Repository" subtitle={repositorySettingsSubtitle(choices.bitbucket)}>
@@ -69,7 +87,7 @@ export function FactorySettingsRepositoryPage() {
                 permissionsLoading ||
                 draft.isSaving
               }
-              onClick={draft.save}
+              onClick={requestSave}
               data-testid="factory-settings-repository-save"
             >
               Save repository
@@ -77,7 +95,46 @@ export function FactorySettingsRepositoryPage() {
           </PermissionTooltip>
         </div>
       </FactorySettingsCard>
+      <UpdateUnfinishedTasksDialog
+        open={confirmTasks}
+        previousBranch={draft.savedBranch}
+        nextBranch={draft.branch.trim()}
+        onOpenChange={setConfirmTasks}
+        onConfirm={() => {
+          setConfirmTasks(false);
+          void draft.save();
+        }}
+      />
     </FactorySettingsPageFrame>
+  );
+}
+
+function UpdateUnfinishedTasksDialog(props: {
+  open: boolean;
+  previousBranch: string;
+  nextBranch: string;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  const previous = props.previousBranch.trim();
+  const description = previous
+    ? `Unfinished tasks with no branch, or with "${previous}", will use "${props.nextBranch}". Closed tasks stay unchanged.`
+    : `Unfinished tasks with no branch will use "${props.nextBranch}". Closed tasks stay unchanged.`;
+  return (
+    <AlertDialog open={props.open} onOpenChange={props.onOpenChange}>
+      <AlertDialogContent data-testid="factory-settings-update-tasks-dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Update unfinished tasks</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="factory-settings-update-tasks-cancel">Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={props.onConfirm} data-testid="factory-settings-update-tasks-confirm">
+            Update tasks
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
