@@ -187,6 +187,33 @@ func Test__PlanActivationRecordsRejectedAndRecoveredSnapshotsCorrectly(t *testin
 	recovered.ModifiedAt = new(pastDue.ModifiedAt.Add(time.Minute))
 	applyPolarApplied(t, db, r.Organization.ID, recovered)
 	assert.Empty(t, activationKeys(t, r.Organization.ID), "recovery within grace")
+
+	for _, recovery := range []struct {
+		name       string
+		failureAge time.Duration
+		graceDays  int
+	}{
+		{name: "expired grace", failureAge: 8 * day, graceDays: 7},
+		{name: "shortened grace", failureAge: 2 * day, graceDays: 1},
+		{name: "disabled grace", failureAge: day, graceDays: 0},
+	} {
+		t.Run(recovery.name, func(t *testing.T) {
+			setPastDueGraceDays(t, 7)
+			pastDue.ModifiedAt = new(recovered.ModifiedAt.Add(time.Minute))
+			applyPolarApplied(t, db, r.Organization.ID, pastDue)
+			// Let access end without resolving the stored paid catalog row.
+			require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).
+				Where("organization_id = ?", r.Organization.ID).
+				Update("past_due_since", time.Now().Add(-recovery.failureAge)).Error)
+			require.NoError(t, billingmodels.UpdatePastDueGraceDays(db, recovery.graceDays))
+			before := activationKeys(t, r.Organization.ID)
+			recovered.ModifiedAt = new(pastDue.ModifiedAt.Add(time.Minute))
+			applyPolarApplied(t, db, r.Organization.ID, recovered)
+			assert.Equal(t, append(before, billingmodels.PlanActivationKeyTeam), activationKeys(t, r.Organization.ID))
+			applyPolarApplied(t, db, r.Organization.ID, recovered)
+			assert.Len(t, activationKeys(t, r.Organization.ID), len(before)+1, "replayed recovery")
+		})
+	}
 }
 
 func Test__PlanActivationRecordsAdminAssignmentsOncePerTransition(t *testing.T) {

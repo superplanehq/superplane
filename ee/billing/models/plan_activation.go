@@ -52,13 +52,28 @@ func NewPlanActivation(orgID uuid.UUID, planKey string, activatedAt time.Time) P
 	}
 }
 
-// activePlanKey returns the catalog key of the plan that grants paid access
-// now, or an empty string when no such plan is active.
-func (p *OrganizationBillingPlan) activePlanKey() string {
-	if p == nil || !p.IsActiveBusiness() {
-		return ""
+// activePlanKey returns the catalog key that grants paid access at the
+// activation time, even when the stored row has not been resolved.
+func (p *OrganizationBillingPlan) activePlanKey(tx *gorm.DB, at time.Time) (string, error) {
+	if p == nil || !p.isPaidPlan() {
+		return "", nil
 	}
-	return p.Catalog.Key
+	if p.PlanSource == BillingPlanSourceAdmin ||
+		p.PlanSource == BillingPlanSourceSystem && p.Catalog.ID != uuid.Nil && p.Catalog.PolarProductID == nil && p.Catalog.PriceCents == 0 ||
+		polarPaidAccessContinues(p, at) {
+		return p.Catalog.Key, nil
+	}
+	if !p.holdsPastDueGraceRow() {
+		return "", nil
+	}
+	graceDays, err := installationPastDueGraceDays(tx)
+	if err != nil {
+		return "", err
+	}
+	if !p.pastDueGraceOpen(at, graceDays) {
+		return "", nil
+	}
+	return p.Catalog.Key, nil
 }
 
 // recordPlanActivation writes an activation when next makes a target plan
@@ -66,8 +81,18 @@ func (p *OrganizationBillingPlan) activePlanKey() string {
 // a source-only change, or a renewal keeps the same active key and writes
 // nothing.
 func recordPlanActivation(tx *gorm.DB, previous, next *OrganizationBillingPlan, at time.Time) error {
-	key := next.activePlanKey()
-	if !slices.Contains(planActivationKeys, key) || previous.activePlanKey() == key {
+	key, err := next.activePlanKey(tx, at)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(planActivationKeys, key) {
+		return nil
+	}
+	previousKey, err := previous.activePlanKey(tx, at)
+	if err != nil {
+		return err
+	}
+	if previousKey == key {
 		return nil
 	}
 	activation := NewPlanActivation(next.OrganizationID, key, at)
