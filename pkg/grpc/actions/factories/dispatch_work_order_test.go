@@ -855,6 +855,47 @@ func Test__DispatchWorkOrder__RequiresASavedBranchBeforeImplement(t *testing.T) 
 	require.Len(t, response.Order.LineDispatches, 1)
 }
 
+func Test__DispatchWorkOrder__RequiresASavedBranchBeforeALaterImplementStep(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	refine, refineEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "refine", "start-refine")
+	implement, implementEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+	require.NoError(t, implement.StampFactoryAppTemplate(db, implementEntry, "line-implementation", 1))
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: refine.ID, Entrypoint: refineEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: implementEntry},
+	})
+	require.NoError(t, err)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Needs a branch", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.ErrorContains(t, err, "Set the default branch in Workspace settings → Repository before you start Implement.")
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
+
+	readOnly, err := factoryModel.CreateLine(db, "refine-only", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: refine.ID, Entrypoint: refineEntry},
+	})
+	require.NoError(t, err)
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  readOnly.Name,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, response.Order.LineDispatches)
+}
+
 func uuidField(value any) (uuid.UUID, bool) {
 	switch typed := value.(type) {
 	case uuid.UUID:

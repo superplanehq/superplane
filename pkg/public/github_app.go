@@ -371,9 +371,74 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 			time.Now().Add(10*time.Second),
 			models.VCSProviderRepositorySyncPriorityInteractive,
 		)
+
+	case *gh.RepositoryEvent:
+		action := event.GetAction()
+		if action != "edited" && action != "renamed" {
+			return nil
+		}
+		repo := event.GetRepo()
+		if repo == nil {
+			return nil
+		}
+		return refreshGitHubCatalogDefaultBranch(tx, installationID, repo.GetID(), repo.GetFullName(), repo.Private, repo.GetDefaultBranch())
+
+	case *gh.PushEvent:
+		if !event.GetCreated() || !strings.HasPrefix(event.GetRef(), "refs/heads/") {
+			return nil
+		}
+		repo := event.GetRepo()
+		if repo == nil {
+			return nil
+		}
+		return refreshGitHubCatalogDefaultBranch(tx, installationID, repo.GetID(), repo.GetFullName(), repo.Private, repo.GetDefaultBranch())
 	}
 
 	return nil
+}
+
+// refreshGitHubCatalogDefaultBranch stores the branch GitHub reports after
+// an edit, a rename, or the first push. A missing catalog row is reconciled
+// later instead of inserting a partial repository.
+func refreshGitHubCatalogDefaultBranch(
+	tx *gorm.DB,
+	installationID, repositoryID int64,
+	fullName string,
+	private *bool,
+	defaultBranch string,
+) error {
+	if repositoryID <= 0 {
+		return nil
+	}
+	existing, err := models.FindVCSProviderRepository(tx, models.ProviderGitHub, repositoryID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.EnqueueVCSProviderReconciliation(tx, models.ProviderGitHub, time.Now())
+	}
+	if err != nil {
+		return err
+	}
+	fullName = strings.TrimSpace(fullName)
+	if fullName == "" {
+		fullName = existing.FullName
+	}
+	defaultBranch = strings.TrimSpace(defaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = existing.DefaultBranch
+	}
+	isPrivate := existing.Private
+	if private != nil {
+		isPrivate = *private
+	}
+	if installationID <= 0 {
+		installationID = existing.InstallationID
+	}
+	return models.UpsertVCSProviderRepositories(tx, models.ProviderGitHub, installationID, []models.VCSProviderRepository{{
+		RepositoryID:   repositoryID,
+		InstallationID: installationID,
+		FullName:       fullName,
+		Private:        isPrivate,
+		DefaultBranch:  defaultBranch,
+	}})
 }
 
 func enqueueWebhookRepositories(tx *gorm.DB, repositories []models.VCSProviderRepository) error {

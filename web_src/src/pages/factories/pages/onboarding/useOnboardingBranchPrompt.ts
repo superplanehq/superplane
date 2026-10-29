@@ -2,11 +2,7 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useMemo } from "react";
 
 import type { RepositoryBranchPrompt } from "./repositoryBranchPrompt";
-import { repositoryBranchChoices } from "../settings/useFactoryRepositoryDraft";
-
-function branchNames(resources: { name?: string | null; id?: string | null }[] | undefined) {
-  return (resources ?? []).map((resource) => resource.name?.trim() || resource.id?.trim() || "").filter(Boolean);
-}
+import { branchNames, repositoryBranchChoices } from "../settings/useFactoryRepositoryDraft";
 
 /** Branch list for the repository step. Shown only when no branch is known. */
 export function useOnboardingBranchPrompt(args: {

@@ -35,8 +35,11 @@ describe("FactorySettingsRepositoryPage", () => {
     const saveButton = within(settings).getByTestId("factory-settings-repository-save");
     await waitFor(() => expect(saveButton).toBeEnabled());
     fireEvent.click(saveButton);
-    const confirmTasks = screen.queryByTestId("factory-settings-update-tasks-confirm");
-    if (confirmTasks) fireEvent.click(confirmTasks);
+    const dialog = await screen.findByTestId("factory-settings-update-tasks-dialog");
+    expect(dialog).toHaveTextContent(/acme\/api/);
+    expect(dialog).toHaveTextContent(/acme\/web/);
+    expect(dialog).toHaveTextContent("Save without updating tasks keeps current tasks on their repository and branch.");
+    fireEvent.click(await screen.findByTestId("factory-settings-update-tasks-confirm"));
 
     await waitFor(() => expect(saveButton).toBeDisabled());
     expect(within(settings).getByRole("option", { name: /acme\/web/i })).toHaveAttribute("aria-selected", "true");
@@ -94,7 +97,7 @@ describe("FactorySettingsRepositoryPage", () => {
     );
 
     const settings = await screen.findByTestId("factory-settings-repository", {}, { timeout: 8000 });
-    const saves: { repository?: string; defaultBranch?: string }[] = [];
+    const saves: { repository?: string; defaultBranch?: string; retargetTasks?: boolean }[] = [];
     const currentFetch = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
       const target = requestTarget(input);
@@ -114,7 +117,46 @@ describe("FactorySettingsRepositoryPage", () => {
       await user.click(saveButton);
       await user.click(await screen.findByTestId("factory-settings-update-tasks-confirm"));
 
-      await waitFor(() => expect(saves).toEqual([{ repository: "acme/api", defaultBranch: "develop" }]));
+      await waitFor(() =>
+        expect(saves).toEqual([{ repository: "acme/api", defaultBranch: "develop", retargetTasks: true }]),
+      );
+    } finally {
+      globalThis.fetch = currentFetch;
+    }
+  }, 10000);
+
+  it("saves a branch without moving unfinished tasks", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/repository`}
+        factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent)}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
+    const settings = await screen.findByTestId("factory-settings-repository", {}, { timeout: 8000 });
+    const saves: { repository?: string; defaultBranch?: string; retargetTasks?: boolean }[] = [];
+    const currentFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const target = requestTarget(input);
+      if (target.includes("/repository") && requestMethodFrom(input, init) !== "GET") {
+        saves.push(await readSaveBody(input, init));
+      }
+      return currentFetch(input, init);
+    };
+    try {
+      const branch = await within(settings).findByTestId("factory-settings-default-branch");
+      await user.click(branch);
+      await user.click(await screen.findByRole("option", { name: "develop" }));
+      const saveButton = within(settings).getByTestId("factory-settings-repository-save");
+      await waitFor(() => expect(saveButton).toBeEnabled());
+      await user.click(saveButton);
+      await user.click(await screen.findByTestId("factory-settings-update-tasks-keep"));
+
+      await waitFor(() =>
+        expect(saves).toEqual([{ repository: "acme/api", defaultBranch: "develop", retargetTasks: false }]),
+      );
     } finally {
       globalThis.fetch = currentFetch;
     }
@@ -134,12 +176,16 @@ function requestMethodFrom(input: RequestInfo | URL, init?: RequestInit): string
 async function readSaveBody(
   input: RequestInfo | URL,
   init?: RequestInit,
-): Promise<{ repository?: string; defaultBranch?: string }> {
+): Promise<{ repository?: string; defaultBranch?: string; retargetTasks?: boolean }> {
   if (typeof init?.body === "string" && init.body) {
-    return JSON.parse(init.body) as { repository?: string; defaultBranch?: string };
+    return JSON.parse(init.body) as { repository?: string; defaultBranch?: string; retargetTasks?: boolean };
   }
   if (input instanceof Request) {
-    return (await input.clone().json()) as { repository?: string; defaultBranch?: string };
+    return (await input.clone().json()) as {
+      repository?: string;
+      defaultBranch?: string;
+      retargetTasks?: boolean;
+    };
   }
   return {};
 }

@@ -278,7 +278,9 @@ func dispatchWorkOrderOnLineTx(
 // requireSavedBranchForImplementation stops Implement when checkout would
 // discover a branch the later pull request cannot read. Create pull request
 // uses the saved task branch. An empty value fails after commits are pushed.
-// Read-only lines still start and follow the remote default.
+// The check covers every step from the start index, so a line that reaches
+// Implement later cannot start without a saved branch. Read-only lines still
+// start and follow the remote default.
 func requireSavedBranchForImplementation(
 	tx *gorm.DB,
 	factory *models.Factory,
@@ -289,21 +291,64 @@ func requireSavedBranchForImplementation(
 	if line == nil || startIndex < 0 || startIndex >= len(line.Steps) {
 		return nil
 	}
-	appID := line.Steps[startIndex].AppID
-	if appID == uuid.Nil {
-		return nil
+	appIDs := make([]uuid.UUID, 0, len(line.Steps)-startIndex)
+	for _, step := range line.Steps[startIndex:] {
+		appIDs = append(appIDs, step.AppID)
 	}
-	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, []uuid.UUID{appID})
-	if err != nil {
+	blocked, err := implementStepsMissingSavedBranch(tx, factory, order, appIDs)
+	if err != nil || !blocked {
 		return err
 	}
-	if models.FactoryAppTemplateID(specs[appID].Nodes) != lineImplementationTemplateID {
-		return nil
+	return invalidArgument("Set the default branch in Workspace settings → Repository before you start Implement.")
+}
+
+// ImplementStepBlockedByMissingBranch reports whether this app is Implement
+// and the task has no branch to publish to. A database error is returned
+// separately so a caller can retry that lookup.
+func ImplementStepBlockedByMissingBranch(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	appID uuid.UUID,
+) (bool, error) {
+	return implementStepsMissingSavedBranch(tx, factory, order, []uuid.UUID{appID})
+}
+
+func implementStepsMissingSavedBranch(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	appIDs []uuid.UUID,
+) (bool, error) {
+	if factory == nil {
+		return false, nil
+	}
+	ids := make([]uuid.UUID, 0, len(appIDs))
+	for _, appID := range appIDs {
+		if appID != uuid.Nil {
+			ids = append(ids, appID)
+		}
+	}
+	if len(ids) == 0 {
+		return false, nil
 	}
 	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
-		return nil
+		return false, nil
 	}
-	return invalidArgument("Set the default branch in Workspace settings → Repository before you start Implement.")
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, ids)
+	if err != nil {
+		return false, err
+	}
+	for _, appID := range ids {
+		spec, ok := specs[appID]
+		if !ok {
+			continue
+		}
+		if models.FactoryAppTemplateID(spec.Nodes) == lineImplementationTemplateID {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // resolvedWorkOrderDefaultBranch matches resolveOrderRepository. A task

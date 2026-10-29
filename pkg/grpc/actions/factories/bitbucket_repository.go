@@ -2,10 +2,12 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/bitbucketapp"
+	"github.com/superplanehq/superplane/pkg/core"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -54,21 +56,19 @@ func visibleBitbucketRepositories(ctx context.Context, db *gorm.DB, accountUUID 
 	})
 }
 
-func bitbucketLiveDefaultBranch(installationID, repository string) (string, error) {
+func bitbucketLiveDefaultBranch(httpCtx core.HTTPContext, installationID, repository string) (string, error) {
+	if httpCtx == nil {
+		return "", errors.New("bitbucket default branch is unavailable")
+	}
 	token, _, err := bitbucketapp.CurrentSystemToken(installationID)
 	if err != nil {
 		return "", err
 	}
-	client := &bitbucket.Client{
+	return bitbucketClientDefaultBranch(&bitbucket.Client{
 		AuthType: bitbucket.AuthTypeForgeApp,
 		Token:    token,
-		HTTP:     providerHTTP(),
-	}
-	branch, err := client.GetMainBranch(repository)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(branch), nil
+		HTTP:     httpCtx,
+	}, repository)
 }
 
 func findVisibleBitbucketRepository(ctx context.Context, db *gorm.DB, accountUUID, repositoryName string) (*bitbucket.VisibleRepository, error) {

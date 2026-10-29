@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -31,8 +30,8 @@ type repositoryBranchResolver struct {
 type repositoryBranchResolverKey struct{}
 
 // onboardingBranchCheck is the provider result used to choose a saved branch.
-// verifyErr and liveErr stay on the result because a failed lookup is not
-// always a failed save: a branch already saved can be kept.
+// A failed lookup keeps a saved branch only when the request names that
+// same branch. A different requested name is rejected.
 type onboardingBranchCheck struct {
 	exists          bool
 	live            string
@@ -55,34 +54,26 @@ func repositoryBranchResolverFrom(ctx context.Context) repositoryBranchResolver 
 // repositoryEmpty is true only when the provider listed no branches.
 // An empty repository accepts the requested name so checkout can create it.
 // A repository that has other branches still rejects a missing name.
-func chooseVerifiedDefaultBranch(
-	requested, saved string,
-	exists bool,
-	verifyErr error,
-	live string,
-	liveErr error,
-	repositoryEmpty bool,
-) (string, bool, error) {
+// A failed check keeps the saved branch only when the request names it.
+// A different requested name returns an error so the caller can retry.
+func chooseVerifiedDefaultBranch(requested, saved string, check onboardingBranchCheck) (string, bool, error) {
 	requested = strings.TrimSpace(requested)
 	saved = strings.TrimSpace(saved)
-	live = strings.TrimSpace(live)
+	live := strings.TrimSpace(check.live)
 	if requested == "" {
 		return "", true, nil
 	}
-	if verifyErr != nil {
-		if saved != "" {
+	if check.verifyErr != nil {
+		if saved != "" && requested == saved {
 			return "", true, nil
 		}
 		return "", false, invalidArgument("could not verify the default branch")
 	}
-	if exists {
+	if check.exists || check.repositoryEmpty {
 		return requested, false, nil
 	}
-	if repositoryEmpty {
-		return requested, false, nil
-	}
-	if liveErr != nil {
-		if saved != "" {
+	if check.liveErr != nil {
+		if saved != "" && requested == saved {
 			return "", true, nil
 		}
 		return "", false, invalidArgument("could not verify the default branch")
@@ -267,24 +258,6 @@ func openBitbucketClient(db *gorm.DB, deps IntakeDependencies, integration *mode
 	return buildBitbucketClient(db, deps, integration)
 }
 
-type coreHTTPClient struct {
-	client *http.Client
-}
-
-func (c coreHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	client := c.client
-	if client == nil {
-		client = http.DefaultClient
-	}
-	return client.Do(req)
-}
-
-func providerHTTP() coreHTTPClient {
-	return coreHTTPClient{client: &http.Client{Timeout: 15 * time.Second}}
-}
-
-// defaultBranchFromCacheOrProvider keeps a cached branch. An empty cache
-// uses the provider value, or stays empty when that call fails.
 // keepSavedDefaultBranch leaves a branch the user already saved when the
 // provider does not report one for the same repository.
 func keepSavedDefaultBranch(current models.FactoryOnboardingConfig, repository, resolved string) string {
@@ -297,18 +270,20 @@ func keepSavedDefaultBranch(current models.FactoryOnboardingConfig, repository, 
 	return strings.TrimSpace(current.DefaultBranch)
 }
 
+// defaultBranchFromCacheOrProvider prefers the live provider branch.
+// The cached value is used only when the live call is missing, fails,
+// or returns a blank name.
 func defaultBranchFromCacheOrProvider(cached string, live func() (string, error)) string {
-	if branch := strings.TrimSpace(cached); branch != "" {
-		return branch
+	cached = strings.TrimSpace(cached)
+	if live != nil {
+		branch, err := live()
+		if err == nil {
+			if branch = strings.TrimSpace(branch); branch != "" {
+				return branch
+			}
+		}
 	}
-	if live == nil {
-		return ""
-	}
-	branch, err := live()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(branch)
+	return cached
 }
 
 func verifiedOnboardingDefaultBranch(
@@ -320,14 +295,22 @@ func verifiedOnboardingDefaultBranch(
 	factory *models.Factory,
 	patch models.FactoryOnboardingPatch,
 ) (models.FactoryOnboardingPatch, error) {
-	if patch.DefaultBranch == nil || factory == nil {
+	if factory == nil {
 		return patch, nil
 	}
-	requested := strings.TrimSpace(*patch.DefaultBranch)
-	if requested == "" {
+	current := factory.OnboardingConfigValue()
+	repositoryChanged := patch.AppRepository != nil && !sameRepository(current.AppRepository, *patch.AppRepository)
+	if patch.DefaultBranch == nil || strings.TrimSpace(*patch.DefaultBranch) == "" {
+		// A new repository must not keep the previous repository's branch.
+		if repositoryChanged {
+			empty := ""
+			patch.DefaultBranch = &empty
+			return patch, nil
+		}
 		patch.DefaultBranch = nil
 		return patch, nil
 	}
+	requested := strings.TrimSpace(*patch.DefaultBranch)
 
 	merged, err := factory.OnboardingConfigAfter(patch)
 	if err != nil {
@@ -335,21 +318,12 @@ func verifiedOnboardingDefaultBranch(
 	}
 	// A saved branch belongs to the current repository. A different
 	// repository must not keep that name when the provider lookup fails.
-	current := factory.OnboardingConfigValue()
 	saved := ""
 	if sameRepository(current.AppRepository, merged.AppRepository) {
 		saved = strings.TrimSpace(current.DefaultBranch)
 	}
 	check := onboardingBranchVerification(ctx, deps, db, orgID, organizationID, merged, requested)
-	chosen, keepSaved, err := chooseVerifiedDefaultBranch(
-		requested,
-		saved,
-		check.exists,
-		check.verifyErr,
-		check.live,
-		check.liveErr,
-		check.repositoryEmpty,
-	)
+	chosen, keepSaved, err := chooseVerifiedDefaultBranch(requested, saved, check)
 	if err != nil {
 		return patch, err
 	}
@@ -543,6 +517,13 @@ func bitbucketRepositoryDefaultBranch(
 	client, err := openBitbucketClient(db, deps, integration)
 	if err != nil {
 		return "", err
+	}
+	return bitbucketClientDefaultBranch(client, repository)
+}
+
+func bitbucketClientDefaultBranch(client *bitbucketintegration.Client, repository string) (string, error) {
+	if client == nil {
+		return "", errors.New("bitbucket client is required")
 	}
 	branch, err := client.GetMainBranch(repository)
 	if err != nil {

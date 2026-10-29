@@ -88,7 +88,7 @@ func TestReconcileFactoryRepositoryPublishesManagedRunnerCredentials(t *testing.
 			}))
 			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 				return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
-					previousID, selectedID, "old-workspace/api", "old-workspace/api", branch, repository)
+					previousID, selectedID, "old-workspace/api", "old-workspace/api", branch, repository, true)
 			}))
 			reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
 			require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestUpdateFactoryRepositorySynchronizesHostedBindingAccess(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	selected, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+	selected, err := SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 		Id:           factory.ID.String(),
 		Provider:     models.ProviderGitHub,
 		RepositoryId: 201,
@@ -228,7 +228,7 @@ func TestReconcileFactoryRepositoryUpdatesLegacyEvidenceComments(t *testing.T) {
 	}))
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
-			previousID, selectedID, "old-workspace/api", "old-workspace/api", branch, repository)
+			previousID, selectedID, "old-workspace/api", "old-workspace/api", branch, repository, true)
 	}))
 
 	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
@@ -309,7 +309,7 @@ func TestReplaceLegacyCheckoutBaseToken(t *testing.T) {
 
 	assert.True(t, replaceLegacyCheckoutBaseToken(nodes, map[string]bool{implementationAgentNodeID: true}))
 	command := nodes[0].Configuration["steps"].([]any)[0].(map[string]any)["command"]
-	assert.Equal(t, "git clone --branch ${BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')} https://github.com/acme/main-service.git", command)
+	assert.Equal(t, "git clone --branch ${BASE:-$(git symbolic-ref -q --short refs/remotes/origin/HEAD | sed 's#^origin/##' || true)} https://github.com/acme/main-service.git", command)
 	assert.Equal(t, "Keep the main branch name in this prompt.", nodes[0].Configuration["steps"].([]any)[1].(map[string]any)["prompt"])
 	assert.Contains(t, nodes[1].Configuration["command"], "${BASE:-main}")
 	assert.False(t, replaceLegacyCheckoutBaseToken(nodes, map[string]bool{implementationAgentNodeID: true}))
@@ -432,7 +432,7 @@ func TestUpdateFactoryRepositoryKeepsRequestedGitHubBranch(t *testing.T) {
 	var kept models.FactoryWorkOrder
 	require.NoError(t, db.First(&kept, "id = ?", started.ID).Error)
 	require.NotNil(t, kept.DefaultBranch)
-	assert.Equal(t, "main", *kept.DefaultBranch)
+	assert.Equal(t, "develop", *kept.DefaultBranch)
 	assert.Equal(t, "acme/api", *kept.Repository)
 
 	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
@@ -457,6 +457,40 @@ func TestUpdateFactoryRepositoryKeepsRequestedGitHubBranch(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, canvasVersions(t, implement.ID), 3)
 	assert.Len(t, canvasVersions(t, closure.ID), 2)
+}
+
+func TestUpdateFactoryRepositoryCanKeepTasksOnThePreviousBranch(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "123")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := githubCatalogFactory(t, r, db)
+	started, err := factory.CreateWorkOrder(db, "Started", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	ctx := withRepositoryBranchResolver(
+		authentication.SetUserIdInMetadata(context.Background(), r.User.String()),
+		repositoryBranchResolver{gitHubBranches: func(string) ([]string, error) {
+			return []string{"main", "develop"}, nil
+		}},
+	)
+	keepTasks := false
+	updated, err := UpdateFactoryRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
+		Id:            factory.ID.String(),
+		Repository:    "acme/api",
+		DefaultBranch: "develop",
+		RetargetTasks: &keepTasks,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "develop", updated.Factory.Onboarding.DefaultBranch)
+
+	var kept models.FactoryWorkOrder
+	require.NoError(t, db.First(&kept, "id = ?", started.ID).Error)
+	require.NotNil(t, kept.DefaultBranch)
+	assert.Equal(t, "main", *kept.DefaultBranch)
+	assert.Equal(t, "acme/api", *kept.Repository)
 }
 
 func TestUpdateFactoryRepositoryRejectsUnknownGitHubBranch(t *testing.T) {
@@ -526,7 +560,7 @@ func githubCatalogFactory(t *testing.T, r *support.ResourceRegistry, db *gorm.DB
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	selected, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+	selected, err := SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 		Id: factory.ID.String(), Provider: models.ProviderGitHub, RepositoryId: 201,
 	})
 	require.NoError(t, err)

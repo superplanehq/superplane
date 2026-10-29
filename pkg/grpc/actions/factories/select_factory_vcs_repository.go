@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -19,6 +20,7 @@ import (
 
 func SelectFactoryVCSProviderRepository(
 	ctx context.Context,
+	deps IntakeDependencies,
 	organizationID string,
 	req *pb.SelectFactoryVCSProviderRepositoryRequest,
 ) (*pb.SelectFactoryVCSProviderRepositoryResponse, error) {
@@ -28,7 +30,7 @@ func SelectFactoryVCSProviderRepository(
 	}
 	provider := strings.ToLower(strings.TrimSpace(req.GetProvider()))
 	if provider == models.ProviderBitbucket {
-		return selectBitbucketFactoryRepository(ctx, orgID, organizationID, req)
+		return selectBitbucketFactoryRepository(ctx, deps, orgID, organizationID, req)
 	}
 	if provider != models.ProviderGitHub {
 		return nil, grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
@@ -45,6 +47,28 @@ func SelectFactoryVCSProviderRepository(
 	}
 
 	db := database.DB(ctx)
+	catalog, findErr := findGitHubCatalogRepository(ctx, db, organizationID, req.GetRepositoryId())
+	if errors.Is(findErr, gorm.ErrRecordNotFound) {
+		return nil, grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
+	}
+	if findErr != nil {
+		return nil, factoryErrorToStatus(findErr, "failed to select VCS repository")
+	}
+	var httpCtx core.HTTPContext
+	if deps.Registry != nil {
+		httpCtx = deps.Registry.HTTPContext()
+	}
+	liveBranch := defaultBranchFromCacheOrProvider(catalog.DefaultBranch, func() (string, error) {
+		return common.InstallationRepositoryDefaultBranch(
+			httpCtx,
+			app.ID,
+			app.PrivateKey,
+			catalog.InstallationID,
+			catalog.RepositoryID,
+			catalog.FullName,
+		)
+	})
+
 	var factory *models.Factory
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err = findFactory(tx, orgID, req.GetId())
@@ -85,17 +109,7 @@ func SelectFactoryVCSProviderRepository(
 		if config := factory.OnboardingConfigValue(); config.BacklogRepository != "" && config.BacklogRepository != config.AppRepository {
 			backlogRepositoryID = nil
 		}
-		branch := defaultBranchFromCacheOrProvider(repository.DefaultBranch, func() (string, error) {
-			return common.InstallationRepositoryDefaultBranch(
-				providerHTTP(),
-				app.ID,
-				app.PrivateKey,
-				repository.InstallationID,
-				repository.RepositoryID,
-				repository.FullName,
-			)
-		})
-		branch = keepSavedDefaultBranch(factory.OnboardingConfigValue(), repository.FullName, branch)
+		branch := keepSavedDefaultBranch(factory.OnboardingConfigValue(), repository.FullName, liveBranch)
 		if updateErr := factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:    &integrationID,
 			VCSProvider:         &provider,

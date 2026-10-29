@@ -875,12 +875,12 @@ func (f *Factory) SnapshotWorkOrderRepository(tx *gorm.DB, repository, defaultBr
 }
 
 // RetargetUnfinishedWorkOrderBranches moves draft and open tasks that still
-// follow the previous workspace repository onto the repository and branch
-// just saved. Repository and branch change together. A task on another
-// repository keeps that pair. A task keeps a branch that is neither empty
-// nor the previous workspace branch. A task with a running line stays
-// unchanged, so later nodes keep the repository and branch checkout used.
-// Closed tasks stay unchanged.
+// follow the previous workspace repository onto the repository just saved.
+// A repository change moves those tasks even when the branch name stays the
+// same. A branch change moves tasks that have no branch or the previous
+// branch. A task on another repository keeps that pair. A task with a
+// running line stays unchanged. Closed tasks stay unchanged. An empty next
+// repository does nothing. An empty next branch does not clear a task branch.
 func (f *Factory) RetargetUnfinishedWorkOrderBranches(
 	tx *gorm.DB,
 	previousRepository, nextRepository, previousBranch, nextBranch, nextProvider string,
@@ -890,11 +890,24 @@ func (f *Factory) RetargetUnfinishedWorkOrderBranches(
 	previousBranch = strings.TrimSpace(previousBranch)
 	nextBranch = strings.TrimSpace(nextBranch)
 	nextProvider = strings.TrimSpace(nextProvider)
-	if nextBranch == "" || nextBranch == previousBranch || nextRepository == "" {
+	if nextRepository == "" {
+		return nil
+	}
+	repositoryChanged := !strings.EqualFold(previousRepository, nextRepository)
+	branchChanged := nextBranch != "" && nextBranch != previousBranch
+	if !repositoryChanged && !branchChanged {
 		return nil
 	}
 	if nextProvider == "" {
 		nextProvider = ProviderGitHub
+	}
+	updates := map[string]any{
+		"repository":   nextRepository,
+		"vcs_provider": nextProvider,
+		"updated_at":   time.Now(),
+	}
+	if nextBranch != "" {
+		updates["default_branch"] = nextBranch
 	}
 
 	return tx.Model(&FactoryWorkOrder{}).
@@ -907,12 +920,7 @@ func (f *Factory) RetargetUnfinishedWorkOrderBranches(
 			WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
 			AND factory_work_order_line_dispatches.state = ?
 		)`, FactoryWorkOrderLineDispatchStateActive).
-		Updates(map[string]any{
-			"repository":     nextRepository,
-			"default_branch": nextBranch,
-			"vcs_provider":   nextProvider,
-			"updated_at":     time.Now(),
-		}).
+		Updates(updates).
 		Error
 }
 

@@ -46,11 +46,13 @@ export function FactorySettingsRepositoryPage() {
 
   usePageTitle(["Repository", "Settings", factory.name ?? "Workspace"]);
   const requestSave = () => {
-    if (draft.branch.trim() !== draft.savedBranch) {
+    const repositoryChanged = !sameRepositoryName(draft.repository, draft.savedRepository);
+    const branchChanged = draft.branch.trim() !== draft.savedBranch;
+    if (repositoryChanged || branchChanged) {
       setConfirmTasks(true);
       return;
     }
-    void draft.save();
+    void draft.save(true);
   };
 
   return (
@@ -97,12 +99,18 @@ export function FactorySettingsRepositoryPage() {
       </FactorySettingsCard>
       <UpdateUnfinishedTasksDialog
         open={confirmTasks}
+        previousRepository={draft.savedRepository}
+        nextRepository={draft.repository}
         previousBranch={draft.savedBranch}
         nextBranch={draft.branch.trim()}
         onOpenChange={setConfirmTasks}
         onConfirm={() => {
           setConfirmTasks(false);
-          void draft.save();
+          void draft.save(true);
+        }}
+        onKeepTasks={() => {
+          setConfirmTasks(false);
+          void draft.save(false);
         }}
       />
     </FactorySettingsPageFrame>
@@ -111,24 +119,31 @@ export function FactorySettingsRepositoryPage() {
 
 function UpdateUnfinishedTasksDialog(props: {
   open: boolean;
+  previousRepository: string;
+  nextRepository: string;
   previousBranch: string;
   nextBranch: string;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
+  onKeepTasks: () => void;
 }) {
-  const previous = props.previousBranch.trim();
-  const description = previous
-    ? `Unfinished tasks with no branch, or with "${previous}", will use "${props.nextBranch}". Closed tasks stay unchanged.`
-    : `Unfinished tasks with no branch will use "${props.nextBranch}". Closed tasks stay unchanged.`;
   return (
     <AlertDialog open={props.open} onOpenChange={props.onOpenChange}>
       <AlertDialogContent data-testid="factory-settings-update-tasks-dialog">
         <AlertDialogHeader>
           <AlertDialogTitle>Update unfinished tasks</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
+          <AlertDialogDescription>{unfinishedTasksDescription(props)}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel data-testid="factory-settings-update-tasks-cancel">Cancel</AlertDialogCancel>
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="factory-settings-update-tasks-keep"
+            onClick={props.onKeepTasks}
+          >
+            Save without updating tasks
+          </Button>
           <AlertDialogAction onClick={props.onConfirm} data-testid="factory-settings-update-tasks-confirm">
             Update tasks
           </AlertDialogAction>
@@ -136,6 +151,48 @@ function UpdateUnfinishedTasksDialog(props: {
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+function unfinishedTasksDescription(props: {
+  previousRepository: string;
+  nextRepository: string;
+  previousBranch: string;
+  nextBranch: string;
+}) {
+  const previousRepository = props.previousRepository.trim();
+  const nextRepository = props.nextRepository.trim();
+  const previousBranch = props.previousBranch.trim();
+  const repositoryChanged = previousRepository !== "" && !sameRepositoryName(previousRepository, nextRepository);
+  const move = repositoryChanged
+    ? repositoryTaskMove(previousRepository, nextRepository, previousBranch, props.nextBranch)
+    : branchTaskMove(previousBranch, props.nextBranch);
+  return `${move} Save without updating tasks keeps current tasks on their repository and branch.`;
+}
+
+function repositoryTaskMove(
+  previousRepository: string,
+  nextRepository: string,
+  previousBranch: string,
+  nextBranch: string,
+) {
+  if (previousBranch && previousBranch !== nextBranch) {
+    return `Unfinished tasks on "${previousRepository}" with no branch, or with "${previousBranch}", will use "${nextRepository}" and "${nextBranch}". Closed tasks stay unchanged.`;
+  }
+  if (previousBranch) {
+    return `Unfinished tasks on "${previousRepository}" will use "${nextRepository}". Closed tasks stay unchanged.`;
+  }
+  return `Unfinished tasks on "${previousRepository}" with no branch will use "${nextRepository}" and "${nextBranch}". Closed tasks stay unchanged.`;
+}
+
+function branchTaskMove(previousBranch: string, nextBranch: string) {
+  if (previousBranch) {
+    return `Unfinished tasks with no branch, or with "${previousBranch}", will use "${nextBranch}". Closed tasks stay unchanged.`;
+  }
+  return `Unfinished tasks with no branch will use "${nextBranch}". Closed tasks stay unchanged.`;
+}
+
+function sameRepositoryName(left: string, right: string) {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
 }
 
 function repositorySettingsSubtitle(bitbucket: boolean) {

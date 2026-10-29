@@ -130,7 +130,7 @@ spec:
               if [ -n "${BASE:-}" ]; then
                 default_branch="$BASE"
               else
-                default_branch="$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')"
+                default_branch="$(git symbolic-ref -q --short refs/remotes/origin/HEAD | sed 's#^origin/##' || true)"
               fi
               if [ -z "$default_branch" ]; then
                 echo "Could not read the repository default branch." >&2

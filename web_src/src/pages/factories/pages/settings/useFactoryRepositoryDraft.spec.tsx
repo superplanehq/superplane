@@ -84,6 +84,35 @@ describe("useFactoryRepositoryDraft", () => {
     expect(result.current.isSaving).toBe(false);
   });
 
+  it("uses the live default branch before the catalog value", async () => {
+    resolveRepositoryDefaultBranch.mockResolvedValue("master");
+    const { result } = renderHook(() =>
+      useFactoryRepositoryDraft(
+        draftArgs({
+          savedBranch: "",
+          catalogRepositories: [{ fullName: "acme/api", defaultBranch: "main" }],
+        }),
+      ),
+    );
+
+    await waitFor(() => expect(result.current.branch).toBe("master"));
+  });
+
+  it("uses the catalog default branch when the live lookup fails", async () => {
+    resolveRepositoryDefaultBranch.mockRejectedValue(new Error("network down"));
+    const { result } = renderHook(() =>
+      useFactoryRepositoryDraft(
+        draftArgs({
+          savedBranch: "",
+          catalogRepositories: [{ fullName: "acme/api", defaultBranch: "main" }],
+        }),
+      ),
+    );
+
+    await waitFor(() => expect(result.current.branch).toBe("main"));
+    expect(showErrorToast).not.toHaveBeenCalled();
+  });
+
   it("is ready to save when the saved branch is empty and the host reports one", async () => {
     const { result } = renderHook(() =>
       useFactoryRepositoryDraft(

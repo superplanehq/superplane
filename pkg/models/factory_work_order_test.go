@@ -86,6 +86,19 @@ func TestFactory_RetargetUnfinishedWorkOrderBranches(t *testing.T) {
 	assertOrderCheckout(t, tx, custom.ID, "acme/old", "release", ProviderGitHub)
 	assertOrderCheckout(t, tx, running.ID, "acme/old", "main", ProviderGitHub)
 	assertOrderCheckout(t, tx, finished.ID, "acme/new", "develop", ProviderBitbucket)
+
+	sameBranch := createOrderWithBranch(t, tx, factoryModel, userID, "Same branch other repository", branchPtr("main"))
+	setOrderRepository(t, tx, sameBranch, "acme/a", ProviderGitHub)
+	emptyOnPrevious := createOrderWithBranch(t, tx, factoryModel, userID, "Empty branch other repository", branchPtr(""))
+	setOrderRepository(t, tx, emptyOnPrevious, "acme/a", ProviderGitHub)
+	customOnPrevious := createOrderWithBranch(t, tx, factoryModel, userID, "Custom branch other repository", branchPtr("release"))
+	setOrderRepository(t, tx, customOnPrevious, "acme/a", ProviderGitHub)
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(
+		tx, "acme/a", "acme/b", "main", "main", ProviderGitHub,
+	))
+	assertOrderCheckout(t, tx, sameBranch.ID, "acme/b", "main", ProviderGitHub)
+	assertOrderCheckout(t, tx, emptyOnPrevious.ID, "acme/b", "main", ProviderGitHub)
+	assertOrderCheckout(t, tx, customOnPrevious.ID, "acme/a", "release", ProviderGitHub)
 }
 
 func createOrderWithBranch(t *testing.T, tx *gorm.DB, factoryModel *Factory, userID uuid.UUID, title string, branch *string) *FactoryWorkOrder {

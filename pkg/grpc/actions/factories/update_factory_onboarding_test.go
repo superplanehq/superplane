@@ -692,7 +692,7 @@ func TestUpdateFactoryOnboardingReplacesAMissingDefaultBranch(t *testing.T) {
 	assert.Equal(t, "master", reloaded.OnboardingConfigValue().DefaultBranch)
 }
 
-func TestUpdateFactoryOnboardingKeepsASavedBranchWhenLookupFails(t *testing.T) {
+func TestUpdateFactoryOnboardingRejectsADifferentBranchWhenLookupFails(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -709,14 +709,24 @@ func TestUpdateFactoryOnboardingKeepsASavedBranchWhenLookupFails(t *testing.T) {
 	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
 		gitHubBranches: func(string) ([]string, error) { return nil, errors.New("github unavailable") },
 	})
-	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+	_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
 		Id:            factory.ID.String(),
 		DefaultBranch: &missing,
 		IssuesSource:  &issues,
 	})
+	require.ErrorContains(t, err, "could not verify the default branch")
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "develop", reloaded.OnboardingConfigValue().DefaultBranch)
+	assert.Empty(t, reloaded.OnboardingConfigValue().IssuesSource)
+
+	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &saved,
+	})
 	require.NoError(t, err)
 	assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
-	assert.Equal(t, pb.FactoryOnboarding_ISSUES_SOURCE_SKIP, response.Factory.Onboarding.IssuesSource)
 
 	blank := " "
 	response, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
@@ -725,6 +735,35 @@ func TestUpdateFactoryOnboardingKeepsASavedBranchWhenLookupFails(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
+}
+
+func TestUpdateFactoryOnboardingClearsTheBranchWhenTheRepositoryChanges(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	saved := "main"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		VCSProvider:   &provider,
+		DefaultBranch: &saved,
+	}))
+
+	nextRepository := "acme/web"
+	response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		AppRepository: &nextRepository,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acme/web", response.Factory.Onboarding.AppRepository)
+	assert.Empty(t, response.Factory.Onboarding.DefaultBranch)
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Empty(t, reloaded.OnboardingConfigValue().DefaultBranch)
+	assert.Equal(t, "acme/web", reloaded.OnboardingConfigValue().AppRepository)
 }
 
 func TestUpdateFactoryOnboardingRejectsAnUnknownBranchWhenNothingIsSaved(t *testing.T) {

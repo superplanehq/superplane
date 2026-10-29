@@ -94,10 +94,10 @@ export function useFactoryRepositoryDraft(args: {
       setIsResolvingDefaultBranch(false);
     });
   };
-  const save = async () => {
+  const save = async (retargetTasks = true) => {
     if (!repository || !branch || !args.integrationId || isSaving) return;
     try {
-      await updateRepository.mutateAsync({ repository, defaultBranch: branch });
+      await updateRepository.mutateAsync({ repository, defaultBranch: branch, retargetTasks });
       showSuccessToast("Workspace repository updated.");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to update workspace repository"));
@@ -106,6 +106,7 @@ export function useFactoryRepositoryDraft(args: {
 
   return {
     repository,
+    savedRepository,
     branch,
     savedBranch,
     setBranch,
@@ -118,18 +119,22 @@ export function useFactoryRepositoryDraft(args: {
   };
 }
 
-function hostDefaultBranchFor(
+async function hostDefaultBranchFor(
   organizationId: string,
   integrationId: string,
   catalogRepositories: CatalogRepository[] | undefined,
   repositoryName: string,
 ) {
-  const catalogBranch = catalogRepositories
-    ?.find((candidate) => candidate.fullName === repositoryName)
-    ?.defaultBranch?.trim();
-  if (catalogBranch) return Promise.resolve(catalogBranch);
-  if (!organizationId || !integrationId || !repositoryName) return Promise.resolve("");
-  return resolveRepositoryDefaultBranch(organizationId, integrationId, repositoryName);
+  const catalogBranch =
+    catalogRepositories?.find((candidate) => candidate.fullName === repositoryName)?.defaultBranch?.trim() ?? "";
+  if (!organizationId || !integrationId || !repositoryName) return catalogBranch;
+  try {
+    const live = (await resolveRepositoryDefaultBranch(organizationId, integrationId, repositoryName))?.trim() ?? "";
+    if (live) return live;
+  } catch (error) {
+    if (!catalogBranch) throw error;
+  }
+  return catalogBranch;
 }
 
 function watchBranchLookup(isCurrent: () => boolean, request: Promise<string>, onBranch: (branch: string) => void) {
@@ -145,7 +150,7 @@ function watchBranchLookup(isCurrent: () => boolean, request: Promise<string>, o
     });
 }
 
-function branchNames(resources: { name?: string | null; id?: string | null }[] | undefined) {
+export function branchNames(resources: { name?: string | null; id?: string | null }[] | undefined) {
   return (resources ?? []).map((resource) => resource.name?.trim() || resource.id?.trim() || "").filter(Boolean);
 }
 

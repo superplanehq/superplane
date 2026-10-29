@@ -27,14 +27,15 @@ const (
 	// Exact token baked into older Implement commands. Replace the token only.
 	// A substring replace of "main" would change unrelated text.
 	legacyCheckoutBaseToken = "${BASE:-main}"
-	remoteHeadCheckoutBase  = "${BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')}"
+	remoteHeadCheckoutBase  = "${BASE:-$(git symbolic-ref -q --short refs/remotes/origin/HEAD | sed 's#^origin/##' || true)}"
 )
 
 // UpdateFactoryRepository changes the repository that factory-managed
 // automations use. It snapshots work orders before publishing canvas changes.
-// Closed tasks keep that snapshot. Unfinished tasks that still use the
-// previous repository, and have no branch or the previous branch, move to
-// the saved repository and branch together. A task with a running line
+// Closed tasks keep that snapshot. When retarget_tasks is unset or true,
+// unfinished tasks that still use the previous repository, and have no
+// branch or the previous branch, move to the saved repository and branch.
+// A false value keeps those tasks unchanged. A task with a running line
 // stays unchanged.
 func UpdateFactoryRepository(
 	ctx context.Context,
@@ -197,6 +198,7 @@ func UpdateFactoryRepository(
 			previous.BacklogRepository,
 			previousBranch,
 			selectedRepository,
+			retargetTasksRequested(req.RetargetTasks),
 		)
 	})
 	if err != nil {
@@ -255,6 +257,13 @@ func factoryDefaultBranchFromNodes(nodes []models.Node) string {
 	return defaultBranch
 }
 
+func retargetTasksRequested(flag *bool) bool {
+	if flag == nil {
+		return true
+	}
+	return *flag
+}
+
 func reconcileFactoryRepository(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -263,6 +272,7 @@ func reconcileFactoryRepository(
 	actorID uuid.UUID,
 	previousVCSIntegrationID, vcsIntegrationID string,
 	previousAppRepository, previousBacklogRepository, previousDefaultBranch, repository string,
+	retargetTasks bool,
 ) error {
 	canvasesForFactory, err := factory.ListCanvases(tx)
 	if err != nil {
@@ -278,15 +288,17 @@ func reconcileFactoryRepository(
 	}
 	config := factory.OnboardingConfigValue()
 	nextBranch := strings.TrimSpace(config.DefaultBranch)
-	if err := factory.RetargetUnfinishedWorkOrderBranches(
-		tx,
-		previousAppRepository,
-		repository,
-		previousDefaultBranch,
-		nextBranch,
-		config.EffectiveVCSProvider(),
-	); err != nil {
-		return err
+	if retargetTasks {
+		if err := factory.RetargetUnfinishedWorkOrderBranches(
+			tx,
+			previousAppRepository,
+			repository,
+			previousDefaultBranch,
+			nextBranch,
+			config.EffectiveVCSProvider(),
+		); err != nil {
+			return err
+		}
 	}
 	previousIntegrationName, integrationName := "", ""
 	if previousVCSIntegrationID != "" && previousVCSIntegrationID != vcsIntegrationID {
