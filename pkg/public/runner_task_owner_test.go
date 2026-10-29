@@ -1,6 +1,7 @@
 package public
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -146,7 +147,7 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 		status            int
 	}{
 		{"invalid member", token, `{"user":"` + uuid.NewString() + `","reason":"Owns pkg."}`, http.StatusBadRequest},
-		{"invalid reason", token, `{"user":"implementation-dev","reason":"https://example.com"}`, http.StatusBadRequest},
+		{"link-only reason", token, `{"user":"implementation-dev","reason":"https://example.com"}`, http.StatusOK},
 	} {
 		t.Run(invalid.name, func(t *testing.T) {
 			rec := assignRunnerOwner(t, server, invalid.token, invalid.body)
@@ -189,6 +190,57 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 	}
 	ctx.RunID = uuid.New()
 	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60)))
+}
+
+func TestRunnerAssignOwnerReasonIsOptional(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("JWT_SECRET", "test")
+	db := database.DB(t.Context())
+	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	require.NotEmpty(t, token)
+	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
+	owner := mustTaskOwnerMember(t, r, "implementation-dev")
+
+	rec := assignRunnerOwner(t, server, token, `{"user":"implementation-dev"}`)
+	assertAssignedOwner(t, rec, owner.ID)
+	persisted, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []uuid.UUID{owner.ID}, persisted.AssigneeIDs())
+	payload := latestOwnerPayload(t, persisted)
+	assert.Empty(t, payload.Reason)
+	require.NotNil(t, payload.Run)
+	assert.Equal(t, ctx.RunID, payload.Run.ID)
+
+	before, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	rec = assignRunnerOwner(t, server, token, `{"user":"implementation-dev","reason":"Owns the runner."}`)
+	assertAssignedOwner(t, rec, owner.ID)
+	after, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, before.UpdatedAt, after.UpdatedAt)
+	assert.Equal(t, []uuid.UUID{owner.ID}, after.AssigneeIDs())
+	payload = latestOwnerPayload(t, after)
+	assert.Equal(t, "Owns the runner.", payload.Reason)
+	require.NotNil(t, payload.Run)
+	assert.Equal(t, ctx.RunID, payload.Run.ID)
+	assert.Equal(t, []factoryevents.UserRef{{ID: owner.ID}}, payload.Assigned)
+}
+
+func latestOwnerPayload(t *testing.T, order *models.FactoryWorkOrder) factoryevents.WorkOrderAssigneesUpdated {
+	t.Helper()
+	events, err := order.ListEvents(database.DB(t.Context()), 20, nil)
+	require.NoError(t, err)
+	for _, event := range events {
+		if event.Type != factoryevents.EventTypeOrderAssigneesUpdated {
+			continue
+		}
+		var payload factoryevents.WorkOrderAssigneesUpdated
+		require.NoError(t, json.Unmarshal(event.Data, &payload))
+		return payload
+	}
+	t.Fatal("no assignees updated event")
+	return factoryevents.WorkOrderAssigneesUpdated{}
 }
 
 func assertRunnerOwnerAccess(t *testing.T, server *Server, ctx core.ExecutionContext, env []runner.TaskEnvironmentVariable, orderID uuid.UUID) string {

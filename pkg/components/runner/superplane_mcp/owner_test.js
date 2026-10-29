@@ -45,12 +45,20 @@ test("assign_owner puts the owner on the task route", async () => {
   assert.deepEqual(calls[0].body, { user: "@mijat", reason: "You changed pkg/payments." });
 });
 
-test("assign_owner requires a user and a reason", async () => {
-  const client = createClient(env, recordingFetch([]));
-  const { handler } = registry.findTool("assign_owner");
+test("assign_owner sends a call with no reason", async () => {
+  const calls = [];
+  const client = createClient(env, recordingFetch(calls));
 
-  await assert.rejects(() => handler({ reason: "Owns pkg." }, client), /user is required/);
-  await assert.rejects(() => handler({ user: "mijat" }, client), /reason is required/);
+  await registry.findTool("assign_owner").handler({ user: "mijat" }, client);
+
+  assert.deepEqual(calls[0].body, { user: "mijat" });
+  assert.equal(Object.hasOwn(calls[0].body, "reason"), false);
+});
+
+test("assign_owner requires a user", async () => {
+  const client = createClient(env, recordingFetch([]));
+
+  await assert.rejects(() => registry.findTool("assign_owner").handler({ reason: "Owns pkg." }, client), /user is required/);
 });
 
 test("the client requires the runner token", async () => {
