@@ -13,8 +13,12 @@ const (
 	RunnerFlowTask            RunnerFlow = "task"
 	RunnerFlowMergeConfidence RunnerFlow = "merge_confidence"
 
-	ScopeOwnerRead  RunnerToolScope = "owner:read"
-	ScopeOwnerWrite RunnerToolScope = "owner:write"
+	ScopeOwnerRead      RunnerToolScope = "owner:read"
+	ScopeOwnerWrite     RunnerToolScope = "owner:write"
+	ScopeTasksRead      RunnerToolScope = "tasks:read"
+	ScopeTasksCreate    RunnerToolScope = "tasks:create"
+	ScopeTasksClose     RunnerToolScope = "tasks:close"
+	ScopeArtifactsWrite RunnerToolScope = "artifacts:write"
 )
 
 // RunnerTool is one tool of the global runner MCP server and the scope that
@@ -27,12 +31,26 @@ type RunnerTool struct {
 var runnerTools = []RunnerTool{
 	{Name: "suggest_owners", Scope: ScopeOwnerRead},
 	{Name: "assign_owner", Scope: ScopeOwnerWrite},
+	{Name: "list_tasks", Scope: ScopeTasksRead},
+	{Name: "create_task", Scope: ScopeTasksCreate},
+	{Name: "close_task", Scope: ScopeTasksClose},
+	{Name: "remove_artifact", Scope: ScopeArtifactsWrite},
+}
+
+// Every flow receives every global tool for now. Narrow the list here later.
+var allRunnerScopes = []RunnerToolScope{
+	ScopeOwnerRead,
+	ScopeOwnerWrite,
+	ScopeTasksRead,
+	ScopeTasksCreate,
+	ScopeTasksClose,
+	ScopeArtifactsWrite,
 }
 
 var runnerFlowScopes = map[RunnerFlow][]RunnerToolScope{
-	RunnerFlowPlanning:        {ScopeOwnerRead, ScopeOwnerWrite},
-	RunnerFlowTask:            {ScopeOwnerRead, ScopeOwnerWrite},
-	RunnerFlowMergeConfidence: {ScopeOwnerRead, ScopeOwnerWrite},
+	RunnerFlowPlanning:        allRunnerScopes,
+	RunnerFlowTask:            allRunnerScopes,
+	RunnerFlowMergeConfidence: allRunnerScopes,
 }
 
 func (f RunnerFlow) Valid() bool {

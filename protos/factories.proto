@@ -699,6 +699,18 @@ service Factories {
     };
   }
 
+  rpc RemoveWorkOrderArtifact(RemoveWorkOrderArtifactRequest) returns (RemoveWorkOrderArtifactResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts/remove"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove one work order artifact";
+      description: "Removes one artifact from a work order by key or title";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribeFactoryVelocity(DescribeFactoryVelocityRequest) returns (DescribeFactoryVelocityResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/velocity"
@@ -2546,6 +2558,18 @@ message CreateWorkOrderArtifactRequest {
 
 message CreateWorkOrderArtifactResponse {
   WorkOrderArtifact artifact = 1;
+}
+
+message RemoveWorkOrderArtifactRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string key = 3;
+  string title = 4;
+}
+
+message RemoveWorkOrderArtifactResponse {
+  string id = 1;
+  string title = 2;
 }
 
 message WorkOrderArtifact {

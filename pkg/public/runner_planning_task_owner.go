@@ -29,11 +29,13 @@ type assignOwnerRequest struct {
 
 // taskOwnerTarget is the authorized task and the members who can own it.
 type taskOwnerTarget struct {
-	session    *models.FactoryPlanningSession
-	repository string
-	factory    *models.Factory
-	order      *models.FactoryWorkOrder
-	candidates []models.TaskOwnerCandidate
+	session     *models.FactoryPlanningSession
+	repository  string
+	factory     *models.Factory
+	order       *models.FactoryWorkOrder
+	candidates  []models.TaskOwnerCandidate
+	canvasID    uuid.UUID
+	canvasRunID uuid.UUID
 }
 
 func (s *Server) handleRunnerPlanningSuggestOwners(w http.ResponseWriter, r *http.Request) {

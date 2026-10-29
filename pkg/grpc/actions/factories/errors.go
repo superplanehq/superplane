@@ -117,6 +117,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "factory line step entrypoint must use the onRun trigger")
 	case errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound):
+		return grpcerrors.NotFound(err, "artifact not found")
 	case errors.Is(err, models.ErrFactoryIntakeNotFound):
 		return grpcerrors.NotFound(err, "factory intake not found")
 	case errors.Is(err, models.ErrFactoryIntakeSourceInvalid):

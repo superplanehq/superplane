@@ -25,7 +25,7 @@ func TestRunnerToolsFollowTheTokenScopes(t *testing.T) {
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
 
-	assert.Equal(t, []string{"suggest_owners", "assign_owner"}, listRunnerTools(t, server, token))
+	assert.Equal(t, everyGlobalRunnerTool, listRunnerTools(t, server, token))
 
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
 	require.NoError(t, err)
@@ -37,6 +37,8 @@ func TestRunnerToolsFollowTheTokenScopes(t *testing.T) {
 	rec := suggestRunnerOwners(t, server, readOnly, `{}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	rec = assignRunnerOwner(t, server, readOnly, `{"user":"`+r.User.String()+`","reason":"Owns pkg."}`)
+	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	rec = runnerRequest(t, server, http.MethodGet, readOnly, "/api/v1/runner/tasks", "")
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 
 	rec = runnerRequest(t, server, http.MethodGet, "not-a-token", "/api/v1/runner/tools", "")
@@ -102,6 +104,10 @@ func TestPlanningRunnerTokenOwnsTheDraftTask(t *testing.T) {
 	rec = assignRunnerOwner(t, server, token, `{"user":"planning-dev","reason":"Owns pkg/payments."}`)
 	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
 	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, env, 60)))
+}
+
+var everyGlobalRunnerTool = []string{
+	"suggest_owners", "assign_owner", "list_tasks", "create_task", "close_task", "remove_artifact",
 }
 
 func listRunnerTools(t *testing.T, server *Server, token string) []string {

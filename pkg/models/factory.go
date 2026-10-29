@@ -1182,6 +1182,34 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	return orders, nil
 }
 
+// ListWorkOrderSummaries returns one bounded page of task identity fields.
+// It does not load descriptions, owners, checks, or pull requests.
+// Limit above DefaultFactoryWorkOrderListLimit is clamped. Order is
+// updated_at DESC, id DESC. There is no offset.
+func (f *Factory) ListWorkOrderSummaries(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
+	limit := filters.Limit
+	if limit <= 0 || limit > DefaultFactoryWorkOrderListLimit {
+		limit = DefaultFactoryWorkOrderListLimit
+	}
+
+	var orders []FactoryWorkOrder
+	err := f.workOrdersQuery(tx, filters).
+		Select(
+			"factory_work_orders.id",
+			"factory_work_orders.number",
+			"factory_work_orders.title",
+			"factory_work_orders.state",
+		).
+		Order("factory_work_orders.updated_at DESC").
+		Order("factory_work_orders.id DESC").
+		Limit(limit).
+		Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	return orders, nil
+}
+
 func (f *Factory) workOrdersQuery(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
 	query := tx.
 		Model(&FactoryWorkOrder{}).

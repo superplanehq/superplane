@@ -6,7 +6,11 @@
  * which tools a run may use.
  */
 
-const MODULES = [require("./modules/owner")];
+const MODULES = [
+  require("./modules/owner"),
+  require("./modules/tasks"),
+  require("./modules/artifacts"),
+];
 
 function allTools(modules = MODULES) {
   return modules.flatMap((module) => module.tools);
