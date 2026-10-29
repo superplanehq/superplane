@@ -1912,6 +1912,18 @@ CREATE TABLE public.users (
 
 
 --
+-- Name: vcs_provider_catalog_schedules; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_catalog_schedules (
+    provider text NOT NULL,
+    next_reconcile_at timestamp with time zone NOT NULL,
+    next_sweep_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: vcs_provider_install_request_refreshes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2040,6 +2052,7 @@ CREATE TABLE public.vcs_provider_repositories (
     default_branch text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    collaborators_synced_at timestamp with time zone,
     CONSTRAINT vcs_provider_repositories_full_name_present CHECK ((btrim(full_name) <> ''::text))
 );
 
@@ -3357,6 +3370,14 @@ ALTER TABLE ONLY public.user_notification_settings
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: vcs_provider_catalog_schedules vcs_provider_catalog_schedules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_catalog_schedules
+    ADD CONSTRAINT vcs_provider_catalog_schedules_pkey PRIMARY KEY (provider);
 
 
 --
@@ -5023,6 +5044,13 @@ CREATE INDEX vcs_provider_integration_repositories_repository_idx ON public.vcs_
 
 
 --
+-- Name: vcs_provider_repositories_collaborators_synced_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_repositories_collaborators_synced_at_idx ON public.vcs_provider_repositories USING btree (provider, collaborators_synced_at);
+
+
+--
 -- Name: vcs_provider_repositories_full_name_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6480,7 +6508,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261028182820	f
+20261029122434	f
 \.
 
 
