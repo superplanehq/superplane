@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgconn"
+	amqp "github.com/rabbitmq/amqp091-go"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -1345,42 +1347,100 @@ func TestBeginPlanningWaitAndNotify_SkipsFollowUpWaitWithoutQuestion(t *testing.
 }
 
 func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
-	r := support.Setup(t)
-	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
-	db := database.DB(t.Context())
-	line := mustAutoStartLine(t, r, factoryModel, true)
-	mustEnableAutoStart(t, db, factoryModel, line.ID)
-	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
-	require.NoError(t, err)
-	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
-		Scores: &models.PlanningReviewScores{
-			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
-			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
-			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
-		},
-		Spec: "# Retry refunds\n\nStop double charges.\n",
-	}))
+	for _, tc := range []struct {
+		name       string
+		ownerCount int
+	}{
+		{name: "single backlog owner", ownerCount: 1},
+		{name: "multiple backlog owners", ownerCount: 2},
+		{name: "unassigned", ownerCount: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+			db := database.DB(t.Context())
+			line := mustAutoStartLine(t, r, factoryModel, true)
+			mustEnableAutoStart(t, db, factoryModel, line.ID)
+			order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+			require.NoError(t, err)
+			require.NotNil(t, order.CreatedByID)
+			owners := make([]uuid.UUID, 0, tc.ownerCount)
+			for range tc.ownerCount {
+				owner := support.CreateUser(t, r, r.Organization.ID)
+				owners = append(owners, owner.ID)
+			}
+			require.NoError(t, order.ReplaceAssignees(db, owners))
+			require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+				Scores: &models.PlanningReviewScores{
+					Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
+					Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
+					Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+				},
+				Spec: "# Retry refunds\n\nStop double charges.\n",
+			}))
 
-	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+			amqpURL, err := config.RabbitMQURL()
+			require.NoError(t, err)
+			connection, err := amqp.Dial(amqpURL)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = connection.Close() })
+			channel, err := connection.Channel()
+			require.NoError(t, err)
+			require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+			queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+			require.NoError(t, err)
+			require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderNotificationRoutingKey, messages.CanvasExchange, false, nil))
+			require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
-	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
-	assert.Nil(t, reloaded.AutoStartLineID)
-	active, err := reloaded.FindActiveLineDispatch(db)
-	require.NoError(t, err)
-	assert.Equal(t, line.ID, active.LineID)
-	assert.Empty(t, active.Model)
-	assert.Empty(t, active.ThinkingLevel)
-	updatedSession, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.PlanningSessionStateEnded, updatedSession.State)
+			reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+			assert.Nil(t, reloaded.AutoStartLineID)
+			assert.ElementsMatch(t, owners, reloaded.AssigneeIDs())
+			assert.Equal(t, order.CreatedByID, reloaded.CreatedByID)
+			events, err := reloaded.ListEvents(db, 0, nil)
+			require.NoError(t, err)
+			var statusUpdates []factoryevents.WorkOrderStatusUpdated
+			for _, event := range events {
+				assert.NotEqual(t, factoryevents.EventTypeOrderAssigneesUpdated, event.Type)
+				if event.Type != factoryevents.EventTypeOrderStatusUpdated {
+					continue
+				}
+				var update factoryevents.WorkOrderStatusUpdated
+				require.NoError(t, json.Unmarshal(event.Data, &update))
+				if update.FromState == models.FactoryWorkOrderStateDraft && update.ToState == models.FactoryWorkOrderStateOpen {
+					statusUpdates = append(statusUpdates, update)
+				}
+			}
+			require.Len(t, statusUpdates, 1)
+			assert.Nil(t, statusUpdates[0].User)
+			delivery, ok, err := channel.Get(queue.Name, true)
+			require.NoError(t, err)
+			require.True(t, ok, "auto-start publishes a status notification")
+			var notification messages.FactoryWorkOrderNotificationMessage
+			require.NoError(t, json.Unmarshal(delivery.Body, &notification))
+			assert.Equal(t, order.ID.String(), notification.OrderID)
+			assert.Equal(t, factoryevents.EventTypeOrderStatusUpdated, notification.EventType)
+			assert.Equal(t, models.FactoryWorkOrderStateDraft, notification.FromState)
+			assert.Equal(t, models.FactoryWorkOrderStateOpen, notification.ToState)
+			assert.Empty(t, notification.ActorUserID)
 
-	err = beginPlanningWaitAndNotify(db, session)
-	require.Error(t, err)
-	activeAgain, err := reloaded.FindActiveLineDispatch(db)
-	require.NoError(t, err)
-	assert.Equal(t, active.ID, activeAgain.ID)
+			active, err := reloaded.FindActiveLineDispatch(db)
+			require.NoError(t, err)
+			assert.Equal(t, line.ID, active.LineID)
+			assert.Empty(t, active.Model)
+			assert.Empty(t, active.ThinkingLevel)
+			updatedSession, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.PlanningSessionStateEnded, updatedSession.State)
+
+			err = beginPlanningWaitAndNotify(db, session)
+			require.Error(t, err)
+			activeAgain, err := reloaded.FindActiveLineDispatch(db)
+			require.NoError(t, err)
+			assert.Equal(t, active.ID, activeAgain.ID)
+		})
+	}
 }
 
 func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {

@@ -4,6 +4,8 @@ import { WorkOrderAssigneePicker } from "./WorkOrderAssigneePicker";
 
 interface WorkOrderAssigneesPopoverProps {
   organizationId: string;
+  factoryId?: string;
+  orderId?: string;
   selectedIds: string[];
   align?: "start" | "center" | "end";
   disabled?: boolean;
@@ -26,6 +28,8 @@ function haveSameIds(left: string[], right: string[]): boolean {
 
 export function WorkOrderAssigneesPopover({
   organizationId,
+  factoryId,
+  orderId,
   selectedIds,
   align = "end",
   disabled = false,
@@ -73,6 +77,8 @@ export function WorkOrderAssigneesPopover({
       <PopoverContent align={align} className="z-[70] w-72 overflow-hidden p-0" sideOffset={8}>
         <WorkOrderAssigneePicker
           organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
           selectedIds={selectedIds}
           onChange={(nextIds) => void handleChange(nextIds)}
           disabled={pickerDisabled}
@@ -85,6 +91,8 @@ export function WorkOrderAssigneesPopover({
 /** Click target for the current owner. Opens the people list when assignment is allowed. */
 export function OwnerAssignTrigger({
   organizationId,
+  factoryId,
+  orderId,
   selectedIds,
   canAssign,
   isSaving = false,
@@ -95,6 +103,8 @@ export function OwnerAssignTrigger({
   children,
 }: {
   organizationId: string;
+  factoryId?: string;
+  orderId?: string;
   selectedIds: string[];
   canAssign: boolean;
   isSaving?: boolean;
@@ -112,6 +122,8 @@ export function OwnerAssignTrigger({
     <span className="pointer-events-auto inline-flex min-w-0 max-w-full" onClick={(event) => event.stopPropagation()}>
       <WorkOrderAssigneesPopover
         organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
         selectedIds={selectedIds}
         align={align}
         canEdit
