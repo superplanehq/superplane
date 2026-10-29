@@ -298,6 +298,23 @@ export type FleetManagerVerificationStatus =
   | "error"
   | "timeout";
 
+function installationKey(draft: FleetManagerDraft): string {
+  return JSON.stringify({ ...draft, kubeContext: undefined });
+}
+
+// The Kubernetes context selects the Helm cluster. The fleet check does not read it.
+export function sameFleetInstallation(left: FleetManagerDraft | null, right: FleetManagerDraft | null): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return installationKey(left) === installationKey(right);
+}
+
+function useFleetInstallation(draft: FleetManagerDraft | null): FleetManagerDraft | null {
+  const [installation, setInstallation] = useState(draft);
+  if (!sameFleetInstallation(installation, draft)) setInstallation(draft);
+  return installation;
+}
+
 export function useFleetManagerVerification(
   enabled: boolean,
   draft: FleetManagerDraft | null,
@@ -305,9 +322,10 @@ export function useFleetManagerVerification(
 ) {
   const [status, setStatus] = useState<FleetManagerVerificationStatus>("idle");
   const [retryKey, setRetryKey] = useState(0);
+  const installation = useFleetInstallation(draft);
 
   useEffect(() => {
-    if (!enabled || !draft || !metadata) {
+    if (!enabled || !installation || !metadata) {
       setStatus("idle");
       return;
     }
@@ -334,7 +352,7 @@ export function useFleetManagerVerification(
 
         const body = (await response.json()) as { fleets?: InstalledFleet[] };
         const installed = body.fleets ?? [];
-        const matches = fleetsMatchConfiguration(installed, draft, metadata.fleetPresets);
+        const matches = fleetsMatchConfiguration(installed, installation, metadata.fleetPresets);
         if (matches) {
           clearFleetManagerDraft();
           setStatus("verified");
@@ -357,7 +375,7 @@ export function useFleetManagerVerification(
       controller.abort();
       if (timeout !== undefined) window.clearTimeout(timeout);
     };
-  }, [draft, enabled, metadata, retryKey]);
+  }, [enabled, installation, metadata, retryKey]);
 
   return { status, retry: () => setRetryKey((current) => current + 1) };
 }
