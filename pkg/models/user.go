@@ -91,6 +91,10 @@ func (u *User) SoftDelete(tx *gorm.DB, now time.Time, tombstoneEmail string) err
 			return err
 		}
 
+		if err := u.RevokeCodexConnections(tx, now); err != nil {
+			return err
+		}
+
 		return tx.Where("user_id = ?", u.ID).Delete(&UserAPIToken{}).Error
 	})
 }
@@ -595,6 +599,20 @@ func ListOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
 	err := tx.
 		Where("organization_id = ?", orgID).
 		Where("is_owner = ?", true).
+		Where("type = ?", UserTypeHuman).
+		Order("id").
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func ListHumanUsersInOrganization(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
+	var users []User
+	err := tx.
+		Where("organization_id = ?", orgID).
 		Where("type = ?", UserTypeHuman).
 		Order("id").
 		Find(&users).
