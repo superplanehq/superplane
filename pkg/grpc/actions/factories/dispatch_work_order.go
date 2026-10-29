@@ -193,20 +193,11 @@ func dispatchWorkOrderOnLineTx(
 	}
 
 	model = strings.TrimSpace(model)
-	if model != "" {
-		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name)
-		if err != nil {
-			return nil, err
-		}
-		if !slices.Contains(allowed, model) {
-			return nil, invalidArgument("model is not available on this line")
-		}
-	}
 	normalizedThinking, err := runner.NormalizeDispatchThinkingLevel(thinkingLevel)
 	if err != nil {
 		return nil, invalidArgument(err.Error())
 	}
-	if err := validateLineThinkingLevel(tx, currentLine, normalizedThinking); err != nil {
+	if err := validateLineDispatchModel(tx, orgID, factoryID, currentLine, model, normalizedThinking); err != nil {
 		return nil, err
 	}
 
@@ -265,8 +256,30 @@ func dispatchWorkOrderOnLineTx(
 	}, nil
 }
 
-func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {
-	if level != runner.ThinkingLevelMinimal && level != runner.ThinkingLevelXHigh {
+// validateLineDispatchModel checks the Start model and thinking overrides.
+// A selected model must be available on the line and must support the
+// thinking level. With Auto, each runner keeps its own model, so the CLI of
+// each runner must accept the thinking level.
+func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string) error {
+	if model == "" {
+		return validateAutoDispatchThinking(tx, line, thinking)
+	}
+	options, _, err := listLineRunnerModelOptions(tx, orgID, factoryID, line.Name)
+	if err != nil {
+		return err
+	}
+	index := slices.IndexFunc(options, func(option lineRunnerModel) bool { return option.ID == model })
+	if index < 0 {
+		return invalidArgument("model is not available on this line")
+	}
+	if !dispatchThinkingOverridesLevel(thinking) || slices.Contains(options[index].ThinkingLevels, thinking) {
+		return nil
+	}
+	return invalidArgument("thinking level is not available for this model")
+}
+
+func validateAutoDispatchThinking(tx *gorm.DB, line *models.FactoryLine, thinking string) error {
+	if !dispatchThinkingOverridesLevel(thinking) {
 		return nil
 	}
 	for _, step := range line.Steps {
@@ -278,14 +291,41 @@ func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level stri
 			return err
 		}
 		for _, node := range version.Nodes {
-			component := node.ComponentName()
-			_, isRunner := runnerComponentProvider(component)
-			if component != runnerCodex && (isRunner || component == models.SuperPlaneRunnerComponent) {
-				return invalidArgument("minimal and xhigh thinking levels require a line with only Codex runners")
+			levels, isRunner := runnerCLIThinkingLevels(node)
+			if isRunner && !slices.Contains(levels, thinking) {
+				return invalidArgument("thinking level is not available for every agent on this line")
 			}
 		}
 	}
 	return nil
+}
+
+// dispatchThinkingOverridesLevel reports whether a Start thinking value sets
+// a level. Empty keeps the agent level and default uses the runner default.
+func dispatchThinkingOverridesLevel(thinking string) bool {
+	return thinking != "" && thinking != runner.DispatchThinkingDefault
+}
+
+// runnerCLIThinkingLevels returns the thinking levels that the CLI of a
+// runner node accepts. A SuperPlane agent without a known provider accepts
+// only the levels that every CLI accepts.
+func runnerCLIThinkingLevels(node models.Node) ([]string, bool) {
+	switch node.ComponentName() {
+	case runnerClaudeCode:
+		return runner.ClaudeCodeThinkingLevels, true
+	case runnerCodex:
+		return runner.CodexThinkingLevels, true
+	case runnerOpenRouter:
+		return runner.OpenCodeThinkingLevels, true
+	case models.SuperPlaneRunnerComponent:
+		parsed, err := models.ParseSelectableLLMModelKey(storedRunnerModel(node.Configuration))
+		if err != nil {
+			return runner.CommonThinkingLevels(), true
+		}
+		return runner.ProviderCLIThinkingLevels(parsed.Provider.ID), true
+	default:
+		return nil, false
+	}
 }
 
 func publishDispatchedWorkOrder(
