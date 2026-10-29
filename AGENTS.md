@@ -13,6 +13,7 @@ Read more only when the task needs it:
   [.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
 - `pkg/models` or new database access: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
 - Local factory GitHub App: [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md)
+- A new factory Git host (GitHub, Bitbucket, GitLab): [.cursor/skills/superplane-vcs-provider/SKILL.md](.cursor/skills/superplane-vcs-provider/SKILL.md) and [docs/contributing/vcs-provider.md](docs/contributing/vcs-provider.md)
 
 ## Read this first
 
