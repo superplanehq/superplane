@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
@@ -27,6 +28,9 @@ import (
 
 func Test__DeleteOrganization(t *testing.T) {
 	r := support.Setup(t)
+	recorder := &deletionAnalyticsRecorder{}
+	previous := productanalytics.SetCurrent(recorder)
+	t.Cleanup(func() { productanalytics.SetCurrent(previous) })
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	t.Run("organization does not exist -> error", func(t *testing.T) {
@@ -36,6 +40,7 @@ func Test__DeleteOrganization(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 		assert.Equal(t, "organization not found", msg)
+		assert.Empty(t, recorder.events)
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
@@ -45,14 +50,62 @@ func Test__DeleteOrganization(t *testing.T) {
 	})
 
 	t.Run("organization is deleted", func(t *testing.T) {
+		// Observation state must not prevent either soft or hard deletion.
+		now := time.Now()
+		_, err := billingmodels.ObserveOrganizationPaymentMethods(database.DB(t.Context()), billingmodels.PaymentMethodObservation{
+			OrganizationID: r.Organization.ID, ReadStartedAt: now, ObservedAt: now,
+		})
+		require.NoError(t, err)
 		response, err := DeleteOrganization(ctx, r.AuthService, r.Organization.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 
 		_, err = models.FindOrganizationByID(r.Organization.ID.String())
 		assert.Error(t, err)
+		require.Len(t, recorder.events, 1)
+		event := recorder.events[0]
+		assert.Equal(t, "organization_deleted", string(event.Name))
+		assert.Equal(t, r.Account.ID.String(), event.DistinctID)
+		assert.Equal(t, productanalytics.ActorUser, event.ActorType)
+		assert.Equal(t, r.Account.ID.String(), event.Properties["actor_account_id"])
+		assert.Equal(t, r.Organization.ID.String(), event.OrganizationID)
+		assert.Equal(t, "direct", event.Properties["deletion_source"])
+		assert.Equal(t, productanalytics.StableEventID(productanalytics.EventOrganizationDeleted, r.Organization.ID.String()), event.EventID)
 	})
 }
+
+func TestDeleteOrganizationAPIKeyAnalytics(t *testing.T) {
+	r := support.Setup(t)
+	key, err := models.CreateAPIKey(database.DB(t.Context()), r.Organization.ID, "admin-key", nil, r.User, nil, nil)
+	require.NoError(t, err)
+	recorder := &deletionAnalyticsRecorder{}
+	previous := productanalytics.SetCurrent(recorder)
+	t.Cleanup(func() { productanalytics.SetCurrent(previous) })
+	ctx := authentication.SetUserIdInMetadata(t.Context(), key.ID.String())
+
+	response, err := DeleteOrganization(ctx, r.AuthService, r.Organization.ID.String())
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	_, err = models.FindOrganizationByID(r.Organization.ID.String())
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	require.Len(t, recorder.events, 1)
+	event := recorder.events[0]
+	assert.Equal(t, productanalytics.EventOrganizationDeleted, event.Name)
+	assert.Equal(t, productanalytics.SyntheticDistinctID(r.Organization.ID.String(), productanalytics.ActorSystem, "organization"), event.DistinctID)
+	assert.Equal(t, productanalytics.ActorSystem, event.ActorType)
+	assert.Equal(t, r.Organization.ID.String(), event.OrganizationID)
+	assert.NotContains(t, event.Properties, "actor_account_id")
+}
+
+type deletionAnalyticsRecorder struct{ events []productanalytics.Event }
+
+func (r *deletionAnalyticsRecorder) Capture(event productanalytics.Event) {
+	r.events = append(r.events, event)
+}
+func (*deletionAnalyticsRecorder) IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity) {
+}
+func (*deletionAnalyticsRecorder) Close() error  { return nil }
+func (*deletionAnalyticsRecorder) Enabled() bool { return true }
 
 func TestDeleteOrganizationWaitsForSubscriptionActivation(t *testing.T) {
 	r := support.Setup(t)
@@ -157,6 +210,9 @@ func TestSubscriptionActivationWaitsForOrganizationDeletion(t *testing.T) {
 
 func Test__DeleteOrganization_TransactionRollback(t *testing.T) {
 	r := support.Setup(t)
+	recorder := &deletionAnalyticsRecorder{}
+	previous := productanalytics.SetCurrent(recorder)
+	t.Cleanup(func() { productanalytics.SetCurrent(previous) })
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	t.Run("auth service failure rolls back organization soft-deletion", func(t *testing.T) {
@@ -182,6 +238,7 @@ func Test__DeleteOrganization_TransactionRollback(t *testing.T) {
 		_, err = DeleteOrganization(ctx, mockAuth, r.Organization.ID.String())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "ooops")
+		assert.Empty(t, recorder.events)
 
 		//
 		// Verify organization is NOT soft-deleted after transaction rollback

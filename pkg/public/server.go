@@ -450,6 +450,8 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/owner", s.handleRunnerPlanningAssignOwner).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", s.handleRunnerPlanningActivity).Methods("PUT")
 	s.Router.HandleFunc("/api/v1/runner/merge-confidence/checks", s.handleRunnerMergeConfidenceCheck).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tasks/suggest-owners", s.handleRunnerTaskSuggestOwners).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tasks/owner", s.handleRunnerTaskAssignOwner).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts/links", s.handleRunnerArtifactLink).Methods(http.MethodPost)
 

@@ -284,6 +284,7 @@ func TestDisconnectAccountProvider_KeepsEmailWhenNextEmailIsTaken(t *testing.T) 
 
 func TestDeleteAccount_SoftDeletesCreatedOrgAndFreesEmail(t *testing.T) {
 	r := support.Setup(t)
+	recorder := useAnalytics(t)
 	require.NoError(t, database.Conn().Model(r.Account).Update("installation_admin", false).Error)
 
 	server, account, token := setupTestServer(r, t)
@@ -299,6 +300,17 @@ func TestDeleteAccount_SoftDeletesCreatedOrgAndFreesEmail(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, res.Code)
 
 	_, err = models.FindAccountByID(account.ID.String())
+	events := recorder.snapshot()
+	require.Len(t, events, 2)
+	assert.Equal(t, "account_deleted", string(events[0].Name))
+	assert.Equal(t, account.ID.String(), events[0].DistinctID)
+	assert.Equal(t, "self_service", events[0].Properties["deletion_source"])
+	assert.Equal(t, account.ID.String(), events[0].Properties["account_id"])
+	assert.Equal(t, account.ID.String(), events[0].Properties["actor_account_id"])
+	assert.Equal(t, []string{r.Organization.ID.String()}, events[0].Properties["deleted_organization_ids"])
+	assert.Equal(t, "organization_deleted", string(events[1].Name))
+	assert.Equal(t, r.Organization.ID.String(), events[1].OrganizationID)
+	assert.Equal(t, "account_deletion", events[1].Properties["deletion_source"])
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	_, err = models.FindAccountByEmail(originalEmail)
@@ -317,6 +329,7 @@ func TestDeleteAccount_SoftDeletesCreatedOrgAndFreesEmail(t *testing.T) {
 
 func TestDeleteAccount_LeavesCreatedOrgWhenOtherOwnerRemains(t *testing.T) {
 	r := support.Setup(t)
+	recorder := useAnalytics(t)
 	require.NoError(t, database.Conn().Model(r.Account).Update("installation_admin", false).Error)
 
 	otherAccount, err := models.CreateAccount("Other Owner", "other-created-owner@example.com")
@@ -353,6 +366,8 @@ func TestDeleteAccount_LeavesCreatedOrgWhenOtherOwnerRemains(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, ownerIDs, r.User.String())
 	assert.Contains(t, ownerIDs, otherUser.ID.String())
+	require.Len(t, recorder.snapshot(), 1)
+	assert.Equal(t, "account_deleted", string(recorder.snapshot()[0].Name))
 }
 
 func TestDeleteAccount_ResolvesSeatsOverCapacityInRemainingOrganization(t *testing.T) {
@@ -408,6 +423,7 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 	for _, status := range []string{billingmodels.PolarSubscriptionStatusActive, billingmodels.PolarSubscriptionStatusPaused} {
 		t.Run(status, func(t *testing.T) {
 			r := support.Setup(t)
+			recorder := useAnalytics(t)
 			db := database.DB(t.Context())
 			require.NoError(t, db.Model(r.Account).Update("installation_admin", false).Error)
 			second := support.CreateOrganization(t, r, r.User)
@@ -447,6 +463,7 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 
 			res := deleteAccount()
 			require.Equal(t, http.StatusConflict, res.Code)
+			assert.Empty(t, recorder.snapshot())
 			assert.Contains(t, res.Body.String(), "Cancel the subscription in Billing")
 			afterAccount, err := models.FindAccountByID(account.ID.String())
 			require.NoError(t, err)
@@ -471,6 +488,7 @@ func TestDeleteAccount_RefusesLiveSubscriptionAndPreservesAccount(t *testing.T) 
 			}, nil)
 			require.NoError(t, err)
 			require.Equal(t, http.StatusNoContent, deleteAccount().Code)
+			require.Len(t, recorder.snapshot(), 3, "one account and both eligible organizations commit")
 			_, err = models.FindAccountByID(account.ID.String())
 			require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 			for _, organization := range []*models.Organization{r.Organization, second} {

@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"errors"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"gorm.io/gorm"
 )
@@ -31,6 +33,13 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 	organization, err := models.FindOrganizationByID(orgID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "organization not found")
+	}
+	actorID, _ := authentication.GetAccountIDFromMetadata(ctx)
+	if actorID == "" {
+		user, findErr := models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
+		if findErr == nil && user.AccountID != nil {
+			actorID = user.AccountID.String()
+		}
 	}
 
 	// Ask Polar before the transaction: the request must not hold the
@@ -56,6 +65,25 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 		organization.ID.String(),
 		userID,
 	)
+	distinctID := actorID
+	actorType := productanalytics.ActorUser
+	properties := productanalytics.Properties{
+		"deletion_source": "direct",
+		"deleted_at":      organization.DeletedAt.Time.UTC().Format(time.RFC3339Nano),
+	}
+	if actorID == "" {
+		distinctID = productanalytics.SyntheticDistinctID(organization.ID.String(), productanalytics.ActorSystem, "organization")
+		actorType = productanalytics.ActorSystem
+	} else {
+		properties["actor_account_id"] = actorID
+	}
+	productanalytics.Capture(productanalytics.Event{
+		Name:       productanalytics.EventOrganizationDeleted,
+		EventID:    productanalytics.StableEventID(productanalytics.EventOrganizationDeleted, organization.ID.String()),
+		DistinctID: distinctID, OrganizationID: organization.ID.String(), ActorType: actorType,
+		Source:     productanalytics.SourceFromContext(ctx, productanalytics.SourceAPI),
+		Properties: properties,
+	})
 
 	return &pb.DeleteOrganizationResponse{}, nil
 }

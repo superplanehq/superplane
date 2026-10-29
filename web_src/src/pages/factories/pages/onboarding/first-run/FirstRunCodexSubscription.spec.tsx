@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunCodexSubscription } from "./FirstRunCodexSubscription";
@@ -32,7 +32,11 @@ function renderPanel(
 }
 
 describe("FirstRunCodexSubscription", () => {
-  it("shows the device link and code while sign-in is pending", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("shows the device link and copies the sign-in code", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
     renderPanel({
       status: "pending",
       verificationUrl: "https://auth.openai.com/codex/device",
@@ -46,6 +50,11 @@ describe("FirstRunCodexSubscription", () => {
     );
     expect(screen.getByText(copy.subscriptionDeviceSettings)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Copy sign-in code" }));
+
+    expect(writeText).toHaveBeenCalledWith("CODE-1234");
+    expect(screen.getByRole("button", { name: "Sign-in code copied" })).toBeInTheDocument();
   });
 
   it("waits for a device code without saying sign-in is finishing", async () => {
@@ -63,6 +72,21 @@ describe("FirstRunCodexSubscription", () => {
 
     expect(screen.getByText(copy.subscriptionFinishing)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: copy.subscriptionCancel })).not.toBeInTheDocument();
+  });
+
+  it("shows cancellation progress and hides the device code until cleanup finishes", () => {
+    renderPanel({
+      status: "canceling",
+      reservationHeld: true,
+      verificationUrl: "https://auth.openai.com/codex/device",
+      verificationCode: "CODE-1234",
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent("Canceling ChatGPT sign-in. Wait for cleanup to finish.");
+    expect(screen.queryByText("CODE-1234")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: copy.subscriptionCancel })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
   });
 
   it("names the connected ChatGPT account", () => {

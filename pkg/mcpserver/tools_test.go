@@ -2,8 +2,11 @@ package mcpserver
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -102,7 +105,7 @@ func TestGetTaskRejectsOtherWorkspace(t *testing.T) {
 	assert.Equal(t, "Not found", err.Error())
 }
 
-func TestCreateTaskReturnsNewTask(t *testing.T) {
+func TestCreateTaskReturnsNewTaskWhenLaterWorkspaceReadsFail(t *testing.T) {
 	r := support.Setup(t)
 	enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
@@ -111,16 +114,38 @@ func TestCreateTaskReturnsNewTask(t *testing.T) {
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Create", "", "CRT")
 	require.NoError(t, err)
 
-	runtime := &Runtime{Auth: r.AuthService}
+	// Fail workspace reads after the task insert. The completed action must
+	// still return its result and URL from the workspace already authorized.
+	var inserted atomic.Bool
+	createCallback := "mcp_test:task_inserted"
+	queryCallback := "mcp_test:workspace_read_failure"
+	require.NoError(t, db.Callback().Create().After("gorm:create").Register(createCallback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "factory_work_orders" && tx.Error == nil {
+			inserted.Store(true)
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Create().Remove(createCallback)) })
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(queryCallback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "factories" && inserted.Load() {
+			tx.AddError(errors.New("workspace read failed after task creation"))
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(queryCallback)) })
+
+	runtime := &Runtime{Auth: r.AuthService, BaseURL: "https://app.example.test"}
 	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
 		"title":       "Ship MCP",
 		"description": "Expose the workspace tools.",
 	})
+	var saved models.FactoryWorkOrder
+	require.NoError(t, db.Where("factory_id = ? AND title = ?", factoryModel.ID, "Ship MCP").First(&saved).Error)
 	require.NoError(t, err)
 	payload := decodeToolJSON(t, result)
 	assert.Equal(t, "Ship MCP", payload["title"])
 	assert.Equal(t, "draft", payload["state"])
-	require.NotEmpty(t, payload["id"])
+	assert.Equal(t, saved.ID.String(), payload["id"])
+	assert.Equal(t, fmt.Sprintf("https://app.example.test/%s/workspaces/%s/task/%d",
+		r.Organization.ID, factoryModel.RouteSegment(), saved.Number), payload["url"])
 }
 
 func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {
@@ -151,6 +176,103 @@ func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {
 	assert.Equal(t, "implement", payload["column"])
 	require.NotEmpty(t, payload["id"])
 	require.NotEmpty(t, payload["key"])
+}
+
+func TestTaskToolsReturnWebURL(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP URLs", "", "URL")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Linked task", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService, BaseURL: "https://app.example.test/"}
+	claims := toolClaims(r, factoryModel.ID)
+	want := fmt.Sprintf("https://app.example.test/%s/workspaces/%s/task/%d",
+		r.Organization.ID, factoryModel.RouteSegment(), order.Number)
+
+	t.Run("get_task", func(t *testing.T) {
+		assert.Equal(t, want, taskURLFromTool(t, runtime, claims, "get_task", map[string]any{"task": order.ID.String()}))
+	})
+
+	t.Run("list_tasks", func(t *testing.T) {
+		payload := listTasks(t, runtime, claims, map[string]any{})
+		rows, ok := payload["tasks"].([]any)
+		require.True(t, ok)
+		require.Len(t, rows, 1)
+		row, ok := rows[0].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, want, row["url"])
+	})
+
+	t.Run("get_task_report", func(t *testing.T) {
+		payload := decodeToolJSON(t, mustCallTool(t, runtime, claims, "get_task_report", map[string]any{"task": order.ID.String()}))
+		task, ok := payload["task"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, want, task["url"])
+	})
+
+	t.Run("assign_task", func(t *testing.T) {
+		assert.Equal(t, want, taskURLFromTool(t, runtime, claims, "assign_task", map[string]any{
+			"task":     order.ID.String(),
+			"unassign": true,
+		}))
+	})
+
+	t.Run("create_task", func(t *testing.T) {
+		created := decodeToolJSON(t, mustCallTool(t, runtime, claims, "create_task", map[string]any{"title": "Second"}))
+		createdID, _ := created["id"].(string)
+		require.NotEmpty(t, createdID)
+		createdURL, _ := created["url"].(string)
+		require.NotEmpty(t, createdURL)
+		assert.Equal(t, taskURLFromTool(t, runtime, claims, "get_task", map[string]any{"task": createdID}), createdURL)
+	})
+}
+
+func TestHandOffTaskReturnsWebURL(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Hand Off URL", "", "HOU")
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	})
+	require.NoError(t, err)
+
+	claims := toolClaims(r, factoryModel.ID)
+	claims.ClientID = LocalClientID
+	runtime := &Runtime{Auth: r.AuthService, BaseURL: "https://app.example.test"}
+	handedOff := decodeToolJSON(t, mustCallTool(t, runtime, claims, "hand_off_task", map[string]any{
+		"title":  "Hand-off URL",
+		"plan":   "# Check the URL.",
+		"column": "implement",
+	}))
+	handedOffURL, _ := handedOff["url"].(string)
+	require.NotEmpty(t, handedOffURL)
+	assert.Equal(t, taskURLFromTool(t, runtime, claims, "get_task", map[string]any{"task": handedOff["id"]}), handedOffURL)
+}
+
+// taskURLFromTool calls a flat task tool and returns the task url field.
+func taskURLFromTool(t *testing.T, runtime *Runtime, claims *AccessClaims, tool string, args map[string]any) string {
+	t.Helper()
+	payload := decodeToolJSON(t, mustCallTool(t, runtime, claims, tool, args))
+	url, ok := payload["url"].(string)
+	require.True(t, ok, "%s response has no url", tool)
+	return url
+}
+
+func mustCallTool(t *testing.T, runtime *Runtime, claims *AccessClaims, tool string, args map[string]any) ToolResult {
+	t.Helper()
+	result, err := runtime.CallTool(t.Context(), claims, tool, args)
+	require.NoError(t, err)
+	return result
 }
 
 func TestCallToolSucceedsWithoutMCPServerFlag(t *testing.T) {
@@ -857,7 +979,7 @@ func TestListWorkspacesReturnsGrantedWorkspaces(t *testing.T) {
 
 	claims := toolClaims(r, first.ID)
 	claims.FactoryIDs = []uuid.UUID{second.ID, first.ID}
-	runtime := &Runtime{Auth: r.AuthService}
+	runtime := &Runtime{Auth: r.AuthService, BaseURL: "https://app.example.test"}
 	result, err := runtime.CallTool(ctx, claims, "list_workspaces", nil)
 	require.NoError(t, err)
 	payload := decodeToolJSON(t, result)
@@ -865,14 +987,21 @@ func TestListWorkspacesReturnsGrantedWorkspaces(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, rows, 2)
 	names := map[string]string{}
+	slugs := map[string]string{}
+	urls := map[string]string{}
 	for _, row := range rows {
 		item, ok := row.(map[string]any)
 		require.True(t, ok)
-		names[item["id"].(string)] = item["name"].(string)
+		id := item["id"].(string)
+		names[id] = item["name"].(string)
+		slugs[id] = item["slug"].(string)
+		urls[id] = item["url"].(string)
 	}
 	assert.Equal(t, "Alpha", names[first.ID.String()])
 	assert.Equal(t, "Beta", names[second.ID.String()])
 	assert.NotContains(t, names, "Hidden")
+	assert.Equal(t, first.RouteSegment(), slugs[first.ID.String()])
+	assert.Equal(t, fmt.Sprintf("https://app.example.test/%s/workspaces/%s", r.Organization.ID, first.RouteSegment()), urls[first.ID.String()])
 }
 
 func TestWorkspaceArgumentSelectsGrantedWorkspace(t *testing.T) {
@@ -899,4 +1028,29 @@ func TestWorkspaceArgumentSelectsGrantedWorkspace(t *testing.T) {
 
 	_, err = runtime.CallTool(ctx, claims, "list_tasks", map[string]any{"workspace": uuid.NewString()})
 	require.EqualError(t, err, "Not found")
+}
+
+func TestHandOffTaskReturnsPendingBacklogTarget(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Personal subscriptions", "", "PERS")
+	require.NoError(t, err)
+	subscription := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
+	require.NoError(t, err)
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(t.Context(), toolClaims(r, factory.ID), "hand_off_task", map[string]any{"title": "Unassigned handoff", "plan": "Keep the plan", "column": "verify", "pull_request_url": "https://github.com/acme/app/pull/42"})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	assert.Equal(t, "draft", payload["state"])
+	assert.Equal(t, "backlog", payload["column"])
+	pending, ok := payload["pending_handoff"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "verify", pending["column"])
+	assert.Equal(t, line.ID.String(), pending["line_id"])
+	assert.Equal(t, "https://github.com/acme/app/pull/42", pending["pull_request_url"])
 }

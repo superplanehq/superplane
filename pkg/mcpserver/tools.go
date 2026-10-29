@@ -22,6 +22,8 @@ import (
 type Runtime struct {
 	Auth   authorization.PermissionChecker
 	Intake factories.IntakeDependencies
+	// BaseURL is the installation's web app base URL. Task and workspace URLs are built from it.
+	BaseURL string
 }
 
 func Tools() []Tool {
@@ -244,17 +246,22 @@ func (rt *Runtime) listWorkspaces(ctx context.Context, claims *AccessClaims, _ m
 		if !OrganizationAllowsPublicMCP(factory.OrganizationID) || !organizationAllowsFactories(factory.OrganizationID) {
 			return ToolResult{}, ToolError("Not found")
 		}
-		rows = append(rows, workspaceRow{ID: factory.ID.String(), Name: factory.Name})
+		rows = append(rows, workspaceRow{
+			ID:   factory.ID.String(),
+			Name: factory.Name,
+			Slug: factory.RouteSegment(),
+			URL:  workspaceURL(rt.BaseURL, factory.OrganizationID, factory.RouteSegment()),
+		})
 	}
 	return TextResult(mustJSON(map[string]any{"workspaces": rows})), nil
 }
 
 func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
 	if err != nil {
 		return ToolResult{}, err
 	}
-	req := &pb.ListWorkOrdersRequest{FactoryId: factoryID.String()}
+	req := &pb.ListWorkOrdersRequest{FactoryId: factory.ID.String()}
 	if mine, _ := args["mine"].(bool); mine {
 		userID := claims.UserID.String()
 		req.UserId = &userID
@@ -281,6 +288,7 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links := newTaskLinks(rt.BaseURL, factory)
 	type taskRow struct {
 		ID        string        `json:"id"`
 		Key       string        `json:"key"`
@@ -288,6 +296,7 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 		State     string        `json:"state"`
 		Assignees []assigneeRef `json:"assignees"`
 		SourceURL string        `json:"source_url"`
+		URL       string        `json:"url"`
 	}
 	rows := make([]taskRow, 0, len(resp.GetOrders()))
 	for _, order := range resp.GetOrders() {
@@ -302,6 +311,7 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 			State:     protoStateName(order.GetState()),
 			Assignees: assigneeRefs(order.GetAssignees()),
 			SourceURL: sourceURL,
+			URL:       links.url(order.GetNumber()),
 		})
 	}
 	payload := map[string]any{"tasks": rows, "has_next_page": resp.GetHasNextPage()}
@@ -312,7 +322,7 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 }
 
 func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -321,12 +331,13 @@ func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[s
 		return ToolResult{}, err
 	}
 	resp, err := factories.DescribeWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.DescribeWorkOrderRequest{
-		FactoryId: factoryID.String(),
+		FactoryId: factory.ID.String(),
 		OrderId:   task,
 	})
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links := newTaskLinks(rt.BaseURL, factory)
 	order := resp.GetOrder()
 	return TextResult(mustJSON(map[string]any{
 		"id":          order.GetId(),
@@ -335,11 +346,12 @@ func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[s
 		"description": order.GetDescription(),
 		"state":       protoStateName(order.GetState()),
 		"assignees":   assigneeRefs(order.GetAssignees()),
+		"url":         links.url(order.GetNumber()),
 	})), nil
 }
 
 func (rt *Runtime) listTaskArtifacts(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -348,7 +360,7 @@ func (rt *Runtime) listTaskArtifacts(ctx context.Context, claims *AccessClaims, 
 		return ToolResult{}, err
 	}
 	resp, err := factories.ListWorkOrderArtifacts(toolContext(ctx, claims), claims.OrgID.String(), &pb.ListWorkOrderArtifactsRequest{
-		FactoryId: factoryID.String(),
+		FactoryId: factory.ID.String(),
 		OrderId:   task,
 	})
 	if err != nil {
@@ -378,7 +390,7 @@ func (rt *Runtime) listTaskArtifacts(ctx context.Context, claims *AccessClaims, 
 }
 
 func (rt *Runtime) getTaskAgent(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -386,12 +398,12 @@ func (rt *Runtime) getTaskAgent(ctx context.Context, claims *AccessClaims, args 
 	if err != nil {
 		return ToolResult{}, err
 	}
-	orderID, err := resolveTaskID(ctx, claims, factoryID, task)
+	orderID, err := resolveTaskID(ctx, claims, factory.ID, task)
 	if err != nil {
 		return ToolResult{}, err
 	}
 	resp, err := factories.FindPlanningSessionByWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
-		FactoryId:   factoryID.String(),
+		FactoryId:   factory.ID.String(),
 		WorkOrderId: orderID,
 	})
 	if err != nil {
@@ -404,7 +416,7 @@ func (rt *Runtime) getTaskAgent(ctx context.Context, claims *AccessClaims, args 
 }
 
 func (rt *Runtime) sendTaskMessage(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:update")
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:update")
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -416,12 +428,12 @@ func (rt *Runtime) sendTaskMessage(ctx context.Context, claims *AccessClaims, ar
 	if err != nil {
 		return ToolResult{}, err
 	}
-	orderID, err := resolveTaskID(ctx, claims, factoryID, task)
+	orderID, err := resolveTaskID(ctx, claims, factory.ID, task)
 	if err != nil {
 		return ToolResult{}, err
 	}
 	found, err := factories.FindPlanningSessionByWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
-		FactoryId:   factoryID.String(),
+		FactoryId:   factory.ID.String(),
 		WorkOrderId: orderID,
 	})
 	if err != nil {
@@ -431,7 +443,7 @@ func (rt *Runtime) sendTaskMessage(ctx context.Context, claims *AccessClaims, ar
 		return ToolResult{}, actionError(err)
 	}
 	resp, err := factories.SendPlanningSessionMessage(toolContext(ctx, claims), claims.OrgID.String(), &pb.SendPlanningSessionMessageRequest{
-		FactoryId: factoryID.String(),
+		FactoryId: factory.ID.String(),
 		SessionId: found.GetSession().GetId(),
 		Text:      message,
 	})
@@ -447,7 +459,7 @@ func (rt *Runtime) sendTaskMessage(ctx context.Context, claims *AccessClaims, ar
 }
 
 func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:create")
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:create")
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -457,19 +469,21 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 	}
 	description, _ := args["description"].(string)
 	resp, err := factories.CreateWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.CreateWorkOrderRequest{
-		FactoryId:   factoryID.String(),
+		FactoryId:   factory.ID.String(),
 		Title:       title,
 		Description: strings.TrimSpace(description),
 	})
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links := newTaskLinks(rt.BaseURL, factory)
 	order := resp.GetOrder()
 	return TextResult(mustJSON(map[string]any{
 		"id":    order.GetId(),
 		"key":   order.GetKey(),
 		"title": order.GetTitle(),
 		"state": protoStateName(order.GetState()),
+		"url":   links.url(order.GetNumber()),
 	})), nil
 }
 
@@ -480,7 +494,7 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
 		return ToolResult{}, err
 	}
-	factoryID, err := rt.resolveGrantedWorkspace(ctx, claims, args)
+	factory, err := rt.resolveGrantedWorkspace(ctx, claims, args)
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -502,7 +516,7 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 
 	clientName := ClientDisplayName(database.DB(ctx), claims.ClientID)
 	result, err := factories.HandOffWorkOrder(toolContext(ctx, claims), rt.Intake, claims.OrgID.String(), factories.HandOffWorkOrderRequest{
-		FactoryID:      factoryID.String(),
+		FactoryID:      factory.ID.String(),
 		Title:          title,
 		Description:    strings.TrimSpace(description),
 		Plan:           plan,
@@ -515,12 +529,17 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links := newTaskLinks(rt.BaseURL, factory)
 	order := result.Order
 	payload := map[string]any{
 		"id":     order.GetId(),
 		"key":    order.GetKey(),
 		"state":  protoStateName(order.GetState()),
 		"column": result.Column,
+		"url":    links.url(order.GetNumber()),
+	}
+	if pending := order.GetPendingHandoff(); pending != nil {
+		payload["pending_handoff"] = map[string]any{"line_id": pending.GetLineId(), "column": pending.GetColumn(), "pull_request_url": pending.GetPullRequestUrl()}
 	}
 	if result.PullRequestURL != "" {
 		payload["pull_request_url"] = result.PullRequestURL
@@ -529,7 +548,7 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 }
 
 func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:update")
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:update")
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -541,7 +560,7 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 	if err != nil {
 		return ToolResult{}, err
 	}
-	orderID, err := resolveTaskID(ctx, claims, factoryID, task)
+	orderID, err := resolveTaskID(ctx, claims, factory.ID, task)
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -559,18 +578,20 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 	}
 
 	resp, err := factories.UpdateWorkOrderAssignees(toolContext(ctx, claims), claims.OrgID.String(), &pb.UpdateWorkOrderAssigneesRequest{
-		FactoryId:   factoryID.String(),
+		FactoryId:   factory.ID.String(),
 		OrderId:     orderID,
 		AssigneeIds: assigneeIDs,
 	})
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	links := newTaskLinks(rt.BaseURL, factory)
 	order := resp.GetOrder()
 	return TextResult(mustJSON(map[string]any{
 		"id":        order.GetId(),
 		"key":       order.GetKey(),
 		"assignees": assigneeRefs(order.GetAssignees()),
+		"url":       links.url(order.GetNumber()),
 	})), nil
 }
 
@@ -830,19 +851,21 @@ func sessionSummary(session *pb.PlanningSession) map[string]any {
 type workspaceRow struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	Slug string `json:"slug"`
+	URL  string `json:"url"`
 }
 
-func (rt *Runtime) beginWorkspaceCall(ctx context.Context, claims *AccessClaims, args map[string]any, scope string) (uuid.UUID, error) {
+func (rt *Runtime) beginWorkspaceCall(ctx context.Context, claims *AccessClaims, args map[string]any, scope string) (*models.Factory, error) {
 	if err := rt.authorize(ctx, claims, scope); err != nil {
-		return uuid.Nil, err
+		return nil, err
 	}
 	return rt.resolveGrantedWorkspace(ctx, claims, args)
 }
 
-func (rt *Runtime) resolveGrantedWorkspace(ctx context.Context, claims *AccessClaims, args map[string]any) (uuid.UUID, error) {
+func (rt *Runtime) resolveGrantedWorkspace(ctx context.Context, claims *AccessClaims, args map[string]any) (*models.Factory, error) {
 	requested, err := optionalStringArg(args, "workspace")
 	if err != nil {
-		return uuid.Nil, err
+		return nil, err
 	}
 	granted := claims.WorkspaceIDs()
 	var factoryID uuid.UUID
@@ -850,25 +873,25 @@ func (rt *Runtime) resolveGrantedWorkspace(ctx context.Context, claims *AccessCl
 	case requested == "" && len(granted) == 1:
 		factoryID = granted[0]
 	case requested == "" && len(granted) > 1:
-		return uuid.Nil, ToolError("This connection can use more than one workspace. Pass workspace.")
+		return nil, ToolError("This connection can use more than one workspace. Pass workspace.")
 	default:
 		parsed, parseErr := uuid.Parse(requested)
 		if parseErr != nil || !slices.Contains(granted, parsed) {
-			return uuid.Nil, ToolError("Not found")
+			return nil, ToolError("Not found")
 		}
 		factoryID = parsed
 	}
 	if !OrganizationAllowsPublicMCP(claims.OrgID) || !organizationAllowsFactories(claims.OrgID) {
-		return uuid.Nil, ToolError("Not found")
+		return nil, ToolError("Not found")
 	}
 	factory, err := models.FindFactory(database.DB(ctx), claims.OrgID, factoryID)
 	if err != nil || factory.OrganizationID != claims.OrgID {
-		return uuid.Nil, ToolError("Not found")
+		return nil, ToolError("Not found")
 	}
 	if !OrganizationAllowsPublicMCP(factory.OrganizationID) || !organizationAllowsFactories(factory.OrganizationID) {
-		return uuid.Nil, ToolError("Not found")
+		return nil, ToolError("Not found")
 	}
-	return factory.ID, nil
+	return factory, nil
 }
 
 func stringArg(args map[string]any, name string) (string, error) {

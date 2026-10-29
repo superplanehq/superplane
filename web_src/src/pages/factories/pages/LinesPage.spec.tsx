@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -1657,16 +1657,18 @@ describe("LinesPage board editing", () => {
     expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
     expect(commitCanvasStagingMutateAsync).not.toHaveBeenCalled();
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await act(async () => {
+      fireEvent.click(within(dialog).getByTestId("implement-settings-save"));
+    });
 
-    await waitFor(() => expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step"));
+    expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step");
     const saved = updateCanvasVersionMutateAsync.mock.calls.at(-1)?.[0] as { canvasYaml?: string };
     const savedAgent = dematerializeCanvasSpec(saved.canvasYaml ?? "")?.nodes?.find(
       (node) => node.id === "implementation-agent-no-issue",
     );
     expect(savedAgent?.concurrency?.max).toBe(3);
     expect(savedAgent?.configuration?.steps).toEqual(implementerCanvas.spec.nodes[1].configuration.steps);
-    await waitFor(() => expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument();
   }, 15000);
 
   it("keeps Backlog Edit as the only edit action", async () => {

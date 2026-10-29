@@ -15,5 +15,5 @@ func AppendMergeConfidenceMCP(environment []TaskEnvironmentVariable, files []Tas
 	if !HasMergeConfidenceToken(environment) {
 		return files
 	}
-	return appendUniqueTaskFiles(files, MergeConfidenceMCPFile())
+	return appendUniqueTaskFiles(files, MergeConfidenceMCPFile(), taskOwnerToolsFile())
 }
