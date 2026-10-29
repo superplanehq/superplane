@@ -62,6 +62,9 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
     enabled: enabled && Boolean(chatId),
     initialPageParam: "",
     queryFn: async ({ pageParam }): Promise<AgentMessagesPage> => {
+      const messagesAtRequestStart = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(
+        agentChatKeys.messages(chatId ?? ""),
+      )?.pages[0]?.messages;
       const response = await agentsListAgentChatMessages(
         withOrganizationHeader({
           organizationId,
@@ -73,10 +76,11 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
         .map((message) => fromApiMessage(message, chatId ?? "", organizationId))
         .filter((m): m is AgentMessage => m !== null);
       if (!pageParam && chatId) {
+        const currentData = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(chatId));
         return {
           messages: mergePendingOptimisticMessages(
-            messages,
-            queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(chatId)),
+            mergeMessagesReceivedDuringFetch(messages, messagesAtRequestStart, currentData?.pages[0]?.messages),
+            currentData,
           ),
           hasMore: Boolean(response.data?.hasMore),
         };
@@ -160,6 +164,25 @@ export function useSendAgentChatMessage(organizationId: string | undefined) {
       }
     },
   });
+}
+
+// A history response can predate live events received while it was in flight.
+// Keep new arrivals and updates within the returned page, without moving
+// older cached history across its pagination boundary.
+function mergeMessagesReceivedDuringFetch(
+  messages: AgentMessage[],
+  messagesAtRequestStart: AgentMessage[] | undefined,
+  currentMessages: AgentMessage[] | undefined,
+): AgentMessage[] {
+  const initialById = new Map(messagesAtRequestStart?.map((message) => [message.id, message]));
+  const merged = new Map(messages.map((message) => [message.id, message]));
+  for (const message of currentMessages ?? []) {
+    const initial = initialById.get(message.id);
+    if (!isOptimisticAgentMessage(message) && initial !== message && (!initial || merged.has(message.id))) {
+      merged.set(message.id, message);
+    }
+  }
+  return [...merged.values()];
 }
 
 function mergePendingOptimisticMessages(
