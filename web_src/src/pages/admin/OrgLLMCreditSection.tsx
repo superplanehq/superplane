@@ -77,7 +77,7 @@ function OrganizationCredit({ orgId }: { orgId: string }) {
         saving={credit.savingPlan}
         error={credit.diagnosticsError}
         syncError={credit.customerSyncError}
-        onRetry={() => void credit.loadDiagnostics()}
+        onRetry={() => void credit.loadDiagnostics(true)}
         onCheck={() => void credit.loadDiagnostics(true)}
         onSync={() => void credit.syncCustomer()}
       />
