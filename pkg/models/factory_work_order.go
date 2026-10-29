@@ -352,40 +352,6 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 	return tx.Transaction(func(tx *gorm.DB) error { return o.updateAssignees(tx, assigneeIDs, updatedBy) })
 }
 
-func (o *FactoryWorkOrder) updateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
-	if err := o.validateSubscriptionAssignment(tx, assigneeIDs); err != nil {
-		return err
-	}
-	previous, err := o.ListAssignees(tx)
-	if err != nil {
-		return err
-	}
-	o.Assignees = previous
-	previousAssignees := o.AssigneeIDs()
-
-	if err := o.replaceAssignees(tx, assigneeIDs); err != nil {
-		return err
-	}
-
-	// Omit associations: `o.Assignees` is stale after ReplaceAssignees, and
-	// GORM would otherwise re-save it as part of this update, reverting the
-	// change we just made.
-	now := time.Now()
-	o.UpdatedAt = now
-	if err := tx.Model(o).Omit(clause.Associations).Update("updated_at", now).Error; err != nil {
-		return err
-	}
-
-	// Keep the in-memory association in sync with what was just written.
-	o.Assignees = make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
-	for _, assigneeID := range assigneeIDs {
-		o.Assignees = append(o.Assignees, FactoryWorkOrderAssignee{WorkOrderID: o.ID, UserID: assigneeID})
-	}
-
-	assigned, unassigned := assigneeDiff(previousAssignees, assigneeIDs)
-	return o.RecordAssigneesUpdated(tx, updatedBy, assigned, unassigned)
-}
-
 // UpdateStatus is the single writer for the work order lifecycle: it
 // validates the transition, updates the row, and records an
 // `order.status.updated` event enriched with the caller's attribution
@@ -926,6 +892,40 @@ func (o *FactoryWorkOrder) AssigneeIDs() []uuid.UUID {
 	}
 
 	return ids
+}
+
+func (o *FactoryWorkOrder) updateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
+	if err := o.validateSubscriptionAssignment(tx, assigneeIDs); err != nil {
+		return err
+	}
+	previous, err := o.ListAssignees(tx)
+	if err != nil {
+		return err
+	}
+	o.Assignees = previous
+	previousAssignees := o.AssigneeIDs()
+
+	if err := o.replaceAssignees(tx, assigneeIDs); err != nil {
+		return err
+	}
+
+	// Omit associations: `o.Assignees` is stale after ReplaceAssignees, and
+	// GORM would otherwise re-save it as part of this update, reverting the
+	// change we just made.
+	now := time.Now()
+	o.UpdatedAt = now
+	if err := tx.Model(o).Omit(clause.Associations).Update("updated_at", now).Error; err != nil {
+		return err
+	}
+
+	// Keep the in-memory association in sync with what was just written.
+	o.Assignees = make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
+	for _, assigneeID := range assigneeIDs {
+		o.Assignees = append(o.Assignees, FactoryWorkOrderAssignee{WorkOrderID: o.ID, UserID: assigneeID})
+	}
+
+	assigned, unassigned := assigneeDiff(previousAssignees, assigneeIDs)
+	return o.RecordAssigneesUpdated(tx, updatedBy, assigned, unassigned)
 }
 
 func (o *FactoryWorkOrder) recordEvent(tx *gorm.DB, eventType string, payload any) error {

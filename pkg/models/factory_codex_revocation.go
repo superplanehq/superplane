@@ -69,6 +69,15 @@ func (c *FactoryCodexConnection) CleanupRevocation(tx *gorm.DB, now time.Time) (
 		if err != nil {
 			return nil, err
 		}
+		// The task was reassigned between the query and the lock. Its new owner
+		// may already have queued work or runs, so leave them alone.
+		var owned int64
+		if err := tx.Model(&FactoryWorkOrderAssignee{}).Where("work_order_id = ? AND user_id = ?", o.ID, c.OwnerUserID).Count(&owned).Error; err != nil {
+			return nil, err
+		}
+		if owned == 0 {
+			continue
+		}
 		if err := o.dropQueuedLineWork(tx); err != nil {
 			return nil, err
 		}

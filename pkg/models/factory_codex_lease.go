@@ -146,6 +146,91 @@ func (c *FactoryCodexConnection) AttachLoginLease(tx *gorm.DB) error {
 	return nil
 }
 
+// RequireSubscriptionLeaseAdmission rechecks revocation and membership before
+// allocating a runner. It does not serialize the execution of separate leases.
+func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
+	lease, err := FindCodexLeaseByTask(tx, t.ID)
+	if err != nil {
+		return err
+	}
+	if lease == nil {
+		// Deleting a connection also deletes its leases. The execution retains
+		// the credential source, so this task must not run with a stale token.
+		execution, err := t.FindExecution(tx)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		credentials, _ := execution.Configuration.Data()["credentials"].(map[string]any)
+		source, _ := credentials["source"].(string)
+		if strings.TrimSpace(source) == "subscription" {
+			return ErrCodexConnectionNotFound
+		}
+		return nil
+	}
+	if lease.RevokedAt != nil {
+		return ErrCodexConnectionStale
+	}
+	connection, err := FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
+	if err != nil {
+		return err
+	}
+	if _, err := ActiveCodexMember(tx, connection.OrganizationID, connection.OwnerUserID); err != nil {
+		return err
+	}
+	// Re-read after locking membership. Removal can revoke the snapshot above
+	// before this transaction acquires its membership lock.
+	connection, err = FindFactoryCodexConnectionByID(tx.Clauses(clause.Locking{Strength: "SHARE"}), lease.ConnectionID)
+	if err != nil {
+		return err
+	}
+	lease, err = FindCodexLeaseForTask(tx, connection.ID, t.ID, lease.Generation)
+	if err != nil {
+		return err
+	}
+	if connection.RevocationPendingAt != nil {
+		return ErrCodexConnectionStale
+	}
+	if lease.Login() {
+		return nil
+	}
+	if connection.Status != CodexConnectionStatusReady || len(connection.BundleCiphertext) == 0 {
+		return ErrCodexConnectionNotReady
+	}
+	execution, err := t.FindExecution(tx)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrSubscriptionTaskAssociation
+	}
+	if err != nil {
+		return err
+	}
+	order, err := FindSubscriptionWorkOrderForRun(tx, connection.OrganizationID, connection.FactoryID, execution.RunID)
+	if err != nil {
+		return err
+	}
+	ownerID, err := order.RequireSubscriptionOwner(tx, true)
+	if err != nil {
+		return err
+	}
+	if ownerID != connection.OwnerUserID {
+		return ErrSubscriptionOwnerInvalid
+	}
+	model, _ := execution.Configuration.Data()["model"].(string)
+	if model == "" {
+		return nil
+	}
+	allowed, err := RunnerAcceptsModel(tx, connection.OrganizationID, &connection.FactoryID, "runnerCodex", map[string]any{"credentials": map[string]any{"source": "subscription"}}, model, ownerID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return ErrSubscriptionModelUnavailable
+	}
+	return nil
+}
+
 func (c *FactoryCodexConnection) createLease(
 	tx *gorm.DB,
 	taskID uuid.UUID,
@@ -244,89 +329,4 @@ func newCodexLeaseSecret(encryptor crypto.Encryptor, connectionID uuid.UUID) (st
 func codexLeaseSecretHash(secret string) string {
 	sum := sha256.Sum256([]byte(secret))
 	return hex.EncodeToString(sum[:])
-}
-
-// RequireSubscriptionLeaseAdmission rechecks revocation and membership before
-// allocating a runner. It does not serialize the execution of separate leases.
-func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
-	lease, err := FindCodexLeaseByTask(tx, t.ID)
-	if err != nil {
-		return err
-	}
-	if lease == nil {
-		// Deleting a connection also deletes its leases. The execution retains
-		// the credential source, so this task must not run with a stale token.
-		execution, err := t.FindExecution(tx)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		credentials, _ := execution.Configuration.Data()["credentials"].(map[string]any)
-		source, _ := credentials["source"].(string)
-		if strings.TrimSpace(source) == "subscription" {
-			return ErrCodexConnectionNotFound
-		}
-		return nil
-	}
-	if lease.RevokedAt != nil {
-		return ErrCodexConnectionStale
-	}
-	connection, err := FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
-	if err != nil {
-		return err
-	}
-	if _, err := ActiveCodexMember(tx, connection.OrganizationID, connection.OwnerUserID); err != nil {
-		return err
-	}
-	// Re-read after locking membership. Removal can revoke the snapshot above
-	// before this transaction acquires its membership lock.
-	connection, err = FindFactoryCodexConnectionByID(tx.Clauses(clause.Locking{Strength: "SHARE"}), lease.ConnectionID)
-	if err != nil {
-		return err
-	}
-	lease, err = FindCodexLeaseForTask(tx, connection.ID, t.ID, lease.Generation)
-	if err != nil {
-		return err
-	}
-	if connection.RevocationPendingAt != nil {
-		return ErrCodexConnectionStale
-	}
-	if lease.Login() {
-		return nil
-	}
-	if connection.Status != CodexConnectionStatusReady || len(connection.BundleCiphertext) == 0 {
-		return ErrCodexConnectionNotReady
-	}
-	execution, err := t.FindExecution(tx)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return ErrSubscriptionTaskAssociation
-	}
-	if err != nil {
-		return err
-	}
-	order, err := FindSubscriptionWorkOrderForRun(tx, connection.OrganizationID, connection.FactoryID, execution.RunID)
-	if err != nil {
-		return err
-	}
-	ownerID, err := order.RequireSubscriptionOwner(tx, true)
-	if err != nil {
-		return err
-	}
-	if ownerID != connection.OwnerUserID {
-		return ErrSubscriptionOwnerInvalid
-	}
-	model, _ := execution.Configuration.Data()["model"].(string)
-	if model == "" {
-		return nil
-	}
-	allowed, err := RunnerAcceptsModel(tx, connection.OrganizationID, &connection.FactoryID, "runnerCodex", map[string]any{"credentials": map[string]any{"source": "subscription"}}, model, ownerID)
-	if err != nil {
-		return err
-	}
-	if !allowed {
-		return ErrSubscriptionModelUnavailable
-	}
-	return nil
 }
