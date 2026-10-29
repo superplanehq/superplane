@@ -26,6 +26,7 @@ import (
 
 func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	r := support.Setup(t)
+	recorder := recordPaymentAnalytics(t)
 	defer r.Close()
 	db := database.DB(t.Context())
 	plan := billingmodels.BillingPlan{Key: "payg_" + uuid.NewString()[:8], Name: "Pay as you go", Category: "paid", Visibility: "public", RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
@@ -64,13 +65,20 @@ func TestSelectBillingPlanRequiresCardWithoutCharging(t *testing.T) {
 	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
 	hasCard = false
 	require.ErrorIs(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID), billingmodels.ErrPaymentMethodRequired)
+	require.Empty(t, recorder.snapshot(), "execution guards do not record observations")
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), req, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	require.Len(t, recorder.snapshot(), 1, "plan rejection does not undo the accepted observation")
+	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), req, r.Account.ID.String(), "http://localhost")
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	require.Len(t, recorder.snapshot(), 1)
 	plan.RequirePaymentMethod = false
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
 	require.NoError(t, polar.AssertOrganizationPaymentMethod(db, r.Organization.ID))
 }
 
-// Selecting a starter plan recovers signup credit deferred by earlier onboarding.
-func TestSelectBillingPlanRecoversSignupCredit(t *testing.T) {
+// Signup credit starts when plan selection activates the plan.
+func TestSelectBillingPlanGrantsSignupCreditAfterActivation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
@@ -87,7 +95,7 @@ func TestSelectBillingPlanRecoversSignupCredit(t *testing.T) {
 	require.NoError(t, err)
 	before, err := billingmodels.DescribeOrganizationLLMCredit(db, organization.ID)
 	require.NoError(t, err)
-	require.Zero(t, before.GrantMicros, "the earlier onboarding deferred signup credit")
+	require.Zero(t, before.GrantMicros, "onboarding has not activated a plan")
 
 	server := polartest.APIServer(t, func(w http.ResponseWriter, req *http.Request) {
 		require.Equal(t, http.MethodGet, req.Method)
@@ -210,7 +218,7 @@ func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 	product := "prod_selected_" + uuid.NewString()
 	plan := billingmodels.BillingPlan{Key: "paid_" + uuid.NewString()[:8], Name: "Paid", Category: "paid", Visibility: "public", PriceCents: 25000, PolarProductID: &product, RequirePaymentMethod: true, CreditFrequency: "none", CreditExpiration: "never"}
 	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
-	// Reproduce an account whose signup credit was deferred.
+	// Start with an account that has not activated a plan.
 	require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
 	require.NoError(t, db.Model(&models.Account{}).Where("id = ?", r.Account.ID).Update("welcome_credit_granted_at", nil).Error)
 	checkoutCalls := 0
@@ -242,21 +250,6 @@ func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 		}
 	})
 	polartest.UseServer(t, server)
-	// A failed account stamp must roll back the grant. Otherwise another
-	// organization can grant the same account signup credit again.
-	callback := "test:fail_welcome_credit_stamp"
-	require.NoError(t, db.Callback().Update().Before("gorm:update").Register(callback, func(tx *gorm.DB) {
-		if tx.Statement.Table == "accounts" {
-			tx.AddError(errors.New("account stamp unavailable"))
-		}
-	}))
-	t.Cleanup(func() { db.Callback().Update().Remove(callback) })
-	_, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key, ReturnPath: "/org/setup?step=billing"}, r.Account.ID.String(), "http://localhost")
-	require.ErrorContains(t, err, "Could not apply signup credit")
-	var grants int64
-	require.NoError(t, db.Model(&billingmodels.OrganizationLLMCreditGrant{}).Where("organization_id = ? AND kind = ?", r.Organization.ID, billingmodels.LLMCreditGrantKindWelcome).Count(&grants).Error)
-	require.Zero(t, grants, "the credit and account stamp must commit together")
-	require.NoError(t, db.Callback().Update().Remove(callback))
 	response, err := SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key, ReturnPath: "/org/setup?step=billing"}, r.Account.ID.String(), "http://localhost")
 	require.NoError(t, err)
 	require.Equal(t, "https://polar.sh/checkout/selected", response.CheckoutUrl)
@@ -264,6 +257,12 @@ func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 	current, err := billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
 	require.NotEqual(t, plan.ID, current.PlanID, "checkout redirect must not activate the plan")
+	credit, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Zero(t, credit.GrantMicros, "an open checkout must not grant signup credit")
+	account, err := models.FindAccountByID(r.Account.ID.String())
+	require.NoError(t, err)
+	require.False(t, account.HasReceivedWelcomeCredit())
 	for _, returnPath := range []string{"https://evil.example/setup", "//evil.example/setup", `/\evil.example/setup`, "/setup#fragment"} {
 		_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key, ReturnPath: returnPath}, r.Account.ID.String(), "http://localhost")
 		require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err), returnPath)
@@ -273,6 +272,41 @@ func TestSelectPaidPlanStartsCheckoutWithoutChangingPlan(t *testing.T) {
 	_, err = SelectBillingPlan(t.Context(), r.Organization.ID.String(), &pb.SelectBillingPlanRequest{PlanKey: plan.Key}, r.Account.ID.String(), "http://localhost")
 	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	require.Equal(t, 1, checkoutCalls)
+	subscription := billingmodels.PolarSubscriptionApply{ID: "sub_" + uuid.NewString(), ProductID: product, Status: billingmodels.PolarSubscriptionStatusActive}
+	pending := subscription
+	pending.Status = billingmodels.PolarSubscriptionStatusIncomplete
+	_, err = billingmodels.ApplyPolarSubscription(db, r.Organization.ID, pending, nil)
+	require.NoError(t, err)
+	credit, err = billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Zero(t, credit.GrantMicros, "an incomplete subscription must not grant signup credit")
+	callback := "test:fail_welcome_credit_stamp"
+	require.NoError(t, db.Callback().Update().Before("gorm:update").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "accounts" {
+			tx.AddError(errors.New("account stamp unavailable"))
+		}
+	}))
+	t.Cleanup(func() { db.Callback().Update().Remove(callback) })
+	_, err = billingmodels.ApplyPolarSubscription(db, r.Organization.ID, subscription, nil)
+	require.ErrorContains(t, err, "account stamp unavailable")
+	current, err = billingmodels.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.NotEqual(t, plan.ID, current.PlanID, "a failed signup grant must roll back plan activation")
+	credit, err = billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Zero(t, credit.GrantMicros)
+	require.NoError(t, db.Callback().Update().Remove(callback))
+	for range 2 {
+		_, err = billingmodels.ApplyPolarSubscription(db, r.Organization.ID, subscription, nil)
+		require.NoError(t, err)
+		credit, err = billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+		require.NoError(t, err)
+		require.Equal(t, billingmodels.CentsToMicros(1000), credit.GrantMicros)
+	}
+	// Deleting the original account must not block future subscription events.
+	require.NoError(t, db.Delete(account).Error)
+	_, err = billingmodels.ApplyPolarSubscription(db, r.Organization.ID, subscription, nil)
+	require.NoError(t, err)
 }
 
 func TestSelectBillingPlanBlocksPausedSubscription(t *testing.T) {

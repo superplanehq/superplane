@@ -197,6 +197,11 @@ function artifactEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
 }
 
+function visualEvidenceEnabled(env = process.env) {
+  if (envFlag(env, "SUPERPLANE_VISUAL_EVIDENCE")) return true;
+  return artifactEnabled(env) && !envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
+}
+
 function mergeConfidenceEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
 }
@@ -508,7 +513,13 @@ function buildOpenCodeConfig({
       }
     }
   }
-  if ((planning || artifactEnabled(env) || mergeConfidenceEnabled(env)) && taskDir) {
+  if (
+    (planning ||
+      artifactEnabled(env) ||
+      mergeConfidenceEnabled(env) ||
+      envFlag(env, "SUPERPLANE_OWNER_TOKEN")) &&
+    taskDir
+  ) {
     config.mcp = {
       superplane: {
         type: "local",
@@ -728,7 +739,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
         text,
       ));
   const planning = planningEnabled(env);
-  if (artifactEnabled(env)) {
+  if (visualEvidenceEnabled(env)) {
     const outputDir = path.join(sp, "evidence");
     fs.mkdirSync(outputDir, { recursive: true });
     env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;

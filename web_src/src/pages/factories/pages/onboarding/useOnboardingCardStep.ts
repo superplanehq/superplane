@@ -1,18 +1,22 @@
 import type { OrganizationsBillingPlanOption } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
+import { onboardingBillingError } from "./onboardingBilling";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 
 export type OnboardingCardStep = {
   /** The billing and permission lookups have answers. */
   ready: boolean;
+  /** The billing lookup failed and no request is running. The user can retry. */
+  failed: boolean;
   /** The user can select one of the available starter plans. */
   available: boolean;
   /** The user must select a starter plan during workspace setup. */
   required: boolean;
-  /** An organization admin must select the plan after workspace setup. */
+  /** An organization admin must finish billing before workspace setup. */
   requiresAdmin: boolean;
   plans: OrganizationsBillingPlanOption[];
   planActive: boolean;
+  activePlanKey?: string;
   hasPaymentMethod: boolean;
   occupiedSeats?: number;
   welcomeCreditCents?: number;
@@ -27,25 +31,29 @@ export type OnboardingCardStep = {
  */
 export function useOnboardingCardStep(organizationId: string): OnboardingCardStep {
   const billing = useOrganizationBilling(organizationId);
+  const { data: currentBilling = {} } = billing;
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const plans = ["pay_as_you_go", "starter"].flatMap((key) => {
-    const plan = billing.data?.availablePlans?.find((candidate) => candidate.key === key && !candidate.perSeat);
+    const plan = currentBilling.availablePlans?.find((candidate) => candidate.key === key && !candidate.perSeat);
     return plan ? [plan] : [];
   });
   const canManageBilling = !permissionsLoading && canAct("org", "update");
-  const hasStarterPlans = Boolean(billing.data?.billingEnabled) && plans.length > 0;
+  const hasStarterPlans = Boolean(currentBilling.billingEnabled) && plans.length > 0;
   const available = hasStarterPlans && canManageBilling;
-  const planActive = billing.data?.planCategory === "paid";
+  const planActive = currentBilling.planCategory === "paid";
+  const billingRequired = Boolean(onboardingBillingError(billing.data));
   return {
-    ready: !billing.isPending && !permissionsLoading,
+    ready: billing.isSuccess && !permissionsLoading,
+    failed: billing.isError && !billing.isFetching,
     available,
-    required: available && !planActive,
-    requiresAdmin: !permissionsLoading && hasStarterPlans && !planActive && !canManageBilling,
+    required: available && billingRequired,
+    requiresAdmin: !permissionsLoading && hasStarterPlans && billingRequired && !canManageBilling,
     plans,
     planActive,
-    hasPaymentMethod: Boolean(billing.data?.hasPaymentMethod),
-    occupiedSeats: billing.data?.occupiedSeats,
-    welcomeCreditCents: Number(billing.data?.welcomeRemainingCents ?? 0),
+    activePlanKey: currentBilling.catalogKey,
+    hasPaymentMethod: Boolean(currentBilling.hasPaymentMethod),
+    occupiedSeats: currentBilling.occupiedSeats,
+    welcomeCreditCents: Number(currentBilling.welcomeRemainingCents ?? 0),
     refetch: billing.refetch,
   };
 }

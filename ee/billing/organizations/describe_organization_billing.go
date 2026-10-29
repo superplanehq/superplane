@@ -49,10 +49,12 @@ func DescribeOrganizationBilling(
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
 	hasCard := false
 	if billingEnabled && hasCustomer {
-		hasCard, err = polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())
-		if err != nil {
-			return nil, polarBillingError(err, "Could not verify the payment method.")
+		snapshot, readErr := polar.NewClientFromEnv().PaymentMethods(ctx, organizationID.String())
+		if readErr != nil {
+			return nil, polarBillingError(readErr, "Could not verify the payment method.")
 		}
+		hasCard = snapshot.HasUsableMethod()
+		polar.ObservePaymentMethods(ctx, organizationID, snapshot)
 	}
 	available := []*pb.BillingPlanOption{}
 	checkoutEnabled := false

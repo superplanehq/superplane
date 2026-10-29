@@ -22,6 +22,18 @@ func TestNormalizeThinkingLevel(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNormalizeCodexThinkingLevel(t *testing.T) {
+	t.Parallel()
+
+	for _, level := range []string{"minimal", "low", "medium", "high", "xhigh"} {
+		got, err := NormalizeCodexThinkingLevel(level)
+		require.NoError(t, err)
+		assert.Equal(t, level, got)
+	}
+	_, err := NormalizeCodexThinkingLevel("max")
+	require.Error(t, err)
+}
+
 func TestOverlayThinkingLevel(t *testing.T) {
 	t.Parallel()
 

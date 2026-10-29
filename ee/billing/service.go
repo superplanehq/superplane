@@ -42,13 +42,6 @@ func (*Service) InitializeOrganization(tx *gorm.DB, organizationID uuid.UUID) er
 	return err
 }
 
-func (*Service) GrantWelcomeCredit(tx *gorm.DB, organizationID, accountID uuid.UUID) error {
-	if !billing.Enabled() {
-		return nil
-	}
-	return billingmodels.GrantWelcomeCredit(tx, organizationID, accountID)
-}
-
 func (*Service) LocalDeletionGuard(tx *gorm.DB, organizationID uuid.UUID) (billing.DeletionGuard, error) {
 	plan, err := billingmodels.FindOrganizationBillingPlan(tx, organizationID)
 	if err != nil {
@@ -83,6 +76,18 @@ func (s *Service) ValidateInvitationCapacity(tx *gorm.DB, organizationID uuid.UU
 }
 func (*Service) ResolveSeats(tx *gorm.DB, organizationID uuid.UUID) (*billing.SeatUsage, error) {
 	return entitlements.ResolveSeats(tx, organizationID)
+}
+
+func (*Service) ResolveOrganizationPlanSummaries(tx *gorm.DB, organizationIDs []uuid.UUID) (map[uuid.UUID]billing.OrganizationPlanSummary, error) {
+	plans, err := billingmodels.ResolveOrganizationBillingPlans(tx, organizationIDs)
+	if err != nil {
+		return nil, err
+	}
+	summaries := make(map[uuid.UUID]billing.OrganizationPlanSummary, len(organizationIDs))
+	for id, plan := range plans {
+		summaries[id] = billing.OrganizationPlanSummary{Key: plan.Catalog.Key, Name: plan.Catalog.Name}
+	}
+	return summaries, nil
 }
 func (s *Service) RecheckSeatCapacity(tx *gorm.DB, organizationID uuid.UUID, cause string) (billing.CapacityAlert, error) {
 	if s.provider == nil {
@@ -134,6 +139,9 @@ func (*Service) LookupRate(provider, model string) (billing.Rate, bool) {
 	return pricebook.Lookup(provider, model)
 }
 func (*Service) PriceUsage(tx *gorm.DB, organizationID uuid.UUID, in billing.Usage) (billing.UsagePrice, error) {
+	if in.FundingSource == models.UsageFundingSourceSubscription {
+		return billing.UsagePrice{PriceBookVersion: pricebook.Version + "+subscription"}, nil
+	}
 	version := pricebook.Version
 	providerMicros := int64(0)
 	if in.CostMicros != nil {

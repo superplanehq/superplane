@@ -14,7 +14,7 @@ import (
 )
 
 func (rt *Runtime) getTaskReport(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
-	factoryID, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:read")
 	if err != nil {
 		return ToolResult{}, err
 	}
@@ -31,14 +31,14 @@ func (rt *Runtime) getTaskReport(ctx context.Context, claims *AccessClaims, args
 		return ToolResult{}, err
 	}
 
-	report, err := factories.BuildTaskReport(toolContext(ctx, claims), claims.OrgID.String(), factoryID.String(), task, models.TaskRunHistoryQuery{
+	report, err := factories.BuildTaskReport(toolContext(ctx, claims), claims.OrgID.String(), factory.ID.String(), task, models.TaskRunHistoryQuery{
 		Limit:  limit,
 		Before: before,
 	})
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
-	return TextResult(mustJSON(taskReportJSON(report))), nil
+	return TextResult(mustJSON(taskReportJSON(report, newTaskLinks(rt.BaseURL, report.Factory)))), nil
 }
 
 func taskRunPageLimit(raw any) (int, error) {
@@ -142,6 +142,7 @@ type reportTask struct {
 	UpdatedAt   string `json:"updated_at"`
 	SourceURL   string `json:"source_url"`
 	SourceLabel string `json:"source_label"`
+	URL         string `json:"url"`
 }
 
 type reportUsage struct {
@@ -227,7 +228,7 @@ type reportRunCount struct {
 	Count          int64  `json:"count"`
 }
 
-func taskReportJSON(report *factories.TaskReport) taskReportDocument {
+func taskReportJSON(report *factories.TaskReport, links taskLinks) taskReportDocument {
 	order := report.Order
 	document := taskReportDocument{
 		Factory: reportFactory{
@@ -235,7 +236,7 @@ func taskReportJSON(report *factories.TaskReport) taskReportDocument {
 			Name: report.Factory.Name,
 			Key:  report.Factory.Key,
 		},
-		Task:               reportTaskJSON(order),
+		Task:               reportTaskJSON(order, links),
 		Usage:              reportUsageJSON(report.UsageRecorded, order),
 		UsageByModel:       reportModelUsageJSON(report.UsageRecorded, order.GetUsageByModel()),
 		UsageByMachineType: reportMachineUsageJSON(report.UsageRecorded, order.GetUsageByMachineType()),
@@ -252,7 +253,7 @@ func taskReportJSON(report *factories.TaskReport) taskReportDocument {
 	return document
 }
 
-func reportTaskJSON(order *pb.WorkOrder) reportTask {
+func reportTaskJSON(order *pb.WorkOrder, links taskLinks) reportTask {
 	task := reportTask{
 		ID:          order.GetId(),
 		Key:         order.GetKey(),
@@ -263,6 +264,7 @@ func reportTaskJSON(order *pb.WorkOrder) reportTask {
 		Result:      enumToken(order.GetResult().String()),
 		CreatedAt:   timestampText(order.GetCreatedAt().AsTime()),
 		UpdatedAt:   timestampText(order.GetUpdatedAt().AsTime()),
+		URL:         links.url(order.GetNumber()),
 	}
 	if origin := order.GetOrigin(); origin != nil {
 		task.SourceURL = origin.GetUrl()

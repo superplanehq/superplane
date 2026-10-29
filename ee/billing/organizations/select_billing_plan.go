@@ -141,13 +141,6 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		if err != nil {
 			return nil, err
 		}
-		if account, err := uuid.Parse(accountID); err == nil {
-			if err := db.Transaction(func(tx *gorm.DB) error {
-				return billingmodels.GrantWelcomeCredit(tx, organizationID, account)
-			}); err != nil {
-				return nil, grpcerrors.Internal(err, "Could not apply signup credit.")
-			}
-		}
 		return &pb.CreateBusinessCheckoutResponse{CheckoutUrl: session.URL}, nil
 	}
 	if catalog.PriceCents != 0 {
@@ -157,11 +150,12 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 		return nil, err
 	}
 	if catalog.RequirePaymentMethod {
-		hasCard, err := polar.NewClientFromEnv().HasPaymentMethod(ctx, organizationID.String())
+		snapshot, err := polar.NewClientFromEnv().PaymentMethods(ctx, organizationID.String())
 		if err != nil {
 			return nil, polarBillingError(err, "Could not verify the payment method.")
 		}
-		if !hasCard {
+		polar.ObservePaymentMethods(ctx, organizationID, snapshot)
+		if !snapshot.HasUsableMethod() {
 			return nil, grpcerrors.FailedPrecondition(nil, "Add a payment method before selecting this plan.")
 		}
 	}
@@ -172,7 +166,7 @@ func SelectBillingPlan(ctx context.Context, orgID string, req *pb.SelectBillingP
 }
 
 // activatePlanWithWelcomeCredit selects a plan that needs no checkout. The
-// one-time signup credit is also granted if an earlier onboarding deferred it.
+// one-time signup credit is granted only after activation succeeds.
 func activatePlanWithWelcomeCredit(db *gorm.DB, organizationID uuid.UUID, accountID string, catalog *billingmodels.BillingPlan) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		if _, err := billingmodels.ActivateOrganizationBillingPlan(tx, organizationID, catalog.Key); err != nil {

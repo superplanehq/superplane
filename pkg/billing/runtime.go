@@ -67,13 +67,13 @@ type Runtime interface {
 	ValidatePastDueGraceDays(int) error
 	Initialize(*gorm.DB) error
 	InitializeOrganization(*gorm.DB, uuid.UUID) error
-	GrantWelcomeCredit(*gorm.DB, uuid.UUID, uuid.UUID) error
 	PrepareDeletion(context.Context, uuid.UUID) (DeletionGuard, error)
 	LocalDeletionGuard(*gorm.DB, uuid.UUID) (DeletionGuard, error)
 	PrepareAdmission(context.Context, uuid.UUID) error
 	ValidateMemberAdmission(*gorm.DB, uuid.UUID) error
 	ValidateInvitationCapacity(*gorm.DB, uuid.UUID, bool, int) error
 	ResolveSeats(*gorm.DB, uuid.UUID) (*SeatUsage, error)
+	ResolveOrganizationPlanSummaries(*gorm.DB, []uuid.UUID) (map[uuid.UUID]OrganizationPlanSummary, error)
 	RecheckSeatCapacity(*gorm.DB, uuid.UUID, string) (CapacityAlert, error)
 	AssertOrganizationPaymentMethod(*gorm.DB, uuid.UUID) error
 	AssertOrganizationPlanAllowsRuns(*gorm.DB, uuid.UUID) error

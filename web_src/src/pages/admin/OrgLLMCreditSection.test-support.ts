@@ -1,5 +1,5 @@
 import { vi } from "bun:test";
-import type { OrganizationLLMCredit } from "./useOrgLLMCredit";
+import type { OrganizationLLMCredit, OrganizationBillingPlan } from "./useOrgLLMCredit";
 
 const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -51,15 +51,35 @@ export function billingPlan(
   trialEndsAt: string | null = null,
   plan = polarManaged ? "business" : "trial",
   catalogCategory?: string,
-) {
+): OrganizationBillingPlan {
+  const polarState = polarManaged
+    ? { verification: "active" as const, customer: "found", card: "usable", checkedAt: new Date().toISOString() }
+    : { verification: "not_configured" as const, customer: "not_configured", card: "not_configured", checkedAt: null };
+
   return {
+    record_exists: true,
+    updated_at: new Date().toISOString(),
+    workspaces: [],
+    checkout_attempts: [],
+    polar: {
+      configured: polarManaged,
+      environment: "sandbox",
+      checked_at: polarState.checkedAt,
+      external_id: "org-1",
+      customer_status: polarState.customer,
+      customer_id: "",
+      customer_id_mismatch: false,
+      card_status: polarState.card,
+      subscription_verification: polarState.verification,
+      subscriptions: [],
+    },
     plan,
     catalog_key: plan === "business" ? (polarManaged ? "business_legacy" : "business_manual") : plan,
     catalog_category: catalogCategory ?? (plan === "trial" ? "trial" : plan === "none" ? "none" : "paid"),
     plan_source: polarManaged ? "polar" : plan === "business" ? "admin" : "system",
     polar_subscription_status: polarManaged ? "active" : "",
     polar_managed: polarManaged,
-    polar_subscription_verification: polarManaged ? "active" : "not_configured",
+    polar_subscription_verification: polarState.verification,
     polar_subscription_id: "",
     polar_subscription_url: "",
     trial_ends_at: trialEndsAt,

@@ -13,9 +13,11 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
@@ -29,6 +31,172 @@ import (
 )
 
 func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
+	for _, scenario := range []string{"complete", "cancel", "queued subscription"} {
+		t.Run(scenario, func(t *testing.T) {
+			cancelOnHeartbeat := scenario == "cancel"
+			resource := support.Setup(t)
+			signer := jwt.NewSigner("registration-secret")
+			runner, registration, fleet := createRegistrationFixture(t)
+			db := database.DB(t.Context())
+
+			taskID := uuid.New()
+			var subscription *models.FactoryCodexConnection
+			document := map[string]any{
+				"id":             taskID.String(),
+				"run_mode":       "bash_script",
+				"script":         "echo hello",
+				"execution_mode": "host",
+			}
+			if scenario == "queued subscription" {
+				require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
+				factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+				require.NoError(t, err)
+				subscription, err = models.CreateFactoryCodexConnection(db, resource.Organization.ID, factory.ID, resource.User, time.Now().Add(-time.Hour))
+				require.NoError(t, err)
+				require.NoError(t, db.Model(subscription).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+				subscription, err = models.ReserveFactoryCodexConnection(db, resource.Organization.ID, factory.ID, taskID, time.Now().Add(-time.Hour), resource.Encryptor)
+				require.NoError(t, err)
+				expired, err := signer.GenerateWithClaims(-time.Minute, map[string]string{"purpose": runneraction.CodexSubscriptionTokenPurpose})
+				require.NoError(t, err)
+				document["environment"] = []runneraction.TaskEnvironmentVariable{{Name: runneraction.EnvCodexSubscriptionToken, Value: expired}}
+				document["execution_timeout_seconds"] = 30
+			}
+			payload, err := json.Marshal(document)
+			require.NoError(t, err)
+			task := &models.RunnerTask{
+				ID:                taskID,
+				OrganizationID:    resource.Organization.ID,
+				FleetID:           fleet.ID,
+				Backend:           models.RunnerTaskBackendIntegrated,
+				State:             models.RunnerTaskStateQueued,
+				PayloadCiphertext: payload,
+				QueuedAt:          time.Now(),
+				CreatedAt:         time.Now(),
+				UpdatedAt:         time.Now(),
+			}
+			require.NoError(t, db.Create(task).Error)
+			require.NoError(t, task.Reserve(db, runner.ID))
+
+			activeStore, err := runnerlogsfs.New(t.TempDir())
+			require.NoError(t, err)
+			require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
+				Context:       t.Context(),
+				MeterProvider: otel.GetMeterProvider(),
+			}))
+			previousStore := runnerlogs.Current()
+			runnerlogs.SetCurrent(activeStore)
+			t.Cleanup(func() {
+				require.NoError(t, activeStore.Delete(context.Background(), task.ID))
+				runnerlogs.SetCurrent(previousStore)
+			})
+
+			registrationToken, err := MintRegistrationToken(
+				signer,
+				runner,
+				registration,
+				fleet.Slug,
+				&task.ID,
+			)
+			require.NoError(t, err)
+			server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StoreFS, nil)
+			require.NoError(t, err)
+			httpServer := httptest.NewServer(server.Handler())
+			defer httpServer.Close()
+
+			registerResponse := executeRegistrationRequest(
+				t,
+				server,
+				registrationToken,
+				runner.RunnerVersion,
+			)
+			require.Equal(t, http.StatusOK, registerResponse.Code, registerResponse.Body.String())
+			var registered registerRunnerResponse
+			require.NoError(t, json.Unmarshal(registerResponse.Body.Bytes(), &registered))
+
+			headers := http.Header{"Authorization": []string{"Bearer " + registered.AccessToken}}
+			socketURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/runner/v1/connect"
+			socket, response, err := websocket.DefaultDialer.Dial(socketURL, headers)
+			require.NoError(t, err)
+			if response != nil {
+				defer response.Body.Close()
+			}
+			defer socket.Close()
+
+			require.NoError(t, socket.WriteJSON(helloMessage{
+				Type:     messageTypeHello,
+				RunnerID: runner.ID.String(),
+				FleetID:  fleet.Slug,
+				Version:  runner.RunnerVersion,
+			}))
+
+			var delivered taskMessage
+			require.NoError(t, socket.ReadJSON(&delivered))
+			assert.Equal(t, messageTypeTask, delivered.Type)
+			if subscription != nil {
+				var received struct {
+					Environment []runneraction.TaskEnvironmentVariable `json:"environment"`
+				}
+				require.NoError(t, json.Unmarshal(delivered.Task, &received))
+				require.Len(t, received.Environment, 1)
+				scope, err := runneraction.ParseCodexSubscriptionToken(signer, received.Environment[0].Value)
+				require.NoError(t, err)
+				assert.Equal(t, task.ID, scope.TaskID)
+				assert.Equal(t, subscription.ID, scope.ConnectionID)
+				claims, err := signer.ValidateAndGetClaims(received.Environment[0].Value)
+				require.NoError(t, err)
+				assert.GreaterOrEqual(t, int64(claims["exp"].(float64)), time.Now().Add(29*time.Second).Unix())
+			}
+
+			if cancelOnHeartbeat {
+				require.NoError(t, task.RequestCancel(db, time.Now()))
+				require.NoError(t, socket.WriteJSON(typedMessage{Type: messageTypePong}))
+				require.NoError(t, socket.SetReadDeadline(time.Now().Add(2*time.Second)))
+				var cancel taskControlMessage
+				require.NoError(t, socket.ReadJSON(&cancel))
+				assert.Equal(t, messageTypeCancel, cancel.Type)
+				assert.Equal(t, task.ID.String(), cancel.TaskID)
+			}
+
+			requestID := uuid.New()
+			require.NoError(t, socket.WriteJSON(completeMessage{
+				Type:      messageTypeComplete,
+				RequestID: requestID.String(),
+				TaskID:    task.ID.String(),
+				ExitCode:  0,
+				Canceled:  cancelOnHeartbeat,
+				Result:    json.RawMessage(`{"value":"ok"}`),
+			}))
+
+			var ack ackMessage
+			require.NoError(t, socket.ReadJSON(&ack))
+			assert.Equal(t, messageTypeAck, ack.Type)
+			assert.Equal(t, requestID.String(), ack.RequestID)
+			var shutdown typedMessage
+			require.NoError(t, socket.ReadJSON(&shutdown))
+			assert.Equal(t, messageTypeShutdown, shutdown.Type)
+
+			reloadedTask, err := models.FindRunnerTask(db, task.ID)
+			require.NoError(t, err)
+			expectedState := models.RunnerTaskStateSucceeded
+			if cancelOnHeartbeat {
+				expectedState = models.RunnerTaskStateCanceled
+			}
+			assert.Equal(t, expectedState, reloadedTask.State)
+			assert.JSONEq(t, `{"value":"ok"}`, string(reloadedTask.Result))
+			lifecycle, err := reloadedTask.FindLifecycle(db)
+			require.NoError(t, err)
+			assert.Equal(t, runnerlogs.StoreFS, lifecycle.ActiveStore)
+			assert.Equal(t, models.RunnerTaskLogStateArchivable, lifecycle.State)
+
+			reloadedRunner, err := models.FindRunner(db, runner.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.RunnerStateTerminated, reloadedRunner.State)
+			assert.Equal(t, models.RunnerTerminationTaskCompleted, *reloadedRunner.TerminationReason)
+			_, err = models.FindRunnerByAccessTokenHash(db, crypto.HashToken(registered.AccessToken))
+			require.NoError(t, err, "credential must remain valid for completion acknowledgement retries")
+
+		})
+	}
 	resource := support.Setup(t)
 	signer := jwt.NewSigner("registration-secret")
 	runner, registration, fleet := createRegistrationFixture(t)

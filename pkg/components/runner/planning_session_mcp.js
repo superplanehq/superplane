@@ -8,6 +8,12 @@ const {
   isCompactStatusText,
 } = require("./analysis_protocol");
 const { MAX_ATTACHMENT_BYTES } = require("./attachment_limit");
+const {
+  suggestOwners,
+  assignOwner,
+  SUGGEST_OWNERS_TOOL,
+  ASSIGN_OWNER_TOOL,
+} = require("./task_owner_tools");
 
 const MAX_INSPECTABLE_ATTACHMENT_BYTES = MAX_ATTACHMENT_BYTES;
 
@@ -491,6 +497,10 @@ async function handleRequest(message) {
         result = await proposeUpdate(args);
       } else if (name === "inspect_attachment") {
         result = inspectAttachment(args);
+      } else if (name === "suggest_owners") {
+        result = await suggestOwners(args);
+      } else if (name === "assign_owner") {
+        result = await assignOwner(args);
       } else {
         sendError(id, -32601, `Unknown tool: ${name}`);
         return;
@@ -647,11 +657,18 @@ if (require.main === module) {
 }
 
 function planningTools() {
-  return [UPDATE_TOOL, TOOLS.find((tool) => tool.name === "inspect_attachment")];
+  return [
+    UPDATE_TOOL,
+    TOOLS.find((tool) => tool.name === "inspect_attachment"),
+    SUGGEST_OWNERS_TOOL,
+    ASSIGN_OWNER_TOOL,
+  ];
 }
 
 module.exports = {
   proposeUpdate,
+  suggestOwners,
+  assignOwner,
   proposeSpec,
   proposeClarity,
   proposeConfidence,

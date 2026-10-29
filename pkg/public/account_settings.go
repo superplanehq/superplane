@@ -186,7 +186,8 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = s.softDeleteAccount(r.Context(), account)
+	actorID := account.ID
+	deletedOrganizations, err := s.softDeleteAccount(r.Context(), account)
 	if errors.Is(err, billing.ErrOrganizationSubscriptionLive) {
 		log.WithError(err).WithField("account_id", account.ID.String()).Info("account deletion blocked by a live subscription")
 		http.Error(w, billing.ErrOrganizationSubscriptionLive.Error(), http.StatusConflict)
@@ -218,6 +219,7 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	authentication.ClearAccountCookie(w, r)
+	captureAccountDeletion(r.Context(), actorID, account.ID, account.DeletedAt.Time, deletedOrganizations, "self_service")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -254,13 +256,10 @@ func (s *Server) softDeleteAccount(ctx context.Context, account *models.Account)
 		if err := s.refuseAccountDeleteGuards(tx, account); err != nil {
 			return err
 		}
-		deletedOrganizations, err = models.ListOrganizationsPendingAccountDeletion(tx, account.ID)
-		if err != nil {
-			return err
-		}
 		// SoftDelete locks all affected organizations in ID order. Keep
 		// those locks before removing grants, as member removal does.
-		if err := account.SoftDelete(tx, time.Now(), clearances); err != nil {
+		deletedOrganizations, err = account.SoftDelete(tx, time.Now(), clearances)
+		if err != nil {
 			return err
 		}
 		if err := s.removeAccountOrganizationGrants(tx, users); err != nil {

@@ -51,6 +51,9 @@ export interface WorkOrderTimelineStepComment {
 export interface WorkOrderTimelineAssigneeChange {
   assignedUserIds: string[];
   unassignedUserIds: string[];
+  /** True when SuperPlane picked the owner during refinement. */
+  assignedBySuperPlane?: boolean;
+  reason?: string;
 }
 
 export interface WorkOrderTimelineStatusChange {
