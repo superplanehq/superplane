@@ -70,7 +70,7 @@ describe("OrgLLMCreditSection Polar verification", () => {
     expect(panel.getByText(/Historical card changes: Unknown/)).toBeVisible();
   });
 
-  it("checks Polar manually, retries failures, and refreshes stored diagnostics after save", async () => {
+  it("checks Polar on opening credits, retries failures, and refreshes stored diagnostics after save", async () => {
     const initial = {
       ...billingPlan(false),
       polar_subscription_verification: "not_checked" as const,
@@ -112,14 +112,13 @@ describe("OrgLLMCreditSection Polar verification", () => {
     });
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
+    await waitFor(() => expect(checks).toBe(1));
+    expect(screen.getByRole("button", { name: "Billing diagnostics" })).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByRole("button", { name: "Billing diagnostics" }));
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeDisabled();
-    expect(checks).toBe(0);
     const panel = within(screen.getByRole("region", { name: "Billing diagnostics" }));
-    await user.click(panel.getByRole("button", { name: "Check Polar" }));
     expect(await panel.findByRole("alert")).toHaveTextContent("Could not load billing diagnostics");
     expect(screen.getByTestId("admin-org-billing-plan")).toBeDisabled();
-    expect(panel.getByText("Stored billing data")).toBeVisible();
     await user.click(panel.getByRole("button", { name: "Try again" }));
     expect(await panel.findByText("Card status is unknown.")).toBeVisible();
     expect(panel.queryByText(/No usable card/)).not.toBeInTheDocument();
@@ -143,19 +142,18 @@ describe("OrgLLMCreditSection Polar verification", () => {
     const original = fetchMock.getMockImplementation()!;
     let finishCheck: (response: Response) => void = () => {};
     fetchMock.mockImplementation(async (input, init) => {
-      if (String(input).includes("check_polar=true"))
+      if (String(input).includes("/org-1/billing-plan?check_polar=true"))
         return new Promise<Response>((resolve) => {
           finishCheck = resolve;
         });
       return original(input, init);
     });
-    const user = userEvent.setup();
     const view = render(<OrgLLMCreditSection orgId="org-1" />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
-    await user.click(await screen.findByRole("button", { name: "Check Polar" }));
-    expect(screen.getByRole("button", { name: "Checking Polar..." })).toBeDisabled();
+    expect(screen.getByRole("region", { name: "Billing diagnostics" })).toHaveAttribute("aria-busy", "true");
+    const oldRequest = fetchMock.mock.calls.find(([input]) => String(input).includes("check_polar=true"));
     view.rerender(<OrgLLMCreditSection orgId="org-2" />);
     await userEvent.setup().click(screen.getByRole("button", { name: "Billing diagnostics" }));
+    expect(oldRequest?.[1]?.signal?.aborted).toBe(true);
     finishCheck(
       jsonResponse({
         ...initial,
