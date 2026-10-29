@@ -754,17 +754,6 @@ func ActiveCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, er
 	return activeHumanCodexMember(tx, organizationID, userID)
 }
 
-func activeHumanCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, error) {
-	var user User
-	err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
-		Where("organization_id = ? AND id = ? AND type = ?", organizationID, userID, UserTypeHuman).
-		First(&user).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrCodexConnectionNotEligible
-	}
-	return &user, err
-}
-
 func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 	if len(limits) == 0 || len(limits) > 32 {
 		return errors.New("invalid Codex usage limits")
@@ -847,4 +836,15 @@ func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID, owne
 		models = append(models, model.Model)
 	}
 	return CompactModelIDs(models), nil
+}
+
+func activeHumanCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, error) {
+	var user User
+	err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+		Where("organization_id = ? AND id = ? AND type = ?", organizationID, userID, UserTypeHuman).
+		First(&user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrCodexConnectionNotEligible
+	}
+	return &user, err
 }
