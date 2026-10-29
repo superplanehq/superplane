@@ -43,7 +43,7 @@ func (w *RunnerTaskScheduler) Start(ctx context.Context) {
 
 func (w *RunnerTaskScheduler) Process(ctx context.Context) error {
 	db := database.DB(ctx)
-	ids, err := models.ListPendingRunnerTaskOrganizations(db, w.after, runnerTaskSchedulerBatchSize)
+	ids, err := models.ListRunnerTaskSchedulingOrganizations(db, w.after, runnerTaskSchedulerBatchSize)
 	if err != nil {
 		return err
 	}
@@ -53,8 +53,17 @@ func (w *RunnerTaskScheduler) Process(ctx context.Context) error {
 		}
 		w.after = id
 		scheduleCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		requeued, err := models.RequeueUnavailableFleetRunnerTasks(database.DB(scheduleCtx), id, runnerTaskSchedulerBatchSize)
+		if err != nil {
+			cancel()
+			log.WithError(err).WithField("organization_id", id).Error("Failed to release unavailable fleet runner slots")
+			continue
+		}
 		tasks, err := models.ScheduleOrganizationRunnerTasks(database.DB(scheduleCtx), id, runnerTaskSchedulerBatchSize)
 		cancel()
+		for i := range requeued {
+			messages.PublishPlanningBoardStatusForTask(db, &requeued[i])
+		}
 		if err != nil {
 			log.WithError(err).WithField("organization_id", id).Error("Failed to schedule organization runner tasks")
 			continue

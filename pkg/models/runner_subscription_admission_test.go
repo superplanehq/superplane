@@ -68,6 +68,46 @@ func TestRunnerAdmissionRejectsInvalidSubscriptionAndContinuesFleetScan(t *testi
 	}
 }
 
+func TestRunnerAdmissionStopsAfterTenCandidatesAndResumesOnNextCall(t *testing.T) {
+	db, connection, first, runner, _ := queuedSubscriptionRunnerTask(t)
+	now := time.Now()
+	require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", first.ID).Update("revoked_at", now).Error)
+	for i := 1; i < 10; i++ {
+		task := *first
+		task.ID = uuid.New()
+		task.QueuedAt = first.QueuedAt.Add(time.Duration(i) * time.Millisecond)
+		require.NoError(t, db.Create(&task).Error)
+		require.NoError(t, db.Create(&models.FactoryCodexLease{
+			ID: uuid.New(), ConnectionID: connection.ID, TaskID: task.ID,
+			Generation: int64(i + 1), Purpose: models.CodexLeasePurposeRun, RevokedAt: &now,
+		}).Error)
+	}
+	healthy := *first
+	healthy.ID = uuid.New()
+	healthy.QueuedAt = first.QueuedAt.Add(time.Minute)
+	require.NoError(t, db.Create(&healthy).Error)
+
+	reservation, err := runner.ReserveNextTask(db)
+	require.NoError(t, err)
+	assert.Nil(t, reservation.Task)
+	require.Len(t, reservation.FailedTasks, 10)
+	for _, failed := range reservation.FailedTasks {
+		stored, err := models.FindRunnerTask(db, failed.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.RunnerTaskStateFailed, stored.State)
+	}
+	assert.Empty(t, codexLeases(t, db, connection.ID))
+	stored, err := models.FindRunnerTask(db, healthy.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStateQueued, stored.State)
+
+	reservation, err = runner.ReserveNextTask(db)
+	require.NoError(t, err)
+	require.NotNil(t, reservation.Task)
+	assert.Equal(t, healthy.ID, reservation.Task.ID)
+	assert.Empty(t, reservation.FailedTasks)
+}
+
 func TestRunnerAdmissionCommitsLoneSubscriptionFailureAndReleasesLogin(t *testing.T) {
 	db, connection, task, previousRunner := newDisconnectedCodexLogin(t)
 	runner := &models.Runner{ID: uuid.New(), FleetID: previousRunner.FleetID, State: models.RunnerStateIdle, RunnerVersion: previousRunner.RunnerVersion}
@@ -92,6 +132,17 @@ func TestRunnerAdmissionCommitsLoneSubscriptionFailureAndReleasesLogin(t *testin
 
 func TestRunnerAdmissionKeepsContendedSubscriptionQueuedAndReleasesLocks(t *testing.T) {
 	db, connection, task, runner, order := queuedSubscriptionRunnerTask(t)
+	otherOrganization, err := models.CreateOrganization("Healthy fleet organization", "")
+	require.NoError(t, err)
+	later := *task
+	later.ID = uuid.New()
+	later.QueuedAt = task.QueuedAt.Add(time.Minute)
+	require.NoError(t, db.Create(&later).Error)
+	healthy := later
+	healthy.ID = uuid.New()
+	healthy.OrganizationID = otherOrganization.ID
+	healthy.QueuedAt = later.QueuedAt.Add(time.Minute)
+	require.NoError(t, db.Create(&healthy).Error)
 	holder := db.Begin()
 	require.NoError(t, holder.Error)
 	defer holder.Rollback()
@@ -102,7 +153,8 @@ func TestRunnerAdmissionKeepsContendedSubscriptionQueuedAndReleasesLocks(t *test
 	defer scan.Rollback()
 	reserved, err := runner.ReserveNextTask(scan)
 	require.NoError(t, err)
-	assert.Nil(t, reserved.Task)
+	require.NotNil(t, reserved.Task)
+	assert.Equal(t, healthy.ID, reserved.Task.ID)
 	assert.Empty(t, reserved.FailedTasks)
 	stored, err := models.FindRunnerTask(db, task.ID)
 	require.NoError(t, err)
@@ -115,7 +167,10 @@ func TestRunnerAdmissionKeepsContendedSubscriptionQueuedAndReleasesLocks(t *test
 	}))
 	require.NoError(t, scan.Commit().Error)
 	require.NoError(t, holder.Rollback().Error)
-	reserved, err = runner.ReserveNextTask(db)
+	nextRunner := *runner
+	nextRunner.ID = uuid.New()
+	require.NoError(t, db.Create(&nextRunner).Error)
+	reserved, err = nextRunner.ReserveNextTask(db)
 	require.NoError(t, err)
 	require.NotNil(t, reserved.Task)
 	assert.Equal(t, task.ID, reserved.Task.ID)

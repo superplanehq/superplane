@@ -29,6 +29,8 @@ const (
 	RunnerTaskLogStateArchived   = "archived"
 )
 
+const runnerTaskReservationAttemptLimit = 10
+
 var (
 	ErrRunnerTaskNotFound           = errors.New("runner task not found")
 	ErrRunnerTaskNotReservable      = errors.New("runner task is not available for reservation")
@@ -283,10 +285,13 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, erro
 			return nil
 		}
 
-		var skippedOrganizations []uuid.UUID
-		for {
+		var skippedTasks, skippedOrganizations []uuid.UUID
+		for range runnerTaskReservationAttemptLimit {
 			query := tx.Where("fleet_id = ? AND backend = ? AND state = ? AND runner_id IS NULL AND cancel_requested_at IS NULL",
 				currentRunner.FleetID, RunnerTaskBackendIntegrated, RunnerTaskStateQueued)
+			if len(skippedTasks) > 0 {
+				query = query.Where("id NOT IN ?", skippedTasks)
+			}
 			if len(skippedOrganizations) > 0 {
 				query = query.Where("organization_id NOT IN ?", skippedOrganizations)
 			}
@@ -297,25 +302,29 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, erro
 				}
 				return err
 			}
-			candidateResult, err := currentRunner.reserveCandidate(tx, &candidate)
+			attempt, err := currentRunner.reserveCandidate(tx, &candidate)
+			if errors.Is(err, ErrRunnerTaskNotReservable) {
+				skippedTasks = append(skippedTasks, candidate.ID)
+				continue
+			}
 			var busy *CodexConnectionBusyError
-			if errors.Is(err, ErrRunnerTaskNotReservable) || errors.As(err, &busy) {
-				// Retry this organization's oldest job on the next attempt.
-				// A later job must not overtake it if capacity changes mid-scan.
+			if errors.As(err, &busy) {
+				// Preserve this organization's queue order while allowing others
+				// to proceed. Retry it on the next notification or heartbeat.
 				skippedOrganizations = append(skippedOrganizations, candidate.OrganizationID)
 				continue
 			}
 			if err != nil {
 				return err
 			}
-			reservation.FailedTasks = append(reservation.FailedTasks, candidateResult.FailedTasks...)
-			reservation.LoginConnections = append(reservation.LoginConnections, candidateResult.LoginConnections...)
-			if candidateResult.Task == nil {
-				continue
+			reservation.FailedTasks = append(reservation.FailedTasks, attempt.FailedTasks...)
+			reservation.LoginConnections = append(reservation.LoginConnections, attempt.LoginConnections...)
+			if attempt.Task != nil {
+				reservation.Task = attempt.Task
+				return nil
 			}
-			reservation.Task = candidateResult.Task
-			return nil
 		}
+		return nil
 	})
 	return reservation, err
 }
@@ -555,8 +564,8 @@ func (t *RunnerTask) markLogsArchivable(tx *gorm.DB, now time.Time) error {
 
 func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTaskReservationResult, error) {
 	var reservation RunnerTaskReservationResult
-	// Roll back each skipped candidate to a savepoint so its locks do not block
-	// other organizations while the fleet scan continues.
+	// Release task and subscription locks on a retryable rejection, even when
+	// the caller keeps an outer transaction open.
 	err := tx.Transaction(func(tx *gorm.DB) error {
 		task, err := FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}), candidate.ID)
 		if errors.Is(err, ErrRunnerTaskNotFound) {

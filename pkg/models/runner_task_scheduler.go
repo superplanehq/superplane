@@ -10,11 +10,16 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// ListPendingRunnerTaskOrganizations traverses organizations by ID so a full
-// organization cannot keep later organizations out of a bounded worker scan.
-func ListPendingRunnerTaskOrganizations(tx *gorm.DB, after uuid.UUID, limit int) ([]uuid.UUID, error) {
+// ListRunnerTaskSchedulingOrganizations includes pending work and queued work
+// that must release its slot because its fleet is unavailable. ID pagination
+// prevents a full organization from hiding later work in a bounded scan.
+func ListRunnerTaskSchedulingOrganizations(tx *gorm.DB, after uuid.UUID, limit int) ([]uuid.UUID, error) {
 	var ids []uuid.UUID
-	err := pendingRunnerTasks(tx).
+	err := unassignedIntegratedRunnerTasks(tx).
+		Where(`(runner_tasks.state = ? AND runner_tasks.cancel_requested_at IS NULL
+			AND runner_fleets.enabled AND runner_fleets.deleted_at IS NULL)
+			OR (runner_tasks.state = ? AND (NOT runner_fleets.enabled OR runner_fleets.deleted_at IS NOT NULL))`,
+			RunnerTaskStatePending, RunnerTaskStateQueued).
 		Where("runner_tasks.organization_id > ?", after).
 		Distinct("runner_tasks.organization_id").
 		Order("runner_tasks.organization_id ASC").Limit(limit).
@@ -74,12 +79,49 @@ func ScheduleOrganizationRunnerTasks(tx *gorm.DB, organizationID uuid.UUID, batc
 	return scheduled, nil
 }
 
+// RequeueUnavailableFleetRunnerTasks releases slots held by unassigned tasks
+// on disabled or deleted fleets. Reserved and running tasks keep their slots.
+func RequeueUnavailableFleetRunnerTasks(tx *gorm.DB, organizationID uuid.UUID, batchSize int) ([]RunnerTask, error) {
+	var tasks []RunnerTask
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		if err := unassignedIntegratedRunnerTasks(tx).
+			Where("runner_tasks.organization_id = ? AND runner_tasks.state = ?", organizationID, RunnerTaskStateQueued).
+			Where("NOT runner_fleets.enabled OR runner_fleets.deleted_at IS NOT NULL").
+			Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "runner_tasks"}, Options: "SKIP LOCKED"}).
+			Select("runner_tasks.*").Order("runner_tasks.queued_at ASC, runner_tasks.id ASC").
+			Limit(batchSize).Find(&tasks).Error; err != nil {
+			return err
+		}
+		if len(tasks) == 0 {
+			return nil
+		}
+		ids := make([]uuid.UUID, 0, len(tasks))
+		now := time.Now()
+		for i := range tasks {
+			ids = append(ids, tasks[i].ID)
+			tasks[i].State = RunnerTaskStatePending
+			tasks[i].ReadyAt = nil
+			tasks[i].UpdatedAt = now
+		}
+		return tx.Model(&RunnerTask{}).Where("id IN ?", ids).
+			Updates(map[string]any{"state": RunnerTaskStatePending, "ready_at": nil, "updated_at": now}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return tasks, nil
+}
+
 func pendingRunnerTasks(tx *gorm.DB) *gorm.DB {
+	return unassignedIntegratedRunnerTasks(tx).
+		Where("runner_tasks.state = ? AND runner_tasks.cancel_requested_at IS NULL", RunnerTaskStatePending).
+		Where("runner_fleets.enabled = ? AND runner_fleets.deleted_at IS NULL", true)
+}
+
+func unassignedIntegratedRunnerTasks(tx *gorm.DB) *gorm.DB {
 	return tx.Model(&RunnerTask{}).
 		Joins("JOIN runner_fleets ON runner_fleets.id = runner_tasks.fleet_id").
-		Where("runner_tasks.backend = ? AND runner_tasks.state = ?", RunnerTaskBackendIntegrated, RunnerTaskStatePending).
-		Where("runner_tasks.runner_id IS NULL AND runner_tasks.cancel_requested_at IS NULL").
-		Where("runner_fleets.enabled = ? AND runner_fleets.deleted_at IS NULL", true)
+		Where("runner_tasks.backend = ? AND runner_tasks.runner_id IS NULL", RunnerTaskBackendIntegrated)
 }
 
 func lockRunnerTaskOrganization(tx *gorm.DB, organizationID uuid.UUID, options string) error {

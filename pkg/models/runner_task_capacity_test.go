@@ -74,6 +74,26 @@ func TestRunnerReservationCannotClaimPendingTasks(t *testing.T) {
 	assert.Nil(t, reservation.Task)
 }
 
+func TestRunnerReservationSkipsLockedQueuedTask(t *testing.T) {
+	f := newRunnerCapacityTest(t, new(2))
+	fleet := f.fleet("locked-task-amd64")
+	first := f.task(f.organizationID, fleet.ID)
+	second := f.task(f.organizationID, fleet.ID)
+	scheduled, err := models.ScheduleOrganizationRunnerTasks(f.db, f.organizationID, 100)
+	require.NoError(t, err)
+	require.Len(t, scheduled, 2)
+
+	holder := f.db.Begin()
+	require.NoError(t, holder.Error)
+	defer holder.Rollback()
+	require.NoError(t, holder.Clauses(clause.Locking{Strength: "UPDATE"}).First(&models.RunnerTask{}, "id = ?", first.ID).Error)
+
+	reservation, err := f.runner(fleet.ID).ReserveNextTask(f.db)
+	require.NoError(t, err)
+	require.NotNil(t, reservation.Task)
+	assert.Equal(t, second.ID, reservation.Task.ID)
+}
+
 func TestRunnerSchedulingReleasesSlotsThroughLifecycle(t *testing.T) {
 	for _, release := range []string{"pending cancellation", "queued cancellation", "completion", "running cancellation", "reserved runner termination", "reserved connection loss", "running runner loss"} {
 		t.Run(release, func(t *testing.T) {
@@ -234,10 +254,10 @@ func TestRunnerSchedulingSkipsLockedOrganizationsAndPaginatesPendingWork(t *test
 	require.NoError(t, err)
 	assert.Empty(t, tasks)
 	// Pagination includes full or locked organizations without hiding later work.
-	page, err := models.ListPendingRunnerTaskOrganizations(f.db, uuid.Nil, 1)
+	page, err := models.ListRunnerTaskSchedulingOrganizations(f.db, uuid.Nil, 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
-	next, err := models.ListPendingRunnerTaskOrganizations(f.db, page[0], 1)
+	next, err := models.ListRunnerTaskSchedulingOrganizations(f.db, page[0], 1)
 	require.NoError(t, err)
 	require.Len(t, next, 1)
 	assert.ElementsMatch(t, []uuid.UUID{f.organizationID, other.ID}, []uuid.UUID{page[0], next[0]})
