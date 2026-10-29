@@ -11,6 +11,7 @@ vi.mock("@/hooks/useCanvasWebsocket", () => ({
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: () => ({ data: undefined, isError: false, isLoading: false }),
   useDescribeRun: () => ({ data: undefined, isError: false, isLoading: false }),
+  useEventExecutions: () => ({ data: undefined, isError: false, isLoading: false }),
 }));
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
