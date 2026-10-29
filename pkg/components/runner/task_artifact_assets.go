@@ -27,12 +27,12 @@ func TaskArtifactMCPFile() TaskFile {
 }
 
 func AppendTaskArtifactMCP(environment []TaskEnvironmentVariable, files []TaskFile) []TaskFile {
-	if !HasArtifactUploadToken(environment) && !HasPublishLinks(environment) {
+	if !HasArtifactUploadToken(environment) && !HasPublishLinks(environment) && !HasTaskOwnerToken(environment) {
 		return files
 	}
 	// The MCP script loads publish_link.js at startup, including visual
 	// evidence runs that do not publish links.
-	files = append(files, TaskArtifactMCPFile(), PublishLinkScriptFile())
+	files = appendUniqueTaskFiles(files, TaskArtifactMCPFile(), PublishLinkScriptFile(), taskOwnerToolsFile())
 	if HasPublishLinks(environment) {
 		files = append(files, TaskCLIScriptFile(), PublishLinkCommandFile())
 	}

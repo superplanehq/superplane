@@ -25,6 +25,9 @@ const SUPERPLANE_MCP_ENV_VARS = [
   "SUPERPLANE_ANALYSIS_SCORE_FILE",
   "SUPERPLANE_ARTIFACT_TOKEN",
   "SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
+  "SUPERPLANE_OWNER_TOKEN",
+  "SUPERPLANE_VISUAL_EVIDENCE",
+  "SUPERPLANE_PUBLISH_LINKS",
 ];
 
 function loadActivityStreamModule() {
@@ -209,7 +212,11 @@ function codexExecArgs(
     );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
-    if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
+    if (
+      artifactEnabled(env) ||
+      mergeConfidenceEnabled(env) ||
+      envFlag(env, "SUPERPLANE_OWNER_TOKEN")
+    ) {
       args.push(...mcpConfigOverrides(mcpScriptPath, env));
     } else {
       args.push(...workspaceMCPConfigOverrides(env));
@@ -269,6 +276,14 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
     "-c",
     `mcp_servers.superplane.env_vars=${tomlStringArray(SUPERPLANE_MCP_ENV_VARS)}`,
+    ...(envFlag(env, "SUPERPLANE_OWNER_TOKEN")
+      ? [
+          "-c",
+          'mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"',
+          "-c",
+          'mcp_servers.superplane.tools.assign_owner.approval_mode="approve"',
+        ]
+      : []),
     // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
     // answer that prompt, so approve only these planning tools, not shell writes.
     ...(planningEnabled(env)

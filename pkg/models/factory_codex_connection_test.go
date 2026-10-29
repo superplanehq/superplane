@@ -630,7 +630,7 @@ func TestMemberRemovalCleansQueuedWorkWithoutARunnerLease(t *testing.T) {
 
 func TestPersonalCodexMigrationPreservesCredentialsAndLeases(t *testing.T) {
 	db := database.DB(t.Context())
-	migration, err := os.ReadFile("../../db/migrations/20261028163351_personal-codex-connections.up.sql")
+	migration, err := os.ReadFile("../../db/migrations/20261029101500_personal-codex-connections.up.sql")
 	require.NoError(t, err)
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		// Temporary tables isolate the old schema from the live test tables.
