@@ -39,13 +39,25 @@ test("tools/list shows only the tools that the backend allows", async () => {
   );
 });
 
-test("tools/list is empty when the tools lookup fails", async () => {
+test("tools/list fails on a failed lookup and retries on the next request", async () => {
+  const lookups = [new Error("Service Unavailable"), ["suggest_owners"]];
+  const client = {
+    request: async () => {
+      const next = lookups.shift();
+      if (next instanceof Error) throw next;
+      return { tools: next };
+    },
+  };
   const transport = recorder();
-  const handle = createHandler({ client: fakeClient(new Error("Unauthorized")) });
+  const handle = createHandler({ client });
 
-  await handle({ id: 1, method: "tools/list" }, transport);
+  await assert.rejects(handle({ id: 1, method: "tools/list" }, transport), /Service Unavailable/);
+  await handle({ id: 2, method: "tools/list" }, transport);
 
-  assert.deepEqual(transport.replies[0].result.tools, []);
+  assert.deepEqual(
+    transport.replies[0].result.tools.map((tool) => tool.name),
+    ["suggest_owners"],
+  );
 });
 
 test("tools/call rejects a hidden tool and runs an allowed tool", async () => {

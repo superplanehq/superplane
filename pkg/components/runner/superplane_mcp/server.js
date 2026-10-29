@@ -15,14 +15,15 @@ const SERVER_NAME = "superplane_global";
 function createHandler({ client = createClient(), tools = registry.allTools() } = {}) {
   let allowed;
 
-  // A failed lookup allows no tools. The agent then sees an empty list
-  // instead of tools that the backend would reject.
+  // A failed lookup is not cached, so the next request can retry it.
   function allowedNames() {
     if (!allowed) {
       allowed = client
         .request("GET", "/api/v1/runner/tools")
-        .then((result) => new Set(Array.isArray(result.tools) ? result.tools : []))
-        .catch(() => new Set());
+        .then((result) => new Set(Array.isArray(result.tools) ? result.tools : []));
+      allowed.catch(() => {
+        allowed = undefined;
+      });
     }
     return allowed;
   }
