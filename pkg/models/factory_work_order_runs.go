@@ -70,6 +70,7 @@ task_runs AS (
 	  AND r.id NOT IN (SELECT id FROM shared_creator)
 	  AND (
 		r.id = ?
+		OR r.id IN (SELECT run_id FROM factory_work_order_refinement_runs WHERE work_order_id = ?)
 		OR r.id IN (SELECT run_id FROM factory_work_order_executions WHERE work_order_id = ?)
 		OR r.id IN (SELECT canvas_run_id FROM factory_planning_sessions WHERE draft_work_order_id = ?)
 		OR r.id IN (
@@ -283,7 +284,7 @@ func (o *FactoryWorkOrder) taskRunQuery(tx *gorm.DB) (string, []any, error) {
 	}
 	return legacyTaskRunIDsCTE, []any{
 		o.FactoryID, o.SourceRunID, o.ID,
-		o.OrganizationID, o.FactoryID, o.SourceRunID, o.ID, o.ID, o.ID,
+		o.OrganizationID, o.FactoryID, o.SourceRunID, o.ID, o.ID, o.ID, o.ID,
 		o.ID.String(), o.FactoryID, o.ID.String(), o.ID.String(),
 	}, nil
 }

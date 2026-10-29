@@ -21,7 +21,13 @@ apt-get install --no-install-recommends -y ca-certificates curl gnupg
 
 . /etc/os-release
 echo "deb http://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-connrefused -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+# Download the complete key before parsing it. A retried partial response must
+# not append bytes to the stream that GPG reads.
+key_file="$(mktemp)"
+trap 'rm -f "${key_file}"' EXIT
+curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-all-errors -fsSL \
+  https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "${key_file}"
+gpg --batch --yes --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg "${key_file}"
 
 apt-get update -y
 apt-get install --no-install-recommends -y "postgresql-client-17=${PG_CLIENT_VERSION}"

@@ -766,6 +766,20 @@ func (o *FactoryWorkOrder) CountEvents(tx *gorm.DB) (int64, error) {
 	return count, nil
 }
 
+// BacklogEntryID identifies the latest transition into Backlog, not later edits.
+func (o *FactoryWorkOrder) BacklogEntryID(tx *gorm.DB) (string, error) {
+	var event FactoryWorkOrderEvent
+	err := tx.Where("work_order_id = ? AND type = ? AND data->>'toState' = ?", o.ID, factory.EventTypeOrderStatusUpdated, FactoryWorkOrderStateDraft).
+		Order("created_at DESC, id DESC").First(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return o.ID.String(), nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return event.ID.String(), nil
+}
+
 func (o *FactoryWorkOrder) Ref() *factory.WorkOrderRef {
 	return &factory.WorkOrderRef{
 		ID:    o.ID,

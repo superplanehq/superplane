@@ -1168,6 +1168,21 @@ describe("LinesPage board extras", () => {
     );
   });
 
+  it("opens reused custom setup with Backlog triggers from Add intake", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    const user = userEvent.setup();
+    renderLinesBoard();
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+    await user.click(screen.getByTestId("add-intake-template-custom-verification"));
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=backlog");
+    const trigger = screen.getByRole("combobox", { name: "Trigger" });
+    expect(trigger).toHaveTextContent("Manual");
+    await user.click(trigger);
+    expect(screen.getByRole("option", { name: /When a task enters Backlog/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Every pull request commit/ })).not.toBeInTheDocument();
+  });
+
   it("opens the created scheduled intake in the board automation view", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_SCHEDULED_INTAKE);
     createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "canvas-scheduled", name: "Scheduled intake" });
