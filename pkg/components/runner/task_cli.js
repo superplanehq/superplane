@@ -70,12 +70,6 @@ const COMMANDS = [
     flags: ["state", "column"],
   },
   {
-    words: ["task", "assign"],
-    usage: "superplane task assign --assignee EMAIL",
-    flags: ["assignee"],
-    required: ["assignee"],
-  },
-  {
     words: ["task", "plan"],
     usage: "superplane task plan --file PATH",
     flags: ["file"],
@@ -89,8 +83,18 @@ const COMMANDS = [
   },
 ];
 
-function usage() {
-  return ["usage:", ...COMMANDS.map((command) => `  ${command.usage}`)].join("\n");
+// The global runner commands ship only with a runner token.
+function loadGlobalCLI() {
+  try {
+    return require("./superplane_mcp/cli");
+  } catch (_error) {
+    return null;
+  }
+}
+
+function usage(globalCLI = loadGlobalCLI()) {
+  const globalLines = globalCLI ? globalCLI.usage().split("\n").slice(1) : [];
+  return ["usage:", ...COMMANDS.map((command) => `  ${command.usage}`), ...globalLines].join("\n");
 }
 
 function findCommand(args) {
@@ -121,6 +125,14 @@ function parseCommand(argv) {
 }
 
 async function main(argv, env = process.env, fetchImpl = fetch, stdout = process.stdout, stderr = process.stderr) {
+  const globalCLI = loadGlobalCLI();
+  if (Array.isArray(argv) && argv[0] === "task" && argv[1] === "help") {
+    stdout.write(`${usage(globalCLI)}\n`);
+    return 0;
+  }
+  if (globalCLI && globalCLI.matches(argv)) {
+    return globalCLI.main(argv, env, fetchImpl, stdout, stderr);
+  }
   try {
     const { command, input } = parseCommand(argv);
     if (command.run === "link") {

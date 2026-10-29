@@ -194,6 +194,30 @@ func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	assert.NotContains(t, joined, "approval_mode")
 }
 
+func TestCodexExecArgsAddsGlobalMCPWithApprovedTools(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"task run": {"SUPERPLANE_RUNNER_TOKEN": "runner-token-secret"},
+		"planning": {
+			"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+			"SUPERPLANE_RUNNER_TOKEN":          "runner-token-secret",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			args := codexExecArgsFromScript(t, env, "gpt-5", "/task/planning_session_mcp.js")
+			joined := strings.Join(args, " ")
+
+			assert.Contains(t, args, `mcp_servers.superplane_global.command="node"`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.args=["/task/superplane_mcp/server.js"]`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR"]`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.tools.suggest_owners.approval_mode="approve"`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.tools.assign_owner.approval_mode="approve"`)
+			assert.NotContains(t, joined, "mcp_servers.superplane.tools.suggest_owners")
+			assert.NotContains(t, joined, "runner-token-secret")
+		})
+	}
+}
+
 func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
 	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))
@@ -215,9 +239,8 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 			assert.Contains(t, joined, "developer_instructions")
 			assert.Contains(t, args, `mcp_servers.superplane.tools.propose_update.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"`)
-			assert.Contains(t, args, `mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"`)
-			assert.Contains(t, args, `mcp_servers.superplane.tools.assign_owner.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
+			assert.NotContains(t, joined, "superplane_global")
 			assertForwardsMCPEnvVars(t, args,
 				"SUPERPLANE_BASE_URL",
 				"SUPERPLANE_RUN_TOKEN",
@@ -229,7 +252,7 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 				"SUPERPLANE_ANALYSIS_SCORE_FILE",
 			)
 			assert.NotContains(t, joined, "run-token-secret")
-			assert.Equal(t, 4, strings.Count(joined, "approval_mode="))
+			assert.Equal(t, 2, strings.Count(joined, "approval_mode="))
 			assert.NotContains(t, joined, "default_tools_approval_mode")
 		})
 	}
