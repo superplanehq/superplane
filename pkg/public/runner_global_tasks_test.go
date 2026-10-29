@@ -3,6 +3,7 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -25,7 +26,7 @@ func TestRunnerListsTasksByState(t *testing.T) {
 	require.NotEmpty(t, token)
 
 	db := database.DB(t.Context())
-	openOrder, err := factory.CreateWorkOrder(db, "Open task", "", nil, nil, nil)
+	openOrder, err := factory.CreateWorkOrder(db, "Open task", "Stop the retry loop.", nil, nil, nil)
 	require.NoError(t, err)
 	_, err = openOrder.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
 	require.NoError(t, err)
@@ -47,6 +48,13 @@ func TestRunnerListsTasksByState(t *testing.T) {
 
 	rec = runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/tasks?state=later", "")
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+
+	rec = runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/tasks?state=open&state=open&state=draft&state=closed", "")
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+
+	rec = runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/tasks?limit=100000", "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.NotContains(t, rec.Body.String(), "Stop the retry loop.")
 }
 
 func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {
@@ -74,6 +82,12 @@ func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {
 
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":" "}`)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"`+strings.Repeat("a", 257)+`"}`)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"ok","description":"`+strings.Repeat("b", 128*1024)+`"}`)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
 }
 
 func TestRunnerClosesThisTaskOnce(t *testing.T) {

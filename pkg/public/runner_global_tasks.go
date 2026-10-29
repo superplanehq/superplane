@@ -8,18 +8,27 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	log "github.com/sirupsen/logrus"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
-	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
-	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+)
+
+const (
+	runnerTaskListMax              = models.DefaultFactoryWorkOrderListLimit
+	runnerTaskStateParamMax        = 3
+	runnerTaskTitleMaxRunes        = 256
+	runnerTaskDescriptionMaxRunes  = 20000
+	runnerArtifactTitleMaxRunes    = 1024
+	runnerTaskCreateBodyMaxBytes   = 128 * 1024
+	runnerTaskMutationBodyMaxBytes = 8 * 1024
 )
 
 type runnerCreateTaskRequest struct {
@@ -69,25 +78,24 @@ func (s *Server) handleRunnerListTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := factoryactions.ListWorkOrders(r.Context(), scope.OrganizationID.String(), &pb.ListWorkOrdersRequest{
-		FactoryId: scope.FactoryID.String(),
-		States:    states,
-		Limit:     limit,
+	orders, err := factoryModel.ListWorkOrderSummaries(db, models.ListFactoryWorkOrdersFilters{
+		States:          states,
+		Limit:           limit,
+		ExcludeArchived: true,
 	})
 	if err != nil {
 		writeRunnerTaskError(w, err)
 		return
 	}
 
-	tasks := make([]runnerTaskView, 0, len(response.GetOrders()))
-	for _, order := range response.GetOrders() {
-		state, _ := factoryactions.WorkOrderStateFromProto(order.GetState())
+	tasks := make([]runnerTaskView, 0, len(orders))
+	for i := range orders {
 		tasks = append(tasks, runnerTaskView{
-			ID:    order.GetId(),
-			Key:   order.GetKey(),
-			Title: order.GetTitle(),
-			State: state,
-			URL:   runnerTaskURL(s.BaseURL, factoryModel, order.GetNumber()),
+			ID:    orders[i].ID.String(),
+			Key:   factoryModel.WorkOrderKey(orders[i].Number),
+			Title: orders[i].Title,
+			State: orders[i].State,
+			URL:   runnerTaskURL(s.BaseURL, factoryModel, orders[i].Number),
 		})
 	}
 	_ = writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
@@ -100,13 +108,21 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var request runnerCreateTaskRequest
-	if err := decodeRunnerJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+	if err := decodeRunnerJSON(w, r, &request, runnerTaskCreateBodyMaxBytes); err != nil {
 		return
 	}
 	title := strings.TrimSpace(request.Title)
 	if title == "" {
 		http.Error(w, "title is required", http.StatusBadRequest)
+		return
+	}
+	if utf8.RuneCountInString(title) > runnerTaskTitleMaxRunes {
+		http.Error(w, fmt.Sprintf("title must be at most %d characters", runnerTaskTitleMaxRunes), http.StatusBadRequest)
+		return
+	}
+	description := strings.TrimSpace(request.Description)
+	if utf8.RuneCountInString(description) > runnerTaskDescriptionMaxRunes {
+		http.Error(w, fmt.Sprintf("description must be at most %d characters", runnerTaskDescriptionMaxRunes), http.StatusBadRequest)
 		return
 	}
 
@@ -119,7 +135,7 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 
 	var order *models.FactoryWorkOrder
 	err = db.Transaction(func(tx *gorm.DB) error {
-		created, createErr := factoryModel.CreateWorkOrder(tx, title, strings.TrimSpace(request.Description), nil, nil, nil)
+		created, createErr := factoryModel.CreateWorkOrder(tx, title, description, nil, nil, nil)
 		if createErr != nil {
 			return createErr
 		}
@@ -143,8 +159,7 @@ func (s *Server) handleRunnerCloseTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var request runnerCloseTaskRequest
-	if err := decodeRunnerJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+	if err := decodeRunnerJSON(w, r, &request, runnerTaskMutationBodyMaxBytes); err != nil {
 		return
 	}
 	result, err := runnerCloseResult(request.Result)
@@ -197,12 +212,21 @@ func (s *Server) handleRunnerRemoveArtifact(w http.ResponseWriter, r *http.Reque
 	}
 
 	var request runnerRemoveArtifactRequest
-	if err := decodeRunnerJSON(r, &request); err != nil {
-		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+	if err := decodeRunnerJSON(w, r, &request, runnerTaskMutationBodyMaxBytes); err != nil {
+		return
+	}
+	key := strings.TrimSpace(request.Key)
+	title := strings.TrimSpace(request.Title)
+	if len(key) > models.MaxFactoryWorkOrderArtifactKeyBytes {
+		http.Error(w, fmt.Sprintf("key must be at most %d bytes", models.MaxFactoryWorkOrderArtifactKeyBytes), http.StatusBadRequest)
+		return
+	}
+	if utf8.RuneCountInString(title) > runnerArtifactTitleMaxRunes {
+		http.Error(w, fmt.Sprintf("title must be at most %d characters", runnerArtifactTitleMaxRunes), http.StatusBadRequest)
 		return
 	}
 
-	removed, err := target.order.RemoveArtifact(database.DB(r.Context()), request.Key, request.Title, nil)
+	removed, err := target.order.RemoveArtifact(database.DB(r.Context()), key, title, nil)
 	if err != nil {
 		writeRunnerTaskError(w, err)
 		return
@@ -235,28 +259,41 @@ func runnerTaskURL(baseURL string, factoryModel *models.Factory, number int64) s
 	return fmt.Sprintf("%s/%s/workspaces/%s/task/%d", base, factoryModel.OrganizationID, factoryModel.RouteSegment(), number)
 }
 
-func runnerTaskStates(values []string) ([]pb.WorkOrder_State, error) {
-	states := make([]pb.WorkOrder_State, 0, len(values))
+func runnerTaskStates(values []string) ([]string, error) {
+	if len(values) > runnerTaskStateParamMax {
+		return nil, fmt.Errorf("state must be draft, open, or closed")
+	}
+	seen := make(map[string]struct{}, len(values))
+	states := make([]string, 0, len(values))
 	for _, value := range values {
-		state := factoryactions.WorkOrderStateToProto(strings.ToLower(strings.TrimSpace(value)))
-		if state == pb.WorkOrder_STATE_UNSPECIFIED {
+		state := strings.ToLower(strings.TrimSpace(value))
+		switch state {
+		case models.FactoryWorkOrderStateDraft, models.FactoryWorkOrderStateOpen, models.FactoryWorkOrderStateClosed:
+		default:
 			return nil, fmt.Errorf("state must be draft, open, or closed")
 		}
+		if _, ok := seen[state]; ok {
+			continue
+		}
+		seen[state] = struct{}{}
 		states = append(states, state)
 	}
 	return states, nil
 }
 
-func runnerListLimit(raw string) (uint32, error) {
+func runnerListLimit(raw string) (int, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return 0, nil
+		return runnerTaskListMax, nil
 	}
-	value, err := strconv.ParseUint(raw, 10, 32)
-	if err != nil || value == 0 {
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
 		return 0, fmt.Errorf("limit must be a positive integer")
 	}
-	return uint32(value), nil
+	if value > runnerTaskListMax {
+		return runnerTaskListMax, nil
+	}
+	return value, nil
 }
 
 func runnerCloseResult(raw string) (string, error) {
@@ -272,12 +309,22 @@ func runnerCloseResult(raw string) (string, error) {
 	}
 }
 
-func decodeRunnerJSON(r *http.Request, dest any) error {
+func decodeRunnerJSON(w http.ResponseWriter, r *http.Request, dest any, maxBytes int64) error {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(dest)
 	if errors.Is(err, io.EOF) {
 		return nil
 	}
+	if err == nil {
+		return nil
+	}
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		http.Error(w, "Request body is too large", http.StatusRequestEntityTooLarge)
+		return err
+	}
+	http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 	return err
 }
 

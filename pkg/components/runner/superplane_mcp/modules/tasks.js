@@ -2,6 +2,10 @@
 
 const TASK_STATES = new Set(["draft", "open", "closed"]);
 const CLOSE_RESULTS = new Set(["completed", "rejected", "failed"]);
+const MAX_LIST_LIMIT = 100;
+const MAX_STATE_VALUES = 3;
+const MAX_TITLE_LENGTH = 256;
+const MAX_DESCRIPTION_LENGTH = 20000;
 
 function stateValues(raw) {
   if (raw == null || raw === "") return [];
@@ -10,14 +14,18 @@ function stateValues(raw) {
 }
 
 async function listTasks(input, client) {
+  const states = stateValues(input && input.state);
+  if (states.length > MAX_STATE_VALUES) throw new Error("state must be draft, open, or closed");
   const params = new URLSearchParams();
-  for (const state of stateValues(input && input.state)) {
+  for (const state of states) {
     if (!TASK_STATES.has(state)) throw new Error("state must be draft, open, or closed");
     params.append("state", state);
   }
   if (input && input.limit != null && input.limit !== "") {
     const limit = Number(input.limit);
-    if (!Number.isInteger(limit) || limit < 1) throw new Error("limit must be a positive integer");
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT) {
+      throw new Error("limit must be an integer from 1 to 100");
+    }
     params.set("limit", String(limit));
   }
   const query = params.toString();
@@ -28,7 +36,11 @@ async function listTasks(input, client) {
 async function createTask(input, client) {
   const title = String((input && input.title) || "").trim();
   if (!title) throw new Error("title is required");
+  if (title.length > MAX_TITLE_LENGTH) throw new Error("title must be at most 256 characters");
   const description = String((input && input.description) || "").trim();
+  if (description.length > MAX_DESCRIPTION_LENGTH) {
+    throw new Error("description must be at most 20000 characters");
+  }
   return client.request("POST", "/api/v1/runner/tasks", { title, description });
 }
 
@@ -45,7 +57,7 @@ const LIST_TASKS = {
   definition: {
     name: "list_tasks",
     description:
-      "List tasks in this workspace. Pass state to keep draft, open, or closed tasks. Repeat state to combine them. Archived tasks stay hidden. Each task includes id, key, title, state, and url.",
+      "List tasks in this workspace. Returns at most 100 tasks, newest update first. Pass state to keep draft, open, or closed tasks. Repeat state to combine them. Archived tasks stay hidden. There is no offset. Each task includes id, key, title, state, and url.",
     inputSchema: {
       type: "object",
       properties: {
@@ -59,7 +71,8 @@ const LIST_TASKS = {
         limit: {
           type: "integer",
           minimum: 1,
-          description: "Maximum number of tasks to return. The default is 100.",
+          maximum: 100,
+          description: "Maximum number of tasks to return. The default and the maximum are 100.",
         },
       },
     },
@@ -75,8 +88,12 @@ const CREATE_TASK = {
     inputSchema: {
       type: "object",
       properties: {
-        title: { type: "string", description: "Task title." },
-        description: { type: "string", description: "Task description. Optional." },
+        title: { type: "string", maxLength: 256, description: "Task title. At most 256 characters." },
+        description: {
+          type: "string",
+          maxLength: 20000,
+          description: "Task description. Optional. At most 20000 characters.",
+        },
       },
       required: ["title"],
     },

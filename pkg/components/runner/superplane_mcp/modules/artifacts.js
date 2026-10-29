@@ -1,9 +1,14 @@
 "use strict";
 
+const MAX_ARTIFACT_KEY_BYTES = 512;
+const MAX_ARTIFACT_TITLE_LENGTH = 1024;
+
 async function removeArtifact(input, client) {
   const key = String((input && input.key) || "").trim();
   const title = String((input && input.title) || "").trim();
   if (!key && !title) throw new Error("key or title is required");
+  if (Buffer.byteLength(key) > MAX_ARTIFACT_KEY_BYTES) throw new Error("key must be at most 512 bytes");
+  if (title.length > MAX_ARTIFACT_TITLE_LENGTH) throw new Error("title must be at most 1024 characters");
   const body = {};
   if (key) body.key = key;
   if (title) body.title = title;
@@ -18,8 +23,12 @@ const REMOVE_ARTIFACT = {
     inputSchema: {
       type: "object",
       properties: {
-        key: { type: "string", description: "Artifact key." },
-        title: { type: "string", description: "Artifact title, when the artifact has no key." },
+        key: { type: "string", maxLength: 512, description: "Artifact key. At most 512 bytes." },
+        title: {
+          type: "string",
+          maxLength: 1024,
+          description: "Artifact title, when the artifact has no key. At most 1024 characters.",
+        },
       },
     },
   },

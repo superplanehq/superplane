@@ -410,11 +410,6 @@ func IsValidWorkOrderArtifactType(t string) bool {
 	return false
 }
 
-type unkeyedArtifactTitle struct {
-	ID    uuid.UUID
-	Title string
-}
-
 func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
 	tx *gorm.DB,
 	artifactType, title string,
@@ -424,39 +419,7 @@ func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
 		return nil, fmt.Errorf("%w: artifact type is required", ErrFactoryWorkOrderArtifactInvalid)
 	}
 
-	var titles []unkeyedArtifactTitle
-	err := tx.Model(&FactoryWorkOrderArtifact{}).
-		Select("id, data->>'title' AS title").
-		Where(
-			"organization_id = ? AND factory_id = ? AND work_order_id = ? AND type = ? AND key IS NULL AND jsonb_typeof(data->'title') = 'string'",
-			o.OrganizationID,
-			o.FactoryID,
-			o.ID,
-			artifactType,
-		).
-		Order("created_at DESC").
-		Order("id DESC").
-		Find(&titles).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	matchID, found := newestMatchingArtifactID(titles, title)
-	if !found {
-		return nil, ErrFactoryWorkOrderArtifactNotFound
-	}
-
-	var artifact FactoryWorkOrderArtifact
-	err = tx.Where("id = ?", matchID).First(&artifact).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryWorkOrderArtifactNotFound
-		}
-		return nil, err
-	}
-
-	return &artifact, nil
+	return o.findNewestUnkeyedArtifact(tx, artifactType, title)
 }
 
 func (o *FactoryWorkOrder) findArtifactToRemove(tx *gorm.DB, key, title string) (*FactoryWorkOrderArtifact, error) {
@@ -472,30 +435,30 @@ func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTitle(tx *gorm.DB, title s
 		return nil, fmt.Errorf("%w: artifact title is required", ErrFactoryWorkOrderArtifactInvalid)
 	}
 
-	var titles []unkeyedArtifactTitle
-	err := tx.Model(&FactoryWorkOrderArtifact{}).
-		Select("id, data->>'title' AS title").
-		Where(
-			"organization_id = ? AND factory_id = ? AND work_order_id = ? AND key IS NULL AND jsonb_typeof(data->'title') = 'string'",
-			o.OrganizationID,
-			o.FactoryID,
-			o.ID,
-		).
-		Order("created_at DESC").
-		Order("id DESC").
-		Find(&titles).
-		Error
-	if err != nil {
-		return nil, err
-	}
+	return o.findNewestUnkeyedArtifact(tx, "", title)
+}
 
-	matchID, found := newestMatchingArtifactID(titles, title)
-	if !found {
-		return nil, ErrFactoryWorkOrderArtifactNotFound
+// findNewestUnkeyedArtifact loads one matching row. The title compare uses
+// btrim so a padded stored title still matches, and LIMIT 1 keeps the scan
+// from reading every artifact on the task.
+func (o *FactoryWorkOrder) findNewestUnkeyedArtifact(tx *gorm.DB, artifactType, title string) (*FactoryWorkOrderArtifact, error) {
+	query := tx.Model(&FactoryWorkOrderArtifact{}).Where(
+		"organization_id = ? AND factory_id = ? AND work_order_id = ? AND key IS NULL AND jsonb_typeof(data->'title') = 'string' AND btrim(data->>'title') = ?",
+		o.OrganizationID,
+		o.FactoryID,
+		o.ID,
+		title,
+	)
+	if artifactType != "" {
+		query = query.Where("type = ?", artifactType)
 	}
 
 	var artifact FactoryWorkOrderArtifact
-	err = tx.Where("id = ?", matchID).First(&artifact).Error
+	err := query.
+		Order("created_at DESC").
+		Order("id DESC").
+		Limit(1).
+		Take(&artifact).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrFactoryWorkOrderArtifactNotFound
@@ -503,16 +466,6 @@ func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTitle(tx *gorm.DB, title s
 		return nil, err
 	}
 	return &artifact, nil
-}
-
-func newestMatchingArtifactID(titles []unkeyedArtifactTitle, title string) (uuid.UUID, bool) {
-	for _, candidate := range titles {
-		if strings.TrimSpace(candidate.Title) == title {
-			return candidate.ID, true
-		}
-	}
-
-	return uuid.Nil, false
 }
 
 // LockFactoryWorkOrder locks the work order row until the transaction ends.

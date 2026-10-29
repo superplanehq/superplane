@@ -39,6 +39,14 @@ test("create_task posts the title", async () => {
   assert.deepEqual(calls[0].body, { title: "Ship it", description: "Notes" });
 });
 
+test("list_tasks rejects a limit above 100", async () => {
+  const client = createClient(env, recordingFetch([]));
+  await assert.rejects(
+    () => registry.findTool("list_tasks").handler({ limit: 101 }, client),
+    /limit must be an integer from 1 to 100/,
+  );
+});
+
 test("create_task requires a title", async () => {
   const client = createClient(env, recordingFetch([]));
   await assert.rejects(() => registry.findTool("create_task").handler({}, client), /title is required/);
