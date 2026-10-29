@@ -68,6 +68,9 @@ func (s *Server) uploadTaskLogChunk(w http.ResponseWriter, r *http.Request) {
 	var appendResult runnerlogs.AppendResult
 	if err == nil {
 		appendResult, err = store.Append(r.Context(), taskID, sequence, content)
+		if err == nil {
+			_ = models.InsertHostedModelCallOutcomes(tx, models.ParseHostedModelCallLogChunk(task.ID.String(), content))
+		}
 	}
 	switch {
 	case err == nil:

@@ -1135,6 +1135,23 @@ CREATE TABLE public.hosted_llm_providers (
 
 
 --
+-- Name: hosted_model_call_outcomes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.hosted_model_call_outcomes (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    provider text NOT NULL,
+    model text NOT NULL,
+    outcome text NOT NULL,
+    occurred_at timestamp with time zone NOT NULL,
+    runner_task_id text NOT NULL,
+    sequence integer NOT NULL,
+    CONSTRAINT hosted_model_call_outcomes_outcome_known CHECK ((outcome = ANY (ARRAY['attempt_1'::text, 'attempt_2'::text, 'attempt_3'::text, 'attempt_4'::text, 'error'::text]))),
+    CONSTRAINT hosted_model_call_outcomes_provider_known CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+);
+
+
+--
 -- Name: installation_admin_organization_pins; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2942,6 +2959,22 @@ ALTER TABLE ONLY public.hosted_llm_providers
 
 
 --
+-- Name: hosted_model_call_outcomes hosted_model_call_outcomes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosted_model_call_outcomes
+    ADD CONSTRAINT hosted_model_call_outcomes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hosted_model_call_outcomes hosted_model_call_outcomes_task_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosted_model_call_outcomes
+    ADD CONSTRAINT hosted_model_call_outcomes_task_sequence_key UNIQUE (runner_task_id, sequence);
+
+
+--
 -- Name: factory_pull_request_runs idx_factory_pull_request_runs_run_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4342,6 +4375,13 @@ CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id)
 --
 
 CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_hosted_model_call_outcomes_occurred_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_hosted_model_call_outcomes_occurred_at ON public.hosted_model_call_outcomes USING btree (occurred_at);
 
 
 --
@@ -6532,7 +6572,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261029132752	f
+20261029155838	f
 \.
 
 

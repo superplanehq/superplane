@@ -44,6 +44,28 @@ function loadActivityStreamModule() {
   return { createActivityStream: () => createDisabledActivityStream() };
 }
 
+function publishHostedModelCallOutcomes(provider, rows) {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [
+    path.join(taskDir, "llm_usage.js"),
+    path.join(__dirname, "..", "llm_usage.js"),
+  ];
+  for (const file of candidates) {
+    if (!file || !fs.existsSync(file)) {
+      continue;
+    }
+    try {
+      const usage = require(file);
+      if (typeof usage.publishModelCallOutcomes === "function") {
+        usage.publishModelCallOutcomes(provider, rows);
+      }
+      return;
+    } catch (_err) {
+      return;
+    }
+  }
+}
+
 function createDisabledActivityStream() {
   const noop = () => undefined;
   return {
@@ -455,11 +477,14 @@ async function runPrompt(promptFile, model, thinking) {
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const stderrDone = pipeRedactedStderr(child.stderr);
+  let stderrText = "";
+  const stderrDone = pipeRedactedStderr(child.stderr, (line) => {
+    stderrText += `${line}\n`;
+  });
 
   let lastResult = {};
   const telemetry = loadTurnTelemetry();
-  const formatter = createCodexFormatter(telemetry, activity);
+  const formatter = createCodexFormatter(telemetry, activity, { model });
   const rl = readline.createInterface({
     input: child.stdout,
     crlfDelay: Infinity,
@@ -523,6 +548,35 @@ async function runPrompt(promptFile, model, thinking) {
     thinkingLevel: rollout.effort || thinking,
     usage,
   };
+  const outcomes = [];
+  for (const occurredAt of formatter.modelCallTimes()) {
+    outcomes.push(
+      ...codexModelCallOutcomes({
+        failed: false,
+        model: payload.model,
+        occurredAt,
+      }),
+    );
+  }
+  if (exitCode !== 0) {
+    const failedOutcomes = codexModelCallOutcomes({
+      failed: true,
+      errorText: `${codexErrorText(lastResult)}\n${stderrText}`,
+      model: payload.model,
+    });
+    outcomes.push(...failedOutcomes);
+    publishHostedModelCallOutcomes("openai", failedOutcomes);
+  } else if (outcomes.length === 0) {
+    const fallback = codexModelCallOutcomes({
+      failed: false,
+      model: payload.model,
+    });
+    outcomes.push(...fallback);
+    publishHostedModelCallOutcomes("openai", fallback);
+  }
+  if (outcomes.length > 0) {
+    payload.modelCallOutcomes = outcomes;
+  }
   telemetry.attachToResult(payload);
   const activityModule = loadActivityStreamModule();
   const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
@@ -688,15 +742,74 @@ function writeStderr(value) {
   process.stderr.write(redactSubscription(safe));
 }
 
-function pipeRedactedStderr(stream) {
+function pipeRedactedStderr(stream, onLine) {
   const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
   lines.on("line", (line) => {
+    if (onLine) {
+      onLine(line);
+    }
     writeStderr(`${line}\n`);
   });
   return new Promise((resolve) => lines.on("close", resolve));
 }
 
-function createCodexFormatter(telemetry, activityOverride) {
+function classifyCodexProviderError(text) {
+  const raw = String(text || "");
+  const lower = raw.toLowerCase();
+  if (
+    /invalid api key|incorrect api key|unauthorized|authentication|insufficient credit|insufficient credits|unknown model|model not found|context (length|window|overflow)|maximum context|prompt is too long/.test(
+      lower,
+    )
+  ) {
+    return "hard";
+  }
+  if (
+    /rate limit exceeded|rate limit reached|please retry shortly|\b429\b/.test(
+      lower,
+    ) ||
+    /too many requests/.test(lower)
+  ) {
+    return "rate_limit";
+  }
+  if (
+    /\b(502|503|504|529)\b/.test(lower) ||
+    /overloaded|unavailable|temporarily|capacity|timeout|econnreset|fetch failed|server error|bad gateway|service unavailable/.test(
+      lower,
+    )
+  ) {
+    return "retryable";
+  }
+  return "other";
+}
+
+function codexErrorText(event) {
+  if (!event || typeof event !== "object") {
+    return "";
+  }
+  const parts = [event.error, event.result, event.text, event.message];
+  return parts
+    .map((part) => (typeof part === "string" ? part : ""))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function codexModelCallOutcomes({ failed, errorText, model, occurredAt }) {
+  const id = String(model || "").trim();
+  if (!id) {
+    return [];
+  }
+  const stamp = String(occurredAt || "").trim() || new Date().toISOString();
+  if (!failed) {
+    return [{ model: id, outcome: "attempt_1", occurredAt: stamp }];
+  }
+  const kind = classifyCodexProviderError(errorText);
+  if (kind === "rate_limit" || kind === "retryable") {
+    return [{ model: id, outcome: "error", occurredAt: stamp }];
+  }
+  return [];
+}
+
+function createCodexFormatter(telemetry, activityOverride, options) {
   const tracker = telemetry || loadTurnTelemetry();
   const activity =
     activityOverride ||
@@ -708,7 +821,26 @@ function createCodexFormatter(telemetry, activityOverride) {
   let anonSeq = 0;
   let contentSeq = 0;
   let roundOpen = false;
+  let roundHasMessage = false;
   let lastText = "";
+  let lastRecordedMessageId = "";
+  const modelCallTimes = [];
+  const callModel = String((options && options.model) || "").trim();
+
+  function recordModelCall() {
+    const occurredAt = new Date().toISOString();
+    modelCallTimes.push(occurredAt);
+    if (callModel) {
+      publishHostedModelCallOutcomes(
+        "openai",
+        codexModelCallOutcomes({
+          failed: false,
+          model: callModel,
+          occurredAt,
+        }),
+      );
+    }
+  }
 
   function itemType(item) {
     return String((item && (item.type || item.item_type)) || "").toLowerCase();
@@ -846,6 +978,7 @@ function createCodexFormatter(telemetry, activityOverride) {
       if (event.type === "turn.completed" || event.type === "result") {
         tracker.updateCurrentUsage(extractUsage(event));
         roundOpen = false;
+        roundHasMessage = false;
         return;
       }
       const item = event.item;
@@ -883,6 +1016,14 @@ function createCodexFormatter(telemetry, activityOverride) {
               writeStdout(`${lastText}\n`);
             }
           }
+          if (type !== "reasoning") {
+            const messageId = String(item.id || id || "");
+            if (!messageId || messageId !== lastRecordedMessageId) {
+              lastRecordedMessageId = messageId;
+              recordModelCall();
+            }
+            roundHasMessage = true;
+          }
         }
         return;
       }
@@ -893,6 +1034,9 @@ function createCodexFormatter(telemetry, activityOverride) {
         if (!roundOpen) {
           tracker.beginTurn(item.usage || event.usage);
           roundOpen = true;
+          if (!roundHasMessage) {
+            recordModelCall();
+          }
         }
         const id = rememberTool(item);
         emitStart(id);
@@ -902,6 +1046,9 @@ function createCodexFormatter(telemetry, activityOverride) {
         if (!roundOpen) {
           tracker.beginTurn(item.usage || event.usage);
           roundOpen = true;
+          if (!roundHasMessage) {
+            recordModelCall();
+          }
         }
         completeTool(item);
       }
@@ -928,6 +1075,9 @@ function createCodexFormatter(telemetry, activityOverride) {
     },
     lastText() {
       return lastText;
+    },
+    modelCallTimes() {
+      return modelCallTimes.slice();
     },
   };
 }
@@ -1106,6 +1256,7 @@ module.exports = {
   codexExecArgs,
   codexExecEnv,
   thinkingArgs,
+  codexModelCallOutcomes,
   codexSessionForPrompt,
   codexSessionIDFromEvent,
   planningEnabled,
