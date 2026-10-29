@@ -8,7 +8,8 @@ CREATE INDEX idx_factory_work_order_refinement_runs_work_order
     ON factory_work_order_refinement_runs (work_order_id);
 
 INSERT INTO factory_work_order_refinement_runs (run_id, work_order_id)
-SELECT canvas_run_id, draft_work_order_id
-FROM factory_planning_sessions
-WHERE canvas_run_id IS NOT NULL AND draft_work_order_id IS NOT NULL
+SELECT s.canvas_run_id, s.draft_work_order_id
+FROM factory_planning_sessions s
+JOIN workflow_runs r ON r.id = s.canvas_run_id
+WHERE s.draft_work_order_id IS NOT NULL
 ON CONFLICT DO NOTHING;
