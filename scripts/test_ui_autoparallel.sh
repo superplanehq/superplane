@@ -15,6 +15,7 @@ cd "${repo_root}/web_src"
 
 junit_file="${JUNIT_FILE:-${repo_root}/junit-report.xml}"
 args=(
+  --timeout=15000
   --dots
   --reporter=junit
   --reporter-outfile="${junit_file}"

@@ -206,8 +206,8 @@ func TestCodexRefreshFailureRequiresReconnect(t *testing.T) {
 	assert.Contains(t, response.Body.String(), "refresh_token_reused")
 	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
 	assert.Equal(t, models.CodexConnectionStatusReconnectRequired, connection.Status)
-	_, err = models.ReserveFactoryCodexConnection(db, connection.OrganizationID, connection.FactoryID, uuid.New(), time.Now(), r.Encryptor)
-	require.ErrorIs(t, err, models.ErrCodexConnectionNotReady)
+	_, err = models.ReserveFactoryCodexConnection(db, connection.OrganizationID, connection.FactoryID, support.CreateCodexOwnedRun(t, db, connection), uuid.New(), time.Now(), r.Encryptor)
+	require.ErrorIs(t, err, models.ErrSubscriptionOwnerInvalid)
 }
 
 func readyCodexRun(t *testing.T, r *support.ResourceRegistry) (*models.FactoryCodexConnection, *models.Factory, string) {
@@ -230,7 +230,7 @@ func readyCodexRun(t *testing.T, r *support.ResourceRegistry) (*models.FactoryCo
 	require.NoError(t, connection.StoreBundle(db, taskID, connection.ReservationGeneration, 1, bundle, "ada@example.com", true, now))
 	require.NoError(t, db.Where("connection_id = ?", connection.ID).Delete(&models.FactoryCodexLease{}).Error)
 	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
-	reserved, err := models.ReserveFactoryCodexConnection(db, r.Organization.ID, factory.ID, uuid.New(), now, r.Encryptor)
+	reserved, err := models.ReserveFactoryCodexConnection(db, r.Organization.ID, factory.ID, support.CreateCodexOwnedRun(t, db, connection), uuid.New(), now, r.Encryptor)
 	require.NoError(t, err)
 	var lease models.FactoryCodexLease
 	require.NoError(t, db.Where("connection_id = ? AND purpose = ?", reserved.ID, models.CodexLeasePurposeRun).First(&lease).Error)

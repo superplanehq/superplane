@@ -68,10 +68,23 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 		return nil, ErrFactoryPlanningSessionInvalid
 	}
 
+	if err := order.RequireExecutionOwner(tx, true); err != nil {
+		return nil, err
+	}
+	override := ""
+	if order.RefinementModel != nil {
+		override = *order.RefinementModel
+	}
+	if err := order.ValidateSubscriptionCanvasModels(tx, params.CanvasID, override); err != nil {
+		return nil, err
+	}
 	existing, err := FindPlanningSessionByRun(tx, params.CanvasRunID)
 	if err == nil {
 		if !analysisSessionMatchesWorkOrder(existing, params.WorkOrderID) {
 			return nil, ErrFactoryPlanningSessionInvalid
+		}
+		if err := order.RecordRefinementRun(tx, params.CanvasRunID); err != nil {
+			return nil, err
 		}
 		return existing, nil
 	}
@@ -91,6 +104,9 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 			return nil, err
 		}
 		if err := existing.AttachAgentRun(tx, params.CanvasRunID, existing.SelectableModelKey); err != nil {
+			return nil, err
+		}
+		if err := order.RecordRefinementRun(tx, params.CanvasRunID); err != nil {
 			return nil, err
 		}
 		return existing, nil
@@ -125,6 +141,9 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 		return FindPlanningSessionByDraftWorkOrder(tx, f.OrganizationID, f.ID, params.WorkOrderID)
 	}
 	if err := session.attachRefineDraft(tx, order); err != nil {
+		return nil, err
+	}
+	if err := order.RecordRefinementRun(tx, params.CanvasRunID); err != nil {
 		return nil, err
 	}
 	return session, nil
