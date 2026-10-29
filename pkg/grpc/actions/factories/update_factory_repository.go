@@ -34,7 +34,8 @@ const (
 // automations use. It snapshots work orders before publishing canvas changes.
 // Closed tasks keep that snapshot. Unfinished tasks that still use the
 // previous repository, and have no branch or the previous branch, move to
-// the saved repository and branch together.
+// the saved repository and branch together. A task with a running line
+// stays unchanged.
 func UpdateFactoryRepository(
 	ctx context.Context,
 	deps IntakeDependencies,
