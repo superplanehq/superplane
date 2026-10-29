@@ -12,7 +12,7 @@ import (
 )
 
 func TestSettingsAutoSave(t *testing.T) {
-	t.Run("auto-saves partial configuration when a required field is cleared", func(t *testing.T) {
+	t.Run("cleared required field persists across tab switches", func(t *testing.T) {
 		steps := &settingsAutoSaveSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Autosave Partial")
@@ -21,20 +21,10 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.clearExpressionField()
 		steps.waitForAutoSave()
 		steps.assertExpressionFieldCleared("FilterPartial")
-	})
-
-	t.Run("partial configuration persists after switching to Info tab", func(t *testing.T) {
-		steps := &settingsAutoSaveSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists("Autosave Tab Switch")
-		steps.addFilterNode("FilterSwitch")
-		steps.assertExpressionFieldEquals("FilterSwitch", "true")
-		steps.clearExpressionField()
-		steps.waitForAutoSave()
 		steps.switchToInfoTab()
 		steps.switchToConfigurationTab()
 		steps.assertExpressionInputEquals("")
-		steps.assertExpressionFieldCleared("FilterSwitch")
+		steps.assertExpressionFieldCleared("FilterPartial")
 	})
 }
 
