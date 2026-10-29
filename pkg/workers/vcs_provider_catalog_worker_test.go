@@ -298,6 +298,7 @@ func TestVCSProviderCatalogWorkerRefillsAvailableSlots(t *testing.T) {
 	close(catalog.release)
 	worker.repositoryJobs.Wait()
 	assert.ElementsMatch(t, []int64{201, 202, 203, 204, 205, 206, 207, 208, 209}, catalog.repositories())
+	assert.Zero(t, len(worker.repositorySlots), "slots without a claimed job must be released")
 }
 
 type progressivelyVisibleVCSProviderCatalog struct {

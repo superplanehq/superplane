@@ -109,6 +109,13 @@ func (VCSProviderRepositorySyncJob) TableName() string {
 	return "vcs_provider_repository_sync_jobs"
 }
 
+type VCSProviderRepositorySyncQueueStat struct {
+	Provider    string
+	Priority    VCSProviderRepositorySyncPriority
+	Due         int64
+	OldestRunAt time.Time
+}
+
 type VCSProviderInstallationReconcileJob struct {
 	Provider       string `gorm:"primaryKey"`
 	InstallationID int64  `gorm:"primaryKey"`
@@ -1338,42 +1345,51 @@ func repositorySyncRunAtExpression(schedule vcsProviderRepositorySchedule, runAt
 	)
 }
 
-func ClaimVCSProviderRepositorySync(
+// ListVCSProviderRepositorySyncQueueStats counts the due jobs that no worker
+// holds, for each provider and priority.
+func ListVCSProviderRepositorySyncQueueStats(tx *gorm.DB, now time.Time) ([]VCSProviderRepositorySyncQueueStat, error) {
+	var stats []VCSProviderRepositorySyncQueueStat
+	err := tx.Model(&VCSProviderRepositorySyncJob{}).
+		Select("provider, priority, COUNT(*) AS due, MIN(run_at) AS oldest_run_at").
+		Where("run_at <= ? AND locked_at IS NULL", now).
+		Group("provider, priority").
+		Scan(&stats).
+		Error
+	return stats, err
+}
+
+// ClaimVCSProviderRepositorySyncs locks up to limit due jobs in one statement,
+// highest priority first. Jobs locked before claimableBefore are claimed
+// again, so a crashed worker does not hold them forever.
+func ClaimVCSProviderRepositorySyncs(
 	tx *gorm.DB,
 	provider string,
 	now, claimableBefore time.Time,
-) (*VCSProviderRepositorySyncJob, error) {
-	var claimed *VCSProviderRepositorySyncJob
-	err := tx.Transaction(func(tx *gorm.DB) error {
-		var job VCSProviderRepositorySyncJob
-		err := tx.
-			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-			Where("provider = ?", provider).
-			Where("run_at <= ?", now).
-			Where("locked_at IS NULL OR locked_at < ?", claimableBefore).
-			Order("priority DESC, run_at ASC").
-			First(&job).
-			Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
+	limit int,
+) ([]VCSProviderRepositorySyncJob, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
 
-		job.LockedAt = &now
-		job.Attempts++
-		if err := tx.Model(&job).Updates(map[string]any{
-			"locked_at":  now,
-			"attempts":   job.Attempts,
-			"updated_at": now,
-		}).Error; err != nil {
-			return err
-		}
-		claimed = &job
-		return nil
-	})
-	return claimed, err
+	var jobs []VCSProviderRepositorySyncJob
+	err := tx.Raw(`
+		UPDATE vcs_provider_repository_sync_jobs AS job
+		SET locked_at = ?, attempts = job.attempts + 1, updated_at = ?
+		FROM (
+			SELECT provider, repository_id
+			FROM vcs_provider_repository_sync_jobs
+			WHERE provider = ?
+				AND run_at <= ?
+				AND (locked_at IS NULL OR locked_at < ?)
+			ORDER BY priority DESC, run_at ASC
+			LIMIT ?
+			FOR UPDATE SKIP LOCKED
+		) AS due
+		WHERE job.provider = due.provider AND job.repository_id = due.repository_id
+		RETURNING job.*`,
+		now, now, provider, now, claimableBefore, limit,
+	).Scan(&jobs).Error
+	return jobs, err
 }
 
 func CompleteVCSProviderRepositorySync(
