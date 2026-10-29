@@ -785,3 +785,83 @@ func TestUpdateFactoryOnboardingUsesTheBitbucketDefaultWhenMainIsMissing(t *test
 	require.NoError(t, err)
 	assert.Equal(t, "master", response.Factory.Onboarding.DefaultBranch)
 }
+
+func TestUpdateFactoryOnboardingAcceptsAnInitialBranchForAnEmptyRepository(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository}))
+
+	requested := "develop"
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		gitHubBranches: func(string) ([]string, error) { return nil, nil },
+		gitHubDefault:  func(string) (string, error) { return "main", nil },
+	})
+	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &requested,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "develop", reloaded.OnboardingConfigValue().DefaultBranch)
+}
+
+func TestUpdateFactoryOnboardingAcceptsAnInitialBitbucketBranchWhenTheRepositoryIsEmpty(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		VCSProvider:   &provider,
+	}))
+
+	requested := "develop"
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		bitbucketHead:        func(string, string) (string, error) { return "", nil },
+		bitbucketDefault:     func(string) (string, error) { return "", nil },
+		bitbucketHasBranches: func(string) (bool, error) { return false, nil },
+	})
+	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &requested,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
+}
+
+func TestUpdateFactoryOnboardingRejectsAMissingBitbucketBranchWhenOtherBranchesExist(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		VCSProvider:   &provider,
+	}))
+
+	requested := "develop"
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		bitbucketHead:        func(string, string) (string, error) { return "", nil },
+		bitbucketDefault:     func(string) (string, error) { return "", nil },
+		bitbucketHasBranches: func(string) (bool, error) { return true, nil },
+	})
+	_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &requested,
+	})
+	require.ErrorContains(t, err, "default branch is required")
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Empty(t, reloaded.OnboardingConfigValue().DefaultBranch)
+}

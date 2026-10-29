@@ -40,14 +40,14 @@ func TestFactory_RetargetUnfinishedWorkOrderBranches(t *testing.T) {
 	require.NoError(t, err)
 	otherFactoryOrder := createOrderWithBranch(t, tx, otherFactory, userID, "Other factory", branchPtr("main"))
 
-	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "main", "main"))
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "", "", "main", "main", ""))
 	assertOrderBranch(t, tx, previousDraft.ID, "main")
 
-	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "main", "master"))
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "", "acme/api", "main", "master", ProviderGitHub))
 
-	assertOrderBranch(t, tx, emptyDraft.ID, "master")
-	assertOrderBranch(t, tx, previousDraft.ID, "master")
-	assertOrderBranch(t, tx, otherOpen.ID, "release")
+	assertOrderCheckout(t, tx, emptyDraft.ID, "acme/api", "master", ProviderGitHub)
+	assertOrderCheckout(t, tx, previousDraft.ID, "acme/api", "master", ProviderGitHub)
+	assertOrderCheckout(t, tx, otherOpen.ID, "", "release", "")
 	assertOrderBranch(t, tx, closed.ID, "main")
 	assertOrderBranch(t, tx, otherFactoryOrder.ID, "main")
 
@@ -55,10 +55,23 @@ func TestFactory_RetargetUnfinishedWorkOrderBranches(t *testing.T) {
 	_, err = blank.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
 	require.NoError(t, err)
 	kept := createOrderWithBranch(t, tx, factoryModel, userID, "Kept draft", branchPtr("develop"))
-	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "", "trunk"))
-	assertOrderBranch(t, tx, blank.ID, "trunk")
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "", "acme/api", "", "trunk", ProviderGitHub))
+	assertOrderCheckout(t, tx, blank.ID, "acme/api", "trunk", ProviderGitHub)
 	assertOrderBranch(t, tx, kept.ID, "develop")
 	assertOrderBranch(t, tx, otherOpen.ID, "release")
+
+	followed := createOrderWithBranch(t, tx, factoryModel, userID, "Followed draft", branchPtr("main"))
+	setOrderRepository(t, tx, followed, "acme/old", ProviderGitHub)
+	separate := createOrderWithBranch(t, tx, factoryModel, userID, "Separate draft", branchPtr("main"))
+	setOrderRepository(t, tx, separate, "acme/other", ProviderGitHub)
+	custom := createOrderWithBranch(t, tx, factoryModel, userID, "Custom branch", branchPtr("release"))
+	setOrderRepository(t, tx, custom, "acme/old", ProviderGitHub)
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(
+		tx, "acme/old", "acme/new", "main", "develop", ProviderBitbucket,
+	))
+	assertOrderCheckout(t, tx, followed.ID, "acme/new", "develop", ProviderBitbucket)
+	assertOrderCheckout(t, tx, separate.ID, "acme/other", "main", ProviderGitHub)
+	assertOrderCheckout(t, tx, custom.ID, "acme/old", "release", ProviderGitHub)
 }
 
 func createOrderWithBranch(t *testing.T, tx *gorm.DB, factoryModel *Factory, userID uuid.UUID, title string, branch *string) *FactoryWorkOrder {
@@ -75,16 +88,38 @@ func branchPtr(value string) *string {
 	return &value
 }
 
+func setOrderRepository(t *testing.T, tx *gorm.DB, order *FactoryWorkOrder, repository, provider string) {
+	t.Helper()
+	require.NoError(t, tx.Model(order).Updates(map[string]any{
+		"repository":   repository,
+		"vcs_provider": provider,
+	}).Error)
+}
+
 func assertOrderBranch(t *testing.T, tx *gorm.DB, id uuid.UUID, want string) {
 	t.Helper()
 	var order FactoryWorkOrder
 	require.NoError(t, tx.First(&order, "id = ?", id).Error)
+	assertOptionalString(t, order.DefaultBranch, want)
+}
+
+func assertOrderCheckout(t *testing.T, tx *gorm.DB, id uuid.UUID, repository, branch, provider string) {
+	t.Helper()
+	var order FactoryWorkOrder
+	require.NoError(t, tx.First(&order, "id = ?", id).Error)
+	assertOptionalString(t, order.Repository, repository)
+	assertOptionalString(t, order.DefaultBranch, branch)
+	assertOptionalString(t, order.VCSProvider, provider)
+}
+
+func assertOptionalString(t *testing.T, got *string, want string) {
+	t.Helper()
 	if want == "" {
-		assert.True(t, order.DefaultBranch == nil || *order.DefaultBranch == "")
+		assert.True(t, got == nil || *got == "")
 		return
 	}
-	require.NotNil(t, order.DefaultBranch)
-	assert.Equal(t, want, *order.DefaultBranch)
+	require.NotNil(t, got)
+	assert.Equal(t, want, *got)
 }
 
 func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {

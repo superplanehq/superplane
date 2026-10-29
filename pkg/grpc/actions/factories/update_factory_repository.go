@@ -32,8 +32,9 @@ const (
 
 // UpdateFactoryRepository changes the repository that factory-managed
 // automations use. It snapshots work orders before publishing canvas changes.
-// Closed tasks keep that snapshot. Unfinished tasks with no branch, or with
-// the previous branch, move to the saved branch.
+// Closed tasks keep that snapshot. Unfinished tasks that still use the
+// previous repository, and have no branch or the previous branch, move to
+// the saved repository and branch together.
 func UpdateFactoryRepository(
 	ctx context.Context,
 	deps IntakeDependencies,
@@ -274,8 +275,16 @@ func reconcileFactoryRepository(
 	if err != nil {
 		return err
 	}
-	nextBranch := strings.TrimSpace(factory.OnboardingConfigValue().DefaultBranch)
-	if err := factory.RetargetUnfinishedWorkOrderBranches(tx, previousDefaultBranch, nextBranch); err != nil {
+	config := factory.OnboardingConfigValue()
+	nextBranch := strings.TrimSpace(config.DefaultBranch)
+	if err := factory.RetargetUnfinishedWorkOrderBranches(
+		tx,
+		previousAppRepository,
+		repository,
+		previousDefaultBranch,
+		nextBranch,
+		config.EffectiveVCSProvider(),
+	); err != nil {
 		return err
 	}
 	previousIntegrationName, integrationName := "", ""

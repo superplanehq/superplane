@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -346,20 +347,22 @@ export function RepositoryDefaultBranchPicker({ prompt }: { prompt: RepositoryBr
       <Label htmlFor={DEFAULT_BRANCH_FIELD_ID}>Default branch</Label>
       <p className="text-[13px] text-muted-foreground">Choose the default branch for this repository.</p>
       {prompt.hasListedBranches ? (
-        <select
-          id={DEFAULT_BRANCH_FIELD_ID}
-          value={prompt.branch}
-          onChange={(event) => prompt.onChange(event.target.value)}
-          data-testid={DEFAULT_BRANCH_FIELD_ID}
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-[13px]"
-        >
-          <option value="">Select a branch</option>
-          {prompt.choices.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+        <Select value={prompt.branch} onValueChange={prompt.onChange}>
+          <SelectTrigger
+            id={DEFAULT_BRANCH_FIELD_ID}
+            data-testid={DEFAULT_BRANCH_FIELD_ID}
+            className="w-full text-[13px]"
+          >
+            <SelectValue placeholder="Select a branch" />
+          </SelectTrigger>
+          <SelectContent>
+            {prompt.choices.map((name) => (
+              <SelectItem key={name} value={name}>
+                {name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       ) : (
         <Input
           id={DEFAULT_BRANCH_FIELD_ID}

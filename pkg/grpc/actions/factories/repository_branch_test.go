@@ -13,16 +13,17 @@ func TestChooseVerifiedDefaultBranch(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		requested string
-		saved     string
-		exists    bool
-		verifyErr error
-		live      string
-		liveErr   error
-		want      string
-		keepSaved bool
-		wantErr   string
+		name            string
+		requested       string
+		saved           string
+		exists          bool
+		verifyErr       error
+		live            string
+		liveErr         error
+		repositoryEmpty bool
+		want            string
+		keepSaved       bool
+		wantErr         string
 	}{
 		{name: "empty request keeps the saved branch", requested: " ", saved: "develop", keepSaved: true},
 		{name: "existing branch is saved", requested: "master", exists: true, want: "master"},
@@ -33,12 +34,16 @@ func TestChooseVerifiedDefaultBranch(t *testing.T) {
 		{name: "failed provider default with nothing saved is rejected", requested: "main", liveErr: errors.New("down"), wantErr: "could not verify the default branch"},
 		{name: "missing provider default keeps a saved branch", requested: "main", saved: "develop", keepSaved: true},
 		{name: "missing provider default with nothing saved is rejected", requested: "main", wantErr: "default branch is required"},
+		{name: "empty repository accepts the requested branch", requested: "develop", repositoryEmpty: true, want: "develop"},
+		{name: "empty repository keeps the requested branch when a default is reported", requested: "develop", live: "main", repositoryEmpty: true, want: "develop"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			got, keepSaved, err := chooseVerifiedDefaultBranch(test.requested, test.saved, test.exists, test.verifyErr, test.live, test.liveErr)
+			got, keepSaved, err := chooseVerifiedDefaultBranch(
+				test.requested, test.saved, test.exists, test.verifyErr, test.live, test.liveErr, test.repositoryEmpty,
+			)
 			if test.wantErr != "" {
 				require.ErrorContains(t, err, test.wantErr)
 				return
