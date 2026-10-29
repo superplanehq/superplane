@@ -8,6 +8,7 @@ export function customAutomationColumnAutomation(
   app: {
     id?: string;
     name?: string;
+    columnKey?: string;
     templateId?: string;
     customAutomationMode?: CustomAutomationMode;
     customAutomationIcon?: string;
@@ -19,7 +20,10 @@ export function customAutomationColumnAutomation(
   if (!id) {
     return null;
   }
-  const copy = customAutomationModeCopy(app.customAutomationMode ?? "manual");
+  const copy = customAutomationModeCopy(
+    app.customAutomationMode ?? "manual",
+    app.columnKey === "backlog" ? "backlog" : "verify",
+  );
   return {
     id: `custom-automation-${id}`,
     kind: "custom-verification",
