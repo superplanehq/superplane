@@ -57,7 +57,14 @@ var (
 	cachedFleetManagerOK              bool
 	cachedFleetManagerReleaseFailedAt time.Time
 	cachedFleetManagerReleaseFailure  error
+	cachedFleetManagerCharts          = map[string]fleetManagerChartResult{}
 )
+
+type fleetManagerChartResult struct {
+	exists    bool
+	err       error
+	fetchedAt time.Time
+}
 
 type githubRunnerRelease struct {
 	TagName    string `json:"tag_name"`
@@ -216,22 +223,21 @@ func runnerVersionsForSetup(stableVersion string) (string, []string) {
 
 func installationFleetManagerVersion(configured string) string {
 	published, err := publishedFleetManagerVersions()
-	if err != nil || len(published) == 0 {
+	if err != nil {
 		return configured
 	}
-	// A configured pin is a candidate only when its chart exists.
-	// Lookup failure still returns the pin.
-	if slices.Contains(published, configured) {
-		return installationRunnerVersion(configured, published)
+
+	candidates := append([]string(nil), published...)
+	if !slices.Contains(candidates, configured) {
+		exists, chartErr := fleetManagerChartExists(configured)
+		if chartErr == nil && exists {
+			candidates = append(candidates, configured)
+		}
 	}
-	exists, chartErr := fleetManagerChartExists(configured)
-	if chartErr != nil {
+	if len(candidates) == 0 {
 		return configured
 	}
-	if !exists {
-		return installationRunnerVersion(published[0], published)
-	}
-	return installationRunnerVersion(configured, published)
+	return installationRunnerVersion(candidates[0], candidates)
 }
 
 func publishedFleetManagerVersions() ([]string, error) {
@@ -281,16 +287,21 @@ func fetchPublishedFleetManagerVersions() ([]string, error) {
 		return nil, nil
 	}
 
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return runnerVersionNewer(candidates[i], candidates[j])
+	})
+
 	token, err := fetchFleetManagerRegistryToken(ctx, client)
 	if err != nil {
 		return nil, err
 	}
 
-	published := make([]string, 0, len(candidates))
+	var verificationErr error
 	for _, version := range candidates {
-		release, found, err := fetchRunnerReleaseByTag(ctx, client, fleetManagerReleaseTagPrefix+version)
-		if err != nil {
-			return nil, err
+		release, found, releaseErr := fetchRunnerReleaseByTag(ctx, client, fleetManagerReleaseTagPrefix+version)
+		if releaseErr != nil {
+			verificationErr = releaseErr
+			continue
 		}
 		if !found || release.Draft || release.Prerelease {
 			continue
@@ -299,28 +310,70 @@ func fetchPublishedFleetManagerVersions() ([]string, error) {
 		if !ok || !stableRunnerVersionPattern.MatchString(confirmed) || confirmed != version {
 			continue
 		}
-		exists, err := fleetManagerChartPublished(ctx, client, token, version)
-		if err != nil {
-			return nil, err
+		exists, chartErr := fleetManagerChartPublished(ctx, client, token, version)
+		storeFleetManagerChart(version, exists, chartErr)
+		if chartErr != nil {
+			verificationErr = chartErr
+			continue
 		}
 		if !exists {
 			continue
 		}
-		published = append(published, version)
+		return []string{version}, nil
 	}
-	return published, nil
+	if verificationErr != nil {
+		return nil, verificationErr
+	}
+	return nil, nil
 }
 
 func fleetManagerChartExists(version string) (bool, error) {
+	if exists, ok, err := freshFleetManagerChart(version); ok {
+		return exists, err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), runnerReleaseLookupTimeout)
 	defer cancel()
 
 	client := &http.Client{Timeout: runnerReleaseLookupTimeout}
 	token, err := fetchFleetManagerRegistryToken(ctx, client)
 	if err != nil {
+		storeFleetManagerChart(version, false, err)
 		return false, err
 	}
-	return fleetManagerChartPublished(ctx, client, token, version)
+	exists, err := fleetManagerChartPublished(ctx, client, token, version)
+	storeFleetManagerChart(version, exists, err)
+	return exists, err
+}
+
+func freshFleetManagerChart(version string) (bool, bool, error) {
+	fleetManagerReleaseCacheMu.Lock()
+	defer fleetManagerReleaseCacheMu.Unlock()
+
+	result, ok := cachedFleetManagerCharts[version]
+	if !ok {
+		return false, false, nil
+	}
+	if result.err != nil {
+		if time.Since(result.fetchedAt) < runnerReleaseFailureBackoff {
+			return false, true, result.err
+		}
+		return false, false, nil
+	}
+	if time.Since(result.fetchedAt) < runnerReleaseCacheTTL {
+		return result.exists, true, nil
+	}
+	return false, false, nil
+}
+
+func storeFleetManagerChart(version string, exists bool, err error) {
+	fleetManagerReleaseCacheMu.Lock()
+	defer fleetManagerReleaseCacheMu.Unlock()
+	cachedFleetManagerCharts[version] = fleetManagerChartResult{
+		exists:    exists,
+		err:       err,
+		fetchedAt: time.Now(),
+	}
 }
 
 func fetchFleetManagerRegistryToken(ctx context.Context, client *http.Client) (string, error) {
@@ -419,6 +472,7 @@ func resetFleetManagerReleaseCache() {
 	cachedFleetManagerOK = false
 	cachedFleetManagerReleaseFailure = nil
 	cachedFleetManagerReleaseFailedAt = time.Time{}
+	cachedFleetManagerCharts = map[string]fleetManagerChartResult{}
 }
 
 func installationRunnerVersion(stableVersion string, published []string) string {
