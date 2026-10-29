@@ -60,10 +60,7 @@ func TestRunnerCapacityConcurrentReservationsAcrossFleets(t *testing.T) {
 	close(start)
 	group.Wait()
 
-	for i, err := range errs {
-		if reservations[i].automatic && errors.Is(err, models.ErrRunnerTaskNotFound) {
-			continue
-		}
+	for _, err := range errs {
 		if errors.Is(err, models.ErrOrganizationRunnerCapacity) {
 			continue
 		}
@@ -94,9 +91,10 @@ func TestRunnerCapacityCountsJobsFromOneAutomationAndSeparatesOrganizations(t *t
 	require.NoError(t, err)
 	second, err := f.runner(fleet.ID).ReserveNextTask(f.db)
 	require.NoError(t, err)
-	assert.NotEqual(t, first.ID, second.ID)
-	_, err = f.runner(fleet.ID).ReserveNextTask(f.db)
-	require.ErrorIs(t, err, models.ErrRunnerTaskNotFound)
+	assert.NotEqual(t, first.Task.ID, second.Task.ID)
+	empty, err := f.runner(fleet.ID).ReserveNextTask(f.db)
+	require.NoError(t, err)
+	assert.Nil(t, empty.Task)
 
 	otherOrganization := support.CreateOrganization(t, f.resource, f.resource.User)
 	_, err = billingmodels.SetAdminOrganizationPlan(f.db, otherOrganization.ID, f.plan.Key, nil)
@@ -104,7 +102,7 @@ func TestRunnerCapacityCountsJobsFromOneAutomationAndSeparatesOrganizations(t *t
 	otherTask := f.task(otherOrganization.ID, fleet.ID)
 	reserved, err := f.runner(fleet.ID).ReserveNextTask(f.db)
 	require.NoError(t, err)
-	assert.Equal(t, otherTask.ID, reserved.ID)
+	assert.Equal(t, otherTask.ID, reserved.Task.ID)
 }
 
 func TestRunnerCapacitySkipsFullAndLockedOrganizationsWithoutRetainingLocks(t *testing.T) {
@@ -146,7 +144,7 @@ func TestRunnerCapacitySkipsFullAndLockedOrganizationsWithoutRetainingLocks(t *t
 			defer tx.Rollback()
 			reserved, err := runner.ReserveNextTask(tx)
 			require.NoError(t, err)
-			assert.Equal(t, firstEligible.ID, reserved.ID)
+			assert.Equal(t, firstEligible.ID, reserved.Task.ID)
 			// Keep the successful reservation open. Skipped candidates must still
 			// be available to another transaction, rather than locked until commit.
 			require.NoError(t, f.db.Transaction(func(probe *gorm.DB) error {
@@ -185,8 +183,9 @@ func TestRunnerCapacitySerializesExplicitAdmissionBeforeRunnerLock(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerTaskStateReserved, storedFirst.State)
 
-	_, err = idleRunner.ReserveNextTask(f.db)
-	require.ErrorIs(t, err, models.ErrRunnerTaskNotFound)
+	empty, err := idleRunner.ReserveNextTask(f.db)
+	require.NoError(t, err)
+	assert.Nil(t, empty.Task)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -253,10 +252,10 @@ func TestRunnerCapacityReservationRetriesKeepTheSameSlot(t *testing.T) {
 		assert.WithinDuration(t, reservedAt, *staleTask.ReservedAt, time.Microsecond)
 		retry, err := runner.ReserveNextTask(f.db)
 		require.NoError(t, err)
-		assert.Equal(t, task.ID, retry.ID)
-		assert.Equal(t, task.State, retry.State)
-		require.NotNil(t, retry.ReservedAt)
-		assert.WithinDuration(t, reservedAt, *retry.ReservedAt, time.Microsecond)
+		assert.Equal(t, task.ID, retry.Task.ID)
+		assert.Equal(t, task.State, retry.Task.State)
+		require.NotNil(t, retry.Task.ReservedAt)
+		assert.WithinDuration(t, reservedAt, *retry.Task.ReservedAt, time.Microsecond)
 		require.ErrorIs(t, queued.Reserve(f.db, f.runner(fleet.ID).ID), models.ErrOrganizationRunnerCapacity)
 	}
 }
@@ -363,7 +362,7 @@ func TestRunnerCapacityRegistrationExpiryReleasesReservations(t *testing.T) {
 			}
 			reserved, err := nextRunner.ReserveNextTask(f.db)
 			require.NoError(t, err)
-			assert.Equal(t, expectedNext, reserved.ID)
+			assert.Equal(t, expectedNext, reserved.Task.ID)
 		})
 	}
 }

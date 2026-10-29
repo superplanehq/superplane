@@ -3,6 +3,8 @@ package organizations
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -32,6 +34,37 @@ func ListSelectableLLMModels(
 				return nil, grpcerrors.NotFound(err, "factory not found")
 			}
 			return nil, grpcerrors.Internal(err, "failed to list selectable models")
+		}
+	}
+
+	if factoryID != nil {
+		f, err := models.FindFactory(tx, organization.ID, *factoryID)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "failed to load workspace")
+		}
+		if f.OnboardingConfigValue().CodexSubscription {
+			rawCaller, _ := authentication.GetUserIdFromMetadata(ctx)
+			callerID, err := uuid.Parse(rawCaller)
+			if err != nil {
+				return nil, grpcerrors.Unauthenticated(err, "Sign in to view subscription models")
+			}
+			ownerID, err := f.ResolveSubscriptionCatalogOwner(tx, callerID, req.GetOrderId())
+			if err != nil {
+				return nil, grpcerrors.InvalidArgument(err, err.Error())
+			}
+			ids, err := models.FactoryCodexSubscriptionModels(tx, organization.ID, f.ID, ownerID)
+			if err != nil {
+				return nil, grpcerrors.Internal(err, "failed to load subscription models")
+			}
+			out := &pb.ListSelectableLLMModelsResponse{}
+			for _, id := range ids {
+				out.Models = append(out.Models, &pb.SelectableLLMModel{
+					Source:   &pb.SelectableLLMNamedID{Id: "subscription", Name: "ChatGPT subscription"},
+					Provider: &pb.SelectableLLMNamedID{Id: "openai", Name: "OpenAI"},
+					Model:    &pb.SelectableLLMNamedID{Id: id, Name: id}, Key: id, Label: id,
+				})
+			}
+			return out, nil
 		}
 	}
 

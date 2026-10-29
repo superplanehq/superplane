@@ -310,6 +310,14 @@ func listDraftWorkOrderIDsByPlanningRunIDs(tx *gorm.DB, runIDs []uuid.UUID) (map
 		}
 		orders[row.CanvasRunID] = row.DraftWorkOrderID
 	}
+
+	var refinements []FactoryWorkOrderRefinementRun
+	if err := tx.Where("run_id IN ?", runIDs).Find(&refinements).Error; err != nil {
+		return nil, fmt.Errorf("load refinement runs: %w", err)
+	}
+	for _, link := range refinements {
+		orders[link.RunID] = link.WorkOrderID
+	}
 	return orders, nil
 }
 
