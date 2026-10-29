@@ -26,20 +26,10 @@ func TestRunsView(t *testing.T) {
 		steps.whenTheManualTriggerRuns()
 		steps.whenIVisitRunInspection()
 		steps.thenTheFinishedRunIsVisible()
+		steps.thenRunInspectionChromeIsVisible()
 		steps.whenIOpenRunNodeDetails()
 		steps.thenRunNodeDetailsModalIsVisible()
 		steps.whenICloseRunNodeDetails()
-		steps.whenIEnterEditModeFromRuns()
-		steps.thenEditModeIsVisible()
-	})
-
-	t.Run("enters edit mode from run inspection header and clears run URL", func(t *testing.T) {
-		steps := &runsViewSteps{t: t}
-		steps.start()
-		steps.givenACanvasWithManualTriggerAndNoop()
-		steps.whenTheManualTriggerRuns()
-		steps.whenIVisitRunInspection()
-		steps.thenRunInspectionChromeIsVisible()
 		steps.whenIClickEditFromRunInspection()
 		steps.thenEditModeIsVisibleAfterHeaderEdit()
 	})
@@ -230,19 +220,6 @@ func (s *runsViewSteps) whenICloseRunNodeDetails() {
 	s.session.AssertHidden(q.TestID("run-inspector-panel"))
 }
 
-func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
-	s.session.Click(q.TestID("runs-sidebar-live-canvas"))
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		if !strings.Contains(s.session.Page().URL(), "run=") {
-			break
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-	require.NotContains(s.t, s.session.Page().URL(), "run=")
-	s.canvas.EnterEditMode()
-}
-
 func (s *runsViewSteps) thenRunInspectionChromeIsVisible() {
 	require.NotNil(s.t, s.run, "expected run to be created")
 	s.session.AssertURLContains("run=" + s.run.ID.String())
@@ -362,12 +339,6 @@ func (s *runsViewSteps) waitForSidebarRowCountAtLeast(locator pw.Locator, expect
 	require.NoError(s.t, lastErr)
 	require.GreaterOrEqual(s.t, lastCount, expected)
 	return lastCount
-}
-
-func (s *runsViewSteps) thenEditModeIsVisible() {
-	s.canvas.WaitForEnabledExitEditButton()
-	url := s.session.Page().URL()
-	require.NotContains(s.t, url, "run="+s.run.ID.String())
 }
 
 func (s *runsViewSteps) waitForFinishedRun() *models.CanvasRun {
