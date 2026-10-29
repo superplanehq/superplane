@@ -340,6 +340,11 @@ func (s *FactoryService) CreateWorkOrderArtifact(ctx context.Context, req *pb.Cr
 	return actions.CreateWorkOrderArtifact(ctx, organizationID, req)
 }
 
+func (s *FactoryService) RemoveWorkOrderArtifact(ctx context.Context, req *pb.RemoveWorkOrderArtifactRequest) (*pb.RemoveWorkOrderArtifactResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RemoveWorkOrderArtifact(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DescribeFactoryVelocity(ctx context.Context, req *pb.DescribeFactoryVelocityRequest) (*pb.DescribeFactoryVelocityResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeFactoryVelocity(ctx, organizationID, req)
