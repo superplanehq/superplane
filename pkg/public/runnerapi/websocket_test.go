@@ -54,7 +54,7 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 				subscription, err = models.CreateFactoryCodexConnection(db, resource.Organization.ID, factory.ID, resource.User, time.Now().Add(-time.Hour))
 				require.NoError(t, err)
 				require.NoError(t, db.Model(subscription).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
-				subscription, err = models.ReserveFactoryCodexConnection(db, resource.Organization.ID, factory.ID, taskID, time.Now().Add(-time.Hour), resource.Encryptor)
+				subscription, err = models.ReserveFactoryCodexConnection(db, resource.Organization.ID, factory.ID, support.CreateCodexOwnedRun(t, db, subscription, taskID), taskID, time.Now().Add(-time.Hour), resource.Encryptor)
 				require.NoError(t, err)
 				expired, err := signer.GenerateWithClaims(-time.Minute, map[string]string{"purpose": runneraction.CodexSubscriptionTokenPurpose})
 				require.NoError(t, err)
