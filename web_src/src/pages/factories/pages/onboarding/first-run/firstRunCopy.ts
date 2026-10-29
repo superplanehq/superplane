@@ -175,7 +175,7 @@ export const FIRST_RUN_COPY = {
     waitingForCard: "Waiting for the card…",
     continue: "Continue",
     starting: "Starting your plan…",
-    unavailable: "No starter plans are available. Contact your organization admin to continue.",
+    unavailable: "No starter plans are available. Try again. If the problem continues, contact your administrator.",
   },
   agent: {
     headline: "Connect agent",
