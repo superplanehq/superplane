@@ -1169,6 +1169,45 @@ func EnqueueUnsyncedVCSProviderRepositories(
 	}).Error
 }
 
+// EnqueueVCSProviderInstallationsRepositorySyncs queues a collaborator sync
+// for every repository of the installations, with the same rules as
+// EnqueueVCSProviderRepositorySync.
+func EnqueueVCSProviderInstallationsRepositorySyncs(
+	tx *gorm.DB,
+	provider string,
+	installationIDs []int64,
+	runAt time.Time,
+	priority VCSProviderRepositorySyncPriority,
+) error {
+	if len(installationIDs) == 0 {
+		return nil
+	}
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	return tx.Exec(`
+		INSERT INTO vcs_provider_repository_sync_jobs
+			(provider, repository_id, run_at, priority, created_at, updated_at)
+		SELECT repository.provider, repository.repository_id, ?, ?, ?, ?
+		FROM vcs_provider_repositories AS repository
+		WHERE repository.provider = ? AND repository.installation_id IN ?
+		ON CONFLICT (provider, repository_id) DO UPDATE SET
+			run_at = ?,
+			priority = GREATEST(vcs_provider_repository_sync_jobs.priority, EXCLUDED.priority),
+			last_error = '',
+			updated_at = GREATEST(
+				EXCLUDED.updated_at,
+				COALESCE(vcs_provider_repository_sync_jobs.locked_at + INTERVAL '1 microsecond', EXCLUDED.updated_at)
+			)
+	`,
+		runAt, priority, now, now,
+		provider, installationIDs,
+		repositorySyncRunAtExpression(vcsProviderRepositoryScheduleEarliest, runAt),
+	).Error
+}
+
 // EnqueueStaleVCSProviderRepositorySyncs queues a background collaborator
 // sync for at most limit repositories last synced before staleBefore, oldest
 // first. It skips repositories that already have a queued job.

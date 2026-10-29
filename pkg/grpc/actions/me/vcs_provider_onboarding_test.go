@@ -278,6 +278,48 @@ func TestRefreshBitbucketOnboardingDoesNotQueueGitHub(t *testing.T) {
 	assert.Zero(t, count)
 }
 
+func TestRefreshGitHubOnboardingResyncsLinkedInstallations(t *testing.T) {
+	r := support.Setup(t)
+	setGitHubAccountConnection(t)
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	db := database.Conn()
+
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		db,
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "101", "first-user", "", ""),
+	))
+	for installationID, repositories := range map[int64][]models.VCSProviderRepository{
+		301: {{RepositoryID: 401, FullName: "acme/visible"}, {RepositoryID: 402, FullName: "acme/granted-without-webhook"}},
+		302: {{RepositoryID: 501, FullName: "other/unrelated"}},
+	} {
+		require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+			Provider:       models.ProviderGitHub,
+			InstallationID: installationID,
+			AccountType:    "Organization",
+		}))
+		require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, repositories))
+	}
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, 401, []models.VCSProviderRepositoryCollaborator{
+		{ProviderUserID: 101, ProviderLogin: "first-user"},
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, 402, nil))
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, 501, nil))
+
+	_, err := RefreshVCSProviderOnboarding(ctx, models.ProviderGitHub, nil)
+	require.NoError(t, err)
+
+	var jobs []models.VCSProviderRepositorySyncJob
+	require.NoError(t, db.Find(&jobs).Error)
+	queued := map[int64]models.VCSProviderRepositorySyncPriority{}
+	for _, job := range jobs {
+		queued[job.RepositoryID] = job.Priority
+	}
+	assert.Equal(t, map[int64]models.VCSProviderRepositorySyncPriority{
+		401: models.VCSProviderRepositorySyncPriorityInteractive,
+		402: models.VCSProviderRepositorySyncPriorityInteractive,
+	}, queued, "a refresh must re-sync the user's installations and no other installation")
+}
+
 func TestDescribeGitHubOnboardingKeepsAccountConnectionForPublicApp(t *testing.T) {
 	r := support.Setup(t)
 	setVCSProviderGitHubAppEnvironment(t)
