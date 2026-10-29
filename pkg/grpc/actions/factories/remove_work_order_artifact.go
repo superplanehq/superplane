@@ -26,11 +26,11 @@ func RemoveWorkOrderArtifact(
 		return nil, factoryErrorToStatus(err, "failed to remove work order artifact")
 	}
 
-	userIDStr, ok := authentication.GetUserIdFromMetadata(ctx)
+	rawUserID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
-	userID, err := uuid.Parse(userIDStr)
+	userID, err := uuid.Parse(rawUserID)
 	if err != nil {
 		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to remove work order artifact")
 	}

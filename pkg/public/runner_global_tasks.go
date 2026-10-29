@@ -155,11 +155,23 @@ func (s *Server) handleRunnerCloseTask(w http.ResponseWriter, r *http.Request) {
 
 	db := database.DB(r.Context())
 	fromState := target.order.State
-	order, err := target.order.Close(db, result, nil)
+	// Pass this run so close does not cancel the agent that called the tool.
+	changed, err := target.order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+		ToState:  models.FactoryWorkOrderStateClosed,
+		Result:   result,
+		Run:      &factoryevents.RunRef{ID: target.canvasRunID},
+		App:      &factoryevents.AppRef{ID: target.canvasID},
+		SkipSame: true,
+	})
 	if err != nil {
 		writeRunnerTaskError(w, err)
 		return
 	}
+	if !changed {
+		http.Error(w, "Task is closed or archived", http.StatusConflict)
+		return
+	}
+	order := target.order
 
 	publishRunnerTaskUpdate(target.factory, order, factoryevents.EventTypeOrderStatusUpdated)
 	notification := messages.FactoryWorkOrderNotificationMessage{

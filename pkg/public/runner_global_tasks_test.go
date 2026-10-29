@@ -97,6 +97,9 @@ func TestRunnerClosesThisTaskOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
 	assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
+	run, err := models.FindUnscopedCanvasRun(db, ctx.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, run.State)
 
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/close", `{}`)
 	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
@@ -181,6 +184,12 @@ func TestPlanningRunnerEditsTheSessionDraft(t *testing.T) {
 	untouched, err := factory.FindWorkOrder(db, other.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateDraft, untouched.State)
+	reloadedSession, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, reloadedSession.State)
+	planningRun, err := models.FindUnscopedCanvasRun(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, planningRun.State)
 }
 
 func mustMarkdownArtifact(t *testing.T, order *models.FactoryWorkOrder, key, title string) {
