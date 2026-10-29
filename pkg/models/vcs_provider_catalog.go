@@ -109,6 +109,13 @@ func (VCSProviderRepositorySyncJob) TableName() string {
 	return "vcs_provider_repository_sync_jobs"
 }
 
+type VCSProviderRepositorySyncQueueStat struct {
+	Provider    string
+	Priority    VCSProviderRepositorySyncPriority
+	Due         int64
+	OldestRunAt time.Time
+}
+
 type VCSProviderInstallationReconcileJob struct {
 	Provider       string `gorm:"primaryKey"`
 	InstallationID int64  `gorm:"primaryKey"`
@@ -1297,13 +1304,6 @@ func repositorySyncRunAtExpression(schedule vcsProviderRepositorySchedule, runAt
 		runAt,
 		runAt,
 	)
-}
-
-type VCSProviderRepositorySyncQueueStat struct {
-	Provider    string
-	Priority    VCSProviderRepositorySyncPriority
-	Due         int64
-	OldestRunAt time.Time
 }
 
 // ListVCSProviderRepositorySyncQueueStats counts the due jobs that no worker
