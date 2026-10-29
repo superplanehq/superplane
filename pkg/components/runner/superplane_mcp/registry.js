@@ -2,8 +2,8 @@
 
 /**
  * Tool modules of the global runner MCP server. Every tool declares an MCP
- * definition, a CLI command, and one handler that both of them call. The
- * backend catalog (runner_tools.go) decides which tools a run may use.
+ * definition and one handler. The backend catalog (runner_tools.go) decides
+ * which tools a run may use.
  */
 
 const MODULES = [require("./modules/owner")];
@@ -16,10 +16,4 @@ function findTool(name, modules = MODULES) {
   return allTools(modules).find((tool) => tool.definition.name === name);
 }
 
-function findCommand(args, modules = MODULES) {
-  return allTools(modules).find((tool) =>
-    tool.cli.words.every((word, index) => args[index] === word),
-  );
-}
-
-module.exports = { allTools, findTool, findCommand };
+module.exports = { allTools, findTool };

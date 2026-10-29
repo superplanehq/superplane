@@ -13,8 +13,8 @@ const GlobalMCPServerName = "superplane_global"
 //go:embed superplane_mcp
 var globalMCPAssets embed.FS
 
-// GlobalMCPFiles returns the global runner MCP server and its CLI. The runner
-// writes them under SUPERPLANE_TASK_DIR/superplane_mcp.
+// GlobalMCPFiles returns the global runner MCP server. The runner writes the
+// files under SUPERPLANE_TASK_DIR/superplane_mcp.
 func GlobalMCPFiles() []TaskFile {
 	files := []TaskFile{}
 	err := fs.WalkDir(globalMCPAssets, "superplane_mcp", func(path string, entry fs.DirEntry, err error) error {
@@ -34,12 +34,11 @@ func GlobalMCPFiles() []TaskFile {
 	return files
 }
 
-// AppendGlobalMCP ships the global runner MCP server and the superplane shell
-// command to runs that hold a runner token.
+// AppendGlobalMCP ships the global runner MCP server to runs that hold a
+// runner token.
 func AppendGlobalMCP(environment []TaskEnvironmentVariable, files []TaskFile) []TaskFile {
 	if !HasRunnerToken(environment) {
 		return files
 	}
-	files = appendUniqueTaskFiles(files, GlobalMCPFiles()...)
-	return appendUniqueTaskFiles(files, taskCLIFiles()...)
+	return appendUniqueTaskFiles(files, GlobalMCPFiles()...)
 }

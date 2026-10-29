@@ -42,13 +42,6 @@ const SUGGEST_OWNERS = {
       },
     },
   },
-  cli: {
-    words: ["task", "suggest-owners"],
-    usage: "superplane task suggest-owners [--path PATH]...",
-    flags: ["path"],
-    repeatable: ["path"],
-    toInput: (flags) => ({ paths: flags.path || [] }),
-  },
   handler: suggestOwners,
 };
 
@@ -72,14 +65,6 @@ const ASSIGN_OWNER = {
       },
       required: ["user", "reason"],
     },
-  },
-  cli: {
-    words: ["task", "assign"],
-    usage: "superplane task assign --user USER --reason TEXT",
-    flags: ["user", "assignee", "reason"],
-    alias: { assignee: "user" },
-    required: ["user", "reason"],
-    toInput: (flags) => ({ user: flags.user, reason: flags.reason }),
   },
   handler: assignOwner,
 };

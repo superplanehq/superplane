@@ -45,6 +45,12 @@ func TestNewCommand_Hierarchy(t *testing.T) {
 	require.NotNil(t, assignCmd.Flags().Lookup("assignee"))
 	require.NotNil(t, assignCmd.Flags().Lookup("task"))
 
+	suggestCmd, _, err := root.Find([]string{"suggest-owners"})
+	require.NoError(t, err)
+	require.NotNil(t, suggestCmd.Flags().Lookup("workspace"))
+	require.NotNil(t, suggestCmd.Flags().Lookup("task"))
+	require.NotNil(t, suggestCmd.Flags().Lookup("path"))
+
 	artifactCmd, _, err := root.Find([]string{"artifacts"})
 	require.NoError(t, err)
 	assert.Contains(t, artifactCmd.Aliases, "artifact")
