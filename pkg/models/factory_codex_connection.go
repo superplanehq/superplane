@@ -16,7 +16,9 @@ import (
 )
 
 const (
-	CodexConnectionStatusPending           = "pending"
+	CodexConnectionStatusPending = "pending"
+	// CodexConnectionStatusCanceling is derived for API views and is not persisted.
+	CodexConnectionStatusCanceling         = "canceling"
 	CodexConnectionStatusFinishing         = "finishing"
 	CodexConnectionStatusReady             = "ready"
 	CodexConnectionStatusReconnectRequired = "reconnect_required"
@@ -47,26 +49,27 @@ func (e *CodexConnectionBusyError) Error() string {
 // FactoryCodexConnection is one member’s ChatGPT subscription in a workspace.
 // The ciphertext is the native Codex auth bundle, bound to this row ID.
 type FactoryCodexConnection struct {
-	ID                     uuid.UUID
-	OrganizationID         uuid.UUID
-	FactoryID              uuid.UUID
-	OwnerUserID            uuid.UUID
-	Status                 string
-	ResumeStatus           string
-	VerificationURL        string
-	VerificationCode       string
-	AccountLabel           string
-	UsageLimits            datatypes.JSONSlice[CodexUsageLimit]
-	AvailableModels        datatypes.JSONSlice[CodexModel]
-	UsageObservedAt        *time.Time
-	BundleCiphertext       []byte
-	CredentialVersion      int64
-	FinalCheckpointVersion int64
-	ReservationGeneration  int64
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
-	RevocationPendingAt    *time.Time
-	LoginLease             *FactoryCodexLease `gorm:"-"`
+	ID                         uuid.UUID
+	OrganizationID             uuid.UUID
+	FactoryID                  uuid.UUID
+	OwnerUserID                uuid.UUID
+	Status                     string
+	ResumeStatus               string
+	VerificationURL            string
+	VerificationCode           string
+	AccountLabel               string
+	UsageLimits                datatypes.JSONSlice[CodexUsageLimit]
+	AvailableModels            datatypes.JSONSlice[CodexModel]
+	UsageObservedAt            *time.Time
+	BundleCiphertext           []byte
+	CredentialVersion          int64
+	FinalCheckpointVersion     int64
+	ReservationGeneration      int64
+	CreatedAt                  time.Time
+	UpdatedAt                  time.Time
+	RevocationPendingAt        *time.Time
+	LoginLease                 *FactoryCodexLease `gorm:"-"`
+	LoginCancellationRequested bool               `gorm:"-"`
 }
 
 type CodexUsageLimit struct {

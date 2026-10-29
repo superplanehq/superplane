@@ -57,8 +57,7 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
       if (current.state.status === "error") return 2000;
       const status = current.state.data?.status;
       return current.state.data?.revocationPending ||
-        status === "pending" ||
-        status === "finishing" ||
+        ["pending", "canceling", "finishing"].includes(status ?? "") ||
         current.state.data?.reservationHeld
         ? 2000
         : false;
@@ -116,6 +115,11 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
         }),
       );
       return response.data?.connection;
+    },
+    onSuccess: async (connection) => {
+      if (!connection) return;
+      await queryClient.cancelQueries({ queryKey });
+      queryClient.setQueryData(queryKey, connection);
     },
     onSettled: refresh,
     onError: () => showErrorToast("SuperPlane could not cancel ChatGPT sign-in. Try again."),

@@ -3267,7 +3267,7 @@ message AnswerPlanningSessionSurveyResponse {
 
 message FactoryCodexConnection {
   string id = 1;
-  // pending, finishing, ready, reconnect_required, or disconnected.
+  // pending, canceling, finishing, ready, reconnect_required, or disconnected.
   string status = 2;
   string verification_url = 3;
   string verification_code = 4;

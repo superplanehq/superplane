@@ -236,14 +236,17 @@ func CancelFactoryCodexConnection(
 		if cancelErr := tasks.RequestCancel(connection.LoginLease.TaskID.String()); cancelErr != nil && !errors.Is(cancelErr, models.ErrRunnerTaskNotFound) {
 			return cancelErr
 		}
-		return models.ReleaseCodexReservationForTask(tx, connection.LoginLease.TaskID, time.Now())
+		if err := models.ReleaseCodexReservationForTask(tx, connection.LoginLease.TaskID, time.Now()); err != nil {
+			return err
+		}
+		connection, lockErr = models.FindFactoryCodexConnection(tx, orgID, factory.ID, callerID)
+		if lockErr != nil {
+			return lockErr
+		}
+		return connection.AttachLoginLease(tx)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to cancel ChatGPT sign-in")
-	}
-	reloaded, _, _, reloadErr := loadCodexConnection(ctx, organizationID, req.GetFactoryId(), false)
-	if reloadErr == nil {
-		connection = reloaded
 	}
 	_ = messages.PublishFactoryCodexConnectionUpdated(connection.FactoryID.String())
 	return &pb.CancelFactoryCodexConnectionResponse{
@@ -418,13 +421,16 @@ func serializeCodexConnection(
 	view.Id = connection.ID.String()
 	view.RevocationPending = connection.RevocationPendingAt != nil
 	view.Status = connection.Status
+	if connection.Status == models.CodexConnectionStatusPending && connection.LoginCancellationRequested {
+		view.Status = models.CodexConnectionStatusCanceling
+	}
 	view.AccountLabel = connection.AccountLabel
 	view.ReservationHeld = connection.Reserved()
 	view.AvailableModels = models.CompactModelIDs(codexModelIDs(connection.AvailableModels))
 	if connection.LoginLease != nil {
 		view.ActiveTaskId = connection.LoginLease.TaskID.String()
 	}
-	if eligible && callerID == connection.OwnerUserID && connection.Status == models.CodexConnectionStatusPending {
+	if eligible && callerID == connection.OwnerUserID && view.Status == models.CodexConnectionStatusPending {
 		view.VerificationUrl = connection.VerificationURL
 		view.VerificationCode = connection.VerificationCode
 	}

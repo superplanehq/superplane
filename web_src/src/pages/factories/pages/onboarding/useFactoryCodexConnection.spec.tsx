@@ -3,7 +3,11 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { factoriesDescribeFactoryCodexConnection, factoriesStartFactoryCodexConnection } from "@/api-client";
+import {
+  factoriesCancelFactoryCodexConnection,
+  factoriesDescribeFactoryCodexConnection,
+  factoriesStartFactoryCodexConnection,
+} from "@/api-client";
 
 import { useFactoryCodexConnection } from "./useFactoryCodexConnection";
 import { factoryOwnerEligibilityKey } from "@/hooks/useFactoryOwnerEligibility";
@@ -32,6 +36,7 @@ describe("useFactoryCodexConnection", () => {
     vi.mocked(factoriesDescribeFactoryCodexConnection).mockReset();
     vi.mocked(factoriesStartFactoryCodexConnection).mockReset();
     vi.mocked(factoriesStartFactoryCodexConnection).mockResolvedValue({ data: {} } as never);
+    vi.mocked(factoriesCancelFactoryCodexConnection).mockReset();
   });
 
   it.each([true, false])("refreshes a legacy catalog only with update permission: %s", async (allowed) => {
@@ -109,5 +114,32 @@ describe("useFactoryCodexConnection", () => {
 
     await waitFor(() => expect(result.result.current.query.data?.status).toBe("ready"));
     expect(factoriesStartFactoryCodexConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the cancellation response while status refresh waits and polls until cleanup finishes", async () => {
+    const pending = { data: { connection: { status: "pending", reservationHeld: true } } };
+    const canceling = { data: { connection: { status: "canceling", reservationHeld: true } } };
+    let finishStatusRefresh = (_response: typeof pending) => {};
+    const statusRefresh = new Promise<typeof pending>((resolve) => {
+      finishStatusRefresh = resolve;
+    });
+    vi.mocked(factoriesDescribeFactoryCodexConnection)
+      .mockResolvedValueOnce(pending as never)
+      .mockImplementationOnce(() => statusRefresh as never)
+      .mockResolvedValue({ data: { connection: { status: "disconnected", reservationHeld: false } } } as never);
+    vi.mocked(factoriesCancelFactoryCodexConnection).mockResolvedValue(canceling as never);
+
+    const result = renderHook(() => useFactoryCodexConnection("org-1", "factory-1", true), { wrapper });
+    try {
+      await waitFor(() => expect(result.result.current.query.data?.status).toBe("pending"));
+      act(() => result.result.current.cancel.mutate());
+
+      await waitFor(() => expect(result.result.current.query.data?.status).toBe("canceling"));
+      finishStatusRefresh(canceling);
+      await waitFor(() => expect(result.result.current.query.data?.status).toBe("disconnected"), { timeout: 5000 });
+    } finally {
+      finishStatusRefresh(canceling);
+      result.unmount();
+    }
   });
 });

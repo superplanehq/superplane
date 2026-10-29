@@ -131,6 +131,18 @@ func (c *FactoryCodexConnection) AttachLoginLease(tx *gorm.DB) error {
 		return err
 	}
 	c.LoginLease = lease
+	c.LoginCancellationRequested = false
+	if lease == nil {
+		return nil
+	}
+	task, err := FindRunnerTask(tx, lease.TaskID)
+	if errors.Is(err, ErrRunnerTaskNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	c.LoginCancellationRequested = task.CancelRequestedAt != nil || task.State == RunnerTaskStateCanceled
 	return nil
 }
 
