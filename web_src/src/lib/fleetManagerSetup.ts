@@ -355,13 +355,22 @@ export function fleetManagerValuesFileCommand(values: string): string {
   return `cat > ${FLEET_MANAGER_VALUES_FILE} <<'EOF'\n${values.trimEnd()}\nEOF\n`;
 }
 
-export function fleetManagerHelmCommand(metadata: FleetManagerSetupMetadata, namespace: string): string {
+function quotedShellArgument(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+export function fleetManagerHelmCommand(
+  metadata: FleetManagerSetupMetadata,
+  namespace: string,
+  kubeContext: string,
+): string {
   return [
     "helm upgrade --install fleet-manager",
     metadata.chartRepository,
     `--version ${metadata.defaultChartVersion}`,
     `--namespace ${namespace}`,
     "--create-namespace",
+    `--kube-context ${quotedShellArgument(kubeContext)}`,
     "--wait",
     "--timeout 10m",
     `-f ${FLEET_MANAGER_VALUES_FILE}`,
@@ -372,8 +381,9 @@ export function fleetManagerInstallCommand(
   metadata: FleetManagerSetupMetadata,
   namespace: string,
   values: string,
+  kubeContext: string,
 ): string {
-  return `${fleetManagerValuesFileCommand(values)}\n${fleetManagerHelmCommand(metadata, namespace)}\n`;
+  return `${fleetManagerValuesFileCommand(values)}\n${fleetManagerHelmCommand(metadata, namespace, kubeContext)}\n`;
 }
 
 export function normalizeInfrastructureFields(fields: Record<string, string | string[]>): FleetManagerProviderFields {
