@@ -127,6 +127,9 @@ func (f *fakeAdmin) MarkRunnerProviderDeleted(
 	_ adminclient.ProviderDeletionRequest,
 ) (adminclient.Runner, error) {
 	f.providerDeleted = append(f.providerDeleted, runnerID)
+	if f.events != nil {
+		*f.events = append(*f.events, "provider-deleted/"+runnerID)
+	}
 	return adminclient.Runner{ID: runnerID, State: adminclient.RunnerStateTerminated}, nil
 }
 
@@ -168,13 +171,15 @@ func (f *fakeArtifactResolver) Resolve(
 }
 
 type fakeProvider struct {
-	resources     []provider.Resource
-	createRequest provider.CreateRequest
-	bootstrap     provider.RunnerBootstrap
-	createError   error
-	deleteError   error
-	deleted       []provider.Resource
-	events        *[]string
+	resources           []provider.Resource
+	createRequest       provider.CreateRequest
+	bootstrap           provider.RunnerBootstrap
+	createError         error
+	deleteError         error
+	deleteErrors        map[string]error
+	synchronousDeletion bool
+	deleted             []provider.Resource
+	events              *[]string
 }
 
 func (f *fakeProvider) Name() string {
@@ -210,7 +215,25 @@ func (f *fakeProvider) Create(
 
 func (f *fakeProvider) Delete(_ context.Context, resource provider.Resource) error {
 	f.deleted = append(f.deleted, resource)
-	return f.deleteError
+	if f.events != nil {
+		*f.events = append(*f.events, "provider-delete/"+resource.ID)
+	}
+	if f.deleteError != nil {
+		return f.deleteError
+	}
+	if err := f.deleteErrors[resource.ID]; err != nil {
+		return err
+	}
+	if f.synchronousDeletion {
+		f.resources = slices.DeleteFunc(f.resources, func(candidate provider.Resource) bool {
+			return candidate.ID == resource.ID
+		})
+	}
+	return nil
+}
+
+func (f *fakeProvider) DeletionIsSynchronous() bool {
+	return f.synchronousDeletion
 }
 
 func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
@@ -429,6 +452,80 @@ func TestProviderDeletionConfirmation(t *testing.T) {
 			confirmed := slices.Contains(admin.providerDeleted, "runner-terminated")
 			if confirmed != test.wantConfirmed {
 				t.Fatalf("provider deletion confirmed = %v, want %v", confirmed, test.wantConfirmed)
+			}
+		})
+	}
+}
+
+func TestSynchronousDeletionConfirmsOnlyRemovedOwnedResources(t *testing.T) {
+	deletionFailure := errors.New("deletion failed")
+	for _, test := range []struct {
+		name           string
+		resourceCount  int
+		failedResource string
+		foreignOwner   bool
+		disabledFleet  bool
+		wantConfirmed  bool
+	}{
+		{name: "observed resource removed", resourceCount: 1, wantConfirmed: true},
+		{name: "all observed resources removed", resourceCount: 2, wantConfirmed: true},
+		{name: "disabled fleet resource removed", resourceCount: 1, disabledFleet: true, wantConfirmed: true},
+		{name: "deletion failed", resourceCount: 1, failedResource: "resource-0"},
+		{name: "first observed resource remains", resourceCount: 2, failedResource: "resource-0"},
+		{name: "one observed resource remains", resourceCount: 2, failedResource: "resource-1"},
+		{name: "resource absent during grace"},
+		{name: "runner owned by another manager", resourceCount: 1, foreignOwner: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var events []string
+			admin := newFakeAdmin()
+			admin.events = &events
+			admin.fleet.Enabled = !test.disabledFleet
+			terminatedAt := time.Now().Add(-time.Second)
+			owner := "manager-a"
+			if test.foreignOwner {
+				owner = "manager-b"
+			}
+			admin.terminatedRunners = []adminclient.Runner{{
+				ID: "runner-terminated", FleetID: "fleet-a", State: adminclient.RunnerStateTerminated,
+				TerminatedAt: &terminatedAt,
+				Tags:         map[string]string{"fleet_manager_id": owner, "runner_provider": "fake"},
+			}}
+			resourceProvider := &fakeProvider{synchronousDeletion: true, events: &events}
+			for i := range test.resourceCount {
+				resourceProvider.resources = append(resourceProvider.resources, provider.Resource{
+					ID: fmt.Sprintf("resource-%d", i), RunnerID: "runner-terminated", FleetID: "fleet-a",
+				})
+			}
+			var wantError error
+			if test.failedResource != "" {
+				wantError = deletionFailure
+				resourceProvider.deleteErrors = map[string]error{test.failedResource: deletionFailure}
+			}
+			reconciler := newTestReconciler(t, admin, &fakeArtifactResolver{}, resourceProvider, 0, 0)
+			if err := reconciler.Reconcile(t.Context()); !errors.Is(err, wantError) {
+				t.Fatalf("reconcile error = %v, want %v", err, wantError)
+			}
+			if len(resourceProvider.deleted) != test.resourceCount {
+				t.Fatalf("deleted resource count = %d, want %d", len(resourceProvider.deleted), test.resourceCount)
+			}
+			confirmed := slices.Contains(admin.providerDeleted, "runner-terminated")
+			if confirmed != test.wantConfirmed {
+				t.Fatalf("provider deletion confirmed = %v, want %v", confirmed, test.wantConfirmed)
+			}
+			if !test.wantConfirmed {
+				return
+			}
+			if len(resourceProvider.resources) != 0 {
+				t.Fatalf("provider deletion confirmed while resources remain: %#v", resourceProvider.resources)
+			}
+			var wantEvents []string
+			for i := range test.resourceCount {
+				wantEvents = append(wantEvents, fmt.Sprintf("provider-delete/resource-%d", i))
+			}
+			wantEvents = append(wantEvents, "provider-deleted/runner-terminated")
+			if !slices.Equal(events, wantEvents) {
+				t.Fatalf("deletion events = %v, want %v", events, wantEvents)
 			}
 		})
 	}

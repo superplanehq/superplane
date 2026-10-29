@@ -495,7 +495,8 @@ func maybeAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanning
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
 		return
 	}
-	_, dispatchedOrder, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, order.CreatedByID, 0, false, "", "")
+	// Auto-start is a system action and preserves the draft's owners.
+	_, dispatchedOrder, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, nil, 0, false, "", "")
 	if err != nil {
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
 		return

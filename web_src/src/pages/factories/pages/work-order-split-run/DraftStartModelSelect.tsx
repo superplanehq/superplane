@@ -1,3 +1,4 @@
+import { useFactoryTaskIdentity } from "../../factoryTaskContext";
 import { Bot, ChevronDown } from "lucide-react";
 import { useEffect } from "react";
 
@@ -34,6 +35,7 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
 export function DraftStartModelSelect({
   organizationId,
   factoryId,
+  orderId,
   lineName,
   model,
   thinkingLevel,
@@ -43,6 +45,7 @@ export function DraftStartModelSelect({
 }: {
   organizationId?: string;
   factoryId?: string;
+  orderId?: string;
   lineName?: string;
   model: string;
   thinkingLevel: string;
@@ -50,7 +53,8 @@ export function DraftStartModelSelect({
   disabled?: boolean;
   appearance?: Appearance;
 }) {
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName);
+  const task = useFactoryTaskIdentity();
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId ?? task.orderId);
   const runnerModels = models.data?.models;
   const selectedName =
     model === DRAFT_START_MODEL_AUTO ? "Auto" : (runnerModels ?? []).find((item) => item.id === model)?.name || model;

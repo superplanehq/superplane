@@ -179,8 +179,15 @@ func dispatchWorkOrderOnLineTx(
 
 	logger := logging.WithWorkOrder(logging.ForFactory(*factory), *order).
 		WithField("organization_id", factory.OrganizationID)
+	if order.PendingHandOff != nil {
+		return nil, grpcFailedPrecondition("Use Start to resume this pending handoff.")
+	}
 	if !order.IsDispatchable() {
 		return nil, models.ErrFactoryWorkOrderNotDispatchable
+	}
+
+	if err := order.RequireExecutionOwner(tx, false); err != nil {
+		return nil, err
 	}
 
 	currentLine, err := factory.FindLine(tx, lineID)
@@ -193,11 +200,20 @@ func dispatchWorkOrderOnLineTx(
 	}
 
 	model = strings.TrimSpace(model)
+	if model != "" {
+		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name, subscriptionOrderOwnerID(tx, order))
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(allowed, model) {
+			return nil, invalidArgument("model is not available on this line")
+		}
+	}
 	normalizedThinking, err := runner.NormalizeDispatchThinkingLevel(thinkingLevel)
 	if err != nil {
 		return nil, invalidArgument(err.Error())
 	}
-	if err := validateLineDispatchModel(tx, orgID, factoryID, currentLine, model, normalizedThinking); err != nil {
+	if err := validateLineDispatchModel(tx, orgID, factoryID, currentLine, model, normalizedThinking, subscriptionOrderOwnerID(tx, order)); err != nil {
 		return nil, err
 	}
 
@@ -260,11 +276,11 @@ func dispatchWorkOrderOnLineTx(
 // A selected model must be available on the line and must support the
 // thinking level. The thinking level also reaches the runners that keep
 // their own model, so the CLI of every runner on the line must accept it.
-func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string) error {
+func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string, ownerID uuid.UUID) error {
 	if model == "" {
 		return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking)
 	}
-	options, _, err := listLineRunnerModelOptions(tx, orgID, factoryID, line.Name)
+	options, _, err := listLineRunnerModelOptions(tx, orgID, factoryID, line.Name, ownerID)
 	if err != nil {
 		return err
 	}

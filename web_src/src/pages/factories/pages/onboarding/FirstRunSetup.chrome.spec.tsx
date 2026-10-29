@@ -211,7 +211,6 @@ describe("FirstRunSetup chrome", () => {
 
   it.each([
     { enabled: false, planActive: false },
-    { enabled: true, planActive: false },
     { enabled: true, planActive: true },
   ])("keeps repository and intake before the final model choice (%j)", async ({ enabled, planActive }) => {
     Object.assign(billingState, { enabled, planActive, byok: true, availablePlans: [] });
@@ -245,8 +244,7 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.saveIssues).toHaveBeenCalledWith("vcs"));
     expect(await screen.findByTestId("first-run-model-source")).toBeInTheDocument();
-    const steps = 5;
-    expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", `Step ${steps} of ${steps}`);
+    expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", "Step 5 of 5");
     expect(model.finish).not.toHaveBeenCalled();
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
 
@@ -281,12 +279,7 @@ describe("FirstRunSetup chrome", () => {
       bringYourOwnKey: true,
       openSection: "agent",
     });
-    billingState.byok = true;
-    render(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=agent"]}>
-        <StatefulSetup model={model} />
-      </MemoryRouter>,
-    );
+    renderStatefulSetup(model);
     await user.click(screen.getByTestId("first-run-finish-setup"));
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
   });
@@ -469,7 +462,7 @@ describe("FirstRunSetup chrome", () => {
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
   });
 
-  it.each(["issues", "card"])("blocks unpaid setup for maintainers from %s", async (step) => {
+  it.each(["issues", "card", "agent"])("blocks unpaid setup for maintainers from %s", async (step) => {
     Object.assign(billingState, { enabled: true });
     billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
     canManageBilling = false;
@@ -547,15 +540,8 @@ describe("FirstRunSetup chrome", () => {
     }
   });
 
-  it.each(
-    ["issues", "billing"].flatMap((step) => [
-      { step, enabled: false, availablePlans: [{ key: "pay_as_you_go", name: "Pay-as-you-go" }] },
-      { step, enabled: true, availablePlans: [{ key: "free", name: "Free" }] },
-      { step, enabled: true, availablePlans: [] },
-      { step, enabled: true, availablePlans: undefined },
-    ]),
-  )("finishes without plan selection (%j)", async ({ step, enabled, availablePlans }) => {
-    Object.assign(billingState, { enabled, availablePlans });
+  it.each(["issues", "billing"])("finishes without plan selection when billing is disabled (%s)", async (step) => {
+    billingState.enabled = false;
     const user = userEvent.setup();
     const model = hostedVcsModel();
     renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
@@ -567,8 +553,24 @@ describe("FirstRunSetup chrome", () => {
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
   });
 
+  it.each([{ availablePlans: undefined }, { availablePlans: [] }, { availablePlans: [{ key: "free", name: "Free" }] }])(
+    "returns unpaid agent setup to billing when starter plans are missing (%j)",
+    async ({ availablePlans }) => {
+      Object.assign(billingState, { enabled: true, availablePlans });
+      const model = hostedVcsModel({ codexSubscriptionOffered: true, codexSubscriptionReady: true });
+      renderSetup(model, "/org-1/workspaces/PAY/setup?step=agent");
+
+      expect(await screen.findByTestId("first-run-card")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("No starter plans are available");
+      expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+      expect(model.finish).not.toHaveBeenCalled();
+      await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
+      expect(refetchBilling).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it.each([false, true])("routes a restored billing URL through model access (own key: %s)", async (byok) => {
-    billingState.enabled = true;
+    Object.assign(billingState, { enabled: true, planActive: true });
     const model = hostedVcsModel({ bringYourOwnKey: byok });
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=billing&plan=team&subscribed=1&checkout_id=old");
     expect(screen.queryByTestId("first-run-card")).not.toBeInTheDocument();
@@ -580,6 +582,6 @@ describe("FirstRunSetup chrome", () => {
     } else {
       await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     }
-    expect(billingState.planActive).toBe(false);
+    expect(billingState.planActive).toBe(true);
   });
 });

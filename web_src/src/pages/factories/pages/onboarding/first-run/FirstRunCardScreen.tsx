@@ -1,4 +1,5 @@
 import type { OrganizationsBillingPlanOption } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -100,6 +101,7 @@ export function FirstRunCardScreen({
   sphere,
   onSelectPlan,
   onContinue,
+  onRetryPlans,
 }: {
   plans: OrganizationsBillingPlanOption[];
   selectedPlanKey?: string;
@@ -111,6 +113,7 @@ export function FirstRunCardScreen({
   sphere?: FirstRunSphereProps;
   onSelectPlan: (key: string) => void;
   onContinue: () => void;
+  onRetryPlans?: () => void;
 }) {
   const plan = plans.find((candidate) => candidate.key === selectedPlanKey);
   const inProgress = ["opening", "waiting-for-card", "starting"].includes(phase);
@@ -154,14 +157,41 @@ export function FirstRunCardScreen({
           <p role="status" className="text-center text-[12px] leading-5 text-muted-foreground">
             {nextStep(phase, Boolean(plan?.subscriptionRequired))}
           </p>
-          {error || plans.length === 0 ? (
-            <p role="alert" className="text-[13px] text-destructive">
-              {error || copy.unavailable}
-            </p>
-          ) : null}
+          <PlanAvailabilityMessage
+            error={error}
+            noPlans={plans.length === 0}
+            disabled={disabled}
+            onRetry={onRetryPlans}
+          />
         </div>
       </div>
     </FirstRunShell>
+  );
+}
+
+function PlanAvailabilityMessage({
+  error,
+  noPlans,
+  disabled,
+  onRetry,
+}: {
+  error?: string;
+  noPlans: boolean;
+  disabled: boolean;
+  onRetry?: () => void;
+}) {
+  if (!error && !noPlans) return null;
+  return (
+    <div className="space-y-2">
+      <p role="alert" className="text-[13px] text-destructive">
+        {error || copy.unavailable}
+      </p>
+      {noPlans && onRetry && (
+        <Button variant="outline" className="w-full" disabled={disabled} onClick={onRetry}>
+          Try again
+        </Button>
+      )}
+    </div>
   );
 }
 

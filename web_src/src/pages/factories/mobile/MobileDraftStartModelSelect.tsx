@@ -25,6 +25,7 @@ type StartChoice = {
 export function MobileDraftStartModelSelect({
   organizationId,
   factoryId,
+  orderId,
   lineName,
   model,
   thinkingLevel,
@@ -33,13 +34,14 @@ export function MobileDraftStartModelSelect({
 }: {
   organizationId?: string;
   factoryId?: string;
+  orderId?: string;
   lineName?: string;
   model: string;
   thinkingLevel: string;
   onChange: (next: StartChoice) => void;
   disabled?: boolean;
 }) {
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName));
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName), orderId);
   const modelOptions = lineName
     ? runnerModelOptions(models.data?.models)
     : [{ value: DRAFT_START_MODEL_AUTO, label: "Auto" }];

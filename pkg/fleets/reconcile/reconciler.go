@@ -524,9 +524,28 @@ func (r *Reconciler) deleteTerminatedResources(
 		}
 		if deleted {
 			delete(resourcesByRunner, runnerID)
+			if err := r.confirmSynchronousDeletion(ctx, runner); err != nil {
+				deleteErrors = append(deleteErrors, err)
+			}
 		}
 	}
 	return errors.Join(deleteErrors...)
+}
+
+func (r *Reconciler) confirmSynchronousDeletion(ctx context.Context, runner adminclient.Runner) error {
+	synchronous, ok := r.provider.(provider.SynchronousDeletionProvider)
+	if !ok || !synchronous.DeletionIsSynchronous() {
+		return nil
+	}
+	if runner.State != adminclient.RunnerStateTerminated || runner.ProviderDeletedAt != nil || !r.ownsRunner(runner) {
+		return nil
+	}
+	return r.markProviderDeleted(ctx, runner.ID)
+}
+
+func (r *Reconciler) ownsRunner(runner adminclient.Runner) bool {
+	return runner.Tags["fleet_manager_id"] == r.config.FleetManagerID &&
+		runner.Tags["runner_provider"] == r.provider.Name()
 }
 
 func (r *Reconciler) confirmProviderDeletion(
@@ -544,8 +563,7 @@ func (r *Reconciler) confirmProviderDeletion(
 			return errors.Join(append(markErrors, fmt.Errorf("list terminated runners for fleet %s: %w", r.config.FleetID, err))...)
 		}
 		for _, runner := range page.Runners {
-			if runner.Tags["fleet_manager_id"] != r.config.FleetManagerID ||
-				runner.Tags["runner_provider"] != r.provider.Name() {
+			if !r.ownsRunner(runner) {
 				continue
 			}
 			if runner.ProviderDeletedAt != nil || len(resourcesByRunner[runner.ID]) > 0 {

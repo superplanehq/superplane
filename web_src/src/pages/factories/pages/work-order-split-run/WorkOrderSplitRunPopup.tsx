@@ -1,3 +1,4 @@
+import { FactoryTaskScope } from "../../FactoryTaskScope";
 import { useState, type ReactNode } from "react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
@@ -36,7 +37,7 @@ export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
  * Work-order popup from a line-board card. Description and a phase log.
  * The automation canvas lives on the full run page, not here.
  */
-export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
+function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
   const {
     organizationId,
     factoryId,
@@ -148,6 +149,7 @@ function AnalysisWorkOrderPopup({
     organizationId,
     factoryId,
     factoryKey,
+    orderId,
     lineId,
     fixture: viewFixture,
     analysis,
@@ -372,6 +374,7 @@ type AnalysisDraftChromeArgs = {
   factory?: FactoriesFactory;
   organizationId?: string;
   factoryId?: string;
+  orderId?: string;
   factoryKey?: string;
   lineId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
@@ -389,6 +392,7 @@ function analysisDraftChrome(args: AnalysisDraftChromeArgs) {
   const modelSelects = draftModelSelects({
     organizationId: args.organizationId,
     factoryId: args.factoryId,
+    orderId: args.orderId,
     fixture: args.fixture,
     model: args.draftModel,
     thinkingLevel: args.draftThinking,
@@ -440,6 +444,7 @@ function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], fact
 function draftModelSelects(args: {
   organizationId?: string;
   factoryId?: string;
+  orderId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   model: string;
   thinkingLevel: string;
@@ -454,4 +459,12 @@ function draftModelSelects(args: {
     footer: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="labeled" />,
     strip: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="ghost" />,
   };
+}
+
+export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
+  return (
+    <FactoryTaskScope factoryId={props.factoryId} orderId={props.orderId}>
+      <WorkOrderSplitRunPopupContent {...props} />
+    </FactoryTaskScope>
+  );
 }
