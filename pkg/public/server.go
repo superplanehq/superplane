@@ -454,6 +454,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/tasks/owner", s.handleRunnerTaskAssignOwner).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts/links", s.handleRunnerArtifactLink).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/artifacts/markdown", s.handleRunnerArtifactMarkdown).Methods(http.MethodPost)
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",

@@ -185,7 +185,7 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 		rec := postPlanningRunner(t, server, invalidToken, "/api/v1/runner/tasks/owner", `{"user":"implementation-dev","reason":"Owns pkg."}`)
 		require.Equal(t, http.StatusUnauthorized, rec.Code)
 	}
-	for _, route := range []string{"/api/v1/runner/planning-sessions/owner", "/api/v1/runner/artifacts/links", "/api/v1/runner/merge-confidence/checks"} {
+	for _, route := range []string{"/api/v1/runner/planning-sessions/owner", "/api/v1/runner/artifacts/links", "/api/v1/runner/artifacts/markdown", "/api/v1/runner/merge-confidence/checks"} {
 		rec := postPlanningRunner(t, server, token, route, `{}`)
 		require.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 	}
