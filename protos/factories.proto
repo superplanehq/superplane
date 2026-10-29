@@ -592,6 +592,18 @@ service Factories {
     };
   }
 
+  rpc SuggestTaskOwners(SuggestTaskOwnersRequest) returns (SuggestTaskOwnersResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/suggest-owners"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Suggest owners for a task";
+      description: "Lists members who can own a task and ranks code owners for the given paths";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateWorkOrder(UpdateWorkOrderRequest) returns (UpdateWorkOrderResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{factory_id}/orders/{order_id}"
@@ -2367,6 +2379,41 @@ message UpdateWorkOrderAssigneesRequest {
 
 message UpdateWorkOrderAssigneesResponse {
   WorkOrder order = 1;
+}
+
+message SuggestTaskOwnersRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  repeated string paths = 3;
+}
+
+message SuggestTaskOwnersResponse {
+  repeated string paths = 1;
+  repeated TaskOwnerMember current_owners = 2;
+  repeated TaskCodeOwner code_owners = 3;
+  repeated TaskOwnerMember members = 4;
+  string history_note = 5;
+}
+
+message TaskOwnerMember {
+  string user_id = 1;
+  string name = 2;
+  string email = 3;
+  string github_login = 4;
+  repeated string roles = 5;
+  int32 open_tasks = 6;
+}
+
+message TaskCodeOwner {
+  string user_id = 1;
+  string name = 2;
+  string github_login = 3;
+  repeated string roles = 4;
+  int32 commits = 5;
+  google.protobuf.Timestamp last_commit_at = 6;
+  repeated string paths = 7;
+  int32 open_tasks = 8;
+  double score = 9;
 }
 
 message UpdateWorkOrderRequest {

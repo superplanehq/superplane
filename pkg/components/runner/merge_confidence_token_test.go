@@ -123,7 +123,7 @@ func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
 	assert.Equal(t, "https://app.example", baseURL)
 
 	withFile := runner.AppendMergeConfidenceMCP(environment, []runner.TaskFile{{Path: "run.js"}})
-	require.Len(t, withFile, 3)
+	require.Len(t, withFile, 2)
 	assert.Equal(t, "merge_confidence_mcp.js", withFile[1].Path)
 }
 
