@@ -1,13 +1,20 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactElement } from "react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import type { ConfigurationField } from "@/api-client";
-import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { useFactoryCodexConnection } from "@/pages/factories/pages/onboarding/useFactoryCodexConnection";
 import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
+import {
+  createField,
+  createSuperPlaneField,
+  installPointerCapturePolyfills,
+  mockSelectableModels,
+  mockWorkspaceUsage,
+  renderField,
+  selectableModel,
+  selectFlyoutOption,
+} from "./HostedModelFieldRenderer.testHelpers";
 
 const useCanvasMock = vi.hoisted(() =>
   vi.fn((): { data: { metadata?: { factoryId?: string } } | undefined; isPending: boolean } => ({
@@ -36,7 +43,14 @@ describe("subscription model picker", () => {
   it("shows Default for an unset model and saves an explicit subscription selection", async () => {
     vi.mocked(useFactoryCodexConnection).mockReturnValue({
       query: {
-        data: { status: "ready", availableModels: ["gpt-5.4", "gpt-5.3"] },
+        data: {
+          status: "ready",
+          availableModels: ["gpt-5.4", "gpt-5.3"],
+          availableModelOptions: [
+            { id: "gpt-5.4", name: "gpt-5.4", thinkingLevels: ["low", "high"] },
+            { id: "gpt-5.3", name: "gpt-5.3", thinkingLevels: [] },
+          ],
+        },
         isLoading: false,
         isError: false,
       },
@@ -73,112 +87,8 @@ describe("subscription model picker", () => {
   });
 });
 
-function createField(provider = "anthropic"): ConfigurationField {
-  return {
-    name: "model",
-    label: "Model",
-    type: "hosted-model",
-    placeholder: "Select a model",
-    typeOptions: { hostedModel: { provider } },
-  };
-}
-
-function createSuperPlaneField(): ConfigurationField {
-  return {
-    name: "model",
-    label: "Model",
-    type: "hosted-model",
-    placeholder: "Instance SuperPlane agent model",
-    typeOptions: { hostedModel: { provider: "all" } },
-  };
-}
-
-function mockSelectableModels(
-  data: Array<{
-    source: { id: string; name: string };
-    provider: { id: string; name: string };
-    model: { id: string; name: string };
-    key: string;
-    label: string;
-  }>,
-  options: { isLoading?: boolean; isError?: boolean } = {},
-) {
-  vi.mocked(useSelectableLLMModels).mockImplementation((_organizationId, queryOptions) => {
-    const sources = queryOptions?.sources;
-    const listed = sources ? data.filter((item) => sources.includes(item.source.id as "hosted" | "byok")) : data;
-    return {
-      data: listed,
-      isLoading: options.isLoading ?? false,
-      isError: options.isError ?? false,
-    } as unknown as ReturnType<typeof useSelectableLLMModels>;
-  });
-}
-
-function selectableModel(
-  source: "hosted" | "byok",
-  provider: string,
-  id: string,
-): {
-  source: { id: string; name: string };
-  provider: { id: string; name: string };
-  model: { id: string; name: string };
-  key: string;
-  label: string;
-} {
-  const label = provider === "openrouter" || provider === "custom" ? id : `${provider}/${id}`;
-  return {
-    source: { id: source, name: source === "hosted" ? "SuperPlane" : "Your keys" },
-    provider: { id: provider, name: provider },
-    model: { id, name: id },
-    key: `${source}::${provider}::${id}`,
-    label,
-  };
-}
-
-function mockWorkspaceUsage(value: {
-  data: { defaultHostedProvider?: string; defaultHostedModel?: string };
-  isLoading: boolean;
-}) {
-  vi.mocked(useOrganizationWorkspaceUsage).mockReturnValue(
-    value as unknown as ReturnType<typeof useOrganizationWorkspaceUsage>,
-  );
-}
-
-async function selectFlyoutOption(user: ReturnType<typeof userEvent.setup>, parentTestId: string, optionName: string) {
-  await user.hover(screen.getByTestId(parentTestId));
-  fireEvent.click(await screen.findByRole("menuitem", { name: optionName }));
-}
-
-function expectClosedThinkingWord(modelName: string, thinkingWord: string) {
-  const control = screen.getByTestId("field-model-hosted-model");
-  const name = control.querySelector(".truncate");
-  const word = control.querySelector(".text-muted-foreground");
-
-  expect(name).toHaveTextContent(modelName);
-  expect(name).not.toHaveTextContent(thinkingWord);
-  expect(word).toHaveTextContent(thinkingWord);
-  expect(word).toHaveClass("ml-auto", "shrink-0", "text-[11px]", "text-muted-foreground");
-  expect(word?.nextElementSibling?.tagName).toBe("svg");
-}
-
-function renderField(ui: ReactElement, path = "/") {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/:organizationId/apps/:appId" element={ui} />
-        <Route path="*" element={ui} />
-      </Routes>
-    </MemoryRouter>,
-  );
-}
-
 describe("HostedModelFieldRenderer", () => {
-  beforeAll(() => {
-    Element.prototype.hasPointerCapture ??= () => false;
-    Element.prototype.setPointerCapture ??= () => {};
-    Element.prototype.releasePointerCapture ??= () => {};
-    Element.prototype.scrollIntoView ??= () => {};
-  });
+  beforeAll(installPointerCapturePolyfills);
 
   beforeEach(() => {
     useCanvasMock.mockReset();
@@ -428,116 +338,6 @@ describe("HostedModelFieldRenderer", () => {
     await user.click(screen.getByTestId("field-model-hosted-model"));
     await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
     expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
-  });
-
-  it("shows the thinking word beside the closed model name", () => {
-    const cases = [
-      [{}, "Default"],
-      [{ thinkingLevel: "low" }, "Low"],
-      [{ thinkingLevel: "medium" }, "Medium"],
-      [{ thinkingLevel: "high" }, "High"],
-    ] as const;
-
-    for (const [extra, word] of cases) {
-      const view = renderField(
-        <HostedModelFieldRenderer
-          field={createField()}
-          value="claude-sonnet-4-6"
-          onChange={vi.fn()}
-          allValues={{ model: "claude-sonnet-4-6", ...extra }}
-          organizationId="org-1"
-        />,
-      );
-
-      expectClosedThinkingWord("sonnet 4-6", word);
-      view.unmount();
-    }
-  });
-
-  it("writes thinkingLevel next to the model", async () => {
-    const user = userEvent.setup();
-    const onValuesChange = vi.fn();
-
-    renderField(
-      <HostedModelFieldRenderer
-        field={createField()}
-        value="claude-sonnet-4-6"
-        onChange={vi.fn()}
-        onValuesChange={onValuesChange}
-        allValues={{ model: "claude-sonnet-4-6" }}
-        organizationId="org-1"
-      />,
-    );
-
-    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("sonnet 4-6");
-    await user.click(screen.getByTestId("field-model-hosted-model"));
-    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
-    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
-  });
-
-  it("offers Codex effort levels for OpenAI models", async () => {
-    const user = userEvent.setup();
-    const onValuesChange = vi.fn();
-    mockSelectableModels([selectableModel("byok", "openai", "gpt-5.4")]);
-
-    renderField(
-      <HostedModelFieldRenderer
-        field={createField("openai")}
-        value="gpt-5.4"
-        onChange={vi.fn()}
-        onValuesChange={onValuesChange}
-        allValues={{ model: "gpt-5.4" }}
-        organizationId="org-1"
-      />,
-    );
-
-    await user.click(screen.getByTestId("field-model-hosted-model"));
-    await selectFlyoutOption(user, "field-model-hosted-thinking", "Extra high");
-    expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-5.4", thinkingLevel: "xhigh" });
-  });
-
-  it("uses a flat model-only menu and preserves Codex effort when the model changes", async () => {
-    const user = userEvent.setup();
-    const onValuesChange = vi.fn();
-    mockSelectableModels([
-      selectableModel("byok", "openai", "gpt-5.4"),
-      selectableModel("byok", "openai", "gpt-5.3-codex"),
-    ]);
-    renderField(
-      <HostedModelFieldRenderer
-        field={createField("openai")}
-        value="gpt-5.4"
-        onChange={vi.fn()}
-        onValuesChange={onValuesChange}
-        allValues={{ model: "gpt-5.4", thinkingLevel: "xhigh" }}
-        organizationId="org-1"
-        modelOnly
-      />,
-    );
-    await user.click(screen.getByTestId("field-model-hosted-model"));
-    expect(screen.queryByTestId("field-model-hosted-thinking")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("menuitem", { name: "openai/gpt-5.3-codex" }));
-    expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-5.3-codex", thinkingLevel: "xhigh" });
-  });
-
-  it("clears thinkingLevel when Default is selected", async () => {
-    const user = userEvent.setup();
-    const onValuesChange = vi.fn();
-
-    renderField(
-      <HostedModelFieldRenderer
-        field={createField()}
-        value="claude-sonnet-4-6"
-        onChange={vi.fn()}
-        onValuesChange={onValuesChange}
-        allValues={{ model: "claude-sonnet-4-6", thinkingLevel: "high" }}
-        organizationId="org-1"
-      />,
-    );
-
-    await user.click(screen.getByTestId("field-model-hosted-model"));
-    await selectFlyoutOption(user, "field-model-hosted-thinking", "Default");
-    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: undefined });
   });
 
   it("lists the custom provider allowlist on an OpenRouter agent", async () => {

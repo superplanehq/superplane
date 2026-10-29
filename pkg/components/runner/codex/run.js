@@ -180,7 +180,7 @@ function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
     .toLowerCase();
-  if (["minimal", "low", "medium", "high", "xhigh"].includes(level)) {
+  if (["none", "minimal", "low", "medium", "high", "xhigh"].includes(level)) {
     return ["-c", `model_reasoning_effort=${tomlString(level)}`];
   }
   return [];

@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -94,14 +95,28 @@ func serializeFactoryLLMModels(ids []string) []*pb.FactoryLLMModel {
 	return out
 }
 
-func serializeLineRunnerModels(ids []string) []*pb.FactoryLLMModel {
-	out := make([]*pb.FactoryLLMModel, 0, len(ids))
-	for _, id := range models.CompactModelIDs(concreteLineRunnerModels(ids)) {
-		name := id
-		if parsed, err := models.ParseSelectableLLMModelKey(id); err == nil {
+func serializeLineRunnerModels(options []lineRunnerModel) []*pb.FactoryLLMModel {
+	ids := make([]string, 0, len(options))
+	for _, option := range options {
+		ids = append(ids, option.ID)
+	}
+	resolved := make([]lineRunnerModel, 0, len(options))
+	for _, option := range options {
+		id := strings.TrimSpace(models.ConcreteClaudeModelID(option.ID, ids))
+		if id == "" {
+			continue
+		}
+		resolved = append(resolved, lineRunnerModel{ID: id, ThinkingLevels: option.ThinkingLevels})
+	}
+
+	merged := mergeLineRunnerModels(resolved)
+	out := make([]*pb.FactoryLLMModel, 0, len(merged))
+	for _, option := range merged {
+		name := option.ID
+		if parsed, err := models.ParseSelectableLLMModelKey(option.ID); err == nil {
 			name = parsed.Label
 		}
-		out = append(out, &pb.FactoryLLMModel{Id: id, Name: name})
+		out = append(out, &pb.FactoryLLMModel{Id: option.ID, Name: name, ThinkingLevels: option.ThinkingLevels})
 	}
 	return out
 }
