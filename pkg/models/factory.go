@@ -878,7 +878,9 @@ func (f *Factory) SnapshotWorkOrderRepository(tx *gorm.DB, repository, defaultBr
 // follow the previous workspace repository onto the repository and branch
 // just saved. Repository and branch change together. A task on another
 // repository keeps that pair. A task keeps a branch that is neither empty
-// nor the previous workspace branch. Closed tasks stay unchanged.
+// nor the previous workspace branch. A task with a running line stays
+// unchanged, so later nodes keep the repository and branch checkout used.
+// Closed tasks stay unchanged.
 func (f *Factory) RetargetUnfinishedWorkOrderBranches(
 	tx *gorm.DB,
 	previousRepository, nextRepository, previousBranch, nextBranch, nextProvider string,
@@ -900,6 +902,11 @@ func (f *Factory) RetargetUnfinishedWorkOrderBranches(
 		Where("state IN ?", []string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen}).
 		Where("default_branch IS NULL OR default_branch = '' OR default_branch = ?", previousBranch).
 		Where("repository IS NULL OR repository = '' OR LOWER(repository) = LOWER(?)", previousRepository).
+		Where(`NOT EXISTS (
+			SELECT 1 FROM factory_work_order_line_dispatches
+			WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			AND factory_work_order_line_dispatches.state = ?
+		)`, FactoryWorkOrderLineDispatchStateActive).
 		Updates(map[string]any{
 			"repository":     nextRepository,
 			"default_branch": nextBranch,

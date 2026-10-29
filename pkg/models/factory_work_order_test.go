@@ -66,12 +66,26 @@ func TestFactory_RetargetUnfinishedWorkOrderBranches(t *testing.T) {
 	setOrderRepository(t, tx, separate, "acme/other", ProviderGitHub)
 	custom := createOrderWithBranch(t, tx, factoryModel, userID, "Custom branch", branchPtr("release"))
 	setOrderRepository(t, tx, custom, "acme/old", ProviderGitHub)
+	running := createOrderWithBranch(t, tx, factoryModel, userID, "Running open", branchPtr("main"))
+	setOrderRepository(t, tx, running, "acme/old", ProviderGitHub)
+	_, err = running.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	finished := createOrderWithBranch(t, tx, factoryModel, userID, "Finished open", branchPtr("main"))
+	setOrderRepository(t, tx, finished, "acme/old", ProviderGitHub)
+	_, err = finished.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(tx, "retarget-ship", nil)
+	require.NoError(t, err)
+	insertOrderLineDispatch(t, tx, line, running, FactoryWorkOrderLineDispatchStateActive)
+	insertOrderLineDispatch(t, tx, line, finished, FactoryWorkOrderLineDispatchStateFinished)
 	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(
 		tx, "acme/old", "acme/new", "main", "develop", ProviderBitbucket,
 	))
 	assertOrderCheckout(t, tx, followed.ID, "acme/new", "develop", ProviderBitbucket)
 	assertOrderCheckout(t, tx, separate.ID, "acme/other", "main", ProviderGitHub)
 	assertOrderCheckout(t, tx, custom.ID, "acme/old", "release", ProviderGitHub)
+	assertOrderCheckout(t, tx, running.ID, "acme/old", "main", ProviderGitHub)
+	assertOrderCheckout(t, tx, finished.ID, "acme/new", "develop", ProviderBitbucket)
 }
 
 func createOrderWithBranch(t *testing.T, tx *gorm.DB, factoryModel *Factory, userID uuid.UUID, title string, branch *string) *FactoryWorkOrder {
@@ -86,6 +100,24 @@ func createOrderWithBranch(t *testing.T, tx *gorm.DB, factoryModel *Factory, use
 
 func branchPtr(value string) *string {
 	return &value
+}
+
+func insertOrderLineDispatch(t *testing.T, tx *gorm.DB, line *FactoryLine, order *FactoryWorkOrder, state string) {
+	t.Helper()
+	now := time.Now()
+	dispatch := &FactoryWorkOrderLineDispatch{
+		ID:             uuid.New(),
+		OrganizationID: order.OrganizationID,
+		FactoryID:      order.FactoryID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		LineName:       line.Name,
+		Steps:          datatypes.JSONSlice[FactoryLineStep]{},
+		State:          state,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	require.NoError(t, tx.Create(dispatch).Error)
 }
 
 func setOrderRepository(t *testing.T, tx *gorm.DB, order *FactoryWorkOrder, repository, provider string) {
