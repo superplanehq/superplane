@@ -125,6 +125,187 @@ func TestRunnerArtifactUploadAndPublicDownload(t *testing.T) {
 	assert.Equal(t, http.StatusOK, download.Code)
 	assert.Equal(t, "image/png", download.Header().Get("Content-Type"))
 	assert.Equal(t, png, download.Body.Bytes())
+	assert.Equal(t, "Checkout", uploaded.Title)
+
+	postFile := func(body []byte, key string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts", bytes.NewReader(body))
+		request.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("Content-Type", "image/png")
+		request.Header.Set("Content-Disposition", `attachment; filename="checkout.png"`)
+		request.Header.Set("X-SuperPlane-Artifact-Title", "Checkout")
+		if key != "" {
+			request.Header.Set("X-SuperPlane-Artifact-Key", key)
+		}
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		return response
+	}
+
+	keyed := postFile(png, "checkout")
+	require.Equal(t, http.StatusCreated, keyed.Code, keyed.Body.String())
+	var first runnerArtifactResponse
+	require.NoError(t, json.Unmarshal(keyed.Body.Bytes(), &first))
+
+	replacedBody := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{1}, 16)...)
+	replaced := postFile(replacedBody, "checkout")
+	require.Equal(t, http.StatusOK, replaced.Code, replaced.Body.String())
+	var second runnerArtifactResponse
+	require.NoError(t, json.Unmarshal(replaced.Body.Bytes(), &second))
+	assert.Equal(t, first.ArtifactID, second.ArtifactID)
+	assert.NotEqual(t, first.FileID, second.FileID)
+	_, err = models.FindFile(database.Conn(), uuid.MustParse(first.FileID))
+	assert.ErrorIs(t, err, models.ErrFileNotFound)
+
+	artifacts, err = order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 2)
+
+	linkPayload, err := json.Marshal(map[string]string{"url": "https://staging.example.com", "title": "Staging", "key": "staging"})
+	require.NoError(t, err)
+	linkRequest := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts/links", bytes.NewReader(linkPayload))
+	linkRequest.Header.Set("Authorization", "Bearer "+token)
+	linkRequest.Header.Set("Content-Type", "application/json")
+	linkResponse := httptest.NewRecorder()
+	server.Router.ServeHTTP(linkResponse, linkRequest)
+	require.Equal(t, http.StatusCreated, linkResponse.Code, linkResponse.Body.String())
+
+	conflict := postFile(png, "staging")
+	assert.Equal(t, http.StatusBadRequest, conflict.Code)
+	artifacts, err = order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 3)
+}
+
+func TestRunnerArtifactReplacementRespectsQuota(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Setenv("BASE_URL", "http://files.test")
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	blob.SetCurrent(store)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	signer := jwt.NewSigner("test")
+	server := newRunnerArtifactTestServer(t, r, signer)
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Capture checkout", "Show the checkout state", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(database.Conn(), support.RandomName("line"), nil)
+	require.NoError(t, err)
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryModel.ID, order.ID, line.ID, line.Name, nil)
+
+	const nodeID = "implementation-agent"
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: nodeID,
+		Name:   "Implementation Agent",
+		Type:   models.NodeTypeComponent,
+	}}, nil)
+	require.NoError(t, database.Conn().Model(canvas).Update("factory_id", factoryModel.ID).Error)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, nodeID, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+	nodeExecution := createExecutionForCanvasRun(t, run, rootEvent.ID, nodeID)
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Create(&models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
+		StepIndex:      0,
+		StepName:       "Implement",
+		RunID:          &run.ID,
+		Status:         models.FactoryWorkOrderExecutionStatusRunning,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}).Error)
+
+	token, err := runneraction.MintArtifactUploadToken(signer, runneraction.ArtifactUploadScope{
+		OrganizationID:  r.Organization.ID,
+		FactoryID:       factoryModel.ID,
+		WorkOrderID:     order.ID,
+		CanvasID:        canvas.ID,
+		CanvasRunID:     run.ID,
+		NodeExecutionID: nodeExecution.ID,
+		NodeID:          nodeID,
+	}, time.Minute)
+	require.NoError(t, err)
+
+	postFile := func(body []byte) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts", bytes.NewReader(body))
+		request.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("Content-Type", "image/png")
+		request.Header.Set("Content-Disposition", `attachment; filename="checkout.png"`)
+		request.Header.Set("X-SuperPlane-Artifact-Key", "checkout")
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		return response
+	}
+
+	originalBody := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0}, 16)...)
+	created := postFile(originalBody)
+	require.Equal(t, http.StatusCreated, created.Code, created.Body.String())
+	var uploaded runnerArtifactResponse
+	require.NoError(t, json.Unmarshal(created.Body.Bytes(), &uploaded))
+	originalFileID := uuid.MustParse(uploaded.FileID)
+
+	var filler *models.File
+	for i := 0; i < models.MaxFilesPerWorkOrder-1; i++ {
+		file, createErr := models.CreatePendingFile(database.Conn(), models.CreateFileParams{
+			Scope:          blob.ScopeTask,
+			OrganizationID: r.Organization.ID,
+			FactoryID:      factoryModel.ID,
+			WorkOrderID:    order.ID,
+			Filename:       "extra.png",
+			ContentType:    "image/png",
+			CreatedByID:    r.User,
+		})
+		require.NoError(t, createErr)
+		require.NoError(t, file.MarkReady(database.Conn(), 1, "x"))
+		filler = file
+	}
+	require.NoError(t, database.Conn().Model(&models.File{}).Where("id = ?", originalFileID).Update("size_bytes", 10).Error)
+	require.NoError(t, database.Conn().Model(filler).Update("size_bytes", models.MaxOrganizationFileBytes-97).Error)
+
+	openCount, err := models.CountOpenTaskFiles(database.Conn(), order.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(models.MaxFilesPerWorkOrder), openCount)
+
+	tooLarge := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{2}, 72)...)
+	require.Len(t, tooLarge, 80)
+	rejected := postFile(tooLarge)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rejected.Code, rejected.Body.String())
+	assert.Contains(t, rejected.Body.String(), "organization storage limit")
+
+	original, err := models.FindFile(database.Conn(), originalFileID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FileStateReady, original.State)
+	artifacts, err := order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	assert.Equal(t, originalFileID, artifactStoredFileID(&artifacts[0]))
+	openCount, err = models.CountOpenTaskFiles(database.Conn(), order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(models.MaxFilesPerWorkOrder), openCount)
+
+	require.NoError(t, database.Conn().Model(filler).Update("size_bytes", models.MaxOrganizationFileBytes-98).Error)
+	replaced := postFile(tooLarge)
+	require.Equal(t, http.StatusOK, replaced.Code, replaced.Body.String())
+	var second runnerArtifactResponse
+	require.NoError(t, json.Unmarshal(replaced.Body.Bytes(), &second))
+	assert.Equal(t, uploaded.ArtifactID, second.ArtifactID)
+	assert.NotEqual(t, uploaded.FileID, second.FileID)
+	_, err = models.FindFile(database.Conn(), originalFileID)
+	assert.ErrorIs(t, err, models.ErrFileNotFound)
+	openCount, err = models.CountOpenTaskFiles(database.Conn(), order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(models.MaxFilesPerWorkOrder), openCount)
 }
 
 func TestRunnerArtifactUploadFromPRDiscussion(t *testing.T) {
@@ -424,6 +605,55 @@ func TestRunnerPublishLinkFromCustomAutomation(t *testing.T) {
 
 	rejected := postLink("javascript:alert(1)")
 	assert.Equal(t, http.StatusBadRequest, rejected.Code)
+
+	postMarkdown := func(body string, key string) *httptest.ResponseRecorder {
+		payload, err := json.Marshal(map[string]string{
+			"body":  body,
+			"title": "Preview login",
+			"key":   key,
+		})
+		require.NoError(t, err)
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/artifacts/markdown", bytes.NewReader(payload))
+		request.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		return response
+	}
+
+	login := "Email: demo@operately.dev\n\nPassword: preview-demo-1\n"
+	createdNote := postMarkdown(login, "preview-login")
+	require.Equal(t, http.StatusCreated, createdNote.Code, createdNote.Body.String())
+	updatedNote := postMarkdown("Email: demo@operately.dev\n\nPassword: preview-demo-2\n", "preview-login")
+	require.Equal(t, http.StatusOK, updatedNote.Code, updatedNote.Body.String())
+
+	artifacts, err = order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, artifacts, 2)
+	var note models.FactoryWorkOrderArtifact
+	var link models.FactoryWorkOrderArtifact
+	for _, artifact := range artifacts {
+		switch artifact.Type {
+		case models.FactoryWorkOrderArtifactTypeMarkdown:
+			note = artifact
+		case models.FactoryWorkOrderArtifactTypeLink:
+			link = artifact
+		}
+	}
+	require.NotNil(t, note.Key)
+	assert.Equal(t, order.ID.String()+":preview-login", *note.Key)
+	data = map[string]any{}
+	require.NoError(t, json.Unmarshal(note.Data, &data))
+	assert.Equal(t, "Email: demo@operately.dev\n\nPassword: preview-demo-2", data["body"])
+	assert.Equal(t, "Preview login", data["title"])
+	data = map[string]any{}
+	require.NoError(t, json.Unmarshal(link.Data, &data))
+	assert.Equal(t, "https://staging.example.com/pr-42-b", data["url"])
+
+	emptyNote := postMarkdown("  ", "preview-login")
+	assert.Equal(t, http.StatusBadRequest, emptyNote.Code)
+	conflictNote := postMarkdown(login, "staging")
+	assert.Equal(t, http.StatusBadRequest, conflictNote.Code)
 
 	webhookEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, map[string]any{
 		"type": "github.pullRequest",
