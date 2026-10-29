@@ -84,7 +84,8 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "key is too long", http.StatusBadRequest)
 		return
 	}
-	if _, err := existingRunnerArtifactFileID(db, artifactContext.Order, storedKey); err != nil {
+	replacedFileID, err := existingRunnerArtifactFileID(db, artifactContext.Order, storedKey)
+	if err != nil {
 		logger.WithError(err).Warn("rejected runner artifact key")
 		http.Error(w, "Artifact key is already used", http.StatusBadRequest)
 		return
@@ -98,6 +99,7 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		Filename:       filename,
 		ContentType:    contentType,
 		Purpose:        models.FilePurposeArtifact,
+		ReplacesFileID: replacedFileID,
 	})
 	if err != nil {
 		logger.WithError(err).Warn("failed to create runner artifact file")
@@ -146,7 +148,6 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	}
 	var artifact *models.FactoryWorkOrderArtifact
 	var created bool
-	var replacedFileID uuid.UUID
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if _, lockErr := models.LockOrganization(tx, scope.OrganizationID); lockErr != nil {
 			return lockErr
@@ -159,7 +160,7 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 			return findErr
 		}
 		replacedFileID = previousID
-		if readyErr := file.MarkReady(tx, upload.SizeBytes, upload.Checksum); readyErr != nil {
+		if readyErr := file.MarkReadyReplacing(tx, upload.SizeBytes, upload.Checksum, replacedFileID); readyErr != nil {
 			return readyErr
 		}
 		var upsertErr error
@@ -177,6 +178,10 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		logger.WithError(err).Error("failed to attach runner artifact")
 		if errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid) {
 			http.Error(w, "Artifact key is already used", http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, models.ErrFileQuotaExceeded) {
+			writeArtifactUploadError(w, err)
 			return
 		}
 		http.Error(w, "Failed to attach artifact", http.StatusInternalServerError)
