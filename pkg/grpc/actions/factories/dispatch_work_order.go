@@ -179,8 +179,15 @@ func dispatchWorkOrderOnLineTx(
 
 	logger := logging.WithWorkOrder(logging.ForFactory(*factory), *order).
 		WithField("organization_id", factory.OrganizationID)
+	if order.PendingHandOff != nil {
+		return nil, grpcFailedPrecondition("Use Start to resume this pending handoff.")
+	}
 	if !order.IsDispatchable() {
 		return nil, models.ErrFactoryWorkOrderNotDispatchable
+	}
+
+	if err := order.RequireExecutionOwner(tx, false); err != nil {
+		return nil, err
 	}
 
 	currentLine, err := factory.FindLine(tx, lineID)
@@ -194,7 +201,7 @@ func dispatchWorkOrderOnLineTx(
 
 	model = strings.TrimSpace(model)
 	if model != "" {
-		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name)
+		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name, subscriptionOrderOwnerID(tx, order))
 		if err != nil {
 			return nil, err
 		}
@@ -205,6 +212,9 @@ func dispatchWorkOrderOnLineTx(
 	normalizedThinking, err := runner.NormalizeDispatchThinkingLevel(thinkingLevel)
 	if err != nil {
 		return nil, invalidArgument(err.Error())
+	}
+	if err := validateLineThinkingLevel(tx, currentLine, normalizedThinking); err != nil {
+		return nil, err
 	}
 
 	fromState := order.State
@@ -260,6 +270,29 @@ func dispatchWorkOrderOnLineTx(
 		fromState:    fromState,
 		logger:       logger,
 	}, nil
+}
+
+func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {
+	if level != runner.ThinkingLevelMinimal && level != runner.ThinkingLevelXHigh {
+		return nil
+	}
+	for _, step := range line.Steps {
+		if step.AppID == uuid.Nil {
+			continue
+		}
+		version, err := models.FindLiveCanvasVersionInTransaction(tx, step.AppID)
+		if err != nil {
+			return err
+		}
+		for _, node := range version.Nodes {
+			component := node.ComponentName()
+			_, isRunner := runnerComponentProvider(component)
+			if component != runnerCodex && (isRunner || component == models.SuperPlaneRunnerComponent) {
+				return invalidArgument("minimal and xhigh thinking levels require a line with only Codex runners")
+			}
+		}
+	}
+	return nil
 }
 
 func publishDispatchedWorkOrder(

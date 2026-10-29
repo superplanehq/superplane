@@ -286,11 +286,20 @@ func customAutomationAgent(tx *gorm.DB, factory *models.Factory, input *pb.Facto
 	integrationName := strings.TrimSpace(input.GetCredentialIntegrationName())
 	switch source {
 	case "", runner.CredentialsSourceSecret, runner.CredentialsSourceIntegration, runner.CredentialsSourceHosted:
+	case runner.CredentialsSourceSubscription:
+		if agent.Component != "runnerCodex" {
+			return nil, invalidArgument("ChatGPT subscription uses Codex")
+		}
 	default:
 		return nil, invalidArgument("agent credential source is not supported")
 	}
 	if source == runner.CredentialsSourceIntegration && integrationName == "" {
 		return nil, invalidArgument("agent credential integration name is required")
+	}
+	// Run SuperPlane Agent has no credential field. A hosted source is the
+	// workspace model, and storing it makes node setup fail.
+	if agent.Component == models.SuperPlaneRunnerComponent {
+		return agent, nil
 	}
 	if source != "" {
 		agent.Credentials = map[string]any{"source": source}
@@ -368,7 +377,7 @@ func buildCustomAutomationCanvas(
 		"environmentFrom":         environmentFrom,
 		"environment":             customAutomationCheckoutEnvironment(factory),
 	}
-	if credentials := settings.Agent.credentials(); credentials != nil {
+	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
 		runnerConfiguration["credentials"] = credentials
 	}
 	if model := settings.Agent.model(); model != "" {

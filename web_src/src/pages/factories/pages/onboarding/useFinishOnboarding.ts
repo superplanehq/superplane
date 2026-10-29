@@ -1,3 +1,5 @@
+import { onboardingBillingError } from "./onboardingBilling";
+import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { resolveOnboardingAgent } from "./onboardingAgentReadiness";
@@ -172,13 +174,15 @@ export async function provisionWorkspace(args: {
       save: (name) => args.updateFactory({ name }),
     });
   }
+  const subscription = args.agentPlan.credentialsSource === "subscription";
   await args.updateOnboarding({
     vcsIntegrationId: args.vcs.id,
-    agentIntegrationId: args.agentIntegrationId ?? "",
+    agentIntegrationId: subscription ? "" : (args.agentIntegrationId ?? ""),
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
     issuesSource: apiIssuesSource(args.issuesChoice),
-    agentHarness: args.agentPlan.harness,
+    agentHarness: subscription ? "AGENT_HARNESS_CODEX" : args.agentPlan.harness,
+    codexSubscription: subscription,
   });
   // Onboarding installs the Implement app with the real default branch (main,
   // master, staging, ...) instead of hardcoding "main", so Create Branch and
@@ -289,9 +293,10 @@ async function verifyOnboardingPlan(
   usage: ReturnType<typeof useOrganizationWorkspaceUsage>,
   savedPlan: OnboardingAgentPlan | undefined,
 ) {
+  if (savedPlan?.credentialsSource === "subscription") return { plan: savedPlan, bypassAnalysis: false };
   try {
     const byokAllowed = await access.verify();
-    if (byokAllowed) return { plan: savedPlan, byokAllowed };
+    if (byokAllowed) return { plan: savedPlan, bypassAnalysis: false };
     const hosted = await usage.refetch();
     if (hosted.error || !hosted.data) throw new Error("SuperPlane could not load hosted models. Try again.");
     const plan = resolveOnboardingAgent({
@@ -304,11 +309,20 @@ async function verifyOnboardingPlan(
       throw new Error(
         "No hosted default model is available. Ask your administrator to configure a SuperPlane-hosted model.",
       );
-    return { plan, byokAllowed };
+    return { plan, bypassAnalysis: true };
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "SuperPlane could not verify model access. Try again."));
     return undefined;
   }
+}
+
+async function verifyOnboardingBilling(billing: ReturnType<typeof useOrganizationBilling>): Promise<void> {
+  const currentBilling = await billing.refetch();
+  if (currentBilling.error || !currentBilling.data) {
+    throw new Error("SuperPlane could not verify billing. Try again.");
+  }
+  const error = onboardingBillingError(currentBilling.data);
+  if (error) throw new Error(error);
 }
 
 export function useFinishOnboarding(args: {
@@ -340,6 +354,7 @@ export function useFinishOnboarding(args: {
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
+  const billing = useOrganizationBilling(args.organizationId);
   const access = useBYOKAccess(args.organizationId);
   const usage = useOrganizationWorkspaceUsage(args.organizationId);
   const navigate = useNavigate();
@@ -358,7 +373,7 @@ export function useFinishOnboarding(args: {
   return async (issuesChoiceOverride?: IssuesChoiceId) => {
     const verified = await verifyOnboardingPlan(access, usage, args.plan);
     if (!verified) return;
-    const { plan, byokAllowed } = verified;
+    const { plan, bypassAnalysis } = verified;
     const appRepository = args.setup.selectedRepo ?? "";
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
     const workspaceName = args.setup.workspaceName.trim();
@@ -392,6 +407,7 @@ export function useFinishOnboarding(args: {
 
     args.setSaving(true);
     try {
+      await verifyOnboardingBilling(billing);
       const selections = await selectionsWithVcsInstallation(args.organizationId, args.selections, vcsHost, vcs.id);
       const provisioned = await provisionWorkspace({
         ...args,
@@ -423,7 +439,7 @@ export function useFinishOnboarding(args: {
         navigate,
         onProvisioned: args.onProvisioned,
         skipInitialImport,
-        bypassAnalysis: !byokAllowed,
+        bypassAnalysis,
       });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));

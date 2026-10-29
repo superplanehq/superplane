@@ -694,6 +694,7 @@ message HostedLLMModel {
 message ListSelectableLLMModelsRequest {
   string id = 1;
   string factory_id = 2;
+  string order_id = 3;
 }
 
 message SelectableLLMNamedID {

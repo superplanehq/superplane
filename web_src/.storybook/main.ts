@@ -6,6 +6,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const config: StorybookConfig = {
   stories: ["../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
+  core: {
+    allowedHosts: ["localhost", "127.0.0.1"],
+  },
   addons: ["@chromatic-com/storybook", "@storybook/addon-docs", "@storybook/addon-onboarding", "@storybook/addon-a11y"],
   // Serve public/ so the MSW service worker (mockServiceWorker.js) is available.
   staticDirs: ["../public"],

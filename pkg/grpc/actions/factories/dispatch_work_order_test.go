@@ -32,7 +32,9 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	creator := support.CreateUser(t, r, r.Organization.ID)
+	owner := support.CreateUser(t, r, r.Organization.ID)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &creator.ID, []uuid.UUID{creator.ID, owner.ID}, nil)
 	require.NoError(t, err)
 
 	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
@@ -58,13 +60,54 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	require.Len(t, dispatch.StepExecutions, 1)
 	assert.Equal(t, pb.WorkOrderExecution_STATE_PENDING, dispatch.StepExecutions[0].State)
 
-	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+	assert.Equal(t, []uuid.UUID{r.User}, reloaded.AssigneeIDs())
 
 	active, err := order.FindActiveLineDispatch(db)
 	require.NoError(t, err)
 	assert.Equal(t, dispatch.Id, active.ID.String())
+}
+
+func TestDispatchThinkingLevelsRequireCompatibleLineRunners(t *testing.T) {
+	for _, components := range [][]string{
+		{runnerCodex}, {runnerClaudeCode}, {models.SuperPlaneRunnerComponent}, {runnerOpenRouter}, {runnerCodex, runnerClaudeCode},
+	} {
+		for _, level := range []string{"minimal", "xhigh", "high", "default"} {
+			t.Run(strings.Join(components, "+")+"/"+level, func(t *testing.T) {
+				r := support.Setup(t)
+				db := database.DB(t.Context())
+				factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+				require.NoError(t, err)
+				order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+				require.NoError(t, err)
+				var steps []models.FactoryLineStep
+				for _, component := range components {
+					app := createLineAppWithRunner(t, r, factory.ID, component, "integration", "")
+					steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"})
+				}
+				line, err := factory.CreateLine(db, "ship", steps)
+				require.NoError(t, err)
+				ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+				response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+					FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name, ThinkingLevel: level,
+				})
+				if level == "high" || level == "default" || len(components) == 1 && components[0] == runnerCodex {
+					require.NoError(t, err)
+					require.Len(t, response.Order.LineDispatches, 1)
+					assert.Equal(t, level, response.Order.LineDispatches[0].ThinkingLevel)
+					return
+				}
+				require.Error(t, err)
+				code, _, ok := grpcerrors.HandlerStatus(err)
+				require.True(t, ok)
+				assert.Equal(t, codes.InvalidArgument, code)
+				_, err = order.FindActiveLineDispatch(db)
+				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			})
+		}
+	}
 }
 
 func Test__DispatchWorkOrder__ClearsAutoStartLine(t *testing.T) {
@@ -79,7 +122,9 @@ func Test__DispatchWorkOrder__ClearsAutoStartLine(t *testing.T) {
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
 	})
 	require.NoError(t, err)
-	order, err := factoryModel.CreateWorkOrderWithAutoStart(db, "Ship it", "", &r.User, nil, nil, &line.ID)
+	creator := support.CreateUser(t, r, r.Organization.ID)
+	owner := support.CreateUser(t, r, r.Organization.ID)
+	order, err := factoryModel.CreateWorkOrderWithAutoStart(db, "Ship it", "", &creator.ID, []uuid.UUID{creator.ID, owner.ID}, nil, &line.ID)
 	require.NoError(t, err)
 	require.NotNil(t, order.AutoStartLineID)
 
@@ -91,10 +136,11 @@ func Test__DispatchWorkOrder__ClearsAutoStartLine(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, resp.Order.GetAutoStartLineId())
 
-	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
 	assert.Nil(t, reloaded.AutoStartLineID)
+	assert.Equal(t, []uuid.UUID{r.User}, reloaded.AssigneeIDs())
 }
 
 func Test__DispatchWorkOrder__CompletesActiveAnalysisRun(t *testing.T) {

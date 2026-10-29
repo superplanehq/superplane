@@ -102,3 +102,27 @@ describe("WorkOrderAssigneePicker", () => {
     expect(onChange).not.toHaveBeenCalledWith(["alice", "bob"]);
   });
 });
+
+it("keeps an ineligible selected owner visible and permits clearing", () => {
+  const { onChange } = renderPicker({
+    selectedIds: ["removed"],
+    eligibility: { subscription: true, ownershipChangeAllowed: true, members: [{ userId: "bob", eligible: true }] },
+  });
+  expect(screen.getByRole("option", { name: /Unavailable member/ })).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(screen.getByRole("option", { name: "No owner" }));
+  expect(onChange).toHaveBeenCalledWith([]);
+});
+
+it("blocks both clearing and assignment while the task stops", () => {
+  const { onChange } = renderPicker({
+    selectedIds: ["alice"],
+    eligibility: {
+      subscription: true,
+      ownershipChangeAllowed: false,
+      restrictionReason: "Wait for this task to stop.",
+    },
+  });
+  fireEvent.click(screen.getByRole("option", { name: "No owner" }));
+  expect(onChange).not.toHaveBeenCalled();
+  expect(screen.getByText("Wait for this task to stop.")).toBeInTheDocument();
+});

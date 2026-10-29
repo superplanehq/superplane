@@ -159,6 +159,13 @@ func ListAnalysisPlanningSessionsForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.
 }
 
 func (s *FactoryPlanningSession) AttachAgentRun(tx *gorm.DB, runID uuid.UUID, modelKey string) error {
+	if s.DraftWorkOrderID != nil {
+		order := &FactoryWorkOrder{ID: *s.DraftWorkOrderID, OrganizationID: s.OrganizationID, FactoryID: s.FactoryID}
+		if err := order.RequireExecutionOwner(tx, true); err != nil {
+			return err
+		}
+	}
+
 	if err := s.guardOpen(); err != nil {
 		return err
 	}

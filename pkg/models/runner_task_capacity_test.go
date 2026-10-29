@@ -56,8 +56,8 @@ func TestRunnerSchedulingSerializesOrganizationsAcrossFleets(t *testing.T) {
 	// Assignment keeps the slot and cannot release another pending task.
 	reserved, err := f.runner(first.ID).ReserveNextTask(f.db)
 	require.NoError(t, err)
-	assert.Equal(t, tasks[0].ID, reserved.ID)
-	require.NoError(t, reserved.Reserve(f.db, *reserved.RunnerID))
+	assert.Equal(t, tasks[0].ID, reserved.Task.ID)
+	require.NoError(t, reserved.Task.Reserve(f.db, *reserved.Task.RunnerID))
 	scheduled, err := models.ScheduleOrganizationRunnerTasks(f.db, f.organizationID, 100)
 	require.NoError(t, err)
 	assert.Empty(t, scheduled)
@@ -69,8 +69,9 @@ func TestRunnerReservationCannotClaimPendingTasks(t *testing.T) {
 	task := f.task(f.organizationID, fleet.ID)
 	runner := f.runner(fleet.ID)
 	require.ErrorIs(t, task.Reserve(f.db, runner.ID), models.ErrRunnerTaskNotReservable)
-	_, err := runner.ReserveNextTask(f.db)
-	require.ErrorIs(t, err, models.ErrRunnerTaskNotFound)
+	reservation, err := runner.ReserveNextTask(f.db)
+	require.NoError(t, err)
+	assert.Nil(t, reservation.Task)
 }
 
 func TestRunnerSchedulingReleasesSlotsThroughLifecycle(t *testing.T) {

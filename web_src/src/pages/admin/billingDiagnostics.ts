@@ -1,0 +1,55 @@
+export type BillingPolarDiagnostics = {
+  configured: boolean;
+  environment: string;
+  checked_at: string | null;
+  external_id: string;
+  customer_status: string;
+  customer_id: string;
+  customer_url?: string;
+  customer_events_url?: string;
+  customer_id_mismatch: boolean;
+  customer_error?: string;
+  card_status: string;
+  card_error?: string;
+  subscription_verification: string;
+  subscriptions: { id: string; status: string; url: string }[];
+  subscription_error?: string;
+};
+
+export type OrganizationBillingPlan = {
+  record_exists?: boolean;
+  updated_at?: string | null;
+  polar_customer_id?: string;
+  polar_customer_url?: string;
+  polar_customer_events_url?: string;
+  trial_started_at?: string | null;
+  current_period_start?: string | null;
+  workspaces?: { id: string; name: string; onboarding_completed_at: string | null }[];
+  checkout_attempts?: {
+    id: string;
+    plan_key: string;
+    state: string;
+    polar_checkout_id: string | null;
+    polar_status: string | null;
+    last_error: string | null;
+    created_at: string;
+    updated_at: string;
+    expires_at: string | null;
+    resolved_at: string | null;
+  }[];
+  polar?: BillingPolarDiagnostics;
+  plan: string;
+  catalog_key?: string;
+  catalog_name?: string;
+  catalog_category?: string;
+  credit_expiration?: string;
+  credit_validity_days?: number | null;
+  plan_source: string;
+  polar_subscription_status: string;
+  polar_managed: boolean;
+  polar_subscription_verification?: "active" | "none" | "failed" | "not_configured" | "not_checked";
+  polar_subscription_id?: string;
+  polar_subscription_url?: string;
+  trial_ends_at: string | null;
+  current_period_end: string | null;
+};

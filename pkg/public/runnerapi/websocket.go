@@ -154,19 +154,29 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 			); err != nil {
 				return
 			}
-			if authenticatedRunner.State != models.RunnerStateBusy {
-				if err := s.reconcileRunnerConnection(
-					r.Context(),
-					connection,
-					authenticatedRunner,
-					connectionID,
-					"",
-					fleet.Slug,
-					fleetScope,
-				); err != nil {
-					s.writeConnectionError(connection, err, "")
+			if authenticatedRunner.State == models.RunnerStateBusy {
+				active, err := authenticatedRunner.FindActiveTask(database.DB(r.Context()))
+				if err != nil {
 					return
 				}
+				if active.CancelRequestedAt != nil {
+					if err := connection.write(taskControlMessage{Type: messageTypeCancel, TaskID: active.ID.String()}); err != nil {
+						return
+					}
+				}
+				continue
+			}
+			if err := s.reconcileRunnerConnection(
+				r.Context(),
+				connection,
+				authenticatedRunner,
+				connectionID,
+				"",
+				fleet.Slug,
+				fleetScope,
+			); err != nil {
+				s.writeConnectionError(connection, err, "")
+				return
 			}
 		case messageTypeShutdownRequest:
 			var shutdown shutdownRequestMessage
@@ -315,6 +325,7 @@ func (s *Server) reconcileRunnerConnection(
 	var shouldShutdown bool
 	var shouldCancel bool
 	var reservedTask *models.RunnerTask
+	var reservation models.RunnerTaskReservationResult
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		current, err := models.FindRunner(tx, runner.ID)
@@ -375,14 +386,11 @@ func (s *Server) reconcileRunnerConnection(
 			if runner.State != models.RunnerStateIdle {
 				return errRunnerStateMismatch
 			}
-			task, err = runner.ReserveNextTask(tx)
-			if errors.Is(err, models.ErrRunnerTaskNotFound) {
-				task = nil
-				return nil
-			}
+			reservation, err = runner.ReserveNextTask(tx)
 			if err != nil {
 				return err
 			}
+			task = reservation.Task
 			reservedTask = task
 		default:
 			return activeErr
@@ -396,6 +404,24 @@ func (s *Server) reconcileRunnerConnection(
 	if reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug, fleetScope)
 		messages.PublishPlanningRunnerStatus(database.DB(ctx), reservedTask)
+	}
+	for _, failedTask := range reservation.FailedTasks {
+		messages.PublishPlanningRunnerStatus(database.DB(ctx), failedTask)
+	}
+	publishedFactories := map[uuid.UUID]bool{}
+	for _, connection := range reservation.LoginConnections {
+		if publishedFactories[connection.FactoryID] {
+			continue
+		}
+		if err := messages.PublishFactoryCodexConnectionUpdated(connection.FactoryID.String()); err != nil {
+			log.WithError(err).Warn("Failed to publish ChatGPT connection change")
+		}
+		publishedFactories[connection.FactoryID] = true
+	}
+	if s.nodeRequestExecutor != nil {
+		for _, failedTask := range reservation.FailedTasks {
+			go s.waitForTaskExecutionRequest(context.WithoutCancel(ctx), failedTask)
+		}
 	}
 
 	if shouldStartTask {
@@ -425,6 +451,10 @@ func (s *Server) reconcileRunnerConnection(
 	}
 	if !json.Valid(payload) {
 		return errors.New("runner task payload is invalid")
+	}
+	payload, err = s.refreshCodexSubscriptionTaskToken(ctx, task, payload)
+	if err != nil {
+		return err
 	}
 	if err := connection.write(taskMessage{
 		Type: messageTypeTask,

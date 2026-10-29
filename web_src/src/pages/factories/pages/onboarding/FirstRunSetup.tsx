@@ -58,7 +58,7 @@ const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
 };
 
 // Steps that this flow does not show. The card step is absent when billing
-// has no starter plans or the organization already has a paid plan.
+// is disabled or the organization already has a paid plan.
 function stepsSkipped(flow: FirstRunSetupFlow, target: FirstRunScreen): { before: number; total: number } {
   const agent = Number(flow.skipAgentScreen);
   const card = Number(!flow.hasCardStep);
@@ -72,6 +72,10 @@ function stepsSkipped(flow: FirstRunSetupFlow, target: FirstRunScreen): { before
 function firstNameOf(name: string | undefined): string | undefined {
   const first = name?.trim().split(/\s+/)[0];
   return first || undefined;
+}
+
+function modelSourceOffered(model: OnboardingPageModel): boolean {
+  return (model.bringYourOwnKey || model.codexSubscriptionOffered) && model.hostedModelsAvailable;
 }
 
 function signOut() {
@@ -461,11 +465,21 @@ function AgentScreenHost({
       saving={flow.busy}
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}
+      providerKeysOffered={model.bringYourOwnKey}
       showCustomProvider={model.customProvider}
       modelSource={{
-        offered: model.bringYourOwnKey && model.hostedModelsAvailable,
+        offered: modelSourceOffered(model),
         choice: flow.credentialChoice,
         onSelect: flow.selectCredentialChoice,
+      }}
+      codex={{
+        offered: Boolean(model.codexSubscriptionOffered),
+        connection: model.codexConnection,
+        ready: Boolean(model.codexSubscriptionReady),
+        starting: Boolean(model.codexStarting),
+        canceling: Boolean(model.codexCanceling),
+        onStart: model.startCodexConnection,
+        onCancel: model.cancelCodexConnection,
       }}
       onRequestConnect={model.requestConnect}
       modelPicker={model.agentModelPicker}
@@ -490,15 +504,20 @@ function CompleteSetupScreen({
     <FirstRunShell testId="first-run-complete" chrome={chrome} busy={flow.busy} sphere={sphere} visual="preview">
       <FirstRunHeading headline="Complete workspace setup">
         <p>
-          {flow.accessError
-            ? "SuperPlane could not verify model access. Try again."
-            : flow.cardStep.requiresAdmin
-              ? "Ask an organization admin to select a billing plan. You can complete workspace setup now."
-              : "Continue with the models available to your organization."}
+          {flow.cardStep.failed
+            ? "SuperPlane could not verify billing. Try again."
+            : flow.accessError
+              ? "SuperPlane could not verify model access. Try again."
+              : flow.cardStep.requiresAdmin
+                ? "Ask an organization admin to select a billing plan before you complete workspace setup."
+                : "Continue with the models available to your organization."}
         </p>
       </FirstRunHeading>
-      <Button disabled={flow.busy || !flow.cardStep.ready} onClick={() => void flow.finishSetup()}>
-        Continue
+      <Button
+        disabled={flow.busy || (!flow.cardStep.ready && !flow.cardStep.failed) || flow.cardStep.requiresAdmin}
+        onClick={() => void (flow.cardStep.failed ? flow.cardStep.refetch() : flow.finishSetup())}
+      >
+        {flow.cardStep.failed ? "Try again" : "Continue"}
       </Button>
     </FirstRunShell>
   );

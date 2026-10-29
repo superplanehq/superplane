@@ -1,5 +1,3 @@
--- Drain old task creators, runner gateways, and runner cleanup workers before
--- applying this migration. Old reservation code does not count queued slots.
 BEGIN;
 ALTER TABLE runner_tasks DROP CONSTRAINT runner_tasks_state_check;
 ALTER TABLE runner_tasks ADD CONSTRAINT runner_tasks_state_check

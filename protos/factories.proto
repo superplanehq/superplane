@@ -938,6 +938,60 @@ service Factories {
     };
   }
 
+  rpc ListFactoryOwnerEligibility(ListFactoryOwnerEligibilityRequest) returns (ListFactoryOwnerEligibilityResponse) {
+    option (google.api.http) = { get: "/api/v1/factories/{factory_id}/owner-eligibility" };
+  }
+
+  rpc ResumeHandOffWorkOrder(ResumeHandOffWorkOrderRequest) returns (ResumeHandOffWorkOrderResponse) {
+    option (google.api.http) = { post: "/api/v1/factories/{factory_id}/work-orders/{order_id}:resume-handoff" body: "*" };
+  }
+
+  rpc DescribeFactoryCodexConnection(DescribeFactoryCodexConnectionRequest) returns (DescribeFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/codex-connection"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe ChatGPT subscription";
+      description: "Returns the factory ChatGPT subscription status. Credentials are never included.";
+      tags: "Factory";
+    };
+  }
+
+  rpc StartFactoryCodexConnection(StartFactoryCodexConnectionRequest) returns (StartFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/codex-connection"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start ChatGPT subscription sign-in";
+      description: "Starts a temporary runner that signs in to ChatGPT with a device code";
+      tags: "Factory";
+    };
+  }
+
+  rpc CancelFactoryCodexConnection(CancelFactoryCodexConnectionRequest) returns (CancelFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/codex-connection:cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel ChatGPT subscription sign-in";
+      description: "Cancels a pending ChatGPT device sign-in";
+      tags: "Factory";
+    };
+  }
+
+  rpc DisconnectFactoryCodexConnection(DisconnectFactoryCodexConnectionRequest) returns (DisconnectFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/codex-connection"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Disconnect ChatGPT subscription";
+      description: "Removes the saved ChatGPT subscription when no task is using it";
+      tags: "Factory";
+    };
+  }
+
   rpc FindPlanningSessionByWorkOrder(FindPlanningSessionByWorkOrderRequest) returns (FindPlanningSessionByWorkOrderResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"
@@ -1033,6 +1087,8 @@ message UpdateFactoryOnboardingRequest {
   optional string provisioned_line_id = 9;
   // When true, validate readiness and set onboarding_completed_at.
   optional bool complete = 10;
+  // When true, this workspace uses a ChatGPT subscription for Codex.
+  optional bool codex_subscription = 12;
   // Default branch of the app repository.
   optional string default_branch = 11;
 }
@@ -1124,6 +1180,8 @@ message FactoryOnboarding {
   string vcs_provider = 14;
   // Bitbucket repository UUID. GitHub leaves this empty.
   string app_repository_external_id = 15;
+  // True when setup uses a ChatGPT subscription instead of an API key.
+  bool codex_subscription = 16;
 }
 
 // Automations the workspace Git host can run. Computed from vcs_provider.
@@ -1981,6 +2039,9 @@ message CreateWorkOrderRequest {
   string description = 3;
   repeated string assignee_ids = 4;
   string model = 5;
+  // In subscription workspaces, explicitly leave the task without an owner.
+  // Otherwise, omitted assignee_ids defaults to the eligible creator.
+  bool unassigned = 6;
 }
 
 message CreateWorkOrderResponse {
@@ -2070,6 +2131,8 @@ message WorkOrder {
   // MCP client that created this task through a hand-off. Empty for
   // tasks that did not come from an MCP client.
   WorkOrderMcpClient mcp_client = 26;
+  string refinement_model = 27;
+  PendingHandOff pending_handoff = 28;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -2104,6 +2167,8 @@ message WorkOrderSummary {
   WorkOrderMcpClient mcp_client = 21;
   // Canvas run that created this task. Needed to link intake history rows.
   string source_run_id = 22;
+  string refinement_model = 23;
+  PendingHandOff pending_handoff = 24;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -2309,6 +2374,7 @@ message UpdateWorkOrderRequest {
   string order_id = 2;
   optional string title = 3;
   optional string description = 4;
+  optional string refinement_model = 5;
 }
 
 message UpdateWorkOrderResponse {
@@ -2832,6 +2898,7 @@ message ExportFactoryWorkOrderRunUsageResponse {
 message ListFactoryLineRunnerModelsRequest {
   string factory_id = 1;
   string line_name = 2;
+  string order_id = 3;
 }
 
 message ListFactoryLineRunnerModelsResponse {
@@ -3198,6 +3265,57 @@ message AnswerPlanningSessionSurveyResponse {
   PlanningSession session = 1;
 }
 
+message FactoryCodexConnection {
+  string id = 1;
+  // pending, canceling, finishing, ready, reconnect_required, or disconnected.
+  string status = 2;
+  string verification_url = 3;
+  string verification_code = 4;
+  string account_label = 5;
+  string active_task_id = 6;
+  // True when this organization can use a ChatGPT subscription.
+  bool eligible = 7;
+  // True while a login runner or a factory task still holds the connection.
+  bool reservation_held = 8;
+  // Models available to this ChatGPT subscription.
+  repeated string available_models = 9;
+  bool revocation_pending = 10;
+}
+
+message DescribeFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message DescribeFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
+message StartFactoryCodexConnectionRequest {
+  string factory_id = 1;
+  // Refresh the model catalog without starting a new device sign-in.
+  bool refresh_catalog = 2;
+}
+
+message StartFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
+message CancelFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message CancelFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
+message DisconnectFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message DisconnectFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
 message FindPlanningSessionByWorkOrderRequest {
   string factory_id = 1;
   string work_order_id = 2;
@@ -3232,3 +3350,39 @@ message RevokeFactoryMCPClientRequest {
 }
 
 message RevokeFactoryMCPClientResponse {}
+
+message PendingHandOff {
+  string line_id = 1;
+  string column = 2;
+  string pull_request_url = 3;
+}
+
+message ResumeHandOffWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string model = 3;
+  string thinking_level = 4;
+}
+
+message ResumeHandOffWorkOrderResponse {
+  WorkOrder order = 1;
+  string column = 2;
+}
+
+message ListFactoryOwnerEligibilityRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message FactoryOwnerEligibility {
+  string user_id = 1;
+  bool eligible = 2;
+  string reason = 3;
+}
+
+message ListFactoryOwnerEligibilityResponse {
+  repeated FactoryOwnerEligibility members = 1;
+  bool ownership_change_allowed = 2;
+  string restriction_reason = 3;
+  bool subscription = 4;
+}

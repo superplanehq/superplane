@@ -56,12 +56,10 @@ func spendingScopedQuery(tx *gorm.DB, filter UsageReportFilter, joinWorkOrders b
 	if filter.MachineType != "" {
 		query = query.Where("workspace_usage_events.machine_type = ?", filter.MachineType)
 	}
-	if filter.FundingSource != "" {
-		if filter.FundingSource == coremodels.UsageFundingSourceHosted {
-			query = query.Where("workspace_usage_events.funding_source = ?", coremodels.UsageFundingSourceHosted)
-		} else {
-			query = query.Where("workspace_usage_events.funding_source IS DISTINCT FROM ?", coremodels.UsageFundingSourceHosted)
-		}
+	if filter.FundingSource == coremodels.UsageFundingSourceBYOK {
+		query = query.Where("workspace_usage_events.funding_source IS DISTINCT FROM ? AND workspace_usage_events.funding_source IS DISTINCT FROM ?", coremodels.UsageFundingSourceHosted, coremodels.UsageFundingSourceSubscription)
+	} else if filter.FundingSource != "" {
+		query = query.Where("workspace_usage_events.funding_source = ?", filter.FundingSource)
 	}
 	if !filter.Since.IsZero() {
 		query = query.Where("workspace_usage_events.occurred_at >= ?", filter.Since)
@@ -245,7 +243,7 @@ const workOrderRunUsageSelect = `
 	COALESCE(SUM(workspace_usage_events.cost_micros), 0) AS cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + coremodels.UsageFundingSourceHosted + `' AND workspace_usage_events.usage_kind = '` + coremodels.UsageKindModel + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + coremodels.UsageFundingSourceBYOK + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS byok_cost_micros,
-	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + coremodels.UsageKindModel + `' AND workspace_usage_events.funding_source IS DISTINCT FROM '` + coremodels.UsageFundingSourceBYOK + `' THEN workspace_usage_events.model END, E'\n'), '') AS models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + coremodels.UsageKindModel + `' AND workspace_usage_events.funding_source IN ('` + coremodels.UsageFundingSourceHosted + `', '` + coremodels.UsageFundingSourceSubscription + `') THEN workspace_usage_events.model END, E'\n'), '') AS models,
 	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + coremodels.UsageKindModel + `' AND workspace_usage_events.funding_source = '` + coremodels.UsageFundingSourceBYOK + `' THEN workspace_usage_events.model END, E'\n'), '') AS byok_models,
 	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + coremodels.UsageKindCompute + `' AND workspace_usage_events.machine_type <> '' THEN workspace_usage_events.machine_type END, E'\n'), '') AS machine_types`
 

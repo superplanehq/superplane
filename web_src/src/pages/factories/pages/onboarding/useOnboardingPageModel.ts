@@ -30,7 +30,13 @@ import {
   githubIntegrationSelection,
   selectionsWithSavedVcsInstallation,
 } from "./githubIntegrationSelection";
-import { AGENT_PROVIDER_IDS, isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import {
+  AGENT_PROVIDER_IDS,
+  CODEX_SUBSCRIPTION_PLAN,
+  isHostedAgentReady,
+  type OnboardingAgentPlan,
+} from "./onboardingAgentReadiness";
+import { useCodexSubscriptionModel } from "./useFactoryCodexConnection";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
@@ -367,6 +373,22 @@ function onboardingSetupOptions(
   };
 }
 
+function useTrimmedIntegrationNames(organizationId: string) {
+  const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId, {
+    enabled: Boolean(organizationId),
+  });
+  const existingIntegrationNames = useMemo(
+    () =>
+      new Set(
+        connectedIntegrations
+          .map((item) => item.metadata?.name?.trim())
+          .filter((name): name is string => Boolean(name)),
+      ),
+    [connectedIntegrations],
+  );
+  return { connectedIntegrations, existingIntegrationNames };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -382,9 +404,7 @@ export function useOnboardingPageModel(args: {
   const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
-  const { data: connectedIntegrations = [] } = useConnectedIntegrations(args.organizationId, {
-    enabled: Boolean(args.organizationId),
-  });
+  const { connectedIntegrations, existingIntegrationNames } = useTrimmedIntegrationNames(args.organizationId);
   const { agent, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
     organizationId: args.organizationId,
     factoryId: args.factoryId,
@@ -395,9 +415,8 @@ export function useOnboardingPageModel(args: {
     connectedIntegrations,
     agentIntegrationId: onboarding?.agentIntegrationId,
   });
-  const existingIntegrationNames = new Set(
-    connectedIntegrations.map((item) => item.metadata?.name?.trim()).filter((name): name is string => Boolean(name)),
-  );
+  const codex = useCodexSubscriptionModel(args.organizationId, args.factoryId);
+  const finishAgent = agentCredentialChoice === "subscription" ? { ...agent, plan: CODEX_SUBSCRIPTION_PLAN } : agent;
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
   const setup = useOnboardingSetupState(
     args.factory?.name ?? "",
@@ -435,7 +454,7 @@ export function useOnboardingPageModel(args: {
     mutations,
     setSaving,
     setProvisionedDestination,
-    agent,
+    agent: finishAgent,
   });
 
   const requestConnect = (id: IntegrationId) => {
@@ -454,6 +473,7 @@ export function useOnboardingPageModel(args: {
   return {
     setup,
     hostedAgentReady: isHostedAgentReady(agent.plan),
+    ...codex,
     hostedModelsAvailable: agent.hostedModelsAvailable,
     hostedModelsAvailableLoading: agent.hostedModelsAvailableLoading,
     bringYourOwnKey: bringYourOwnKey.allowed,

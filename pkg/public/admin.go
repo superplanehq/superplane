@@ -406,13 +406,13 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 
 	items, err := serializeAdminOrganizations(ctx, organizations)
 	if err != nil {
-		log.Errorf("admin: failed to load remaining credit: %v", err)
+		log.Errorf("admin: failed to serialize organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
 		return
 	}
 	pinned, err := serializeAdminOrganizations(ctx, pinnedOrganizations)
 	if err != nil {
-		log.Errorf("admin: failed to load remaining credit: %v", err)
+		log.Errorf("admin: failed to serialize pinned organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
 		return
 	}
@@ -461,14 +461,14 @@ func (s *Server) adminGetOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	remaining, err := remainingCreditCentsByOrganization(r.Context(), []uuid.UUID{organization.ID})
+	items, err := serializeAdminOrganizations(r.Context(), []models.OrganizationWithCounts{*organization})
 	if err != nil {
-		log.Errorf("admin: failed to load remaining credit for organization %s: %v", orgID, err)
+		log.Errorf("admin: failed to serialize organization %s: %v", orgID, err)
 		http.Error(w, "Failed to load organization", http.StatusInternalServerError)
 		return
 	}
 
-	item := serializeAdminOrganization(*organization, remaining[organization.ID])
+	item := items[0]
 	item.Pinned = pinned
 	respondJSON(w, item)
 }
@@ -932,6 +932,7 @@ func (s *Server) adminDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	targetEmail := target.Email
+	actorID := admin.ID
 
 	deletedOrganizations, err := s.softDeleteAccount(r.Context(), target)
 	if errors.Is(err, models.ErrAccountDeleteLastInstallationAdmin) {
@@ -945,6 +946,7 @@ func (s *Server) adminDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deletedOrganizationIDs := make([]string, 0, len(deletedOrganizations))
+	captureAccountDeletion(r.Context(), actorID, target.ID, target.DeletedAt.Time, deletedOrganizations, "admin")
 	for _, organization := range deletedOrganizations {
 		deletedOrganizationIDs = append(deletedOrganizationIDs, organization.ID.String())
 	}
@@ -1051,6 +1053,8 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 type adminOrgItem struct {
 	ID                   string  `json:"id"`
 	Name                 string  `json:"name"`
+	PlanKey              string  `json:"plan_key"`
+	PlanName             string  `json:"plan_name"`
 	Slug                 string  `json:"slug"`
 	Description          string  `json:"description"`
 	CanvasCount          int64   `json:"canvas_count"`
@@ -1089,6 +1093,9 @@ func serializeAdminOrganizations(ctx context.Context, organizations []models.Org
 	ctx, done := telemetry.Span(ctx, "organizations.serialize")
 	defer done(&err)
 
+	if err := models.ResolveOrganizationPlans(database.DB(ctx), organizations); err != nil {
+		return nil, err
+	}
 	remaining, err := adminOrganizationRemainingCents(ctx, organizations)
 	if err != nil {
 		return nil, err
@@ -1158,6 +1165,10 @@ func serializeAdminOrganization(org models.OrganizationWithCounts, remainingCred
 		RemainingCreditCents: remainingCreditCents,
 	}
 
+	if org.PlanSummary != nil {
+		item.PlanKey = org.PlanSummary.Key
+		item.PlanName = org.PlanSummary.Name
+	}
 	if org.CreatedAt != nil {
 		formatted := org.CreatedAt.Format(time.RFC3339)
 		item.CreatedAt = &formatted

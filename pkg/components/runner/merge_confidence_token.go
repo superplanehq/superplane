@@ -221,6 +221,7 @@ func HasMergeConfidenceToken(environment []TaskEnvironmentVariable) bool {
 // order id. Other agent runs are unchanged. The work order id is removed from
 // the task environment after the token is minted.
 func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, steps []AgentStep, timeoutSeconds int) ([]TaskEnvironmentVariable, error) {
+	environment = withoutEnvironmentName(environment, EnvSuperplaneMergeConfidenceToken)
 	orderID, ok := environmentValue(environment, EnvSuperplaneMergeConfidenceOrderID)
 	if !ok {
 		return environment, nil
@@ -249,6 +250,18 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvir
 	}
 	if canvas.FactoryID == nil || *canvas.FactoryID == uuid.Nil {
 		return nil, fmt.Errorf("merge confidence requires a factory canvas")
+	}
+
+	factory, err := models.FindFactory(database.DB(context.Background()), orgID, *canvas.FactoryID)
+	if err != nil {
+		return nil, fmt.Errorf("merge confidence workspace: %w", err)
+	}
+	if factory.OnboardingConfigValue().CodexSubscription {
+		order, err := models.FindSubscriptionWorkOrderForRun(database.DB(context.Background()), orgID, factory.ID, ctx.RunID)
+		if err != nil {
+			return nil, err
+		}
+		workOrderID = order.ID
 	}
 
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)

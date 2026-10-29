@@ -27,6 +27,17 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 
 service Me {
 
+  rpc ListCodexUsage(ListCodexUsageRequest) returns (ListCodexUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/codex-usage"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List Codex subscription usage";
+      description: "Returns saved quota snapshots for the calling user's ChatGPT connections in this organization";
+      tags: "Me";
+    };
+  }
+
   //
   // Endpoint for getting the currently authenticated user.
   //
@@ -217,6 +228,35 @@ service Me {
 
 message MeRequest {
   bool include_permissions = 1;
+}
+
+message ListCodexUsageRequest {}
+
+message ListCodexUsageResponse {
+  repeated CodexUsageConnection connections = 1;
+}
+
+message CodexUsageConnection {
+  string id = 1;
+  string factory_id = 2;
+  string account_label = 3;
+  string status = 4;
+  google.protobuf.Timestamp observed_at = 5;
+  repeated CodexUsageLimit limits = 6;
+}
+
+message CodexUsageLimit {
+  string limit_id = 1;
+  string limit_name = 2;
+  string plan_type = 3;
+  CodexUsageWindow primary = 4;
+  CodexUsageWindow secondary = 5;
+}
+
+message CodexUsageWindow {
+  double used_percent = 1;
+  optional int64 window_duration_mins = 2;
+  google.protobuf.Timestamp resets_at = 3;
 }
 
 message MeResponse {

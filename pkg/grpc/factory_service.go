@@ -76,6 +76,26 @@ func (s *FactoryService) SwitchFactoryModelSource(ctx context.Context, req *pb.S
 	return actions.SwitchFactoryModelSource(ctx, s.registry, organizationID, req)
 }
 
+func (s *FactoryService) DescribeFactoryCodexConnection(ctx context.Context, req *pb.DescribeFactoryCodexConnectionRequest) (*pb.DescribeFactoryCodexConnectionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DescribeFactoryCodexConnection(ctx, organizationID, req)
+}
+
+func (s *FactoryService) StartFactoryCodexConnection(ctx context.Context, req *pb.StartFactoryCodexConnectionRequest) (*pb.StartFactoryCodexConnectionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.StartFactoryCodexConnection(ctx, s.intakeDeps.Encryptor, organizationID, req)
+}
+
+func (s *FactoryService) CancelFactoryCodexConnection(ctx context.Context, req *pb.CancelFactoryCodexConnectionRequest) (*pb.CancelFactoryCodexConnectionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CancelFactoryCodexConnection(ctx, s.intakeDeps.Encryptor, organizationID, req)
+}
+
+func (s *FactoryService) DisconnectFactoryCodexConnection(ctx context.Context, req *pb.DisconnectFactoryCodexConnectionRequest) (*pb.DisconnectFactoryCodexConnectionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DisconnectFactoryCodexConnection(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryRepository(ctx, s.intakeDeps, organizationID, req)
@@ -425,4 +445,14 @@ func (s *FactoryService) ListFactoryMCPClients(ctx context.Context, req *pb.List
 func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.RevokeFactoryMCPClientRequest) (*pb.RevokeFactoryMCPClientResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryOwnerEligibility(ctx context.Context, req *pb.ListFactoryOwnerEligibilityRequest) (*pb.ListFactoryOwnerEligibilityResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryOwnerEligibility(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ResumeHandOffWorkOrder(ctx context.Context, req *pb.ResumeHandOffWorkOrderRequest) (*pb.ResumeHandOffWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ResumeHandOffWorkOrder(ctx, s.intakeDeps, organizationID, req)
 }

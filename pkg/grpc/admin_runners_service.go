@@ -85,3 +85,10 @@ func (s *AdminRunnersService) DeleteRunner(
 ) (*pb.DeleteRunnerResponse, error) {
 	return s.actions.DeleteRunner(ctx, req)
 }
+
+func (s *AdminRunnersService) MarkRunnerProviderDeleted(
+	ctx context.Context,
+	req *pb.MarkRunnerProviderDeletedRequest,
+) (*pb.MarkRunnerProviderDeletedResponse, error) {
+	return s.actions.MarkRunnerProviderDeleted(ctx, req)
+}

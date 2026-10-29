@@ -7,11 +7,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/protobuf/types/known/structpb"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestCustomAutomationSettingsAllowBashOnly(t *testing.T) {
@@ -98,6 +103,146 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	subscription := true
+	harness := models.FactoryOnboardingAgentHarnessCodex
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID:  &integrationID,
+		AgentHarness:      &harness,
+		CodexSubscription: &subscription,
+	}))
+	// GitHub setup is external to saving the agent configuration.
+	r.Registry.Integrations["github"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: "github.onPullRequest"})},
+	})
+	ctx := onboardingContext(r)
+	deps := onboardingDeps(r)
+	organizationID := r.Organization.ID.String()
+	created, err := CreateFactoryCustomAutomation(ctx, deps, organizationID, &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(),
+		Name:      "Review changes",
+		Settings: &pb.FactoryCustomAutomation_Settings{
+			StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+			Steps:     []*pb.FactoryCustomAutomation_Step{{Name: "Review", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Review the pull request."}},
+		},
+	})
+	require.NoError(t, err)
+	automationID := created.GetCustomAutomation().GetAutomation().GetId()
+	described, err := DescribeFactoryCustomAutomation(ctx, organizationID, &pb.DescribeFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	require.NoError(t, err)
+	settings := described.GetCustomAutomation().GetSettings()
+	require.Equal(t, "runnerCodex", settings.GetAgent().GetComponent())
+	require.Equal(t, runner.CredentialsSourceSubscription, settings.GetAgent().GetCredentialSource())
+	settings.Steps[0].Prompt = "Review the changed files."
+	_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Review changed files", Settings: settings,
+	})
+	require.NoError(t, err)
+	saved, err := DescribeFactoryCustomAutomation(ctx, organizationID, &pb.DescribeFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Review changed files", saved.GetCustomAutomation().GetAutomation().GetName())
+	assert.Equal(t, "Review the changed files.", saved.GetCustomAutomation().GetSettings().GetSteps()[0].GetPrompt())
+	assert.Equal(t, "runnerCodex", saved.GetCustomAutomation().GetSettings().GetAgent().GetComponent())
+	assert.Equal(t, runner.CredentialsSourceSubscription, saved.GetCustomAutomation().GetSettings().GetAgent().GetCredentialSource())
+}
+
+func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID: &integrationID,
+	}))
+	r.Registry.Integrations["github"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: "github.onPullRequest"})},
+	})
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	anthropic := models.UsageProviderAnthropic
+	modelName := "claude-sonnet-4-6"
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      anthropic,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{modelName},
+	})
+	require.NoError(t, err)
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		DefaultHostedProvider: &anthropic,
+		DefaultHostedModel:    &modelName,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{})
+		_ = db.Where("provider = ?", anthropic).Delete(&models.HostedLLMProvider{}).Error
+	})
+	ctx := onboardingContext(r)
+	deps := onboardingDeps(r)
+	organizationID := r.Organization.ID.String()
+	settings := &pb.FactoryCustomAutomation_Settings{
+		StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
+		Agent: &pb.FactoryAppTemplateAgent{
+			Component:        models.SuperPlaneRunnerComponent,
+			CredentialSource: runner.CredentialsSourceHosted,
+		},
+		Steps: []*pb.FactoryCustomAutomation_Step{
+			{Name: "Deploy", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "true", WorkingDirectory: "repo"},
+		},
+	}
+	created, err := CreateFactoryCustomAutomation(ctx, deps, organizationID, &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(),
+		Name:      "Preview Environment",
+		Settings:  settings,
+	})
+	require.NoError(t, err)
+	automationID := created.GetCustomAutomation().GetAutomation().GetId()
+	canvasID := uuid.MustParse(automationID)
+
+	node := requireSuperPlaneAutomationNode(t, db, canvasID)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
+	assert.Nil(t, node.StateReason)
+	assert.NotContains(t, node.Configuration.Data(), "credentials")
+
+	reason := "credentials is not supported on Run SuperPlane Agent"
+	broken := node.Configuration.Data()
+	broken["credentials"] = map[string]any{"source": runner.CredentialsSourceHosted}
+	node.Configuration = datatypes.NewJSONType(broken)
+	node.State = models.CanvasNodeStateError
+	node.StateReason = &reason
+	require.NoError(t, db.Save(node).Error)
+
+	_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId:    factory.ID.String(),
+		AutomationId: automationID,
+		Name:         "Preview Environment",
+		Settings:     settings,
+	})
+	require.NoError(t, err)
+
+	repaired := requireSuperPlaneAutomationNode(t, db, canvasID)
+	assert.Equal(t, models.CanvasNodeStateReady, repaired.State)
+	assert.Nil(t, repaired.StateReason)
+	assert.NotContains(t, repaired.Configuration.Data(), "credentials")
+}
+
+func requireSuperPlaneAutomationNode(t *testing.T, db *gorm.DB, canvasID uuid.UUID) *models.CanvasNode {
+	t.Helper()
+	node, err := models.FindCanvasNode(db, canvasID, customAutomationRunnerID)
+	require.NoError(t, err)
+	assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
+	return node
 }
 
 func environmentVars(t *testing.T, raw any) map[string]string {

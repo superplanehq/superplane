@@ -27,10 +27,12 @@ export function OrgBillingPlanField(args: {
   setTrialEndsOn: (value: string) => void;
   trialEndInvalid: boolean;
   savingPlan: boolean;
+  busy?: boolean;
   savePlan: () => void;
 }) {
   const { editable: planEditable, help } = billingPlanState(args.planKnown, args.polarManaged, args.savedPlan);
   const catalogLocked = !!args.catalogError || args.catalog.length === 0;
+  const controlsBusy = args.savingPlan || args.busy;
   const selectedCategory = args.catalog.find((plan) => plan.key === args.planValue)?.category;
   const showTrialEnd = planEditable && selectedCategory === "trial";
   return (
@@ -44,7 +46,7 @@ export function OrgBillingPlanField(args: {
           <div className="flex flex-wrap items-center gap-2">
             <div className="w-64 max-w-full">
               <Select
-                disabled={!planEditable || catalogLocked}
+                disabled={!planEditable || catalogLocked || controlsBusy}
                 value={args.planValue}
                 onValueChange={args.setPlanValue}
               >
@@ -70,7 +72,7 @@ export function OrgBillingPlanField(args: {
                 data-testid="admin-org-billing-plan-save"
                 onClick={args.savePlan}
                 disabled={
-                  args.savingPlan ||
+                  controlsBusy ||
                   catalogLocked ||
                   args.catalog.some(
                     (plan) =>
@@ -99,6 +101,7 @@ export function OrgBillingPlanField(args: {
             value={args.trialEndsOn}
             min={utcCalendarDate(new Date())}
             aria-invalid={args.trialEndInvalid}
+            disabled={controlsBusy}
             onChange={(event) => args.setTrialEndsOn(event.target.value)}
           />
           <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">{ADMIN_TRIAL_ENDS_HELP}</Text>
@@ -159,8 +162,14 @@ function billingPlanState(
   if (!planKnown) {
     return { editable: false, help: ADMIN_PLAN_UNKNOWN_COPY };
   }
+  if (verification === "not_checked") {
+    return { editable: false, help: "Select Check Polar to verify subscriptions before changing the plan." };
+  }
   if (verification === "failed") {
-    return { editable: false, help: "SuperPlane could not verify the Polar subscription. Refresh and try again." };
+    return {
+      editable: false,
+      help: "SuperPlane could not verify the Polar subscription. Select Check Polar to try again.",
+    };
   }
   if (verification === "none") {
     return { editable: true, help: ADMIN_LOCAL_PLAN_COPY };

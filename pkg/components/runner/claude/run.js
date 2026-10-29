@@ -102,7 +102,12 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 const PLANNING_READONLY_TOOLS = "Read,Bash";
 
 function analysisAllowedTools() {
-  return ["mcp__superplane__propose_update", "mcp__superplane__inspect_attachment"];
+  return [
+    "mcp__superplane__propose_update",
+    "mcp__superplane__inspect_attachment",
+    "mcp__superplane__suggest_owners",
+    "mcp__superplane__assign_owner",
+  ];
 }
 const ARTIFACT_ALLOWED_TOOLS = [
   "mcp__superplane__inspect_screenshot",
@@ -140,15 +145,21 @@ function allowedClaudeTools(env = process.env) {
       "mcp__superplane",
       ...workspaceAllow,
       "mcp__superplane__report_merge_check",
+      ...(envFlag(env, "SUPERPLANE_OWNER_TOKEN")
+        ? ["mcp__superplane__suggest_owners", "mcp__superplane__assign_owner"]
+        : []),
     ].join(",");
   }
-  if (artifactMCPEnabled(env)) {
-    return [
-      BASE_ALLOWED_TOOLS,
-      "mcp__superplane",
-      ...workspaceAllow,
-      ...ARTIFACT_ALLOWED_TOOLS,
-    ].join(",");
+  if (taskToolsEnabled(env)) {
+    const tools = [BASE_ALLOWED_TOOLS, "mcp__superplane", ...workspaceAllow];
+    if (artifactMCPEnabled(env)) tools.push(...ARTIFACT_ALLOWED_TOOLS);
+    if (publishLinksEnabled(env)) tools.push("mcp__superplane__publish_link");
+    if (envFlag(env, "SUPERPLANE_OWNER_TOKEN"))
+      tools.push(
+        "mcp__superplane__suggest_owners",
+        "mcp__superplane__assign_owner",
+      );
+    return tools.join(",");
   }
   if (workspaceAllow.length === 0) {
     return BASE_ALLOWED_TOOLS;
@@ -186,7 +197,11 @@ function claudePermissionMode(env = process.env) {
 }
 
 function mcpToolsEnabled(env = process.env) {
-  return planningMCPEnabled(env) || artifactMCPEnabled(env) || mergeConfidenceMCPEnabled(env);
+  return (
+    planningMCPEnabled(env) ||
+    taskToolsEnabled(env) ||
+    mergeConfidenceMCPEnabled(env)
+  );
 }
 
 function planningMCPEnabled(env = process.env) {
@@ -196,8 +211,25 @@ function planningMCPEnabled(env = process.env) {
   );
 }
 
+function visualEvidenceEnabled(env = process.env) {
+  if (envFlag(env, "SUPERPLANE_VISUAL_EVIDENCE")) return true;
+  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN") && !publishLinksEnabled(env);
+}
+
+function publishLinksEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
+}
+
 function artifactMCPEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
+  return visualEvidenceEnabled(env);
+}
+
+function taskToolsEnabled(env = process.env) {
+  return (
+    artifactMCPEnabled(env) ||
+    publishLinksEnabled(env) ||
+    envFlag(env, "SUPERPLANE_OWNER_TOKEN")
+  );
 }
 
 function mergeConfidenceMCPEnabled(env = process.env) {
