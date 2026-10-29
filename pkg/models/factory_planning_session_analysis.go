@@ -68,6 +68,16 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 		return nil, ErrFactoryPlanningSessionInvalid
 	}
 
+	if err := order.RequireExecutionOwner(tx, true); err != nil {
+		return nil, err
+	}
+	override := ""
+	if order.RefinementModel != nil {
+		override = *order.RefinementModel
+	}
+	if err := order.ValidateSubscriptionCanvasModels(tx, params.CanvasID, override); err != nil {
+		return nil, err
+	}
 	existing, err := FindPlanningSessionByRun(tx, params.CanvasRunID)
 	if err == nil {
 		if !analysisSessionMatchesWorkOrder(existing, params.WorkOrderID) {

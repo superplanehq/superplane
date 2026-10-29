@@ -389,6 +389,7 @@ function invalidateFactoryWorkOrdersOnReconnect(
   organizationId: string,
   factoryId: string,
 ) {
+  invalidateSubscriptionState(queryClient, organizationId, factoryId);
   invalidateOrdersList(queryClient, organizationId, factoryId);
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.planningSessions(organizationId, factoryId),
@@ -410,6 +411,7 @@ export function invalidateFactoryWorkOrderQueries(
   factoryId: string,
   orderId?: string,
 ): void {
+  invalidateModelCatalogs(queryClient, organizationId, factoryId);
   invalidateOrdersList(queryClient, organizationId, factoryId);
   invalidateCachedCanvasRuns(queryClient, organizationId, factoryId, orderId);
 
@@ -450,6 +452,10 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       if (data.payload?.factoryId && data.payload.factoryId !== factoryId) {
         return;
       }
+      if (data.payload?.reason === "codex_connection") {
+        invalidateSubscriptionState(queryClient, organizationId, factoryId);
+        return;
+      }
       if (data.payload?.reason === "runner_capacity") {
         invalidateOrdersList(queryClient, organizationId, factoryId);
         void queryClient.invalidateQueries({
@@ -460,6 +466,7 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       if (!orderId) {
         return;
       }
+      invalidateModelCatalogs(queryClient, organizationId, factoryId);
       const version = (refreshVersion.current.get(orderId) ?? 0) + 1;
       refreshVersion.current.set(orderId, version);
       const isCurrent = () => refreshVersion.current.get(orderId) === version;
@@ -508,4 +515,18 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
     },
     enabled && url !== null,
   );
+}
+
+function invalidateSubscriptionState(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {
+  invalidateModelCatalogs(queryClient, organizationId, factoryId);
+  void queryClient.invalidateQueries({ queryKey: ["factory-codex-connection", organizationId, factoryId] });
+  void queryClient.invalidateQueries({ queryKey: ["me", organizationId] });
+}
+
+function invalidateModelCatalogs(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {
+  void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "line-runner-models"] });
+  void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "owner-eligibility"] });
+  void queryClient.invalidateQueries({
+    queryKey: ["organizations", organizationId, "selectable-llm-models", factoryId],
+  });
 }
