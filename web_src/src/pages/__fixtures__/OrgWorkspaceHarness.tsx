@@ -367,12 +367,15 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           />
         </Route>
         <Route path="organization/*" element={factoryRoute(<LegacyOrganizationSettingsRedirect />)} />
-        <Route path="settings/llm-spend" element={<LegacyOrganizationSettingsRedirect destination="llm-spend" />} />
+        <Route
+          path="settings/llm-spend"
+          element={factoryRoute(<LegacyOrganizationSettingsRedirect destination="llm-spend" />)}
+        />
         <Route
           path="settings/integrations/:integrationName/setup"
-          element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
+          element={factoryRoute(<div data-testid="integration-setup-placeholder">Integration setup</div>)}
         />
-        <Route path="settings/*" element={<OrganizationSettings />} />
+        <Route path="settings/*" element={factoryRoute(<OrganizationSettings />)} />
       </Route>
     </Routes>
   );
