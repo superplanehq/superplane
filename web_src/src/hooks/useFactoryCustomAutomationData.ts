@@ -65,6 +65,7 @@ export function useFactoryCustomAutomations(
 
 type CustomAutomationInput = {
   name: string;
+  columnKey?: "backlog" | "verify";
   settings: FactoriesFactoryCustomAutomationSettings;
 };
 

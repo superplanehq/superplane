@@ -25,7 +25,7 @@ func EmitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *mode
 		return
 	}
 
-	if err := emitWorkOrderCreated(tx, factoryModel, order, uuid.Nil, nil); err != nil {
+	if err := emitWorkOrderCreated(tx, factoryModel, order, uuid.Nil, nil, false); err != nil {
 		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
 	}
 }
@@ -35,7 +35,14 @@ func EmitWorkOrderCreatedOnCanvas(tx *gorm.DB, factoryModel *models.Factory, ord
 		return nil
 	}
 	refinementEnabled := true
-	return emitWorkOrderCreated(tx, factoryModel, order, canvasID, &refinementEnabled)
+	return emitWorkOrderCreated(tx, factoryModel, order, canvasID, &refinementEnabled, false)
+}
+
+// EmitBacklogCustomAutomations delivers a return without repeating refinement.
+func EmitBacklogCustomAutomations(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) {
+	if err := emitWorkOrderCreated(tx, factoryModel, order, uuid.Nil, nil, true); err != nil {
+		log.WithError(err).Warnf("failed to emit Backlog automation for task %s", order.ID)
+	}
 }
 
 func emitWorkOrderCreated(
@@ -44,6 +51,7 @@ func emitWorkOrderCreated(
 	order *models.FactoryWorkOrder,
 	onlyCanvas uuid.UUID,
 	refinementEnabledOverride *bool,
+	customOnly bool,
 ) error {
 	if factoryModel.OnboardingConfigValue().CodexSubscription {
 		owners, err := order.ListAssignees(tx)
@@ -94,6 +102,32 @@ func emitWorkOrderCreated(
 		}
 		spec, ok := specs[live[i].ID]
 		if !ok {
+			continue
+		}
+		isCustom := models.FactoryAppTemplateID(spec.Nodes) == models.FactoryAppTemplateCustomAutomationID
+		if customOnly && !isCustom {
+			continue
+		}
+		if isCustom {
+			if live[i].ColumnKey == nil || *live[i].ColumnKey != models.CanvasColumnKeyBacklog || order.State != models.FactoryWorkOrderStateDraft {
+				continue
+			}
+			automatic := false
+			for _, node := range spec.Nodes {
+				template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+				automatic = automatic || template["startMode"] == "automatic"
+			}
+			if !automatic {
+				continue
+			}
+			event, err := StartBacklogCustomAutomation(tx, factoryModel, &live[i], order, true)
+			if err != nil {
+				log.WithError(err).Warnf("failed to start Backlog custom automation %s for work order %s", live[i].ID, order.ID)
+				continue
+			}
+			if event != nil {
+				emitted = append(emitted, *event)
+			}
 			continue
 		}
 		if !refinementEnabled && models.IsBacklogFactoryApp(spec.Nodes, spec.Edges) {
