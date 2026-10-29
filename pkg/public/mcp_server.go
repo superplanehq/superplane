@@ -293,6 +293,7 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 			Encryptor:   s.encryptor,
 			AuthService: s.authService,
 		},
+		BaseURL: s.BaseURL,
 	}
 	response := mcpserver.HandleJSONRPC(r.Context(), runtime, claims, message)
 	if response == nil {
