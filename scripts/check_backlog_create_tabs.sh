@@ -8,7 +8,13 @@ url="http://127.0.0.1:${port}"
 log="${TMPDIR:-/tmp}/backlog-create-tabs-storybook.log"
 
 cd "${repo_root}/web_src"
-npm run storybook -- --host 127.0.0.1 --port "${port}" --ci --no-open >"${log}" 2>&1 &
+# CI builds Storybook before this check. Serve that output so browser timeouts
+# measure the rendered stories, not on-demand development compilation.
+if [[ ! -f storybook-static/iframe.html ]]; then
+  echo "Storybook build is missing. Run make check.build.storybook first." >&2
+  exit 1
+fi
+node scripts/serve-storybook-check.mjs "${port}" >"${log}" 2>&1 &
 server_pid=$!
 cleanup() {
   kill "${server_pid}" >/dev/null 2>&1 || true
