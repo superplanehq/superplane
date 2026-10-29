@@ -95,7 +95,7 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			got := environmentVars(t, agent.Configuration["environment"])
 			assert.Equal(t, "acme/app", got["REPO"])
 			assert.Equal(t, "acme/app", got["SOURCE_REPO"])
-			assert.Equal(t, runner.WorkspaceContextRepoURL(provider, "acme/app"), got["REPO_URL"])
+			assert.Equal(t, runner.WorkspaceContextRepoURL(provider, "acme/app", ""), got["REPO_URL"])
 			assert.Equal(t, "main", got["BASE"])
 			assert.Equal(t, prFeedbackPRNumberExpression(), got["PR_NUMBER"])
 			assert.Equal(t, prFeedbackPRHeadExpression(), got["PR_HEAD"])

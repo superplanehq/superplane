@@ -5,6 +5,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
@@ -233,7 +234,7 @@ func githubUserAutomation(user *githubWebhookUser) *factoryevents.AutomationRef 
 	}
 	htmlURL := strings.TrimSpace(user.HTMLURL)
 	if htmlURL == "" {
-		htmlURL = "https://github.com/" + login
+		htmlURL = githubcommon.DotCom().ProfileURL(login)
 	}
 	return &factoryevents.AutomationRef{
 		AppName:  login,
