@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 const (
 	FactoryWorkOrderLineDispatchStateActive   = "active"
 	FactoryWorkOrderLineDispatchStateFinished = "finished"
+	subscriptionAdmissionStatusNoteKey        = "subscription-admission"
 )
 
 var (
@@ -55,6 +57,12 @@ type FactoryWorkOrderLineDispatch struct {
 	FinishedAt    *time.Time
 }
 
+// FactoryLineStartOptions records the choices made for one Start action.
+type FactoryLineStartOptions struct {
+	Model         string
+	ThinkingLevel string
+}
+
 func (FactoryWorkOrderLineDispatch) TableName() string {
 	return "factory_work_order_line_dispatches"
 }
@@ -85,6 +93,9 @@ func (l *FactoryLine) DispatchFrom(tx *gorm.DB, order *FactoryWorkOrder, startIn
 // DispatchFromWithModel is DispatchFrom with optional Start model and
 // thinking overrides. Empty model or thinking means Auto.
 func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder, startIndex int, model, thinkingLevel string) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
+	if err := order.RequireExecutionOwner(tx, true); err != nil {
+		return nil, nil, err
+	}
 	if len(l.Steps) == 0 {
 		return nil, nil, ErrFactoryLineHasNoSteps
 	}
@@ -92,6 +103,11 @@ func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder
 		return nil, nil, ErrFactoryLineStepOutOfRange
 	}
 
+	for _, step := range l.Steps[startIndex:] {
+		if err := order.ValidateSubscriptionCanvasModels(tx, step.AppID, model); err != nil {
+			return nil, nil, err
+		}
+	}
 	now := time.Now()
 	dispatch := &FactoryWorkOrderLineDispatch{
 		ID:             uuid.New(),
@@ -128,6 +144,7 @@ func (l *FactoryLine) RecordPassedStageWithoutRun(
 	tx *gorm.DB,
 	order *FactoryWorkOrder,
 	stepIndex int,
+	startOptions ...FactoryLineStartOptions,
 ) (*FactoryWorkOrderLineDispatch, *FactoryWorkOrderExecution, error) {
 	if l == nil || order == nil {
 		return nil, nil, ErrFactoryLineNotFound
@@ -159,6 +176,10 @@ func (l *FactoryLine) RecordPassedStageWithoutRun(
 		CreatedAt:      now,
 		UpdatedAt:      now,
 		FinishedAt:     &now,
+	}
+	if len(startOptions) > 0 {
+		dispatch.Model = strings.TrimSpace(startOptions[0].Model)
+		dispatch.ThinkingLevel = strings.TrimSpace(startOptions[0].ThinkingLevel)
 	}
 	if err := tx.Clauses(clause.Returning{}).Create(dispatch).Error; err != nil {
 		return nil, nil, err
@@ -269,6 +290,12 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 	}
 
 	step := steps[stepIndex]
+	if err := order.RequireExecutionOwner(tx, true); err != nil {
+		return l.rejectStepAdmission(tx, order, stepIndex, err)
+	}
+	if err := order.ValidateSubscriptionCanvasModels(tx, step.AppID, l.Model); err != nil {
+		return l.rejectStepAdmission(tx, order, stepIndex, err)
+	}
 
 	node, err := FindCanvasNode(tx, step.AppID, step.Entrypoint)
 	if err != nil {
@@ -343,6 +370,15 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 
 	if err := l.RecordStepExecutionCreated(tx, order, execution, run); err != nil {
 		return nil, err
+	}
+	notes, err := order.StatusNotes()
+	if err != nil {
+		return nil, err
+	}
+	if slices.ContainsFunc(notes, func(note FactoryWorkOrderStatusNote) bool { return note.Key == subscriptionAdmissionStatusNoteKey }) {
+		if err := order.ClearStatusNote(tx, subscriptionAdmissionStatusNoteKey); err != nil {
+			return nil, err
+		}
 	}
 
 	return &FactoryLineStepResult{
@@ -484,9 +520,9 @@ func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) ([]*FactoryLin
 
 // RetryLineStep starts stepIndex again on a traversal that already ran
 // earlier steps. It does not open a new dispatch, so earlier steps stay
-// on the same history. The second return lists every started step that
-// has a canvas run, including waiters this retry admitted. The caller
-// must publish those runs after commit.
+// on the same history. The second return includes admitted runs and failed
+// attempts, including waiters this retry admitted. The caller publishes
+// runs and task refreshes after commit.
 func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepIndex int) (*FactoryLineStepResult, []*FactoryLineStepResult, error) {
 	if stepIndex < 0 {
 		return nil, nil, ErrFactoryLineStepOutOfRange
@@ -519,7 +555,7 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 			return nil, nil, err
 		}
 
-		return result, append(abandoned, startedLineStepResults(result)...), nil
+		return result, append(abandoned, lineStepExecutionResults(result)...), nil
 	}
 
 	var started []*FactoryLineStepResult
@@ -551,13 +587,13 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return nil, nil, err
 	}
 
-	return result, append(started, startedLineStepResults(result)...), nil
+	return result, append(started, lineStepExecutionResults(result)...), nil
 }
 
-func startedLineStepResults(results ...*FactoryLineStepResult) []*FactoryLineStepResult {
+func lineStepExecutionResults(results ...*FactoryLineStepResult) []*FactoryLineStepResult {
 	var started []*FactoryLineStepResult
 	for _, result := range results {
-		if result != nil && result.Run != nil {
+		if result != nil && result.Execution != nil {
 			started = append(started, result)
 		}
 	}
@@ -579,7 +615,7 @@ func (l *FactoryWorkOrderLineDispatch) releaseOpenWorkFrom(tx *gorm.DB, stepInde
 		if err != nil {
 			return nil, err
 		}
-		started = append(started, startedLineStepResults(admitted...)...)
+		started = append(started, lineStepExecutionResults(admitted...)...)
 	}
 
 	return started, nil
@@ -856,4 +892,47 @@ func WorkOrderIsWaitingAfterPassedStage(tx *gorm.DB, workOrderID uuid.UUID) (boo
 	}
 	return furthest.Status == FactoryWorkOrderExecutionStatusFinished &&
 		furthest.Result == CanvasRunResultPassed, nil
+}
+
+// rejectStepAdmission records a failed attempt without a run for confirmed
+// subscription failures. Contention and database errors still abort the
+// caller's transaction so the preceding completion can retry unchanged.
+func (l *FactoryWorkOrderLineDispatch) rejectStepAdmission(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int, admissionErr error) (*FactoryLineStepResult, error) {
+	if !IsPermanentSubscriptionAdmissionError(admissionErr) {
+		return nil, admissionErr
+	}
+	canvas, err := FindCanvasInTransaction(tx, l.OrganizationID, l.Steps[stepIndex].AppID)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	execution := &FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: l.OrganizationID,
+		FactoryID:      l.FactoryID,
+		WorkOrderID:    order.ID,
+		LineID:         l.LineID,
+		LineDispatchID: l.ID,
+		StepIndex:      stepIndex,
+		StepName:       canvas.Name,
+		Status:         FactoryWorkOrderExecutionStatusFinished,
+		Result:         CanvasRunResultFailed,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		FinishedAt:     &now,
+	}
+	if err := tx.Create(execution).Error; err != nil {
+		return nil, err
+	}
+	if err := l.Finish(tx, CanvasRunResultFailed); err != nil {
+		return nil, err
+	}
+	if _, err := order.SetStatusNote(tx, FactoryWorkOrderStatusNoteParams{
+		Key:      subscriptionAdmissionStatusNoteKey,
+		Headline: "Task could not start",
+		Body:     admissionErr.Error(),
+	}); err != nil {
+		return nil, err
+	}
+	return &FactoryLineStepResult{Execution: execution}, nil
 }

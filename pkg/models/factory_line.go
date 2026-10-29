@@ -122,8 +122,8 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 // FactoryLineStepResult is the outcome of making a work order ready for a
 // step (see FactoryLine.Dispatch and
 // FactoryWorkOrderLineDispatch.EnqueueOrStartStep): either the run +
-// execution created by starting it, or — when the step is at its
-// maxParallelism — the queue item created instead (Run and Execution nil).
+// execution created by starting it, a failed execution without a run when
+// subscription admission is rejected, or a queue item when at capacity.
 type FactoryLineStepResult struct {
 	Run       *CanvasRun
 	Execution *FactoryWorkOrderExecution

@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { factoriesDescribeFactoryCodexConnection, factoriesStartFactoryCodexConnection } from "@/api-client";
 
 import { useFactoryCodexConnection } from "./useFactoryCodexConnection";
+import { factoryOwnerEligibilityKey } from "@/hooks/useFactoryOwnerEligibility";
+import { factoryLineRunnerModelsQueryKey } from "@/hooks/useFactoryLineRunnerModels";
 
 let canUpdate = true;
 vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ canAct: () => canUpdate }) }));
@@ -63,6 +65,25 @@ describe("useFactoryCodexConnection", () => {
     await waitFor(() => expect(result.result.current.query.isSuccess).toBe(true));
 
     expect(factoriesStartFactoryCodexConnection).not.toHaveBeenCalled();
+  });
+
+  it("refreshes cached ownership and line models after sign-in completes", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const eligibilityKey = factoryOwnerEligibilityKey("org-1", "factory-1");
+    const catalogKey = factoryLineRunnerModelsQueryKey("org-1", "factory-1", "ship");
+    client.setQueryData(eligibilityKey, { members: [{ userId: "member-1", eligible: false }] });
+    client.setQueryData(catalogKey, { models: [] });
+    vi.mocked(factoriesDescribeFactoryCodexConnection).mockResolvedValue({
+      data: { connection: { status: "ready", availableModels: ["gpt-5.6-sol"] } },
+    } as never);
+    const result = renderHook(() => useFactoryCodexConnection("org-1", "factory-1", true), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    await waitFor(() => expect(result.result.current.query.isSuccess).toBe(true));
+    await waitFor(() => expect(client.getQueryState(eligibilityKey)?.isInvalidated).toBe(true));
+    expect(client.getQueryState(catalogKey)?.isInvalidated).toBe(true);
   });
 
   it("detects a saved sign-in after an initial status request fails", async () => {
