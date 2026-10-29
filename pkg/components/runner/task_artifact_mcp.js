@@ -5,11 +5,6 @@ const fs = require("node:fs");
 const crypto = require("node:crypto");
 const path = require("node:path");
 const { PUBLISH_LINK_TOOL, publishLink } = require("./publish_link");
-const {
-  ownerTools,
-  suggestOwners,
-  assignOwner,
-} = require("./task_owner_tools");
 
 const MAX_ARTIFACT_BYTES = 100 * 1024 * 1024;
 const MAX_INSPECTABLE_SCREENSHOT_BYTES = 5 * 1024 * 1024;
@@ -370,7 +365,7 @@ function listedTools(env = process.env) {
   const tools = [];
   if (visualEvidenceToolsEnabled(env)) tools.push(...VISUAL_EVIDENCE_TOOLS);
   if (envFlag("SUPERPLANE_PUBLISH_LINKS", env)) tools.push(PUBLISH_LINK_TOOL);
-  return [...tools, ...ownerTools(env)];
+  return tools;
 }
 
 const VISUAL_EVIDENCE_TOOLS = [
@@ -489,8 +484,6 @@ async function handleRequest(message) {
     else if (name === "report_visual_evidence_unavailable")
       result = reportVisualEvidenceUnavailable(args);
     else if (name === "publish_link") result = await publishLink(args);
-    else if (name === "suggest_owners") result = await suggestOwners(args);
-    else if (name === "assign_owner") result = await assignOwner(args);
     else throw new Error(`Unknown tool: ${name}`);
     const content = result.content || [{ type: "text", text: JSON.stringify(result) }];
     const structuredContent = result.structuredContent || result;

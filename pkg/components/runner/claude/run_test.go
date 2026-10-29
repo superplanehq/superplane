@@ -74,8 +74,9 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__propose_update")
 	assert.Contains(t, tools, "mcp__superplane__inspect_attachment")
-	assert.Contains(t, tools, "mcp__superplane__suggest_owners")
-	assert.Contains(t, tools, "mcp__superplane__assign_owner")
+	assert.NotContains(t, tools, "mcp__superplane__suggest_owners")
+	assert.NotContains(t, tools, "mcp__superplane__assign_owner")
+	assert.NotContains(t, tools, "mcp__superplane_global")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
 	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
 	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
@@ -85,6 +86,50 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.NotContains(t, tools, "mcp__superplane__propose_draft")
 	assert.NotContains(t, tools, "Edit")
 	assert.NotContains(t, tools, "Write")
+}
+
+func TestClaudeAllowsAndStartsTheGlobalMCPServer(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"task run": {"SUPERPLANE_RUNNER_TOKEN": "runner-token"},
+		"planning": {
+			"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+			"SUPERPLANE_RUNNER_TOKEN":          "runner-token",
+		},
+		"merge confidence": {
+			"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "merge-token",
+			"SUPERPLANE_RUNNER_TOKEN":           "runner-token",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tools := strings.Split(allowedClaudeToolsFromScript(t, env), ",")
+			assert.Contains(t, tools, "mcp__superplane_global")
+			assert.NotContains(t, tools, "mcp__superplane__suggest_owners")
+
+			taskDir := t.TempDir()
+			config := claudeMCPConfigFromScript(t, taskDir, env, false)
+			servers, _ := config["mcpServers"].(map[string]any)
+			global, _ := servers["superplane_global"].(map[string]any)
+			assert.Equal(t, []any{filepath.Join(taskDir, "superplane_mcp", "server.js")}, global["args"])
+		})
+	}
+}
+
+func claudeMCPConfigFromScript(t *testing.T, taskDir string, env map[string]string, includeSuperplane bool) map[string]any {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { writeClaudeMCPConfig } = require(process.argv[1]); process.stdout.write(writeClaudeMCPConfig(process.argv[2], JSON.parse(process.argv[3]), process.argv[4] === "true"));`, script, taskDir, string(payload), fmt.Sprint(includeSuperplane))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	require.NotEmpty(t, string(out))
+	content, err := os.ReadFile(string(out))
+	require.NoError(t, err)
+	var config map[string]any
+	require.NoError(t, json.Unmarshal(content, &config))
+	return config
 }
 
 func TestAllowedClaudeToolsUsesProposeUpdateWithoutReviewEnv(t *testing.T) {

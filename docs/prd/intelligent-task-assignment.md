@@ -152,6 +152,19 @@ integration of the factory. The server:
 
 ## Endpoints
 
+The `superplane_global` MCP server and the `superplane task` CLI call these
+routes with `SUPERPLANE_RUNNER_TOKEN`. The token scope selects the task: the
+draft task of a planning session, or the task of the run.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/v1/runner/tools` | List the global tools that the run token allows. |
+| `POST /api/v1/runner/task/suggest-owners` | List members and rank code owners for the task. |
+| `PUT /api/v1/runner/task/owner` | Set the owner of the task. |
+
+The routes below stay for one release so that runs that started before the
+change can finish. Remove them in a later release.
+
 | Route | Purpose |
 | --- | --- |
 | `POST /api/v1/runner/planning-sessions/suggest-owners` | List members and rank code owners for the session task. |
@@ -163,7 +176,7 @@ integration of the factory. The server:
 
 No new deployment configuration is required. API and worker processes use the
 existing signing secret and runner API URL configuration. The runner receives
-the managed `SUPERPLANE_OWNER_TOKEN` and `SUPERPLANE_BASE_URL` for each eligible
+the managed `SUPERPLANE_RUNNER_TOKEN` and `SUPERPLANE_BASE_URL` for each eligible
 execution. Codex forwards the token by environment variable name.
 
 Code-history ranking uses the existing factory GitHub integration. Bitbucket

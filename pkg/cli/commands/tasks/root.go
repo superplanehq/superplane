@@ -197,6 +197,38 @@ Example:
 		assignees: &taskAssignAssignees,
 	}, options)
 
+	var (
+		taskSuggestWorkspace string
+		taskSuggestTaskID    string
+		taskSuggestPaths     []string
+	)
+
+	taskSuggestCmd := &cobra.Command{
+		Use:   "suggest-owners",
+		Short: "List people who can own a task",
+		Long: `List the people who can own a task.
+
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
+
+--path is a repository path. Repeat it for each path the change touches.
+SuperPlane uses the first 10 paths and ranks members who changed them.
+Without --path, the command lists members only.
+
+Example:
+  superplane tasks suggest-owners --workspace super --task 1823 --path pkg/payments`,
+		Args: cobra.NoArgs,
+	}
+	taskSuggestCmd.Flags().StringVar(&taskSuggestWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	bindTaskIDFlag(taskSuggestCmd, &taskSuggestTaskID)
+	taskSuggestCmd.Flags().StringArrayVar(&taskSuggestPaths, "path", nil, "repository path (repeatable, at most 10)")
+	core.Bind(taskSuggestCmd, &taskSuggestOwnersCommand{
+		workspace: &taskSuggestWorkspace,
+		taskID:    &taskSuggestTaskID,
+		paths:     &taskSuggestPaths,
+	}, options)
+
 	artifactCmd := &cobra.Command{
 		Use:     "artifacts",
 		Short:   "Manage task artifacts",
@@ -305,6 +337,7 @@ Example:
 	root.AddCommand(taskCreateCmd)
 	root.AddCommand(taskDispatchCmd)
 	root.AddCommand(taskAssignCmd)
+	root.AddCommand(taskSuggestCmd)
 	root.AddCommand(artifactCmd)
 
 	return root
