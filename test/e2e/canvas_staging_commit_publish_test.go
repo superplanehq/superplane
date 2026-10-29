@@ -23,6 +23,10 @@ func TestCanvasStagingCommitPromoteLive(t *testing.T) {
 		steps.whenIStageNode("PromotedNode")
 		steps.thenNodeIsVisibleInEditor("PromotedNode")
 		steps.thenNodeIsOnlyStagedNotLive("PromotedNode")
+		steps.whenIExitEditMode()
+		steps.thenNodeIsHiddenOnLiveView("PromotedNode")
+		steps.whenIEnterEditMode()
+		steps.thenNodeIsVisibleInEditor("PromotedNode")
 		steps.whenICommitStaging()
 		steps.thenStagingIsCleared()
 		steps.thenCommitPromotedNodeToLive("PromotedNode", initialLiveVersionID)
@@ -95,6 +99,12 @@ func (s *canvasStagingPromoteSteps) thenCommitPromotedNodeToLive(nodeName string
 func (s *canvasStagingPromoteSteps) thenNodeIsVisibleOnLiveView(nodeName string) {
 	s.session.AssertVisible(q.TestID("canvas-edit-button"))
 	s.session.AssertText(nodeName)
+}
+
+func (s *canvasStagingPromoteSteps) thenNodeIsHiddenOnLiveView(nodeName string) {
+	s.session.AssertVisible(q.TestID("canvas-edit-button"))
+	s.session.AssertHidden(q.TestID("node", nodeName, "header"))
+	s.canvas.AssertLiveCanvasLacksNode(nodeName)
 }
 
 func (s *canvasStagingPromoteSteps) thenVersionHistoryShowsCommit() {
