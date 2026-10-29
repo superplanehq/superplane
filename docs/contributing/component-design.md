@@ -17,8 +17,6 @@ This guide establishes **product design principles and quality standards** for S
 - Code patterns and syntax
 - Backend/frontend architecture
 
-For implementation, see [integrations.md](integrations.md) and [component-implementations.md](component-implementations.md).
-
 ## Table of Contents
 
 - [Glossary](#glossary)
@@ -1003,5 +1001,4 @@ Use this checklist when designing or reviewing components.
 
 ## References
 
-- [Integration Development Guide](integrations.md) - Creating new integrations
 - [Component Implementation Patterns](component-implementations.md) - Backend implementation best practices

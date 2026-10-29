@@ -19,12 +19,18 @@ func (s *Server) refreshCodexSubscriptionTaskToken(ctx context.Context, task *mo
 	if err != nil {
 		return nil, err
 	}
+	if lease != nil && lease.RevokedAt != nil {
+		return nil, models.ErrCodexConnectionStale
+	}
 	if lease == nil || lease.Login() {
 		return payload, nil
 	}
 	connection, err := models.FindFactoryCodexConnectionByID(db, lease.ConnectionID)
 	if err != nil {
 		return nil, err
+	}
+	if connection.RevocationPendingAt != nil || connection.Status != models.CodexConnectionStatusReady {
+		return nil, models.ErrCodexConnectionNotReady
 	}
 	var document map[string]json.RawMessage
 	var spec runnerpayload.TaskPayload

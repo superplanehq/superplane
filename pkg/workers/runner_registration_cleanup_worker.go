@@ -142,7 +142,39 @@ func (w *RunnerCleanupWorker) Process() error {
 	); err != nil {
 		return err
 	}
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	connections, err := models.ListPendingCodexRevocations(database.DB(context.Background()))
+	if err != nil {
+		return err
+	}
+	for i := range connections {
+		var results []*models.RunCancellationResult
+		err := database.DB(context.Background()).Transaction(func(tx *gorm.DB) error {
+			var err error
+			results, err = connections[i].CleanupRevocation(tx, now)
+			return err
+		})
+		if err != nil {
+			return err
+		}
+		notifier := &RunCancellationNotifier{}
+		notifier.RecordRuns(results)
+		notifier.Publish()
+		if len(results) > 0 || connections[i].RevocationPendingAt == nil {
+			_ = messages.PublishFactoryCodexConnectionUpdated(connections[i].FactoryID.String())
+		}
+	}
+	var logins []models.FactoryCodexConnection
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		logins, err = models.ListCodexLoginConnections(tx)
+		if err != nil {
+			return err
+		}
 		return models.ReleaseConfirmedCodexReservations(tx, now)
 	})
+	if err != nil {
+		return err
+	}
+	messages.PublishCodexConnectionChanges(database.DB(context.Background()), logins)
+	return nil
 }

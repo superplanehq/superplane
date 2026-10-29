@@ -140,7 +140,6 @@ sign-off, and the review process.
 ### Adding new integrations to SuperPlane
 
 - **[Opening PRs for integrations](docs/contributing/integration-prs.md)** — Checklist for opening and submitting integration PRs (title, description, video, frontend/backend/docs, CI, DCO)
-- **[Integrations](docs/contributing/integrations.md)** — Instructions for adding new third-party integrations to SuperPlane
 - **[Component Implementation](docs/contributing/component-implementations.md)** — Step-by-step instructions for creating new components or triggers
 - **[Templates](docs/contributing/templates.md)** — Guide for creating and adding new workflow templates
 - **[Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/17)** — View all integration-related work on the SuperPlane Board

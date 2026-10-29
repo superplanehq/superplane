@@ -538,6 +538,9 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 		"column": result.Column,
 		"url":    links.url(order.GetNumber()),
 	}
+	if pending := order.GetPendingHandoff(); pending != nil {
+		payload["pending_handoff"] = map[string]any{"line_id": pending.GetLineId(), "column": pending.GetColumn(), "pull_request_url": pending.GetPullRequestUrl()}
+	}
 	if result.PullRequestURL != "" {
 		payload["pull_request_url"] = result.PullRequestURL
 	}
