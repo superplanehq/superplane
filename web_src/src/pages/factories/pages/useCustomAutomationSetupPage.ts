@@ -11,6 +11,7 @@ import {
   customAutomationDraft,
   customAutomationMode,
   customAutomationSettings,
+  customAutomationSchedule,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
   workspaceAgentFromOnboarding,
   type CustomAutomationMode,
@@ -31,6 +32,7 @@ export function useCustomAutomationSetupPage(args: {
   const update = useUpdateFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId ?? "");
   const [name, setName] = useState("Custom automation");
   const [mode, setMode] = useState<CustomAutomationMode>("manual");
+  const [schedule, setSchedule] = useState(() => customAutomationSchedule());
   const [icon, setIcon] = useState(DEFAULT_CUSTOM_AUTOMATION_ICON);
   const agentHarness = args.factory?.onboarding?.agentHarness;
   const [draft, setDraft] = useState<PlanningReviewDraft>(() =>
@@ -45,6 +47,7 @@ export function useCustomAutomationSetupPage(args: {
     }
     setName("Custom automation");
     setMode("manual");
+    setSchedule(customAutomationSchedule());
     setIcon(DEFAULT_CUSTOM_AUTOMATION_ICON);
     setDraft(customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }));
     setSaveError("");
@@ -56,6 +59,7 @@ export function useCustomAutomationSetupPage(args: {
     }
     setName(automation.automation?.name?.trim() || "Custom automation");
     setMode(customAutomationMode(automation.settings?.startMode));
+    setSchedule(customAutomationSchedule(automation));
     setIcon(automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON);
     setDraft(customAutomationDraft(automation));
   }, [automation]);
@@ -66,6 +70,16 @@ export function useCustomAutomationSetupPage(args: {
   const validationError = useMemo(() => validateDraft(name, draft), [draft, name]);
 
   const save = async () => {
+    if (
+      mode === "scheduled" &&
+      (!schedule.cronExpression.trim() ||
+        !Number.isFinite(schedule.utcOffset) ||
+        schedule.utcOffset < -12 ||
+        schedule.utcOffset > 14)
+    ) {
+      setSaveError("Enter a cron expression and a UTC offset from -12 to +14 hours.");
+      return false;
+    }
     if (validationError) {
       setSaveError(validationError);
       return;
@@ -73,7 +87,7 @@ export function useCustomAutomationSetupPage(args: {
     setSaveError("");
     const input = {
       name: name.trim(),
-      settings: customAutomationSettings(mode, draft, icon),
+      settings: customAutomationSettings(mode, draft, icon, schedule),
     };
     try {
       if (args.automationId) {
@@ -97,6 +111,8 @@ export function useCustomAutomationSetupPage(args: {
     setName,
     mode,
     setMode,
+    schedule,
+    setSchedule,
     icon,
     setIcon,
     draft,

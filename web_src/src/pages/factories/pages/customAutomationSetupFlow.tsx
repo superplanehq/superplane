@@ -33,10 +33,14 @@ export function AutomationFlow({
         <FlowCard selected={selectedStep === null} onClick={onSelectTrigger}>
           <FlowBadge kind="trigger" />
           <p className="mt-3 text-sm font-semibold text-foreground">
-            {mode === "automatic" ? "Every pull request commit" : "Manual"}
+            {mode === "scheduled" ? "Schedule" : mode === "automatic" ? "Every pull request commit" : "Manual"}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {mode === "automatic" ? "Runs for every new pull request commit." : "Runs when you start it from a task."}
+            {mode === "scheduled"
+              ? "Runs on the repository default branch."
+              : mode === "automatic"
+                ? "Runs for every new pull request commit."
+                : "Runs when you start it from a task."}
           </p>
         </FlowCard>
         {steps.map((step, index) => (
