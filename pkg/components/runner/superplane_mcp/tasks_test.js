@@ -47,6 +47,20 @@ test("list_tasks rejects a limit above 100", async () => {
   );
 });
 
+test("create_task counts an emoji as one character", async () => {
+  const calls = [];
+  const client = createClient(env, recordingFetch(calls, '{"id":"1","state":"draft"}'));
+  const title = `${"a".repeat(255)}😀`;
+
+  await registry.findTool("create_task").handler({ title }, client);
+
+  assert.equal(calls[0].body.title, title);
+  await assert.rejects(
+    () => registry.findTool("create_task").handler({ title: `${title}b` }, client),
+    /title must be at most 256 characters/,
+  );
+});
+
 test("create_task requires a title", async () => {
   const client = createClient(env, recordingFetch([]));
   await assert.rejects(() => registry.findTool("create_task").handler({}, client), /title is required/);

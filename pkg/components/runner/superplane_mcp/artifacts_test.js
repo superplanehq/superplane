@@ -31,6 +31,20 @@ test("remove_artifact deletes by key or title", async () => {
   assert.deepEqual(calls[1].body, { title: "PLAN.md" });
 });
 
+test("remove_artifact counts an emoji as one character", async () => {
+  const calls = [];
+  const client = createClient(env, recordingFetch(calls));
+  const title = `${"a".repeat(1023)}😀`;
+
+  await registry.findTool("remove_artifact").handler({ title }, client);
+
+  assert.equal(calls[0].body.title, title);
+  await assert.rejects(
+    () => registry.findTool("remove_artifact").handler({ title: `${title}b` }, client),
+    /title must be at most 1024 characters/,
+  );
+});
+
 test("remove_artifact requires a key or a title", async () => {
   const client = createClient(env, recordingFetch([]));
   await assert.rejects(

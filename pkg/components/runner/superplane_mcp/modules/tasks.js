@@ -7,6 +7,17 @@ const MAX_STATE_VALUES = 3;
 const MAX_TITLE_LENGTH = 256;
 const MAX_DESCRIPTION_LENGTH = 20000;
 
+function exceedsCodePoints(value, max) {
+  let count = 0;
+  for (let index = 0; index < value.length; ) {
+    count += 1;
+    if (count > max) return true;
+    const code = value.codePointAt(index);
+    index += code > 0xffff ? 2 : 1;
+  }
+  return false;
+}
+
 function stateValues(raw) {
   if (raw == null || raw === "") return [];
   const values = Array.isArray(raw) ? raw : [raw];
@@ -36,9 +47,9 @@ async function listTasks(input, client) {
 async function createTask(input, client) {
   const title = String((input && input.title) || "").trim();
   if (!title) throw new Error("title is required");
-  if (title.length > MAX_TITLE_LENGTH) throw new Error("title must be at most 256 characters");
+  if (exceedsCodePoints(title, MAX_TITLE_LENGTH)) throw new Error("title must be at most 256 characters");
   const description = String((input && input.description) || "").trim();
-  if (description.length > MAX_DESCRIPTION_LENGTH) {
+  if (exceedsCodePoints(description, MAX_DESCRIPTION_LENGTH)) {
     throw new Error("description must be at most 20000 characters");
   }
   return client.request("POST", "/api/v1/runner/tasks", { title, description });

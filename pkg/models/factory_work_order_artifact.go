@@ -438,15 +438,25 @@ func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTitle(tx *gorm.DB, title s
 	return o.findNewestUnkeyedArtifact(tx, "", title)
 }
 
-// findNewestUnkeyedArtifact loads one matching row. The title compare uses
-// btrim so a padded stored title still matches, and LIMIT 1 keeps the scan
-// from reading every artifact on the task.
+// artifactTitleEdgeSpace matches unicode.IsSpace, which strings.TrimSpace uses.
+// The SQL compare strips those same characters from the stored title.
+const artifactTitleEdgeSpace = "\t\n\v\f\r \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+
+func artifactTitleTrimPattern() string {
+	class := "[" + artifactTitleEdgeSpace + "]"
+	return "^" + class + "+|" + class + "+$"
+}
+
+// findNewestUnkeyedArtifact loads one matching row. The title compare strips
+// the same edge whitespace as strings.TrimSpace. LIMIT 1 keeps the scan from
+// reading every artifact on the task.
 func (o *FactoryWorkOrder) findNewestUnkeyedArtifact(tx *gorm.DB, artifactType, title string) (*FactoryWorkOrderArtifact, error) {
 	query := tx.Model(&FactoryWorkOrderArtifact{}).Where(
-		"organization_id = ? AND factory_id = ? AND work_order_id = ? AND key IS NULL AND jsonb_typeof(data->'title') = 'string' AND btrim(data->>'title') = ?",
+		"organization_id = ? AND factory_id = ? AND work_order_id = ? AND key IS NULL AND jsonb_typeof(data->'title') = 'string' AND regexp_replace(data->>'title', ?, '', 'g') = ?",
 		o.OrganizationID,
 		o.FactoryID,
 		o.ID,
+		artifactTitleTrimPattern(),
 		title,
 	)
 	if artifactType != "" {
