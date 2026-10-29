@@ -1,158 +1,70 @@
 # Architecture Overview
 
-This document provides a high-level overview of SuperPlane's architecture to help contributors understand the core system components.
+SuperPlane coordinates software work in organization-scoped workspaces. This
+guide connects the product concepts to the code used to plan, run, and review
+tasks.
 
-SuperPlane is built as a modular monolith, where each module (API, Workers, etc.) can be independently scaled based on workload requirements.
+## Product model
 
-## Key Concepts
+| Concept                   | Role                                                                    |
+| ------------------------- | ----------------------------------------------------------------------- |
+| Organization              | Owns workspaces, members, and integrations.                             |
+| Workspace (`Factory`)     | Groups tasks, automations, and workspace settings.                      |
+| Task (`FactoryWorkOrder`) | Tracks a unit of software work through planning and execution.          |
+| Automation                | A versioned execution graph of triggers and components.                 |
+| Runner job (`RunnerTask`) | One execution job for a runner. A product task can create several jobs. |
 
-### API
+## Runtime components
 
-The API handles all user requests and business logic. It consists of a Public API (serves the frontend and REST endpoints) and an Internal API (gRPC server with business logic). The API is built with Go, using gRPC for the Internal API and gRPC-Gateway to expose REST endpoints. API contracts are defined using Protocol Buffers.
+The Go server provides API handlers, execution workers, and the Runner API.
+A deployment can run these roles together or in separate server processes.
+The React UI uses REST for requests and WebSocket for updates. Protocol Buffers
+define the API contracts; the REST gateway calls application actions in process.
 
-### Workers
+PostgreSQL stores domain objects, execution records, and queued runner jobs.
+RabbitMQ carries worker events and runner-control notifications. Integrated
+runners receive work through the Runner API over HTTP and WebSocket.
+Active runner logs use filesystem storage; workers compact them into blob archives.
 
-Workers are background processes that handle asynchronous tasks like workflow execution, webhook management, and maintenance. They communicate via RabbitMQ message queues. Workers are implemented in Go and consume messages from RabbitMQ queues for processing.
+Fleet Manager reads capacity through the installation admin API and provisions
+or removes runners.
 
-### Message Passing
+![Factory architecture: UI, server, runner capacity, and persistence](../images/factory-architecture.png)
 
-Message passing enables asynchronous communication between the API and workers via RabbitMQ. It allows tasks to be queued and processed independently, enabling horizontal scaling and reliable message delivery. RabbitMQ provides the message queue infrastructure for this communication.
+[Diagram source and render instructions](https://github.com/velrino/superplane/tree/92159774f9343c779d759471da8aaa3731ca27d6/source).
 
-### Data Persistence
+## From task to execution
 
-All data is persisted in PostgreSQL, including workflows, users, organizations, integrations, and components. The system uses GORM as the ORM for database access and migrations.
+1. A user or intake integration creates a task in a workspace. Dispatch starts
+   or queues a configured automation step.
+2. The server pins the run to the live automation version and records its
+   execution. Workers initialize the graph, route events, and invoke components.
+3. Components can call external APIs or queue a `RunnerTask` for an integrated
+   runner. A connected runner reserves a job from its fleet through the Runner API.
+4. For runner jobs, the runner uploads logs and reports completion. Workers resume
+   the graph and update the task execution. After an automation finishes, the next
+   configured step can start.
 
-### Frontend
+Local development uses the integrated runner stack. The retired task broker is
+retained for historical logs.
 
-The frontend is a React application built with TypeScript and Vite. It communicates with the Public API via REST endpoints and receives real-time updates via WebSocket. The TypeScript API client is auto-generated from the OpenAPI specification.
+## Find the code
 
-## Core Event Processing System
+| Location                                                                                                               | Purpose                                                    |
+| ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [cmd/server](../../cmd/server), [cmd/cli](../../cmd/cli)                                                               | Server and CLI entrypoints.                                |
+| [web_src/src/pages/factories](../../web_src/src/pages/factories), [web_src/src/pages/app](../../web_src/src/pages/app) | Workspace UI and automation editor.                        |
+| [pkg/public](../../pkg/public), [pkg/grpc/actions/factories](../../pkg/grpc/actions/factories)                         | HTTP gateway, webhooks, and Factory actions.               |
+| [pkg/models](../../pkg/models)                                                                                         | Persistent domain objects and transactional state changes. |
+| [pkg/workers](../../pkg/workers), [pkg/components](../../pkg/components)                                               | Graph scheduling and built-in components.                  |
+| [pkg/integrations](../../pkg/integrations)                                                                             | External tool integrations.                                |
+| [cmd/runner](../../cmd/runner), [pkg/runners](../../pkg/runners)                                                       | Runner executable and execution engines.                   |
+| [pkg/public/runnerapi](../../pkg/public/runnerapi)                                                                     | Runner registration, job delivery, logs, and completion.   |
+| [cmd/fleetmanager](../../cmd/fleetmanager), [pkg/fleets](../../pkg/fleets)                                             | Fleet Manager executable and capacity reconciliation.      |
+| [protos](../../protos), [db](../../db)                                                                                 | API contracts, database schema, and migrations.            |
 
-The event processing system is the engine that drives workflow execution. It operates on an event-driven model where events flow through workflow graphs, triggering component execution.
+The generated UI client is `web_src/src/api-client/`. Run `make pb.gen` to
+regenerate API clients after changing protos. Generated clients are ignored by Git.
 
-**Event Lifecycle:**
-
-1. **Event Creation**: Events are created when triggers fire (webhooks, schedules, manual starts) or when components complete execution. Events are stored in the database with a `pending` state.
-
-2. **Event Routing**: The WorkflowEventRouter worker periodically scans for pending events and routes them through the workflow graph. It identifies downstream nodes connected via edges and creates queue items for nodes that should execute.
-
-3. **Queue Processing**: Queue items are created for each node that should receive the event. These items are published to RabbitMQ for asynchronous processing.
-
-4. **Component Execution**: Workers consume queue items and execute the corresponding components. Components process the event data, perform their actions, and emit new events upon completion.
-
-5. **Event Propagation**: When a component finishes, it emits a new event that flows to its downstream nodes, continuing the workflow execution cycle.
-
-This architecture enables parallel execution of independent workflow branches, reliable event delivery, and scalable processing through worker queues.
-
-## Authentication & Authorization
-
-SuperPlane uses a multi-layered security model to authenticate users and enforce fine-grained permissions.
-
-**Authentication:**
-
-- **JWT Tokens**: Users authenticate via JWT tokens stored in cookies (for web UI) or Bearer tokens (for API access)
-- **User API Tokens**: Long-lived tokens for programmatic API access
-- **OIDC Support**: Optional OIDC authentication for external identity providers
-
-**Authorization:**
-
-- **RBAC with Casbin**: Role-based access control is implemented using Casbin, which provides flexible policy management
-- **Organization-Scoped Permissions**: All permissions are scoped to organizations, ensuring complete tenant isolation
-- **Permission Model**: Permissions are defined as resource-action pairs (e.g., "workflows:create", "integrations:read")
-- **Groups and Roles**: Users can be assigned to groups with specific roles, enabling team-based access control
-
-**Enforcement:**
-
-- **API Layer**: Authorization is enforced at the gRPC interceptor level, checking permissions before any business logic executes
-- **Context Propagation**: User and organization context is extracted from request metadata and propagated through the call chain
-- **Policy Loading**: Policies are loaded dynamically from the database, allowing real-time permission updates without service restarts
-
-This architecture ensures that all API requests are authenticated and authorized before accessing any resources, with complete isolation between organizations.
-
-## Core Database Entities
-
-The database model follows a hierarchical structure that enables multi-tenancy and resource organization:
-
-**Account:**
-
-- Represents a person's identity (email, name)
-- Can have multiple OAuth providers (GitHub, Google, etc.) linked via `account_providers`
-- One account can belong to multiple organizations through different users
-
-**User:**
-
-- Represents a person's membership in a specific organization
-- Links an Account to an Organization
-- Each user has organization-scoped permissions and roles
-- A single account can have multiple users (one per organization they belong to)
-
-**Organization:**
-
-- Top-level tenant boundary providing complete data isolation
-- All resources (canvases, integrations, secrets) are scoped to an organization
-
-**Canvas:**
-
-- Workspace for building and managing workflows
-- Belongs to an organization
-- Contains multiple workflows with their nodes and edges
-- Stores workflow graph structure, node configurations, and metadata
-- Versioning is always enabled: users edit the live canvas through a stage → commit loop. Canvas/console/files edits autosave into per-user `workflow_staged_files`; **Commit** creates a new version on main and promotes it to live
-- Edit paths:
-  - **Web UI and agent tools** stage canvas/console/files edits into `workflow_staged_files`, then require **Commit** with a message to go live. Agent reads serve the effective staged content and agent `patch_staging` writes go through the same staging layer
-  - **CLI** stages via `PUT /staging` and goes live via `POST /staging/commit`
-- Stale staging (when main moved while the user had staged edits) must be discarded before new edits can be committed.
-
-**Integration:**
-
-- Connects SuperPlane to external services (GitHub, Semaphore, etc.)
-- Stores encrypted credentials and configuration
-- Scoped to an organization
-- Enables components to interact with third-party APIs
-
-**Relationship Hierarchy:**
-
-```
-Account (1) ──→ (N) Users ──→ (1) Organization
-Organization (1) ──→ (N) Canvases
-Organization (1) ──→ (N) Integrations
-```
-
-## Directory Structure
-
-- **`cmd/`** - Application entry points
-
-  - `cmd/server/` - Main server entry point
-  - `cmd/cli/` - CLI tool entry point
-
-- **`pkg/`** - Core Go packages
-
-  - `pkg/grpc/` - gRPC service implementations
-  - `pkg/workers/` - Background worker processes
-  - `pkg/models/` - Database models and ORM logic
-  - `pkg/components/` - Workflow component implementations
-  - `pkg/triggers/` - Event trigger implementations
-  - `pkg/integrations/` - Third-party integration implementations (GitHub, Slack, Discord, etc.)
-  - `pkg/public/` - Public HTTP server (serves UI + REST API)
-  - `pkg/registry/` - Component and trigger registry
-  - `pkg/authentication/` - User authentication logic
-  - `pkg/authorization/` - RBAC and permission checks
-
-- **`web_src/`** - Frontend React application
-
-  - `web_src/src/` - React source code (pages, components, hooks, utils)
-  - `web_src/src/api/` - Auto-generated TypeScript API client
-
-- **`protos/`** - Protocol Buffer definitions for the API (workflows, components, integrations, users, etc.)
-
-- **`db/`** - Database
-
-  - `db/migrations/` - Database migration files
-  - `db/structure.sql` - Current database schema
-
-- **`test/`** - Test files
-
-  - `test/e2e/` - End-to-end tests
-  - `test/support/` - Test support utilities
-
-- **`docs/`** - Documentation (concepts, contributing guides, examples)
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for local setup and
+[model guidelines](../../pkg/models/AGENTS.md) for database changes.
