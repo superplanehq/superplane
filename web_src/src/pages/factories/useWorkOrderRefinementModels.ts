@@ -8,6 +8,7 @@ import {
   hostedSelectableLLMModelKey,
   normalizeSuperPlaneModelValue,
   SELECTABLE_LLM_SOURCE_BYOK,
+  SELECTABLE_LLM_SOURCE_SUBSCRIPTION,
   SELECTABLE_LLM_SOURCE_HOSTED,
   selectableLLMModelsForProvider,
 } from "@/lib/selectableLLMModels";
@@ -21,6 +22,7 @@ import type { SelectableLLMModel } from "@/lib/selectableLLMModels";
 export function useWorkOrderRefinementModels(
   organizationId: string,
   factoryId: string,
+  orderId?: string,
 ): WorkOrderRefinementModelSelection {
   const apps = useFactoryAutomations(organizationId, factoryId);
   const canvasId = findBacklogAutomationApp(apps.data ?? [])?.id;
@@ -31,13 +33,14 @@ export function useWorkOrderRefinementModels(
   const field = planningReviewModelUsedField(component, action.data?.configuration);
   const provider = field?.typeOptions?.hostedModel?.provider ?? "";
   const hosted = provider === HOSTED_MODEL_ALL_PROVIDERS;
+  const configuration = refinementConfiguration(node);
   const models = useSelectableLLMModels(organizationId, {
     factoryId,
-    sources: [hosted ? SELECTABLE_LLM_SOURCE_HOSTED : SELECTABLE_LLM_SOURCE_BYOK],
+    orderId,
+    sources: [refinementCatalogSource(configuration, hosted)],
     enabled: Boolean(node && provider),
   });
   const usage = useOrganizationWorkspaceUsage(organizationId);
-  const configuration = refinementConfiguration(node);
   const current = modelValue(configuration.model);
   const isLoading = [
     apps.isPending,
@@ -77,6 +80,9 @@ function refinementModelSelection(
   models: SelectableLLMModel[],
   usage: { defaultHostedProvider?: string; defaultHostedModel?: string } | undefined,
 ): WorkOrderRefinementModelSelection {
+  if (refinementCatalogSource(configuration, false) === SELECTABLE_LLM_SOURCE_SUBSCRIPTION) {
+    return { defaultModel: "", options: models.map((model) => ({ value: model.model.id, label: model.label })) };
+  }
   const current = modelValue(configuration.model);
   const provider = field?.typeOptions?.hostedModel?.provider ?? "";
   if (!provider) {
@@ -121,4 +127,10 @@ function byokModelSelection(
         }))
       : [],
   };
+}
+
+function refinementCatalogSource(configuration: Record<string, unknown>, hosted: boolean) {
+  const credentials = configuration.credentials as { source?: string } | undefined;
+  if (credentials?.source === "subscription") return SELECTABLE_LLM_SOURCE_SUBSCRIPTION;
+  return hosted ? SELECTABLE_LLM_SOURCE_HOSTED : SELECTABLE_LLM_SOURCE_BYOK;
 }

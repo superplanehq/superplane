@@ -31,6 +31,7 @@ var expressionRegex = regexp.MustCompile(`(?s)\{\{(.*?)\}\}`)
 type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB
 	workflowID          uuid.UUID
+	runID               uuid.UUID
 	nodeID              string
 	previousExecutionID *uuid.UUID
 	incomingEventID     *uuid.UUID
@@ -46,6 +47,11 @@ func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigu
 		tx:         tx,
 		workflowID: workflowID,
 	}
+}
+
+func (b *NodeConfigurationBuilder) WithRunID(runID uuid.UUID) *NodeConfigurationBuilder {
+	b.runID = runID
+	return b
 }
 
 func (b *NodeConfigurationBuilder) WithNodeID(nodeID string) *NodeConfigurationBuilder {
@@ -2393,8 +2399,15 @@ func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, m
 	}
 
 	ok, err := b.nodeAcceptsDispatchModel(resolved, override)
-	if err != nil || !ok {
-		return resolved, err
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		credentials, _ := resolved["credentials"].(map[string]any)
+		if credentials["source"] == "subscription" {
+			return nil, models.ErrSubscriptionModelUnavailable
+		}
+		return resolved, nil
 	}
 
 	resolved["model"] = override
@@ -2532,5 +2545,25 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		return false, err
 	}
 
+	credentials, _ := resolved["credentials"].(map[string]any)
+	if credentials["source"] == "subscription" && workflow.FactoryID != nil {
+		runID := b.runID
+		if runID == uuid.Nil && b.rootEventID != nil {
+			run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+			if err != nil {
+				return false, err
+			}
+			runID = run.ID
+		}
+		order, err := models.FindSubscriptionWorkOrderForRun(b.tx, workflow.OrganizationID, *workflow.FactoryID, runID)
+		if err != nil {
+			return false, err
+		}
+		ownerID, err := order.RequireSubscriptionOwner(b.tx, true)
+		if err != nil {
+			return false, err
+		}
+		return models.RunnerAcceptsModel(b.tx, workflow.OrganizationID, workflow.FactoryID, node.ComponentName(), resolved, model, ownerID)
+	}
 	return models.RunnerAcceptsModel(b.tx, workflow.OrganizationID, workflow.FactoryID, node.ComponentName(), resolved, model)
 }

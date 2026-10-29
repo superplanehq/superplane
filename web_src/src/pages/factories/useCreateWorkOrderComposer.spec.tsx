@@ -112,8 +112,9 @@ describe("useCreateWorkOrderComposer", () => {
     expect(result.current.assigneeIds).toEqual(["user-manual"]);
   });
 
-  it("does not clobber a manual change made after me resolves", () => {
+  it("preserves an explicitly cleared owner when creating the task", async () => {
     permissionsState.currentUserId = "user-me";
+    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
 
     const { result } = renderHook(() =>
       useCreateWorkOrderComposer({
@@ -131,9 +132,19 @@ describe("useCreateWorkOrderComposer", () => {
     });
 
     expect(result.current.assigneeIds).toEqual([]);
+    await act(async () => {
+      await result.current.handleCreate({ title: "No owner", description: "Keep in backlog" });
+    });
+    expect(createMutate).toHaveBeenCalledWith({
+      title: "No owner",
+      description: "Keep in backlog",
+      assigneeIds: [],
+      unassigned: true,
+    });
   });
 
   it("opens the new task without closing to the list first", async () => {
+    permissionsState.currentUserId = "user-me";
     createMutate.mockResolvedValue({ id: "order-1", number: "101" });
 
     const { result } = renderHook(() =>
@@ -155,6 +166,7 @@ describe("useCreateWorkOrderComposer", () => {
 
     expect(onCreated).toHaveBeenCalledWith("101", { id: "order-1", number: "101" });
     expect(onClose).not.toHaveBeenCalled();
+    expect(createMutate).toHaveBeenCalledWith({ title: "Ship the refunds line", description: "" });
   });
 
   it("keeps the first 256 characters of a long pasted title", () => {
@@ -196,7 +208,6 @@ describe("useCreateWorkOrderComposer", () => {
     expect(createMutate).toHaveBeenCalledWith({
       title: "Refunds fail on retry.",
       description: "Refunds fail on retry.",
-      assigneeIds: [],
     });
     expect(onCreated).toHaveBeenCalledWith("101", { id: "order-1", number: "101" });
   });
@@ -223,7 +234,6 @@ describe("useCreateWorkOrderComposer", () => {
     expect(createMutate).toHaveBeenCalledWith({
       title: "New task",
       description: "![receipt.png](sp-file://file-2)",
-      assigneeIds: [],
     });
   });
 

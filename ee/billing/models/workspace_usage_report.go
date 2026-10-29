@@ -243,7 +243,7 @@ const workOrderRunUsageSelect = `
 	COALESCE(SUM(workspace_usage_events.cost_micros), 0) AS cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + coremodels.UsageFundingSourceHosted + `' AND workspace_usage_events.usage_kind = '` + coremodels.UsageKindModel + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
 	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + coremodels.UsageFundingSourceBYOK + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS byok_cost_micros,
-	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + coremodels.UsageKindModel + `' AND workspace_usage_events.funding_source = '` + coremodels.UsageFundingSourceHosted + `' THEN workspace_usage_events.model END, E'\n'), '') AS models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + coremodels.UsageKindModel + `' AND workspace_usage_events.funding_source IN ('` + coremodels.UsageFundingSourceHosted + `', '` + coremodels.UsageFundingSourceSubscription + `') THEN workspace_usage_events.model END, E'\n'), '') AS models,
 	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + coremodels.UsageKindModel + `' AND workspace_usage_events.funding_source = '` + coremodels.UsageFundingSourceBYOK + `' THEN workspace_usage_events.model END, E'\n'), '') AS byok_models,
 	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + coremodels.UsageKindCompute + `' AND workspace_usage_events.machine_type <> '' THEN workspace_usage_events.machine_type END, E'\n'), '') AS machine_types`
 

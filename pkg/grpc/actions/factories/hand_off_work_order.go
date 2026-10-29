@@ -123,6 +123,11 @@ func HandOffWorkOrder(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to hand off work order")
 	}
+	if column == HandOffColumnVerify {
+		if _, err := validateHandOffPullRequestURL(factory, req.PullRequestURL); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to hand off work order")
+		}
+	}
 
 	line, err := resolveHandOffLine(db, factory, req.LineName)
 	if err != nil {
@@ -151,8 +156,13 @@ func HandOffWorkOrder(
 		}
 	}
 
+	assigneeIDs, err := factory.DefaultSubscriptionAssignees(db, &createdByID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to choose task owner")
+	}
+	deferred := factory.OnboardingConfigValue().CodexSubscription && len(assigneeIDs) == 0
 	var pullRequest *handOffPullRequest
-	if column == HandOffColumnVerify {
+	if column == HandOffColumnVerify && !deferred {
 		pullRequest, err = loadHandOffPullRequest(ctx, db, deps, factory, strings.TrimSpace(req.PullRequestURL))
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to hand off work order")
@@ -160,7 +170,6 @@ func HandOffWorkOrder(
 	}
 
 	actor := createdByID
-	assigneeIDs := []uuid.UUID{createdByID}
 	clientName := strings.TrimSpace(req.MCPClientName)
 	if clientName == "" {
 		clientName = models.DefaultMCPClientName
@@ -171,6 +180,15 @@ func HandOffWorkOrder(
 	var trackedPR *models.FactoryPullRequest
 	var dispatched *workOrderLineDispatchResult
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if !deferred {
+			var ownerErr error
+			assigneeIDs, ownerErr = factory.DefaultSubscriptionAssignees(tx, &createdByID)
+			if ownerErr != nil {
+				return ownerErr
+			}
+			deferred = factory.OnboardingConfigValue().CodexSubscription && len(assigneeIDs) == 0
+		}
+
 		created, err := factory.CreateWorkOrder(tx, title, req.Description, &createdByID, assigneeIDs, nil)
 		if err != nil {
 			return err
@@ -195,6 +213,9 @@ func HandOffWorkOrder(
 		if bindErr != nil {
 			return bindErr
 		}
+		if deferred {
+			return order.SetPendingHandOff(tx, &models.PendingHandOff{LineID: line.ID, Column: column, PullRequestURL: strings.TrimSpace(req.PullRequestURL)})
+		}
 		if column == HandOffColumnImplement {
 			started, err := dispatchWorkOrderOnLineTx(tx, factory, order.ID, line, &actor, implementIndex, false, "", "")
 			if err != nil {
@@ -205,7 +226,7 @@ func HandOffWorkOrder(
 			order = started.order
 			return nil
 		}
-		return recordVerifyHandOff(tx, factory, order, line, &actor, pullRequest, verifyIndex)
+		return recordVerifyHandOff(tx, factory, order, line, &actor, pullRequest, verifyIndex, models.FactoryLineStartOptions{})
 	})
 	if delErr := storedfiles.ApplyBindResult(ctx, db, blob.Current(), orgID, factory.ID, bound, err); delErr != nil {
 		log.WithError(delErr).Warn("Failed to delete file objects after bind")
@@ -246,48 +267,16 @@ func HandOffWorkOrder(
 			dispatched.fromState,
 			dispatched.startedSteps,
 		)
-	} else {
-		if err := messages.PublishFactoryWorkOrderUpdated(
-			factory.ID.String(),
-			order.ID.String(),
-			factoryevents.EventTypeOrderStatusUpdated,
-		); err != nil {
-			log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
-		}
-		tracked, err := latestTrackedPullRequest(db, order.ID)
+	} else if !deferred {
+		trackedPR, err = publishVerificationHandOff(ctx, deps, db, factory, order)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to hand off work order")
 		}
-		trackedPR = tracked
-		if trackedPR != nil && trackedPR.Provider == models.FactoryPullRequestProviderGitHub {
-			ScheduleFactoryPullRequestMergeabilityRefresh(
-				ctx,
-				deps,
-				factory.OrganizationID,
-				factory.ID,
-				trackedPR.ID,
-			)
-			StartPullRequestChecks(ctx, deps, trackedPR.ID)
-			StartVisualEvidenceCapture(
-				ctx,
-				deps,
-				factory.OrganizationID,
-				factory.ID,
-				trackedPR.ID,
-			)
+	} else {
+		if err := messages.PublishFactoryWorkOrderUpdated(factory.ID.String(), order.ID.String(), factoryevents.EventTypeOrderUpdated); err != nil {
+			log.WithError(err).Warn("Failed to publish pending handoff")
 		}
-		if trackedPR != nil {
-			if err := StartAutomaticCustomAutomations(ctx, deps, factory, order); err != nil {
-				log.WithError(err).Warnf("Failed to start custom automation for order %s", order.ID)
-			}
-		}
-		if err := messages.PublishFactoryWorkOrderUpdated(
-			factory.ID.String(),
-			order.ID.String(),
-			factoryevents.EventTypeOrderPullRequestAdded,
-		); err != nil {
-			log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
-		}
+
 	}
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
@@ -296,6 +285,10 @@ func HandOffWorkOrder(
 	}
 
 	result := &HandOffWorkOrderResult{Order: serialized, Column: column}
+	if deferred {
+		result.Column = "backlog"
+		result.PullRequestURL = strings.TrimSpace(req.PullRequestURL)
+	}
 	if trackedPR != nil {
 		result.PullRequestURL = trackedPR.URL
 	}
@@ -310,6 +303,7 @@ func recordVerifyHandOff(
 	actor *uuid.UUID,
 	pullRequest *handOffPullRequest,
 	verifyIndex int,
+	options models.FactoryLineStartOptions,
 ) error {
 	if pullRequest == nil {
 		return invalidArgument("pull_request_url is required")
@@ -370,7 +364,7 @@ func recordVerifyHandOff(
 	if err != nil {
 		return err
 	}
-	_, _, err = currentLine.RecordPassedStageWithoutRun(tx, order, verifyIndex)
+	_, _, err = currentLine.RecordPassedStageWithoutRun(tx, order, verifyIndex, options)
 	return err
 }
 
@@ -381,18 +375,31 @@ func loadHandOffPullRequest(
 	factory *models.Factory,
 	rawURL string,
 ) (*handOffPullRequest, error) {
-	parsed, ok := parseHandOffPullRequestURL(rawURL)
-	if !ok {
-		return nil, invalidArgument(handOffPullRequestURLInvalid)
-	}
-	workspaceProvider := factory.OnboardingConfigValue().EffectiveVCSProvider()
-	if !strings.EqualFold(parsed.Provider, workspaceProvider) {
-		return nil, invalidArgument(handOffPullRequestProviderMismatch(parsed.Provider, workspaceProvider))
+	parsed, err := validateHandOffPullRequestURL(factory, rawURL)
+	if err != nil {
+		return nil, err
 	}
 	if parsed.Provider == models.FactoryPullRequestProviderBitbucket {
 		return loadBitbucketHandOffPullRequest(db, deps, factory, rawURL, parsed)
 	}
 	return loadGitHubHandOffPullRequest(ctx, db, deps, factory, rawURL, parsed)
+}
+
+func validateHandOffPullRequestURL(factory *models.Factory, rawURL string) (parsedHandOffPullRequestURL, error) {
+	parsedURL, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsedURL.Host == "" || parsedURL.User != nil ||
+		(!strings.EqualFold(parsedURL.Scheme, "http") && !strings.EqualFold(parsedURL.Scheme, "https")) {
+		return parsedHandOffPullRequestURL{}, invalidArgument(handOffPullRequestURLInvalid)
+	}
+	parsed, ok := parseHandOffPullRequestURL(rawURL)
+	if !ok {
+		return parsedHandOffPullRequestURL{}, invalidArgument(handOffPullRequestURLInvalid)
+	}
+	workspaceProvider := factory.OnboardingConfigValue().EffectiveVCSProvider()
+	if !strings.EqualFold(parsed.Provider, workspaceProvider) {
+		return parsedHandOffPullRequestURL{}, invalidArgument(handOffPullRequestProviderMismatch(parsed.Provider, workspaceProvider))
+	}
+	return parsed, nil
 }
 
 func loadGitHubHandOffPullRequest(
@@ -679,4 +686,50 @@ func latestTrackedPullRequest(tx *gorm.DB, orderID uuid.UUID) (*models.FactoryPu
 		return nil, nil
 	}
 	return &prs[0], nil
+}
+
+func publishVerificationHandOff(ctx context.Context, deps IntakeDependencies, db *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder) (*models.FactoryPullRequest, error) {
+
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factory.ID.String(),
+		order.ID.String(),
+		factoryevents.EventTypeOrderStatusUpdated,
+	); err != nil {
+		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+	tracked, err := latestTrackedPullRequest(db, order.ID)
+	if err != nil {
+		return nil, err
+	}
+	trackedPR := tracked
+	if trackedPR != nil && trackedPR.Provider == models.FactoryPullRequestProviderGitHub {
+		ScheduleFactoryPullRequestMergeabilityRefresh(
+			ctx,
+			deps,
+			factory.OrganizationID,
+			factory.ID,
+			trackedPR.ID,
+		)
+		StartPullRequestChecks(ctx, deps, trackedPR.ID)
+		StartVisualEvidenceCapture(
+			ctx,
+			deps,
+			factory.OrganizationID,
+			factory.ID,
+			trackedPR.ID,
+		)
+	}
+	if trackedPR != nil {
+		if err := StartAutomaticCustomAutomations(ctx, deps, factory, order); err != nil {
+			log.WithError(err).Warnf("Failed to start custom automation for order %s", order.ID)
+		}
+	}
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factory.ID.String(),
+		order.ID.String(),
+		factoryevents.EventTypeOrderPullRequestAdded,
+	); err != nil {
+		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+	return trackedPR, nil
 }

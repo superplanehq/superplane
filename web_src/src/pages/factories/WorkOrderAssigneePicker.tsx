@@ -7,29 +7,66 @@ import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 import { useMemo } from "react";
 
+import { useOptionalFactoriesLayout } from "./layout/factoriesLayoutContext";
+import { useFactoryOwnerEligibility } from "@/hooks/useFactoryOwnerEligibility";
+import type { FactoriesListFactoryOwnerEligibilityResponse } from "@/api-client";
+
+import { useFactoryTaskIdentity } from "./factoryTaskContext";
 import { EmptyOwnerMark } from "./OrgUserReference";
 
 interface WorkOrderAssigneePickerProps {
   organizationId: string;
+  factoryId?: string;
+  orderId?: string;
+  eligibility?: FactoriesListFactoryOwnerEligibilityResponse;
   selectedIds: string[];
   onChange: (assigneeIds: string[]) => void;
   disabled?: boolean;
 }
 
-export function WorkOrderAssigneePicker({
+export function WorkOrderAssigneePicker(props: WorkOrderAssigneePickerProps) {
+  const layout = useOptionalFactoriesLayout();
+  const task = useFactoryTaskIdentity();
+  const factoryId = props.factoryId ?? task.factoryId ?? layout?.factoryId;
+  if (factoryId && layout?.factory?.onboarding?.codexSubscription === true)
+    return <ScopedWorkOrderAssigneePicker {...props} orderId={props.orderId ?? task.orderId} factoryId={factoryId} />;
+  return <OwnerPickerOptions {...props} />;
+}
+
+function ScopedWorkOrderAssigneePicker(props: WorkOrderAssigneePickerProps & { factoryId: string }) {
+  const eligibility = useFactoryOwnerEligibility(props.organizationId, props.factoryId, props.orderId);
+  return (
+    <>
+      {eligibility.isError ? (
+        <p role="alert" className="p-3 text-sm">
+          Could not load eligible owners. Close and reopen the picker.
+        </p>
+      ) : null}
+      <OwnerPickerOptions
+        {...props}
+        eligibility={eligibility.data}
+        disabled={props.disabled || eligibility.isPending || eligibility.isError}
+      />
+    </>
+  );
+}
+
+function OwnerPickerOptions({
   organizationId,
   selectedIds,
+  eligibility,
   onChange,
   disabled = false,
 }: WorkOrderAssigneePickerProps) {
   const { data: users = [], isLoading } = useOrganizationUsers(organizationId);
   const { currentUserId } = usePermissions();
-  const selectedId = selectedIds[0];
+
+  disabled = disabled || eligibility?.ownershipChangeAllowed === false;
 
   const userOptions = useMemo(() => {
     const usersById = buildOrgUserDisplayMap(users);
 
-    return users
+    const listed = users
       .filter((user) => user.metadata?.id)
       .map((user) => {
         const id = user.metadata!.id!;
@@ -54,7 +91,13 @@ export function WorkOrderAssigneePicker({
 
         return left.label.localeCompare(right.label);
       });
-  }, [currentUserId, users]);
+    for (const id of selectedIds) {
+      if (!listed.some((user) => user.id === id)) {
+        listed.push({ id, label: "Unavailable member", display: { id, name: "Unavailable member", initials: "?" } });
+      }
+    }
+    return listed;
+  }, [currentUserId, users, selectedIds]);
 
   const selectUser = (userId: string) => {
     if (disabled) {
@@ -72,6 +115,7 @@ export function WorkOrderAssigneePicker({
 
   return (
     <Command>
+      {eligibility?.restrictionReason ? <p className="p-3 text-sm">{eligibility.restrictionReason}</p> : null}
       <CommandInput placeholder="Search people" autoFocus disabled={disabled} />
       <CommandList>
         {isLoading ? (
@@ -86,16 +130,26 @@ export function WorkOrderAssigneePicker({
                 {selectedIds.length === 0 ? <Check className="size-4" aria-hidden /> : null}
               </CommandItem>
               {userOptions.map((user) => {
-                const selected = user.id === selectedId;
+                const selected = selectedIds.includes(user.id);
+                const member = eligibility?.members?.find((member) => member.userId === user.id);
+                const ineligible = eligibility?.subscription === true && member?.eligible !== true;
                 return (
                   <CommandItem
                     key={user.id}
                     value={`${user.label} ${user.id}`}
                     onSelect={() => selectUser(user.id)}
-                    disabled={disabled}
+                    disabled={disabled || ineligible}
+                    title={ineligible ? member?.reason || "This member is unavailable." : undefined}
                   >
                     <Avatar src={user.display.avatarUrl} initials={user.display.initials} alt="" className="size-6" />
-                    <span className="min-w-0 flex-1 truncate">{user.label}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{user.label}</span>
+                      {ineligible ? (
+                        <span className="block text-xs text-muted-foreground">
+                          {member?.reason || "This member is unavailable."}
+                        </span>
+                      ) : null}
+                    </span>
                     <Check className={cn("size-4", selected ? "opacity-100" : "opacity-0")} aria-hidden />
                   </CommandItem>
                 );

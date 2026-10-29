@@ -9,10 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type stepQueueFixture struct {
@@ -51,10 +53,10 @@ func setupStepQueueLine(t *testing.T, r *support.ResourceRegistry, stepMaxParall
 	return &stepQueueFixture{factory: f, line: line}
 }
 
-func (f *stepQueueFixture) createOpenWorkOrder(t *testing.T, r *support.ResourceRegistry, title string) *models.FactoryWorkOrder {
+func (f *stepQueueFixture) createOpenWorkOrder(t *testing.T, r *support.ResourceRegistry, title string, assignees ...uuid.UUID) *models.FactoryWorkOrder {
 	t.Helper()
 
-	order, err := f.factory.CreateWorkOrder(database.Conn(), title, "", &r.User, nil, nil)
+	order, err := f.factory.CreateWorkOrder(database.Conn(), title, "", &r.User, assignees, nil)
 	require.NoError(t, err)
 	dispatchWorkOrderForTest(t, order)
 	return order
@@ -433,4 +435,153 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted.Status)
 	assert.Equal(t, secondDispatch.ID, admitted.LineDispatchID)
 	assertExecutionRunID(t, thirdPending[0].runID, admitted)
+}
+
+func readyStepQueueOwner(t *testing.T, fixture *stepQueueFixture, ownerID uuid.UUID) *models.FactoryCodexConnection {
+	t.Helper()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(fixture.factory.OrganizationID, features.FeatureCodexSubscriptions))
+	connection, err := models.CreateFactoryCodexConnection(db, fixture.factory.OrganizationID, fixture.factory.ID, ownerID, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{
+		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle"),
+	}).Error)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "stage-model"}}, time.Now()))
+	return connection
+}
+
+func Test__StepQueue_InvalidOwnerFailsAttemptAndAdmitsNextTask(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1)})
+	readyStepQueueOwner(t, fixture, r.User)
+	rejectedOwner := support.CreateUser(t, r, r.Organization.ID)
+	rejectedConnection := readyStepQueueOwner(t, fixture, rejectedOwner.ID)
+	subscription := true
+	require.NoError(t, fixture.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+
+	first := fixture.createOpenWorkOrder(t, r, "Completing task", r.User)
+	second := fixture.createOpenWorkOrder(t, r, "Rejected task", rejectedOwner.ID)
+	third := fixture.createOpenWorkOrder(t, r, "Eligible task", r.User)
+	firstDispatch, firstResult := fixture.dispatchLine(t, first)
+	secondDispatch, _ := fixture.dispatchLine(t, second)
+	thirdDispatch, _ := fixture.dispatchLine(t, third)
+	require.NoError(t, db.Model(rejectedConnection).Update("status", models.CodexConnectionStatusDisconnected).Error)
+
+	finishRun(t, firstResult.Run, models.CanvasRunResultPassed)
+	pending, updates := advanceFactoryLineWithUpdates(t, r, firstResult.Run.ID)
+	require.Len(t, pending, 1)
+	assert.Equal(t, models.CanvasRunResultPassed, reloadDispatch(t, firstDispatch.ID).Result)
+	assert.Nil(t, queueItemForDispatch(t, secondDispatch.ID))
+	rejected := executionsForOrder(t, second.ID)
+	require.Len(t, rejected, 1)
+	assert.Nil(t, rejected[0].RunID)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, rejected[0].Status)
+	assert.Equal(t, models.CanvasRunResultFailed, rejected[0].Result)
+	assert.NotNil(t, rejected[0].FinishedAt)
+	assert.Equal(t, models.CanvasRunResultFailed, reloadDispatch(t, secondDispatch.ID).Result)
+	stored, err := fixture.factory.FindWorkOrder(db, second.ID)
+	require.NoError(t, err)
+	assert.True(t, stored.IsOpen())
+	notes, err := stored.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 1)
+	assert.Equal(t, models.ErrSubscriptionOwnerInvalid.Error(), notes[0].Body)
+	assert.Nil(t, queueItemForDispatch(t, thirdDispatch.ID))
+	admitted := executionsForOrder(t, third.ID)
+	require.Len(t, admitted, 1)
+	assertExecutionRunID(t, pending[0].runID, admitted[0])
+	require.Len(t, updates, 2)
+	assert.Equal(t, second.ID, updates[0].orderID)
+	assert.Equal(t, third.ID, updates[1].orderID)
+}
+
+func Test__StepQueue_InvalidNextStagePreservesCompletionAndAllowsCorrection(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1), stepMaxParallelism(1)})
+	connection := readyStepQueueOwner(t, fixture, r.User)
+	subscription := true
+	require.NoError(t, fixture.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	order := fixture.createOpenWorkOrder(t, r, "Stage model changed", r.User)
+	version, err := models.FindLiveCanvasVersionInTransaction(db, fixture.line.Steps[1].AppID)
+	require.NoError(t, err)
+	version.Nodes = append(version.Nodes, models.Node{
+		ID: "agent", Type: models.NodeTypeComponent, Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}},
+		Configuration: map[string]any{"credentials": map[string]any{"source": "subscription"}, "model": "stage-model"},
+	})
+	require.NoError(t, db.Save(version).Error)
+	dispatch, first := fixture.dispatchLine(t, order)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "other-model"}}, time.Now()))
+
+	finishRun(t, first.Run, models.CanvasRunResultPassed)
+	pending, updates := advanceFactoryLineWithUpdates(t, r, first.Run.ID)
+	assert.Empty(t, pending)
+	require.Len(t, updates, 1)
+	assert.Equal(t, order.ID, updates[0].orderID)
+	executions := executionsForOrder(t, order.ID)
+	require.Len(t, executions, 2)
+	assert.Equal(t, models.CanvasRunResultPassed, executions[0].Result)
+	assert.Equal(t, models.CanvasRunResultFailed, executions[1].Result)
+	assert.Nil(t, executions[1].RunID)
+	assert.Equal(t, models.CanvasRunResultFailed, reloadDispatch(t, dispatch.ID).Result)
+	stored, err := fixture.factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	notes, err := stored.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 1)
+	assert.Equal(t, models.ErrSubscriptionModelUnavailable.Error(), notes[0].Body)
+
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "stage-model"}}, time.Now()))
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		result, _, err := stored.RetryLineStep(tx, fixture.line, 1)
+		if err != nil {
+			return err
+		}
+		require.NotNil(t, result.Run)
+		return nil
+	}))
+	stored, err = fixture.factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	notes, err = stored.StatusNotes()
+	require.NoError(t, err)
+	assert.Empty(t, notes)
+}
+
+func Test__StepQueue_TemporaryOwnerLockRollsBackThenRetries(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1)})
+	readyStepQueueOwner(t, fixture, r.User)
+	subscription := true
+	require.NoError(t, fixture.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	first := fixture.createOpenWorkOrder(t, r, "Completing task", r.User)
+	second := fixture.createOpenWorkOrder(t, r, "Locked task", r.User)
+	_, firstResult := fixture.dispatchLine(t, first)
+	secondDispatch, _ := fixture.dispatchLine(t, second)
+	finishRun(t, firstResult.Run, models.CanvasRunResultPassed)
+	locked := db.Begin()
+	require.NoError(t, locked.Error)
+	t.Cleanup(func() { locked.Rollback() })
+	var lockedOrder models.FactoryWorkOrder
+	require.NoError(t, locked.Clauses(clause.Locking{Strength: "UPDATE"}).First(&lockedOrder, "id = ?", second.ID).Error)
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		_, _, err := finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
+		return err
+	})
+	var busy *models.CodexConnectionBusyError
+	require.ErrorAs(t, err, &busy)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, executionsForOrder(t, first.ID)[0].Status)
+	assert.NotNil(t, queueItemForDispatch(t, secondDispatch.ID))
+	assert.Empty(t, executionsForOrder(t, second.ID))
+	require.NoError(t, locked.Rollback().Error)
+	pending := advanceFactoryLine(t, r, firstResult.Run.ID)
+	require.Len(t, pending, 1)
+	assert.Nil(t, queueItemForDispatch(t, secondDispatch.ID))
+	assert.Equal(t, models.CanvasRunResultPassed, executionsForOrder(t, first.ID)[0].Result)
 }

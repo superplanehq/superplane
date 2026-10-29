@@ -1029,3 +1029,28 @@ func TestWorkspaceArgumentSelectsGrantedWorkspace(t *testing.T) {
 	_, err = runtime.CallTool(ctx, claims, "list_tasks", map[string]any{"workspace": uuid.NewString()})
 	require.EqualError(t, err, "Not found")
 }
+
+func TestHandOffTaskReturnsPendingBacklogTarget(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Personal subscriptions", "", "PERS")
+	require.NoError(t, err)
+	subscription := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
+	require.NoError(t, err)
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(t.Context(), toolClaims(r, factory.ID), "hand_off_task", map[string]any{"title": "Unassigned handoff", "plan": "Keep the plan", "column": "verify", "pull_request_url": "https://github.com/acme/app/pull/42"})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	assert.Equal(t, "draft", payload["state"])
+	assert.Equal(t, "backlog", payload["column"])
+	pending, ok := payload["pending_handoff"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "verify", pending["column"])
+	assert.Equal(t, line.ID.String(), pending["line_id"])
+	assert.Equal(t, "https://github.com/acme/app/pull/42", pending["pull_request_url"])
+}

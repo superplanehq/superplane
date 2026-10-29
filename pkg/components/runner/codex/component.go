@@ -147,7 +147,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	environment, err = injectCodexCredentials(ctx, environment, spec.Credentials, taskID, spec.ExecutionTimeoutSeconds)
+	environment, err = injectCodexCredentials(ctx, environment, spec.Credentials, taskID, spec.ExecutionTimeoutSeconds, spec.Model)
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	return runner.AfterRunnerTaskCreated(ctx, createdTaskID)
 }
 
-func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials, taskID uuid.UUID, timeoutSeconds int) ([]runner.TaskEnvironmentVariable, error) {
+func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials, taskID uuid.UUID, timeoutSeconds int, model string) ([]runner.TaskEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenAIAPIKey, credentials.Secret)
@@ -195,17 +195,17 @@ func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.Task
 	case runner.CredentialsSourceHosted:
 		return nil, runner.RejectHostedCredentials(credentials)
 	case runner.CredentialsSourceSubscription:
-		return injectSubscriptionCredentials(ctx, environment, taskID, timeoutSeconds)
+		return injectSubscriptionCredentials(ctx, environment, taskID, timeoutSeconds, model)
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}
 }
 
-func injectSubscriptionCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, taskID uuid.UUID, timeoutSeconds int) ([]runner.TaskEnvironmentVariable, error) {
+func injectSubscriptionCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, taskID uuid.UUID, timeoutSeconds int, model string) ([]runner.TaskEnvironmentVariable, error) {
 	if ctx.CodexSubscription == nil {
 		return nil, fmt.Errorf("connect ChatGPT before this task can run")
 	}
-	lease, err := ctx.CodexSubscription.Reserve(taskID)
+	lease, err := ctx.CodexSubscription.Reserve(taskID, model)
 	if err != nil {
 		return nil, err
 	}
