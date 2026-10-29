@@ -333,6 +333,13 @@ function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?line
   );
 }
 
+// The refine chat model control can show the same "Model: Auto" name, so pick the Start control by test id.
+function startModelButton(name: string) {
+  const button = screen.getByTestId("split-run-draft-model");
+  expect(button).toHaveAttribute("aria-label", name);
+  return button;
+}
+
 describe("MobileTaskDetailPage model select", () => {
   beforeEach(() => {
     resetPlanningSession();
@@ -348,7 +355,7 @@ describe("MobileTaskDetailPage model select", () => {
   it("shows a model control next to Start on a draft when planning is on", () => {
     renderDraft();
 
-    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
+    expect(startModelButton("Model: Auto")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
   });
 
@@ -356,7 +363,7 @@ describe("MobileTaskDetailPage model select", () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    await user.click(startModelButton("Model: Auto"));
 
     expect(screen.getByRole("menuitem", { name: "Auto" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "claude-opus-4-6" })).toBeInTheDocument();
@@ -375,7 +382,7 @@ describe("MobileTaskDetailPage model select", () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    await user.click(startModelButton("Model: Auto"));
     await user.click(screen.getByRole("menuitem", { name: "Anthropic Claude Opus 4.6 with extended context" }));
 
     expect(
@@ -400,7 +407,7 @@ describe("MobileTaskDetailPage model select", () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    await user.click(startModelButton("Model: Auto"));
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6" }));
     await user.click(screen.getByRole("menuitem", { name: "High" }));
@@ -417,13 +424,13 @@ describe("MobileTaskDetailPage model select", () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    await user.click(startModelButton("Model: Auto"));
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6" }));
     await user.click(screen.getByRole("menuitem", { name: "High" }));
     await user.click(screen.getByTestId("mobile-task-test-line"));
 
-    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
+    expect(startModelButton("Model: Auto")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start" }));
 
     expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
@@ -460,7 +467,7 @@ describe("MobileTaskDetailPage model select", () => {
     dispatchingIds.current = new Set([DRAFT_WORK_ORDER.id ?? ""]);
     renderDraft();
 
-    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeDisabled();
+    expect(startModelButton("Model: Auto")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
   });
 
