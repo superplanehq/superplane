@@ -443,7 +443,10 @@ func (c *FactoryContext) createFactoryWorkOrder(
 			return nil, fmt.Errorf("find default task owner: %w", err)
 		}
 		if err == nil && user.IsHuman() {
-			assigneeIDs = append(assigneeIDs, user.ID)
+			assigneeIDs, err = factoryModel.DefaultSubscriptionAssignees(c.tx, &user.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	if origin := c.originFromSourceRun(sourceRunID); origin != nil {

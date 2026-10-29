@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -52,6 +53,29 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		return response.GetIntake()
 	}
+
+	t.Run("subscription intake defaults only a new intake to its eligible creator", func(t *testing.T) {
+		db := database.DB(t.Context())
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+		f := newFactory(t)
+		subscription := true
+		require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+		// Existing empty defaults must stay empty when a connection is added.
+		existing := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		assert.Empty(t, existing.Settings.GetDefaultOwnerId())
+		connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
+		require.NoError(t, err)
+		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+		implicit := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		assert.Equal(t, r.User.String(), implicit.Settings.GetDefaultOwnerId())
+		// The published graph carries the owner before initial events can run.
+		assert.Equal(t, r.User.String(), liveIntakeNode(t, r.Organization.ID, implicit, "create-work-order").Configuration["defaultOwnerId"])
+		cleared := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
+		assert.Empty(t, cleared.Settings.GetDefaultOwnerId())
+		updated, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: existing.Id, Settings: &pb.FactoryIntake_Settings{Labels: []string{"urgent"}}})
+		require.NoError(t, err)
+		assert.Empty(t, updated.Intake.Settings.GetDefaultOwnerId())
+	})
 
 	t.Run("default owner survives API saves and explicit clearing", func(t *testing.T) {
 		f := newFactory(t)

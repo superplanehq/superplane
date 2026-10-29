@@ -63,7 +63,7 @@ type CodexSubscriptionLease struct {
 
 // CodexSubscriptionContext reserves the factory ChatGPT connection before a task is created.
 type CodexSubscriptionContext interface {
-	Reserve(taskID uuid.UUID) (CodexSubscriptionLease, error)
+	Reserve(taskID uuid.UUID, model string) (CodexSubscriptionLease, error)
 }
 
 type AppExecutionContext interface {

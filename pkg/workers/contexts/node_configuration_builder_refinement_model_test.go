@@ -4,9 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -36,10 +38,11 @@ func TestBuildRefinementModel(t *testing.T) {
 			require.NoError(t, err)
 			t.Cleanup(func() { db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{}) })
 			if tc.source == "subscription" {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 				connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
 				require.NoError(t, err)
-				require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: tc.override}}, time.Now()))
-				require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
+				require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: tc.override}, {Model: tc.stored}}, time.Now()))
+				require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 			}
 			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
 				{NodeID: "trigger", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "onWorkOrder"}}), Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 3))},
@@ -48,7 +51,7 @@ func TestBuildRefinementModel(t *testing.T) {
 			}, nil)
 			require.NoError(t, db.Model(canvas).Update("factory_id", f.ID).Error)
 			canvas.FactoryID = &f.ID
-			order, err := f.CreateWorkOrder(db, "Refine this", "", &r.User, nil, nil)
+			order, err := f.CreateWorkOrder(db, "Refine this", "", &r.User, []uuid.UUID{r.User}, nil)
 			require.NoError(t, err)
 			for _, model := range []string{tc.override, "", tc.excluded} {
 				t.Run(model, func(t *testing.T) {
@@ -70,7 +73,12 @@ func TestBuildRefinementModel(t *testing.T) {
 					require.NoError(t, err)
 					require.NoError(t, db.Model(dispatch).Updates(map[string]any{"model": tc.stored, "thinking_level": "high"}).Error)
 					configuration := map[string]any{"model": tc.stored, "thinkingLevel": "low", "credentials": map[string]any{"source": tc.source}}
-					resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID("refine-task").WithRootEvent(&event.ID).Build(configuration)
+					resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithRunID(run.ID).WithNodeID("refine-task").WithRootEvent(&event.ID).Build(configuration)
+					if tc.source == "subscription" && model == tc.excluded {
+						require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
+						require.NoError(t, models.EndPlanningSessionForFinishedRun(db, run.ID, models.CanvasRunResultPassed))
+						return
+					}
 					require.NoError(t, err)
 					expected := tc.stored
 					if model == tc.override {
@@ -79,7 +87,7 @@ func TestBuildRefinementModel(t *testing.T) {
 					assert.Equal(t, expected, resolved["model"])
 					assert.Equal(t, "low", resolved["thinkingLevel"])
 					assert.Equal(t, tc.stored, configuration["model"])
-					started, err := NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID("start").WithRootEvent(&event.ID).Build(configuration)
+					started, err := NewNodeConfigurationBuilder(db, canvas.ID).WithRunID(run.ID).WithNodeID("start").WithRootEvent(&event.ID).Build(configuration)
 					require.NoError(t, err)
 					assert.Equal(t, tc.stored, started["model"])
 					require.NoError(t, models.EndPlanningSessionForFinishedRun(db, run.ID, models.CanvasRunResultPassed))

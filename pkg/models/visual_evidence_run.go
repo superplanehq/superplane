@@ -31,6 +31,11 @@ func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEven
 	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
 }
 
+// MaybeLinkMergeConfidenceRun records task authority before agent admission.
+func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
+	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, "risk-score", "Merge confidence")
+}
+
 func maybeLinkFactoryColumnAppRun(
 	tx *gorm.DB,
 	canvas *Canvas,
@@ -64,12 +69,41 @@ func maybeLinkFactoryColumnAppRun(
 		return err
 	}
 
+	order, err := factoryModel.FindWorkOrder(tx, pullRequest.WorkOrderID)
+	if err != nil {
+		return err
+	}
+	if err := order.RequireExecutionOwner(tx, true); err != nil {
+		return recordColumnAppRejection(tx, order, title, err)
+	}
+	if err := order.ValidateSubscriptionCanvasModels(tx, canvas.ID, ""); err != nil {
+		return recordColumnAppRejection(tx, order, title, err)
+	}
 	_, err = pullRequest.CreateActivity(tx, FactoryPullRequestActivityParams{
 		RunID:  run.ID,
 		Title:  title,
 		Access: FactoryPullRequestAccessConcurrent,
 	})
 	return err
+}
+
+// recordColumnAppRejection shows members why an automatic app run cannot
+// start. Only permanent subscription errors leave a note. Temporary
+// contention and database errors pass through unchanged, so the caller can
+// retry. The original error is always returned.
+func recordColumnAppRejection(tx *gorm.DB, order *FactoryWorkOrder, title string, cause error) error {
+	if !IsPermanentSubscriptionAdmissionError(cause) || !order.IsOpen() {
+		return cause
+	}
+	_, err := order.SetStatusNote(tx, FactoryWorkOrderStatusNoteParams{
+		Key:      subscriptionAdmissionStatusNoteKey,
+		Headline: "Automation could not start",
+		Body:     title + ": " + cause.Error(),
+	})
+	if err != nil {
+		return err
+	}
+	return cause
 }
 
 func visualEvidencePullRequestID(eventData any) uuid.UUID {
