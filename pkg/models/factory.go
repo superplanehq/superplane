@@ -874,6 +874,27 @@ func (f *Factory) SnapshotWorkOrderRepository(tx *gorm.DB, repository, defaultBr
 		Error
 }
 
+// RetargetUnfinishedWorkOrderBranches moves draft and open tasks onto the
+// branch just saved for the workspace. A task keeps a branch that is neither
+// empty nor the previous workspace branch. Closed tasks stay unchanged.
+func (f *Factory) RetargetUnfinishedWorkOrderBranches(tx *gorm.DB, previousBranch, nextBranch string) error {
+	previousBranch = strings.TrimSpace(previousBranch)
+	nextBranch = strings.TrimSpace(nextBranch)
+	if nextBranch == "" || nextBranch == previousBranch {
+		return nil
+	}
+
+	return tx.Model(&FactoryWorkOrder{}).
+		Where("factory_id = ?", f.ID).
+		Where("state IN ?", []string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen}).
+		Where("default_branch IS NULL OR default_branch = '' OR default_branch = ?", previousBranch).
+		Updates(map[string]any{
+			"default_branch": nextBranch,
+			"updated_at":     time.Now(),
+		}).
+		Error
+}
+
 func (f *Factory) CreateWorkOrderWithOrigin(
 	tx *gorm.DB,
 	title, description string,

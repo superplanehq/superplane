@@ -67,7 +67,10 @@ func selectBitbucketFactoryRepository(
 		}
 		fullName := match.FullName
 		externalID := match.UUID
-		branch := match.DefaultBranch
+		branch := defaultBranchFromCacheOrProvider(match.DefaultBranch, func() (string, error) {
+			return bitbucketLiveDefaultBranch(match.InstallationID, match.FullName)
+		})
+		branch = keepSavedDefaultBranch(factory.OnboardingConfigValue(), fullName, branch)
 		return factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:        &integrationID,
 			VCSProvider:             &provider,
