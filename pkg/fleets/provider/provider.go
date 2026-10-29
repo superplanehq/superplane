@@ -38,3 +38,11 @@ type Provider interface {
 	Create(ctx context.Context, request CreateRequest) (Resource, error)
 	Delete(ctx context.Context, resource Resource) error
 }
+
+// SynchronousDeletionProvider guarantees that a successful Delete returns only
+// after the resource has stopped and no longer exists. Providers whose delete
+// operation only accepts a request must not opt in.
+type SynchronousDeletionProvider interface {
+	Provider
+	DeletionIsSynchronous() bool
+}

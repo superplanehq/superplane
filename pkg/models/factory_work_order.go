@@ -75,6 +75,7 @@ type FactoryWorkOrder struct {
 	Title           string
 	Description     string
 	RefinementModel *string
+	PendingHandOff  *datatypes.JSONType[PendingHandOff] `gorm:"column:pending_handoff"`
 	State           string
 	Result          string
 	CreatedByID     *uuid.UUID
@@ -177,13 +178,17 @@ func (o *FactoryWorkOrder) MCPClient() *WorkOrderMCPClient {
 
 func (o *FactoryWorkOrder) SetRefinementModel(tx *gorm.DB, model string) error {
 	model = strings.TrimSpace(model)
-	if model == "" {
+	if model == "" && o.RefinementModel == nil {
 		return nil
 	}
-	if err := tx.Model(o).Update("refinement_model", model).Error; err != nil {
+	var selected *string
+	if model != "" {
+		selected = &model
+	}
+	if err := tx.Model(o).Omit(clause.Associations).Update("refinement_model", selected).Error; err != nil {
 		return err
 	}
-	o.RefinementModel = &model
+	o.RefinementModel = selected
 	return nil
 }
 
@@ -344,9 +349,21 @@ func (o *FactoryWorkOrder) UpdateContent(tx *gorm.DB, title *string, description
 }
 
 func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
+	return tx.Transaction(func(tx *gorm.DB) error { return o.updateAssignees(tx, assigneeIDs, updatedBy) })
+}
+
+func (o *FactoryWorkOrder) updateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
+	if err := o.validateSubscriptionAssignment(tx, assigneeIDs); err != nil {
+		return err
+	}
+	previous, err := o.ListAssignees(tx)
+	if err != nil {
+		return err
+	}
+	o.Assignees = previous
 	previousAssignees := o.AssigneeIDs()
 
-	if err := o.ReplaceAssignees(tx, assigneeIDs); err != nil {
+	if err := o.replaceAssignees(tx, assigneeIDs); err != nil {
 		return err
 	}
 
@@ -417,6 +434,11 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	now := time.Now()
 
 	err := db.Transaction(func(tx *gorm.DB) error {
+		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen {
+			if err := o.RequireExecutionOwner(tx, true); err != nil {
+				return err
+			}
+		}
 		// Reverting `open → draft` while a line dispatch is still active would
 		// desync the FSM from the executor. Mirror the dispatch guard here.
 		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
@@ -657,6 +679,10 @@ func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) e
 // assigned. Used when someone takes part in refining a draft: a reply in the
 // chat makes them an owner.
 func (o *FactoryWorkOrder) AddAssignee(tx *gorm.DB, userID uuid.UUID, actor uuid.UUID) (bool, error) {
+	subscription, err := o.UsesCodexSubscription(tx)
+	if err != nil || subscription {
+		return false, err
+	}
 	assignees, err := o.ListAssignees(tx)
 	if err != nil {
 		return false, err
@@ -673,6 +699,10 @@ func (o *FactoryWorkOrder) AddAssignee(tx *gorm.DB, userID uuid.UUID, actor uuid
 }
 
 func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) error {
+	subscription, err := o.UsesCodexSubscription(tx)
+	if err != nil || subscription {
+		return err
+	}
 	if err := tx.Preload("User").Where("work_order_id = ?", o.ID).Find(&o.Assignees).Error; err != nil {
 		return err
 	}
@@ -686,6 +716,15 @@ func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) e
 }
 
 func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := o.validateSubscriptionAssignment(tx, assigneeIDs); err != nil {
+			return err
+		}
+		return o.replaceAssignees(tx, assigneeIDs)
+	})
+}
+
+func (o *FactoryWorkOrder) replaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID) error {
 	if err := tx.Where("work_order_id = ?", o.ID).Delete(&FactoryWorkOrderAssignee{}).Error; err != nil {
 		return err
 	}

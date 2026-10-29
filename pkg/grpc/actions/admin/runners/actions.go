@@ -434,6 +434,7 @@ func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRun
 	}
 
 	var runner *models.Runner
+	var logins []models.FactoryCodexConnection
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		runner, err = fleet.FindRunner(tx, runnerID)
 		if err != nil {
@@ -444,6 +445,10 @@ func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRun
 			runner.Tags.Data()[models.RunnerTagProvider] != req.GetProvider() {
 			return fmt.Errorf("runner provider ownership does not match the confirming manager")
 		}
+		logins, err = models.ListCodexLoginConnections(tx)
+		if err != nil {
+			return err
+		}
 		return runner.MarkProviderDeleted(tx, time.Now())
 	})
 	if errors.Is(err, models.ErrRunnerNotFound) {
@@ -452,6 +457,7 @@ func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRun
 	if err != nil {
 		return nil, grpcerrors.FailedPrecondition(err, "runner VM is not confirmed deleted")
 	}
+	messages.PublishCodexConnectionChanges(database.DB(ctx), logins)
 	return &pb.MarkRunnerProviderDeletedResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
 }
 
@@ -559,7 +565,14 @@ func (s *Service) createRunner(
 		return nil, nil, grpcerrors.NotFound(err, "task not found")
 	case errors.Is(err, models.ErrOrganizationRunnerCapacity):
 		return nil, nil, grpcerrors.ResourceExhausted(err, "Organization parallel runner limit reached.")
-	case errors.Is(err, models.ErrRunnerTaskNotReservable),
+	case errors.Is(err, models.ErrCodexConnectionStale),
+		errors.Is(err, models.ErrCodexConnectionNotEligible),
+		errors.Is(err, models.ErrCodexConnectionNotReady),
+		errors.Is(err, models.ErrSubscriptionOwnerRequired),
+		errors.Is(err, models.ErrSubscriptionOwnerInvalid),
+		errors.Is(err, models.ErrSubscriptionTaskAssociation),
+		errors.Is(err, models.ErrSubscriptionModelUnavailable),
+		errors.Is(err, models.ErrRunnerTaskNotReservable),
 		errors.Is(err, models.ErrRunnerTaskFleetMismatch),
 		errors.Is(err, models.ErrRunnerTaskBackendMismatch):
 		return nil, nil, grpcerrors.FailedPrecondition(err, err.Error())
