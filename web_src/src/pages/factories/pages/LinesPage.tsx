@@ -1095,8 +1095,10 @@ function LineDetail({
         ...app,
         customAutomationMode: app.id ? customAutomationModes.get(app.id) : undefined,
         customAutomationIcon: app.id ? customAutomationIcons.get(app.id) : undefined,
+        customAutomationCronExpression: customAutomationDetails.find(({ automationId }) => automationId === app.id)
+          ?.automation.settings?.schedule?.cronExpression,
       })),
-    [apps, customAutomationIcons, customAutomationModes],
+    [apps, customAutomationDetails, customAutomationIcons, customAutomationModes],
   );
   const manualCustomAutomations = useMemo<ManualCustomAutomation[]>(
     () =>

@@ -11,6 +11,7 @@ export function customAutomationColumnAutomation(
     templateId?: string;
     customAutomationMode?: CustomAutomationMode;
     customAutomationIcon?: string;
+    customAutomationCronExpression?: string;
   },
   workOrders: FactoriesWorkOrder[],
   runningCountForApp: (appId: string | undefined, orders: FactoriesWorkOrder[]) => number,
@@ -24,7 +25,10 @@ export function customAutomationColumnAutomation(
     id: `custom-automation-${id}`,
     kind: "custom-verification",
     name: app.name?.trim() || "Custom automation",
-    trigger: copy.trigger,
+    trigger:
+      app.customAutomationMode === "scheduled" && app.customAutomationCronExpression
+        ? `On schedule: ${app.customAutomationCronExpression}`
+        : copy.trigger,
     action: copy.action,
     iconSrc: "",
     iconAlt: "",
