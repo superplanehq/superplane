@@ -16,11 +16,10 @@ export function IntakeAutomaticIntakeSetting({
     <div className="flex items-start justify-between gap-6">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={id} className="text-sm">
-          Automatic intake
+          Automatic task creation
         </Label>
         <p id={`${id}-help`} className="text-xs text-muted-foreground">
-          Turn off to pause automatic task creation from GitHub. Changes apply immediately. Manual imports stay
-          available.
+          Changes apply immediately. Manual imports remain available.
         </p>
       </div>
       <Switch

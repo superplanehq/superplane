@@ -92,19 +92,9 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 	db := database.DB(t.Context())
 	owner := mustTaskOwnerMember(t, r, "payments-dev")
 	other := mustTaskOwnerMember(t, r, "other-dev")
-	amqpURL, err := config.RabbitMQURL()
-	require.NoError(t, err)
-	connection, err := amqp.Dial(amqpURL)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = connection.Close() })
-	channel, err := connection.Channel()
-	require.NoError(t, err)
-	require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
-	queue, err := channel.QueueDeclare("", false, true, true, false, nil)
-	require.NoError(t, err)
-	require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderUpdatedRoutingKey, messages.CanvasExchange, false, nil))
+	channel, queueName := taskOwnerUpdateQueue(t)
 	assertUpdate := func() {
-		delivery, ok, err := channel.Get(queue.Name, true)
+		delivery, ok, err := channel.Get(queueName, true)
 		require.NoError(t, err)
 		require.True(t, ok, "ownership changes publish an update")
 		var update pb.FactoryWorkOrderUpdatedMessage
@@ -156,7 +146,7 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 	t.Run("same owner succeeds without publishing", func(t *testing.T) {
 		rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", `{"user":"other-dev","reason":"Owns the code."}`)
 		assertAssignedOwner(t, rec, other.ID)
-		_, published, err := channel.Get(queue.Name, true)
+		_, published, err := channel.Get(queueName, true)
 		require.NoError(t, err)
 		assert.False(t, published, "same-owner assignment does not publish another update")
 	})
@@ -177,7 +167,7 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 		eventsAfter, err := order.ListEvents(db, 0, nil)
 		require.NoError(t, err)
 		assert.Equal(t, eventsBefore, eventsAfter)
-		_, published, err := channel.Get(queue.Name, true)
+		_, published, err := channel.Get(queueName, true)
 		require.NoError(t, err)
 		assert.False(t, published)
 	})
@@ -299,4 +289,20 @@ func latestOwnerEvent(t *testing.T, order *models.FactoryWorkOrder) (string, str
 	}
 	t.Fatal("no assignees updated event")
 	return "", ""
+}
+
+func taskOwnerUpdateQueue(t *testing.T) (*amqp.Channel, string) {
+	t.Helper()
+	amqpURL, err := config.RabbitMQURL()
+	require.NoError(t, err)
+	connection, err := amqp.Dial(amqpURL)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = connection.Close() })
+	channel, err := connection.Channel()
+	require.NoError(t, err)
+	require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+	queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderUpdatedRoutingKey, messages.CanvasExchange, false, nil))
+	return channel, queue.Name
 }

@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"gorm.io/datatypes"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -72,17 +74,18 @@ func Test__Build__OverlaysLineDispatchModelOnMatchingRunner(t *testing.T) {
 func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factoryModel.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}}, time.Now()))
-	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-4.1"})
 	require.NoError(t, err)
 
 	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerCodex")
-	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
 	linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
 	execution, err := models.FindWorkOrderExecutionByRunID(db, run.ID)
@@ -106,10 +109,30 @@ func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 			resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).
 				WithNodeID("agent").WithRootEvent(&rootEvent.ID).
 				Build(map[string]any{"model": "gpt-5-codex", "credentials": map[string]any{"source": tc.source}})
+			if tc.source == "subscription" && tc.model == "gpt-4.1" {
+				require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.expected, resolved["model"])
 		})
 	}
+	t.Run("a locked task retries queue admission", func(t *testing.T) {
+		require.NoError(t, db.Model(dispatch).Update("model", "gpt-5.4").Error)
+		node, err := models.FindCanvasNode(db, canvas.ID, "agent")
+		require.NoError(t, err)
+		node.Configuration = datatypes.NewJSONType(map[string]any{"model": "gpt-5-codex", "credentials": map[string]any{"source": "subscription"}})
+		locked := db.Begin()
+		require.NoError(t, locked.Error)
+		t.Cleanup(func() { locked.Rollback() })
+		require.NoError(t, order.LockForUpdate(locked))
+		_, err = BuildProcessQueueContext(nil, db, node, &models.CanvasNodeQueueItem{WorkflowID: canvas.ID, NodeID: "agent", RunID: run.ID, RootEventID: rootEvent.ID, EventID: rootEvent.ID}, nil, nil)
+		var busy *models.CodexConnectionBusyError
+		require.ErrorAs(t, err, &busy)
+		var invalidConfiguration *ConfigurationBuildError
+		assert.False(t, errors.As(err, &invalidConfiguration), "task contention must retry rather than create a failed execution")
+	})
+
 }
 
 func Test__Build__OverlaysLineDispatchThinkingOnMatchingRunner(t *testing.T) {

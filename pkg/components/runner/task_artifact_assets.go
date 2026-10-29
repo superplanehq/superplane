@@ -8,6 +8,12 @@ var taskArtifactMCPScript string
 //go:embed publish_link.js
 var publishLinkScript string
 
+//go:embed publish_markdown.js
+var publishMarkdownScript string
+
+//go:embed publish_file.js
+var publishFileScript string
+
 //go:embed task_cli.js
 var taskCLIScript string
 
@@ -27,20 +33,29 @@ func TaskArtifactMCPFile() TaskFile {
 }
 
 func AppendTaskArtifactMCP(environment []TaskEnvironmentVariable, files []TaskFile) []TaskFile {
-	if !HasArtifactUploadToken(environment) && !HasPublishLinks(environment) {
+	if !HasArtifactUploadToken(environment) && !HasPublishLinks(environment) && !HasTaskOwnerToken(environment) {
 		return files
 	}
 	// The MCP script loads publish_link.js at startup, including visual
 	// evidence runs that do not publish links.
-	files = append(files, TaskArtifactMCPFile(), PublishLinkScriptFile())
+	files = appendUniqueTaskFiles(files, TaskArtifactMCPFile(), PublishLinkScriptFile(), taskOwnerToolsFile())
 	if HasPublishLinks(environment) {
-		files = append(files, TaskCLIScriptFile(), PublishLinkCommandFile())
+		// task_cli.js loads publish_markdown.js and publish_file.js at startup, including link-only calls.
+		files = append(files, TaskCLIScriptFile(), PublishMarkdownScriptFile(), PublishFileScriptFile(), PublishLinkCommandFile())
 	}
 	return files
 }
 
 func PublishLinkScriptFile() TaskFile {
 	return TaskFile{Path: "publish_link.js", Content: publishLinkScript, Mode: "0644"}
+}
+
+func PublishMarkdownScriptFile() TaskFile {
+	return TaskFile{Path: "publish_markdown.js", Content: publishMarkdownScript, Mode: "0644"}
+}
+
+func PublishFileScriptFile() TaskFile {
+	return TaskFile{Path: "publish_file.js", Content: publishFileScript, Mode: "0644"}
 }
 
 func TaskCLIScriptFile() TaskFile {

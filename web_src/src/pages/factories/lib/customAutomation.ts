@@ -44,7 +44,7 @@ export function workspaceAgentFromOnboarding(onboarding?: {
 }): FactoriesFactoryCustomAutomationSettings["agent"] | undefined {
   switch (onboarding?.agentHarness) {
     case "AGENT_HARNESS_SUPERPLANE":
-      return { component: "runnerSuperPlane", credentialSource: "hosted" };
+      return { component: "runnerSuperPlane" };
     case "AGENT_HARNESS_CODEX":
       return { component: "runnerCodex" };
     case "AGENT_HARNESS_CLAUDE_CODE":
@@ -108,6 +108,7 @@ export function customAutomationSettings(
   const credentialSource = typeof configuration.credentialSource === "string" ? configuration.credentialSource : "";
   const credentialIntegrationName =
     typeof configuration.credentialIntegrationName === "string" ? configuration.credentialIntegrationName : "";
+  const superPlaneAgent = component?.component === "runnerSuperPlane";
   return {
     startMode: mode === "automatic" ? "START_MODE_AUTOMATIC" : "START_MODE_MANUAL",
     icon,
@@ -116,7 +117,7 @@ export function customAutomationSettings(
       ? {
           component: component.component,
           model: typeof configuration.model === "string" ? configuration.model : "",
-          ...(credentialSource
+          ...(!superPlaneAgent && credentialSource
             ? { credentialSource, credentialIntegrationName: credentialIntegrationName || undefined }
             : {}),
         }

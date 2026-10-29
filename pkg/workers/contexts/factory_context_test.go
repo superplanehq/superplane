@@ -20,6 +20,7 @@ import (
 	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -2435,17 +2436,30 @@ func TestFactoryContextDefaultOwner(t *testing.T) {
 	member, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
 	require.NoError(t, err)
 	require.NoError(t, database.Conn().Delete(member).Error)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	connection, err := models.CreateFactoryCodexConnection(database.Conn(), r.Organization.ID, f.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(connection).Updates(map[string]any{"credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	for _, tc := range []struct {
-		name, owner string
-		assigned    bool
+		name, owner  string
+		assigned     bool
+		subscription bool
 	}{
 		{name: "active member", owner: r.User.String(), assigned: true},
 		{name: "missing member", owner: uuid.NewString()},
 		{name: "removed member", owner: member.ID.String()},
 		{name: "non human", owner: key.ID.String()},
 		{name: "old configuration"},
+		{name: "connected subscriber", owner: r.User.String(), assigned: true, subscription: true},
+		{name: "disconnected subscriber", owner: r.User.String(), subscription: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, f.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{CodexSubscription: &tc.subscription}))
+			status := models.CodexConnectionStatusDisconnected
+			if tc.assigned {
+				status = models.CodexConnectionStatusReady
+			}
+			require.NoError(t, database.Conn().Model(connection).Update("status", status).Error)
 			canvas, execution, _ := setupFactoryAppExecution(t, r, f.ID)
 			ctx := NewFactoryContext(database.Conn(), canvas, execution)
 			order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: tc.name, DefaultOwnerID: tc.owner})

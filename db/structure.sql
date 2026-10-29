@@ -578,6 +578,7 @@ CREATE TABLE public.factory_codex_connections (
     usage_limits jsonb DEFAULT '[]'::jsonb NOT NULL,
     usage_observed_at timestamp with time zone,
     available_models jsonb DEFAULT '[]'::jsonb NOT NULL,
+    revocation_pending_at timestamp with time zone,
     CONSTRAINT factory_codex_connections_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'finishing'::character varying, 'ready'::character varying, 'reconnect_required'::character varying, 'disconnected'::character varying])::text[]))),
     CONSTRAINT factory_codex_connections_version_check CHECK (((credential_version >= 0) AND (final_checkpoint_version >= 0) AND (final_checkpoint_version <= credential_version) AND (reservation_generation >= 0)))
 );
@@ -597,6 +598,7 @@ CREATE TABLE public.factory_codex_leases (
     secret_ciphertext bytea,
     started_version bigint DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    revoked_at timestamp with time zone,
     CONSTRAINT factory_codex_leases_generation_check CHECK (((generation >= 1) AND (started_version >= 0))),
     CONSTRAINT factory_codex_leases_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['login'::character varying, 'run'::character varying])::text[])))
 );
@@ -1027,6 +1029,17 @@ CREATE TABLE public.factory_work_order_queue_items (
 
 
 --
+-- Name: factory_work_order_refinement_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_refinement_runs (
+    run_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_orders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1053,6 +1066,7 @@ CREATE TABLE public.factory_work_orders (
     mcp_client_name text,
     vcs_provider text,
     refinement_model text,
+    pending_handoff jsonb,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -1495,6 +1509,20 @@ CREATE TABLE public.organization_llm_settings (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     polar_customer_id text,
     CONSTRAINT organization_llm_settings_markup_non_negative CHECK (((markup_bps IS NULL) OR (markup_bps >= 0)))
+);
+
+
+--
+-- Name: organization_payment_method_observations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_payment_method_observations (
+    organization_id uuid NOT NULL,
+    usable boolean NOT NULL,
+    read_started_at bigint NOT NULL,
+    observed_at timestamp with time zone NOT NULL,
+    usable_method_hashes text[] DEFAULT '{}'::text[] NOT NULL,
+    transition_id uuid
 );
 
 
@@ -2626,11 +2654,11 @@ ALTER TABLE ONLY public.factory_agent_resources
 
 
 --
--- Name: factory_codex_connections factory_codex_connections_factory_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: factory_codex_connections factory_codex_connections_factory_owner_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_codex_connections
-    ADD CONSTRAINT factory_codex_connections_factory_key UNIQUE (factory_id);
+    ADD CONSTRAINT factory_codex_connections_factory_owner_key UNIQUE (factory_id, owner_user_id);
 
 
 --
@@ -2855,6 +2883,14 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 ALTER TABLE ONLY public.factory_work_order_queue_items
     ADD CONSTRAINT factory_work_order_queue_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_work_order_refinement_runs factory_work_order_refinement_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_refinement_runs
+    ADD CONSTRAINT factory_work_order_refinement_runs_pkey PRIMARY KEY (run_id);
 
 
 --
@@ -3111,6 +3147,14 @@ ALTER TABLE ONLY public.organization_llm_credit_grants
 
 ALTER TABLE ONLY public.organization_llm_settings
     ADD CONSTRAINT organization_llm_settings_pkey PRIMARY KEY (organization_id);
+
+
+--
+-- Name: organization_payment_method_observations organization_payment_method_observations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_payment_method_observations
+    ADD CONSTRAINT organization_payment_method_observations_pkey PRIMARY KEY (organization_id);
 
 
 --
@@ -3605,6 +3649,13 @@ CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories
 --
 
 CREATE UNIQUE INDEX factories_url_id_key ON public.factories USING btree (url_id);
+
+
+--
+-- Name: factory_codex_connections_revocation_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX factory_codex_connections_revocation_pending_idx ON public.factory_codex_connections USING btree (revocation_pending_at) WHERE (revocation_pending_at IS NOT NULL);
 
 
 --
@@ -4221,6 +4272,13 @@ CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
+
+
+--
+-- Name: idx_factory_work_order_refinement_runs_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_refinement_runs_work_order ON public.factory_work_order_refinement_runs USING btree (work_order_id);
 
 
 --
@@ -5683,6 +5741,22 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 
 --
+-- Name: factory_work_order_refinement_runs factory_work_order_refinement_runs_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_refinement_runs
+    ADD CONSTRAINT factory_work_order_refinement_runs_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_work_order_refinement_runs factory_work_order_refinement_runs_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_refinement_runs
+    ADD CONSTRAINT factory_work_order_refinement_runs_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_work_orders factory_work_orders_auto_start_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5896,6 +5970,14 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_payment_method_observations organization_payment_method_observations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_payment_method_observations
+    ADD CONSTRAINT organization_payment_method_observations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -6450,7 +6532,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261027163500	f
+20261029132752	f
 \.
 
 

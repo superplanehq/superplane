@@ -58,9 +58,12 @@ func TestAccountSoftDelete_MarksOnlyLastOwnerOrganizations(t *testing.T) {
 	clearance, err := billingmodels.NewLocalDeletionClearance(r.Organization.ID, plan)
 	require.NoError(t, err)
 
-	require.NoError(t, r.Account.SoftDelete(db, time.Now(), map[uuid.UUID]billing.DeletionGuard{
+	deletedOrganizations, err := r.Account.SoftDelete(db, time.Now(), map[uuid.UUID]billing.DeletionGuard{
 		r.Organization.ID: clearance,
-	}))
+	})
+	require.NoError(t, err)
+	require.Len(t, deletedOrganizations, 1)
+	assert.Equal(t, r.Organization.ID, deletedOrganizations[0].ID)
 
 	_, err = models.FindOrganizationByID(r.Organization.ID.String())
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
@@ -73,9 +76,10 @@ func TestAccountSoftDelete_RequiresClearanceForEachDeletedOrganization(t *testin
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	err := r.Account.SoftDelete(db, time.Now(), nil)
+	deletedOrganizations, err := r.Account.SoftDelete(db, time.Now(), nil)
 
 	require.ErrorIs(t, err, billing.ErrOrganizationSubscriptionUnverified)
+	assert.Empty(t, deletedOrganizations)
 	_, err = models.FindOrganizationByID(r.Organization.ID.String())
 	require.NoError(t, err)
 	_, err = models.FindAccountByID(r.Account.ID.String())

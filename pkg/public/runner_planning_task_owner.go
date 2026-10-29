@@ -24,36 +24,52 @@ import (
 
 const taskOwnerHistoryUnavailable = "SuperPlane could not read the code history. Use the members list."
 
-type planningSuggestOwnersRequest struct {
+type suggestOwnersRequest struct {
 	Paths []string `json:"paths"`
 }
 
-type planningAssignOwnerRequest struct {
+type assignOwnerRequest struct {
 	User   string `json:"user"`
 	Reason string `json:"reason"`
 }
 
-// planningTaskOwnerTarget is the session task and the members who can own it.
-type planningTaskOwnerTarget struct {
+// taskOwnerTarget is the authorized task and the members who can own it.
+type taskOwnerTarget struct {
 	session    *models.FactoryPlanningSession
+	repository string
 	factory    *models.Factory
 	order      *models.FactoryWorkOrder
 	candidates []models.TaskOwnerCandidate
 }
 
 func (s *Server) handleRunnerPlanningSuggestOwners(w http.ResponseWriter, r *http.Request) {
+	s.handleRunnerSuggestOwners(w, r, s.planningOwnerTarget)
+}
+
+type ownerTargetLoader func(http.ResponseWriter, *http.Request) (*taskOwnerTarget, bool)
+
+func (s *Server) planningOwnerTarget(w http.ResponseWriter, r *http.Request) (*taskOwnerTarget, bool) {
 	scope, ok := s.authenticatePlanningSessionRunner(w, r)
 	if !ok {
-		return
-	}
-	var req planningSuggestOwnersRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return nil, false
 	}
 	target, err := s.loadPlanningTaskOwnerTarget(r, scope)
 	if err != nil {
 		writeRunnerPlanningError(w, r, sessionOf(target), err)
+		return nil, false
+	}
+	return target, true
+}
+
+func (s *Server) handleRunnerSuggestOwners(w http.ResponseWriter, r *http.Request, load ownerTargetLoader) {
+	target, ok := load(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
+	var req suggestOwnersRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -72,8 +88,8 @@ func (s *Server) handleRunnerPlanningSuggestOwners(w http.ResponseWriter, r *htt
 	})
 }
 
-func (s *Server) suggestCodeOwners(ctx context.Context, target *planningTaskOwnerTarget, paths []string) taskowner.Suggestion {
-	history, err := s.taskOwnerHistory(ctx, target.factory, target.session.Repository)
+func (s *Server) suggestCodeOwners(ctx context.Context, target *taskOwnerTarget, paths []string) taskowner.Suggestion {
+	history, err := s.taskOwnerHistory(ctx, target.factory, target.repository)
 	suggestion := taskowner.Suggestion{CodeOwners: []taskowner.CodeOwner{}, Members: taskowner.Members(target.candidates)}
 	if err == nil {
 		suggestion, err = taskowner.Suggest(ctx, history, paths, target.candidates, time.Now())
@@ -85,7 +101,7 @@ func (s *Server) suggestCodeOwners(ctx context.Context, target *planningTaskOwne
 	return suggestion
 }
 
-func currentTaskOwners(target *planningTaskOwnerTarget) []taskowner.Member {
+func currentTaskOwners(target *taskOwnerTarget) []taskowner.Member {
 	owners := []taskowner.Member{}
 	for _, assigneeID := range target.order.AssigneeIDs() {
 		owner, ok := models.FindTaskOwnerCandidate(target.candidates, assigneeID.String())
@@ -98,11 +114,16 @@ func currentTaskOwners(target *planningTaskOwnerTarget) []taskowner.Member {
 }
 
 func (s *Server) handleRunnerPlanningAssignOwner(w http.ResponseWriter, r *http.Request) {
-	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	s.handleRunnerAssignOwner(w, r, s.planningOwnerTarget)
+}
+
+func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request, load ownerTargetLoader) {
+	target, ok := load(w, r)
 	if !ok {
 		return
 	}
-	var req planningAssignOwnerRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
+	var req assignOwnerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -112,11 +133,6 @@ func (s *Server) handleRunnerPlanningAssignOwner(w http.ResponseWriter, r *http.
 		http.Error(w, "reason is required. Write one sentence that names the code.", http.StatusBadRequest)
 		return
 	}
-	target, err := s.loadPlanningTaskOwnerTarget(r, scope)
-	if err != nil {
-		writeRunnerPlanningError(w, r, sessionOf(target), err)
-		return
-	}
 
 	owner, ok := models.FindTaskOwnerCandidate(target.candidates, req.User)
 	if !ok {
@@ -124,13 +140,18 @@ func (s *Server) handleRunnerPlanningAssignOwner(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err = assignPlanningTaskOwner(database.DB(r.Context()), target.order, models.TaskOwnerAssignment{
+	err := assignTaskOwner(database.DB(r.Context()), target.order, models.TaskOwnerAssignment{
 		UserID: owner.UserID,
 		Source: models.TaskOwnerSourceAgent,
 		Reason: reason,
 	})
 	if err != nil {
-		writeRunnerPlanningError(w, r, target.session, err)
+		if target.session != nil {
+			writeRunnerPlanningError(w, r, target.session, err)
+			return
+		}
+		log.WithError(err).Error("task owner assignment failed")
+		http.Error(w, "Task owner assignment failed", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -139,7 +160,7 @@ func (s *Server) handleRunnerPlanningAssignOwner(w http.ResponseWriter, r *http.
 	})
 }
 
-func assignPlanningTaskOwner(db *gorm.DB, order *models.FactoryWorkOrder, assignment models.TaskOwnerAssignment) error {
+func assignTaskOwner(db *gorm.DB, order *models.FactoryWorkOrder, assignment models.TaskOwnerAssignment) error {
 	changed, err := order.AssignOwner(db, assignment)
 	if err != nil || !changed {
 		return err
@@ -157,13 +178,13 @@ func assignPlanningTaskOwner(db *gorm.DB, order *models.FactoryWorkOrder, assign
 // loadPlanningTaskOwnerTarget loads the task of a runner session. The runner
 // token outlives the session, so an ended session or a closed task cannot
 // change owners.
-func (s *Server) loadPlanningTaskOwnerTarget(r *http.Request, scope *runneraction.PlanningSessionScope) (*planningTaskOwnerTarget, error) {
+func (s *Server) loadPlanningTaskOwnerTarget(r *http.Request, scope *runneraction.PlanningSessionScope) (*taskOwnerTarget, error) {
 	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
 	if err != nil {
-		return &planningTaskOwnerTarget{session: session}, err
+		return &taskOwnerTarget{session: session}, err
 	}
 	if session.State == models.PlanningSessionStateEnded {
-		return &planningTaskOwnerTarget{session: session}, models.ErrFactoryPlanningSessionEnded
+		return &taskOwnerTarget{session: session}, models.ErrFactoryPlanningSessionEnded
 	}
 	target, err := s.loadPlanningTaskOwnerTargetForSession(r.Context(), session)
 	if err != nil {
@@ -175,25 +196,37 @@ func (s *Server) loadPlanningTaskOwnerTarget(r *http.Request, scope *runneractio
 	return target, nil
 }
 
-func (s *Server) loadPlanningTaskOwnerTargetForSession(ctx context.Context, session *models.FactoryPlanningSession) (*planningTaskOwnerTarget, error) {
-	db := database.DB(ctx)
-	target := &planningTaskOwnerTarget{session: session}
+func (s *Server) loadPlanningTaskOwnerTargetForSession(ctx context.Context, session *models.FactoryPlanningSession) (*taskOwnerTarget, error) {
+	target := &taskOwnerTarget{session: session, repository: session.Repository}
 	if session.DraftWorkOrderID == nil {
 		return target, models.ErrFactoryWorkOrderNotFound
 	}
-	factoryModel, err := models.FindFactory(db, session.OrganizationID, session.FactoryID)
+	loaded, err := s.loadTaskOwnerTarget(ctx, session.OrganizationID, session.FactoryID, *session.DraftWorkOrderID, session.Repository)
+	if loaded != nil {
+		loaded.session = session
+	}
+	return loaded, err
+}
+
+func (s *Server) loadTaskOwnerTarget(ctx context.Context, orgID, factoryID, orderID uuid.UUID, repository string) (*taskOwnerTarget, error) {
+	db := database.DB(ctx)
+	target := &taskOwnerTarget{repository: repository}
+	factoryModel, err := models.FindFactory(db, orgID, factoryID)
 	if err != nil {
 		return target, err
 	}
-	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, orderID)
 	if err != nil {
 		return target, err
 	}
-	candidates, err := models.ListTaskOwnerCandidates(db, session.OrganizationID, session.FactoryID)
+	if strings.TrimSpace(target.repository) == "" && order.Repository != nil {
+		target.repository = *order.Repository
+	}
+	candidates, err := models.ListTaskOwnerCandidates(db, orgID, factoryID)
 	if err != nil {
 		return target, err
 	}
-	s.addTaskOwnerRoles(ctx, session.OrganizationID, candidates)
+	s.addTaskOwnerRoles(ctx, orgID, candidates)
 	target.factory = factoryModel
 	target.order = order
 	target.candidates = candidates
@@ -296,7 +329,7 @@ func effectiveTaskOwnerProvider(provider string) string {
 	return provider
 }
 
-func sessionOf(target *planningTaskOwnerTarget) *models.FactoryPlanningSession {
+func sessionOf(target *taskOwnerTarget) *models.FactoryPlanningSession {
 	if target == nil {
 		return nil
 	}

@@ -932,6 +932,7 @@ func (s *Server) adminDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	targetEmail := target.Email
+	actorID := admin.ID
 
 	deletedOrganizations, err := s.softDeleteAccount(r.Context(), target)
 	if errors.Is(err, models.ErrAccountDeleteLastInstallationAdmin) {
@@ -945,6 +946,7 @@ func (s *Server) adminDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deletedOrganizationIDs := make([]string, 0, len(deletedOrganizations))
+	captureAccountDeletion(r.Context(), actorID, target.ID, target.DeletedAt.Time, deletedOrganizations, "admin")
 	for _, organization := range deletedOrganizations {
 		deletedOrganizationIDs = append(deletedOrganizationIDs, organization.ID.String())
 	}

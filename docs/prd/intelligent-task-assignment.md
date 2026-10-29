@@ -1,4 +1,4 @@
-# Task owner tools for planning
+# Task owner tools for task agents
 
 ## Summary
 
@@ -6,10 +6,16 @@ Exceptions, production problems, and CVE security problems often arrive at
 night. A task without an owner stays stale. Each team has its own rules for who
 reviews and who owns a task.
 
-The planning agent gets two tools. One tool finds the people who can review or
-own a task. The other tool sets the task owner. The team writes its rules in
-the **Additional instructions** of the planning settings. SuperPlane does not
-add an owner rule to the planning prompt.
+Every supported agent gets two owner tools when its run has a validated task
+association. One tool finds eligible owners. The other tool sets the task owner
+through an explicit agent action. Teams supply assignment rules in their agent
+instructions. Planning sessions keep their existing owner tools and instructions.
+
+This includes Run Claude Code, Run Codex, Run OpenRouter Agent, and Run
+SuperPlane Agent. Hosted providers and custom providers through OpenCode use
+the same tools. Supported task associations include factory line runs, PR
+discussion runs, visual verification, custom automations, and merge-confidence
+runs. Visual evidence is not required.
 
 ## Goals
 
@@ -50,9 +56,9 @@ Everything else goes to the person with the fewest assigned tasks on the board.
 
 ```mermaid
 sequenceDiagram
-  participant Agent as PlanningAgent
+  participant Agent as TaskAgent
   participant MCP as RunnerMCP
-  participant API as RunnerPlanningAPI
+  participant API as RunnerOwnerAPI
   participant GH as GitHubAPI
   Agent->>MCP: suggest_owners with optional paths
   MCP->>API: POST suggest-owners
@@ -69,8 +75,15 @@ when the task or the instructions ask for a reviewer or an owner.
 
 ## Tools
 
-Both tools use the planning session token. Each tool can only read or change
-the task of that session.
+Planning tools use the planning session token. Other task agents use a dedicated
+signed owner token. The runner derives the task from its validated run association.
+Merge-confidence agents use the task from their validated merge scope.
+
+The owner token binds the organization, factory, task, canvas, run, and node
+execution. The server checks these associations on each request. Tool calls
+cannot select a different task. Runs without a validated task receive no owner
+token. Ownership alone does not enable artifacts, link publication, merge
+reports, or planning publication.
 
 ### `suggest_owners`
 
@@ -129,11 +142,11 @@ integration of the factory. The server:
 - The server only accepts human members of the organization, so a bad pick
   cannot assign a stranger.
 - Assignment and history commit together. Invalid members, empty normalized
-  reasons, and inactive planning targets leave ownership and history unchanged.
+   reasons, and inactive targets leave ownership and history unchanged.
 - The agent writes the reason while it reads untrusted text. The server keeps
   one line of plain text, removes links, and limits it to 280 characters.
-- The runner token outlives the session. The owner routes reject an ended
-  session and a closed or archived task.
+- All owner routes reject expired tokens and closed or archived tasks.
+  Planning routes also reject ended sessions.
 - The manual owner update and `assign_owner` lock the task row. The assignment
   reads current assignees inside the lock and replaces them with one owner.
 
@@ -143,8 +156,15 @@ integration of the factory. The server:
 | --- | --- |
 | `POST /api/v1/runner/planning-sessions/suggest-owners` | List members and rank code owners for the session task. |
 | `POST /api/v1/runner/planning-sessions/owner` | Set the owner of the session task. |
+| `POST /api/v1/runner/tasks/suggest-owners` | List members and rank code owners for the run task. |
+| `POST /api/v1/runner/tasks/owner` | Set the owner of the run task. |
 
 ## Deployment
 
-No new environment variables. The tools use the existing GitHub integration of
-the factory and the existing planning session token.
+No new deployment configuration is required. API and worker processes use the
+existing signing secret and runner API URL configuration. The runner receives
+the managed `SUPERPLANE_OWNER_TOKEN` and `SUPERPLANE_BASE_URL` for each eligible
+execution. Codex forwards the token by environment variable name.
+
+Code-history ranking uses the existing factory GitHub integration. Bitbucket
+factories still receive the members list with a history note when paths are supplied.
