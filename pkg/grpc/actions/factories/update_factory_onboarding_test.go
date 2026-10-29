@@ -786,6 +786,36 @@ func TestUpdateFactoryOnboardingUsesTheBitbucketDefaultWhenMainIsMissing(t *test
 	assert.Equal(t, "master", response.Factory.Onboarding.DefaultBranch)
 }
 
+func TestUpdateFactoryOnboardingRejectsASavedBranchFromAnotherRepository(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	saved := "develop"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		DefaultBranch: &saved,
+	}))
+
+	nextRepository := "acme/web"
+	requested := "main"
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		gitHubBranches: func(string) ([]string, error) { return nil, errors.New("github unavailable") },
+	})
+	_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		AppRepository: &nextRepository,
+		DefaultBranch: &requested,
+	})
+	require.ErrorContains(t, err, "could not verify the default branch")
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "acme/api", reloaded.OnboardingConfigValue().AppRepository)
+	assert.Equal(t, "develop", reloaded.OnboardingConfigValue().DefaultBranch)
+}
+
 func TestUpdateFactoryOnboardingAcceptsAnInitialBranchForAnEmptyRepository(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

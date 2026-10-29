@@ -333,7 +333,13 @@ func verifiedOnboardingDefaultBranch(
 	if err != nil {
 		return patch, err
 	}
-	saved := strings.TrimSpace(factory.OnboardingConfigValue().DefaultBranch)
+	// A saved branch belongs to the current repository. A different
+	// repository must not keep that name when the provider lookup fails.
+	current := factory.OnboardingConfigValue()
+	saved := ""
+	if sameRepository(current.AppRepository, merged.AppRepository) {
+		saved = strings.TrimSpace(current.DefaultBranch)
+	}
 	check := onboardingBranchVerification(ctx, deps, db, orgID, organizationID, merged, requested)
 	chosen, keepSaved, err := chooseVerifiedDefaultBranch(
 		requested,
