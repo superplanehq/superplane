@@ -27,12 +27,12 @@ describe("IntakeSettingsHost", () => {
     renderHost();
 
     const dialog = screen.getByTestId("intake-source-settings");
-    expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Create tasks from GitHub issues" })).toBeInTheDocument();
     expect(within(dialog).queryByTestId("intake-connection")).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeChecked();
-    expect(within(dialog).getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "Only authors with repository access" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "Include reopened issues" })).toBeChecked();
     expect(
       within(dialog).queryByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
     ).not.toBeInTheDocument();
@@ -51,9 +51,10 @@ describe("IntakeSettingsHost", () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     renderHost({ onClose });
-    await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
-    await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "bug" }));
+    await user.click(screen.getByRole("checkbox", { name: "Include reopened issues" }));
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "bug" }));
     await user.click(screen.getByTestId("intake-source-settings-automatic-intake"));
     await waitFor(() => expect(updateIntake).toHaveBeenLastCalledWith({ intakeId: "intake-github", paused: true }));
     await waitFor(() => expect(screen.getByTestId("intake-source-settings-automatic-intake")).not.toBeChecked());
@@ -115,8 +116,9 @@ describe("IntakeSettingsHost", () => {
     const user = userEvent.setup();
     renderHost();
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
-    await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "superplane" }));
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "superplane" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     expect(updateIntake).toHaveBeenCalledWith({
@@ -140,8 +142,9 @@ describe("IntakeSettingsHost", () => {
     const save = screen.getByTestId("intake-source-settings-save");
     expect(save).toBeEnabled();
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
-    await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "superplane" }));
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "superplane" }));
     await user.click(save);
 
     expect(updateIntake).toHaveBeenCalledWith(

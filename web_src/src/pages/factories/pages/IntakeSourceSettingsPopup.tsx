@@ -8,6 +8,7 @@ import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavi
 import { NodeConfigRepositoryLine } from "./NodeConfigPanel";
 import {
   intakeSettingsContentKey,
+  intakeSourceSettingsTitle,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -98,6 +99,7 @@ export function IntakeSourceSettingsPopup({
     <>
       <IntakeSettingsHeader
         name={settings.name}
+        repository={repository}
         sourceId={sourceId}
         history={history}
         hasAgent={Boolean(agent)}
@@ -155,7 +157,7 @@ export function IntakeSourceSettingsPopup({
       <section
         className="flex h-full min-h-0 flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] dark:bg-gray-900"
         data-testid="intake-source-settings"
-        aria-label={`Intake ${settings.name}`}
+        aria-label={intakeSourceSettingsTitle(sourceId, settings.name)}
       >
         {content}
       </section>
@@ -221,27 +223,9 @@ function IntakeSettingsTabPanel({
   getDraft,
   onSave,
   onClose,
-}: {
-  automaticIntakeSetting?: ReactNode;
-  repository?: string;
+}: IntakeGeneralTabProps & {
   tab: IntakeSettingsTab;
-  sourceId: LineIntakeSourceId;
-  organizationId?: string;
-  integrationId?: string;
-  resourceId?: string;
-  labelOptions?: string[];
-  labelOptionsLoading?: boolean;
-  draft: IntakeSourceSettings;
   agent?: PlanningReviewAgentSlot;
-  savePending?: boolean;
-  saveError?: string;
-  deletePending: boolean;
-  deleteError?: string;
-  onDelete?: () => Promise<void> | void;
-  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
-  getDraft: () => IntakeSourceSettings;
-  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
-  onClose: () => void;
 }) {
   if (tab === "agent" && agent) {
     return (
@@ -283,6 +267,27 @@ function IntakeSettingsTabPanel({
   );
 }
 
+type IntakeGeneralTabProps = {
+  automaticIntakeSetting?: ReactNode;
+  repository?: string;
+  sourceId: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
+  labelOptions?: string[];
+  labelOptionsLoading?: boolean;
+  draft: IntakeSourceSettings;
+  savePending?: boolean;
+  saveError?: string;
+  deletePending: boolean;
+  deleteError?: string;
+  onDelete?: () => Promise<void> | void;
+  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  getDraft: () => IntakeSourceSettings;
+  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
+  onClose: () => void;
+};
+
 function IntakeGeneralTab({
   automaticIntakeSetting,
   repository,
@@ -302,32 +307,27 @@ function IntakeGeneralTab({
   getDraft,
   onSave,
   onClose,
-}: {
-  automaticIntakeSetting?: ReactNode;
-  repository?: string;
-  sourceId: LineIntakeSourceId;
-  organizationId?: string;
-  integrationId?: string;
-  resourceId?: string;
-  labelOptions?: string[];
-  labelOptionsLoading?: boolean;
-  draft: IntakeSourceSettings;
-  savePending?: boolean;
-  saveError?: string;
-  deletePending: boolean;
-  deleteError?: string;
-  onDelete?: () => Promise<void> | void;
-  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
-  getDraft: () => IntakeSourceSettings;
-  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
-  onClose: () => void;
-}) {
+}: IntakeGeneralTabProps) {
+  const ownerField = (
+    <IntakeSourceDefaultOwner
+      sourceId={sourceId}
+      organizationId={organizationId}
+      draft={draft}
+      disabled={savePending}
+      onDraftChange={onDraftChange}
+    />
+  );
+  const isGitHub = sourceId === "github-issues";
+
   return (
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
           {sourceId === "dependabot-alerts" && repository ? <NodeConfigRepositoryLine value={repository} /> : null}
-          {IntakeSourceDefaultOwner({ sourceId, organizationId, draft, disabled: savePending, onDraftChange })}
+          {isGitHub && automaticIntakeSetting ? (
+            <div className="border-b border-border pb-4">{automaticIntakeSetting}</div>
+          ) : null}
+          {!isGitHub ? ownerField : null}
           <GitHubIntakeFilterFields
             sourceId={sourceId}
             settings={draft}
@@ -374,7 +374,7 @@ function IntakeGeneralTab({
             organizationId={organizationId}
             integrationId={integrationId}
           />
-          {automaticIntakeSetting}
+          {isGitHub && organizationId ? <div className="border-t border-border pt-4">{ownerField}</div> : null}
         </div>
       </div>
       <IntakeSourceSettingsFooter
