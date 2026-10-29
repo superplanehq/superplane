@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,92 @@ func TestThinkingArgsMapsReasoningEffort(t *testing.T) {
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="high"`}, thinkingArgsFromScript(t, "HIGH"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="minimal"`}, thinkingArgsFromScript(t, "minimal"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="xhigh"`}, thinkingArgsFromScript(t, "xhigh"))
+}
+
+func TestCodexRunStampsModelCallOutcomesOnAgentMessage(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	resultPath := filepath.Join(taskDir, "result.json")
+	require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	fakeCodex := filepath.Join(taskDir, "codex")
+	require.NoError(t, os.WriteFile(fakeCodex, []byte(`#!/usr/bin/env node
+process.stdout.write('{"type":"item.completed","item":{"id":"msg_a","type":"agent_message","text":"one"}}\n');
+process.stdout.write('{"type":"item.completed","item":{"id":"tool_a","type":"command_execution","command":"true","aggregated_output":"ok","exit_code":0}}\n');
+process.stdout.write('{"type":"item.completed","item":{"id":"msg_b","type":"agent_message","text":"two"}}\n');
+process.stdout.write('{"type":"turn.completed","usage":{"input_tokens":2,"output_tokens":2}}\n');
+`), 0o700))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt, "gpt-5")
+	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+		"OPENAI_API_KEY=sk-test-openai-key",
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+resultPath,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	content, err := os.ReadFile(resultPath)
+	require.NoError(t, err)
+	var result map[string]any
+	require.NoError(t, json.Unmarshal(content, &result))
+	rows, ok := result["modelCallOutcomes"].([]any)
+	require.True(t, ok)
+	require.Len(t, rows, 2)
+	first := rows[0].(map[string]any)
+	second := rows[1].(map[string]any)
+	assert.Equal(t, "gpt-5", first["model"])
+	assert.Equal(t, "attempt_1", first["outcome"])
+	assert.Equal(t, "attempt_1", second["outcome"])
+	firstAt, err := time.Parse(time.RFC3339Nano, first["occurredAt"].(string))
+	require.NoError(t, err)
+	secondAt, err := time.Parse(time.RFC3339Nano, second["occurredAt"].(string))
+	require.NoError(t, err)
+	assert.False(t, secondAt.Before(firstAt))
+	assert.WithinDuration(t, time.Now(), firstAt, 5*time.Second)
+}
+
+func TestCodexModelCallOutcomesMapsSuccessAndProviderFailures(t *testing.T) {
+	stamp := time.Now().UTC().Truncate(time.Millisecond).Format(time.RFC3339Nano)
+	assert.Equal(t, []any{
+		map[string]any{"model": "gpt-5", "outcome": "attempt_1", "occurredAt": stamp},
+	}, codexModelCallOutcomesFromScript(t, map[string]any{
+		"failed": false, "model": "gpt-5", "occurredAt": stamp,
+	}))
+	assert.Equal(t, []any{
+		map[string]any{"model": "gpt-5", "outcome": "error", "occurredAt": stamp},
+	}, codexModelCallOutcomesFromScript(t, map[string]any{
+		"failed": true, "errorText": "HTTP 429 Too Many Requests", "model": "gpt-5", "occurredAt": stamp,
+	}))
+	assert.Empty(t, codexModelCallOutcomesFromScript(t, map[string]any{
+		"failed": true, "errorText": "Invalid API key", "model": "gpt-5", "occurredAt": stamp,
+	}))
+}
+
+func codexModelCallOutcomesFromScript(t *testing.T, input map[string]any) []any {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(input)
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { codexModelCallOutcomes } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexModelCallOutcomes(JSON.parse(process.argv[2]))));`,
+		script,
+		string(payload),
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var outcomes []any
+	require.NoError(t, json.Unmarshal(out, &outcomes))
+	if outcomes == nil {
+		return []any{}
+	}
+	return outcomes
 }
 
 func TestCodexRunReadsModelFromRolloutAndMapsUsage(t *testing.T) {
