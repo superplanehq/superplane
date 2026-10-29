@@ -226,6 +226,11 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_RUNNER_TASK_SCHEDULER") == "yes" {
+		log.Println("Starting Runner Task Scheduler")
+		go workers.NewRunnerTaskScheduler(time.Second).Start(context.Background())
+	}
+
 	if os.Getenv("START_RUNNER_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Runner Cleanup Worker")
 		w := workers.NewRunnerCleanupWorker(5 * time.Second)

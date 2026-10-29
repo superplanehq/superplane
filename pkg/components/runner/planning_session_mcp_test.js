@@ -140,6 +140,12 @@ test("withAnalysisContinuation prepends prior spec on the first prompt", () => {
   );
 });
 
+test("analysis protocol allows the owner tools only on request", () => {
+  const pack = analysisProtocol();
+  assert.match(pack, /propose_update, inspect_attachment, suggest_owners, and assign_owner/);
+  assert.match(pack, /only when the task or your instructions ask for a reviewer or an owner/);
+});
+
 test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "analysis-outputs-"));
   const spec = path.join(dir, "spec.md");

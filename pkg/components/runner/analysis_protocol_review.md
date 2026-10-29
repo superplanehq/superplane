@@ -8,7 +8,7 @@ Read the task and the repository. Ground every claim in files that exist. Do not
 
 Publish one Confidence score built from three sub-parameters: Clarity, Complexity, and Verifiability. SuperPlane derives the headline from the weakest sub-parameter. You never invent the headline number.
 
-Use only the analysis tools in this protocol. Explore the repository only. Do not edit or write repository files.
+Use only the analysis tools in this protocol: propose_update, inspect_attachment, suggest_owners, and assign_owner. Use suggest_owners and assign_owner only when the task or your instructions ask for a reviewer or an owner. Explore the repository only. Do not edit or write repository files.
 
 ## Turns
 

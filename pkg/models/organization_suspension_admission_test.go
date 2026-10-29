@@ -14,20 +14,37 @@ func TestSuspendedOrganizationRunnerAdmission(t *testing.T) {
 	fleet := f.fleet("suspension-amd64")
 	queued := f.task(f.organizationID, fleet.ID)
 	reserved := f.task(f.organizationID, fleet.ID)
+	scheduled, err := models.ScheduleOrganizationRunnerTasks(f.db, f.organizationID, 100)
+	require.NoError(t, err)
+	require.Len(t, scheduled, 2)
+	*reserved = scheduled[1]
 	runner := f.runner(fleet.ID)
 	require.NoError(t, reserved.Reserve(f.db, runner.ID))
 	other, err := models.CreateOrganization("Active fleet user", "")
 	require.NoError(t, err)
 	active := f.task(other.ID, fleet.ID)
+	_, err = models.ScheduleOrganizationRunnerTasks(f.db, other.ID, 100)
+	require.NoError(t, err)
+	pending := f.task(f.organizationID, fleet.ID)
 	organization := &models.Organization{ID: f.organizationID}
 	require.NoError(t, organization.Suspend(f.db, uuid.New(), "Abuse"))
 	require.ErrorIs(t, queued.Reserve(f.db, f.runner(fleet.ID).ID), models.ErrOrganizationSuspended)
 	require.ErrorIs(t, reserved.Start(f.db, runner, "test", time.Now()), models.ErrOrganizationSuspended)
 	selected, err := f.runner(fleet.ID).ReserveNextTask(f.db)
 	require.NoError(t, err)
-	require.Equal(t, active.ID, selected.ID)
+	require.Equal(t, active.ID, selected.Task.ID)
 	newTask := &models.RunnerTask{ID: uuid.New(), OrganizationID: organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued}
 	require.ErrorIs(t, f.db.Create(newTask).Error, models.ErrOrganizationSuspended)
+	scheduled, err = models.ScheduleOrganizationRunnerTasks(f.db, organization.ID, 100)
+	require.NoError(t, err)
+	require.Empty(t, scheduled)
+	_, tasks, _, err := organization.SuspensionWork(f.db)
+	require.NoError(t, err)
+	var pendingFound bool
+	for _, task := range tasks {
+		pendingFound = pendingFound || task.ID == pending.ID
+	}
+	require.True(t, pendingFound, "pending tasks must be included in suspension cancellation")
 	require.NoError(t, reserved.RequestCancel(f.db, time.Now()))
 }
 

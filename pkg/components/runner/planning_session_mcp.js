@@ -647,7 +647,10 @@ if (require.main === module) {
 }
 
 function planningTools() {
-  return [UPDATE_TOOL, TOOLS.find((tool) => tool.name === "inspect_attachment")];
+  return [
+    UPDATE_TOOL,
+    TOOLS.find((tool) => tool.name === "inspect_attachment"),
+  ];
 }
 
 module.exports = {

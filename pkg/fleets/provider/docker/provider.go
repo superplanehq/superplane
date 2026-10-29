@@ -297,6 +297,10 @@ func (p *Provider) Delete(
 	return nil
 }
 
+func (p *Provider) DeletionIsSynchronous() bool {
+	return true
+}
+
 func dockerError(operation string, output []byte, err error) error {
 	message := strings.TrimSpace(string(output))
 	if message == "" {
@@ -315,4 +319,4 @@ func nonEmpty(values []string) []string {
 	return out
 }
 
-var _ provider.Provider = (*Provider)(nil)
+var _ provider.SynchronousDeletionProvider = (*Provider)(nil)

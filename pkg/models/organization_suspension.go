@@ -142,7 +142,7 @@ func (o *Organization) SuspensionWork(tx *gorm.DB) ([]CanvasRun, []RunnerTask, [
 		return nil, nil, nil, err
 	}
 	var tasks []RunnerTask
-	err = tx.Where("organization_id = ? AND state IN ?", o.ID, []string{RunnerTaskStateQueued, RunnerTaskStateReserved, RunnerTaskStateRunning}).Order("queued_at").Limit(100).Find(&tasks).Error
+	err = tx.Where("organization_id = ? AND state IN ?", o.ID, []string{RunnerTaskStatePending, RunnerTaskStateQueued, RunnerTaskStateReserved, RunnerTaskStateRunning}).Order("queued_at").Limit(100).Find(&tasks).Error
 	if err != nil {
 		return nil, nil, nil, err
 	}

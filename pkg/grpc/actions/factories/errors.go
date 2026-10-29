@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
@@ -27,12 +28,23 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return err
 	}
 
+	var busy *models.CodexConnectionBusyError
+	if errors.As(err, &busy) {
+		return grpcerrors.Conflict(err, busy.Error())
+	}
+
 	var datadogAPIErr *datadog.APIError
 	if errors.As(err, &datadogAPIErr) {
 		return grpcerrors.FailedPrecondition(err, datadogAPIErr.Error())
 	}
 
 	switch {
+	case errors.Is(err, billing.ErrPaymentMethodRequired):
+		return grpcerrors.FailedPrecondition(err, "Add a payment method before you complete workspace setup.")
+	case errors.Is(err, billing.ErrHostedSubscriptionRequired), errors.Is(err, billing.ErrHostedPaymentPastDue), errors.Is(err, billing.ErrHostedSubscriptionPaused):
+		return grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
+	case errors.Is(err, models.ErrSubscriptionModelUnavailable), errors.Is(err, models.ErrSubscriptionOwnerRequired), errors.Is(err, models.ErrSubscriptionOwnerInvalid), errors.Is(err, models.ErrSubscriptionOwnerBusy), errors.Is(err, models.ErrSubscriptionTaskAssociation):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, models.ErrBYOKAccessDenied):
 		return grpcerrors.PermissionDenied(err, err.Error())
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):
@@ -105,6 +117,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "factory line step entrypoint must use the onRun trigger")
 	case errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound):
+		return grpcerrors.NotFound(err, "artifact not found")
 	case errors.Is(err, models.ErrFactoryIntakeNotFound):
 		return grpcerrors.NotFound(err, "factory intake not found")
 	case errors.Is(err, models.ErrFactoryIntakeSourceInvalid):
@@ -261,6 +275,18 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		return grpcerrors.NotFound(err, "resource not found")
+	case errors.Is(err, models.ErrCodexConnectionNotFound):
+		return grpcerrors.NotFound(err, "ChatGPT subscription connection not found")
+	case errors.Is(err, models.ErrCodexConnectionNotEligible):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionNotReady):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionStale):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionActive):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionUnavailable):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	default:
 		return grpcerrors.Internal(err, internalMessage)
 	}

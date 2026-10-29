@@ -41,6 +41,7 @@ export function CardOwnerMark({
     return (
       <OwnerAssignTrigger
         organizationId={organizationId}
+        orderId={entry.id}
         selectedIds={[]}
         canAssign={canAssign}
         isSaving={isAssigneesSaving}
@@ -74,6 +75,7 @@ export function CardOwnerMark({
   return (
     <OwnerAssignTrigger
       organizationId={organizationId}
+      orderId={entry.id}
       selectedIds={[owner.id]}
       canAssign={canAssign}
       isSaving={isAssigneesSaving}
@@ -117,6 +119,7 @@ export function AssigneeGroup({
     return (
       <OwnerAssignTrigger
         organizationId={organizationId}
+        orderId={entry.id}
         selectedIds={[]}
         canAssign
         isSaving={isAssigneesSaving}
@@ -146,6 +149,7 @@ export function AssigneeGroup({
   return (
     <OwnerAssignTrigger
       organizationId={organizationId}
+      orderId={entry.id}
       selectedIds={[owner.id]}
       canAssign
       isSaving={isAssigneesSaving}

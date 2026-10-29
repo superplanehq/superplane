@@ -114,7 +114,13 @@ func (w *RunnerCleanupWorker) Process() error {
 			if runner.State != models.RunnerStateTerminated {
 				lostTask = nil
 			}
-			return err
+			if err != nil {
+				return err
+			}
+			if lostRunningTask != nil {
+				return models.MarkCodexConnectionUncertain(tx, lostRunningTask.ID, now)
+			}
+			return nil
 		})
 		if err != nil {
 			w.logger.WithError(err).
@@ -129,9 +135,46 @@ func (w *RunnerCleanupWorker) Process() error {
 			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask, staleRunner.FleetSlug, staleRunner.FleetScope)
 		}
 	}
-	return models.RevokeTerminatedRunnerCredentials(
+	if err := models.RevokeTerminatedRunnerCredentials(
 		database.Conn(),
 		now.Add(-terminatedRunnerCredentialRetryWindow),
 		now,
-	)
+	); err != nil {
+		return err
+	}
+	connections, err := models.ListPendingCodexRevocations(database.DB(context.Background()))
+	if err != nil {
+		return err
+	}
+	for i := range connections {
+		var results []*models.RunCancellationResult
+		err := database.DB(context.Background()).Transaction(func(tx *gorm.DB) error {
+			var err error
+			results, err = connections[i].CleanupRevocation(tx, now)
+			return err
+		})
+		if err != nil {
+			return err
+		}
+		notifier := &RunCancellationNotifier{}
+		notifier.RecordRuns(results)
+		notifier.Publish()
+		if len(results) > 0 || connections[i].RevocationPendingAt == nil {
+			_ = messages.PublishFactoryCodexConnectionUpdated(connections[i].FactoryID.String())
+		}
+	}
+	var logins []models.FactoryCodexConnection
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		logins, err = models.ListCodexLoginConnections(tx)
+		if err != nil {
+			return err
+		}
+		return models.ReleaseConfirmedCodexReservations(tx, now)
+	})
+	if err != nil {
+		return err
+	}
+	messages.PublishCodexConnectionChanges(database.DB(context.Background()), logins)
+	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -98,6 +99,7 @@ func TestRefreshBacklog(t *testing.T) {
 	}
 
 	t.Run("archives unavailable items from every readable intake source", func(t *testing.T) {
+		recorder := useAnalytics(t)
 		factory := newFactory(t)
 		createIntake(t, factory, models.FactoryIntakeSourceGitHubIssues)
 		createIntake(t, factory, models.FactoryIntakeSourceProductiveTasks)
@@ -136,9 +138,26 @@ func TestRefreshBacklog(t *testing.T) {
 		reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), openOrder.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
+		events := recorder.snapshot()
+		require.Len(t, events, 2)
+		for _, event := range events {
+			assert.Equal(t, "factory_task_archived", string(event.Name))
+			assert.Equal(t, "backlog_refresh", event.Properties["archive_source"])
+			assert.Equal(t, productanalytics.StableEventID(productanalytics.EventFactoryTaskArchived, event.TaskID, models.FactoryWorkOrderResultArchived), event.EventID)
+			assert.Equal(t, r.Account.ID.String(), event.DistinctID)
+		}
+		response, err = RefreshBacklog(ctx, IntakeDependencies{
+			NewItemSource: func(_ context.Context, _ *gorm.DB, intake *models.FactoryIntake) (intakeItemSource, error) {
+				return sources[intake.Source], nil
+			},
+		}, orgID, request(factory))
+		require.NoError(t, err)
+		assert.Zero(t, response.GetArchivedCount())
+		require.Len(t, recorder.snapshot(), 2)
 	})
 
 	t.Run("counts each failed item lookup once", func(t *testing.T) {
+		recorder := useAnalytics(t)
 		factory := newFactory(t)
 		createIntake(t, factory, models.FactoryIntakeSourceGitHubIssues)
 		originURL := "https://github.com/acme/payments/issues/12"
@@ -159,6 +178,7 @@ func TestRefreshBacklog(t *testing.T) {
 		assert.Zero(t, response.GetArchivedCount())
 		assert.Equal(t, int32(1), response.GetFailedItemCount())
 		assert.Equal(t, 1, source.checks)
+		assert.Empty(t, recorder.snapshot())
 	})
 
 	t.Run("keeps an open Productive task after it moves to another project", func(t *testing.T) {

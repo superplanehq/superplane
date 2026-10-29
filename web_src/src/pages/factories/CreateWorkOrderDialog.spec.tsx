@@ -249,7 +249,6 @@ describe("CreateWorkOrderDialog", () => {
     expect(createMutate).toHaveBeenCalledWith({
       title: "Refunds fail on retry.",
       description: "Refunds fail on retry.",
-      assigneeIds: [],
     });
     expect(screen.queryByTestId("create-work-order-auto-start")).not.toBeInTheDocument();
     expect(dispatchMutate).not.toHaveBeenCalled();

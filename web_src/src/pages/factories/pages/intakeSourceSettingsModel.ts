@@ -465,3 +465,7 @@ function assignmentFromApi(assignment: FactoriesFactoryIntakeSettings["assignmen
   }
   return "any";
 }
+
+export function intakeSourceSettingsTitle(sourceId: string, name: string): string {
+  return sourceId === "github-issues" ? "Create tasks from GitHub issues" : `Intake ${name}`;
+}

@@ -556,6 +556,55 @@ CREATE TABLE public.factory_agent_resources (
 
 
 --
+-- Name: factory_codex_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_codex_connections (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    owner_user_id uuid NOT NULL,
+    status character varying(32) NOT NULL,
+    resume_status character varying(32) DEFAULT ''::character varying NOT NULL,
+    verification_url text DEFAULT ''::text NOT NULL,
+    verification_code text DEFAULT ''::text NOT NULL,
+    account_label text DEFAULT ''::text NOT NULL,
+    bundle_ciphertext bytea,
+    credential_version bigint DEFAULT 0 NOT NULL,
+    final_checkpoint_version bigint DEFAULT 0 NOT NULL,
+    reservation_generation bigint DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    usage_limits jsonb DEFAULT '[]'::jsonb NOT NULL,
+    usage_observed_at timestamp with time zone,
+    available_models jsonb DEFAULT '[]'::jsonb NOT NULL,
+    revocation_pending_at timestamp with time zone,
+    CONSTRAINT factory_codex_connections_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'finishing'::character varying, 'ready'::character varying, 'reconnect_required'::character varying, 'disconnected'::character varying])::text[]))),
+    CONSTRAINT factory_codex_connections_version_check CHECK (((credential_version >= 0) AND (final_checkpoint_version >= 0) AND (final_checkpoint_version <= credential_version) AND (reservation_generation >= 0)))
+);
+
+
+--
+-- Name: factory_codex_leases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_codex_leases (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    connection_id uuid NOT NULL,
+    task_id uuid NOT NULL,
+    generation bigint NOT NULL,
+    purpose character varying(16) NOT NULL,
+    secret_hash text DEFAULT ''::text NOT NULL,
+    secret_ciphertext bytea,
+    started_version bigint DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    revoked_at timestamp with time zone,
+    CONSTRAINT factory_codex_leases_generation_check CHECK (((generation >= 1) AND (started_version >= 0))),
+    CONSTRAINT factory_codex_leases_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['login'::character varying, 'run'::character varying])::text[])))
+);
+
+
+--
 -- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -980,6 +1029,17 @@ CREATE TABLE public.factory_work_order_queue_items (
 
 
 --
+-- Name: factory_work_order_refinement_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_refinement_runs (
+    run_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_orders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1006,6 +1066,7 @@ CREATE TABLE public.factory_work_orders (
     mcp_client_name text,
     vcs_provider text,
     refinement_model text,
+    pending_handoff jsonb,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -1452,6 +1513,20 @@ CREATE TABLE public.organization_llm_settings (
 
 
 --
+-- Name: organization_payment_method_observations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_payment_method_observations (
+    organization_id uuid NOT NULL,
+    usable boolean NOT NULL,
+    read_started_at bigint NOT NULL,
+    observed_at timestamp with time zone NOT NULL,
+    usable_method_hashes text[] DEFAULT '{}'::text[] NOT NULL,
+    transition_id uuid
+);
+
+
+--
 -- Name: organization_seat_limit_overrides; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1648,8 +1723,9 @@ CREATE TABLE public.runner_tasks (
     finished_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    ready_at timestamp with time zone,
     CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
-    CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
+    CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
 );
 
 
@@ -1677,7 +1753,9 @@ CREATE TABLE public.runners (
     arch text DEFAULT ''::text NOT NULL,
     hostname text DEFAULT ''::text NOT NULL,
     ip text DEFAULT ''::text NOT NULL,
+    provider_deleted_at timestamp with time zone,
     CONSTRAINT runners_creation_idempotency_check CHECK ((((creation_idempotency_key IS NULL) AND (creation_request_hash IS NULL)) OR ((creation_idempotency_key IS NOT NULL) AND (creation_request_hash IS NOT NULL)))),
+    CONSTRAINT runners_provider_deleted_check CHECK (((provider_deleted_at IS NULL) OR ((state)::text = 'terminated'::text))),
     CONSTRAINT runners_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'idle'::character varying, 'busy'::character varying, 'terminated'::character varying])::text[]))),
     CONSTRAINT runners_termination_check CHECK (((((state)::text = 'terminated'::text) AND (terminated_at IS NOT NULL)) OR (((state)::text <> 'terminated'::text) AND (terminated_at IS NULL))))
 );
@@ -2596,6 +2674,38 @@ ALTER TABLE ONLY public.factory_agent_resources
 
 
 --
+-- Name: factory_codex_connections factory_codex_connections_factory_owner_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_factory_owner_key UNIQUE (factory_id, owner_user_id);
+
+
+--
+-- Name: factory_codex_connections factory_codex_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_codex_leases factory_codex_leases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_leases
+    ADD CONSTRAINT factory_codex_leases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_codex_leases factory_codex_leases_task_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_leases
+    ADD CONSTRAINT factory_codex_leases_task_key UNIQUE (connection_id, task_id);
+
+
+--
 -- Name: factory_intakes factory_intakes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2793,6 +2903,14 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 ALTER TABLE ONLY public.factory_work_order_queue_items
     ADD CONSTRAINT factory_work_order_queue_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_work_order_refinement_runs factory_work_order_refinement_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_refinement_runs
+    ADD CONSTRAINT factory_work_order_refinement_runs_pkey PRIMARY KEY (run_id);
 
 
 --
@@ -3049,6 +3167,14 @@ ALTER TABLE ONLY public.organization_llm_credit_grants
 
 ALTER TABLE ONLY public.organization_llm_settings
     ADD CONSTRAINT organization_llm_settings_pkey PRIMARY KEY (organization_id);
+
+
+--
+-- Name: organization_payment_method_observations organization_payment_method_observations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_payment_method_observations
+    ADD CONSTRAINT organization_payment_method_observations_pkey PRIMARY KEY (organization_id);
 
 
 --
@@ -3551,6 +3677,34 @@ CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories
 --
 
 CREATE UNIQUE INDEX factories_url_id_key ON public.factories USING btree (url_id);
+
+
+--
+-- Name: factory_codex_connections_revocation_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX factory_codex_connections_revocation_pending_idx ON public.factory_codex_connections USING btree (revocation_pending_at) WHERE (revocation_pending_at IS NOT NULL);
+
+
+--
+-- Name: factory_codex_leases_login_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factory_codex_leases_login_idx ON public.factory_codex_leases USING btree (connection_id) WHERE ((purpose)::text = 'login'::text);
+
+
+--
+-- Name: factory_codex_leases_secret_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factory_codex_leases_secret_idx ON public.factory_codex_leases USING btree (secret_hash) WHERE (secret_hash <> ''::text);
+
+
+--
+-- Name: factory_codex_leases_task_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX factory_codex_leases_task_idx ON public.factory_codex_leases USING btree (task_id);
 
 
 --
@@ -4146,6 +4300,13 @@ CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
+
+
+--
+-- Name: idx_factory_work_order_refinement_runs_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_refinement_runs_work_order ON public.factory_work_order_refinement_runs USING btree (work_order_id);
 
 
 --
@@ -4796,7 +4957,7 @@ CREATE INDEX runner_tasks_fleet_state_idx ON public.runner_tasks USING btree (fl
 -- Name: runner_tasks_organization_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING btree (organization_id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = ANY ((ARRAY['reserved'::character varying, 'running'::character varying])::text[])));
+CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING btree (organization_id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying])::text[])));
 
 
 --
@@ -4804,6 +4965,13 @@ CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING b
 --
 
 CREATE INDEX runner_tasks_organization_idx ON public.runner_tasks USING btree (organization_id, created_at);
+
+
+--
+-- Name: runner_tasks_organization_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_organization_pending_idx ON public.runner_tasks USING btree (organization_id, queued_at, id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = 'pending'::text));
 
 
 --
@@ -5164,6 +5332,38 @@ ALTER TABLE ONLY public.factory_agent_resources
 
 ALTER TABLE ONLY public.factory_agent_resources
     ADD CONSTRAINT factory_agent_resources_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_codex_connections factory_codex_connections_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_codex_connections factory_codex_connections_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_codex_connections factory_codex_connections_owner_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_codex_leases factory_codex_leases_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_leases
+    ADD CONSTRAINT factory_codex_leases_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.factory_codex_connections(id) ON DELETE CASCADE;
 
 
 --
@@ -5583,6 +5783,22 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 
 --
+-- Name: factory_work_order_refinement_runs factory_work_order_refinement_runs_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_refinement_runs
+    ADD CONSTRAINT factory_work_order_refinement_runs_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_work_order_refinement_runs factory_work_order_refinement_runs_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_refinement_runs
+    ADD CONSTRAINT factory_work_order_refinement_runs_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_work_orders factory_work_orders_auto_start_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5796,6 +6012,14 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_payment_method_observations organization_payment_method_observations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_payment_method_observations
+    ADD CONSTRAINT organization_payment_method_observations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -6358,7 +6582,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261027134021	f
+20261029221537	f
 \.
 
 

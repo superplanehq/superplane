@@ -171,6 +171,12 @@ func (f *Factory) RouteSegment() string {
 	return strings.ToLower(f.Key) + "-" + f.URLID
 }
 
+func (f *Factory) LockForUpdate(tx *gorm.DB) error {
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND organization_id = ?", f.ID, f.OrganizationID).
+		First(f).Error
+}
+
 var newFactoryURLID = generateFactoryURLID
 
 func generateFactoryURLID() (string, error) {
@@ -888,6 +894,20 @@ func (f *Factory) createWorkOrder(
 	origin *WorkOrderOrigin,
 	autoStartLineID *uuid.UUID,
 ) (*FactoryWorkOrder, error) {
+	if f.OnboardingConfigValue().CodexSubscription {
+		if len(assignees) > 1 {
+			return nil, ErrSubscriptionOwnerRequired
+		}
+		if len(assignees) == 1 {
+			eligible, err := SubscriptionOwnerEligible(tx, f.OrganizationID, f.ID, assignees[0])
+			if err != nil {
+				return nil, err
+			}
+			if !eligible {
+				return nil, ErrSubscriptionOwnerInvalid
+			}
+		}
+	}
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
@@ -944,7 +964,7 @@ func (f *Factory) createWorkOrder(
 	}
 
 	if len(assignees) > 0 {
-		if err := order.ReplaceAssignees(tx, assignees); err != nil {
+		if err := order.replaceAssignees(tx, assignees); err != nil {
 			return nil, err
 		}
 	}
@@ -1159,6 +1179,34 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 		return nil, err
 	}
 
+	return orders, nil
+}
+
+// ListWorkOrderSummaries returns one bounded page of task identity fields.
+// It does not load descriptions, owners, checks, or pull requests.
+// Limit above DefaultFactoryWorkOrderListLimit is clamped. Order is
+// updated_at DESC, id DESC. There is no offset.
+func (f *Factory) ListWorkOrderSummaries(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
+	limit := filters.Limit
+	if limit <= 0 || limit > DefaultFactoryWorkOrderListLimit {
+		limit = DefaultFactoryWorkOrderListLimit
+	}
+
+	var orders []FactoryWorkOrder
+	err := f.workOrdersQuery(tx, filters).
+		Select(
+			"factory_work_orders.id",
+			"factory_work_orders.number",
+			"factory_work_orders.title",
+			"factory_work_orders.state",
+		).
+		Order("factory_work_orders.updated_at DESC").
+		Order("factory_work_orders.id DESC").
+		Limit(limit).
+		Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
 	return orders, nil
 }
 

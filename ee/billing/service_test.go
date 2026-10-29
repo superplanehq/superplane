@@ -2,7 +2,9 @@ package billing_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +17,81 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
+
+func TestOrganizationPlanSummariesBatchReadsAndGraceExpiration(t *testing.T) {
+	t.Setenv(billing.BillingEnabledEnv, "no")
+	t.Cleanup(billing.Bind(eebilling.New(nil)))
+	tx := database.DB(t.Context()).Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
+	require.NoError(t, billingmodels.UpdatePastDueGraceDays(tx, 7))
+	custom := billingmodels.BillingPlan{Key: "batch_" + uuid.NewString()[:8], Name: "Private Team", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(tx, &custom))
+	trial, err := billingmodels.FindBillingPlan(tx, billingmodels.BillingPlanTrial)
+	require.NoError(t, err)
+	now := time.Now()
+	future, recent := now.Add(time.Hour), now.Add(-time.Hour)
+	ids := make([]uuid.UUID, 60)
+	expected := make(map[uuid.UUID]billing.OrganizationPlanSummary, len(ids))
+	for i := range ids {
+		org, err := models.CreateOrganizationInTransaction(tx, support.RandomName("batch-plan"), "")
+		require.NoError(t, err)
+		ids[i] = org.ID
+		plan := billingmodels.OrganizationBillingPlan{OrganizationID: org.ID, PlanID: custom.ID, Plan: custom.Key, PlanSource: billingmodels.BillingPlanSourceAdmin}
+		catalog := custom
+		switch i % 3 {
+		case 1:
+			catalog = *trial
+			plan.PlanID, plan.Plan, plan.TrialEndsAt = trial.ID, trial.Key, &future
+		case 2:
+			plan.PlanSource = billingmodels.BillingPlanSourcePolar
+			plan.PolarSubscriptionStatus = billingmodels.PolarSubscriptionStatusPastDue
+			plan.PastDueSince = &recent
+		}
+		require.NoError(t, tx.Omit("Catalog").Create(&plan).Error)
+		expected[org.ID] = billing.OrganizationPlanSummary{Key: catalog.Key, Name: catalog.Name}
+	}
+	for _, count := range []int{3, len(ids)} {
+		t.Run(fmt.Sprintf("%d organizations", count), func(t *testing.T) {
+			queries := &planSummaryQueryCounter{Interface: tx.Logger}
+			summaries, err := billing.ResolveOrganizationPlanSummaries(tx.Session(&gorm.Session{Logger: queries}), append(ids[:count:count], ids[0]))
+			require.NoError(t, err)
+			require.Len(t, summaries, count)
+			for _, id := range ids[:count] {
+				assert.Equal(t, expected[id], summaries[id])
+			}
+			assert.LessOrEqual(t, queries.count, 4, "billing rows, catalogs, and grace settings must not be read separately for each organization")
+		})
+	}
+	// A later batch must use the current setting, and each expired row must
+	// independently fall back to its remaining trial or None.
+	require.NoError(t, tx.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", ids[5]).Update("trial_ends_at", future).Error)
+	require.NoError(t, billingmodels.UpdatePastDueGraceDays(tx, 0))
+	summaries, err := billing.ResolveOrganizationPlanSummaries(tx, ids[:6])
+	require.NoError(t, err)
+	none, err := billingmodels.FindBillingPlan(tx, billingmodels.BillingPlanNone)
+	require.NoError(t, err)
+	for id, catalog := range map[uuid.UUID]billingmodels.BillingPlan{ids[2]: *none, ids[5]: *trial} {
+		assert.Equal(t, billing.OrganizationPlanSummary{Key: catalog.Key, Name: catalog.Name}, summaries[id])
+		stored, err := billingmodels.FindOrganizationBillingPlan(tx, id)
+		require.NoError(t, err)
+		require.NotNil(t, stored)
+		assert.Equal(t, catalog.ID, stored.PlanID)
+		assert.Equal(t, billingmodels.PolarSubscriptionStatusPastDue, stored.PolarSubscriptionStatus)
+	}
+}
+
+type planSummaryQueryCounter struct {
+	logger.Interface
+	count int
+}
+
+func (l *planSummaryQueryCounter) Trace(ctx context.Context, begin time.Time, query func() (string, int64), err error) {
+	l.count++
+	l.Interface.Trace(ctx, begin, query, err)
+}
 
 func TestRuntimeInitializesOrganizationBilling(t *testing.T) {
 	t.Setenv(billing.BillingEnabledEnv, "yes")

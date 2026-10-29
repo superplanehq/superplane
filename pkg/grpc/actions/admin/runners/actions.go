@@ -262,9 +262,24 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 	if len(idempotencyKey) > maxIdempotencyKeyLength {
 		return nil, grpcerrors.InvalidArgument(nil, "idempotency key is too long")
 	}
+	fleetManagerID := strings.TrimSpace(req.GetFleetManagerId())
+	providerName := strings.TrimSpace(req.GetProvider())
+	if (fleetManagerID == "") != (providerName == "") {
+		return nil, grpcerrors.InvalidArgument(nil, "fleet manager ID and provider must be supplied together")
+	}
 	requestHash := ""
 	if idempotencyKey != "" {
 		requestHash = createRunnerRequestHash(fleetID, taskID, req.GetEphemeral())
+		if fleetManagerID != "" {
+			// Preserve hashes for older clients that did not supply ownership.
+			sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%q:%q", requestHash, fleetManagerID, providerName)))
+			requestHash = hex.EncodeToString(sum[:])
+		}
+	}
+	tags := map[string]string{}
+	if fleetManagerID != "" {
+		tags[models.RunnerTagFleetManagerID] = fleetManagerID
+		tags[models.RunnerTagProvider] = providerName
 	}
 
 	runner, registration, err := s.createRunner(
@@ -274,6 +289,7 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 		req.GetEphemeral(),
 		idempotencyKey,
 		requestHash,
+		tags,
 	)
 	if err != nil {
 		return nil, err
@@ -407,12 +423,51 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 	return &pb.DeleteRunnerResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
 }
 
+func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRunnerProviderDeletedRequest) (*pb.MarkRunnerProviderDeletedResponse, error) {
+	fleet, err := findFleet(ctx, req.GetFleetId())
+	if err != nil {
+		return nil, err
+	}
+	runnerID, err := parseID(req.GetRunnerId(), "runner ID")
+	if err != nil {
+		return nil, err
+	}
+
+	var runner *models.Runner
+	var logins []models.FactoryCodexConnection
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		runner, err = fleet.FindRunner(tx, runnerID)
+		if err != nil {
+			return err
+		}
+		if req.GetFleetManagerId() == "" || req.GetProvider() == "" ||
+			runner.Tags.Data()[models.RunnerTagFleetManagerID] != req.GetFleetManagerId() ||
+			runner.Tags.Data()[models.RunnerTagProvider] != req.GetProvider() {
+			return fmt.Errorf("runner provider ownership does not match the confirming manager")
+		}
+		logins, err = models.ListCodexLoginConnections(tx)
+		if err != nil {
+			return err
+		}
+		return runner.MarkProviderDeleted(tx, time.Now())
+	})
+	if errors.Is(err, models.ErrRunnerNotFound) {
+		return nil, grpcerrors.NotFound(err, "runner not found")
+	}
+	if err != nil {
+		return nil, grpcerrors.FailedPrecondition(err, "runner VM is not confirmed deleted")
+	}
+	messages.PublishCodexConnectionChanges(database.DB(ctx), logins)
+	return &pb.MarkRunnerProviderDeletedResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
+}
+
 func (s *Service) createRunner(
 	ctx context.Context,
 	fleetID string,
 	taskID *uuid.UUID,
 	ephemeral bool,
 	idempotencyKey, requestHash string,
+	tags map[string]string,
 ) (*models.Runner, *models.RunnerRegistration, error) {
 	var runner *models.Runner
 	var registration *models.RunnerRegistration
@@ -452,6 +507,7 @@ func (s *Service) createRunner(
 			State:         models.RunnerStatePending,
 			RunnerVersion: fleet.RunnerVersion,
 			Ephemeral:     ephemeral,
+			Tags:          datatypes.NewJSONType(tags),
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		}
@@ -507,9 +563,14 @@ func (s *Service) createRunner(
 		return nil, nil, grpcerrors.NotFound(err, "fleet not found")
 	case errors.Is(err, models.ErrRunnerTaskNotFound):
 		return nil, nil, grpcerrors.NotFound(err, "task not found")
-	case errors.Is(err, models.ErrOrganizationRunnerCapacity):
-		return nil, nil, grpcerrors.ResourceExhausted(err, "Organization parallel runner limit reached.")
-	case errors.Is(err, models.ErrRunnerTaskNotReservable),
+	case errors.Is(err, models.ErrCodexConnectionStale),
+		errors.Is(err, models.ErrCodexConnectionNotEligible),
+		errors.Is(err, models.ErrCodexConnectionNotReady),
+		errors.Is(err, models.ErrSubscriptionOwnerRequired),
+		errors.Is(err, models.ErrSubscriptionOwnerInvalid),
+		errors.Is(err, models.ErrSubscriptionTaskAssociation),
+		errors.Is(err, models.ErrSubscriptionModelUnavailable),
+		errors.Is(err, models.ErrRunnerTaskNotReservable),
 		errors.Is(err, models.ErrRunnerTaskFleetMismatch),
 		errors.Is(err, models.ErrRunnerTaskBackendMismatch):
 		return nil, nil, grpcerrors.FailedPrecondition(err, err.Error())
@@ -681,6 +742,7 @@ func validateRunnerStates(states []string) error {
 
 func validateTaskStates(states []string) error {
 	valid := []string{
+		models.RunnerTaskStatePending,
 		models.RunnerTaskStateQueued,
 		models.RunnerTaskStateReserved,
 		models.RunnerTaskStateRunning,

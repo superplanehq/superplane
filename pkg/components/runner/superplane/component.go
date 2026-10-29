@@ -153,12 +153,14 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
 		return err
 	}
-	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
+	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasVisualEvidence(environment))
+	dispatched.Steps = runner.AppendPublishLinkProtocol(dispatched.Steps, runner.HasPublishLinks(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
 	commands, files, err := buildSuperPlaneTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, dispatched.Steps, dispatched.Attachments)
 	if err != nil {
@@ -170,6 +172,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	environment, files = runner.AttachFactoryCommitIdentity(ctx, environment, files)
 	files = runner.AppendTaskArtifactMCP(environment, files)
 	files = runner.AppendMergeConfidenceMCP(environment, files)
+	files = runner.AppendGlobalMCP(environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {
 		access, err = mintOpenRouterRunnerKey(ctx, access, spec.ExecutionTimeoutSeconds)

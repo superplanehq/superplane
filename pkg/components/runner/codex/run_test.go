@@ -19,6 +19,60 @@ func TestThinkingArgsMapsReasoningEffort(t *testing.T) {
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="low"`}, thinkingArgsFromScript(t, "low"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="medium"`}, thinkingArgsFromScript(t, "medium"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="high"`}, thinkingArgsFromScript(t, "HIGH"))
+	assert.Equal(t, []string{"-c", `model_reasoning_effort="minimal"`}, thinkingArgsFromScript(t, "minimal"))
+	assert.Equal(t, []string{"-c", `model_reasoning_effort="xhigh"`}, thinkingArgsFromScript(t, "xhigh"))
+}
+
+func TestCodexRunReadsModelFromRolloutAndMapsUsage(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	resultPath := filepath.Join(taskDir, "result.json")
+	codexHome := filepath.Join(taskDir, "codex-home")
+	require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), []byte(`module.exports = {
+  subscriptionEnabled: () => true,
+  subscriptionChildEnv: (env) => env,
+  reportUsage: async () => { throw new Error("Usage upload unavailable"); },
+};`), 0o600))
+	fakeCodex := filepath.Join(taskDir, "codex")
+	require.NoError(t, os.WriteFile(fakeCodex, []byte(`#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+const id = "thread-123";
+const dir = path.join(process.env.CODEX_HOME, "sessions", "2026", "10", "19");
+fs.mkdirSync(dir, { recursive: true });
+fs.writeFileSync(path.join(dir, "rollout-test-" + id + ".jsonl"), [
+  JSON.stringify({ type: "turn_context", payload: { model: "gpt-5.4", effort: "xhigh" } }),
+  "{invalid"
+].join("\n"));
+process.stdout.write(JSON.stringify({ type: "thread.started", thread_id: id }) + "\n");
+process.stdout.write(JSON.stringify({ type: "turn.completed", usage: { input_tokens: 10, output_tokens: 4, cache_read_input_tokens: 3, cache_write_input_tokens: 2, reasoning_output_tokens: 1 } }) + "\n");
+`), 0o700))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+		"OPENAI_API_KEY=sk-test-openai-key",
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+resultPath,
+		"CODEX_HOME="+codexHome,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Contains(t, string(out), "Usage upload unavailable")
+
+	var result map[string]any
+	content, err := os.ReadFile(resultPath)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(content, &result))
+	assert.Equal(t, "gpt-5.4", result["model"])
+	assert.Equal(t, "xhigh", result["thinkingLevel"])
+	usage := result["usage"].(map[string]any)
+	assert.Equal(t, float64(2), usage["cache_creation_input_tokens"])
+	assert.Equal(t, float64(1), usage["reasoning_tokens"])
 }
 
 func thinkingArgsFromScript(t *testing.T, thinking string) []string {
@@ -140,6 +194,30 @@ func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	assert.NotContains(t, joined, "approval_mode")
 }
 
+func TestCodexExecArgsAddsGlobalMCPWithApprovedTools(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"task run": {"SUPERPLANE_RUNNER_TOKEN": "runner-token-secret"},
+		"planning": {
+			"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+			"SUPERPLANE_RUNNER_TOKEN":          "runner-token-secret",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			args := codexExecArgsFromScript(t, env, "gpt-5", "/task/planning_session_mcp.js")
+			joined := strings.Join(args, " ")
+
+			assert.Contains(t, args, `mcp_servers.superplane_global.command="node"`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.args=["/task/superplane_mcp/server.js"]`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR"]`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.tools.suggest_owners.approval_mode="approve"`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.tools.assign_owner.approval_mode="approve"`)
+			assert.NotContains(t, joined, "mcp_servers.superplane.tools.suggest_owners")
+			assert.NotContains(t, joined, "runner-token-secret")
+		})
+	}
+}
+
 func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
 	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))
@@ -162,9 +240,13 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 			assert.Contains(t, args, `mcp_servers.superplane.tools.propose_update.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
+			assert.NotContains(t, joined, "superplane_global")
 			assertForwardsMCPEnvVars(t, args,
 				"SUPERPLANE_BASE_URL",
 				"SUPERPLANE_RUN_TOKEN",
+				"SUPERPLANE_ARTIFACT_TOKEN",
+				"SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
+				"SUPERPLANE_ACTIVITY_ID",
 				"SUPERPLANE_TASK_DIR",
 				"SUPERPLANE_ANALYSIS_SPEC_FILE",
 				"SUPERPLANE_ANALYSIS_SCORE_FILE",
@@ -305,34 +387,64 @@ func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCodexRunPassesOpenAIAPIKeyToCodexChild(t *testing.T) {
-	taskDir := t.TempDir()
-	prompt := filepath.Join(taskDir, "prompt.txt")
-	result := filepath.Join(taskDir, "result.json")
-	received := filepath.Join(taskDir, "received-key")
-	require.NoError(t, os.WriteFile(prompt, []byte("hello"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
-	require.NoError(t, os.WriteFile(
-		filepath.Join(taskDir, "codex"),
-		[]byte("#!/bin/sh\nprintf '%s' \"$CODEX_API_KEY\" > \"$RECEIVED_KEY\"\nprintf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"thread-1\"}' '{\"type\":\"item.completed\",\"item\":{\"id\":\"reply-1\",\"type\":\"agent_message\",\"text\":\"ok\"}}'\n"),
-		0o700,
-	))
-
-	script, err := filepath.Abs("run.js")
-	require.NoError(t, err)
-	cmd := exec.Command("node", script, prompt)
-	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
-		"PATH="+taskDir+":"+os.Getenv("PATH"),
-		"SUPERPLANE_TASK_DIR="+taskDir,
-		"SUPERPLANE_RESULT_FILE="+result,
-		"RECEIVED_KEY="+received,
-		"OPENAI_API_KEY=sk-from-openai",
-	)
-	output, err := cmd.CombinedOutput()
-	require.NoError(t, err, string(output))
-	got, err := os.ReadFile(received)
-	require.NoError(t, err)
-	assert.Equal(t, "sk-from-openai", string(got))
+func TestCodexRunSelectsAuthenticationForCodexChild(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		subscription bool
+		suppliedKeys bool
+	}{
+		{name: "API key", suppliedKeys: true},
+		{name: "subscription without API keys", subscription: true},
+		{name: "subscription removes API keys", subscription: true, suppliedKeys: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			taskDir := t.TempDir()
+			prompt := filepath.Join(taskDir, "prompt.txt")
+			result := filepath.Join(taskDir, "result.json")
+			received := filepath.Join(taskDir, "received-environment.json")
+			require.NoError(t, os.WriteFile(prompt, []byte("hello"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(`#!/usr/bin/env node
+const fs = require("fs");
+fs.writeFileSync(process.env.RECEIVED_ENVIRONMENT, JSON.stringify(process.env));
+process.stdout.write('{"type":"thread.started","thread_id":"thread-1"}\n{"type":"item.completed","item":{"id":"reply-1","type":"agent_message","text":"ok"}}\n');
+`), 0o700))
+			script, err := filepath.Abs("run.js")
+			require.NoError(t, err)
+			cmd := exec.Command("node", script, prompt)
+			cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+				"PATH="+taskDir+":"+os.Getenv("PATH"),
+				"SUPERPLANE_TASK_DIR="+taskDir,
+				"SUPERPLANE_RESULT_FILE="+result,
+				"RECEIVED_ENVIRONMENT="+received,
+			)
+			if test.suppliedKeys {
+				cmd.Env = append(cmd.Env, "OPENAI_API_KEY=sk-from-openai", "OPENAI_BASE_URL=https://api.example.com")
+				if test.subscription {
+					cmd.Env = append(cmd.Env, "CODEX_API_KEY=sk-codex")
+				}
+			}
+			if test.subscription {
+				require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), []byte(subscriptionScript), 0o600))
+				cmd.Env = append(cmd.Env, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=subscription-token")
+			}
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, string(output))
+			encoded, err := os.ReadFile(received)
+			require.NoError(t, err)
+			var got map[string]string
+			require.NoError(t, json.Unmarshal(encoded, &got))
+			if test.subscription {
+				assert.Empty(t, got["CODEX_API_KEY"])
+				assert.Empty(t, got["OPENAI_API_KEY"])
+				assert.Empty(t, got["OPENAI_BASE_URL"])
+				assert.Equal(t, filepath.Join(taskDir, "codex-home"), got["CODEX_HOME"])
+				return
+			}
+			assert.Equal(t, "sk-from-openai", got["CODEX_API_KEY"])
+			assert.Equal(t, "sk-from-openai", got["OPENAI_API_KEY"])
+		})
+	}
 }
 
 func TestCodexRunRejectsMissingAPIKeyBeforeSpawn(t *testing.T) {

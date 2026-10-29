@@ -27,6 +27,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/billing"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -103,6 +104,7 @@ type Server struct {
 	authHandler           *authentication.Handler
 	isDev                 bool
 	licenseService        *licensing.Service
+	codexTokenRefresh     func(context.Context, string) (runner.CodexTokenSet, error)
 }
 
 // SetLicenseService connects the installation license. Without it, the server
@@ -433,6 +435,10 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/credentials", s.handleRunnerCodexSubscriptionCredentials).Methods("GET")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/checkpoint", s.handleRunnerCodexSubscriptionCheckpoint).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/progress", s.handleRunnerCodexSubscriptionProgress).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/refresh", s.handleRunnerCodexSubscriptionRefresh).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/updates", s.handleRunnerPlanningUpdate).Methods("POST")
@@ -440,9 +446,22 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/agent-messages", s.handleRunnerPlanningAgentMessage).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/suggest-owners", s.handleRunnerPlanningSuggestOwners).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/owner", s.handleRunnerPlanningAssignOwner).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", s.handleRunnerPlanningActivity).Methods("PUT")
 	s.Router.HandleFunc("/api/v1/runner/merge-confidence/checks", s.handleRunnerMergeConfidenceCheck).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tasks/suggest-owners", s.handleRunnerTaskSuggestOwners).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tasks/owner", s.handleRunnerTaskAssignOwner).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tools", s.handleRunnerTools).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerListTasks).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerCreateTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/close", s.handleRunnerCloseTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/artifacts", s.handleRunnerRemoveArtifact).Methods(http.MethodDelete)
+	s.Router.HandleFunc("/api/v1/runner/task/suggest-owners", s.handleRunnerGlobalSuggestOwners).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/owner", s.handleRunnerGlobalAssignOwner).Methods(http.MethodPut)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/artifacts/links", s.handleRunnerArtifactLink).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/artifacts/markdown", s.handleRunnerArtifactMarkdown).Methods(http.MethodPost)
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
@@ -1185,16 +1204,6 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if billing.Enabled() {
-		err = billing.GrantWelcomeCredit(tx, organization.ID, account.ID)
-		if err != nil {
-			tx.Rollback()
-			log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
-			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-			return
-		}
-	}
-
 	err = tx.Commit().Error
 	if err != nil {
 		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
@@ -1203,7 +1212,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
-	recordOrganizationCreated(organization, account.ID, "workspace_switcher")
+	recordOrganizationCreated(organization, account, "workspace_switcher")
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
@@ -1287,7 +1296,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
 	}
-	recordOrganizationCreated(organization, account.ID, "initial_onboarding")
+	recordOrganizationCreated(organization, account, "initial_onboarding")
 
 	writeInitialWorkspaceResponse(w, organization, workspace)
 }
@@ -1365,23 +1374,35 @@ func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.O
 	})
 }
 
-func recordOrganizationCreated(organization *models.Organization, accountID uuid.UUID, creationPath string) {
+func recordOrganizationCreated(organization *models.Organization, account *models.Account, creationPath string) {
 	organizationID := organization.ID.String()
+	properties := productanalytics.Properties{"creation_path": creationPath}
+	identity := productanalytics.Properties{}
+	for key, value := range map[string]string{"email": account.Email, "name": account.Name} {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		properties[key] = value
+		identity[key] = value
+	}
+	if len(identity) > 0 {
+		properties["$set"] = identity
+	}
 	productanalytics.Capture(productanalytics.Event{
 		Name:           productanalytics.EventOrganizationCreated,
 		EventID:        productanalytics.StableEventID(productanalytics.EventOrganizationCreated, organizationID),
-		DistinctID:     accountID.String(),
+		DistinctID:     account.ID.String(),
 		OrganizationID: organizationID,
 		ActorType:      productanalytics.ActorUser,
 		Source:         productanalytics.SourceUI,
-		Properties:     productanalytics.Properties{"creation_path": creationPath},
+		Properties:     properties,
 	})
 	productanalytics.IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity{
 		ID:        organizationID,
 		Name:      organization.Name,
 		Slug:      organization.Slug,
 		CreatedAt: organization.CreatedAt,
-		AccountID: accountID.String(),
+		AccountID: account.ID.String(),
 	})
 }
 
@@ -1492,11 +1513,6 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	}
 	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
-	}
-	if billing.Enabled() {
-		if err := billing.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
-			return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
-		}
 	}
 
 	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")

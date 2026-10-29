@@ -339,6 +339,45 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 	return artifacts, nil
 }
 
+// RemoveArtifact deletes one artifact. A key selects that artifact. A title
+// selects the newest unkeyed artifact with that title. It records one
+// timeline event and does not delete git branches.
+func (o *FactoryWorkOrder) RemoveArtifact(db *gorm.DB, key, title string, actor *uuid.UUID) (*FactoryWorkOrderArtifact, error) {
+	key = strings.TrimSpace(key)
+	title = strings.TrimSpace(title)
+	if key == "" && title == "" {
+		return nil, fmt.Errorf("%w: artifact key or title is required", ErrFactoryWorkOrderArtifactInvalid)
+	}
+
+	var removed *FactoryWorkOrderArtifact
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(o, "id = ?", o.ID).Error; err != nil {
+			return err
+		}
+		if o.IsClosed() {
+			return fmt.Errorf("%w: task is closed or archived", ErrFactoryWorkOrderInvalidState)
+		}
+
+		artifact, err := o.findArtifactToRemove(tx, key, title)
+		if err != nil {
+			return err
+		}
+		result := tx.Delete(artifact)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrFactoryWorkOrderArtifactNotFound
+		}
+		removed = artifact
+		return o.RecordArtifactsCleared(tx, 1, actor)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return removed, nil
+}
+
 // DeleteArtifacts removes every artifact row for this order and records
 // one timeline event. It does not delete git branches.
 func (o *FactoryWorkOrder) DeleteArtifacts(tx *gorm.DB, actor *uuid.UUID) (int, error) {
@@ -371,11 +410,6 @@ func IsValidWorkOrderArtifactType(t string) bool {
 	return false
 }
 
-type unkeyedArtifactTitle struct {
-	ID    uuid.UUID
-	Title string
-}
-
 func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
 	tx *gorm.DB,
 	artifactType, title string,
@@ -385,49 +419,68 @@ func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
 		return nil, fmt.Errorf("%w: artifact type is required", ErrFactoryWorkOrderArtifactInvalid)
 	}
 
-	var titles []unkeyedArtifactTitle
-	err := tx.Model(&FactoryWorkOrderArtifact{}).
-		Select("id, data->>'title' AS title").
-		Where(
-			"organization_id = ? AND factory_id = ? AND work_order_id = ? AND type = ? AND key IS NULL AND jsonb_typeof(data->'title') = 'string'",
-			o.OrganizationID,
-			o.FactoryID,
-			o.ID,
-			artifactType,
-		).
-		Order("created_at DESC").
-		Order("id DESC").
-		Find(&titles).
-		Error
-	if err != nil {
-		return nil, err
+	return o.findNewestUnkeyedArtifact(tx, artifactType, title)
+}
+
+func (o *FactoryWorkOrder) findArtifactToRemove(tx *gorm.DB, key, title string) (*FactoryWorkOrderArtifact, error) {
+	if key != "" {
+		return o.FindArtifactByKey(tx, key)
+	}
+	return o.findNewestUnkeyedArtifactByTitle(tx, title)
+}
+
+func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTitle(tx *gorm.DB, title string) (*FactoryWorkOrderArtifact, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return nil, fmt.Errorf("%w: artifact title is required", ErrFactoryWorkOrderArtifactInvalid)
 	}
 
-	matchID, found := newestMatchingArtifactID(titles, title)
-	if !found {
-		return nil, ErrFactoryWorkOrderArtifactNotFound
+	return o.findNewestUnkeyedArtifact(tx, "", title)
+}
+
+// artifactTitleEdgeSpace matches unicode.IsSpace, which strings.TrimSpace uses.
+// The SQL compare strips those same characters from the stored title.
+const artifactTitleEdgeSpace = "\t\n\v\f\r \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+
+func artifactTitleTrimPattern() string {
+	class := "[" + artifactTitleEdgeSpace + "]"
+	return "^" + class + "+|" + class + "+$"
+}
+
+// findNewestUnkeyedArtifact loads one matching row. The title compare strips
+// the same edge whitespace as strings.TrimSpace. LIMIT 1 keeps the scan from
+// reading every artifact on the task.
+func (o *FactoryWorkOrder) findNewestUnkeyedArtifact(tx *gorm.DB, artifactType, title string) (*FactoryWorkOrderArtifact, error) {
+	query := tx.Model(&FactoryWorkOrderArtifact{}).Where(
+		"organization_id = ? AND factory_id = ? AND work_order_id = ? AND key IS NULL AND jsonb_typeof(data->'title') = 'string' AND regexp_replace(data->>'title', ?, '', 'g') = ?",
+		o.OrganizationID,
+		o.FactoryID,
+		o.ID,
+		artifactTitleTrimPattern(),
+		title,
+	)
+	if artifactType != "" {
+		query = query.Where("type = ?", artifactType)
 	}
 
 	var artifact FactoryWorkOrderArtifact
-	err = tx.Where("id = ?", matchID).First(&artifact).Error
+	err := query.
+		Order("created_at DESC").
+		Order("id DESC").
+		Limit(1).
+		Take(&artifact).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrFactoryWorkOrderArtifactNotFound
 		}
 		return nil, err
 	}
-
 	return &artifact, nil
 }
 
-func newestMatchingArtifactID(titles []unkeyedArtifactTitle, title string) (uuid.UUID, bool) {
-	for _, candidate := range titles {
-		if strings.TrimSpace(candidate.Title) == title {
-			return candidate.ID, true
-		}
-	}
-
-	return uuid.Nil, false
+// LockFactoryWorkOrder locks the work order row until the transaction ends.
+func LockFactoryWorkOrder(tx *gorm.DB, id uuid.UUID) error {
+	return lockFactoryWorkOrder(tx, id)
 }
 
 func lockFactoryWorkOrder(tx *gorm.DB, id uuid.UUID) error {

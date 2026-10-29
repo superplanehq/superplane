@@ -25,6 +25,15 @@ const SUPERPLANE_MCP_ENV_VARS = [
   "SUPERPLANE_ANALYSIS_SCORE_FILE",
   "SUPERPLANE_ARTIFACT_TOKEN",
   "SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
+  "SUPERPLANE_VISUAL_EVIDENCE",
+  "SUPERPLANE_PUBLISH_LINKS",
+];
+
+const GLOBAL_MCP_SERVER = "superplane_global";
+const GLOBAL_MCP_ENV_VARS = [
+  "SUPERPLANE_BASE_URL",
+  "SUPERPLANE_RUNNER_TOKEN",
+  "SUPERPLANE_TASK_DIR",
 ];
 
 function loadActivityStreamModule() {
@@ -119,6 +128,13 @@ function requireCodexAPIKey(env = process.env) {
 }
 
 function codexExecEnv(env = process.env) {
+  if (envValue(env, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN")) {
+    const subscription = loadSubscriptionModule(env);
+    if (!subscription) {
+      throw new Error("ChatGPT subscription helper is missing");
+    }
+    return subscription.subscriptionChildEnv(env);
+  }
   return {
     ...env,
     CODEX_API_KEY: requireCodexAPIKey(env),
@@ -138,6 +154,11 @@ function planningAnalysisEnabled(env = process.env) {
 
 function artifactEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
+}
+
+function visualEvidenceEnabled(env = process.env) {
+  if (envFlag(env, "SUPERPLANE_VISUAL_EVIDENCE")) return true;
+  return artifactEnabled(env) && !envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
 }
 
 function mergeConfidenceEnabled(env = process.env) {
@@ -165,7 +186,7 @@ function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
     .toLowerCase();
-  if (level === "low" || level === "medium" || level === "high") {
+  if (["minimal", "low", "medium", "high", "xhigh"].includes(level)) {
     return ["-c", `model_reasoning_effort=${tomlString(level)}`];
   }
   return [];
@@ -203,6 +224,7 @@ function codexExecArgs(
       args.push(...workspaceMCPConfigOverrides(env));
     }
   }
+  args.push(...globalMCPConfigOverrides(path.dirname(String(mcpScriptPath || "")), env));
   if (model) {
     args.push("-m", model);
   }
@@ -271,6 +293,42 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
   ];
 }
 
+function loadGlobalMCPRegistry(taskDir) {
+  const candidates = [
+    path.join(taskDir, "superplane_mcp", "registry.js"),
+    path.join(__dirname, "..", "superplane_mcp", "registry.js"),
+  ];
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return null;
+}
+
+// The global server lists only the tools that the run token allows. Approve
+// every known global tool: Codex exec cannot answer an approval prompt, and the
+// backend rejects a call outside the token scope.
+function globalMCPConfigOverrides(taskDir, env = process.env) {
+  if (!envFlag(env, "SUPERPLANE_RUNNER_TOKEN")) {
+    return [];
+  }
+  const registry = loadGlobalMCPRegistry(taskDir);
+  const toolNames = registry ? registry.allTools().map((tool) => tool.definition.name) : [];
+  return [
+    "-c",
+    `mcp_servers.${GLOBAL_MCP_SERVER}.command=${tomlString("node")}`,
+    "-c",
+    `mcp_servers.${GLOBAL_MCP_SERVER}.args=${tomlStringArray([path.join(taskDir, "superplane_mcp", "server.js")])}`,
+    "-c",
+    `mcp_servers.${GLOBAL_MCP_SERVER}.env_vars=${tomlStringArray(GLOBAL_MCP_ENV_VARS)}`,
+    ...toolNames.flatMap((name) => [
+      "-c",
+      `mcp_servers.${GLOBAL_MCP_SERVER}.tools.${tomlKey(name)}.approval_mode="approve"`,
+    ]),
+  ];
+}
+
 function workspaceMCPConfigPath(env = process.env) {
   const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
   const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
@@ -309,7 +367,7 @@ function workspaceMCPConfigOverrides(env = process.env) {
   for (const server of workspaceMCPServers(env)) {
     const name = String((server && server.name) || "").trim();
     const url = String((server && server.url) || "").trim();
-    if (!name || name === "superplane" || !url) {
+    if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER || !url) {
       continue;
     }
     const serverKey = tomlKey(name);
@@ -374,7 +432,7 @@ async function runPrompt(promptFile, model, thinking) {
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
-  requireCodexAPIKey(process.env);
+  const childEnv = codexExecEnv(process.env);
 
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
@@ -390,7 +448,7 @@ async function runPrompt(promptFile, model, thinking) {
   }
 
   const startedAt = Date.now();
-  if (artifactEnabled()) {
+  if (visualEvidenceEnabled()) {
     const outputDir = path.join(sp, "evidence");
     fs.mkdirSync(outputDir, { recursive: true });
     process.env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;
@@ -421,7 +479,7 @@ async function runPrompt(promptFile, model, thinking) {
   codexArgs.push(prompt);
 
   const child = spawn("codex", codexArgs, {
-    env: codexExecEnv(process.env),
+    env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
   });
   const stderrDone = pipeRedactedStderr(child.stderr);
@@ -484,16 +542,21 @@ async function runPrompt(promptFile, model, thinking) {
   if (tokenTotal(usage) > 0) {
     telemetry.updateCurrentUsage(usage);
   }
+  const rollout = readRolloutContext(childEnv.CODEX_HOME, readSessionID(sp));
   const payload = {
     type: "result",
     result: formatter.lastText() || lastResult.result || lastResult.text || "",
-    model: lastResult.model || model,
+    model: rollout.model || lastResult.model || model,
+    thinkingLevel: rollout.effort || thinking,
     usage,
   };
   telemetry.attachToResult(payload);
   const activityModule = loadActivityStreamModule();
   const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
-  fs.writeFileSync(resultFile, `${JSON.stringify(safePayload)}\n`);
+  if (typeof safePayload.result === "string") {
+    safePayload.result = redactSubscription(safePayload.result);
+  }
+  fs.writeFileSync(resultFile, `${redactSubscription(JSON.stringify(safePayload))}\n`);
   accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
@@ -509,6 +572,14 @@ async function runPrompt(promptFile, model, thinking) {
         : 1,
     duration_ms: Date.now() - startedAt,
   });
+  const subscription = loadSubscriptionModule();
+  if (exitCode === 0 && subscription && subscription.subscriptionEnabled()) {
+    try {
+      await subscription.reportUsage();
+    } catch (err) {
+      writeStderr(`${err && err.message ? err.message : "ChatGPT usage was not saved"}\n`);
+    }
+  }
   return exitCode;
 }
 
@@ -520,6 +591,7 @@ function tokenTotal(usage) {
     Number(usage.input_tokens || 0) +
     Number(usage.output_tokens || 0) +
     Number(usage.cache_read_input_tokens || 0) +
+    Number(usage.cache_creation_input_tokens || 0) +
     Number(usage.reasoning_tokens || 0)
   );
 }
@@ -555,11 +627,45 @@ function extractUsage(event) {
     cache_read_input_tokens: Number(
       source.cached_input_tokens || source.cache_read_input_tokens || 0,
     ),
-    reasoning_tokens: Number(source.reasoning_tokens || 0),
+    cache_creation_input_tokens: Number(source.cache_write_input_tokens || 0),
+    reasoning_tokens: Number(
+      source.reasoning_output_tokens || source.reasoning_tokens || 0,
+    ),
   };
   const cost = event.total_cost_usd ?? source.total_cost_usd;
   if (cost != null && Number.isFinite(Number(cost))) usage.total_cost_usd = Number(cost);
   return usage;
+}
+
+function readRolloutContext(home, sessionID) {
+  const sessions = home && path.join(home, "sessions");
+  if (!sessions || !sessionID || !fs.existsSync(sessions)) {
+    return {};
+  }
+  try {
+    const suffix = `-${sessionID}.jsonl`;
+    const files = fs
+      .readdirSync(sessions, { recursive: true })
+      .filter((file) => path.basename(file).startsWith("rollout-") && file.endsWith(suffix))
+      .sort();
+    const context = {};
+    for (const file of files) {
+      for (const line of fs.readFileSync(path.join(sessions, file), "utf8").split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const record = JSON.parse(line);
+          if (record.type !== "turn_context" || !record.payload) continue;
+          if (typeof record.payload.model === "string") context.model = record.payload.model;
+          if (typeof record.payload.effort === "string") context.effort = record.payload.effort;
+        } catch (_err) {
+          // Rollout files are internal Codex state. Ignore records from formats we do not know.
+        }
+      }
+    }
+    return context;
+  } catch (_err) {
+    return {};
+  }
 }
 
 function accumulateLLMUsage(payload) {
@@ -580,16 +686,33 @@ function writeLiveLogRecord(rec) {
   process.stdout.write(`${JSON.stringify(safe)}\n`);
 }
 
+function loadSubscriptionModule(env = process.env) {
+  const taskDir = env.SUPERPLANE_TASK_DIR || "";
+  const file = path.join(taskDir, "codex_subscription.js");
+  if (!taskDir || !fs.existsSync(file)) {
+    return null;
+  }
+  return require(file);
+}
+
+function redactSubscription(value) {
+  const helper = loadSubscriptionModule();
+  if (!helper || !helper.redactSecrets) {
+    return String(value);
+  }
+  return helper.redactSecrets(String(value));
+}
+
 function writeStdout(value) {
   const activity = loadActivityStreamModule();
   const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stdout.write(safe);
+  process.stdout.write(redactSubscription(safe));
 }
 
 function writeStderr(value) {
   const activity = loadActivityStreamModule();
   const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stderr.write(safe);
+  process.stderr.write(redactSubscription(safe));
 }
 
 function pipeRedactedStderr(stream) {

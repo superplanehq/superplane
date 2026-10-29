@@ -17,6 +17,7 @@ import (
 )
 
 const OrganizationSortRemainingCreditCents = "remaining_credit_cents"
+const OrganizationSortPlanName = "plan_name"
 
 type Organization struct {
 	ID uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
@@ -59,13 +60,14 @@ func (o *Organization) HasExperimentalFeature(id string) bool {
 
 type OrganizationWithCounts struct {
 	Organization
-	CanvasCount           int64  `gorm:"column:canvas_count"`
-	TaskCount             int64  `gorm:"column:task_count"`
-	DoneTaskCount         int64  `gorm:"column:done_task_count"`
-	MemberCount           int64  `gorm:"column:member_count"`
-	WorkspaceCount        int64  `gorm:"column:workspace_count"`
-	RepositoryCount       int64  `gorm:"column:repository_count"`
-	RemainingCreditMicros *int64 `gorm:"-"`
+	CanvasCount           int64                            `gorm:"column:canvas_count"`
+	TaskCount             int64                            `gorm:"column:task_count"`
+	DoneTaskCount         int64                            `gorm:"column:done_task_count"`
+	MemberCount           int64                            `gorm:"column:member_count"`
+	WorkspaceCount        int64                            `gorm:"column:workspace_count"`
+	RepositoryCount       int64                            `gorm:"column:repository_count"`
+	RemainingCreditMicros *int64                           `gorm:"-"`
+	PlanSummary           *billing.OrganizationPlanSummary `gorm:"-"`
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
@@ -80,6 +82,10 @@ func ListUnpinnedOrganizations(tx *gorm.DB, search string, limit, offset int, so
 
 	if sortBy == OrganizationSortRemainingCreditCents {
 		organizations, unpinnedTotal, err = listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection, excludeIDs)
+		return organizations, unpinnedTotal, matchTotal, err
+	}
+	if sortBy == OrganizationSortPlanName {
+		organizations, unpinnedTotal, err = listOrganizationsByPlanName(tx, search, limit, offset, sortDirection, excludeIDs)
 		return organizations, unpinnedTotal, matchTotal, err
 	}
 
@@ -161,6 +167,55 @@ func sliceOrganizations(organizations []OrganizationWithCounts, limit, offset in
 		organizations = organizations[:limit]
 	}
 	return organizations
+}
+
+// ResolveOrganizationPlans carries current plans with rows so callers can reuse resolved values.
+func ResolveOrganizationPlans(tx *gorm.DB, organizations []OrganizationWithCounts) error {
+	missing := make([]uuid.UUID, 0, len(organizations))
+	for _, org := range organizations {
+		if org.PlanSummary == nil {
+			missing = append(missing, org.ID)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	summaries, err := billing.ResolveOrganizationPlanSummaries(tx, missing)
+	if err != nil {
+		return err
+	}
+	for i := range organizations {
+		if organizations[i].PlanSummary == nil {
+			summary := summaries[organizations[i].ID]
+			organizations[i].PlanSummary = &summary
+		}
+	}
+	return nil
+}
+
+func listOrganizationsByPlanName(tx *gorm.DB, search string, limit, offset int, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc", excludeIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := ResolveOrganizationPlans(tx, organizations); err != nil {
+		return nil, 0, err
+	}
+	sort.Slice(organizations, func(i, j int) bool {
+		left, right := organizations[i], organizations[j]
+		leftPlan, rightPlan := strings.ToLower(left.PlanSummary.Name), strings.ToLower(right.PlanSummary.Name)
+		if leftPlan != rightPlan {
+			if sortDirection == "asc" {
+				return leftPlan < rightPlan
+			}
+			return leftPlan > rightPlan
+		}
+		if left.Name != right.Name {
+			return left.Name < right.Name
+		}
+		return left.ID.String() < right.ID.String()
+	})
+	return sliceOrganizations(organizations, limit, offset), total, nil
 }
 
 func FindOrganizationWithCounts(tx *gorm.DB, id uuid.UUID) (*OrganizationWithCounts, error) {
