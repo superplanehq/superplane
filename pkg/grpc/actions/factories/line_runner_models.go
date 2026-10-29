@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strings"
 
@@ -112,7 +113,8 @@ func listLineRunnerModelOptions(tx *gorm.DB, orgID, factoryID uuid.UUID, lineNam
 }
 
 // mergeLineRunnerModels keeps one entry per model id in first-seen order.
-// Two runners can offer the same model; the entry keeps the levels of both.
+// Two runners can offer the same model. Start sends one level to both, so the
+// entry keeps only the levels that every runner accepts.
 func mergeLineRunnerModels(options []lineRunnerModel) []lineRunnerModel {
 	merged := map[string]int{}
 	var out []lineRunnerModel
@@ -123,7 +125,10 @@ func mergeLineRunnerModels(options []lineRunnerModel) []lineRunnerModel {
 			out = append(out, lineRunnerModel{ID: option.ID, ThinkingLevels: runner.SupportedThinkingLevels(option.ThinkingLevels)})
 			continue
 		}
-		out[index].ThinkingLevels = runner.SupportedThinkingLevels(append(out[index].ThinkingLevels, option.ThinkingLevels...))
+		shared := runner.SupportedThinkingLevels(option.ThinkingLevels)
+		out[index].ThinkingLevels = slices.DeleteFunc(out[index].ThinkingLevels, func(level string) bool {
+			return !slices.Contains(shared, level)
+		})
 	}
 	return out
 }

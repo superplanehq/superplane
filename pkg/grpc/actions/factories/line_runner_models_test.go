@@ -340,6 +340,19 @@ func TestLineRunnerModelsReportModelThinkingLevels(t *testing.T) {
 	}, options)
 }
 
+func TestMergeLineRunnerModelsKeepsLevelsEveryRunnerAccepts(t *testing.T) {
+	merged := mergeLineRunnerModels([]lineRunnerModel{
+		{ID: "gpt-5.4", ThinkingLevels: []string{"none", "low", "high", "xhigh"}},
+		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh"}},
+		{ID: "claude-opus-5-5", ThinkingLevels: []string{"low", "max"}},
+	})
+
+	assert.Equal(t, []lineRunnerModel{
+		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh"}},
+		{ID: "claude-opus-5-5", ThinkingLevels: []string{"low", "max"}},
+	}, merged)
+}
+
 func Test__ListLineRunnerModels__NoRunnerNodesReturnsEmpty(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
