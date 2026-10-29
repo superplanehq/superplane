@@ -418,9 +418,39 @@ function main() {
   runPrompt(args[0], args[1] || "", args[2] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      writeStderr(`${err && err.message ? err.message : err}\n`);
+      const message = safeLogText(err && err.message ? err.message : err).slice(0, 8192);
+      writeStderr(`Codex error: ${message}\n`);
+      saveFailureResult(message);
       process.exit(1);
     });
+}
+
+function saveFailureResult(message) {
+  const resultFile = process.env.SUPERPLANE_RESULT_FILE;
+  if (!resultFile) {
+    return;
+  }
+  let previous = {};
+  try {
+    const saved = JSON.parse(fs.readFileSync(resultFile, "utf8"));
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+      previous = saved;
+    }
+  } catch (_err) {
+    // A failure before the first turn may not have a saved result.
+  }
+  const payload = {
+    ...previous,
+    type: "result",
+    is_error: true,
+    error: previous.is_error && previous.error ? previous.error : message,
+    result: previous.result || "",
+  };
+  try {
+    fs.writeFileSync(resultFile, `${safeLogText(JSON.stringify(payload))}\n`);
+  } catch (err) {
+    writeStderr(`Codex error result could not be saved: ${err.message}\n`);
+  }
 }
 
 async function runPrompt(promptFile, model, thinking) {
@@ -526,14 +556,20 @@ async function runPrompt(promptFile, model, thinking) {
     }
   });
 
-  const exitCode = await Promise.all([
+  const [processExitCode, , stderr] = await Promise.all([
     new Promise((resolve, reject) => {
       child.on("error", reject);
       child.on("close", (code) => resolve(code == null ? 1 : code));
     }),
     new Promise((resolve) => rl.on("close", resolve)),
     stderrDone,
-  ]).then(([code]) => code);
+  ]);
+
+  const exitCode = formatter.errorMessage() && processExitCode === 0 ? 1 : processExitCode;
+  if (exitCode !== 0 && !formatter.errorMessage()) {
+    const message = `Codex failed with exit code ${exitCode}.`;
+    formatter.reportError(stderr ? `${message}\n${stderr}` : message);
+  }
 
   formatter.flush(exitCode !== 0);
   activity.end(exitCode === 0 ? "passed" : "failed");
@@ -545,6 +581,8 @@ async function runPrompt(promptFile, model, thinking) {
   const rollout = readRolloutContext(childEnv.CODEX_HOME, readSessionID(sp));
   const payload = {
     type: "result",
+    is_error: exitCode !== 0,
+    ...(exitCode !== 0 ? { error: formatter.errorMessage() } : {}),
     result: formatter.lastText() || lastResult.result || lastResult.text || "",
     model: rollout.model || lastResult.model || model,
     thinkingLevel: rollout.effort || thinking,
@@ -704,23 +742,28 @@ function redactSubscription(value) {
 }
 
 function writeStdout(value) {
-  const activity = loadActivityStreamModule();
-  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stdout.write(redactSubscription(safe));
+  process.stdout.write(safeLogText(value));
 }
 
 function writeStderr(value) {
+  process.stderr.write(safeLogText(value));
+}
+
+function safeLogText(value) {
   const activity = loadActivityStreamModule();
   const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stderr.write(redactSubscription(safe));
+  return redactSubscription(safe);
 }
 
 function pipeRedactedStderr(stream) {
+  let tail = "";
   const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
   lines.on("line", (line) => {
-    writeStderr(`${line}\n`);
+    const safe = safeLogText(line);
+    tail = `${tail}${safe}\n`.slice(-8192);
+    writeStderr(`${safe}\n`);
   });
-  return new Promise((resolve) => lines.on("close", resolve));
+  return new Promise((resolve) => lines.on("close", () => resolve(tail.trim())));
 }
 
 function createCodexFormatter(telemetry, activityOverride) {
@@ -736,6 +779,17 @@ function createCodexFormatter(telemetry, activityOverride) {
   let contentSeq = 0;
   let roundOpen = false;
   let lastText = "";
+  let lastError = "";
+
+  function reportError(message) {
+    const safe = safeLogText(message).trim().slice(0, 8192) || "Codex failed without an error message.";
+    if (safe === lastError) {
+      return;
+    }
+    lastError = safe;
+    writeStderr(`Codex error: ${safe}\n`);
+    activity.notice("codex_error", safe);
+  }
 
   function itemType(item) {
     return String((item && (item.type || item.item_type)) || "").toLowerCase();
@@ -870,6 +924,11 @@ function createCodexFormatter(telemetry, activityOverride) {
 
   return {
     handleEvent(event) {
+      if (event.type === "error" || event.type === "turn.failed") {
+        reportError(event.message || (event.error && event.error.message) || "");
+        roundOpen = false;
+        return;
+      }
       if (event.type === "turn.completed" || event.type === "result") {
         tracker.updateCurrentUsage(extractUsage(event));
         roundOpen = false;
@@ -956,6 +1015,10 @@ function createCodexFormatter(telemetry, activityOverride) {
     lastText() {
       return lastText;
     },
+    errorMessage() {
+      return lastError;
+    },
+    reportError,
   };
 }
 

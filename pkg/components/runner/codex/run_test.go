@@ -346,7 +346,7 @@ func TestCodexSessionIDFromThreadEvent(t *testing.T) {
 	assert.Equal(t, "thread-123", string(out))
 }
 
-func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
+func TestCodexAnalysisRunPreservesFailedResultWhenMessageUploadFails(t *testing.T) {
 	taskDir := t.TempDir()
 	prompt := filepath.Join(taskDir, "prompt.txt")
 	result := filepath.Join(taskDir, "result.json")
@@ -355,7 +355,10 @@ func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(taskDir, "planning_session_mcp.js"),
-		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);`),
+		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => {
+  fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);
+  throw new Error("Planning message upload failed");
+};`),
 		0o600,
 	))
 	fakeCodex := filepath.Join(taskDir, "codex")
@@ -379,12 +382,122 @@ func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
 	)
 	output, err := cmd.CombinedOutput()
 	require.Error(t, err, string(output))
+	assert.Contains(t, string(output), "Planning message upload failed")
 
 	message, err := os.ReadFile(recorded)
 	require.NoError(t, err)
 	assert.Equal(t, "I found useful context before the tool failed.", string(message))
-	_, err = os.Stat(result)
+	content, err := os.ReadFile(result)
 	require.NoError(t, err)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(content, &payload))
+	assert.Equal(t, string(message), payload["result"])
+	assert.Equal(t, true, payload["is_error"])
+	assert.Equal(t, "Codex failed with exit code 1.", payload["error"])
+	assert.NotNil(t, payload["usage"])
+}
+
+func TestCodexRunReportsProviderFailures(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		events   string
+		stderr   string
+		exitCode int
+		message  string
+	}{
+		{
+			name: "failed turn",
+			events: `{"type":"item.completed","item":{"id":"reply","type":"agent_message","text":"I started the task."}}
+{"type":"turn.failed","error":{"message":"The model is not available with your ChatGPT subscription."}}`,
+			exitCode: 1,
+			message:  "The model is not available with your ChatGPT subscription.",
+		},
+		{
+			name:     "stream error",
+			events:   `{"type":"error","message":"Your ChatGPT usage limit has been reached."}`,
+			exitCode: 1,
+			message:  "Your ChatGPT usage limit has been reached.",
+		},
+		{
+			name:    "failed event with zero exit code",
+			events:  `{"type":"turn.failed","error":{"message":"Your ChatGPT session has expired."}}`,
+			message: "Your ChatGPT session has expired.",
+		},
+		{
+			name:     "stderr failure",
+			stderr:   "Failed to refresh your ChatGPT credentials.",
+			exitCode: 1,
+			message:  "Failed to refresh your ChatGPT credentials.",
+		},
+		{
+			name:     "failure with only startup diagnostics",
+			stderr:   "Reading additional input from stdin...",
+			exitCode: 2,
+			message:  "Codex failed with exit code 2.",
+		},
+		{
+			name:     "empty failure",
+			exitCode: 1,
+			message:  "Codex failed with exit code 1.",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			taskDir := t.TempDir()
+			prompt := filepath.Join(taskDir, "prompt.txt")
+			resultPath := filepath.Join(taskDir, "result.json")
+			require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "planning_session_mcp.js"), []byte(`module.exports.recordAgentMessage = async () => {};`), 0o600))
+			events := strings.ReplaceAll(test.events, test.message, test.message+" subscription-secret-value api-secret-value")
+			stderr := strings.ReplaceAll(test.stderr, test.message, test.message+" subscription-secret-value api-secret-value")
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(fmt.Sprintf(`#!/usr/bin/env node
+process.stdout.write(%q + "\n");
+process.stderr.write(%q + "\n");
+process.exitCode = %d;
+`, events, stderr, test.exitCode)), 0o700))
+			// Use the real activity module and subscription redactor to check every
+			// persisted failure surface, including a credential read from auth.json.
+			subscription, err := os.ReadFile("codex_subscription.js")
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), subscription, 0o600))
+			require.NoError(t, os.Mkdir(filepath.Join(taskDir, "codex-home"), 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex-home", "auth.json"), []byte(`{"tokens":{"access_token":"subscription-secret-value"}}`), 0o600))
+			script, err := filepath.Abs("run.js")
+			require.NoError(t, err)
+			cmd := exec.Command("node", script, prompt)
+			cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+				"PATH="+taskDir+":"+os.Getenv("PATH"),
+				"SUPERPLANE_TASK_DIR="+taskDir,
+				"SUPERPLANE_RESULT_FILE="+resultPath,
+				"CODEX_HOME="+filepath.Join(taskDir, "codex-home"),
+				"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+				"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+				"OPENAI_API_KEY=api-secret-value",
+			)
+			output, err := cmd.CombinedOutput()
+			require.Error(t, err, string(output))
+			assert.Contains(t, string(output), test.message)
+			content, err := os.ReadFile(resultPath)
+			require.NoError(t, err)
+			var result map[string]any
+			require.NoError(t, json.Unmarshal(content, &result))
+			assert.Equal(t, true, result["is_error"])
+			assert.Contains(t, result["error"], test.message)
+			assert.NotContains(t, string(output)+string(content), "subscription-secret-value")
+			assert.NotContains(t, string(output)+string(content), "api-secret-value")
+			if test.name == "failed turn" {
+				assert.Equal(t, "I started the task.", result["result"])
+			}
+			var noticeFound bool
+			for _, record := range activityRecords(t, string(output)) {
+				if record["type"] == "activity_notice" && record["code"] == "codex_error" {
+					noticeFound = true
+					assert.Contains(t, record["message"], test.message)
+				}
+			}
+			assert.True(t, noticeFound, "failure should be visible in task activity")
+		})
+	}
 }
 
 func TestCodexRunSelectsAuthenticationForCodexChild(t *testing.T) {

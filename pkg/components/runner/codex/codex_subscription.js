@@ -48,6 +48,19 @@ function redactSecrets(text, env = process.env) {
   return output;
 }
 
+function sanitizeErrorMessage(message) {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const activityModule = [
+    path.join(taskDir, "activity_stream.js"),
+    path.join(__dirname, "..", "activity_stream.js"),
+  ].find((file) => fs.existsSync(file));
+  const activity = activityModule ? require(activityModule) : null;
+  const safe = activity?.redactSensitiveText
+    ? activity.redactSensitiveText(message)
+    : String(message);
+  return redactSecrets(safe).slice(0, 8192);
+}
+
 function secretValues(value, found = []) {
   if (!value || typeof value !== "object") {
     return found;
@@ -377,9 +390,24 @@ async function main(argv = process.argv.slice(2)) {
 
 if (require.main === module) {
   main().catch((err) => {
-    process.stderr.write(
-      `${err && err.message ? err.message : "ChatGPT subscription failed"}\n`,
+    const message = sanitizeErrorMessage(
+      `ChatGPT subscription ${process.argv[2] || "command"} failed: ${err && err.message ? err.message : "Unknown error"}`,
     );
+    process.stderr.write(`${message}\n`);
+    const resultFile = process.env.SUPERPLANE_RESULT_FILE;
+    if (resultFile) {
+      try {
+        fs.writeFileSync(
+          resultFile,
+          `${JSON.stringify({ type: "result", is_error: true, error: message })}\n`,
+        );
+      } catch (writeError) {
+        const writeMessage = sanitizeErrorMessage(
+          `ChatGPT subscription error could not be saved: ${writeError.message}`,
+        );
+        process.stderr.write(`${writeMessage}\n`);
+      }
+    }
     process.exit(1);
   });
 }
