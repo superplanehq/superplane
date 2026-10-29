@@ -894,6 +894,20 @@ func (f *Factory) createWorkOrder(
 	origin *WorkOrderOrigin,
 	autoStartLineID *uuid.UUID,
 ) (*FactoryWorkOrder, error) {
+	if f.OnboardingConfigValue().CodexSubscription {
+		if len(assignees) > 1 {
+			return nil, ErrSubscriptionOwnerRequired
+		}
+		if len(assignees) == 1 {
+			eligible, err := SubscriptionOwnerEligible(tx, f.OrganizationID, f.ID, assignees[0])
+			if err != nil {
+				return nil, err
+			}
+			if !eligible {
+				return nil, ErrSubscriptionOwnerInvalid
+			}
+		}
+	}
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
@@ -950,7 +964,7 @@ func (f *Factory) createWorkOrder(
 	}
 
 	if len(assignees) > 0 {
-		if err := order.ReplaceAssignees(tx, assignees); err != nil {
+		if err := order.replaceAssignees(tx, assignees); err != nil {
 			return nil, err
 		}
 	}

@@ -88,6 +88,43 @@ func TestFactory_AttachAnalysisSessionReconnectsRunningSessionWithoutRun(t *test
 	assert.Equal(t, "Use the existing retry helper.", reconnected.Messages[0].Text)
 }
 
+func TestFactory_AttachAnalysisSessionKeepsEarlierRefinementRunsInTaskHistory(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-history")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	attach := func() *CanvasRun {
+		run, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
+		require.NoError(t, err)
+		_, err = factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+			Repository:  "acme/payments",
+			CanvasID:    canvas.ID,
+			CanvasRunID: run.ID,
+			WorkOrderID: order.ID,
+		})
+		require.NoError(t, err)
+		return run
+	}
+	first := attach()
+	session, err := FindPlanningSessionByRun(db, first.ID)
+	require.NoError(t, err)
+	// A chat message after the first run finishes detaches it and starts a new run.
+	require.NoError(t, session.DetachAgentRun(db))
+	second := attach()
+
+	subscription := true
+	require.NoError(t, factoryModel.UpdateOnboarding(db, FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	runs, err := order.ListRuns(db)
+	require.NoError(t, err)
+	ids := make([]uuid.UUID, len(runs))
+	for i := range runs {
+		ids[i] = runs[i].ID
+	}
+	assert.ElementsMatch(t, []uuid.UUID{first.ID, second.ID}, ids)
+}
+
 func TestFactoryPlanningSession_NeedsAnalysisRestart(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-restart")

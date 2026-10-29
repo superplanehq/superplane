@@ -43,6 +43,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "Add a payment method before you complete workspace setup.")
 	case errors.Is(err, billing.ErrHostedSubscriptionRequired), errors.Is(err, billing.ErrHostedPaymentPastDue), errors.Is(err, billing.ErrHostedSubscriptionPaused):
 		return grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
+	case errors.Is(err, models.ErrSubscriptionModelUnavailable), errors.Is(err, models.ErrSubscriptionOwnerRequired), errors.Is(err, models.ErrSubscriptionOwnerInvalid), errors.Is(err, models.ErrSubscriptionOwnerBusy), errors.Is(err, models.ErrSubscriptionTaskAssociation):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, models.ErrBYOKAccessDenied):
 		return grpcerrors.PermissionDenied(err, err.Error())
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):

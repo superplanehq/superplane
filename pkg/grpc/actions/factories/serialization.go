@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -140,9 +139,7 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		VcsProvider:             config.VCSProvider,
 		CodexSubscription:       config.CodexSubscription,
 	}
-	if connection, err := models.FindFactoryCodexConnection(database.Conn(), factory.OrganizationID, factory.ID); err == nil {
-		onboarding.CodexConnectionId = connection.ID.String()
-	}
+
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
 	}
@@ -526,6 +523,8 @@ func serializeWorkOrder(
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
 		AutoStartLineId:      serializeOptionalID(order.AutoStartLineID),
 		McpClient:            serializeWorkOrderMCPClient(order),
+		RefinementModel:      refinementModelValue(order),
+		PendingHandoff:       serializePendingHandOff(order),
 	}, nil
 }
 
@@ -565,6 +564,8 @@ func serializeWorkOrderSummary(
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		McpClient:            serializeWorkOrderMCPClient(order),
+		RefinementModel:      refinementModelValue(order),
+		PendingHandoff:       serializePendingHandOff(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
 	}, nil
 }
@@ -992,4 +993,19 @@ func loadedMemberDeleted(user *models.User) bool {
 
 func loadedMemberFormer(user *models.User) bool {
 	return user != nil && user.DeletedAt.Valid && !loadedMemberDeleted(user)
+}
+
+func refinementModelValue(order *models.FactoryWorkOrder) string {
+	if order.RefinementModel == nil {
+		return ""
+	}
+	return *order.RefinementModel
+}
+
+func serializePendingHandOff(order *models.FactoryWorkOrder) *pb.PendingHandOff {
+	if order.PendingHandOff == nil {
+		return nil
+	}
+	pending := order.PendingHandOff.Data()
+	return &pb.PendingHandOff{LineId: pending.LineID.String(), Column: pending.Column, PullRequestUrl: pending.PullRequestURL}
 }

@@ -19,7 +19,45 @@ const (
 // taskRunIDsCTE is the set of runs tied to one task.
 // It includes planning, line steps, pull-request activity, and descendants.
 // A creator run shared by another task is left out, including as a root for descendants.
-const taskRunIDsCTE = `
+// factoryTaskRunAssociationsCTE is shared by routing, cancellation and owner
+// restrictions. Only stored task links carry authority; payloads do not.
+const factoryTaskRunAssociationsCTE = `
+WITH RECURSIVE scoped_runs AS (
+ SELECT r.id, r.parent_run_id FROM workflow_runs r
+ JOIN workflows w ON w.id = r.workflow_id
+ WHERE w.organization_id = ? AND w.factory_id = ?
+), direct_task_runs AS (
+ SELECT e.work_order_id, r.id FROM scoped_runs r
+ JOIN factory_work_order_executions e ON e.run_id = r.id
+ UNION
+ SELECT s.draft_work_order_id, r.id FROM scoped_runs r
+ JOIN factory_planning_sessions s ON s.canvas_run_id = r.id
+ WHERE s.draft_work_order_id IS NOT NULL
+ UNION
+ SELECT f.work_order_id, r.id FROM scoped_runs r
+ JOIN factory_work_order_refinement_runs f ON f.run_id = r.id
+ UNION
+ SELECT p.work_order_id, r.id FROM scoped_runs r
+ JOIN factory_pull_request_runs a ON a.run_id = r.id
+ JOIN factory_pull_requests p ON p.id = a.pull_request_id
+ UNION
+ SELECT o.id, r.id FROM scoped_runs r
+ JOIN factory_work_orders o ON o.source_run_id = r.id
+ WHERE NOT EXISTS (
+  SELECT 1 FROM factory_work_orders shared
+  WHERE shared.source_run_id = o.source_run_id AND shared.factory_id = o.factory_id AND shared.id <> o.id
+ )
+), associated_task_runs AS (
+ SELECT work_order_id, id FROM direct_task_runs
+ UNION
+ SELECT a.work_order_id, r.id FROM scoped_runs r
+ JOIN associated_task_runs a ON r.parent_run_id = a.id
+)`
+
+const taskRunIDsCTE = factoryTaskRunAssociationsCTE + `,
+task_runs AS (SELECT id FROM associated_task_runs WHERE work_order_id = ?)`
+
+const legacyTaskRunIDsCTE = `
 WITH RECURSIVE shared_creator AS (
 	SELECT source_run_id AS id
 	FROM factory_work_orders
@@ -101,10 +139,14 @@ type TaskRunHistory struct {
 // ListRuns includes task automations, line steps, PR activity, and their descendants.
 // A creator run shared by other tasks is left out, including as a root for descendants.
 func (o *FactoryWorkOrder) ListRuns(tx *gorm.DB) ([]CanvasRun, error) {
+	query, args, err := o.taskRunQuery(tx)
+	if err != nil {
+		return nil, err
+	}
 	var runs []CanvasRun
-	err := tx.Raw(
-		taskRunIDsCTE+" SELECT r.* FROM workflow_runs r JOIN task_runs t ON r.id = t.id ORDER BY r.id",
-		o.taskRunArgs()...,
+	err = tx.Raw(
+		query+" SELECT r.* FROM workflow_runs r JOIN task_runs t ON r.id = t.id ORDER BY r.id",
+		args...,
 	).Scan(&runs).Error
 	return runs, err
 }
@@ -120,7 +162,10 @@ func (o *FactoryWorkOrder) ListTaskRunHistory(tx *gorm.DB, query TaskRunHistoryQ
 		limit = MaxTaskRunHistoryLimit
 	}
 
-	args := o.taskRunArgs()
+	querySQL, args, err := o.taskRunQuery(tx)
+	if err != nil {
+		return TaskRunHistory{}, err
+	}
 	cursorSQL := ""
 	if query.Before != nil {
 		cursorSQL = "WHERE (r.created_at, r.id) < (?, ?)"
@@ -129,7 +174,7 @@ func (o *FactoryWorkOrder) ListTaskRunHistory(tx *gorm.DB, query TaskRunHistoryQ
 	args = append(args, limit+1)
 
 	var rows []taskRunRow
-	err := tx.Raw(taskRunIDsCTE+`
+	err = tx.Raw(querySQL+`
 		SELECT r.id, r.workflow_id, w.name AS workflow_name, r.parent_run_id,
 			r.state, r.result, r.created_at, r.updated_at, r.finished_at,
 			COALESCE(activity.title, '') AS activity_title,
@@ -199,8 +244,12 @@ func (o *FactoryWorkOrder) ListTaskRunHistory(tx *gorm.DB, query TaskRunHistoryQ
 }
 
 func (o *FactoryWorkOrder) listTaskRunCounts(tx *gorm.DB) ([]TaskRunCount, error) {
+	querySQL, args, err := o.taskRunQuery(tx)
+	if err != nil {
+		return nil, err
+	}
 	var rows []taskRunCountRow
-	err := tx.Raw(taskRunIDsCTE+`
+	err = tx.Raw(querySQL+`
 		SELECT w.id AS automation_id, w.name AS automation_name,
 			COALESCE(r.result, '') AS result, COUNT(*) AS count
 		FROM workflow_runs r
@@ -208,7 +257,7 @@ func (o *FactoryWorkOrder) listTaskRunCounts(tx *gorm.DB) ([]TaskRunCount, error
 		JOIN workflows w ON w.id = r.workflow_id
 		GROUP BY w.id, w.name, COALESCE(r.result, '')
 		ORDER BY w.name ASC, w.id ASC, result ASC
-	`, o.taskRunArgs()...).Scan(&rows).Error
+	`, args...).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -224,12 +273,19 @@ func (o *FactoryWorkOrder) listTaskRunCounts(tx *gorm.DB) ([]TaskRunCount, error
 	return counts, nil
 }
 
-func (o *FactoryWorkOrder) taskRunArgs() []any {
-	return []any{
+func (o *FactoryWorkOrder) taskRunQuery(tx *gorm.DB) (string, []any, error) {
+	subscription, err := o.UsesCodexSubscription(tx)
+	if err != nil {
+		return "", nil, err
+	}
+	if subscription {
+		return taskRunIDsCTE, []any{o.OrganizationID, o.FactoryID, o.ID}, nil
+	}
+	return legacyTaskRunIDsCTE, []any{
 		o.FactoryID, o.SourceRunID, o.ID,
 		o.OrganizationID, o.FactoryID, o.SourceRunID, o.ID, o.ID, o.ID,
 		o.ID.String(), o.FactoryID, o.ID.String(), o.ID.String(),
-	}
+	}, nil
 }
 
 type taskRunRow struct {
