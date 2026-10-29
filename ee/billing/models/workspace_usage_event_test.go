@@ -78,6 +78,8 @@ func Test__RecordUsage__SubscriptionCostsNothingAndIsNotHosted(t *testing.T) {
 	execution := dispatchWorkOrderExecution(t, r)
 	runID := requireExecutionRunID(t, execution)
 	input := sonnetUsage(t, r, runID)
+	input.Provider = models.UsageProviderOpenAI
+	input.Model = "gpt-5.4"
 	input.FundingSource = models.UsageFundingSourceSubscription
 	require.NoError(t, models.RecordUsage(db, input))
 
@@ -92,6 +94,9 @@ func Test__RecordUsage__SubscriptionCostsNothingAndIsNotHosted(t *testing.T) {
 	}, 50, 0)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
+	assert.Equal(t, []string{"gpt-5.4"}, rows[0].Models)
+	assert.Empty(t, rows[0].BYOKModels)
+	assert.Equal(t, input.TotalTokens, rows[0].TotalTokens)
 	assert.Zero(t, rows[0].HostedCostCents())
 	assert.Zero(t, rows[0].BYOKCostCents())
 }
