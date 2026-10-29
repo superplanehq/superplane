@@ -121,6 +121,43 @@ describe("FleetManagerSetup", () => {
     expect(command).toHaveTextContent("maxCapacity: 10");
   });
 
+  it("restores the Kubernetes context into the install command", async () => {
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({
+        provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v0.2.0",
+        selectedFleetIds: ["e1-large-amd64"],
+        fleetCapacities: { "e1-large-amd64": { warmCapacity: 1, maxCapacity: 10 } },
+        fields: { region: "us-east-1", imageAmd64: "ami-amd64" },
+        kubeContext: "aws-prod",
+      }),
+    );
+
+    function InstallWizard() {
+      const setup = useFleetManagerSetup(true, "org-1");
+      return (
+        <FleetManagerWizardScreen
+          step="install"
+          setup={setup}
+          onNext={() => undefined}
+          onFinish={() => undefined}
+          onFinishLater={() => undefined}
+        />
+      );
+    }
+
+    render(<InstallWizard />);
+
+    expect(await screen.findByLabelText("Kubernetes context")).toHaveValue("aws-prod");
+    expect(screen.getByText(/Run this command in the same directory/)).toBeInTheDocument();
+    expect(screen.getByText(/helm upgrade --install fleet-manager/)).toHaveTextContent("--kube-context 'aws-prod'");
+  });
+
   it("keeps a saved warm 0 and max 1 capacity", async () => {
     window.localStorage.setItem(
       FLEET_MANAGER_DRAFT_KEY,
@@ -365,11 +402,16 @@ describe("FleetManagerSetup", () => {
     expect(command).toHaveTextContent("ami: ami-amd64");
     expect(command).toHaveTextContent("runnerVersion: v0.2.0");
     expect(command).toHaveTextContent("cpuMillicores: 2000");
-    expect(command).toHaveTextContent("-f fleet-manager-values.yaml");
     expect(command).not.toHaveTextContent("kubectl create secret");
     expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("one-time-personal-token");
 
     expect(command).toHaveTextContent("cat > fleet-manager-values.yaml <<'EOF'");
+    expect(command).not.toHaveTextContent("helm upgrade --install fleet-manager");
+    fireEvent.change(screen.getByLabelText("Kubernetes context"), { target: { value: "aws-prod" } });
+    const helmCommand = await screen.findByText(/helm upgrade --install fleet-manager/);
+    expect(helmCommand).toHaveTextContent("--kube-context 'aws-prod'");
+    expect(helmCommand).toHaveTextContent("-f fleet-manager-values.yaml");
+    expect(helmCommand).not.toHaveTextContent("kubectl");
     fireEvent.click(screen.getByRole("button", { name: "Copy values command" }));
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining("cat > fleet-manager-values.yaml <<'EOF'")),
@@ -379,6 +421,7 @@ describe("FleetManagerSetup", () => {
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining("helm upgrade --install fleet-manager")),
     );
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("--kube-context 'aws-prod'"));
     expect(writeText.mock.calls.some(([text]) => String(text).includes("kubectl"))).toBe(false);
 
     fireEvent.change(screen.getByLabelText("Maximum capacity"), { target: { value: "3" } });

@@ -44,6 +44,7 @@ function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
     selectedFleetIds: hasDefaultFleet ? [DEFAULT_SETUP_FLEET_ID] : [],
     fleetCapacities: hasDefaultFleet ? { [DEFAULT_SETUP_FLEET_ID]: { ...DEFAULT_FLEET_CAPACITY } } : {},
     fields,
+    kubeContext: "",
   };
 }
 
@@ -283,6 +284,8 @@ export function useFleetManagerSetup(enabled = true, organizationId = "") {
     setNamespace: (value: string) => updateDraft((current) => ({ ...current, namespace: value })),
     setServiceAccountName: (value: string) => updateDraft((current) => ({ ...current, serviceAccountName: value })),
     setSuperplaneUrl: (value: string) => updateDraft((current) => ({ ...current, superplaneUrl: value })),
+    setKubeContext: (value: string) =>
+      updateDraft((current) => ({ ...current, kubeContext: value.replace(/[\r\n]/g, "") })),
   };
 }
 

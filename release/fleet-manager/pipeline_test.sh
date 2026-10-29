@@ -16,6 +16,11 @@ ruby -ryaml -e '
   }.join("\n")
   raise "Fleet Manager publish must verify the docker image archive" unless publish_commands.include?("fleet-manager-docker.oci.tar")
   raise "Fleet Manager publish must tag the docker image" unless publish_commands.include?("${RELEASE_VERSION}-docker")
+  chart = publish_commands.index("release/fleet-manager/publish-chart.sh")
+  stage = publish_commands.index("stage-github-release")
+  publish_release = publish_commands.index("publish-github-release")
+  raise "chart push must finish before the GitHub release is staged" unless chart && stage && chart < stage
+  raise "the GitHub release must be published after it is staged" unless stage && publish_release && stage < publish_release
 ' "${REPO_ROOT}/.semaphore/prepare-fleet-manager-release.yml" \
   "${REPO_ROOT}/.semaphore/publish-fleet-manager-release.yml"
 
