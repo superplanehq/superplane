@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -8,17 +9,152 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	factorypb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
+
+func Test__NodeRequestExecutor_CustomScheduleLifecycle(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("scheduled"), "", "")
+	require.NoError(t, err)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	repository, branch, integrationID := "acme/app", "main", integration.ID.String()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository, DefaultBranch: &branch, VCSIntegrationID: &integrationID}))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	llmSettings, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.Background()).Model(llmSettings).Updates(map[string]any{
+			"default_hosted_provider": llmSettings.DefaultHostedProvider, "default_hosted_model": llmSettings.DefaultHostedModel,
+		}).Error)
+	})
+	require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", llmSettings.ID).Updates(map[string]any{
+		"default_hosted_provider": nil, "default_hosted_model": nil,
+	}).Error)
+	probe := &scheduledRunnerProbe{Action: r.Registry.Actions["runnerClaudeCode"]}
+	r.Registry.Actions["runnerClaudeCode"] = probe
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	deps := factoryactions.IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+	settings := &factorypb.FactoryCustomAutomation_Settings{
+		StartMode: factorypb.FactoryCustomAutomation_START_MODE_SCHEDULED,
+		Schedule:  &factorypb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *"},
+		Agent:     &factorypb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", CredentialSource: "integration", CredentialIntegrationName: integration.InstallationName},
+		Steps:     []*factorypb.FactoryCustomAutomation_Step{{Name: "Test", Type: factorypb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make test", WorkingDirectory: "repo"}},
+	}
+	created, err := factoryactions.CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &factorypb.CreateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), Name: "Scheduled tests", Settings: settings})
+	require.NoError(t, err)
+	canvasID := uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId())
+	requestForLiveTrigger := func() models.CanvasNodeRequest {
+		canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvasID)
+		require.NoError(t, err)
+		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+		require.NoError(t, err)
+		for _, node := range version.Nodes {
+			if node.Type != models.NodeTypeTrigger {
+				continue
+			}
+			var request models.CanvasNodeRequest
+			var pending int64
+			require.NoError(t, db.Model(&models.CanvasNodeRequest{}).Where("workflow_id = ? AND node_id = ? AND state = ?", canvasID, node.ID, models.NodeExecutionRequestStatePending).Count(&pending).Error)
+			assert.EqualValues(t, 1, pending, "one active scheduling chain")
+			require.NoError(t, db.Where("workflow_id = ? AND node_id = ? AND state = ?", canvasID, node.ID, models.NodeExecutionRequestStatePending).First(&request).Error)
+			return request
+		}
+		t.Fatal("schedule trigger is missing")
+		return models.CanvasNodeRequest{}
+	}
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
+	first := requestForLiveTrigger()
+	require.NoError(t, executor.RunNow(first))
+	var event models.CanvasEvent
+	require.NoError(t, db.Where("workflow_id = ?", canvasID).First(&event).Error)
+	amqpURL, _ := config.RabbitMQURL()
+	require.NoError(t, NewEventRouter(amqpURL).LockAndProcessEvent(executor.logger, event, time.Now()))
+	items, err := models.ListNodeQueueItems(db, canvasID, "verify", 10, nil)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, event.RunID, items[0].RunID)
+	payload := models.RootEventSourcePayload(event.Data.Data())
+	assert.NotContains(t, payload, "pullRequest")
+	assert.NotContains(t, payload, "workOrder")
+	var linked int64
+	require.NoError(t, db.Model(&models.FactoryPullRequestRun{}).Where("run_id = ?", event.RunID).Count(&linked).Error)
+	assert.Zero(t, linked)
+	node, err := models.FindCanvasNode(db, canvasID, "verify")
+	require.NoError(t, err)
+	require.NoError(t, NewNodeQueueWorker(r.Registry, amqpURL).LockAndProcessNode(executor.logger, *node, time.Now()))
+	var execution models.CanvasNodeExecution
+	require.NoError(t, db.Where("workflow_id = ? AND root_event_id = ?", canvasID, event.ID).First(&execution).Error)
+	require.NoError(t, newTestNodeExecutor(t, r).LockAndProcessNodeExecution(execution.ID))
+	storedExecution, err := models.FindNodeExecution(canvasID, execution.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionResultPassed, storedExecution.Result, storedExecution.ResultMessage)
+	require.True(t, probe.executed, "scheduler tick must reach the generated runner action")
+	configuration := probe.configuration.(map[string]any)
+	for _, raw := range configuration["environment"].([]any) {
+		variable := raw.(map[string]any)
+		assert.NotEqual(t, "PR_NUMBER", variable["name"])
+		assert.NotEqual(t, "PR_HEAD", variable["name"])
+	}
+	old := requestForLiveTrigger()
+	settings.Schedule.CronExpression = "30 0 9 * * *"
+	_, err = factoryactions.UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &factorypb.UpdateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: canvasID.String(), Name: "Scheduled tests", Settings: settings})
+	require.NoError(t, err)
+	current := requestForLiveTrigger()
+	assert.NotEqual(t, old.NodeID, current.NodeID)
+	require.NoError(t, executor.RunNow(old))
+	count, err := models.CountCanvasEvents(db, canvasID, old.NodeID)
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, count)
+	r.Registry.Integrations["github"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: "github.onPullRequest"})}})
+	settings.StartMode, settings.Schedule = factorypb.FactoryCustomAutomation_START_MODE_MANUAL, nil
+	_, err = factoryactions.UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &factorypb.UpdateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: canvasID.String(), Name: "Scheduled tests", Settings: settings})
+	require.NoError(t, err)
+	require.NoError(t, executor.RunNow(current))
+	count, err = models.CountCanvasEvents(db, canvasID, current.NodeID)
+	require.NoError(t, err)
+	assert.Zero(t, count)
+	settings.StartMode = factorypb.FactoryCustomAutomation_START_MODE_SCHEDULED
+	settings.Schedule = &factorypb.FactoryCustomAutomation_Schedule{CronExpression: "0 10 * * *"}
+	_, err = factoryactions.UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &factorypb.UpdateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: canvasID.String(), Name: "Scheduled tests", Settings: settings})
+	require.NoError(t, err)
+	current = requestForLiveTrigger()
+	_, err = factoryactions.DeleteFactoryAutomation(ctx, r.Organization.ID.String(), &factorypb.DeleteFactoryAutomationRequest{FactoryId: factory.ID.String(), AutomationId: canvasID.String()})
+	require.NoError(t, err)
+	require.NoError(t, executor.RunNow(current))
+	count, err = models.CountCanvasEvents(db, canvasID, current.NodeID)
+	require.NoError(t, err)
+	assert.Zero(t, count)
+}
+
+// Keep the runner schema and setup validation. Replace external task dispatch.
+type scheduledRunnerProbe struct {
+	core.Action
+	executed      bool
+	configuration any
+}
+
+func (p *scheduledRunnerProbe) Execute(ctx core.ExecutionContext) error {
+	p.executed = true
+	p.configuration = ctx.Configuration
+	return ctx.ExecutionState.Pass()
+}
 
 func Test__NodeRequestExecutor_RunNow(t *testing.T) {
 	r := support.Setup(t)

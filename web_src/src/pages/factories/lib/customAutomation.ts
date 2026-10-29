@@ -9,7 +9,23 @@ import type { PlanningReviewDraft, PlanningReviewStep } from "../pages/planningR
 
 export const CUSTOM_AUTOMATION_TEMPLATE_ID = "custom-verification";
 
-export type CustomAutomationMode = "manual" | "automatic";
+export type CustomAutomationMode = "manual" | "automatic" | "scheduled";
+const CUSTOM_AUTOMATION_START_MODES: Record<CustomAutomationMode, FactoryCustomAutomationStartMode> = {
+  manual: "START_MODE_MANUAL",
+  automatic: "START_MODE_AUTOMATIC",
+  scheduled: "START_MODE_SCHEDULED",
+};
+export type CustomAutomationSchedule = { cronExpression: string; utcOffset: number };
+
+export function customAutomationSchedule(automation?: FactoriesFactoryCustomAutomation): CustomAutomationSchedule {
+  if (automation?.settings?.startMode === "START_MODE_SCHEDULED") {
+    return {
+      cronExpression: automation.settings.schedule?.cronExpression ?? "",
+      utcOffset: automation.settings.schedule?.utcOffset ?? 0,
+    };
+  }
+  return { cronExpression: "0 9 * * *", utcOffset: -new Date().getTimezoneOffset() / 60 };
+}
 export type ManualCustomAutomation = {
   id: string;
   name: string;
@@ -20,6 +36,7 @@ export const DEFAULT_CUSTOM_AUTOMATION_ICON = "sparkles";
 export const DEFAULT_CUSTOM_AUTOMATION_TIMEOUT_SECONDS = 3600;
 
 export function customAutomationMode(value: FactoryCustomAutomationStartMode | undefined): CustomAutomationMode {
+  if (value === "START_MODE_SCHEDULED") return "scheduled";
   return value === "START_MODE_AUTOMATIC" ? "automatic" : "manual";
 }
 
@@ -27,6 +44,9 @@ export function customAutomationModeCopy(mode: CustomAutomationMode): {
   trigger: string;
   action: string;
 } {
+  if (mode === "scheduled") {
+    return { trigger: "On schedule", action: "Run automation on the repository default branch" };
+  }
   if (mode === "automatic") {
     return {
       trigger: "On Verify and new commits",
@@ -101,6 +121,7 @@ export function customAutomationSettings(
   mode: CustomAutomationMode,
   draft: PlanningReviewDraft,
   icon = DEFAULT_CUSTOM_AUTOMATION_ICON,
+  schedule?: CustomAutomationSchedule,
 ): FactoriesFactoryCustomAutomationSettings {
   const component = draft.components[0];
   const configuration = component?.configuration ?? {};
@@ -110,7 +131,8 @@ export function customAutomationSettings(
     typeof configuration.credentialIntegrationName === "string" ? configuration.credentialIntegrationName : "";
   const superPlaneAgent = component?.component === "runnerSuperPlane";
   return {
-    startMode: mode === "automatic" ? "START_MODE_AUTOMATIC" : "START_MODE_MANUAL",
+    startMode: CUSTOM_AUTOMATION_START_MODES[mode],
+    ...(mode === "scheduled" ? { schedule } : {}),
     icon,
     executionTimeoutSeconds: customAutomationTimeout(configuration.executionTimeoutSeconds),
     agent: component?.component

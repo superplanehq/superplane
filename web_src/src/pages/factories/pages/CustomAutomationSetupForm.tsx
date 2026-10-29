@@ -4,12 +4,13 @@ import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn, resolveIcon } from "@/lib/utils";
-import { CircleAlert, GitCommitHorizontal, MousePointerClick } from "lucide-react";
+import { AlarmClock, CircleAlert, GitCommitHorizontal, MousePointerClick } from "lucide-react";
 import { useState } from "react";
 
-import type { CustomAutomationMode } from "../lib/customAutomation";
+import type { CustomAutomationMode, CustomAutomationSchedule } from "../lib/customAutomation";
 import { AutomationFlow } from "./customAutomationSetupFlow";
 import { StepEditor } from "./customAutomationStepEditor";
+import { CustomAutomationScheduleFields } from "./CustomAutomationScheduleFields";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
@@ -17,6 +18,8 @@ type CustomAutomationSetupFormProps = {
   name: string;
   icon: string;
   mode: CustomAutomationMode;
+  schedule: CustomAutomationSchedule;
+  onScheduleChange: (schedule: CustomAutomationSchedule) => void;
   draft: PlanningReviewDraft;
   organizationId: string;
   factoryId: string;
@@ -95,6 +98,8 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
               name={name}
               icon={icon}
               mode={mode}
+              schedule={props.schedule}
+              onScheduleChange={props.onScheduleChange}
               draft={draft}
               organizationId={organizationId}
               factoryId={factoryId}
@@ -263,6 +268,8 @@ function TriggerEditor({
   name,
   icon,
   mode,
+  schedule,
+  onScheduleChange,
   draft,
   organizationId,
   factoryId,
@@ -275,6 +282,8 @@ function TriggerEditor({
   name: string;
   icon: string;
   mode: CustomAutomationMode;
+  schedule: CustomAutomationSchedule;
+  onScheduleChange: (schedule: CustomAutomationSchedule) => void;
   draft: PlanningReviewDraft;
   organizationId: string;
   factoryId: string;
@@ -291,7 +300,12 @@ function TriggerEditor({
         <Label htmlFor="custom-automation-mode" className="sr-only">
           Trigger
         </Label>
-        <Select value={mode} onValueChange={(value) => onModeChange(value === "automatic" ? "automatic" : "manual")}>
+        <Select
+          value={mode}
+          onValueChange={(value) =>
+            onModeChange(value === "scheduled" ? "scheduled" : value === "automatic" ? "automatic" : "manual")
+          }
+        >
           <SelectTrigger id="custom-automation-mode" className="min-h-14 w-full !h-auto py-2.5">
             <SelectValue>
               <TriggerOption mode={mode} />
@@ -304,9 +318,13 @@ function TriggerEditor({
             <SelectItem value="automatic" className="py-2.5">
               <TriggerOption mode="automatic" />
             </SelectItem>
+            <SelectItem value="scheduled" className="py-2.5">
+              <TriggerOption mode="scheduled" />
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
+      {mode === "scheduled" ? <CustomAutomationScheduleFields schedule={schedule} onChange={onScheduleChange} /> : null}
       <div className="flex flex-col gap-2">
         <Label htmlFor="automation-name">Automation name</Label>
         <div className="flex items-center gap-2">
@@ -440,7 +458,7 @@ function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (ico
 
 function TriggerOption({ mode }: { mode: CustomAutomationMode }) {
   const automatic = mode === "automatic";
-  const Icon = automatic ? GitCommitHorizontal : MousePointerClick;
+  const Icon = mode === "scheduled" ? AlarmClock : automatic ? GitCommitHorizontal : MousePointerClick;
   return (
     <span className="flex min-w-0 items-center gap-3 text-left">
       <span
@@ -455,10 +473,14 @@ function TriggerOption({ mode }: { mode: CustomAutomationMode }) {
       </span>
       <span className="flex min-w-0 flex-col">
         <span className="text-sm font-medium text-foreground">
-          {automatic ? "Every pull request commit" : "Manual"}
+          {mode === "scheduled" ? "Schedule" : automatic ? "Every pull request commit" : "Manual"}
         </span>
         <span className="text-xs font-normal text-muted-foreground">
-          {automatic ? "Runs after each new commit." : "Runs only when you start it."}
+          {mode === "scheduled"
+            ? "Runs on the repository default branch."
+            : automatic
+              ? "Runs after each new commit."
+              : "Runs only when you start it."}
         </span>
       </span>
     </span>
