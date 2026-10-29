@@ -96,6 +96,15 @@ type CodexReasoningEffortOption struct {
 	Description     string `json:"description"`
 }
 
+// ReasoningEfforts lists the reasoning effort values that Codex reports for the model.
+func (m CodexModel) ReasoningEfforts() []string {
+	efforts := make([]string, 0, len(m.SupportedReasoningEfforts))
+	for _, option := range m.SupportedReasoningEfforts {
+		efforts = append(efforts, option.ReasoningEffort)
+	}
+	return efforts
+}
+
 func (FactoryCodexConnection) TableName() string {
 	return "factory_codex_connections"
 }
@@ -794,6 +803,20 @@ func (c *FactoryCodexConnection) StoreUsage(tx *gorm.DB, limits []CodexUsageLimi
 }
 
 func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]string, error) {
+	catalog, err := FactoryCodexSubscriptionCatalog(tx, organizationID, factoryID)
+	if err != nil {
+		return nil, err
+	}
+	models := make([]string, 0, len(catalog))
+	for _, model := range catalog {
+		models = append(models, model.Model)
+	}
+	return CompactModelIDs(models), nil
+}
+
+// FactoryCodexSubscriptionCatalog returns the models of a ready ChatGPT
+// subscription. Other connection states have no models.
+func FactoryCodexSubscriptionCatalog(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]CodexModel, error) {
 	connection, err := FindFactoryCodexConnection(tx, organizationID, factoryID)
 	if errors.Is(err, ErrCodexConnectionNotFound) {
 		return nil, nil
@@ -804,9 +827,5 @@ func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID uuid.
 	if connection.Status != CodexConnectionStatusReady {
 		return nil, nil
 	}
-	models := make([]string, 0, len(connection.AvailableModels))
-	for _, model := range connection.AvailableModels {
-		models = append(models, model.Model)
-	}
-	return CompactModelIDs(models), nil
+	return connection.AvailableModels, nil
 }
