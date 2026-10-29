@@ -127,7 +127,16 @@ spec:
               fi
 
               # Fail if this branch has no commits ahead of the default branch.
-              if [ "$(git rev-list --count "origin/${BASE:-main}..HEAD")" -eq 0 ]; then
+              if [ -n "${BASE:-}" ]; then
+                default_branch="$BASE"
+              else
+                default_branch="$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')"
+              fi
+              if [ -z "$default_branch" ]; then
+                echo "Could not read the repository default branch." >&2
+                exit 1
+              fi
+              if [ "$(git rev-list --count "origin/${default_branch}..HEAD")" -eq 0 ]; then
                 echo "No commits to push" >&2
                 exit 1
               fi

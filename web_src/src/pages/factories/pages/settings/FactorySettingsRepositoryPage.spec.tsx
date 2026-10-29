@@ -35,6 +35,8 @@ describe("FactorySettingsRepositoryPage", () => {
     const saveButton = within(settings).getByTestId("factory-settings-repository-save");
     await waitFor(() => expect(saveButton).toBeEnabled());
     fireEvent.click(saveButton);
+    const confirmTasks = screen.queryByTestId("factory-settings-update-tasks-confirm");
+    if (confirmTasks) fireEvent.click(confirmTasks);
 
     await waitFor(() => expect(saveButton).toBeDisabled());
     expect(within(settings).getByRole("option", { name: /acme\/web/i })).toHaveAttribute("aria-selected", "true");
@@ -110,6 +112,7 @@ describe("FactorySettingsRepositoryPage", () => {
       const saveButton = within(settings).getByTestId("factory-settings-repository-save");
       await waitFor(() => expect(saveButton).toBeEnabled());
       await user.click(saveButton);
+      await user.click(await screen.findByTestId("factory-settings-update-tasks-confirm"));
 
       await waitFor(() => expect(saves).toEqual([{ repository: "acme/api", defaultBranch: "develop" }]));
     } finally {
