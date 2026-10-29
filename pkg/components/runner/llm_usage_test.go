@@ -297,6 +297,47 @@ func TestWrapAgentStepCommandMergesUsageOnSIGTERM(t *testing.T) {
 	assert.Equal(t, float64(2), usage["output_tokens"])
 }
 
+func TestPublishModelCallOutcomesWritesLiveLogRecords(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	stamp := time.Now().UTC().Truncate(time.Millisecond).Format(time.RFC3339Nano)
+	payload, err := json.Marshal([]map[string]any{
+		{"model": "claude-sonnet-4-6", "outcome": "attempt_1", "occurredAt": stamp},
+	})
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", "require('./llm_usage.js').publishModelCallOutcomes('anthropic', "+string(payload)+")")
+	cmd.Dir = taskDir
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_HOSTED_MODEL_STATUS=yes",
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var rec map[string]any
+	require.NoError(t, json.Unmarshal(out, &rec))
+	assert.Equal(t, "model_call", rec["type"])
+	assert.Equal(t, "anthropic", rec["provider"])
+	assert.Equal(t, "claude-sonnet-4-6", rec["model"])
+	assert.Equal(t, "attempt_1", rec["outcome"])
+	assert.Equal(t, stamp, rec["occurredAt"])
+	assert.Equal(t, float64(1), rec["sequence"])
+}
+
+func TestPublishModelCallOutcomesStaysQuietWithoutHostedFlag(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	cmd := exec.Command("node", "-e", "require('./llm_usage.js').publishModelCallOutcomes('anthropic', [{model:'claude-sonnet-4-6',outcome:'attempt_1'}])")
+	cmd.Dir = taskDir
+	cmd.Env = append(os.Environ(), "SUPERPLANE_TASK_DIR="+taskDir)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Empty(t, string(out))
+}
+
 func writeLLMUsageScript(t *testing.T, taskDir string) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "llm_usage.js"), []byte(LLMUsageScript), 0o644))

@@ -164,3 +164,41 @@ func TestDeleteExpiredHostedModelCallOutcomes(t *testing.T) {
 	assert.Equal(t, "gpt-5", cells[0].Model)
 	assert.Equal(t, 1, cells[0].CallCount)
 }
+
+func TestParseHostedModelCallLogChunkKeepsCompleteCalls(t *testing.T) {
+	stamp := time.Now().UTC().Truncate(time.Millisecond)
+	chunk := "noise\n" +
+		`{"type":"model_call","provider":"anthropic","model":"claude-sonnet-4-6","outcome":"attempt_1","occurredAt":"` + stamp.Format(time.RFC3339Nano) + `","sequence":1}` + "\n" +
+		`{"type":"tool_start","id":"tool-1"}` + "\n" +
+		`{"type":"model_call","provider":"openai","model":"gpt-5","outcome":"attempt_1","sequence":0}` + "\n" +
+		`{"type":"model_call","provider":"openai","model":"gpt-5","outcome":"attempt_2","occurredAt":"` + stamp.Format(time.RFC3339Nano) + `","sequence":2}` + "\n" +
+		`{"type":"model_call"`
+	inputs := models.ParseHostedModelCallLogChunk("task-live", []byte(chunk))
+	require.Len(t, inputs, 2)
+	assert.Equal(t, models.UsageProviderAnthropic, inputs[0].Provider)
+	assert.Equal(t, "claude-sonnet-4-6", inputs[0].Model)
+	assert.Equal(t, models.HostedModelCallOutcomeAttempt1, inputs[0].Outcome)
+	assert.Equal(t, 1, inputs[0].Sequence)
+	assert.True(t, inputs[0].OccurredAt.UTC().Equal(stamp))
+	assert.Equal(t, models.UsageProviderOpenAI, inputs[1].Provider)
+	assert.Equal(t, 2, inputs[1].Sequence)
+}
+
+func TestInsertHostedModelCallOutcomesFromLogChunkIsIdempotent(t *testing.T) {
+	_ = support.Setup(t)
+	db := database.DB(t.Context())
+	t.Cleanup(func() {
+		_ = db.Where("runner_task_id = ?", "task-live-1").Delete(&models.HostedModelCallOutcome{}).Error
+	})
+
+	stamp := time.Now().UTC().Truncate(time.Millisecond)
+	chunk := []byte(`{"type":"model_call","provider":"openai","model":"gpt-5","outcome":"attempt_1","occurredAt":"` + stamp.Format(time.RFC3339Nano) + `","sequence":1}` + "\n")
+	require.NoError(t, models.InsertHostedModelCallOutcomes(db, models.ParseHostedModelCallLogChunk("task-live-1", chunk)))
+	require.NoError(t, models.InsertHostedModelCallOutcomes(db, models.ParseHostedModelCallLogChunk("task-live-1", chunk)))
+
+	var rows []models.HostedModelCallOutcome
+	require.NoError(t, db.Where("runner_task_id = ?", "task-live-1").Find(&rows).Error)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "gpt-5", rows[0].Model)
+	assert.True(t, rows[0].OccurredAt.UTC().Equal(stamp))
+}

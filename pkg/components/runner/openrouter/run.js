@@ -342,6 +342,28 @@ function occurredAtStamp(value) {
   return new Date().toISOString();
 }
 
+function publishHostedModelCallOutcomes(rows) {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [
+    path.join(taskDir, "llm_usage.js"),
+    path.join(__dirname, "..", "llm_usage.js"),
+  ];
+  for (const file of candidates) {
+    if (!file || !fs.existsSync(file)) {
+      continue;
+    }
+    try {
+      const usage = require(file);
+      if (typeof usage.publishModelCallOutcomes === "function") {
+        usage.publishModelCallOutcomes("openrouter", rows);
+      }
+      return;
+    } catch (_err) {
+      return;
+    }
+  }
+}
+
 function appendModelCallOutcomes(outcomes, model, outcome, count, occurredAt) {
   const id = catalogModelId(model);
   const n = Math.max(0, Number(count) || 0);
@@ -349,9 +371,13 @@ function appendModelCallOutcomes(outcomes, model, outcome, count, occurredAt) {
     return;
   }
   const stamp = occurredAtStamp(occurredAt);
+  const added = [];
   for (let i = 0; i < n; i += 1) {
-    outcomes.push({ model: id, outcome, occurredAt: stamp });
+    const row = { model: id, outcome, occurredAt: stamp };
+    outcomes.push(row);
+    added.push(row);
   }
+  publishHostedModelCallOutcomes(added);
 }
 
 function appendSpawnRoundtripOutcomes(outcomes, model, attempt, count, times) {
@@ -361,14 +387,18 @@ function appendSpawnRoundtripOutcomes(outcomes, model, attempt, count, times) {
     return;
   }
   const stamps = Array.isArray(times) ? times : [];
+  const added = [];
   for (let i = 0; i < n; i += 1) {
     const callAttempt = Number(attempt) > 1 && i === 0 ? attempt : 1;
-    outcomes.push({
+    const row = {
       model: id,
       outcome: attemptOutcome(callAttempt),
       occurredAt: occurredAtStamp(stamps[i]),
-    });
+    };
+    outcomes.push(row);
+    added.push(row);
   }
+  publishHostedModelCallOutcomes(added);
 }
 
 function uniqueCatalogModels(ids) {
