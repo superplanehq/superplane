@@ -496,6 +496,43 @@ func TestVCSProviderCatalogWorkerReconciliationDoesNotBlockRequestedWork(t *test
 	}
 }
 
+func TestVCSProviderCatalogWorkerRunsScheduledTasksOnceAcrossReplicas(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	db := database.Conn()
+	now := time.Now()
+
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 101,
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, 101, []models.VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/stale"},
+		{RepositoryID: 202, FullName: "acme/fresh"},
+		{RepositoryID: 203, FullName: "acme/due-before-next-sweep"},
+	}))
+	for repositoryID, syncedAt := range map[int64]time.Time{
+		201: now.Add(-2 * vcsProviderCollaboratorsFreshnessWindow),
+		202: now.Add(-time.Hour),
+		203: now.Add(vcsProviderSweepInterval/2 - vcsProviderCollaboratorsFreshnessWindow),
+	} {
+		require.NoError(t, db.Model(&models.VCSProviderRepository{}).
+			Where("provider = ? AND repository_id = ?", models.ProviderGitHub, repositoryID).
+			UpdateColumn("collaborators_synced_at", syncedAt).Error)
+	}
+
+	first := &recordingVCSProviderCatalog{}
+	second := &recordingVCSProviderCatalog{}
+	newTestVCSProviderCatalogWorker(first).runScheduledTasks(t.Context(), now)
+	newTestVCSProviderCatalogWorker(second).runScheduledTasks(t.Context(), now.Add(time.Minute))
+
+	assert.Len(t, first.priorities(), 1)
+	assert.Empty(t, second.priorities(), "a second replica must not repeat the catalog reconcile")
+	var repositoryIDs []int64
+	require.NoError(t, db.Model(&models.VCSProviderRepositorySyncJob{}).Pluck("repository_id", &repositoryIDs).Error)
+	assert.ElementsMatch(t, []int64{201, 203}, repositoryIDs)
+}
+
 func TestVCSProviderInstallationRetryDelay(t *testing.T) {
 	assert.Equal(t, time.Second, vcsProviderInstallationRetryDelay(1))
 	assert.Equal(t, 2*time.Second, vcsProviderInstallationRetryDelay(2))
