@@ -10,23 +10,27 @@ export function IntakeDefaultOwnerField({
   value,
   onChange,
   disabled = false,
+  title = "Default task owner",
+  description = "Assign this person when intake creates a task.",
 }: {
   organizationId: string;
   value: string;
   onChange: (ownerId: string) => void;
   disabled?: boolean;
+  title?: string;
+  description?: string;
 }) {
   const { data: users = [], isLoading, isError } = useOrganizationUsers(organizationId);
   const owner = buildOrgUserDisplayMap(users).get(value);
   const label = value ? (isLoading ? "Loading member…" : (owner?.name ?? "Unavailable member")) : "No owner";
 
   return (
-    <section className="flex flex-col gap-2" aria-label="Default task owner">
+    <section className="flex flex-col gap-2" aria-label={title}>
       <p className="text-sm font-medium" id="intake-default-owner-label">
-        Default task owner
+        {title}
       </p>
       <p className="text-sm text-muted-foreground" id="intake-default-owner-help">
-        Assign this person when intake creates a task.
+        {description}
       </p>
       <WorkOrderAssigneesPopover
         organizationId={organizationId}
@@ -78,6 +82,8 @@ export function IntakeSourceDefaultOwner({
   return (
     <IntakeDefaultOwnerField
       organizationId={organizationId}
+      title={sourceId === "github-issues" ? "Task owner" : undefined}
+      description={sourceId === "github-issues" ? "Assign new SuperPlane tasks to this person." : undefined}
       value={draft.defaultOwnerId}
       disabled={disabled}
       onChange={(defaultOwnerId) => onDraftChange((current) => ({ ...current, defaultOwnerId }))}

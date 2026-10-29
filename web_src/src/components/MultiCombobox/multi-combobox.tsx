@@ -261,6 +261,7 @@ export function MultiCombobox<T extends { id: string }>({
                     <button
                       type="button"
                       data-testid={`remove-${option.id}`}
+                      aria-label={`Remove ${displayValue(option)}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemove(option);
