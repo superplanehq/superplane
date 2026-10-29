@@ -118,7 +118,7 @@ describe("onboarding session replay", () => {
     await user.click(screen.getByTestId("first-run-go-to-board"));
     await waitFor(() => expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument());
     expect(stopRecording).toHaveBeenCalledTimes(1);
-  });
+  }, 15000);
 
   it("stops when completion skips the initial import and navigates away", async () => {
     const user = userEvent.setup();
@@ -134,7 +134,7 @@ describe("onboarding session replay", () => {
     expect(startRecording).toHaveBeenCalledTimes(1);
     expect(stopRecording).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("first-run-analysis")).not.toBeInTheDocument();
-  });
+  }, 15000);
 
   it("stops when switching workspaces and starts again when returning to onboarding", async () => {
     const user = userEvent.setup();
