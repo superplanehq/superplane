@@ -290,9 +290,12 @@ func TestValidateRunClaudeCodeSpecRejectsUnknownThinking(t *testing.T) {
 			Source: "secret",
 			Secret: secretRef("anthropic", "api_key"),
 		},
-		ThinkingLevel: "xhigh",
+		ThinkingLevel: "minimal",
 	}
 	require.Error(t, validateRunClaudeCodeSpec(spec))
+
+	spec.ThinkingLevel = "max"
+	require.NoError(t, validateRunClaudeCodeSpec(spec))
 }
 
 func TestBuildClaudeCodeTaskAppliesIntegrationUsageAndSetup(t *testing.T) {

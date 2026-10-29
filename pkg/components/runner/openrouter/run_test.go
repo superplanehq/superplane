@@ -43,6 +43,16 @@ func TestOpencodeRunArgsAddsVariantForThinking(t *testing.T) {
 	assert.Contains(t, args, "high")
 }
 
+func TestOpencodeRunArgsPassesModelSpecificVariant(t *testing.T) {
+	args := jsOpencodeArgs(t, map[string]any{
+		"model":    "openai/gpt-5.4",
+		"prompt":   "do the work",
+		"thinking": "xhigh",
+	})
+	assert.Contains(t, args, "--variant")
+	assert.Contains(t, args, "xhigh")
+}
+
 func TestOpencodeRunArgsOmitsVariantForDefaultThinking(t *testing.T) {
 	args := jsOpencodeArgs(t, map[string]any{
 		"model":  "x-ai/grok-4.6",
