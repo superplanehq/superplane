@@ -1,6 +1,8 @@
 package models
 
 import (
+	"bytes"
+	"encoding/json"
 	"math"
 	"slices"
 	"strings"
@@ -110,6 +112,48 @@ func ScoreHostedModelCallOutcomes(attempt1, attempt2, attempt3, attempt4, errors
 		attempt4*hostedModelCallOutcomeScores[HostedModelCallOutcomeAttempt4]
 	score := int(math.Round(float64(sum) / float64(total)))
 	return &score
+}
+
+func ParseHostedModelCallLogChunk(taskID string, content []byte) []HostedModelCallOutcomeInput {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" || !bytes.Contains(content, []byte(`"type":"model_call"`)) {
+		return nil
+	}
+	var inputs []HostedModelCallOutcomeInput
+	for _, line := range bytes.Split(content, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 || !bytes.Contains(line, []byte(`"type":"model_call"`)) {
+			continue
+		}
+		var row struct {
+			Type       string `json:"type"`
+			Provider   string `json:"provider"`
+			Model      string `json:"model"`
+			Outcome    string `json:"outcome"`
+			OccurredAt string `json:"occurredAt"`
+			Sequence   int    `json:"sequence"`
+		}
+		if err := json.Unmarshal(line, &row); err != nil || strings.TrimSpace(row.Type) != "model_call" || row.Sequence < 1 {
+			continue
+		}
+		occurredAt := time.Time{}
+		if stamp := strings.TrimSpace(row.OccurredAt); stamp != "" {
+			if parsed, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
+				occurredAt = parsed
+			} else if parsed, err := time.Parse(time.RFC3339, stamp); err == nil {
+				occurredAt = parsed
+			}
+		}
+		inputs = append(inputs, HostedModelCallOutcomeInput{
+			Provider:     strings.TrimSpace(row.Provider),
+			Model:        strings.TrimSpace(row.Model),
+			Outcome:      strings.TrimSpace(row.Outcome),
+			OccurredAt:   occurredAt,
+			RunnerTaskID: taskID,
+			Sequence:     row.Sequence,
+		})
+	}
+	return inputs
 }
 
 func InsertHostedModelCallOutcomes(tx *gorm.DB, inputs []HostedModelCallOutcomeInput) error {

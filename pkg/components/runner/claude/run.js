@@ -31,6 +31,28 @@ function loadActivityStreamModule() {
   return { createActivityStream: () => createDisabledActivityStream() };
 }
 
+function publishHostedModelCallOutcomes(provider, rows) {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [
+    path.join(taskDir, "llm_usage.js"),
+    path.join(__dirname, "..", "llm_usage.js"),
+  ];
+  for (const file of candidates) {
+    if (!file || !fs.existsSync(file)) {
+      continue;
+    }
+    try {
+      const usage = require(file);
+      if (typeof usage.publishModelCallOutcomes === "function") {
+        usage.publishModelCallOutcomes(provider, rows);
+      }
+      return;
+    } catch (_err) {
+      return;
+    }
+  }
+}
+
 function createDisabledActivityStream() {
   const noop = () => undefined;
   return {
@@ -467,6 +489,7 @@ async function runPrompt(promptFile, model, thinking) {
     promptFile,
     (id) => writeSessionID(sp, id),
     activity,
+    model,
   );
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
@@ -575,7 +598,7 @@ function promptSeriesName(promptFile) {
     .join(" ");
 }
 
-function createFormatter(promptFile, onSession, activityOverride) {
+function createFormatter(promptFile, onSession, activityOverride, model) {
   let streamedText = false;
   let inText = false;
   let textBuf = "";
@@ -670,10 +693,20 @@ function createFormatter(promptFile, onSession, activityOverride) {
           });
           if (!messageId || messageId !== lastRecordedMessageId) {
             lastRecordedMessageId = messageId;
+            const occurredAt = new Date().toISOString();
             successfulCalls.push({
               apiRetryCount,
-              occurredAt: new Date().toISOString(),
+              occurredAt,
             });
+            publishHostedModelCallOutcomes(
+              "anthropic",
+              claudeModelCallOutcomes({
+                failed: false,
+                apiRetryCount,
+                model,
+                occurredAt,
+              }),
+            );
             apiRetryCount = 0;
           }
           formatAssistant(event, streamedText, tools, activity);
@@ -746,24 +779,24 @@ function createFormatter(promptFile, onSession, activityOverride) {
         );
       }
       if (failed) {
-        outcomes.push(
-          ...claudeModelCallOutcomes({
-            failed: true,
-            sawRateLimit,
-            errorText,
-            model,
-            occurredAt,
-          }),
-        );
+        const failedOutcomes = claudeModelCallOutcomes({
+          failed: true,
+          sawRateLimit,
+          errorText,
+          model,
+          occurredAt,
+        });
+        outcomes.push(...failedOutcomes);
+        publishHostedModelCallOutcomes("anthropic", failedOutcomes);
       } else if (outcomes.length === 0) {
-        outcomes.push(
-          ...claudeModelCallOutcomes({
-            failed: false,
-            apiRetryCount,
-            model,
-            occurredAt,
-          }),
-        );
+        const fallback = claudeModelCallOutcomes({
+          failed: false,
+          apiRetryCount,
+          model,
+          occurredAt,
+        });
+        outcomes.push(...fallback);
+        publishHostedModelCallOutcomes("anthropic", fallback);
       }
       if (outcomes.length > 0) {
         parsed.modelCallOutcomes = outcomes;
@@ -1480,7 +1513,12 @@ function truncateText(text) {
 }
 
 function formatStreamJsonLines(rawLines, options) {
-  const formatter = createFormatter();
+  const formatter = createFormatter(
+    undefined,
+    undefined,
+    undefined,
+    options && options.model,
+  );
   for (const line of rawLines) {
     formatter.handleLine(line);
   }

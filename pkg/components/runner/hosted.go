@@ -9,6 +9,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/llm"
 )
 
+const (
+	EnvHostedModelStatus     = "SUPERPLANE_HOSTED_MODEL_STATUS"
+	HostedModelStatusEnabled = "yes"
+)
+
 type AgentCredentials struct {
 	Source      string                       `mapstructure:"source"`
 	Secret      configuration.SecretKeyRef   `mapstructure:"secret"`
@@ -90,8 +95,10 @@ func PrepareHostedRun(ctx core.ExecutionContext, provider, model string) (core.H
 }
 
 func InjectHostedAPIKey(environment []TaskEnvironmentVariable, envName, apiKey string, extra ...TaskEnvironmentVariable) []TaskEnvironmentVariable {
+	environment = dropEnvironmentNames(environment, envName, EnvHostedModelStatus)
 	environment = append(environment, TaskEnvironmentVariable{Name: envName, Value: apiKey})
-	return append(environment, extra...)
+	environment = append(environment, extra...)
+	return append(environment, TaskEnvironmentVariable{Name: EnvHostedModelStatus, Value: HostedModelStatusEnabled})
 }
 
 func InjectHostedCredentials(environment []TaskEnvironmentVariable, apiKeyEnv, apiKey, baseURLEnv, baseURL string) []TaskEnvironmentVariable {
