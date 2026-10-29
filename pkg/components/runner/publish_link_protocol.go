@@ -10,7 +10,13 @@ Use the publish_link tool, or run this command:
 
 superplane task artifact add --url "https://example.com" --name "Staging" --key staging
 
---url is required. The URL must use http or https. --name is the label people see. --key replaces that link on the next run. Omit --key to add another link. Attach the link only after the deploy succeeds.`
+--url is required. The URL must use http or https. --name is the label people see. --key replaces that link on the next run. Omit --key to add another link. Attach the link only after the deploy succeeds.
+
+You can also attach markdown:
+
+superplane task artifact add --file ./notes.md --name "Preview login" --key preview-login
+
+--file is the markdown body. --name is the title. --key replaces that note on the next run.`
 
 const publishLinkProtocolMarker = "## Task link"
 

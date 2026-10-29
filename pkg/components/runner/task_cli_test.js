@@ -2,6 +2,8 @@
 
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
@@ -61,6 +63,66 @@ test("superplane task artifact add attaches the url and label", async () => {
     { url: "https://staging.example.com", title: "Staging", key: "staging" },
     { url: "https://preview.example.com", title: "Preview", key: "" },
   ]);
+});
+
+test("superplane task artifact add attaches a markdown file", async () => {
+  const file = path.join(os.tmpdir(), `preview-login-${process.pid}.md`);
+  fs.writeFileSync(file, "Email: demo@operately.dev\n\nPassword: preview-demo-1\n");
+  const requests = [];
+  let stdout = "";
+  const code = await main(
+    ["task", "artifact", "add", "--file", file, "--name", "Preview login", "--key", "preview-login"],
+    env,
+    async (url, options) => {
+      requests.push({ url, body: JSON.parse(options.body) });
+      return {
+        ok: true,
+        status: 201,
+        text: async () => JSON.stringify({ title: "Preview login" }),
+      };
+    },
+    { write: (chunk) => { stdout += chunk; } },
+    { write() {} },
+  );
+  fs.unlinkSync(file);
+  assert.equal(code, 0);
+  assert.equal(stdout, "Preview login\n");
+  assert.equal(requests[0].url, "https://app.example/api/v1/runner/artifacts/markdown");
+  assert.deepEqual(requests[0].body, {
+    body: "Email: demo@operately.dev\n\nPassword: preview-demo-1",
+    title: "Preview login",
+    key: "preview-login",
+  });
+});
+
+test("superplane task artifact add rejects a url and a file together", async () => {
+  let stderr = "";
+  const code = await main(
+    ["task", "artifact", "add", "--url", "https://example.com", "--file", "notes.md"],
+    env,
+    async () => {
+      throw new Error("fetch must not run");
+    },
+    { write() {} },
+    { write: (chunk) => { stderr += chunk; } },
+  );
+  assert.equal(code, 1);
+  assert.match(stderr, /--url URL \| --file PATH/);
+});
+
+test("superplane task artifact add reports a missing file", async () => {
+  let stderr = "";
+  const code = await main(
+    ["task", "artifact", "add", "--file", "missing-preview-login.md"],
+    env,
+    async () => {
+      throw new Error("fetch must not run");
+    },
+    { write() {} },
+    { write: (chunk) => { stderr += chunk; } },
+  );
+  assert.equal(code, 1);
+  assert.match(stderr, /cannot read missing-preview-login.md/);
 });
 
 test("superplane task artifact add requires a url", () => {
