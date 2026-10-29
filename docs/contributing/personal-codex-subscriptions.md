@@ -16,6 +16,13 @@ An automatic Verify automation that cannot start because of an owner or model
 error fails its run and adds a status note to the task. The event does not retry
 until the choice is corrected and the automation runs again.
 
+Task refinement handles the same errors in the same way. The refinement run
+fails with the reason, and the event does not retry. A draft task cannot show
+status notes, so the failed run shows the reason.
+
+The Start check compares only literal model choices with the owner's catalog.
+A model expression is resolved later, and dispatch checks the resolved value.
+
 A saved model can become unavailable after an owner change. Select another model
 or clear the override to Auto. The previous choice remains visible until it is
 changed. API-key and hosted-provider workspaces keep their existing behavior.

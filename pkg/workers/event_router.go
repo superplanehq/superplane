@@ -301,6 +301,9 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 	}
 
 	if err := models.MaybeAttachAnalysisSession(tx, canvas, event, run); err != nil {
+		if models.IsPermanentSubscriptionAdmissionError(err) {
+			return rejectRootEvent(tx, event, run, err)
+		}
 		return nil, uuid.Nil, fmt.Errorf("attach analysis session for run %s: %w", run.ID, err)
 	}
 	if err := linkFactoryColumnAppRun(tx, canvas, event, run); err != nil {
@@ -308,18 +311,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 			return nil, uuid.Nil, err
 		}
 
-		//
-		// The task owner or model needs a correction. Retrying cannot fix it,
-		// so we fail the run and mark the event routed. The task shows why.
-		//
-		if err := run.AddError(tx, err.Error(), config.MaxPayloadSize()); err != nil {
-			return nil, uuid.Nil, fmt.Errorf("record run error for run %s: %w", run.ID, err)
-		}
-		if err := event.RoutedInTransaction(tx); err != nil {
-			return nil, uuid.Nil, err
-		}
-
-		return nil, run.ID, nil
+		return rejectRootEvent(tx, event, run, err)
 	}
 
 	var queueItems []models.CanvasNodeQueueItem
@@ -355,6 +347,20 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 	}
 
 	return queueItems, run.ID, nil
+}
+
+// rejectRootEvent handles a permanent subscription error. The task owner or
+// model needs a correction. Retrying cannot fix it, so we fail the run and
+// mark the event routed. Temporary errors do not use this path.
+func rejectRootEvent(tx *gorm.DB, event *models.CanvasEvent, run *models.CanvasRun, cause error) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+	if err := run.AddError(tx, cause.Error(), config.MaxPayloadSize()); err != nil {
+		return nil, uuid.Nil, fmt.Errorf("record run error for run %s: %w", run.ID, err)
+	}
+	if err := event.RoutedInTransaction(tx); err != nil {
+		return nil, uuid.Nil, err
+	}
+
+	return nil, run.ID, nil
 }
 
 // linkFactoryColumnAppRun returns permanent subscription errors unchanged, so

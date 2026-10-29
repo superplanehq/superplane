@@ -270,7 +270,8 @@ func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasI
 			model, _ = node.Configuration["model"].(string)
 			model = strings.TrimSpace(model)
 		}
-		if model == "" {
+		// Expressions resolve later. Dispatch checks the resolved value.
+		if model == "" || strings.Contains(model, "{{") {
 			continue
 		}
 		allowed, err := RunnerAcceptsModel(tx, o.OrganizationID, &o.FactoryID, node.ComponentName(), node.Configuration, model, ownerID)
