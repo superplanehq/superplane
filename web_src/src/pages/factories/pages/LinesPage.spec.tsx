@@ -1500,7 +1500,13 @@ describe("LinesPage board extras", () => {
     useFactoryIntakes.mockReturnValue({
       data: [
         GITHUB_ISSUES_INTAKE,
-        { id: "intake-triage", canvasId: "app-triage", name: "Triage issues", source: "SOURCE_GITHUB_ISSUES" },
+        {
+          id: "intake-triage",
+          canvasId: "app-triage",
+          name: "Triage issues",
+          source: "SOURCE_GITHUB_ISSUES",
+          settings: { labels: ["triage"] },
+        },
       ],
     });
     const user = userEvent.setup();
@@ -1508,9 +1514,8 @@ describe("LinesPage board extras", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Triage issues settings" }));
 
-    expect(
-      within(screen.getByTestId("intake-source-settings")).getByRole("heading", { name: "Intake Triage issues" }),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("intakeId=intake-triage");
+    expect(within(screen.getByTestId("intake-source-settings")).getByText("triage")).toBeInTheDocument();
   });
 
   it("does not list intake runs under the GitHub issues row", () => {

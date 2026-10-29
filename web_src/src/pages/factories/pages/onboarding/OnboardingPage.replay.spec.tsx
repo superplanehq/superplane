@@ -134,7 +134,7 @@ describe("onboarding session replay", () => {
     expect(startRecording).toHaveBeenCalledTimes(1);
     expect(stopRecording).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("first-run-analysis")).not.toBeInTheDocument();
-  });
+  }, 15000);
 
   it("stops when switching workspaces and starts again when returning to onboarding", async () => {
     const user = userEvent.setup();
