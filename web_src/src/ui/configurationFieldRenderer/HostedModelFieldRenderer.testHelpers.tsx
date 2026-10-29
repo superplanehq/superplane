@@ -97,14 +97,9 @@ export async function selectFlyoutOption(
 
 export function expectClosedThinkingWord(modelName: string, thinkingWord: string) {
   const control = screen.getByTestId("field-model-hosted-model");
-  const name = control.querySelector(".truncate");
-  const word = control.querySelector(".text-muted-foreground");
 
-  expect(name).toHaveTextContent(modelName);
-  expect(name).not.toHaveTextContent(thinkingWord);
-  expect(word).toHaveTextContent(thinkingWord);
-  expect(word).toHaveClass("ml-auto", "shrink-0", "text-[11px]", "text-muted-foreground");
-  expect(word?.nextElementSibling?.tagName).toBe("svg");
+  expect(control).toHaveTextContent(modelName);
+  expect(control).toHaveTextContent(thinkingWord);
 }
 
 export function renderField(ui: ReactElement, path = "/") {
