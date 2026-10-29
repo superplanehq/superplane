@@ -27,7 +27,6 @@ const placeholders = [
   ["task", "create", "--title", "Slow query", "--description", "The daily report query."],
   ["task", "close"],
   ["task", "list", "--state", "open", "--column", "verify"],
-  ["task", "assign", "--assignee", "alice@example.com"],
   ["task", "plan", "--file", "./PLAN.md"],
   ["task", "move", "--column", "done"],
 ];
@@ -255,6 +254,14 @@ test("other task commands are recognized and do no work", async () => {
     assert.equal(code, 1, argv.join(" "));
     assert.match(stderr, new RegExp(`superplane ${command} is not available yet`));
   }
+});
+
+test("task help lists the artifact commands", async () => {
+  let stdout = "";
+  const code = await main(["task", "help"], env, fetch, { write: (chunk) => { stdout += chunk; } }, { write() {} });
+  assert.equal(code, 0);
+  assert.match(stdout, /superplane task artifact add-link/);
+  assert.doesNotMatch(stdout, /suggest-owners/);
 });
 
 test("a placeholder with a missing flag does not claim to run", async () => {

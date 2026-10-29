@@ -289,6 +289,14 @@ func (s *FactoryService) UpdateWorkOrderAssignees(
 	return actions.UpdateWorkOrderAssignees(ctx, organizationID, req)
 }
 
+func (s *FactoryService) SuggestTaskOwners(
+	ctx context.Context,
+	req *pb.SuggestTaskOwnersRequest,
+) (*pb.SuggestTaskOwnersResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SuggestTaskOwners(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) UpdateWorkOrder(
 	ctx context.Context,
 	req *pb.UpdateWorkOrderRequest,

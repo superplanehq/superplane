@@ -111,6 +111,10 @@ function planningEnabled(env = process.env) {
   );
 }
 
+// The global runner MCP server lists only the tools that the run token
+// allows, and the backend checks the scope on every call.
+const GLOBAL_MCP_SERVER = "superplane_global";
+
 function workspaceMCPConfigPath(env = process.env) {
   const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
   const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
@@ -143,7 +147,7 @@ function workspaceMCPServers(env = process.env) {
     for (const server of servers) {
       const name = String((server && server.name) || "").trim();
       const url = String((server && server.url) || "").trim();
-      if (!name || name === "superplane" || !url) {
+      if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER || !url) {
         continue;
       }
       const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
@@ -513,17 +517,21 @@ function buildOpenCodeConfig({
       }
     }
   }
-  if (
-    (planning ||
-      artifactEnabled(env) ||
-      mergeConfidenceEnabled(env) ||
-      envFlag(env, "SUPERPLANE_OWNER_TOKEN")) &&
-    taskDir
-  ) {
+  if ((planning || artifactEnabled(env) || mergeConfidenceEnabled(env)) && taskDir) {
     config.mcp = {
       superplane: {
         type: "local",
         command: ["node", superplaneMCPScript(taskDir, env, planning)],
+        enabled: true,
+      },
+    };
+  }
+  if (envFlag(env, "SUPERPLANE_RUNNER_TOKEN") && taskDir) {
+    config.mcp = {
+      ...(config.mcp || {}),
+      [GLOBAL_MCP_SERVER]: {
+        type: "local",
+        command: ["node", path.join(taskDir, "superplane_mcp", "server.js")],
         enabled: true,
       },
     };

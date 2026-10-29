@@ -1,22 +1,19 @@
 package runner
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
-	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
+// TaskOwnerTokenPurpose is the legacy owner token. New runs use the runner
+// token. The backend still accepts this token so that runs started before the
+// global runner MCP server can finish.
 const TaskOwnerTokenPurpose = "runner_task_owner"
-const EnvSuperplaneOwnerToken = "SUPERPLANE_OWNER_TOKEN"
 
 // TaskOwnerScope binds ownership to one validated task and agent execution.
 type TaskOwnerScope struct {
@@ -78,86 +75,18 @@ func ParseTaskOwnerToken(signer *jwt.Signer, token string) (*TaskOwnerScope, err
 
 // ValidateTaskOwnerScope rechecks the signed run associations on every request.
 func ValidateTaskOwnerScope(db *gorm.DB, scope *TaskOwnerScope) error {
-	execution, err := models.FindNodeExecutionInTransaction(db, scope.CanvasID, scope.NodeExecutionID)
-	if err != nil || execution.RunID != scope.CanvasRunID || execution.NodeID != scope.NodeID {
-		return fmt.Errorf("owner execution does not match")
-	}
-	run, err := models.FindUnscopedCanvasRun(db, scope.CanvasRunID)
-	if err != nil || run.WorkflowID != scope.CanvasID {
-		return fmt.Errorf("owner run does not match")
-	}
-	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, scope.CanvasID)
-	if err != nil || canvas.OrganizationID != scope.OrganizationID || canvas.FactoryID == nil || *canvas.FactoryID != scope.FactoryID {
-		return fmt.Errorf("owner canvas does not match")
-	}
+	flow := RunnerFlowTask
 	if scope.MergeConfidence {
-		if execution.State != models.CanvasNodeExecutionStateStarted {
-			return fmt.Errorf("merge confidence execution is inactive")
-		}
-		return nil
+		flow = RunnerFlowMergeConfidence
 	}
-	linked, err := ResolveArtifactRunContext(db, scope.CanvasRunID)
-	if err != nil || linked.OrganizationID != scope.OrganizationID || linked.FactoryID != scope.FactoryID || linked.WorkOrderID != scope.WorkOrderID || linked.CanvasID != scope.CanvasID {
-		return fmt.Errorf("owner task association does not match")
-	}
-	return nil
-}
-
-func HasTaskOwnerToken(environment []TaskEnvironmentVariable) bool {
-	value, ok := environmentValue(environment, EnvSuperplaneOwnerToken)
-	return ok && value != ""
-}
-
-func AttachTaskOwnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int) []TaskEnvironmentVariable {
-	environment = withoutEnvironmentName(environment, EnvSuperplaneOwnerToken)
-	if HasPlanningSessionToken(environment) || ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
-		return environment
-	}
-	canvasID, err := uuid.Parse(ctx.WorkflowID)
-	if err != nil {
-		return environment
-	}
-	orgID, err := uuid.Parse(ctx.OrganizationID)
-	if err != nil {
-		return environment
-	}
-	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
-	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
-	if secret == "" || baseURL == "" {
-		return environment
-	}
-	db := database.DB(context.Background())
-	scope := TaskOwnerScope{
-		OrganizationID: orgID, CanvasID: canvasID, CanvasRunID: ctx.RunID, NodeExecutionID: ctx.ID, NodeID: ctx.NodeID,
-	}
-	if token, ok := environmentValue(environment, EnvSuperplaneMergeConfidenceToken); ok {
-		merge, err := ParseMergeConfidenceToken(jwt.NewSigner(secret), token)
-		if err != nil || merge.OrganizationID != orgID || merge.CanvasRunID != ctx.RunID || merge.NodeExecutionID != ctx.ID {
-			return environment
-		}
-		scope.FactoryID, scope.WorkOrderID, scope.MergeConfidence = merge.FactoryID, merge.WorkOrderID, true
-	} else {
-		linked, err := ResolveArtifactRunContext(db, ctx.RunID)
-		if err != nil {
-			return environment
-		}
-		scope.FactoryID, scope.WorkOrderID = linked.FactoryID, linked.WorkOrderID
-	}
-	if err := ValidateTaskOwnerScope(db, &scope); err != nil {
-		return environment
-	}
-	factory, err := models.FindFactory(db, scope.OrganizationID, scope.FactoryID)
-	if err != nil {
-		return environment
-	}
-	order, err := factory.FindWorkOrder(db, scope.WorkOrderID)
-	if err != nil || order.State == models.FactoryWorkOrderStateClosed || order.IsArchived() {
-		return environment
-	}
-	token, err := MintTaskOwnerToken(jwt.NewSigner(secret), scope, time.Duration(timeoutSeconds)*time.Second+artifactTokenGracePeriod)
-	if err != nil {
-		return environment
-	}
-	environment = withoutEnvironmentName(environment, EnvSuperplaneBaseURL)
-	return append(environment, TaskEnvironmentVariable{Name: EnvSuperplaneBaseURL, Value: strings.TrimRight(baseURL, "/")}, TaskEnvironmentVariable{Name: EnvSuperplaneOwnerToken, Value: token})
+	return ValidateRunnerScope(db, &RunnerScope{
+		OrganizationID:  scope.OrganizationID,
+		FactoryID:       scope.FactoryID,
+		WorkOrderID:     scope.WorkOrderID,
+		CanvasID:        scope.CanvasID,
+		CanvasRunID:     scope.CanvasRunID,
+		NodeExecutionID: scope.NodeExecutionID,
+		NodeID:          scope.NodeID,
+		Flow:            flow,
+	})
 }

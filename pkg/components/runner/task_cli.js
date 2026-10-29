@@ -70,12 +70,6 @@ const COMMANDS = [
     flags: ["state", "column"],
   },
   {
-    words: ["task", "assign"],
-    usage: "superplane task assign --assignee EMAIL",
-    flags: ["assignee"],
-    required: ["assignee"],
-  },
-  {
     words: ["task", "plan"],
     usage: "superplane task plan --file PATH",
     flags: ["file"],
@@ -121,6 +115,10 @@ function parseCommand(argv) {
 }
 
 async function main(argv, env = process.env, fetchImpl = fetch, stdout = process.stdout, stderr = process.stderr) {
+  if (Array.isArray(argv) && argv[0] === "task" && argv[1] === "help") {
+    stdout.write(`${usage()}\n`);
+    return 0;
+  }
   try {
     const { command, input } = parseCommand(argv);
     if (command.run === "link") {

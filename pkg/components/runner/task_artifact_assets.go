@@ -33,17 +33,25 @@ func TaskArtifactMCPFile() TaskFile {
 }
 
 func AppendTaskArtifactMCP(environment []TaskEnvironmentVariable, files []TaskFile) []TaskFile {
-	if !HasArtifactUploadToken(environment) && !HasPublishLinks(environment) && !HasTaskOwnerToken(environment) {
+	if !HasArtifactUploadToken(environment) && !HasPublishLinks(environment) {
 		return files
 	}
 	// The MCP script loads publish_link.js at startup, including visual
 	// evidence runs that do not publish links.
-	files = appendUniqueTaskFiles(files, TaskArtifactMCPFile(), PublishLinkScriptFile(), taskOwnerToolsFile())
+	files = appendUniqueTaskFiles(files, TaskArtifactMCPFile(), PublishLinkScriptFile())
 	if HasPublishLinks(environment) {
-		// task_cli.js loads publish_markdown.js and publish_file.js at startup, including link-only calls.
-		files = append(files, TaskCLIScriptFile(), PublishMarkdownScriptFile(), PublishFileScriptFile(), PublishLinkCommandFile())
+		files = appendUniqueTaskFiles(files, taskCLIFiles()...)
 	}
 	return files
+}
+
+// taskCLIFiles is the superplane shell command. task_cli.js loads
+// publish_link.js, publish_markdown.js, and publish_file.js at startup,
+// including calls that do not publish an artifact.
+func taskCLIFiles() []TaskFile {
+	return []TaskFile{
+		TaskCLIScriptFile(), PublishLinkScriptFile(), PublishMarkdownScriptFile(), PublishFileScriptFile(), PublishLinkCommandFile(),
+	}
 }
 
 func PublishLinkScriptFile() TaskFile {
