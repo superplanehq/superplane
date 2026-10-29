@@ -281,6 +281,33 @@ func Test__SerializeLineRunnerModels__NamesHostedSelectableKeys(t *testing.T) {
 	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetName())
 }
 
+func TestLineRunnerModelsKeepSubscriptionAndAPIKeyCatalogsSeparate(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, []string{"gpt-4o"})
+	require.NoError(t, err)
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}}, time.Now()))
+	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
+	for _, source := range []string{"subscription", "integration", "secret"} {
+		app := createLineAppWithRunner(t, r, factory.ID, runnerCodex, source, "")
+		_, err = factory.CreateLine(db, source, []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"}})
+		require.NoError(t, err)
+		ids, hosted, err := listLineRunnerModels(db, r.Organization.ID, factory.ID, source)
+		require.NoError(t, err)
+		assert.False(t, hosted)
+		if source == "subscription" {
+			assert.Equal(t, []string{"gpt-5.4"}, ids)
+			continue
+		}
+		assert.Equal(t, []string{"gpt-4o"}, ids)
+	}
+}
+
 func Test__ListLineRunnerModels__NoRunnerNodesReturnsEmpty(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

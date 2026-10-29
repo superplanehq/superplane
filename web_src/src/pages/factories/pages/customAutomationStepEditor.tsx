@@ -11,8 +11,8 @@ import { useState } from "react";
 import { FlowBadge } from "./customAutomationSetupFlow";
 import { ImplementSettingRow } from "./ImplementSettingRow";
 import { mergeCheckPromptBody, withMergeCheckHeader } from "./mergeConfidenceSteps";
-import { PlanningReviewStepBody } from "./PlanningReviewStepBody";
 import type { PlanningReviewStep } from "./planningReviewMockup";
+import { PlanningReviewStepBody } from "./PlanningReviewStepBody";
 
 export function StepEditor({
   step,

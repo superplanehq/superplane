@@ -114,7 +114,13 @@ func (w *RunnerCleanupWorker) Process() error {
 			if runner.State != models.RunnerStateTerminated {
 				lostTask = nil
 			}
-			return err
+			if err != nil {
+				return err
+			}
+			if lostRunningTask != nil {
+				return models.MarkCodexConnectionUncertain(tx, lostRunningTask.ID, now)
+			}
+			return nil
 		})
 		if err != nil {
 			w.logger.WithError(err).
@@ -129,9 +135,14 @@ func (w *RunnerCleanupWorker) Process() error {
 			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask, staleRunner.FleetSlug, staleRunner.FleetScope)
 		}
 	}
-	return models.RevokeTerminatedRunnerCredentials(
+	if err := models.RevokeTerminatedRunnerCredentials(
 		database.Conn(),
 		now.Add(-terminatedRunnerCredentialRetryWindow),
 		now,
-	)
+	); err != nil {
+		return err
+	}
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return models.ReleaseConfirmedCodexReservations(tx, now)
+	})
 }

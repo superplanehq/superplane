@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { showErrorToast } from "@/lib/toast";
-import { useOnboardingCardStep } from "./useOnboardingCardStep";
+import { useOnboardingCardStep, type OnboardingCardStep } from "./useOnboardingCardStep";
 import type { FirstRunScreen, OnboardingPageModel } from "./useFirstRunSetupFlow";
 
 export function useOnboardingModelTransition(
-  model: Pick<OnboardingPageModel, "saving" | "finish">,
+  model: Pick<OnboardingPageModel, "saving" | "finish" | "codexSubscriptionOffered" | "codexSubscriptionLoading">,
   navigation: { screen: FirstRunScreen; goToScreen: (next: FirstRunScreen) => void },
   organizationId: string,
 ) {
@@ -17,9 +17,9 @@ export function useOnboardingModelTransition(
   // plan is active and the step is no longer required.
   const [cardStepShown, setCardStepShown] = useState(false);
   const continueAfterModelAccess = useCallback(async () => {
-    if (!cardStep.ready) return;
+    if (!cardStep.ready || model.codexSubscriptionLoading) return;
     try {
-      if (await access.verify()) {
+      if (model.codexSubscriptionOffered || (await access.verify())) {
         navigation.goToScreen("agent");
         return;
       }
@@ -29,7 +29,7 @@ export function useOnboardingModelTransition(
     }
   }, [access, navigation, model, cardStep.ready]);
   useEffect(() => {
-    if (!ticketsSaved || model.saving || !cardStep.ready) return;
+    if (!ticketsSaved || model.saving || !cardStep.ready || model.codexSubscriptionLoading) return;
     setTicketsSaved(false);
     if (cardStep.required) {
       navigation.goToScreen("card");
@@ -44,25 +44,29 @@ export function useOnboardingModelTransition(
   }, [
     ticketsSaved,
     model.saving,
+    model.codexSubscriptionLoading,
     cardStep.ready,
     cardStep.required,
     cardStep.requiresAdmin,
     navigation,
     continueAfterModelAccess,
   ]);
-  let screen = navigation.screen;
-  if (screen === "agent" && !access.allowed) screen = "complete";
-  if (screen === "card" && cardStep.ready && !cardStep.available) screen = "complete";
+  const agentOffered = access.allowed || model.codexSubscriptionOffered;
+  const screen = screenWithOnboardingAccess(navigation.screen, cardStep, agentOffered, model.codexSubscriptionLoading);
   useEffect(() => {
     if (screen === "card") setCardStepShown(true);
   }, [screen]);
   useEffect(() => {
-    if (access.ready && screen !== navigation.screen) navigation.goToScreen(screen);
-  }, [access.ready, screen, navigation]);
+    if (access.ready && !model.codexSubscriptionLoading && screen !== navigation.screen) navigation.goToScreen(screen);
+  }, [access.ready, model.codexSubscriptionLoading, screen, navigation]);
   return {
     screen,
-    pending,
-    skipAgentScreen: !access.allowed,
+    pending:
+      pending ||
+      (["agent", "complete"].includes(navigation.screen) && !cardStep.ready && !cardStep.failed) ||
+      ((ticketsSaved || navigation.screen === "agent" || navigation.screen === "complete") &&
+        model.codexSubscriptionLoading),
+    skipAgentScreen: !agentOffered,
     hasCardStep: cardStep.required || cardStepShown,
     cardStep,
     accessError: access.error,
@@ -71,4 +75,20 @@ export function useOnboardingModelTransition(
     },
     continueAfterModelAccess,
   };
+}
+
+function screenWithOnboardingAccess(
+  screen: FirstRunScreen,
+  cardStep: OnboardingCardStep,
+  agentOffered: boolean,
+  codexSubscriptionLoading: boolean,
+): FirstRunScreen {
+  if ((screen === "agent" || screen === "complete") && cardStep.failed) screen = "complete";
+  if ((screen === "agent" || screen === "complete") && cardStep.ready) {
+    if (cardStep.required) screen = "card";
+    if (cardStep.requiresAdmin) screen = "complete";
+  }
+  if (screen === "agent" && !agentOffered && !codexSubscriptionLoading) screen = "complete";
+  if (screen === "card" && cardStep.ready && !cardStep.available) screen = "complete";
+  return screen;
 }

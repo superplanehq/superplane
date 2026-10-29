@@ -7,8 +7,10 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -20,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 type analyticsRecorder struct {
@@ -68,6 +71,102 @@ func useAnalytics(t *testing.T) *analyticsRecorder {
 		productanalytics.SetCurrent(previous)
 	})
 	return recorder
+}
+
+func TestAccountDeletionAnalyticsWithoutOrganizations(t *testing.T) {
+	r := support.Setup(t)
+	account, err := models.CreateAccount("No workspace", support.RandomName("account")+"@example.com")
+	require.NoError(t, err)
+	r.Account = account
+	server, _, token := setupTestServer(r, t)
+	recorder := useAnalytics(t)
+	body, err := json.Marshal(map[string]string{"email": account.Email})
+	require.NoError(t, err)
+	request := httptest.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	request.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	response := httptest.NewRecorder()
+	server.Router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusNoContent, response.Code)
+	events := recorder.snapshot()
+	require.Len(t, events, 1)
+	assert.Equal(t, productanalytics.EventAccountDeleted, events[0].Name)
+	assert.Empty(t, events[0].OrganizationID)
+	assert.Empty(t, events[0].Properties["deleted_organization_ids"])
+	assert.Equal(t, account.ID.String(), events[0].DistinctID)
+	assert.Equal(t, productanalytics.StableEventID(productanalytics.EventAccountDeleted, account.ID.String()), events[0].EventID)
+	deletedAt, err := time.Parse(time.RFC3339Nano, events[0].Properties["deleted_at"].(string))
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now(), deletedAt, time.Minute)
+}
+
+func TestAccountDeletionAnalytics_ConcurrentOwnerPromotionKeepsOrganization(t *testing.T) {
+	for _, source := range []string{"self_service", "admin"} {
+		t.Run(source, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			require.NoError(t, db.Model(r.Account).Update("installation_admin", false).Error)
+			otherAccount, err := models.CreateAccount("Other Owner", uuid.NewString()+"@example.com")
+			require.NoError(t, err)
+			otherUser, err := models.CreateUserInTransaction(db, r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
+			require.NoError(t, err)
+			server, account, _ := setupTestServer(r, t)
+			recorder := useAnalytics(t)
+			body, err := json.Marshal(map[string]string{"email": account.Email})
+			require.NoError(t, err)
+			request := httptest.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+			request = request.WithContext(accountContext(account))
+			handler := server.deleteAccount
+			if source == "admin" {
+				require.NoError(t, models.PromoteToInstallationAdmin(otherAccount.ID.String()))
+				request = request.WithContext(accountContext(otherAccount))
+				request = mux.SetURLVars(request, map[string]string{"accountId": account.ID.String()})
+				handler = server.adminDeleteAccount
+			}
+
+			// Hold the organization lock while deletion reads its candidate list.
+			// Commit another owner only after deletion reaches the lock.
+			promotion := db.Begin()
+			require.NoError(t, promotion.Error)
+			defer promotion.Rollback()
+			_, err = models.LockOrganization(promotion, r.Organization.ID)
+			require.NoError(t, err)
+			var promotionPID int
+			require.NoError(t, promotion.Raw("SELECT pg_backend_pid()").Scan(&promotionPID).Error)
+			response := httptest.NewRecorder()
+			deletion := run(func() error {
+				handler(response, request)
+				return nil
+			})
+			require.Eventually(t, func() bool {
+				var waiting bool
+				require.NoError(t, db.Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid)))", promotionPID).Scan(&waiting).Error)
+				return waiting
+			}, 10*time.Second, 10*time.Millisecond)
+			require.NoError(t, models.SetUserIsOwner(promotion, otherUser.ID, true))
+			require.NoError(t, promotion.Commit().Error)
+			require.NoError(t, finished(t, deletion))
+
+			if source == "admin" {
+				require.Equal(t, http.StatusOK, response.Code)
+				var result struct {
+					DeletedOrganizationIDs []string `json:"deleted_organization_ids"`
+				}
+				require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+				assert.Empty(t, result.DeletedOrganizationIDs)
+			} else {
+				require.Equal(t, http.StatusNoContent, response.Code)
+			}
+			_, err = models.FindOrganizationByID(r.Organization.ID.String())
+			require.NoError(t, err, "the promoted owner keeps the organization")
+			_, err = models.FindAccountByID(account.ID.String())
+			require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			events := recorder.snapshot()
+			require.Len(t, events, 1, "a retained organization must not emit organization_deleted")
+			assert.Equal(t, productanalytics.EventAccountDeleted, events[0].Name)
+			assert.Equal(t, source, events[0].Properties["deletion_source"])
+			assert.Empty(t, events[0].Properties["deleted_organization_ids"])
+		})
+	}
 }
 
 func TestOrganizationCreationAnalytics(t *testing.T) {

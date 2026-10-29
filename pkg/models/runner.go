@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,6 +26,11 @@ const (
 	RunnerTerminationVersionMismatch     = "version_mismatch"
 	RunnerTerminationTaskCompleted       = "task_completed"
 	RunnerTerminationConnectionLost      = "connection_lost"
+
+	// These tags are set by the admin API before provisioning. Registration
+	// cannot supply or replace them: provider deletion depends on their owner.
+	RunnerTagFleetManagerID = "fleet_manager_id"
+	RunnerTagProvider       = "runner_provider"
 )
 
 var (
@@ -74,6 +80,7 @@ type Runner struct {
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	TerminatedAt           *time.Time
+	ProviderDeletedAt      *time.Time
 	CreationIdempotencyKey *string
 	CreationRequestHash    *string
 }
@@ -338,6 +345,16 @@ func (r *Runner) Register(
 		return fmt.Errorf("%w: registration grant was consumed concurrently", ErrRunnerRegistrationInvalid)
 	}
 
+	tags := maps.Clone(host.Tags)
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+	for _, key := range []string{RunnerTagFleetManagerID, RunnerTagProvider} {
+		delete(tags, key)
+		if value, ok := r.Tags.Data()[key]; ok {
+			tags[key] = value
+		}
+	}
 	result = tx.Model(r).
 		Where("state = ?", RunnerStatePending).
 		Updates(map[string]any{
@@ -346,7 +363,7 @@ func (r *Runner) Register(
 			"arch":          host.Arch,
 			"hostname":      host.Hostname,
 			"ip":            host.IP,
-			"tags":          datatypes.NewJSONType(host.Tags),
+			"tags":          datatypes.NewJSONType(tags),
 			"registered_at": now,
 			"last_seen_at":  now,
 			"updated_at":    now,
@@ -363,7 +380,7 @@ func (r *Runner) Register(
 	r.Arch = host.Arch
 	r.Hostname = host.Hostname
 	r.IP = host.IP
-	r.Tags = datatypes.NewJSONType(host.Tags)
+	r.Tags = datatypes.NewJSONType(tags)
 	r.RegisteredAt = &now
 	r.LastSeenAt = &now
 	r.UpdatedAt = now
@@ -544,6 +561,37 @@ func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
 		Where("runner_id = ? AND revoked_at IS NULL", r.ID).
 		Update("revoked_at", now).
 		Error
+}
+
+// MarkProviderDeleted records that Fleet Manager removed the runner VM.
+// A terminated runner row alone does not prove the process has stopped.
+func (r *Runner) MarkProviderDeleted(tx *gorm.DB, now time.Time) error {
+	if r.State != RunnerStateTerminated {
+		return fmt.Errorf("runner %s is not terminated", r.ID)
+	}
+	if r.ProviderDeletedAt != nil {
+		return nil
+	}
+	result := tx.Model(r).
+		Where("state = ? AND provider_deleted_at IS NULL", RunnerStateTerminated).
+		Updates(map[string]any{
+			"provider_deleted_at": now,
+			"updated_at":          now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		current, err := FindRunner(tx, r.ID)
+		if err != nil {
+			return err
+		}
+		*r = *current
+		return nil
+	}
+	r.ProviderDeletedAt = &now
+	r.UpdatedAt = now
+	return ReleaseConfirmedCodexReservations(tx, now)
 }
 
 func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {

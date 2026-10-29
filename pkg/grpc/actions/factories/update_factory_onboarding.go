@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
@@ -59,16 +60,37 @@ func UpdateFactoryOnboarding(
 		}
 	}
 
+	if req.GetComplete() && !wasComplete && billing.Enabled() {
+		if err := billing.AssertOrganizationPlanAllowsRuns(db, orgID); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+		if err := billing.AssertOrganizationPaymentMethod(db, orgID); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+	}
+
 	if req.Complete != nil && *req.Complete {
-		if validationErr := validateFactoryOnboardingResources(db, orgID, factory, config); validationErr != nil {
-			return nil, factoryErrorToStatus(validationErr, "failed to update factory onboarding")
-		}
-		if !wasComplete {
-			if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, db, factory, patch, config); err != nil {
-				return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if err := validateFactoryOnboardingResources(tx, orgID, factory, config); err != nil {
+				return err
 			}
-		}
-		err = factory.CompleteOnboarding(db, patch)
+			if !wasComplete {
+				if err := synchronizeOnboardingSubscriptionApps(ctx, tx, deps, factory, config); err != nil {
+					return err
+				}
+			}
+			if config.CodexSubscription {
+				if err := validateSubscriptionCanvases(tx, factory); err != nil {
+					return err
+				}
+			}
+			if !wasComplete {
+				if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, tx, factory, patch, config); err != nil {
+					return err
+				}
+			}
+			return factory.CompleteOnboarding(tx, patch)
+		})
 	} else {
 		err = factory.UpdateOnboarding(db, patch)
 	}
@@ -183,7 +205,11 @@ func validateFactoryOnboardingResources(
 		}
 	}
 
-	if config.AgentIntegrationID != "" {
+	if config.CodexSubscription {
+		if err := validateCodexSubscriptionOnboarding(db, organizationID, factory, config); err != nil {
+			return err
+		}
+	} else if config.AgentIntegrationID != "" {
 		integration, err := findReadyOnboardingIntegration(db, organizationID, config.AgentIntegrationID)
 		if err != nil {
 			return err
@@ -340,8 +366,75 @@ func factoryOnboardingPatchFromRequest(req *pb.UpdateFactoryOnboardingRequest) (
 		}
 		patch.AgentHarness = &harness
 	}
+	if req.CodexSubscription != nil {
+		value := req.GetCodexSubscription()
+		patch.CodexSubscription = &value
+	}
 
 	return patch, nil
+}
+
+func validateCodexSubscriptionOnboarding(
+	db *gorm.DB,
+	organizationID uuid.UUID,
+	factory *models.Factory,
+	config models.FactoryOnboardingConfig,
+) error {
+	if config.AgentHarness != models.FactoryOnboardingAgentHarnessCodex {
+		return invalidArgument("ChatGPT subscription uses Codex")
+	}
+	if config.AgentIntegrationID != "" {
+		return invalidArgument("ChatGPT subscription does not use an API key")
+	}
+	if _, err := models.SoleHumanOrganizationMember(db, organizationID); err != nil {
+		return err
+	}
+	connection, err := models.FindFactoryCodexConnection(db, organizationID, factory.ID)
+	if err != nil {
+		return invalidArgument("Connect ChatGPT before you finish setup")
+	}
+	if connection.Status != models.CodexConnectionStatusReady || connection.Reserved() {
+		return invalidArgument("Wait until the ChatGPT sign-in runner has stopped")
+	}
+	return nil
+}
+
+func validateSubscriptionCanvases(db *gorm.DB, factory *models.Factory) error {
+	canvases, err := factory.ListCanvases(db)
+	if err != nil {
+		return err
+	}
+	for i := range canvases {
+		nodes, err := models.FindCanvasNodesInTransaction(db, canvases[i].ID)
+		if err != nil {
+			return err
+		}
+		for _, node := range nodes {
+			if err := validateSubscriptionCodexNode(node); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateSubscriptionCodexNode(node models.CanvasNode) error {
+	name := node.ComponentName()
+	switch name {
+	case "", "runnerClaudeCode", "runnerOpenRouter", models.SuperPlaneRunnerComponent:
+		if name == "" {
+			return nil
+		}
+		return invalidArgument("This workspace must use Codex with a ChatGPT subscription")
+	case "runnerCodex":
+		configuration := node.Configuration.Data()
+		credentials, _ := configuration["credentials"].(map[string]any)
+		source, _ := credentials["source"].(string)
+		if source != "subscription" {
+			return invalidArgument("This workspace must use Codex with a ChatGPT subscription")
+		}
+	}
+	return nil
 }
 
 func factoryOnboardingIssuesSourceFromProto(source pb.FactoryOnboarding_IssuesSource) (string, error) {

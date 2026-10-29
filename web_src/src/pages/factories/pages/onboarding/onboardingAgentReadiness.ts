@@ -19,7 +19,7 @@ export type OnboardingAgentHarness = "AGENT_HARNESS_CLAUDE_CODE" | "AGENT_HARNES
 export type OnboardingAgentPlan = {
   providerId?: AgentProviderId;
   component: "runnerClaudeCode" | "runnerCodex" | "runnerOpenRouter" | "runnerSuperPlane";
-  credentialsSource: "integration" | "hosted";
+  credentialsSource: "integration" | "hosted" | "subscription";
   integrationName?: AgentProviderId;
   harness: OnboardingAgentHarness;
   model: string;
@@ -164,7 +164,15 @@ export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boole
   return plan?.component === "runnerSuperPlane";
 }
 
-export type OnboardingAgentCredentialChoice = "own-key" | "hosted";
+export type OnboardingAgentCredentialChoice = "own-key" | "hosted" | "subscription";
+
+export const CODEX_SUBSCRIPTION_PLAN: OnboardingAgentPlan = {
+  component: "runnerCodex",
+  credentialsSource: "subscription",
+  harness: "AGENT_HARNESS_CODEX",
+  model: "",
+  planningModel: "",
+};
 
 /**
  * A model source choice must be made before setup finishes. Own-key setup
@@ -176,7 +184,9 @@ export function agentFinishReady(args: {
   providerConnected: boolean;
   agentReady: boolean;
   hostedAgentReady: boolean;
+  subscriptionReady?: boolean;
 }): boolean {
+  if (args.credentialChoice === "subscription") return args.subscriptionReady === true;
   if (args.modelSourceChoice && !args.credentialChoice) return false;
   if (args.credentialChoice === "own-key") return args.providerConnected;
   return args.agentReady || args.hostedAgentReady;
@@ -187,7 +197,7 @@ export function firstWorkOrderAgentError(args: {
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
 }): string | null {
-  if (args.plan?.component === "runnerSuperPlane") return null;
+  if (args.plan?.credentialsSource === "subscription" || args.plan?.component === "runnerSuperPlane") return null;
   if (args.hostedModelsLoading) {
     return "Hosted models are still loading. Try again.";
   }

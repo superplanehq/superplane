@@ -37,6 +37,8 @@ const (
 
 // CreateTaskParams describes an integrated runner task.
 type CreateTaskParams struct {
+	// TaskID identifies a subscription reservation created before the task.
+	TaskID                  string
 	MachineType             string
 	RunMode                 string
 	Script                  string

@@ -74,6 +74,8 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__propose_update")
 	assert.Contains(t, tools, "mcp__superplane__inspect_attachment")
+	assert.Contains(t, tools, "mcp__superplane__suggest_owners")
+	assert.Contains(t, tools, "mcp__superplane__assign_owner")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
 	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
 	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
@@ -208,6 +210,18 @@ func TestPlanningSystemPromptKeepsProtocolAtSystemPriority(t *testing.T) {
 func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{})
 	assert.Equal(t, "Bash,Read,Edit,Write", tools)
+}
+
+func TestAllowedClaudeToolsAddsPublishLinkWithoutScreenshotTools(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+		"SUPERPLANE_PUBLISH_LINKS":  "yes",
+	})
+
+	assert.Contains(t, tools, "Bash,Read,Edit,Write")
+	assert.Contains(t, tools, "mcp__superplane__publish_link")
+	assert.NotContains(t, tools, "mcp__superplane__upload_artifact")
+	assert.NotContains(t, tools, "mcp__superplane__inspect_screenshot")
 }
 
 func TestAllowedClaudeToolsAddsArtifactToolsOutsidePlanning(t *testing.T) {
