@@ -192,7 +192,8 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
     sessionStorage.clear();
     gheApp.ready = false;
     gheApp.currentStepName = "";
-    gheApp.connect.mockClear();
+    gheApp.connect.mockReset();
+    gheApp.connect.mockResolvedValue(true);
     gheApp.submitOwner.mockClear();
     gheApp.resume.mockClear();
   });
@@ -324,6 +325,32 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
 
     expect(await screen.findByTestId("first-run-github-enterprise-choose")).toBeInTheDocument();
     expect(gheApp.connect).not.toHaveBeenCalled();
+  });
+
+  it("creates a new App after a failed hostname change instead of reusing the old connection", async () => {
+    const user = userEvent.setup();
+    gheApp.ready = true;
+    gheApp.connect.mockRejectedValueOnce(new Error("could not reach GitHub"));
+    writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
+    const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+    const connected = new Set<IntegrationId>(["github"]);
+    Object.defineProperty(hook.result.current, "connected", { get: () => connected });
+    hook.result.current.selectVcsHost("github");
+
+    renderSetup(hook.result.current, "/org-1/workspaces/PAY/setup?step=repo");
+
+    await user.click(screen.getByTestId("first-run-back"));
+    const hostname = await screen.findByTestId("first-run-github-enterprise-hostname");
+    await user.clear(hostname);
+    await user.type(hostname, "other.ghe.com");
+    await user.click(screen.getByTestId("first-run-github-enterprise-continue"));
+    await waitFor(() => expect(gheApp.connect).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("first-run-github-enterprise-continue"));
+    await waitFor(() => expect(gheApp.connect).toHaveBeenCalledTimes(2));
+    expect(gheApp.connect).toHaveBeenLastCalledWith("other.ghe.com", expect.stringContaining("step=repo"));
+    expect(screen.queryByTestId("first-run-github-enterprise-choose")).not.toBeInTheDocument();
   });
 
   it("lists repositories from the GitHub Enterprise integration", () => {

@@ -12,7 +12,7 @@ export function connectGitHubEnterpriseAction(args: {
   currentHost?: string;
   integrationId?: string;
   ready?: boolean;
-  setGitHubEnterprise: (enabled: boolean, host?: string) => void;
+  setGitHubEnterprise: (enabled: boolean, host?: string, integrationId?: string) => void;
   setGitHubEnterpriseError: (message: string | undefined) => void;
   setShowHost: (show: boolean) => void;
   goToChoose: () => void;
@@ -21,12 +21,12 @@ export function connectGitHubEnterpriseAction(args: {
   return (host: string) =>
     args.blocking.run("opening-github", async () => {
       args.setGitHubEnterpriseError(undefined);
-      args.setGitHubEnterprise(true, host);
       if (args.integrationId && host === args.currentHost) {
         args.setShowHost(false);
         if (args.ready) args.goToChoose();
         return;
       }
+      args.setGitHubEnterprise(true, host, "");
       const returnPath = onboardingStepPath(args.locationPath, "repo");
       try {
         await args.connectGitHubEnterpriseApp(host, returnPath);
@@ -65,8 +65,8 @@ export function useGitHubEnterpriseChoice(factoryId: string, githubIntegrationId
   const [githubEnterpriseHost, setGitHubEnterpriseHost] = useState(remembered.host);
   const [githubEnterpriseError, setGitHubEnterpriseError] = useState<string>();
   const [showGitHubEnterpriseHost, setShowGitHubEnterpriseHost] = useState(false);
-  const setGitHubEnterprise = (enabled: boolean, host = "") => {
-    writeOnboardingGithubEnterprise(factoryId, enabled, host);
+  const setGitHubEnterprise = (enabled: boolean, host = "", integrationId?: string) => {
+    writeOnboardingGithubEnterprise(factoryId, enabled, host, integrationId);
     setGitHubEnterpriseEnabled(enabled);
     if (!enabled) {
       setGitHubEnterpriseHost("");

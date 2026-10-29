@@ -247,7 +247,7 @@ type FirstRunCommandsArgs = {
   installScope: GitHubInstallScope;
   factoryId: string;
   githubEnterprise: boolean;
-  setGitHubEnterprise: (enabled: boolean, host?: string) => void;
+  setGitHubEnterprise: (enabled: boolean, host?: string, integrationId?: string) => void;
   setGitHubEnterpriseError: (message: string | undefined) => void;
   connectGitHubEnterpriseApp: (host: string, returnTo: string) => Promise<boolean>;
   submitGitHubEnterpriseOwner: (owner: string, returnTo: string) => Promise<boolean>;
