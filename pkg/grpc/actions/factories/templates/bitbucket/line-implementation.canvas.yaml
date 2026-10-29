@@ -121,7 +121,15 @@ spec:
               set -euo pipefail
 
               # Do not commit or push while HEAD is still the default branch.
-              default_branch="${BASE:-main}"
+              if [ -n "${BASE:-}" ]; then
+                default_branch="$BASE"
+              else
+                default_branch="$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')"
+              fi
+              if [ -z "$default_branch" ]; then
+                echo "Could not read the repository default branch." >&2
+                exit 1
+              fi
               branch="$(git rev-parse --abbrev-ref HEAD)"
               if [ "$branch" = "HEAD" ] || [ "$branch" = "$default_branch" ]; then
                 echo "Create a working branch before you push. The current branch is ${branch}." >&2
@@ -135,7 +143,7 @@ spec:
               fi
 
               # Fail if this branch has no commits ahead of the default branch.
-              if [ "$(git rev-list --count "origin/${BASE:-main}..HEAD")" -eq 0 ]; then
+              if [ "$(git rev-list --count "origin/${default_branch}..HEAD")" -eq 0 ]; then
                 echo "No commits to push" >&2
                 exit 1
               fi

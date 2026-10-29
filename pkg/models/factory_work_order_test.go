@@ -17,6 +17,76 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestFactory_RetargetUnfinishedWorkOrderBranches(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "retarget-branch")
+	_, _, otherFactory := setupFactoryWithUser(t, "retarget-other")
+	tx := database.DB(t.Context())
+
+	emptyDraft := createOrderWithBranch(t, tx, factoryModel, userID, "Empty draft", nil)
+	previousDraft := createOrderWithBranch(t, tx, factoryModel, userID, "Previous draft", branchPtr("main"))
+	otherOpen := createOrderWithBranch(t, tx, factoryModel, userID, "Other open", branchPtr("release"))
+	_, err := otherOpen.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	closed := createOrderWithBranch(t, tx, factoryModel, userID, "Closed", branchPtr("main"))
+	_, err = closed.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	_, err = closed.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateClosed,
+		Result:  FactoryWorkOrderResultCompleted,
+		Actor:   &userID,
+	})
+	require.NoError(t, err)
+	otherFactoryOrder := createOrderWithBranch(t, tx, otherFactory, userID, "Other factory", branchPtr("main"))
+
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "main", "main"))
+	assertOrderBranch(t, tx, previousDraft.ID, "main")
+
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "main", "master"))
+
+	assertOrderBranch(t, tx, emptyDraft.ID, "master")
+	assertOrderBranch(t, tx, previousDraft.ID, "master")
+	assertOrderBranch(t, tx, otherOpen.ID, "release")
+	assertOrderBranch(t, tx, closed.ID, "main")
+	assertOrderBranch(t, tx, otherFactoryOrder.ID, "main")
+
+	blank := createOrderWithBranch(t, tx, factoryModel, userID, "Blank open", branchPtr(""))
+	_, err = blank.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	kept := createOrderWithBranch(t, tx, factoryModel, userID, "Kept draft", branchPtr("develop"))
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "", "trunk"))
+	assertOrderBranch(t, tx, blank.ID, "trunk")
+	assertOrderBranch(t, tx, kept.ID, "develop")
+	assertOrderBranch(t, tx, otherOpen.ID, "release")
+}
+
+func createOrderWithBranch(t *testing.T, tx *gorm.DB, factoryModel *Factory, userID uuid.UUID, title string, branch *string) *FactoryWorkOrder {
+	t.Helper()
+	order, err := factoryModel.CreateWorkOrder(tx, title, "", &userID, nil, nil)
+	require.NoError(t, err)
+	if branch != nil {
+		require.NoError(t, tx.Model(order).Update("default_branch", *branch).Error)
+	}
+	return order
+}
+
+func branchPtr(value string) *string {
+	return &value
+}
+
+func assertOrderBranch(t *testing.T, tx *gorm.DB, id uuid.UUID, want string) {
+	t.Helper()
+	var order FactoryWorkOrder
+	require.NoError(t, tx.First(&order, "id = ?", id).Error)
+	if want == "" {
+		assert.True(t, order.DefaultBranch == nil || *order.DefaultBranch == "")
+		return
+	}
+	require.NotNil(t, order.DefaultBranch)
+	assert.Equal(t, want, *order.DefaultBranch)
+}
+
 func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

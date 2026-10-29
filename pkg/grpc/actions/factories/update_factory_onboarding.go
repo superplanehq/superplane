@@ -37,6 +37,10 @@ func UpdateFactoryOnboarding(
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 	setOnboardingVCSProvider(db, orgID, &patch)
+	patch, err = verifiedOnboardingDefaultBranch(ctx, deps, db, orgID, organizationID, factory, patch)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
 
 	if err := rejectVCSProviderChange(factory, patch); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
