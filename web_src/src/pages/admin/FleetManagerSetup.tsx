@@ -103,12 +103,17 @@ function ProviderChoice({ setup }: { setup: FleetManagerSetupState }) {
   );
 }
 
+function sameFleetInstallation(left: FleetManagerDraft, right: FleetManagerDraft) {
+  return JSON.stringify({ ...left, kubeContext: undefined }) === JSON.stringify({ ...right, kubeContext: undefined });
+}
+
 function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
   const [submittedDraft, setSubmittedDraft] = useState<FleetManagerDraft | null>(null);
-  const [kubeContext, setKubeContext] = useState("");
   const draft = setup.draft;
+  const kubeContext = draft?.kubeContext ?? "";
   const draftIsValid = setup.validationErrors.length === 0;
-  const submittedDraftIsCurrent = submittedDraft !== null && draft === submittedDraft;
+  const submittedDraftIsCurrent =
+    submittedDraft !== null && draft !== null && sameFleetInstallation(submittedDraft, draft);
   const verification = useFleetManagerVerification(submittedDraftIsCurrent, submittedDraft, setup.metadata);
   const commands = useMemo(() => {
     if (!setup.metadata || !draft || !setup.values) return null;
@@ -141,7 +146,7 @@ function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
                 : null
             }
             kubeContext={kubeContext}
-            onKubeContextChange={setKubeContext}
+            onKubeContextChange={setup.setKubeContext}
             isPreparingInstallation={setup.isPreparingInstallation}
             onGenerate={() => void setup.prepareInstallation()}
           />

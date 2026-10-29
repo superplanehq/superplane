@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import {
   FleetManagerCommandBlock,
@@ -187,9 +187,11 @@ function InstallStep({
   return (
     <div data-testid="fleet-manager-install-step">
       <FirstRunHeading headline="Install the chart" size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          Run this command in the same directory. It reads {FLEET_MANAGER_VALUES_FILE}.
-        </p>
+        {helmCommand ? (
+          <p className="text-[15px] leading-6 text-muted-foreground">
+            Run this command in the same directory. It reads {FLEET_MANAGER_VALUES_FILE}.
+          </p>
+        ) : null}
       </FirstRunHeading>
       <div className="mt-5">
         <FleetManagerHelmInstall
@@ -293,7 +295,7 @@ export function FleetManagerWizardScreen(props: WizardProps) {
 }
 
 function FleetManagerWizardSteps(props: WizardProps) {
-  const [kubeContext, setKubeContext] = useState("");
+  const kubeContext = props.setup.draft?.kubeContext ?? "";
   const back = props.showBackButton ? props.onBack : undefined;
   const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
   const continueToNextStep = async () => {
@@ -332,5 +334,5 @@ function FleetManagerWizardSteps(props: WizardProps) {
     }
     return <ValuesStep setup={props.setup} actions={continueActions} />;
   }
-  return <InstallStep {...props} kubeContext={kubeContext} onKubeContextChange={setKubeContext} />;
+  return <InstallStep {...props} kubeContext={kubeContext} onKubeContextChange={props.setup.setKubeContext} />;
 }

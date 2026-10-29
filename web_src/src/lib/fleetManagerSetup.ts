@@ -51,6 +51,7 @@ export type FleetManagerDraft = {
   fleetCapacities: Record<string, FleetCapacity>;
   fields: FleetManagerProviderFields;
   fieldsByProvider?: Partial<Record<FleetManagerProvider, FleetManagerProviderFields>>;
+  kubeContext?: string;
 };
 
 export type InstalledFleet = {
@@ -277,9 +278,7 @@ function quoteReleaseBaseUrl(values: string): string {
 
 export function validateFleetInfrastructure(input: FleetInfrastructureInput): string[] {
   const errors: string[] = [];
-  if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(input.managerId)) {
-    errors.push("Enter a valid Fleet Manager ID.");
-  }
+  if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(input.managerId)) errors.push("Enter a valid Fleet Manager ID.");
   if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(input.namespace)) {
     errors.push("Enter a valid Kubernetes namespace.");
   }
@@ -489,6 +488,7 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       Object.entries(draft.fields).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
     );
     const fleetCapacities = storedFleetCapacities(draft);
+    const kubeContext = typeof draft.kubeContext === "string" ? draft.kubeContext.replace(/[\r\n]/g, "") : "";
     const fieldsByProvider = {
       ...storedFieldsByProvider(draft.fieldsByProvider),
       [draft.provider]: fields,
@@ -504,6 +504,7 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       fleetCapacities,
       fields,
       fieldsByProvider,
+      kubeContext,
     };
   } catch {
     return null;

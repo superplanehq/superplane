@@ -495,6 +495,7 @@ it("uses a browser key that stores only the non-secret draft", () => {
     selectedFleetIds: ["e1-large-amd64"],
     fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
     fields: { region: "us-east-1" },
+    kubeContext: "aws-prod",
   };
 
   saveFleetManagerDraft(draft);
@@ -526,5 +527,6 @@ it("migrates global capacities and removes unknown values from a stored draft", 
 
   const draft = loadFleetManagerDraft();
   expect(draft).not.toHaveProperty("plaintextToken");
+  expect(draft?.kubeContext).toBe("");
   expect(draft?.fleetCapacities).toEqual({ "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } });
 });
