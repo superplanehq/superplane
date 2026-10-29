@@ -142,6 +142,58 @@ func TestCatalogReconcileContinuesAfterInstallationFailure(t *testing.T) {
 	assert.Equal(t, models.VCSProviderRepositorySyncPriorityInteractive, job.Priority)
 }
 
+func TestCatalogReconcileQueuesOnlyRepositoriesWithoutCollaborators(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 101,
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, 101, []models.VCSProviderRepository{
+		{RepositoryID: 77, FullName: "acme/api"},
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, 77, []models.VCSProviderRepositoryCollaborator{
+		{ProviderUserID: 9, ProviderLogin: "writer"},
+	}))
+
+	appClient, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/app/installations":
+			_, _ = w.Write([]byte(`[{"id":101,"account":{"id":1,"login":"acme"}}]`))
+		case "/app/installations/101":
+			_, _ = w.Write([]byte(`{"id":101,"account":{"id":1,"login":"acme"}}`))
+		case "/app/installation-requests":
+			_, _ = w.Write([]byte(`[]`))
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	installationClient, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/installation/repositories", r.URL.Path)
+		_, _ = w.Write([]byte(`{"total_count":2,"repositories":[
+			{"id":77,"full_name":"acme/api"},
+			{"id":78,"full_name":"acme/web"}
+		]}`))
+	})
+	catalog := &Catalog{
+		db:           db,
+		appClient:    appClient,
+		installation: func(int64) (*gh.Client, error) { return installationClient, nil },
+		now:          time.Now,
+	}
+	queuedRepositories := func() []int64 {
+		var repositoryIDs []int64
+		require.NoError(t, db.Model(&models.VCSProviderRepositorySyncJob{}).Order("repository_id").Pluck("repository_id", &repositoryIDs).Error)
+		return repositoryIDs
+	}
+
+	require.NoError(t, catalog.Reconcile(t.Context(), models.VCSProviderRepositorySyncPriorityBackground))
+	assert.Equal(t, []int64{78}, queuedRepositories(), "the catalog reconcile must not queue a repository with synced collaborators")
+
+	require.NoError(t, catalog.ReconcileInstallation(t.Context(), 101, models.VCSProviderRepositorySyncPriorityInteractive))
+	assert.Equal(t, []int64{77, 78}, queuedRepositories(), "a requested installation reconcile queues every repository")
+}
+
 func TestCatalogReconcileInstallRequestsRemovesCancelledRequests(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	db := database.Conn()

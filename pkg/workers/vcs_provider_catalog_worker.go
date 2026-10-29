@@ -14,6 +14,10 @@ import (
 
 const (
 	vcsProviderReconcileInterval             = 5 * time.Minute
+	vcsProviderScheduleCheckInterval         = 30 * time.Second
+	vcsProviderSweepInterval                 = 10 * time.Minute
+	vcsProviderCollaboratorsFreshnessWindow  = 24 * time.Hour
+	vcsProviderSweepMinimumBatch             = 50
 	vcsProviderInstallRequestPollInterval    = 2 * time.Second
 	vcsProviderInstallRequestRefreshInterval = 15 * time.Second
 	vcsProviderInstallationRequesterGrace    = 5 * time.Minute
@@ -144,23 +148,82 @@ func (w *VCSProviderCatalogWorker) startInstallationReconciliation(ctx context.C
 }
 
 func (w *VCSProviderCatalogWorker) startReconciliation(ctx context.Context) {
-	w.reconcile(ctx)
+	w.runScheduledTasks(ctx, time.Now())
 	w.processReconcileJob(ctx)
-	reconcileTicker := time.NewTicker(vcsProviderReconcileInterval)
+	scheduleTicker := time.NewTicker(vcsProviderScheduleCheckInterval)
 	jobTicker := time.NewTicker(vcsProviderJobPollInterval)
-	defer reconcileTicker.Stop()
+	defer scheduleTicker.Stop()
 	defer jobTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-reconcileTicker.C:
-			w.reconcile(ctx)
+		case now := <-scheduleTicker.C:
+			w.runScheduledTasks(ctx, now)
 		case <-jobTicker.C:
 			w.processReconcileJob(ctx)
 		}
 	}
+}
+
+func (w *VCSProviderCatalogWorker) runScheduledTasks(ctx context.Context, now time.Time) {
+	if w.claimSchedule(models.VCSProviderCatalogScheduleReconcile, now, vcsProviderReconcileInterval) {
+		w.reconcile(ctx)
+	}
+	if w.claimSchedule(models.VCSProviderCatalogScheduleSweep, now, vcsProviderSweepInterval) {
+		w.sweepStaleRepositories(now)
+	}
+}
+
+// sweepStaleRepositories refreshes collaborators that no webhook changed. Each
+// sweep queues a share of the catalog, so every repository is refreshed within
+// vcsProviderCollaboratorsFreshnessWindow without one large burst. A repository
+// is queued one sweep interval before its window ends, because the next sweep
+// would run after the deadline.
+func (w *VCSProviderCatalogWorker) sweepStaleRepositories(now time.Time) {
+	db := database.Conn()
+	repositoryCount, err := models.CountVCSProviderRepositories(db, w.provider)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to count VCS provider repositories")
+		return
+	}
+
+	queued, err := models.EnqueueStaleVCSProviderRepositorySyncs(
+		db,
+		w.provider,
+		now.Add(vcsProviderSweepInterval-vcsProviderCollaboratorsFreshnessWindow),
+		vcsProviderSweepBatchSize(repositoryCount),
+		now,
+	)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to queue stale VCS repository collaborator syncs")
+		return
+	}
+	if queued > 0 {
+		w.logger.WithField("queued", queued).Info("queued stale VCS repository collaborator syncs")
+	}
+}
+
+// vcsProviderSweepBatchSize returns 1.5 times the even share per sweep, so the
+// sweep catches up after an outage.
+func vcsProviderSweepBatchSize(repositoryCount int64) int {
+	sweepsPerWindow := int64(vcsProviderCollaboratorsFreshnessWindow / vcsProviderSweepInterval)
+	share := (repositoryCount*3 + sweepsPerWindow*2 - 1) / (sweepsPerWindow * 2)
+	return int(max(share, vcsProviderSweepMinimumBatch))
+}
+
+func (w *VCSProviderCatalogWorker) claimSchedule(
+	kind models.VCSProviderCatalogScheduleKind,
+	now time.Time,
+	interval time.Duration,
+) bool {
+	claimed, err := models.ClaimVCSProviderCatalogSchedule(database.Conn(), w.provider, kind, now, interval)
+	if err != nil {
+		w.logger.WithError(err).WithField("schedule", kind).Error("failed to claim a VCS provider catalog schedule")
+		return false
+	}
+	return claimed
 }
 
 func (w *VCSProviderCatalogWorker) startRepositorySynchronization(ctx context.Context) {
