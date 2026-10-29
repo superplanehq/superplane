@@ -729,6 +729,12 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 			runID:      result.Run.ID,
 		})
 	}
+	if result.Run == nil && result.Execution != nil {
+		orderUpdates = append(orderUpdates, factoryWorkOrderUpdate{
+			factoryID: result.Execution.FactoryID,
+			orderID:   result.Execution.WorkOrderID,
+		})
+	}
 
 	return pendingRuns, orderUpdates, nil
 }

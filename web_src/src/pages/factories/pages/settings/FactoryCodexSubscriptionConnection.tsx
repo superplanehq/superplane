@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
@@ -12,12 +13,25 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: ReturnTyp
   const features = useExperimentalFeature(organizationId);
   const offered =
     !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS) && codex.query.data?.eligible === true;
+  const disabled = [
+    !canAct("factories", "read"),
+    isLoading,
+    codex.query.isLoading,
+    codex.query.data?.revocationPending,
+    !offered,
+  ].some(Boolean);
   return (
-    <FactorySettingsCard title="ChatGPT subscription">
+    <FactorySettingsCard
+      title="Your ChatGPT subscription"
+      description="Only your tasks use this connection in this workspace."
+    >
       {features.isLoading || codex.query.isLoading ? <p role="status">Loading ChatGPT connection...</p> : null}
+      {codex.query.data?.revocationPending ? (
+        <p role="status">Stopping your previous tasks. You can reconnect when cleanup finishes.</p>
+      ) : null}
       <FirstRunCodexSubscription
         selected
-        disabled={!canAct("factories", "update") || isLoading || codex.query.isLoading || !offered}
+        disabled={disabled}
         connection={codex.query.data}
         starting={codex.start.isPending}
         canceling={codex.cancel.isPending}
@@ -25,6 +39,16 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: ReturnTyp
         onStart={() => codex.start.mutate()}
         onCancel={() => codex.cancel.mutate()}
       />
+      {codex.query.data?.id && codex.query.data.status !== "disconnected" ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={codex.disconnect.isPending || !canAct("factories", "read")}
+          onClick={() => codex.disconnect.mutate()}
+        >
+          Disconnect ChatGPT
+        </Button>
+      ) : null}
     </FactorySettingsCard>
   );
 }

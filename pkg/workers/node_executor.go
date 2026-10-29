@@ -482,6 +482,7 @@ func (w *NodeExecutor) executeActionNode(
 		WithRootEvent(&execution.RootEventID).
 		WithIncomingEventID(&execution.EventID).
 		WithInput(map[string]any{inputEvent.NodeID: input})
+	builder = builder.WithRunID(execution.RunID)
 	if execution.PreviousExecutionID != nil {
 		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
 	}
@@ -527,7 +528,7 @@ func (w *NodeExecutor) executeActionNode(
 			w.encryptor,
 			workflow.OrganizationID,
 		),
-		CodexSubscription: contexts.NewCodexSubscriptionContext(tx, workflow, w.encryptor),
+		CodexSubscription: contexts.NewCodexSubscriptionContext(tx, workflow, execution.RunID, w.encryptor),
 		Logger:            logger,
 	}
 	if node.AppInstallationID != nil {
