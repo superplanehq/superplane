@@ -28,6 +28,7 @@ export function consolePages(
   phase?: SplitRunPhase,
   runs: AutomationStage[] = [stage],
   actionCount = 0,
+  actionsFailed = false,
 ): ConsolePageId[] {
   const pages: ConsolePageId[] = [];
   if (runs.some((run) => hasAgentLog(run, run.id === stage.id ? phase : undefined))) {
@@ -39,7 +40,7 @@ export function consolePages(
   if (stage.checks.length > 0) {
     pages.push("checks");
   }
-  if (actionCount > 0) {
+  if (actionCount > 0 || actionsFailed) {
     pages.push("actions");
   }
   return pages;

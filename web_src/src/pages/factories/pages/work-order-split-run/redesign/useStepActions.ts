@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { useWorkOrderEvents } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -15,22 +15,38 @@ export function useStepActions(
   orderId: string,
   automation: ConsoleAutomation,
   phases: SplitRunPhase[],
-): StepActionRow[] {
+): { rows: StepActionRow[]; isError: boolean; retry: () => void } {
   const { has } = useExperimentalFeature(organizationId);
   const events = useWorkOrderEvents(organizationId, factoryId, orderId);
+  const { data, hasNextPage, isFetchingNextPage, isError, fetchNextPage, refetch } = events;
   const { resolveUser } = useOrgUserLookup(organizationId);
   const enabled = has(FEATURE_FACTORY_STEP_ACTIONS);
 
-  return useMemo(() => {
+  useEffect(() => {
+    if (!enabled || isError || !hasNextPage || isFetchingNextPage) {
+      return;
+    }
+    void fetchNextPage();
+  }, [enabled, fetchNextPage, hasNextPage, isError, isFetchingNextPage]);
+
+  const rows = useMemo(() => {
     if (!enabled) {
       return [];
     }
     return stepActionRows(
-      flattenWorkOrderEventsPages(events.data?.pages),
+      flattenWorkOrderEventsPages(data?.pages),
       automationRunIds(automation, phases),
       (userId) => resolveUser(userId)?.name,
     );
-  }, [automation, enabled, events.data?.pages, phases, resolveUser]);
+  }, [automation, data?.pages, enabled, phases, resolveUser]);
+
+  return {
+    rows,
+    isError: enabled && isError,
+    retry: () => {
+      void refetch();
+    },
+  };
 }
 
 function automationRunIds(automation: ConsoleAutomation, phases: SplitRunPhase[]): Set<string> {

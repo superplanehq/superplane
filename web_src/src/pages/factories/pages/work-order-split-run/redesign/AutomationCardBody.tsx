@@ -58,7 +58,7 @@ export function AutomationCardBody(props: {
 }) {
   const { organizationId, factoryId, orderId } = props;
   if (!organizationId || !factoryId || !orderId) {
-    return <AutomationCardBodyView {...props} actionRows={[]} />;
+    return <AutomationCardBodyView {...props} actionRows={[]} actionsFailed={false} />;
   }
   return (
     <AutomationCardBodyWithActions {...props} organizationId={organizationId} factoryId={factoryId} orderId={orderId} />
@@ -86,14 +86,21 @@ function AutomationCardBodyActions(
     orderId: string;
   },
 ) {
-  const actionRows = useStepActions(
+  const actions = useStepActions(
     props.organizationId,
     props.factoryId,
     props.orderId,
     props.automation,
     props.phases ?? [],
   );
-  return <AutomationCardBodyView {...props} actionRows={actionRows} />;
+  return (
+    <AutomationCardBodyView
+      {...props}
+      actionRows={actions.rows}
+      actionsFailed={actions.isError}
+      onRetryActions={actions.retry}
+    />
+  );
 }
 
 function AutomationCardBodyView({
@@ -108,6 +115,8 @@ function AutomationCardBodyView({
   phases,
   queued = false,
   actionRows,
+  actionsFailed = false,
+  onRetryActions,
 }: {
   queued?: boolean;
   automation: ConsoleAutomation;
@@ -120,9 +129,11 @@ function AutomationCardBodyView({
   onRetry?: () => void;
   actionBusy: boolean;
   actionRows: StepActionRow[];
+  actionsFailed?: boolean;
+  onRetryActions?: () => void;
 }) {
   const { latest, runs } = automation;
-  const pages = consolePages(latest, phase, runs, actionRows.length);
+  const pages = consolePages(latest, phase, runs, actionRows.length, actionsFailed);
   const [chosen, setChosen] = useState<ConsolePageId>();
   const active = chosen && pages.includes(chosen) ? chosen : pages[0];
   if (compactQueuedRun(queued, runs.length, automation, pages)) {
@@ -155,9 +166,13 @@ function AutomationCardBodyView({
             />
           </div>
         ) : null}
-        {active === "artifacts" ? <ArtifactsPage stage={latest} /> : null}
-        {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
-        {active === "actions" ? <ActionsPage rows={actionRows} /> : null}
+        <CardDetailPage
+          active={active}
+          stage={latest}
+          actionRows={actionRows}
+          actionsFailed={actionsFailed}
+          onRetryActions={onRetryActions}
+        />
         <CardRunFooter
           automation={automation}
           phases={phases ?? (phase ? [phase] : [])}
@@ -367,19 +382,61 @@ function PageTabDetail({
         : page === "actions"
           ? actionCount
           : stage.checks.length;
+  if (count === 0) {
+    return null;
+  }
   return <span className="tabular-nums opacity-60">{count}</span>;
 }
 
-function ActionsPage({ rows }: { rows: StepActionRow[] }) {
+function CardDetailPage({
+  active,
+  stage,
+  actionRows,
+  actionsFailed,
+  onRetryActions,
+}: {
+  active?: ConsolePageId;
+  stage: AutomationStage;
+  actionRows: StepActionRow[];
+  actionsFailed: boolean;
+  onRetryActions?: () => void;
+}) {
+  if (active === "artifacts") {
+    return <ArtifactsPage stage={stage} />;
+  }
+  if (active === "checks") {
+    return <ChecksPage checks={stage.checks} />;
+  }
+  if (active === "actions") {
+    return <ActionsPage rows={actionRows} failed={actionsFailed} onRetry={onRetryActions} />;
+  }
+  return null;
+}
+
+function ActionsPage({ rows, failed, onRetry }: { rows: StepActionRow[]; failed?: boolean; onRetry?: () => void }) {
   return (
-    <ul className="flex flex-col divide-y divide-border">
-      {rows.map((row) => (
-        <li key={row.id} className="py-2.5 first:pt-0 last:pb-0">
-          <p className="text-[12px] font-medium text-foreground">{row.title}</p>
-          {row.detail ? <p className="mt-1.5 text-[12px] leading-5 text-muted-foreground">{row.detail}</p> : null}
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-3">
+      {failed ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[12px] leading-5 text-muted-foreground">The actions did not load.</p>
+          {onRetry ? (
+            <Button size="sm" variant="outline" onClick={onRetry}>
+              Try again
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      {rows.length > 0 ? (
+        <ul className="flex flex-col divide-y divide-border">
+          {rows.map((row) => (
+            <li key={row.id} className="py-2.5 first:pt-0 last:pb-0">
+              <p className="text-[12px] font-medium text-foreground">{row.title}</p>
+              {row.detail ? <p className="mt-1.5 text-[12px] leading-5 text-muted-foreground">{row.detail}</p> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

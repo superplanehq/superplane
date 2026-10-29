@@ -8,7 +8,7 @@ import { stepActionRows } from "./consoleStepActions";
 import type { StepActionRow } from "./consoleStepActions";
 import type { SplitRunPhase } from "../splitRunMocks";
 
-const shown: { on: boolean; rows: StepActionRow[] } = { on: false, rows: [] };
+const shown: { on: boolean; rows: StepActionRow[]; error: boolean } = { on: false, rows: [], error: false };
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
@@ -20,7 +20,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 vi.mock("./useStepActions", () => ({
-  useStepActions: () => shown.rows,
+  useStepActions: () => ({ rows: shown.rows, isError: shown.error, retry: () => undefined }),
 }));
 
 const { AutomationCardBody } = await import("./AutomationCardBody");
@@ -97,6 +97,7 @@ function card() {
 describe("step Actions tab", () => {
   it("stays hidden until the flag is on, then lists this run only", async () => {
     shown.on = false;
+    shown.error = false;
     shown.rows = [];
     const view = render(card());
 
@@ -120,5 +121,17 @@ describe("step Actions tab", () => {
     expect(screen.getByText("Changed pkg/payments.")).toBeInTheDocument();
     expect(screen.queryByText("Other run.")).not.toBeInTheDocument();
     expect(screen.getByText("Assigned Bea as owner").closest("li")?.querySelectorAll("p")).toHaveLength(1);
+  });
+
+  it("shows a retry when the action history did not load", async () => {
+    shown.on = true;
+    shown.rows = [];
+    shown.error = true;
+    render(card());
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: "Actions" }));
+    expect(screen.getByText("The actions did not load.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 });
