@@ -84,8 +84,7 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "key is too long", http.StatusBadRequest)
 		return
 	}
-	previousFileID, err := existingRunnerArtifactFileID(db, artifactContext.Order, storedKey)
-	if err != nil {
+	if _, err := existingRunnerArtifactFileID(db, artifactContext.Order, storedKey); err != nil {
 		logger.WithError(err).Warn("rejected runner artifact key")
 		http.Error(w, "Artifact key is already used", http.StatusBadRequest)
 		return
@@ -147,7 +146,16 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	}
 	var artifact *models.FactoryWorkOrderArtifact
 	var created bool
+	var replacedFileID uuid.UUID
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if lockErr := models.LockFactoryWorkOrder(tx, artifactContext.Order.ID); lockErr != nil {
+			return lockErr
+		}
+		previousID, findErr := existingRunnerArtifactFileID(tx, artifactContext.Order, storedKey)
+		if findErr != nil {
+			return findErr
+		}
+		replacedFileID = previousID
 		if readyErr := file.MarkReady(tx, upload.SizeBytes, upload.Checksum); readyErr != nil {
 			return readyErr
 		}
@@ -171,8 +179,8 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Failed to attach artifact", http.StatusInternalServerError)
 		return
 	}
-	if previousFileID != uuid.Nil && previousFileID != file.ID {
-		removeReplacedArtifactFile(r.Context(), provider, previousFileID, logger)
+	if !created && replacedFileID != uuid.Nil && replacedFileID != file.ID {
+		removeReplacedArtifactFile(r.Context(), provider, replacedFileID, logger)
 	}
 
 	reason := factory.EventTypeOrderArtifactUpdated
