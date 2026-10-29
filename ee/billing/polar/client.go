@@ -694,7 +694,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 
 	payload, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return classified(err, ErrOutcomeUnknown)
+		return classified(&responseBodyReadError{statusCode: resp.StatusCode, err: err}, ErrOutcomeUnknown)
 	}
 	servedVersion := strings.TrimSpace(resp.Header.Get(apiVersionHeader))
 	// Polar echoes Polar-Version on every response it routes. A 404 without it
@@ -760,6 +760,20 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 		return classified(err, ErrOutcomeUnknown)
 	}
 	return nil
+}
+
+// responseBodyReadError preserves the HTTP status when the body is interrupted.
+type responseBodyReadError struct {
+	statusCode int
+	err        error
+}
+
+func (e *responseBodyReadError) Error() string {
+	return fmt.Sprintf("polar api response %d: %v", e.statusCode, e.err)
+}
+
+func (e *responseBodyReadError) Unwrap() error {
+	return e.err
 }
 
 // classifiedError keeps the original message and also matches a sentinel.
