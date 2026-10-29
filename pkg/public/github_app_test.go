@@ -427,3 +427,123 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 	_, err = models.FindVCSProviderIntegrationBinding(db, binding.ID)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
+
+func TestApplyGitHubCatalogWebhookRefreshesDefaultBranch(t *testing.T) {
+	support.Setup(t)
+	db := database.DB(t.Context())
+	const installationID = int64(808)
+	const repositoryID = int64(909)
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: installationID,
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+	}))
+	require.NoError(t, models.UpsertVCSProviderRepositories(db, models.ProviderGitHub, installationID, []models.VCSProviderRepository{{
+		RepositoryID:  repositoryID,
+		FullName:      "acme/api",
+		Private:       true,
+		DefaultBranch: "main",
+	}}))
+
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.RepositoryEvent{
+		Action: gh.Ptr("edited"),
+		Repo: &gh.Repository{
+			ID:            gh.Ptr(repositoryID),
+			FullName:      gh.Ptr("acme/api"),
+			Private:       gh.Ptr(true),
+			DefaultBranch: gh.Ptr("master"),
+		},
+	}, installationID))
+	stored := requireCatalogRepository(t, db, repositoryID)
+	assert.Equal(t, "master", stored.DefaultBranch)
+	assert.Equal(t, "acme/api", stored.FullName)
+	assert.True(t, stored.Private)
+
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.RepositoryEvent{
+		Action: gh.Ptr("renamed"),
+		Repo: &gh.Repository{
+			ID:            gh.Ptr(repositoryID),
+			FullName:      gh.Ptr("acme/service"),
+			Private:       gh.Ptr(true),
+			DefaultBranch: gh.Ptr("master"),
+		},
+	}, installationID))
+	stored = requireCatalogRepository(t, db, repositoryID)
+	assert.Equal(t, "acme/service", stored.FullName)
+
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.RepositoryEvent{
+		Action: gh.Ptr("publicized"),
+		Repo: &gh.Repository{
+			ID:            gh.Ptr(repositoryID),
+			FullName:      gh.Ptr("acme/other"),
+			Private:       gh.Ptr(false),
+			DefaultBranch: gh.Ptr("develop"),
+		},
+	}, installationID))
+	stored = requireCatalogRepository(t, db, repositoryID)
+	assert.Equal(t, "acme/service", stored.FullName)
+	assert.Equal(t, "master", stored.DefaultBranch)
+	assert.True(t, stored.Private)
+
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.PushEvent{
+		Created: gh.Ptr(false),
+		Ref:     gh.Ptr("refs/heads/master"),
+		Repo: &gh.PushEventRepository{
+			ID:            gh.Ptr(repositoryID),
+			FullName:      gh.Ptr("acme/service"),
+			Private:       gh.Ptr(true),
+			DefaultBranch: gh.Ptr("develop"),
+		},
+	}, installationID))
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.PushEvent{
+		Created: gh.Ptr(true),
+		Ref:     gh.Ptr("refs/tags/v1"),
+		Repo: &gh.PushEventRepository{
+			ID:            gh.Ptr(repositoryID),
+			FullName:      gh.Ptr("acme/service"),
+			Private:       gh.Ptr(true),
+			DefaultBranch: gh.Ptr("develop"),
+		},
+	}, installationID))
+	stored = requireCatalogRepository(t, db, repositoryID)
+	assert.Equal(t, "master", stored.DefaultBranch)
+
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.PushEvent{
+		Created: gh.Ptr(true),
+		Ref:     gh.Ptr("refs/heads/master"),
+		Repo: &gh.PushEventRepository{
+			ID:            gh.Ptr(repositoryID),
+			FullName:      gh.Ptr("acme/service"),
+			Private:       gh.Ptr(true),
+			DefaultBranch: gh.Ptr("develop"),
+		},
+	}, installationID))
+	stored = requireCatalogRepository(t, db, repositoryID)
+	assert.Equal(t, "develop", stored.DefaultBranch)
+
+	const missingID = int64(42)
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.RepositoryEvent{
+		Action: gh.Ptr("edited"),
+		Repo: &gh.Repository{
+			ID:            gh.Ptr(missingID),
+			FullName:      gh.Ptr("acme/missing"),
+			Private:       gh.Ptr(false),
+			DefaultBranch: gh.Ptr("main"),
+		},
+	}, installationID))
+	_, err := models.FindVCSProviderRepository(db, models.ProviderGitHub, missingID)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	var jobs int64
+	require.NoError(t, db.Model(&models.VCSProviderReconcileJob{}).
+		Where("provider = ?", models.ProviderGitHub).
+		Count(&jobs).Error)
+	assert.Equal(t, int64(1), jobs)
+}
+
+func requireCatalogRepository(t *testing.T, db *gorm.DB, repositoryID int64) *models.VCSProviderRepository {
+	t.Helper()
+	stored, err := models.FindVCSProviderRepository(db, models.ProviderGitHub, repositoryID)
+	require.NoError(t, err)
+	return stored
+}

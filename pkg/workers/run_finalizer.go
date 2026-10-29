@@ -718,6 +718,18 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultPassed)
 	}
 
+	// Do not return this refusal. MarkFinished already ran, and an error
+	// here rolls that write back and retries the same step forever.
+	// Finish the dispatch so the user can set the branch and start Implement.
+	blocked, err := factoryactions.ImplementStepBlockedByMissingBranch(tx, factory, workOrder, dispatch.Steps[nextIndex].AppID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if blocked {
+		w.logger.WithField("work_order_id", workOrder.ID).Info("stopped the line before Implement because no default branch is saved")
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
+	}
+
 	result, err := dispatch.EnqueueOrStartStep(tx, workOrder, nextIndex)
 	if err != nil {
 		return nil, nil, err

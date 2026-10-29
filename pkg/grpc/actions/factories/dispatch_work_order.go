@@ -216,6 +216,9 @@ func dispatchWorkOrderOnLineTx(
 	if err := validateLineThinkingLevel(tx, currentLine, normalizedThinking); err != nil {
 		return nil, err
 	}
+	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
+		return nil, err
+	}
 
 	fromState := order.State
 	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
@@ -270,6 +273,92 @@ func dispatchWorkOrderOnLineTx(
 		fromState:    fromState,
 		logger:       logger,
 	}, nil
+}
+
+// requireSavedBranchForImplementation stops Implement when checkout would
+// discover a branch the later pull request cannot read. Create pull request
+// uses the saved task branch. An empty value fails after commits are pushed.
+// The check covers every step from the start index, so a line that reaches
+// Implement later cannot start without a saved branch. Read-only lines still
+// start and follow the remote default.
+func requireSavedBranchForImplementation(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	line *models.FactoryLine,
+	startIndex int,
+) error {
+	if line == nil || startIndex < 0 || startIndex >= len(line.Steps) {
+		return nil
+	}
+	appIDs := make([]uuid.UUID, 0, len(line.Steps)-startIndex)
+	for _, step := range line.Steps[startIndex:] {
+		appIDs = append(appIDs, step.AppID)
+	}
+	blocked, err := implementStepsMissingSavedBranch(tx, factory, order, appIDs)
+	if err != nil || !blocked {
+		return err
+	}
+	return invalidArgument("Set the default branch in Workspace settings → Repository before you start Implement.")
+}
+
+// ImplementStepBlockedByMissingBranch reports whether this app is Implement
+// and the task has no branch to publish to. A database error is returned
+// separately so a caller can retry that lookup.
+func ImplementStepBlockedByMissingBranch(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	appID uuid.UUID,
+) (bool, error) {
+	return implementStepsMissingSavedBranch(tx, factory, order, []uuid.UUID{appID})
+}
+
+func implementStepsMissingSavedBranch(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	appIDs []uuid.UUID,
+) (bool, error) {
+	if factory == nil {
+		return false, nil
+	}
+	ids := make([]uuid.UUID, 0, len(appIDs))
+	for _, appID := range appIDs {
+		if appID != uuid.Nil {
+			ids = append(ids, appID)
+		}
+	}
+	if len(ids) == 0 {
+		return false, nil
+	}
+	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
+		return false, nil
+	}
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, ids)
+	if err != nil {
+		return false, err
+	}
+	for _, appID := range ids {
+		spec, ok := specs[appID]
+		if !ok {
+			continue
+		}
+		if models.FactoryAppTemplateID(spec.Nodes) == lineImplementationTemplateID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// resolvedWorkOrderDefaultBranch matches resolveOrderRepository. A task
+// snapshot is used only when it has both a repository and a branch.
+// Otherwise the workspace branch is the branch Implement will publish to.
+func resolvedWorkOrderDefaultBranch(order *models.FactoryWorkOrder, config models.FactoryOnboardingConfig) string {
+	if order != nil && strings.TrimSpace(derefString(order.Repository)) != "" && strings.TrimSpace(derefString(order.DefaultBranch)) != "" {
+		return strings.TrimSpace(derefString(order.DefaultBranch))
+	}
+	return strings.TrimSpace(config.DefaultBranch)
 }
 
 func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {

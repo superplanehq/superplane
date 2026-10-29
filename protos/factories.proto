@@ -1132,6 +1132,10 @@ message UpdateFactoryRepositoryRequest {
   string repository = 2;
   // Default branch resolved from the selected repository.
   string default_branch = 3;
+  // When unset or true, unfinished tasks that still follow the previous
+  // repository move to the saved repository and branch. False keeps those
+  // tasks on their current repository and branch.
+  optional bool retarget_tasks = 4;
 }
 
 message UpdateFactoryRepositoryResponse {

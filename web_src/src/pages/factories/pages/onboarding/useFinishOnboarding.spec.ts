@@ -4,6 +4,8 @@ import {
   afterOnboardingPath,
   afterWorkspaceProvisioned,
   finishOnboardingError,
+  MissingRepositoryBranchError,
+  onboardingDefaultBranch,
   provisionWorkspace,
 } from "./useFinishOnboarding";
 
@@ -101,39 +103,39 @@ describe("finishOnboardingError", () => {
 // any repository, since the ticket screen always answers "vcs") saves the
 // answer it was just given instead of overwriting it with
 // ISSUES_SOURCE_UNSPECIFIED.
-describe("provisionWorkspace", () => {
-  function provisionArgs(overrides: Partial<Parameters<typeof provisionWorkspace>[0]> = {}) {
-    return {
-      organizationId: "org-1",
-      factoryId: "factory-1",
-      factory: null,
-      selections: {},
-      updateFactory: vi.fn().mockResolvedValue({}),
-      updateOnboarding: vi.fn().mockResolvedValue({}),
-      installFactory: vi.fn().mockResolvedValue({ canvasId: "canvas-1", canvasName: "canvas-1" }),
-      createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
-      listIntakes: vi.fn().mockResolvedValue([]),
-      createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
-      updateIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
-      deleteIntake: vi.fn().mockResolvedValue({}),
-      listApps: vi.fn().mockResolvedValue([]),
-      workspaceName: "Payments Service",
-      takenNames: [],
-      appRepository: "acme/payments-service",
-      backlogRepository: "acme/payments-service",
-      issuesChoice: "vcs" as const,
-      resolveDefaultBranch: vi.fn().mockResolvedValue("main"),
-      vcs: { id: "github-1", provider: "github" as const },
-      agentPlan: readyPlan,
-      agentRewrite: {
-        component: "runnerSuperPlane",
-        model: "",
-        planningModel: "",
-      },
-      ...overrides,
-    };
-  }
+function provisionArgs(overrides: Partial<Parameters<typeof provisionWorkspace>[0]> = {}) {
+  return {
+    organizationId: "org-1",
+    factoryId: "factory-1",
+    factory: null,
+    selections: {},
+    updateFactory: vi.fn().mockResolvedValue({}),
+    updateOnboarding: vi.fn().mockResolvedValue({}),
+    installFactory: vi.fn().mockResolvedValue({ canvasId: "canvas-1", canvasName: "canvas-1" }),
+    createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
+    listIntakes: vi.fn().mockResolvedValue([]),
+    createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
+    updateIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
+    deleteIntake: vi.fn().mockResolvedValue({}),
+    listApps: vi.fn().mockResolvedValue([]),
+    workspaceName: "Payments Service",
+    takenNames: [],
+    appRepository: "acme/payments-service",
+    backlogRepository: "acme/payments-service",
+    issuesChoice: "vcs" as const,
+    resolveDefaultBranch: vi.fn().mockResolvedValue("main"),
+    vcs: { id: "github-1", provider: "github" as const },
+    agentPlan: readyPlan,
+    agentRewrite: {
+      component: "runnerSuperPlane",
+      model: "",
+      planningModel: "",
+    },
+    ...overrides,
+  };
+}
 
+describe("provisionWorkspace", () => {
   it.each(["vcs", "jira", "linear"] as const)(
     "can skip the initial %s import without skipping intake creation",
     async (issuesChoice) => {
@@ -386,6 +388,89 @@ describe("afterWorkspaceProvisioned", () => {
       factoryKey: "SP",
       lineId: "line-1",
     });
+  });
+});
+
+describe("onboardingDefaultBranch", () => {
+  it("keeps a saved branch when the lookup returns an empty name", async () => {
+    await expect(onboardingDefaultBranch({ lookup: async () => "", saved: "develop" })).resolves.toBe("develop");
+  });
+
+  it("keeps a saved branch when the lookup fails", async () => {
+    await expect(
+      onboardingDefaultBranch({
+        lookup: async () => {
+          throw new Error("github unavailable");
+        },
+        saved: "develop",
+      }),
+    ).resolves.toBe("develop");
+  });
+
+  it("rejects when the lookup and the saved branch are both empty", async () => {
+    await expect(onboardingDefaultBranch({ lookup: async () => "", saved: "" })).rejects.toBeInstanceOf(
+      MissingRepositoryBranchError,
+    );
+  });
+});
+
+describe("provisionWorkspace default branch", () => {
+  it("does not save or provision when no default branch is known", async () => {
+    const updateOnboarding = vi.fn().mockResolvedValue({});
+    const installFactory = vi.fn();
+    const updateFactory = vi.fn();
+
+    await expect(
+      provisionWorkspace(
+        provisionArgs({
+          factory: { name: "Payments Service", onboarding: { defaultBranch: "" } },
+          resolveDefaultBranch: vi.fn().mockResolvedValue(""),
+          updateOnboarding,
+          installFactory,
+          updateFactory,
+        }),
+      ),
+    ).rejects.toBeInstanceOf(MissingRepositoryBranchError);
+
+    expect(updateFactory).not.toHaveBeenCalled();
+    expect(updateOnboarding).not.toHaveBeenCalled();
+    expect(installFactory).not.toHaveBeenCalled();
+  });
+
+  it("provisions with a saved branch when the lookup returns an empty name", async () => {
+    const installFactory = vi.fn().mockResolvedValue({ canvasId: "canvas-1", canvasName: "canvas-1" });
+
+    await provisionWorkspace(
+      provisionArgs({
+        factory: { name: "Payments Service", onboarding: { defaultBranch: "develop" } },
+        resolveDefaultBranch: vi.fn().mockResolvedValue(""),
+        installFactory,
+      }),
+    );
+
+    expect(installFactory).toHaveBeenCalledWith(
+      expect.objectContaining({ installParams: expect.objectContaining({ defaultBranch: "develop" }) }),
+    );
+  });
+
+  it("provisions with the branch returned by the onboarding update", async () => {
+    const updateOnboarding = vi.fn().mockImplementation(async (input: { defaultBranch?: string }) => {
+      if (input.defaultBranch) return { onboarding: { defaultBranch: "release" } };
+      return {};
+    });
+    const installFactory = vi.fn().mockResolvedValue({ canvasId: "canvas-1", canvasName: "canvas-1" });
+
+    await provisionWorkspace(
+      provisionArgs({
+        resolveDefaultBranch: vi.fn().mockResolvedValue("master"),
+        updateOnboarding,
+        installFactory,
+      }),
+    );
+
+    expect(installFactory).toHaveBeenCalledWith(
+      expect.objectContaining({ installParams: expect.objectContaining({ defaultBranch: "release" }) }),
+    );
   });
 });
 
