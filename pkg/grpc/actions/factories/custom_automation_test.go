@@ -121,6 +121,26 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, runs, 2)
 	assert.Equal(t, models.FactoryWorkOrderStateDraft, second.State)
+	for i, state := range []pb.WorkOrder_State{pb.WorkOrder_STATE_OPEN, pb.WorkOrder_STATE_CLOSED} {
+		_, err = UpdateWorkOrderStatus(ctx, r.Organization.ID.String(), &pb.UpdateWorkOrderStatusRequest{
+			FactoryId: factory.ID.String(), OrderId: second.ID.String(), State: state, Result: pb.WorkOrder_RESULT_ARCHIVED,
+		})
+		require.NoError(t, err)
+		_, err = UpdateWorkOrderStatus(ctx, r.Organization.ID.String(), &pb.UpdateWorkOrderStatusRequest{
+			FactoryId: factory.ID.String(), OrderId: second.ID.String(), State: pb.WorkOrder_STATE_DRAFT,
+		})
+		require.NoError(t, err)
+		second, err = factory.FindWorkOrder(db, second.ID)
+		require.NoError(t, err)
+		runs, err = second.ListRuns(db)
+		require.NoError(t, err)
+		expectedRuns := 3 + i
+		require.Len(t, runs, expectedRuns, "the status API must start a run for each Backlog entry")
+		contexts.EmitBacklogCustomAutomations(db, factory, second)
+		runs, err = second.ListRuns(db)
+		require.NoError(t, err)
+		assert.Len(t, runs, expectedRuns, "repeated delivery must not start another run")
+	}
 	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultArchived, Actor: &r.User})
 	require.NoError(t, err)
 	settings.StartMode = pb.FactoryCustomAutomation_START_MODE_MANUAL

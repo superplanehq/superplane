@@ -122,7 +122,8 @@ func emitWorkOrderCreated(
 			}
 			event, err := StartBacklogCustomAutomation(tx, factoryModel, &live[i], order, true)
 			if err != nil {
-				return err
+				log.WithError(err).Warnf("failed to start Backlog custom automation %s for work order %s", live[i].ID, order.ID)
+				continue
 			}
 			if event != nil {
 				emitted = append(emitted, *event)

@@ -32,7 +32,7 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(screen.getByRole("button", { name: /Run/ })).toBeEnabled();
   });
 
-  it("offers only Verify manual actions after implementation with an open pull request", () => {
+  it.each([false, true])("offers Verify manual actions while PR feedback is active: %s", (activeFeedback) => {
     const order = {
       ...BOARD_IMPLEMENT_NOTIFY_ORDER,
       id: "wo-verify-manual",
@@ -50,7 +50,20 @@ describe("AutomationsConsoleVariant timeline markers", () => {
         },
       ],
     };
-    renderConsole(splitRunFixtureForWorkOrder(order, { demoArtifacts: false }), {
+    const fixture = splitRunFixtureForWorkOrder(order, {
+      demoArtifacts: false,
+      prFeedbackRuns: activeFeedback
+        ? [
+            {
+              canvasId: "feedback",
+              handlerName: "Address PR feedback",
+              run: { id: "feedback-run", state: "STATE_STARTED" },
+            },
+          ]
+        : [],
+    });
+    if (activeFeedback) expect(fixture.footer.attentionCard).not.toBe(true);
+    renderConsole(fixture, {
       organizationId: "org-1",
       factoryId: "factory-1",
       orderId: order.id,

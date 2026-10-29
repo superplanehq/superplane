@@ -13,6 +13,7 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
 )
 
@@ -85,6 +86,9 @@ func UpdateWorkOrderStatus(
 			Result:  result,
 			Actor:   &actor,
 		})
+		if err == nil && changed && toState == models.FactoryWorkOrderStateDraft {
+			contexts.EmitBacklogCustomAutomations(tx, factory, order)
+		}
 		return err
 	})
 	if err != nil {

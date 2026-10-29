@@ -16,7 +16,6 @@ import { type ReactNode } from "react";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import type { ManualCustomAutomation } from "../../../lib/customAutomation";
 import { CustomAutomationRunAction } from "../../CustomAutomationRunAction";
-import { isPullRequestReviewFooter } from "../splitRunPullRequestReview";
 
 import { type SplitRunFixture, type SplitRunPhase } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
@@ -423,7 +422,6 @@ function ColumnTimelineItem({
   );
 }
 
-/** Empty Backlog after Intake is not skipped; the creation stage already ran. */
 function eligibleColumnAutomations(
   automations: readonly ManualCustomAutomation[],
   columnId: ConsoleColumnId,
@@ -432,10 +430,11 @@ function eligibleColumnAutomations(
   return automations.filter((automation) => {
     const savedColumn = automation.columnKey ?? "verify";
     if (savedColumn !== columnId) return false;
-    return savedColumn === "backlog" ? fixture.footer.kind === "draft" : isPullRequestReviewFooter(fixture.footer);
+    return savedColumn === "backlog" ? fixture.footer.kind === "draft" : fixture.canRunVerifyCustomAutomation;
   });
 }
 
+/** Empty Backlog after Intake is not skipped; the creation stage already ran. */
 function emptyColumnCopy(
   columnId: ConsoleColumnId,
   index: number,
