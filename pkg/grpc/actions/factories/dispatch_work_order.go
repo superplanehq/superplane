@@ -262,7 +262,7 @@ func dispatchWorkOrderOnLineTx(
 // their own model, so the CLI of every runner on the line must accept it.
 func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string) error {
 	if model == "" {
-		return validateDispatchThinkingForRunners(tx, line, thinking)
+		return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking)
 	}
 	options, _, err := listLineRunnerModelOptions(tx, orgID, factoryID, line.Name)
 	if err != nil {
@@ -275,10 +275,14 @@ func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *mo
 	if dispatchThinkingOverridesLevel(thinking) && !slices.Contains(options[index].ThinkingLevels, thinking) {
 		return invalidArgument("thinking level is not available for this model")
 	}
-	return validateDispatchThinkingForRunners(tx, line, thinking)
+	return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking)
 }
 
-func validateDispatchThinkingForRunners(tx *gorm.DB, line *models.FactoryLine, thinking string) error {
+// validateDispatchThinkingForRunners checks the thinking level against the CLI
+// that each runner on the line uses for this dispatch. A SuperPlane agent that
+// accepts the selected model runs the CLI of that model provider. Other agents
+// keep their own CLI.
+func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string) error {
 	if !dispatchThinkingOverridesLevel(thinking) {
 		return nil
 	}
@@ -291,7 +295,10 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, line *models.FactoryLine, t
 			return err
 		}
 		for _, node := range version.Nodes {
-			levels, isRunner := runnerCLIThinkingLevels(node)
+			levels, isRunner, err := runnerCLIThinkingLevels(tx, orgID, factoryID, node, model)
+			if err != nil {
+				return err
+			}
 			if isRunner && !slices.Contains(levels, thinking) {
 				return invalidArgument("thinking level is not available for every agent on this line")
 			}
@@ -307,25 +314,52 @@ func dispatchThinkingOverridesLevel(thinking string) bool {
 }
 
 // runnerCLIThinkingLevels returns the thinking levels that the CLI of a
-// runner node accepts. A SuperPlane agent without a known provider accepts
-// only the levels that every CLI accepts.
-func runnerCLIThinkingLevels(node models.Node) ([]string, bool) {
+// runner node accepts for a dispatch with the selected model. A SuperPlane
+// agent runs the CLI of the provider of its model. That model is the selected
+// model when the agent accepts it, and the saved model otherwise. An agent
+// without a known provider accepts only the levels that every CLI accepts.
+func runnerCLIThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, model string) ([]string, bool, error) {
 	switch node.ComponentName() {
 	case runnerClaudeCode:
-		return runner.ClaudeCodeThinkingLevels, true
+		return runner.ClaudeCodeThinkingLevels, true, nil
 	case runnerCodex:
-		return runner.CodexThinkingLevels, true
+		return runner.CodexThinkingLevels, true, nil
 	case runnerOpenRouter:
-		return runner.OpenCodeThinkingLevels, true
+		return runner.OpenCodeThinkingLevels, true, nil
 	case models.SuperPlaneRunnerComponent:
-		parsed, err := models.ParseSelectableLLMModelKey(storedRunnerModel(node.Configuration))
+		provider, err := superPlaneRunnerDispatchProvider(tx, orgID, factoryID, node, model)
 		if err != nil {
-			return runner.CommonThinkingLevels(), true
+			return nil, true, err
 		}
-		return runner.ProviderCLIThinkingLevels(parsed.Provider.ID), true
+		if provider == "" {
+			return runner.CommonThinkingLevels(), true, nil
+		}
+		return runner.ProviderCLIThinkingLevels(provider), true, nil
 	default:
-		return nil, false
+		return nil, false, nil
 	}
+}
+
+// superPlaneRunnerDispatchProvider returns the provider of the model that a
+// SuperPlane agent runs in a dispatch, or an empty string when it is unknown.
+func superPlaneRunnerDispatchProvider(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, model string) (string, error) {
+	if model != "" {
+		accepted, err := models.RunnerAcceptsModel(tx, orgID, &factoryID, node.ComponentName(), node.Configuration, model)
+		if err != nil {
+			return "", err
+		}
+		if accepted {
+			parsed, err := models.ParseHostedLLMModelKey(model)
+			if err == nil && parsed.IsSet() {
+				return parsed.Provider, nil
+			}
+		}
+	}
+	parsed, err := models.ParseSelectableLLMModelKey(storedRunnerModel(node.Configuration))
+	if err != nil {
+		return "", nil
+	}
+	return parsed.Provider.ID, nil
 }
 
 func publishDispatchedWorkOrder(
