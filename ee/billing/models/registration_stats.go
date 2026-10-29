@@ -19,6 +19,11 @@ type RegistrationStats struct {
 	Total             int64                    `json:"total"`
 	TrialGrantedCents *int64                   `json:"trial_granted_cents,omitempty"`
 	TrialSpentCents   *int64                   `json:"trial_spent_cents,omitempty"`
+	// PlanActivations counts activations in the period. It is not tied to the
+	// registration cohort, and it is returned on every page.
+	PlanActivations PlanActivationCounts `json:"plan_activations"`
+	// PlanActivationTrackingStartedAt is the first moment that activations are tracked.
+	PlanActivationTrackingStartedAt time.Time `json:"plan_activation_tracking_started_at"`
 }
 
 type RegisteredOrganization struct {
@@ -34,8 +39,20 @@ type RegisteredOrganization struct {
 // They need every organization in the cohort, so only the first page (offset 0)
 // calculates them, and report zero totals when no organization matches. Later
 // pages load credit for their own rows only.
+//
+// Plan activation totals use activation time and do not depend on the cohort,
+// the page, or the offset. They are calculated before any early return.
 func DescribeRegistrationStats(tx *gorm.DB, start, end time.Time, offset int) (RegistrationStats, error) {
 	report := RegistrationStats{Items: []RegisteredOrganization{}}
+	trackingStart, err := PlanActivationTrackingStartedAt(tx)
+	if err != nil {
+		return report, err
+	}
+	report.PlanActivationTrackingStartedAt = trackingStart
+	report.PlanActivations, err = CountPlanActivations(tx, start, end, trackingStart)
+	if err != nil {
+		return report, err
+	}
 	cohort := func() *gorm.DB {
 		return tx.Model(&coremodels.Organization{}).Where("organizations.created_at >= ? AND organizations.created_at < ?", start, end)
 	}
