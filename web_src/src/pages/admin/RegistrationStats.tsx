@@ -27,6 +27,9 @@ export type RegistrationReport = {
   total: number;
   trial_granted_cents: number;
   trial_spent_cents: number;
+  plan_activations: { team: number; starter: number; pay_as_you_go: number };
+  // ISO timestamp. Activations before this time are not tracked.
+  plan_activation_tracking_started_at: string;
 };
 
 type RegistrationResponse = Omit<RegistrationReport, "trial_granted_cents" | "trial_spent_cents"> &
@@ -81,7 +84,9 @@ export function RegistrationStats() {
     <div className="space-y-6 text-gray-800 dark:text-gray-100">
       <header className="space-y-2">
         <Heading level={1}>Statistics</Heading>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Track new organizations and their trial credits.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Track new organizations, trial credits, and plan activations.
+        </p>
       </header>
       <RegistrationDateFilter period={query} onChange={(period) => setQuery({ ...period, offset: 0 })} />
       {loading ? (
@@ -102,6 +107,7 @@ export function RegistrationStats() {
         report && (
           <RegistrationStatsReport
             report={report}
+            periodStart={query.start}
             offset={query.offset}
             onPageChange={(offset) => setQuery((current) => ({ ...current, offset }))}
           />
@@ -146,7 +152,7 @@ function RegistrationDateFilter({
       className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
     >
       <div className="flex flex-wrap items-center gap-3">
-        <Label htmlFor="registration-period">Registration period</Label>
+        <Label htmlFor="registration-period">Period</Label>
         <Select value={preset} onValueChange={changePreset}>
           <SelectTrigger id="registration-period">
             <SelectValue />
@@ -204,39 +210,68 @@ function RegistrationDateFilter({
         </form>
       )}
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        Dates use {Intl.DateTimeFormat().resolvedOptions().timeZone}. Weeks run Sunday to Saturday.
+        Registration totals use registration time. Plan activations use activation time. Dates use{" "}
+        {Intl.DateTimeFormat().resolvedOptions().timeZone}. Weeks run Sunday to Saturday.
       </p>
     </section>
   );
 }
 
+function MetricCards({ metrics }: { metrics: { label: string; value: string }[] }) {
+  return (
+    <dl className="grid gap-4 sm:grid-cols-3">
+      {metrics.map((metric) => (
+        <div
+          key={metric.label}
+          className="rounded-lg border border-slate-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900"
+        >
+          <dt className="text-sm text-gray-500 dark:text-gray-400">{metric.label}</dt>
+          <dd className="mt-2 text-2xl font-semibold tabular-nums">{metric.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export function RegistrationStatsReport({
   report,
+  periodStart,
   offset,
   onPageChange,
 }: {
   report: RegistrationReport;
+  periodStart: string;
   offset: number;
   onPageChange: (offset: number) => void;
 }) {
-  const metrics = [
+  const registrationMetrics = [
     { label: "New organizations", value: report.total.toLocaleString() },
     { label: "Trial credits granted", value: formatUsdCents(report.trial_granted_cents) },
     { label: "Trial credits spent", value: formatUsdCents(report.trial_spent_cents) },
   ];
+  const activationMetrics = [
+    { label: "Team activations", value: report.plan_activations.team.toLocaleString() },
+    { label: "Starter activations", value: report.plan_activations.starter.toLocaleString() },
+    { label: "Pay-as-you-go activations", value: report.plan_activations.pay_as_you_go.toLocaleString() },
+  ];
+  const trackingStart = new Date(report.plan_activation_tracking_started_at);
+  const trackingStartLabel = trackingStart.toLocaleDateString();
+  const periodBeforeTracking = new Date(periodStart).getTime() < trackingStart.getTime();
   return (
     <>
-      <dl className="grid gap-4 sm:grid-cols-3">
-        {metrics.map((metric) => (
-          <div
-            key={metric.label}
-            className="rounded-lg border border-slate-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900"
-          >
-            <dt className="text-sm text-gray-500 dark:text-gray-400">{metric.label}</dt>
-            <dd className="mt-2 text-2xl font-semibold tabular-nums">{metric.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <MetricCards metrics={registrationMetrics} />
+      <div className="space-y-2">
+        <MetricCards metrics={activationMetrics} />
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Activations count each switch to a plan and each reactivation. Tracking started on {trackingStartLabel}.
+        </p>
+        {periodBeforeTracking && (
+          <p role="note" className="text-sm text-amber-700 dark:text-amber-400">
+            This period starts before tracking began. Activations before {trackingStartLabel} are not tracked, so these
+            counts are incomplete.
+          </p>
+        )}
+      </div>
       <section
         className="rounded-lg border border-slate-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900"
         aria-labelledby="new-organizations-heading"

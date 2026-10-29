@@ -7,6 +7,8 @@ const report: RegistrationReport = {
   total: 6,
   trial_granted_cents: 6000,
   trial_spent_cents: 2350,
+  plan_activations: { team: 3, starter: 5, pay_as_you_go: 12 },
+  plan_activation_tracking_started_at: "2026-01-01T00:00:00Z",
   items: [
     { id: "1", name: "Acme", owner_email: "ada@acme.example", plan: "Trial", available_credit_cents: 750 },
     {
@@ -55,17 +57,42 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// Local noon today. The default period (today) starts before this time.
+const trackingStartedToday = new Date();
+trackingStartedToday.setHours(12, 0, 0, 0);
+
+function statsHandler(body: Partial<RegistrationReport>) {
+  return {
+    msw: {
+      handlers: [http.get("/admin/api/stats", () => HttpResponse.json({ ...report, ...body }))],
+    },
+  };
+}
+
 export const Populated: Story = {};
 export const Empty: Story = {
-  parameters: {
-    msw: {
-      handlers: [
-        http.get("/admin/api/stats", () =>
-          HttpResponse.json({ items: [], total: 0, trial_granted_cents: 0, trial_spent_cents: 0 }),
-        ),
-      ],
-    },
-  },
+  parameters: statsHandler({
+    items: [],
+    total: 0,
+    trial_granted_cents: 0,
+    trial_spent_cents: 0,
+    plan_activations: { team: 0, starter: 0, pay_as_you_go: 0 },
+  }),
+};
+export const ZeroActivations: Story = {
+  parameters: statsHandler({ plan_activations: { team: 0, starter: 0, pay_as_you_go: 0 } }),
+};
+export const EmptyRegistrationsWithActivations: Story = {
+  parameters: statsHandler({
+    items: [],
+    total: 0,
+    trial_granted_cents: 0,
+    trial_spent_cents: 0,
+    plan_activations: { team: 2, starter: 1, pay_as_you_go: 4 },
+  }),
+};
+export const CrossesTrackingCutoff: Story = {
+  parameters: statsHandler({ plan_activation_tracking_started_at: trackingStartedToday.toISOString() }),
 };
 export const Loading: Story = {
   parameters: {

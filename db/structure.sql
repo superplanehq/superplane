@@ -1513,6 +1513,19 @@ CREATE TABLE public.organization_payment_method_observations (
 
 
 --
+-- Name: organization_plan_activations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_plan_activations (
+    id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    plan_key text NOT NULL,
+    activated_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: organization_seat_limit_overrides; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1566,6 +1579,17 @@ CREATE TABLE public.organizations (
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
     created_by_account_id uuid
+);
+
+
+--
+-- Name: plan_activation_tracking; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.plan_activation_tracking (
+    id integer NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    CONSTRAINT plan_activation_tracking_id_check CHECK ((id = 1))
 );
 
 
@@ -3136,6 +3160,14 @@ ALTER TABLE ONLY public.organization_payment_method_observations
 
 
 --
+-- Name: organization_plan_activations organization_plan_activations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_plan_activations
+    ADD CONSTRAINT organization_plan_activations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_seat_limit_overrides organization_seat_limit_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3157,6 +3189,14 @@ ALTER TABLE ONLY public.organization_seat_purchases
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: plan_activation_tracking plan_activation_tracking_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.plan_activation_tracking
+    ADD CONSTRAINT plan_activation_tracking_pkey PRIMARY KEY (id);
 
 
 --
@@ -4834,6 +4874,13 @@ CREATE UNIQUE INDEX organization_invitations_pending_email_idx ON public.organiz
 
 
 --
+-- Name: organization_plan_activations_activated_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_plan_activations_activated_at_idx ON public.organization_plan_activations USING btree (activated_at);
+
+
+--
 -- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5929,6 +5976,14 @@ ALTER TABLE ONLY public.organization_payment_method_observations
 
 
 --
+-- Name: organization_plan_activations organization_plan_activations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_plan_activations
+    ADD CONSTRAINT organization_plan_activations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_seat_limit_overrides organization_seat_limit_overrides_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6480,7 +6535,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261028182820	f
+20261029101138	f
 \.
 
 
