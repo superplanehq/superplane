@@ -938,6 +938,14 @@ service Factories {
     };
   }
 
+  rpc ListFactoryOwnerEligibility(ListFactoryOwnerEligibilityRequest) returns (ListFactoryOwnerEligibilityResponse) {
+    option (google.api.http) = { get: "/api/v1/factories/{factory_id}/owner-eligibility" };
+  }
+
+  rpc ResumeHandOffWorkOrder(ResumeHandOffWorkOrderRequest) returns (ResumeHandOffWorkOrderResponse) {
+    option (google.api.http) = { post: "/api/v1/factories/{factory_id}/work-orders/{order_id}:resume-handoff" body: "*" };
+  }
+
   rpc DescribeFactoryCodexConnection(DescribeFactoryCodexConnectionRequest) returns (DescribeFactoryCodexConnectionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/codex-connection"
@@ -1174,8 +1182,6 @@ message FactoryOnboarding {
   string app_repository_external_id = 15;
   // True when setup uses a ChatGPT subscription instead of an API key.
   bool codex_subscription = 16;
-  // Saved ChatGPT connection for this workspace. Empty until sign-in starts.
-  string codex_connection_id = 17;
 }
 
 // Automations the workspace Git host can run. Computed from vcs_provider.
@@ -2033,6 +2039,9 @@ message CreateWorkOrderRequest {
   string description = 3;
   repeated string assignee_ids = 4;
   string model = 5;
+  // In subscription workspaces, explicitly leave the task without an owner.
+  // Otherwise, omitted assignee_ids defaults to the eligible creator.
+  bool unassigned = 6;
 }
 
 message CreateWorkOrderResponse {
@@ -2122,6 +2131,8 @@ message WorkOrder {
   // MCP client that created this task through a hand-off. Empty for
   // tasks that did not come from an MCP client.
   WorkOrderMcpClient mcp_client = 26;
+  string refinement_model = 27;
+  PendingHandOff pending_handoff = 28;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -2156,6 +2167,8 @@ message WorkOrderSummary {
   WorkOrderMcpClient mcp_client = 21;
   // Canvas run that created this task. Needed to link intake history rows.
   string source_run_id = 22;
+  string refinement_model = 23;
+  PendingHandOff pending_handoff = 24;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -2361,6 +2374,7 @@ message UpdateWorkOrderRequest {
   string order_id = 2;
   optional string title = 3;
   optional string description = 4;
+  optional string refinement_model = 5;
 }
 
 message UpdateWorkOrderResponse {
@@ -2884,6 +2898,7 @@ message ExportFactoryWorkOrderRunUsageResponse {
 message ListFactoryLineRunnerModelsRequest {
   string factory_id = 1;
   string line_name = 2;
+  string order_id = 3;
 }
 
 message ListFactoryLineRunnerModelsResponse {
@@ -3252,7 +3267,7 @@ message AnswerPlanningSessionSurveyResponse {
 
 message FactoryCodexConnection {
   string id = 1;
-  // pending, finishing, ready, reconnect_required, or disconnected.
+  // pending, canceling, finishing, ready, reconnect_required, or disconnected.
   string status = 2;
   string verification_url = 3;
   string verification_code = 4;
@@ -3264,6 +3279,7 @@ message FactoryCodexConnection {
   bool reservation_held = 8;
   // Models available to this ChatGPT subscription.
   repeated string available_models = 9;
+  bool revocation_pending = 10;
 }
 
 message DescribeFactoryCodexConnectionRequest {
@@ -3334,3 +3350,39 @@ message RevokeFactoryMCPClientRequest {
 }
 
 message RevokeFactoryMCPClientResponse {}
+
+message PendingHandOff {
+  string line_id = 1;
+  string column = 2;
+  string pull_request_url = 3;
+}
+
+message ResumeHandOffWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string model = 3;
+  string thinking_level = 4;
+}
+
+message ResumeHandOffWorkOrderResponse {
+  WorkOrder order = 1;
+  string column = 2;
+}
+
+message ListFactoryOwnerEligibilityRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message FactoryOwnerEligibility {
+  string user_id = 1;
+  bool eligible = 2;
+  string reason = 3;
+}
+
+message ListFactoryOwnerEligibilityResponse {
+  repeated FactoryOwnerEligibility members = 1;
+  bool ownership_change_allowed = 2;
+  string restriction_reason = 3;
+  bool subscription = 4;
+}

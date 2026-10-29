@@ -1,4 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
+import { showErrorToast } from "@/lib/toast";
+import { CopyButton } from "@/ui/CopyButton";
 import type { FactoriesFactoryCodexConnection } from "@/api-client";
 import { useEffect, useState } from "react";
 
@@ -11,7 +13,8 @@ function codexPhase(connection?: FactoriesFactoryCodexConnection): CodexPhase {
   if (!connection) return "start";
   if (connection.status === "pending" && connection.verificationUrl && connection.verificationCode) return "device";
   if (connection.status === "pending") return "pending";
-  if (connection.status === "finishing" || connection.reservationHeld === true) return "finishing";
+  if (connection.status === "finishing" || connection.status === "canceling" || connection.reservationHeld === true)
+    return "finishing";
   if (connection.status === "ready") return "ready";
   return "start";
 }
@@ -34,9 +37,17 @@ function DeviceSignIn({
           {connection.verificationUrl}
         </a>
       </p>
-      <p className="font-mono text-base" data-testid="first-run-codex-code">
-        {connection.verificationCode}
-      </p>
+      <div className="flex items-center gap-2">
+        <p className="font-mono text-base" data-testid="first-run-codex-code">
+          {connection.verificationCode}
+        </p>
+        <CopyButton
+          text={connection.verificationCode ?? ""}
+          ariaLabel={copy.subscriptionCopyCode}
+          copiedAriaLabel={copy.subscriptionCodeCopied}
+          onCopyError={() => showErrorToast(copy.subscriptionCopyFailed)}
+        />
+      </div>
       <p className="text-muted-foreground">{copy.subscriptionDeviceSettings}</p>
       <LoadingButton type="button" variant="outline" loading={canceling} onClick={onCancel}>
         {copy.subscriptionCancel}
@@ -69,10 +80,16 @@ function WaitingSignIn({
   );
 }
 
+function signInCleanupMessage(status?: string): string {
+  const copy = FIRST_RUN_COPY.agent;
+  if (status === "canceling") return copy.subscriptionCanceling;
+  if (status === "finishing" || status === "ready") return copy.subscriptionFinishing;
+  return copy.subscriptionStopping;
+}
+
 function FinishingSignIn({ connection }: { connection?: FactoriesFactoryCodexConnection }) {
   const [delayed, setDelayed] = useState(false);
   const copy = FIRST_RUN_COPY.agent;
-  const saved = connection?.status === "finishing" || connection?.status === "ready";
   useEffect(() => {
     setDelayed(false);
     const timer = setTimeout(() => setDelayed(true), 60000);
@@ -81,7 +98,7 @@ function FinishingSignIn({ connection }: { connection?: FactoriesFactoryCodexCon
 
   return (
     <>
-      <p>{saved ? copy.subscriptionFinishing : copy.subscriptionStopping}</p>
+      <p>{signInCleanupMessage(connection?.status)}</p>
       {delayed ? <p>{copy.subscriptionDelayed}</p> : null}
     </>
   );

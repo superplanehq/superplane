@@ -75,7 +75,7 @@ func TestInjectSubscriptionCredentialsPreservesPlanningEnvironment(t *testing.T)
 		{Name: runner.EnvSuperplaneRunToken, Value: "planning-token"},
 		{Name: envOpenAIAPIKey, Value: "api-key"},
 		{Name: envOpenAIBaseURL, Value: "https://api.example.com"},
-	}, uuid.New(), 60)
+	}, uuid.New(), 60, "gpt-5.4")
 	require.NoError(t, err)
 
 	values := map[string]string{}
@@ -94,7 +94,7 @@ func TestInjectSubscriptionCredentialsPreservesPlanningEnvironment(t *testing.T)
 
 type subscriptionLease struct{}
 
-func (subscriptionLease) Reserve(uuid.UUID) (core.CodexSubscriptionLease, error) {
+func (subscriptionLease) Reserve(uuid.UUID, string) (core.CodexSubscriptionLease, error) {
 	return core.CodexSubscriptionLease{ConnectionID: uuid.New(), FactoryID: uuid.New(), Generation: 1}, nil
 }
 

@@ -8,7 +8,7 @@ export type OnboardingCardStep = {
   ready: boolean;
   /** The billing lookup failed and no request is running. The user can retry. */
   failed: boolean;
-  /** The user can select one of the available starter plans. */
+  /** Billing is enabled and the user can manage the plan. */
   available: boolean;
   /** The user must select a starter plan during workspace setup. */
   required: boolean;
@@ -38,8 +38,7 @@ export function useOnboardingCardStep(organizationId: string): OnboardingCardSte
     return plan ? [plan] : [];
   });
   const canManageBilling = !permissionsLoading && canAct("org", "update");
-  const hasStarterPlans = Boolean(currentBilling.billingEnabled) && plans.length > 0;
-  const available = hasStarterPlans && canManageBilling;
+  const available = Boolean(currentBilling.billingEnabled) && canManageBilling;
   const planActive = currentBilling.planCategory === "paid";
   const billingRequired = Boolean(onboardingBillingError(billing.data));
   return {
@@ -47,7 +46,7 @@ export function useOnboardingCardStep(organizationId: string): OnboardingCardSte
     failed: billing.isError && !billing.isFetching,
     available,
     required: available && billingRequired,
-    requiresAdmin: !permissionsLoading && hasStarterPlans && billingRequired && !canManageBilling,
+    requiresAdmin: !permissionsLoading && billingRequired && !canManageBilling,
     plans,
     planActive,
     activePlanKey: currentBilling.catalogKey,

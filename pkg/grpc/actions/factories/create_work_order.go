@@ -47,12 +47,17 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
-	assigneeIDs := []uuid.UUID{createdByID}
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := validateRefinementModel(tx, factory, strings.TrimSpace(req.GetModel())); err != nil {
+		assigneeIDs, err := workOrderCreationOwners(tx, factory, createdByID, req)
+		if err != nil {
 			return err
+		}
+		if !factory.OnboardingConfigValue().CodexSubscription {
+			if err := validateRefinementModel(tx, factory, strings.TrimSpace(req.GetModel())); err != nil {
+				return err
+			}
 		}
 		created, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
 		if err != nil {
@@ -112,6 +117,30 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	return &pb.CreateWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func workOrderCreationOwners(tx *gorm.DB, factory *models.Factory, creatorID uuid.UUID, req *pb.CreateWorkOrderRequest) ([]uuid.UUID, error) {
+	if !factory.OnboardingConfigValue().CodexSubscription {
+		return factory.DefaultSubscriptionAssignees(tx, &creatorID)
+	}
+	if req.GetUnassigned() {
+		if len(req.GetAssigneeIds()) > 0 {
+			return nil, invalidArgument("An unassigned task cannot have an owner.")
+		}
+		return nil, nil
+	}
+	if len(req.GetAssigneeIds()) == 0 {
+		return factory.DefaultSubscriptionAssignees(tx, &creatorID)
+	}
+	owners := make([]uuid.UUID, 0, len(req.GetAssigneeIds()))
+	for _, raw := range req.GetAssigneeIds() {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			return nil, invalidArgument("The owner ID is invalid.")
+		}
+		owners = append(owners, id)
+	}
+	return owners, nil
 }
 
 func validateRefinementModel(tx *gorm.DB, factory *models.Factory, model string) error {
