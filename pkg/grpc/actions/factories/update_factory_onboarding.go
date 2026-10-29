@@ -71,7 +71,7 @@ func UpdateFactoryOnboarding(
 
 	if req.Complete != nil && *req.Complete {
 		err = db.Transaction(func(tx *gorm.DB) error {
-			if err := validateFactoryOnboardingResources(tx, orgID, factory, config); err != nil {
+			if err := validateFactoryOnboardingResources(ctx, tx, orgID, factory, config); err != nil {
 				return err
 			}
 			if !wasComplete {
@@ -187,6 +187,7 @@ func ensureOnboardingDiscussionHandler(
 }
 
 func validateFactoryOnboardingResources(
+	ctx context.Context,
 	db *gorm.DB,
 	organizationID uuid.UUID,
 	factory *models.Factory,
@@ -206,7 +207,7 @@ func validateFactoryOnboardingResources(
 	}
 
 	if config.CodexSubscription {
-		if err := validateCodexSubscriptionOnboarding(db, organizationID, factory, config); err != nil {
+		if err := validateCodexSubscriptionOnboarding(ctx, db, organizationID, factory, config); err != nil {
 			return err
 		}
 	} else if config.AgentIntegrationID != "" {
@@ -375,6 +376,7 @@ func factoryOnboardingPatchFromRequest(req *pb.UpdateFactoryOnboardingRequest) (
 }
 
 func validateCodexSubscriptionOnboarding(
+	ctx context.Context,
 	db *gorm.DB,
 	organizationID uuid.UUID,
 	factory *models.Factory,
@@ -386,10 +388,14 @@ func validateCodexSubscriptionOnboarding(
 	if config.AgentIntegrationID != "" {
 		return invalidArgument("ChatGPT subscription does not use an API key")
 	}
-	if _, err := models.SoleHumanOrganizationMember(db, organizationID); err != nil {
+	callerID, err := codexCallerID(ctx)
+	if err != nil {
 		return err
 	}
-	connection, err := models.FindFactoryCodexConnection(db, organizationID, factory.ID)
+	if _, err := models.ActiveCodexMember(db, organizationID, callerID); err != nil {
+		return err
+	}
+	connection, err := models.FindFactoryCodexConnection(db, organizationID, factory.ID, callerID)
 	if err != nil {
 		return invalidArgument("Connect ChatGPT before you finish setup")
 	}

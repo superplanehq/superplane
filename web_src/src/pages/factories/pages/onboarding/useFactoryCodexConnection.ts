@@ -1,5 +1,6 @@
 import {
   factoriesCancelFactoryCodexConnection,
+  factoriesDisconnectFactoryCodexConnection,
   factoriesDescribeFactoryCodexConnection,
   factoriesStartFactoryCodexConnection,
   type FactoriesFactoryCodexConnection,
@@ -9,24 +10,36 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { usePermissions } from "@/contexts/usePermissions";
 import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
-export function factoryCodexConnectionKey(organizationId: string, factoryId: string) {
-  return ["factory-codex-connection", organizationId, factoryId] as const;
+export function factoryCodexConnectionKey(organizationId: string, factoryId: string, memberId = "") {
+  return ["factory-codex-connection", organizationId, factoryId, memberId] as const;
 }
 
 export function codexSubscriptionReady(connection: FactoriesFactoryCodexConnection | undefined): boolean {
   return connection?.status === "ready" && connection.reservationHeld !== true;
 }
 
+function invalidateSubscriptionCatalogs(queryClient: QueryClient, organizationId: string, factoryId: string) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "owner-eligibility"] }),
+    queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "line-runner-models"] }),
+    queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "selectable-llm-models"] }),
+  ]);
+}
+
 export function useFactoryCodexConnection(organizationId: string, factoryId: string, enabled: boolean) {
-  const { canAct } = usePermissions();
-  const canRefreshCatalog = canAct("factories", "update");
+  const { canAct, currentUserId } = usePermissions();
+  const canRefreshCatalog = canAct("factories", "read");
   const queryClient = useQueryClient();
-  const queryKey = factoryCodexConnectionKey(organizationId, factoryId);
+  const queryKey = factoryCodexConnectionKey(organizationId, factoryId, currentUserId);
   const refreshAttempted = useRef(false);
   const invalidatedCatalog = useRef("");
+  useEffect(() => {
+    refreshAttempted.current = false;
+    invalidatedCatalog.current = "";
+  }, [organizationId, factoryId, currentUserId]);
   const query = useQuery({
     queryKey,
     enabled: enabled && Boolean(organizationId && factoryId),
@@ -43,13 +56,19 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
     refetchInterval: (current) => {
       if (current.state.status === "error") return 2000;
       const status = current.state.data?.status;
-      return status === "pending" || status === "finishing" || current.state.data?.reservationHeld ? 2000 : false;
+      return current.state.data?.revocationPending ||
+        ["pending", "canceling", "finishing"].includes(status ?? "") ||
+        current.state.data?.reservationHeld
+        ? 2000
+        : false;
     },
     refetchIntervalInBackground: true,
   });
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey });
+    await invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
+    await queryClient.invalidateQueries({ queryKey: ["me", organizationId] });
   };
 
   const start = useMutation({
@@ -97,8 +116,20 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
       );
       return response.data?.connection;
     },
+    onSuccess: async (connection) => {
+      if (!connection) return;
+      await queryClient.cancelQueries({ queryKey });
+      queryClient.setQueryData(queryKey, connection);
+    },
     onSettled: refresh,
     onError: () => showErrorToast("SuperPlane could not cancel ChatGPT sign-in. Try again."),
+  });
+
+  const disconnect = useMutation({
+    mutationFn: async () =>
+      factoriesDisconnectFactoryCodexConnection(withOrganizationHeader({ organizationId, path: { factoryId } })),
+    onSettled: refresh,
+    onError: () => showErrorToast("Stop your tasks before you disconnect ChatGPT. Then try again."),
   });
 
   useEffect(() => {
@@ -111,7 +142,7 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
       const catalog = availableModels.join("\n");
       if (invalidatedCatalog.current !== catalog) {
         invalidatedCatalog.current = catalog;
-        void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "selectable-llm-models"] });
+        void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
       }
       return;
     }
@@ -120,9 +151,9 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
       refreshAttempted.current = true;
       refreshCatalog.mutate();
     }
-  }, [canRefreshCatalog, enabled, organizationId, query.data, queryClient, refreshCatalog]);
+  }, [canRefreshCatalog, enabled, organizationId, factoryId, query.data, queryClient, refreshCatalog]);
 
-  return { query, start, cancel, refreshCatalog };
+  return { query, start, cancel, refreshCatalog, disconnect };
 }
 
 export function useCodexSubscriptionModel(organizationId: string, factoryId: string) {

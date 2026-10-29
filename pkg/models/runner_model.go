@@ -9,7 +9,7 @@ import (
 )
 
 // RunnerAcceptsModel checks the provider and funding source of the executing node.
-func RunnerAcceptsModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, component string, configuration map[string]any, model string) (bool, error) {
+func RunnerAcceptsModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, component string, configuration map[string]any, model string, ownerIDs ...uuid.UUID) (bool, error) {
 	if component == SuperPlaneRunnerComponent {
 		parsed, err := ParseHostedLLMModelKey(model)
 		if err != nil || !parsed.IsSet() {
@@ -37,7 +37,10 @@ func RunnerAcceptsModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, comp
 		if component != "runnerCodex" || factoryID == nil || *factoryID == uuid.Nil {
 			return false, nil
 		}
-		models, err := FactoryCodexSubscriptionModels(tx, orgID, *factoryID)
+		if len(ownerIDs) != 1 {
+			return false, nil
+		}
+		models, err := FactoryCodexSubscriptionModels(tx, orgID, *factoryID, ownerIDs[0])
 		return slices.Contains(models, strings.TrimSpace(model)), err
 	}
 	funding := UsageFundingSourceHosted

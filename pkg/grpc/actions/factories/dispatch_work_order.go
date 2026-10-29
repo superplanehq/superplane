@@ -179,8 +179,15 @@ func dispatchWorkOrderOnLineTx(
 
 	logger := logging.WithWorkOrder(logging.ForFactory(*factory), *order).
 		WithField("organization_id", factory.OrganizationID)
+	if order.PendingHandOff != nil {
+		return nil, grpcFailedPrecondition("Use Start to resume this pending handoff.")
+	}
 	if !order.IsDispatchable() {
 		return nil, models.ErrFactoryWorkOrderNotDispatchable
+	}
+
+	if err := order.RequireExecutionOwner(tx, false); err != nil {
+		return nil, err
 	}
 
 	currentLine, err := factory.FindLine(tx, lineID)
@@ -194,7 +201,7 @@ func dispatchWorkOrderOnLineTx(
 
 	model = strings.TrimSpace(model)
 	if model != "" {
-		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name)
+		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name, subscriptionOrderOwnerID(tx, order))
 		if err != nil {
 			return nil, err
 		}

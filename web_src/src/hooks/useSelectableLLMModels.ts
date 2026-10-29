@@ -1,3 +1,4 @@
+import { useTaskModelCatalogContext, type TaskModelCatalogContext } from "./useTaskModelCatalogContext";
 import { useQuery } from "@tanstack/react-query";
 
 import { organizationsListSelectableLlmModels } from "@/api-client";
@@ -8,25 +9,41 @@ import {
 } from "@/lib/selectableLLMModels";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-export function selectableLLMModelsQueryKey(organizationId: string, factoryId?: string, sources?: string) {
-  return ["organizations", organizationId, "selectable-llm-models", factoryId ?? "", sources ?? ""] as const;
+export function selectableLLMModelsQueryKey(
+  organizationId: string,
+  factoryId?: string,
+  sources?: string,
+  context: TaskModelCatalogContext = {},
+) {
+  return [
+    "organizations",
+    organizationId,
+    "selectable-llm-models",
+    factoryId ?? "",
+    sources ?? "",
+    context.orderId ?? "",
+    context.ownerId ?? "",
+    context.memberId ?? "",
+  ] as const;
 }
 
 export function useSelectableLLMModels(
   organizationId: string | undefined,
-  options?: { factoryId?: string; sources?: SelectableLLMSourceID[]; enabled?: boolean },
+  options?: { factoryId?: string; sources?: SelectableLLMSourceID[]; orderId?: string; enabled?: boolean },
 ) {
+  const orderId = options?.orderId;
+  const context = useTaskModelCatalogContext(organizationId, options?.factoryId, orderId);
   const factoryId = options?.factoryId;
   const sources = options?.sources;
   const enabled = options?.enabled ?? true;
   return useQuery({
-    queryKey: selectableLLMModelsQueryKey(organizationId ?? "", factoryId, sources?.join(",") ?? ""),
+    queryKey: selectableLLMModelsQueryKey(organizationId ?? "", factoryId, sources?.join(",") ?? "", context),
     queryFn: async (): Promise<SelectableLLMModel[]> => {
       const response = await organizationsListSelectableLlmModels(
         withOrganizationHeader({
           organizationId: organizationId!,
           path: { id: organizationId! },
-          query: { factoryId },
+          query: { factoryId, ...(orderId ? { orderId } : {}) },
         }),
       );
       return selectableLLMModelsFromResponse(response.data?.models ?? [], sources);
