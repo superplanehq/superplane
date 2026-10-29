@@ -64,45 +64,20 @@ Once inside the cloned repository, bring up Docker, install dependencies and
 migrations, then start the development server:
 
 ```sh
-make dev.up        # Build app and runner images. Start db, rabbitmq, and the app shell
-make dev.setup     # Codegen, Go + JS deps, and migrate superplane_dev
-make dev.server    # Start air, Vite, and the Docker Fleet Manager
+make dev.up       # Start containers
+make dev.setup    # Install dependencies and prepare databases
+make dev.server   # Start the development server
 ```
 
-After the first setup, run `make dev.up` when the stack is not running, then
-`make dev.server` to start air, Vite, and the workers (use
-`make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you
-need a fresh `npm install`, codegen, or migrations.
+When `make dev.server` reports the app as healthy, open
+[http://localhost:8000](http://localhost:8000).
+On a fresh database, complete the initial owner account setup in your browser.
 
-When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
+For daily development and additional setup, see:
 
-After owner setup, create the required installation fleets through the admin
-API or admin CLI. Create a personal API token for the installation
-administrator and set `INSTALLATION_ADMIN_TOKEN` in `.env`. The Docker Fleet
-Manager then creates an ephemeral runner for each integrated task. The
-`new_runners` feature is enabled for every organization.
-
-A local dump lets you create a new environment without owner setup or GitHub
-connection. This is the intended path when a script or agent creates local
-environments.
-See [Local database snapshot](docs/contributing/local-database-snapshot.md).
-
-`make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
-runner API and Docker Fleet Manager. Set `TASK_BROKER_*` in `.env` only while
-you test legacy or remote broker routing (see `.env.example`).
-
-The local worker image includes Claude Code, Codex, OpenCode, git, `gh`, and
-`jq` so factory line apps can run locally. Do not install those CLIs on the
-host. Connect GitHub and Claude integrations in the organization before you
-dispatch a factory line. Factory nodes use those integrations, not `.env`
-`ANTHROPIC_API_KEY`. After you change `release/runner/Dockerfile`, run
-`make dev.up` again. Check tools with `make doctor-local` after
-`make dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter
-Agent.
-
-Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
-in `.env` only when you need the SuperPlane-hosted provider. See
-[Connecting to third-party services](docs/contributing/connecting-to-3rdparty-services-from-development.md).
+- [Local development guide](docs/contributing/local-development.md) — Restarting, runner tools, and advanced configuration
+- [Local database snapshot](docs/contributing/local-database-snapshot.md) — Restore an existing environment
+- [Connecting to third-party services](docs/contributing/connecting-to-3rdparty-services-from-development.md) — External integrations and hosted OpenRouter
 
 ## Pull requests
 
@@ -127,6 +102,7 @@ sign-off, and the review process.
 
 ### Contributing
 
+- **[Local Development Guide](docs/contributing/local-development.md)** - Everyday workflow, runner tools, and advanced configuration
 - **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
 - **[Issue Tracking](docs/contributing/issue-tracking.md)** - How to report bugs, use the SuperPlane Board, and understand issue types
 - **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
