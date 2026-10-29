@@ -77,6 +77,20 @@ describe("custom automation settings", () => {
     expect(settings.steps?.map((step) => step.type)).toEqual(["TYPE_BASH"]);
   });
 
+  it("does not send credentials for the SuperPlane agent", () => {
+    const draft = customAutomationDraft({
+      settings: { agent: workspaceAgentFromOnboarding({ agentHarness: "AGENT_HARNESS_SUPERPLANE" }) },
+    });
+
+    expect(customAutomationSettings("automatic", draft).agent).toEqual({
+      component: "runnerSuperPlane",
+      model: "",
+    });
+
+    draft.components[0]!.configuration.credentialSource = "hosted";
+    expect(customAutomationSettings("automatic", draft).agent?.credentialSource).toBeUndefined();
+  });
+
   it("fills an empty create draft from the workspace agent", () => {
     const draft = customAutomationDraft({
       settings: { agent: workspaceAgentFromOnboarding({ agentHarness: "AGENT_HARNESS_CLAUDE_CODE" }) },
