@@ -61,6 +61,14 @@ func UpdateWorkOrder(
 			return err
 		}
 
+		if err := order.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if req.RefinementModel != nil {
+			if err := order.SetRefinementModel(tx, strings.TrimSpace(req.GetRefinementModel())); err != nil {
+				return err
+			}
+		}
 		if err := order.UpdateContent(tx, title, description); err != nil {
 			return err
 		}
@@ -113,7 +121,7 @@ func UpdateWorkOrder(
 }
 
 func workOrderContentFromRequest(req *pb.UpdateWorkOrderRequest) (*string, *string, error) {
-	if req.Title == nil && req.Description == nil {
+	if req.Title == nil && req.Description == nil && req.RefinementModel == nil {
 		return nil, nil, invalidArgument("title or description is required")
 	}
 

@@ -91,6 +91,10 @@ func (u *User) SoftDelete(tx *gorm.DB, now time.Time, tombstoneEmail string) err
 			return err
 		}
 
+		if err := u.RevokeCodexConnections(tx, now); err != nil {
+			return err
+		}
+
 		return tx.Where("user_id = ?", u.ID).Delete(&UserAPIToken{}).Error
 	})
 }

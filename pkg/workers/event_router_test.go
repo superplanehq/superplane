@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func Test__EventRouter_ProcessRootEvent(t *testing.T) {
@@ -83,6 +84,125 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	assert.True(t, queueConsumer.HasReceivedMessage())
 	assert.True(t, runConsumer.HasReceivedMessage())
 	assert.False(t, terminalEventConsumer.HasReceivedMessage())
+}
+
+func Test__EventRouter_ProcessRootEvent_RecordsPermanentSubscriptionRejection(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+	db := database.Conn()
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Needs an owner", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+	// The task has no owner, so subscription admission cannot succeed.
+	subscription := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/app",
+		Number:     42,
+		URL:        "https://github.com/acme/app/pull/42",
+		Title:      "Needs an owner",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+
+	trigger := "trigger-1"
+	component := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:   trigger,
+				Type:     models.NodeTypeTrigger,
+				Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata("risk-score", 1)),
+			},
+			{NodeID: component, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{{SourceID: trigger, TargetID: component, Channel: "default"}},
+	)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+
+	event := support.EmitCanvasEventForNodeWithData(t, canvas.ID, trigger, "default", nil, map[string]any{
+		"data": map[string]any{"pullRequest": map[string]any{"id": pullRequest.ID.String()}},
+	})
+	require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
+
+	updatedEvent, err := models.FindCanvasEvent(event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
+
+	queueItems, err := models.ListNodeQueueItems(db, canvas.ID, component, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(db, event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{models.ErrSubscriptionOwnerRequired.Error()}, run.ErrorMessages())
+
+	stored, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	notes, err := stored.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 1)
+	assert.Contains(t, notes[0].Body, models.ErrSubscriptionOwnerRequired.Error())
+}
+
+func Test__EventRouter_ProcessRootEvent_FailsRefinementRunOnPermanentSubscriptionRejection(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+	db := database.Conn()
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	subscription := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	// The draft task has no owner, so subscription admission cannot succeed.
+	order, err := factory.CreateWorkOrder(db, "Refine without an owner", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	component := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:   models.FactoryAppBacklogTriggerID,
+				Type:     models.NodeTypeTrigger,
+				Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 3)),
+			},
+			{NodeID: component, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{{SourceID: models.FactoryAppBacklogTriggerID, TargetID: component, Channel: "default"}},
+	)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+
+	event := support.EmitCanvasEventForNodeWithData(t, canvas.ID, models.FactoryAppBacklogTriggerID, "default", nil, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{"taskRefinementEnabled": true, "workOrder": map[string]any{"id": order.ID.String()}},
+	})
+	require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
+
+	updatedEvent, err := models.FindCanvasEvent(event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
+
+	queueItems, err := models.ListNodeQueueItems(db, canvas.ID, component, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(db, event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{models.ErrSubscriptionOwnerRequired.Error()}, run.ErrorMessages())
 }
 
 func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T) {
