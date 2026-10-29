@@ -609,6 +609,20 @@ func ListOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
 	return users, nil
 }
 
+func ListHumanUsersInOrganization(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
+	var users []User
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("type = ?", UserTypeHuman).
+		Order("id").
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func LockOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
 	return ListOrganizationOwners(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orgID)
 }

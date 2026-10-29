@@ -55,8 +55,8 @@ func ListFactoryOwnerEligibility(ctx context.Context, organizationID string, req
 			response.RestrictionReason = models.ErrSubscriptionOwnerBusy.Error()
 		}
 	}
-	var users []models.User
-	if err := db.Where("organization_id = ? AND type = ?", orgID, models.UserTypeHuman).Order("id").Find(&users).Error; err != nil {
+	users, err := models.ListHumanUsersInOrganization(db, orgID)
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to load workspace members")
 	}
 	for _, user := range users {

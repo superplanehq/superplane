@@ -145,48 +145,6 @@ func (o *FactoryWorkOrder) SubscriptionOwnershipBlocked(tx *gorm.DB) (bool, erro
 	return active > 0, err
 }
 
-func (o *FactoryWorkOrder) validateSubscriptionAssignment(tx *gorm.DB, ids []uuid.UUID) error {
-	subscription, err := o.UsesCodexSubscription(tx)
-	if err != nil || !subscription {
-		return err
-	}
-	if err := o.LockForUpdate(tx); err != nil {
-		return err
-	}
-	previous, err := o.ListAssignees(tx)
-	if err != nil {
-		return err
-	}
-	oldIDs := make([]uuid.UUID, 0, len(previous))
-	for _, owner := range previous {
-		oldIDs = append(oldIDs, owner.UserID)
-	}
-	if slices.Equal(oldIDs, ids) {
-		return nil
-	}
-	if len(ids) > 1 {
-		return ErrSubscriptionOwnerRequired
-	}
-	blocked, err := o.SubscriptionOwnershipBlocked(tx)
-	if err != nil {
-		return err
-	}
-	if blocked {
-		return ErrSubscriptionOwnerBusy
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	eligible, err := SubscriptionOwnerEligible(tx, o.OrganizationID, o.FactoryID, ids[0])
-	if err != nil {
-		return err
-	}
-	if !eligible {
-		return ErrSubscriptionOwnerInvalid
-	}
-	return nil
-}
-
 // DefaultSubscriptionAssignees applies only to implicit assignments. Explicit
 // assignments go through ReplaceAssignees and are rejected without mutation.
 func (f *Factory) DefaultSubscriptionAssignees(tx *gorm.DB, userID *uuid.UUID) ([]uuid.UUID, error) {
@@ -281,6 +239,48 @@ func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasI
 		if !allowed {
 			return ErrSubscriptionModelUnavailable
 		}
+	}
+	return nil
+}
+
+func (o *FactoryWorkOrder) validateSubscriptionAssignment(tx *gorm.DB, ids []uuid.UUID) error {
+	subscription, err := o.UsesCodexSubscription(tx)
+	if err != nil || !subscription {
+		return err
+	}
+	if err := o.LockForUpdate(tx); err != nil {
+		return err
+	}
+	previous, err := o.ListAssignees(tx)
+	if err != nil {
+		return err
+	}
+	oldIDs := make([]uuid.UUID, 0, len(previous))
+	for _, owner := range previous {
+		oldIDs = append(oldIDs, owner.UserID)
+	}
+	if slices.Equal(oldIDs, ids) {
+		return nil
+	}
+	if len(ids) > 1 {
+		return ErrSubscriptionOwnerRequired
+	}
+	blocked, err := o.SubscriptionOwnershipBlocked(tx)
+	if err != nil {
+		return err
+	}
+	if blocked {
+		return ErrSubscriptionOwnerBusy
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	eligible, err := SubscriptionOwnerEligible(tx, o.OrganizationID, o.FactoryID, ids[0])
+	if err != nil {
+		return err
+	}
+	if !eligible {
+		return ErrSubscriptionOwnerInvalid
 	}
 	return nil
 }
