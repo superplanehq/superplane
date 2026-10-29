@@ -348,6 +348,39 @@ The table `organization_seat_purchases` is the marker for seat changes that
 SuperPlane started. Use `models.FindExpectedSeatCount` with the current period
 start to tell them from outside changes in Polar.
 
+### Manual release check: Buy seats (G10)
+
+This release check requires one manual purchase in the Polar sandbox before
+release. It is separate from local development setup. Automated tests use
+simulated Polar responses and do not satisfy this manual check.
+
+Status: pending. No manual sandbox purchase is recorded for this change.
+
+1. Use an organization with an active per-seat sandbox subscription.
+2. Sign in as an organization admin.
+3. Open Billing and select **Buy seats**.
+4. Verify the additional seat count, prorated charge, renewal date, and new monthly total.
+5. Select **Confirm purchase** once.
+6. If confirmation stays pending, close the dialog. Verify that billing continues to check the payment.
+7. Verify that **Seats added.** appears and purchased capacity increases by the selected count.
+8. Verify the charge and updated subscription quantity in the Polar sandbox.
+
+Record these items in the release evidence:
+
+- Test date and tester.
+- Sandbox organization.
+- Purchase ID and Polar order ID.
+- Before and after seat quantities.
+- Charge and final status.
+
+Do not record payment details or access tokens.
+
+See the broader G10 requirements under
+[D14. Renewal quantity and seat removal](../prd/team-plan-seats-and-billing.md#d14-renewal-quantity-and-seat-removal).
+They also require actual invoices for a purchase during a pending removal
+and a removal with no current charge, refund, or credit.
+This purchase check alone does not satisfy all G10 requirements.
+
 ## Renewal keeps paid seats
 
 Polar renews a subscription with the seat count of the subscription.
