@@ -43,7 +43,7 @@ You can work on and submit claims for multiple bounties at the same time; each c
 Bounty work must meet the same standards as any contribution to SuperPlane:
 
 - Follow our [Pull Requests](pull-requests.md) guide (branching, title format, description, sign-off).
-- For integration work, follow [Component Implementation](component-implementations.md) and the [Integrations](integrations.md) guide.
+- For integration work, follow the [Component Implementation](component-implementations.md) guide.
 - All commits must be [signed off](commit_sign-off.md).
 - Code and behavior must meet our [Quality Standards](quality.md).
 
