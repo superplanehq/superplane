@@ -121,6 +121,43 @@ describe("FleetManagerSetup", () => {
     expect(command).toHaveTextContent("maxCapacity: 10");
   });
 
+  it("restores the Kubernetes context into the install command", async () => {
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({
+        provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v0.2.0",
+        selectedFleetIds: ["e1-large-amd64"],
+        fleetCapacities: { "e1-large-amd64": { warmCapacity: 1, maxCapacity: 10 } },
+        fields: { region: "us-east-1", imageAmd64: "ami-amd64" },
+        kubeContext: "aws-prod",
+      }),
+    );
+
+    function InstallWizard() {
+      const setup = useFleetManagerSetup(true, "org-1");
+      return (
+        <FleetManagerWizardScreen
+          step="install"
+          setup={setup}
+          onNext={() => undefined}
+          onFinish={() => undefined}
+          onFinishLater={() => undefined}
+        />
+      );
+    }
+
+    render(<InstallWizard />);
+
+    expect(await screen.findByLabelText("Kubernetes context")).toHaveValue("aws-prod");
+    expect(screen.getByText(/Run this command in the same directory/)).toBeInTheDocument();
+    expect(screen.getByText(/helm upgrade --install fleet-manager/)).toHaveTextContent("--kube-context 'aws-prod'");
+  });
+
   it("keeps a saved warm 0 and max 1 capacity", async () => {
     window.localStorage.setItem(
       FLEET_MANAGER_DRAFT_KEY,
