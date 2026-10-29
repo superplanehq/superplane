@@ -9,7 +9,7 @@ import {
 import { FleetManagerVerificationStatus } from "@/components/fleet-manager-setup/FleetManagerWizard";
 import { Button } from "@/components/ui/button";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
-import { useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
+import { sameFleetInstallation, useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
 import {
   fleetManagerHelmCommand,
   fleetManagerValuesFileCommand,
@@ -101,10 +101,6 @@ function ProviderChoice({ setup }: { setup: FleetManagerSetupState }) {
       <FleetManagerProviderSection setup={setup} />
     </SectionCard>
   );
-}
-
-function sameFleetInstallation(left: FleetManagerDraft, right: FleetManagerDraft) {
-  return JSON.stringify({ ...left, kubeContext: undefined }) === JSON.stringify({ ...right, kubeContext: undefined });
 }
 
 function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
