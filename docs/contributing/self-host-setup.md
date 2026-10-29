@@ -22,8 +22,6 @@ invitation link and send it to the invited person. This replaces delivery of the
 invitation email only. New invited users who create password accounts still need
 email delivery to receive a verification code.
 
-Before an upgrade, read the [shared invite links release note](../release-notes/invite-links.md).
-
 ## 3. Configure Fleet Manager (optional)
 
 SuperPlane does not call Fleet Manager. Owner setup creates the
