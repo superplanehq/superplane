@@ -322,7 +322,7 @@ func TestLineRunnerModelsReportModelThinkingLevels(t *testing.T) {
 			{ReasoningEffort: "high"}, {ReasoningEffort: "low"}, {ReasoningEffort: "xhigh"},
 		},
 	}}, time.Now()))
-	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	claude := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "hosted", "claude-opus-5-5")
 	codex := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "subscription", "")
 	_, err = factory.CreateLine(db, "ship", []models.FactoryLineStep{
@@ -331,7 +331,7 @@ func TestLineRunnerModelsReportModelThinkingLevels(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	options, _, err := listLineRunnerModelOptions(db, r.Organization.ID, factory.ID, "ship")
+	options, _, err := listLineRunnerModelOptions(db, r.Organization.ID, factory.ID, "ship", r.User)
 	require.NoError(t, err)
 	assert.Equal(t, []lineRunnerModel{
 		{ID: "claude-haiku-4-5", ThinkingLevels: []string{}},
