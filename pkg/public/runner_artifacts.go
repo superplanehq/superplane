@@ -148,6 +148,9 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	var created bool
 	var replacedFileID uuid.UUID
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if _, lockErr := models.LockOrganization(tx, scope.OrganizationID); lockErr != nil {
+			return lockErr
+		}
 		if lockErr := models.LockFactoryWorkOrder(tx, artifactContext.Order.ID); lockErr != nil {
 			return lockErr
 		}
