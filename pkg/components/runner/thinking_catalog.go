@@ -11,9 +11,9 @@ import (
 )
 
 // ModelThinkingLevels returns the thinking levels that the agent CLI for a
-// provider can send to a model, in display order. The provider selects the
-// CLI: Anthropic runs Claude Code, OpenAI runs Codex, and OpenRouter runs
-// OpenCode. An empty result means that the model has no thinking control.
+// direct provider can send to a model, in display order. Anthropic runs
+// Claude Code and OpenAI runs Codex. OpenRouter efforts come from its stored
+// provider catalog. An empty result means that the model has no thinking control.
 //
 // Keep this catalog in sync with the models that the CLIs accept. A model
 // that is not in the catalog has no thinking levels, so the UI hides the
@@ -32,8 +32,6 @@ func modelThinkingLevels(provider, id string) []string {
 		return claudeCodeModelThinkingLevels(id)
 	case models.UsageProviderOpenAI:
 		return openAIModelThinkingLevels(modelLeaf(id))
-	case models.UsageProviderOpenRouter:
-		return openRouterModelThinkingLevels(id)
 	default:
 		return nil
 	}
@@ -191,32 +189,6 @@ func gpt5Minor(id string) (int, bool) {
 	}
 	minor, err := strconv.Atoi(match[1])
 	return minor, err == nil && minor > 0
-}
-
-// OpenCode has no thinking variants for these model families.
-var openCodeModelsWithoutVariants = []string{"deepseek", "minimax", "glm", "kimi", "k2p", "qwen"}
-
-// openRouterModelThinkingLevels follows the OpenCode variants for the
-// OpenRouter provider. OpenAI models keep their own effort values, and
-// other reasoning models get low to high.
-func openRouterModelThinkingLevels(id string) []string {
-	leaf := modelLeaf(id)
-	if strings.HasPrefix(id, "openai/") {
-		return openAIModelThinkingLevels(leaf)
-	}
-	if slices.ContainsFunc(openCodeModelsWithoutVariants, func(family string) bool { return strings.Contains(id, family) }) {
-		return nil
-	}
-	if strings.Contains(leaf, "grok-3-mini") {
-		return []string{ThinkingLevelLow, ThinkingLevelHigh}
-	}
-	if model, ok := parseClaudeModel(leaf); ok && model.major >= 4 {
-		return thinkingLowToHigh
-	}
-	if strings.HasPrefix(leaf, "gemini-2.5") || strings.HasPrefix(leaf, "gemini-3") {
-		return thinkingLowToHigh
-	}
-	return nil
 }
 
 func modelLeaf(id string) string {

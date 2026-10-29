@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/superplanehq/superplane/pkg/features"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -13,11 +14,49 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 )
+
+func TestSelectableOpenRouterModelsUseCapabilitiesOfTheirSource(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	saveEmptyHostedModelSelections(t, db, r.Organization.ID)
+	const model = "deepseek/deepseek-v4.1-flash"
+	const hostedURL = "https://gateway.example/openrouter"
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider: models.UsageProviderOpenRouter, Enabled: true, APIKey: []byte("encrypted"), BaseURL: hostedURL,
+		AllowedModels: datatypes.NewJSONSlice([]string{model}),
+	})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.NewJSONSlice([]string{model}))
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.NewJSONSlice([]string{model}))
+	require.NoError(t, err)
+	for source, levels := range map[string][]string{
+		llm.DefaultOpenRouterBaseURL: {"max", "high", "low", "none"},
+		hostedURL:                    {"xhigh", "high"},
+	} {
+		require.NoError(t, models.ReplaceLLMModelCapabilities(db, models.UsageProviderOpenRouter, source, []models.LLMModelCapability{{
+			Model: model, ThinkingLevels: datatypes.NewJSONSlice(levels), RefreshedAt: time.Now(),
+		}}))
+	}
+
+	response, err := ListSelectableLLMModels(t.Context(), nil, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
+	require.NoError(t, err)
+	levels := make(map[string][]string)
+	for _, option := range response.Models {
+		levels[option.Source.Id] = option.ThinkingLevels
+	}
+	assert.Equal(t, map[string][]string{
+		models.UsageFundingSourceBYOK:   {"none", "low", "high", "max"},
+		models.UsageFundingSourceHosted: {"high", "xhigh"},
+	}, levels)
+}
 
 func Test__ListSelectableLLMModels(t *testing.T) {
 	r := support.Setup(t)

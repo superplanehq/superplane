@@ -55,27 +55,6 @@ func TestModelThinkingLevelsForCodex(t *testing.T) {
 	}
 }
 
-func TestModelThinkingLevelsForOpenCode(t *testing.T) {
-	t.Parallel()
-
-	cases := map[string][]string{
-		"anthropic/claude-opus-5.5":            {"low", "medium", "high"},
-		"anthropic/claude-sonnet-4.6":          {"low", "medium", "high"},
-		"openai/gpt-5.4":                       {"none", "low", "medium", "high", "xhigh"},
-		"openai/gpt-4o":                        nil,
-		"google/gemini-2.5-pro":                {"low", "medium", "high"},
-		"google/gemini-3-pro-preview":          {"low", "medium", "high"},
-		"x-ai/grok-3-mini":                     {"low", "high"},
-		"x-ai/grok-4.6":                        nil,
-		"deepseek/deepseek-r1":                 nil,
-		"moonshotai/kimi-k2":                   nil,
-		"openrouter/anthropic/claude-opus-4.7": {"low", "medium", "high"},
-	}
-	for model, want := range cases {
-		assert.Equal(t, want, nilIfEmpty(ModelThinkingLevels(models.UsageProviderOpenRouter, model)), model)
-	}
-}
-
 func TestModelThinkingLevelsWithoutCatalogProvider(t *testing.T) {
 	t.Parallel()
 

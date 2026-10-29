@@ -6,17 +6,20 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -136,6 +139,45 @@ func TestDispatchThinkingLevelMustBeSupportedBySelectedModel(t *testing.T) {
 	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
 		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
 		Model: "claude-opus-5-5", ThinkingLevel: "max",
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+	assert.Equal(t, "max", response.Order.LineDispatches[0].ThinkingLevel)
+}
+
+func TestDispatchOpenRouterThinkingFollowsProviderCatalog(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	const model = "deepseek/deepseek-v4.1-flash"
+	seedHostedModels(t, db, models.UsageProviderOpenRouter, model)
+	require.NoError(t, models.ReplaceLLMModelCapabilities(db, models.UsageProviderOpenRouter, llm.DefaultOpenRouterBaseURL, []models.LLMModelCapability{{
+		Model: model, ThinkingLevels: datatypes.NewJSONSlice([]string{"max", "high", "low", "none"}), RefreshedAt: time.Now(),
+	}}))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app := createLineAppWithRunner(t, r, factory.ID, runnerOpenRouter, "hosted", model)
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	options, err := ListFactoryLineRunnerModels(ctx, r.Organization.ID.String(), &pb.ListFactoryLineRunnerModelsRequest{
+		FactoryId: factory.ID.String(), LineName: line.Name,
+	})
+	require.NoError(t, err)
+	require.Len(t, options.Models, 1)
+	assert.Equal(t, []string{"none", "low", "high", "max"}, options.Models[0].ThinkingLevels)
+
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: model, ThinkingLevel: "medium",
+	})
+	assertDispatchRejected(t, db, order, err)
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: model, ThinkingLevel: "max",
 	})
 	require.NoError(t, err)
 	require.Len(t, response.Order.LineDispatches, 1)

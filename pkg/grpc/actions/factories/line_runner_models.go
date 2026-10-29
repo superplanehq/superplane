@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -83,6 +84,10 @@ func listLineRunnerModelOptions(tx *gorm.DB, orgID, factoryID uuid.UUID, lineNam
 	if err != nil {
 		return nil, false, err
 	}
+	catalog, err := llmcatalog.LoadThinkingCatalog(tx)
+	if err != nil {
+		return nil, false, err
+	}
 
 	usesHostedFunding := false
 	var out []lineRunnerModel
@@ -102,7 +107,7 @@ func listLineRunnerModelOptions(tx *gorm.DB, orgID, factoryID uuid.UUID, lineNam
 			if err != nil {
 				return nil, false, err
 			}
-			thinkingLevels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, ownerIDs...)
+			thinkingLevels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, catalog, ownerIDs...)
 			if err != nil {
 				return nil, false, err
 			}
@@ -141,7 +146,7 @@ func mergeLineRunnerModels(options []lineRunnerModel) []lineRunnerModel {
 // runner node can send to each of its models. A ChatGPT subscription reports
 // its levels in the Codex model catalog. The other runners use the model
 // catalog for the provider of their CLI.
-func lineRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, ownerIDs ...uuid.UUID) (func(string) []string, error) {
+func lineRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, catalog *llmcatalog.ThinkingCatalog, ownerIDs ...uuid.UUID) (func(string) []string, error) {
 	credentials, _ := node.Configuration["credentials"].(map[string]any)
 	if node.ComponentName() == runnerCodex && credentials["source"] == "subscription" {
 		if len(ownerIDs) != 1 {
@@ -154,21 +159,21 @@ func lineRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node mode
 		return codexSubscriptionThinkingLevels(catalog), nil
 	}
 	if node.ComponentName() == models.SuperPlaneRunnerComponent {
-		return hostedModelThinkingLevels, nil
+		return func(key string) []string {
+			parsed, err := models.ParseSelectableLLMModelKey(key)
+			if err != nil {
+				return nil
+			}
+			return catalog.ThinkingLevels(parsed.Provider.ID, parsed.Model.ID, parsed.Source.ID)
+		}, nil
 	}
 	provider, ok := runnerNodeProvider(node)
 	if !ok {
 		return func(string) []string { return nil }, nil
 	}
-	return func(id string) []string { return runner.ModelThinkingLevels(provider, id) }, nil
-}
-
-func hostedModelThinkingLevels(key string) []string {
-	parsed, err := models.ParseSelectableLLMModelKey(key)
-	if err != nil {
-		return nil
-	}
-	return runner.ModelThinkingLevels(parsed.Provider.ID, parsed.Model.ID)
+	return func(id string) []string {
+		return catalog.ThinkingLevels(provider, id, runnerFundingSource(node.Configuration))
+	}, nil
 }
 
 func codexSubscriptionThinkingLevels(catalog []models.CodexModel) func(string) []string {

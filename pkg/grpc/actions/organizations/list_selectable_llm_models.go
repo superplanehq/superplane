@@ -6,9 +6,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 
-	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -81,10 +81,14 @@ func ListSelectableLLMModels(
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list selectable models")
 	}
-	return &pb.ListSelectableLLMModelsResponse{Models: serializeSelectableLLMModels(listed)}, nil
+	catalog, err := llmcatalog.LoadThinkingCatalog(tx)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load model capabilities")
+	}
+	return &pb.ListSelectableLLMModelsResponse{Models: serializeSelectableLLMModels(listed, catalog)}, nil
 }
 
-func serializeSelectableLLMModels(listed []models.SelectableLLMModel) []*pb.SelectableLLMModel {
+func serializeSelectableLLMModels(listed []models.SelectableLLMModel, catalog *llmcatalog.ThinkingCatalog) []*pb.SelectableLLMModel {
 	out := make([]*pb.SelectableLLMModel, 0, len(listed))
 	for _, model := range listed {
 		out = append(out, &pb.SelectableLLMModel{
@@ -93,7 +97,7 @@ func serializeSelectableLLMModels(listed []models.SelectableLLMModel) []*pb.Sele
 			Model:          &pb.SelectableLLMNamedID{Id: model.Model.ID, Name: model.Model.Name},
 			Key:            model.Key,
 			Label:          model.Label,
-			ThinkingLevels: runner.ModelThinkingLevels(model.Provider.ID, model.Model.ID),
+			ThinkingLevels: catalog.ThinkingLevels(model.Provider.ID, model.Model.ID, model.Source.ID),
 		})
 	}
 	return out
