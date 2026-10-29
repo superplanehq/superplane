@@ -2900,6 +2900,9 @@ message ListFactoryLLMModelsRequest {
 message FactoryLLMModel {
   string id = 1;
   string name = 2;
+  // Thinking levels that the model supports, in display order. Empty means
+  // that the model has no thinking control.
+  repeated string thinking_levels = 3;
 }
 
 message ListFactoryLLMModelsResponse {
@@ -3264,6 +3267,8 @@ message FactoryCodexConnection {
   bool reservation_held = 8;
   // Models available to this ChatGPT subscription.
   repeated string available_models = 9;
+  // Models available to this ChatGPT subscription, with their thinking levels.
+  repeated FactoryLLMModel available_model_options = 10;
 }
 
 message DescribeFactoryCodexConnectionRequest {

@@ -8,7 +8,6 @@ import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
-import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ArrowLeft } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -334,17 +333,18 @@ function LoadedMobileTask({
 }
 
 /**
- * Start choice for a draft. The model resets when the start line changes so
- * Start never sends a model from another line.
+ * Start choice for a draft. The model and thinking level reset when the
+ * start line changes so Start never sends a choice from another line.
  */
 function useMobileDraftStart(model: MobileTaskModel, startLineKey: string) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const [draftLineKey, setDraftLineKey] = useState(startLineKey);
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
+  const [draftThinking, setDraftThinking] = useState("");
   if (draftLineKey !== startLineKey) {
     setDraftLineKey(startLineKey);
     setDraftModel(DRAFT_START_MODEL_AUTO);
+    setDraftThinking("");
   }
   const { fixture } = model;
   const onStart = draftStartAction(

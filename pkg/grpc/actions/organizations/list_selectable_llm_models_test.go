@@ -58,6 +58,7 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 	assert.Equal(t, "hosted::anthropic::claude-sonnet-4-6", resp.Models[1].Key)
 	assert.Equal(t, "SuperPlane", resp.Models[1].Source.Name)
 	assert.Equal(t, "anthropic/claude-sonnet-4-6", resp.Models[1].Label)
+	assert.Equal(t, []string{"low", "medium", "high", "max"}, resp.Models[1].ThinkingLevels)
 
 	_, err = ListSelectableLLMModels(context.Background(), r.Registry, "not-a-uuid", &pb.ListSelectableLLMModelsRequest{})
 	require.Error(t, err)
