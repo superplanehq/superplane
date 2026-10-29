@@ -36,8 +36,10 @@ export function CustomAutomationScheduleFields({
         required
       />
       <p className="text-xs text-muted-foreground">
-        Effective timezone: UTC{schedule.utcOffset >= 0 ? "+" : ""}
-        {schedule.utcOffset}. This fixed offset does not change for daylight saving time.
+        {Number.isFinite(schedule.utcOffset)
+          ? `Effective timezone: UTC${schedule.utcOffset >= 0 ? "+" : ""}${schedule.utcOffset}.`
+          : "Enter a UTC offset to set the timezone."}{" "}
+        This fixed offset does not change for daylight saving time.
       </p>
     </div>
   );

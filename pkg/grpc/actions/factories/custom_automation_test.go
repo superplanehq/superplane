@@ -66,6 +66,34 @@ func TestCustomAutomationScheduleRoundTripAndTransitions(t *testing.T) {
 			assert.Equal(t, "main", env["BASE"])
 			assert.NotContains(t, env, "PR_NUMBER")
 			assert.NotContains(t, env, "PR_HEAD")
+			for _, repository := range []string{"acme/app", "acme/new-app"} {
+				previous := factory.OnboardingConfigValue()
+				branch := "develop"
+				selectedID := previous.VCSIntegrationID
+				if repository != previous.AppRepository {
+					selectedID = createReadyOnboardingIntegration(t, r.Organization.ID, provider)
+				}
+				require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+					AppRepository: &repository, BacklogRepository: &repository,
+					DefaultBranch: &branch, VCSIntegrationID: &selectedID,
+				}))
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					return reconcileFactoryRepository(ctx, tx, deps, factory, r.User,
+						previous.VCSIntegrationID, selectedID, previous.AppRepository,
+						previous.BacklogRepository, previous.DefaultBranch, repository)
+				}))
+				node, err = models.FindCanvasNode(db, canvasID, customAutomationRunnerID)
+				require.NoError(t, err)
+				env = environmentVars(t, node.Configuration.Data()["environment"])
+				assert.Equal(t, "develop", env["BASE"])
+				assert.Equal(t, repository, env["REPO"])
+				assert.Equal(t, repository, env["SOURCE_REPO"])
+				assert.Equal(t, runner.WorkspaceContextRepoURL(provider, repository), env["REPO_URL"])
+				assert.NotContains(t, env, "PR_HEAD")
+				assert.Equal(t, integrationName(t, r.Organization.ID, selectedID),
+					node.Configuration.Data()["environmentFrom"].([]any)[0].(map[string]any)["integration"].(map[string]any)["name"])
+				assert.True(t, proto.Equal(settings, describe()), "repository updates must preserve automation settings")
+			}
 			for _, invalid := range []*pb.FactoryCustomAutomation_Schedule{
 				nil, {}, {CronExpression: "bad"}, {CronExpression: "0 9 31 2 *"},
 				{CronExpression: "0 9 * * *", UtcOffset: 15}, {CronExpression: "0 9 * * *", UtcOffset: -13},
