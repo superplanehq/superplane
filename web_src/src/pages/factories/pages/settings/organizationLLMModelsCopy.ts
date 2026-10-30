@@ -44,7 +44,7 @@ export const ORGANIZATION_LLM_MODELS_COPY = {
   subscriptionHelper: "All models available to this ChatGPT subscription are enabled.",
   subscriptionLoading: "Loading models from the ChatGPT subscription...",
   subscriptionEmptyCatalog: "Unable to list models from the ChatGPT subscription.",
-  subscriptionReconnect: "Connect ChatGPT again in workspace setup to load subscription models.",
+  subscriptionReconnect: "Connect your Codex account again to load subscription models.",
   noProviderTitle: "Connect a model provider",
   noProviderDescription: "Connect Claude, OpenAI, or OpenRouter on Integrations. All models from the key are enabled.",
   noProviderAction: "Open Integrations",

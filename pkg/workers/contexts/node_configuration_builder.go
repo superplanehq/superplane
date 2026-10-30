@@ -2551,11 +2551,7 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 			}
 			runID = run.ID
 		}
-		order, err := models.FindSubscriptionWorkOrderForRun(b.tx, workflow.OrganizationID, *workflow.FactoryID, runID)
-		if err != nil {
-			return false, err
-		}
-		ownerID, err := order.RequireSubscriptionOwner(b.tx, true)
+		ownerID, err := models.RequireSubscriptionRunOwner(b.tx, workflow.OrganizationID, *workflow.FactoryID, runID)
 		if err != nil {
 			return false, err
 		}

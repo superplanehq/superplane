@@ -2427,7 +2427,8 @@ func setupFactoryAppExecutionWithPayload(
 func TestFactoryContextDefaultOwner(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	f, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	db := database.DB(t.Context())
+	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	key, err := models.CreateAPIKey(database.Conn(), r.Organization.ID, support.RandomName("key"), nil, r.User, nil, nil)
 	require.NoError(t, err)
@@ -2437,13 +2438,15 @@ func TestFactoryContextDefaultOwner(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, database.Conn().Delete(member).Error)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
-	connection, err := models.CreateFactoryCodexConnection(database.Conn(), r.Organization.ID, f.ID, r.User, time.Now())
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
 	require.NoError(t, err)
-	require.NoError(t, database.Conn().Model(connection).Updates(map[string]any{"credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	for _, tc := range []struct {
-		name, owner  string
-		assigned     bool
-		subscription bool
+		name, owner, requestOwner string
+		assigned, subscription    bool
+		disconnected, untrusted   bool
+		ambiguous                 bool
+		wantErr                   error
 	}{
 		{name: "active member", owner: r.User.String(), assigned: true},
 		{name: "missing member", owner: uuid.NewString()},
@@ -2451,26 +2454,67 @@ func TestFactoryContextDefaultOwner(t *testing.T) {
 		{name: "non human", owner: key.ID.String()},
 		{name: "old configuration"},
 		{name: "connected subscriber", owner: r.User.String(), assigned: true, subscription: true},
-		{name: "disconnected subscriber", owner: r.User.String(), subscription: true},
+		{name: "disconnected subscriber", owner: r.User.String(), assigned: true, subscription: true, disconnected: true},
+		{name: "persisted default overrides component parameters", owner: r.User.String(), requestOwner: uuid.NewString(), assigned: true, subscription: true},
+		{name: "missing subscription default", requestOwner: r.User.String(), subscription: true, wantErr: models.ErrSubscriptionOwnerRequired},
+		{name: "missing subscription member", owner: uuid.NewString(), subscription: true, wantErr: models.ErrSubscriptionOwnerInvalid},
+		{name: "removed subscription member", owner: member.ID.String(), subscription: true, wantErr: models.ErrSubscriptionOwnerInvalid},
+		{name: "non human subscription owner", owner: key.ID.String(), subscription: true, wantErr: models.ErrSubscriptionOwnerInvalid},
+		{name: "untrusted automation cannot supply an owner", owner: r.User.String(), subscription: true, untrusted: true, wantErr: gorm.ErrRecordNotFound},
+		{name: "ambiguous creation nodes", owner: r.User.String(), subscription: true, ambiguous: true, wantErr: models.ErrSubscriptionTaskAssociation},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			require.NoError(t, f.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{CodexSubscription: &tc.subscription}))
+			require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &tc.subscription}))
 			status := models.CodexConnectionStatusDisconnected
-			if tc.assigned {
+			if tc.assigned && !tc.disconnected {
 				status = models.CodexConnectionStatusReady
 			}
-			require.NoError(t, database.Conn().Model(connection).Update("status", status).Error)
-			canvas, execution, _ := setupFactoryAppExecution(t, r, f.ID)
-			ctx := NewFactoryContext(database.Conn(), canvas, execution)
-			order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: tc.name, DefaultOwnerID: tc.owner})
+			require.NoError(t, db.Model(connection).Update("status", status).Error)
+			canvas, execution, run := setupFactoryAppExecution(t, r, f.ID)
+			if tc.subscription {
+				version, err := models.FindCanvasVersionInTransaction(db, canvas.ID, run.VersionID)
+				require.NoError(t, err)
+				version.Nodes = datatypes.JSONSlice[models.Node]{{
+					ID: "create-work-order", Type: models.NodeTypeComponent,
+					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "createWorkOrder"}},
+					Configuration: map[string]any{"defaultOwnerId": tc.owner},
+				}}
+				if tc.ambiguous {
+					duplicate := version.Nodes[0]
+					duplicate.ID = "another-create-work-order"
+					version.Nodes = append(version.Nodes, duplicate)
+				}
+				require.NoError(t, models.SaveCanvasVersionInTransaction(db, version))
+				if !tc.untrusted {
+					_, err = f.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+					require.NoError(t, err)
+				}
+			}
+			requestOwner := tc.owner
+			if tc.requestOwner != "" {
+				requestOwner = tc.requestOwner
+			}
+			ctx := NewFactoryContext(db, canvas, execution)
+			order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: tc.name, DefaultOwnerID: requestOwner})
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.False(t, created)
+				orders, err := models.ListWorkOrdersBySourceRunIDs(db, f.ID, []uuid.UUID{run.ID})
+				require.NoError(t, err)
+				assert.Empty(t, orders, "invalid intake ownership must not create an ownerless task")
+				return
+			}
 			require.NoError(t, err)
 			require.True(t, created)
-			persisted, err := f.FindWorkOrder(database.Conn(), uuid.MustParse(order.ID))
+			persisted, err := f.FindWorkOrder(db, uuid.MustParse(order.ID))
 			require.NoError(t, err)
 			assert.Nil(t, persisted.CreatedBy)
 			if tc.assigned {
 				require.Len(t, persisted.Assignees, 1)
 				assert.Equal(t, r.User, persisted.Assignees[0].UserID)
+				if tc.disconnected {
+					assert.ErrorIs(t, persisted.RequireExecutionOwner(db, false), models.ErrSubscriptionOwnerInvalid)
+				}
 				return
 			}
 			assert.Empty(t, persisted.Assignees)

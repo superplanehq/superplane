@@ -133,12 +133,13 @@ function OwnerPickerOptions({
                 const selected = selectedIds.includes(user.id);
                 const member = eligibility?.members?.find((member) => member.userId === user.id);
                 const ineligible = eligibility?.subscription === true && member?.eligible !== true;
+                const requiresAnotherMemberConnection = ineligible && user.id !== currentUserId;
                 return (
                   <CommandItem
                     key={user.id}
                     value={`${user.label} ${user.id}`}
                     onSelect={() => selectUser(user.id)}
-                    disabled={disabled || ineligible}
+                    disabled={disabled || requiresAnotherMemberConnection}
                     title={ineligible ? member?.reason || "This member is unavailable." : undefined}
                   >
                     <Avatar src={user.display.avatarUrl} initials={user.display.initials} alt="" className="size-6" />

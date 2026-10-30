@@ -1,4 +1,8 @@
-import { type Dispatch, type SetStateAction } from "react";
+import { useId, type Dispatch, type SetStateAction } from "react";
+import { useFactoryOwnerEligibility } from "@/hooks/useFactoryOwnerEligibility";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
+import type { IntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { buildOrgUserDisplayMap } from "@/lib/orgUserDisplay";
@@ -10,6 +14,8 @@ export function IntakeDefaultOwnerField({
   value,
   onChange,
   disabled = false,
+  factoryId,
+  required = false,
   title = "Default task owner",
   description = "Assign this person when intake creates a task.",
 }: {
@@ -17,47 +23,42 @@ export function IntakeDefaultOwnerField({
   value: string;
   onChange: (ownerId: string) => void;
   disabled?: boolean;
+  factoryId?: string;
+  required?: boolean;
   title?: string;
   description?: string;
 }) {
-  const { data: users = [], isLoading, isError } = useOrganizationUsers(organizationId);
-  const owner = buildOrgUserDisplayMap(users).get(value);
-  const label = value ? (isLoading ? "Loading member…" : (owner?.name ?? "Unavailable member")) : "No owner";
-
+  const labelId = useId();
+  const helpId = useId();
   return (
     <section className="flex flex-col gap-2" aria-label={title}>
-      <p className="text-sm font-medium" id="intake-default-owner-label">
+      <p className="text-sm font-medium" id={labelId}>
         {title}
+        {required ? " (required)" : ""}
       </p>
-      <p className="text-sm text-muted-foreground" id="intake-default-owner-help">
+      <p className="text-sm text-muted-foreground" id={helpId}>
         {description}
       </p>
-      <WorkOrderAssigneesPopover
-        organizationId={organizationId}
-        selectedIds={value ? [value] : []}
-        align="start"
-        disabled={disabled}
-        onChange={(ids) => onChange(ids[0] ?? "")}
-      >
-        <Button
-          type="button"
-          variant="outline"
-          className="justify-start"
-          aria-labelledby="intake-default-owner-label"
-          aria-describedby="intake-default-owner-help"
+      {required && factoryId ? (
+        <ConnectedOwnerSelect
+          organizationId={organizationId}
+          factoryId={factoryId}
+          value={value}
+          onChange={onChange}
           disabled={disabled}
-        >
-          {label}
-        </Button>
-      </WorkOrderAssigneesPopover>
-      {isError ? (
-        <p className="text-sm text-destructive" role="alert">
-          SuperPlane could not load members. Close and reopen the settings to try again.
-        </p>
-      ) : null}
-      {value && !isLoading && !owner ? (
-        <p className="text-sm text-muted-foreground">This member is unavailable. Select another member or No owner.</p>
-      ) : null}
+          labelId={labelId}
+          helpId={helpId}
+        />
+      ) : (
+        <OptionalOwnerSelect
+          organizationId={organizationId}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          labelId={labelId}
+          helpId={helpId}
+        />
+      )}
     </section>
   );
 }
@@ -75,18 +76,153 @@ export function IntakeSourceDefaultOwner({
   disabled?: boolean;
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
 }) {
-  if (!intakeSourceSupportsDefaultOwner(sourceId) || !organizationId) {
+  const layout = useOptionalFactoriesLayout();
+  if (
+    !layout?.factory?.onboarding?.codexSubscription ||
+    !intakeSourceSupportsDefaultOwner(sourceId) ||
+    !organizationId
+  ) {
     return null;
   }
 
   return (
     <IntakeDefaultOwnerField
       organizationId={organizationId}
-      title={sourceId === "github-issues" ? "Task owner" : undefined}
-      description={sourceId === "github-issues" ? "Assign new SuperPlane tasks to this person." : undefined}
+      factoryId={layout.factoryId}
+      required
       value={draft.defaultOwnerId}
       disabled={disabled}
       onChange={(defaultOwnerId) => onDraftChange((current) => ({ ...current, defaultOwnerId }))}
     />
+  );
+}
+
+function ConnectedOwnerSelect({
+  organizationId,
+  factoryId,
+  value,
+  onChange,
+  disabled,
+  labelId,
+  helpId,
+}: {
+  organizationId: string;
+  factoryId: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+  labelId: string;
+  helpId: string;
+}) {
+  const eligibility = useFactoryOwnerEligibility(organizationId, factoryId);
+  const { data: users = [] } = useOrganizationUsers(organizationId);
+  const displays = buildOrgUserDisplayMap(users);
+  const members = eligibility.data?.members ?? [];
+  const selected = members.find((member) => member.userId === value);
+  return (
+    <>
+      <Select
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled || eligibility.isPending || eligibility.isError}
+        required
+      >
+        <SelectTrigger aria-labelledby={labelId} aria-describedby={helpId}>
+          <SelectValue placeholder="Select a connected member" />
+        </SelectTrigger>
+        <SelectContent>
+          {value && !members.some((member) => member.userId === value) ? (
+            <SelectItem value={value} disabled>
+              Unavailable member
+            </SelectItem>
+          ) : null}
+          {members
+            .filter((member) => member.userId && (member.eligible || member.userId === value))
+            .map((member) => (
+              <SelectItem key={member.userId} value={member.userId!} disabled={!member.eligible}>
+                {displays.get(member.userId!)?.name ?? "Unavailable member"}
+              </SelectItem>
+            ))}
+        </SelectContent>
+      </Select>
+      {eligibility.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          SuperPlane could not load connected members.{" "}
+          <Button variant="link" onClick={() => void eligibility.refetch()}>
+            Try again
+          </Button>
+        </p>
+      ) : null}
+      {value && selected && !selected.eligible ? (
+        <p className="text-sm text-muted-foreground">This owner must reconnect Codex before tasks can run.</p>
+      ) : null}
+      {!eligibility.isPending && !eligibility.isError && !members.some((member) => member.eligible) ? (
+        <p className="text-sm text-muted-foreground">Connect Codex before you select a default task owner.</p>
+      ) : null}
+    </>
+  );
+}
+
+export function IntakeSetupDefaultOwner({ owner, disabled }: { owner: IntakeOwnerDraft; disabled?: boolean }) {
+  if (!owner.required) return null;
+  return (
+    <IntakeDefaultOwnerField
+      organizationId={owner.organizationId}
+      factoryId={owner.factoryId}
+      required
+      value={owner.value}
+      onChange={owner.setValue}
+      disabled={disabled}
+    />
+  );
+}
+
+function OptionalOwnerSelect({
+  organizationId,
+  value,
+  onChange,
+  disabled,
+  labelId,
+  helpId,
+}: {
+  organizationId: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+  labelId: string;
+  helpId: string;
+}) {
+  const { data: users = [], isLoading, isError } = useOrganizationUsers(organizationId);
+  const owner = buildOrgUserDisplayMap(users).get(value);
+  const label = value ? (isLoading ? "Loading member…" : (owner?.name ?? "Unavailable member")) : "No owner";
+  return (
+    <>
+      <WorkOrderAssigneesPopover
+        organizationId={organizationId}
+        selectedIds={value ? [value] : []}
+        align="start"
+        disabled={disabled}
+        onChange={(ids) => onChange(ids[0] ?? "")}
+      >
+        <Button
+          type="button"
+          variant="outline"
+          className="justify-start"
+          aria-labelledby={labelId}
+          aria-describedby={helpId}
+          disabled={disabled}
+        >
+          {label}
+        </Button>
+      </WorkOrderAssigneesPopover>
+      {isError ? (
+        <p className="text-sm text-destructive" role="alert">
+          SuperPlane could not load members. Close and reopen the settings to try again.
+        </p>
+      ) : null}
+      {value && !isLoading && !owner ? (
+        <p className="text-sm text-muted-foreground">This member is unavailable. Select another member.</p>
+      ) : null}
+    </>
   );
 }

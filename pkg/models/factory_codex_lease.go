@@ -206,11 +206,7 @@ func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	order, err := FindSubscriptionWorkOrderForRun(tx, connection.OrganizationID, connection.FactoryID, execution.RunID)
-	if err != nil {
-		return err
-	}
-	ownerID, err := order.RequireSubscriptionOwner(tx, true)
+	ownerID, err := RequireSubscriptionRunOwner(tx, connection.OrganizationID, connection.FactoryID, execution.RunID)
 	if err != nil {
 		return err
 	}
