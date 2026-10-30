@@ -796,6 +796,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource: "work_orders", Action: "update", DomainType: models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/codex-usage"}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
 			Resource:                     "factories",
 			Action:                       "read",

@@ -65,6 +65,54 @@ function fixture(
       accountLabel: "ada@example.com",
       availableModels: ["gpt-5.4", "gpt-5.3-codex"],
     },
+    codexMembers: [
+      {
+        userId: "ada",
+        displayName: "Ada Lovelace",
+        email: "ada@example.com",
+        observedAt: new Date().toISOString(),
+        limits: [
+          {
+            limitId: "codex",
+            limitName: "Codex",
+            planType: "Plus",
+            primary: {
+              usedPercent: 25,
+              windowDurationMins: "300",
+              resetsAt: new Date(Date.now() + 3600000).toISOString(),
+            },
+            secondary: {
+              usedPercent: 40,
+              windowDurationMins: "10080",
+              resetsAt: new Date(Date.now() + 86400000 * 4).toISOString(),
+            },
+          },
+        ],
+      },
+      {
+        userId: "grace",
+        displayName: "Grace Hopper",
+        email: "grace@example.com",
+        observedAt: new Date().toISOString(),
+        limits: [
+          {
+            limitId: "codex",
+            limitName: "Codex",
+            planType: "Pro",
+            primary: {
+              usedPercent: 10,
+              windowDurationMins: "300",
+              resetsAt: new Date(Date.now() + 7200000).toISOString(),
+            },
+            secondary: {
+              usedPercent: 20,
+              windowDurationMins: "10080",
+              resetsAt: new Date(Date.now() + 86400000 * 6).toISOString(),
+            },
+          },
+        ],
+      },
+    ],
     ...overrides,
   };
 }
@@ -120,26 +168,22 @@ export const UnavailableSubscriptionModels: Story = {
       }),
     ),
 };
-export const ReconnectSubscription: Story = {
+export const NoConnectedMembers: Story = {
+  render: () => renderFixture(fixture("subscription", { codexMembers: [] })),
+};
+export const MemberUsageUnavailable: Story = {
   render: () =>
     renderFixture(
       fixture("subscription", {
-        codexConnection: { eligible: true, status: "reconnect_required", accountLabel: "ada@example.com" },
+        codexMembers: [{ userId: "ada", displayName: "Ada Lovelace", email: "ada@example.com" }],
       }),
     ),
 };
-export const SubscriptionSignIn: Story = {
-  render: () =>
-    renderFixture(
-      fixture("subscription", {
-        codexConnection: {
-          eligible: true,
-          status: "pending",
-          verificationUrl: "https://auth.openai.com/codex/device",
-          verificationCode: "ABCD-1234",
-        },
-      }),
-    ),
+export const ConnectedMembersError: Story = {
+  render: () => renderFixture(fixture("subscription", { codexMembersError: true })),
+};
+export const ConnectedMembersLoading: Story = {
+  render: () => renderFixture(fixture("subscription", { codexMembersDelayMs: 30000 })),
 };
 export const CatalogError: Story = {
   render: () =>

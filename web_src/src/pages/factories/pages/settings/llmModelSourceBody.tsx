@@ -11,8 +11,7 @@ import type { LLMModelsSwitchProvider } from "./FactorySettingsLLMModelsSwitchPr
 import { byokProviderProductName, ORGANIZATION_LLM_MODELS_COPY as COPY } from "./organizationLLMModelsCopy";
 import type { WorkspaceModelSource } from "./workspaceModelSource";
 import { WorkspaceModelPolicyEditor } from "./WorkspaceModelPolicyEditor";
-import { FactoryCodexSubscriptionConnection } from "./FactoryCodexSubscriptionConnection";
-import type { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
+import { WorkspaceCodexMembers } from "./WorkspaceCodexMembers";
 
 type BYOKQuery = ReturnType<typeof useBYOKLLMModels>;
 
@@ -26,18 +25,16 @@ type ModelSourceBodyProps = {
   canUpdate: boolean;
   canCreateIntegration: boolean;
   integrationsHref: string;
-  codex: ReturnType<typeof useFactoryCodexConnection>;
   onChooseProvider: (provider: LLMModelsSwitchProvider) => void;
   onChangeDefaultOwner?: () => void;
 };
 
 export function ModelSourceBody(props: ModelSourceBodyProps) {
-  const { source, organizationId, factoryId, canUpdate, codex, onChangeDefaultOwner } = props;
+  const { source, organizationId, factoryId, canUpdate, onChangeDefaultOwner } = props;
   const editorProps = { organizationId, factoryId, canUpdate };
   if (source === "subscription")
     return (
       <div className="space-y-5" data-testid="llm-models-codex-subscription">
-        <FactoryCodexSubscriptionConnection codex={codex} />
         <p className="text-xs text-muted-foreground">{COPY.subscriptionHelper}</p>
         {onChangeDefaultOwner ? (
           <Button type="button" variant="outline" size="sm" disabled={!canUpdate} onClick={onChangeDefaultOwner}>
@@ -50,6 +47,7 @@ export function ModelSourceBody(props: ModelSourceBodyProps) {
           fundingSource="subscription"
           label="ChatGPT subscription"
         />
+        <WorkspaceCodexMembers organizationId={organizationId} factoryId={factoryId} />
       </div>
     );
 

@@ -19,7 +19,7 @@ export function subscriptionModelSourceSwitchCases({
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     renderPage("AGENT_HARNESS_SUPERPLANE", false, client);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "Your ChatGPT subscription" }));
+    await user.click(await screen.findByRole("tab", { name: "ChatGPT subscriptions" }));
     expect(screen.getByRole("button", { name: "Switch to Codex" })).toBeDisabled();
     await user.click(await screen.findByRole("button", { name: "Connect Codex" }));
     await user.click(await screen.findByRole("button", { name: "Connect ChatGPT" }));
@@ -41,7 +41,7 @@ export function subscriptionModelSourceSwitchCases({
     switchSource.mockRejectedValueOnce(new Error("The intake configuration changed."));
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "Your ChatGPT subscription" }));
+    await user.click(await screen.findByRole("tab", { name: "ChatGPT subscriptions" }));
     await user.click(screen.getByRole("combobox", { name: "Default task owner (required)" }));
     await user.click(await screen.findByRole("option", { name: "Other member" }));
     await user.click(screen.getByRole("button", { name: "Switch to Codex" }));
@@ -55,7 +55,7 @@ export function subscriptionModelSourceSwitchCases({
   it("does not switch after owner selection is canceled", async () => {
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "Your ChatGPT subscription" }));
+    await user.click(await screen.findByRole("tab", { name: "ChatGPT subscriptions" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
     expect(switchSource).not.toHaveBeenCalled();
     expect(screen.getByRole("tab", { name: "SuperPlane" })).toHaveAttribute("aria-selected", "true");
@@ -77,7 +77,7 @@ export function subscriptionModelSourceSwitchCases({
   it("warns about replacing intake owners before the first switch to Codex", async () => {
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "Your ChatGPT subscription" }));
+    await user.click(await screen.findByRole("tab", { name: "ChatGPT subscriptions" }));
     expect(await screen.findByText(/replaces the default task owner of every intake/)).toBeInTheDocument();
   });
 

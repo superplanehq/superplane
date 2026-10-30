@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 import { canvasKeys } from "./useCanvasData";
 import { factoryQueryKeys } from "./useFactoryData";
-import { invalidateWorkspaceModelQueries } from "./workspaceModelQueries";
+import { invalidateSubscriptionState, invalidateWorkspaceModelQueries } from "./workspaceModelQueries";
 import {
   applyWorkOrderToListCaches,
   cachedWorkOrderIdsFromLists,
@@ -507,12 +507,6 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
     },
     enabled && url !== null,
   );
-}
-
-function invalidateSubscriptionState(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {
-  void invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId);
-  void queryClient.invalidateQueries({ queryKey: ["factory-codex-connection", organizationId] });
-  void queryClient.invalidateQueries({ queryKey: ["me", organizationId] });
 }
 
 function invalidateModelCatalogs(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {

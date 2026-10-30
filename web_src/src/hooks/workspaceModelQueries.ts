@@ -24,3 +24,10 @@ export function invalidateWorkspaceModelQueries(queryClient: QueryClient, organi
     }),
   ]);
 }
+
+export function invalidateSubscriptionState(queryClient: QueryClient, organizationId: string, factoryId: string) {
+  void invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId);
+  void queryClient.invalidateQueries({ queryKey: ["factory-codex-connection", organizationId] });
+  void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "codex-usage"] });
+  void queryClient.invalidateQueries({ queryKey: ["me", organizationId] });
+}

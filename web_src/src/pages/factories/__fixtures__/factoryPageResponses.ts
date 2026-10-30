@@ -5,6 +5,7 @@ import type {
   OrganizationsPurchaseSeatsResponse,
   FactoriesFactory,
   FactoriesFactoryCodexConnection,
+  FactoriesCodexMemberUsage,
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
   FactoriesFactoryLine,
@@ -376,6 +377,9 @@ export interface FactoriesFixture {
   workspaceModelPolicyError?: string;
   workspaceModelPolicyDelayMs?: { GET?: number; PUT?: number };
   codexConnection?: FactoriesFactoryCodexConnection;
+  codexMembers?: FactoriesCodexMemberUsage[];
+  codexMembersError?: boolean;
+  codexMembersDelayMs?: number;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /** Global GitHub App catalog state for Factory onboarding. */

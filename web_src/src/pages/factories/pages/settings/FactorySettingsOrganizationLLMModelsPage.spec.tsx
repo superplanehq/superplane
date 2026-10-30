@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import {
   meCancelCodexConnection,
   factoriesListFactoryOwnerEligibility,
+  factoriesListFactoryCodexUsage,
   meDescribeCodexConnection,
   meStartCodexConnection,
   type FactoriesFactoryCodexConnection,
@@ -80,6 +81,7 @@ vi.mock("@/api-client", () => ({
   meStartCodexConnection: vi.fn(),
   meCancelCodexConnection: vi.fn(),
   factoriesListFactoryOwnerEligibility: vi.fn(),
+  factoriesListFactoryCodexUsage: vi.fn(),
 }));
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
@@ -135,6 +137,30 @@ describe("workspace LLM model settings", () => {
             },
           }) as never,
       );
+    vi.mocked(factoriesListFactoryCodexUsage)
+      .mockReset()
+      .mockResolvedValue({
+        data: {
+          members: [
+            {
+              userId: "other",
+              displayName: "Other member",
+              email: "other@example.com",
+              observedAt: new Date().toISOString(),
+              limits: [
+                {
+                  limitId: "codex",
+                  primary: {
+                    usedPercent: 25,
+                    windowDurationMins: "300",
+                    resetsAt: new Date(Date.now() + 3600000).toISOString(),
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      } as never);
     saveModels.mockReset().mockResolvedValue({});
     switchSource.mockReset().mockResolvedValue({});
     vi.mocked(showErrorToast).mockClear();
@@ -275,13 +301,31 @@ describe("workspace LLM model settings", () => {
     expect(screen.getByRole("checkbox", { name: /sonnet 4-6/ })).toBeDisabled();
   });
 
-  it("starts personal reconnection without changing the model source", async () => {
-    codexConnection = { status: "reconnect_required", eligible: true };
+  it("shows connected members and saved usage without personal connection controls", async () => {
+    codexConnection = { status: "reconnect_required", eligible: true, accountLabel: "personal@example.com" };
     renderPage("AGENT_HARNESS_CODEX", true);
-    const connect = await screen.findByRole("button", { name: "Reconnect ChatGPT" });
-    await userEvent.setup().click(connect);
-    expect(meStartCodexConnection).toHaveBeenCalledTimes(1);
-    expect(switchSource).not.toHaveBeenCalled();
+    expect(await screen.findByText("Other member")).toBeInTheDocument();
+    expect(screen.getByText("other@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "5-hour window remaining" })).toHaveAttribute("aria-valuenow", "75");
+    expect(screen.queryByText("personal@example.com")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /(?:Connect|Reconnect|Disconnect) ChatGPT|Refresh usage/ }),
+    ).not.toBeInTheDocument();
+    expect(meStartCodexConnection).not.toHaveBeenCalled();
+  });
+
+  it("shows an empty connected-member list without connection controls", async () => {
+    vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({ data: { members: [] } } as never);
+    renderPage("AGENT_HARNESS_CODEX", true);
+    expect(await screen.findByText("No members have a connected ChatGPT account.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
+  });
+
+  it("can retry a failed member usage request", async () => {
+    vi.mocked(factoriesListFactoryCodexUsage).mockRejectedValueOnce(new Error("Unavailable"));
+    renderPage("AGENT_HARNESS_CODEX", true);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Other member")).toBeInTheDocument();
   });
 
   subscriptionModelSourceSwitchCases({

@@ -79,6 +79,9 @@ export function createOrgWorkspaceFixtureFetch(
     const url = new URL(requestUrl(input), fixtureFetchBaseHref());
     const method = requestMethod(input, init);
     const body = await readRequestJson(input, init);
+    if (/^\/api\/v1\/factories\/[^/]+\/codex-usage$/.test(url.pathname) && factoriesFixture?.codexMembersDelayMs) {
+      await new Promise((resolve) => setTimeout(resolve, factoriesFixture.codexMembersDelayMs));
+    }
     if (/^\/api\/v1\/factories\/[^/]+\/llm-models$/.test(url.pathname)) {
       const delay =
         method === "PUT"

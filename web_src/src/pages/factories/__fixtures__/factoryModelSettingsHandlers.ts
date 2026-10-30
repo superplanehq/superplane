@@ -123,5 +123,16 @@ function modelSourceRoute(fixture: FactoriesFixture): FactoriesRoute {
 }
 
 export function factoryModelSettingsRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
-  return [workspaceModelPolicyRoute(fixture), ...personalConnectionRoutes(fixture), modelSourceRoute(fixture)];
+  return [
+    {
+      pattern: pattern("codex-usage"),
+      resolve: () =>
+        fixture.codexMembersError
+          ? { status: 503, json: { message: "Could not load connected ChatGPT members." } }
+          : { json: { members: fixture.codexMembers ?? [] } },
+    },
+    workspaceModelPolicyRoute(fixture),
+    ...personalConnectionRoutes(fixture),
+    modelSourceRoute(fixture),
+  ];
 }

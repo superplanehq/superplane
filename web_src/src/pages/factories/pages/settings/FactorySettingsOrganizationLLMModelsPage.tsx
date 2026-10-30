@@ -56,7 +56,6 @@ function WorkspaceModelSettings({ settings }: { settings: ReturnType<typeof useW
               !settings.switcher.saving &&
               (settings.source !== "subscription" || settings.subscription.offered)
             }
-            codex={settings.subscription.codex}
             onChangeDefaultOwner={() => settings.switcher.setSubscriptionDialog("warn")}
             onChooseProvider={(target) => {
               if (target !== settings.currentProvider) settings.switcher.setDialog({ target, step: "warn" });

@@ -48,6 +48,7 @@ describe("useFactoryWebsocket subscription recovery", () => {
       selectableLLMModelsQueryKey(organizationId, factoryId, "", { orderId: "order-1" }),
       factoryCodexConnectionKey(organizationId, factoryId, "member-1"),
       factoryLLMModelsQueryKey(organizationId, factoryId, "openai", "subscription"),
+      ["factories", organizationId, factoryId, "codex-usage"],
       ...(trigger === "reconnect" ? [factoryQueryKeys.detail(organizationId, factoryId)] : []),
     ];
     const currentKeys = [

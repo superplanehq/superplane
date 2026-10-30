@@ -970,6 +970,15 @@ service Factories {
     option (google.api.http) = { post: "/api/v1/factories/{factory_id}/work-orders/{order_id}:resume-handoff" body: "*" };
   }
 
+  rpc ListFactoryCodexUsage(ListFactoryCodexUsageRequest) returns (ListFactoryCodexUsageResponse) {
+    option (google.api.http) = { get: "/api/v1/factories/{factory_id}/codex-usage" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List connected members and ChatGPT usage";
+      description: "Returns saved usage snapshots for connected workspace members.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribeFactoryCodexConnection(DescribeFactoryCodexConnectionRequest) returns (DescribeFactoryCodexConnectionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/codex-connection"
@@ -3466,4 +3475,34 @@ message ListFactoryOwnerEligibilityResponse {
   bool ownership_change_allowed = 2;
   string restriction_reason = 3;
   bool subscription = 4;
+}
+
+message ListFactoryCodexUsageRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryCodexUsageResponse {
+  repeated CodexMemberUsage members = 1;
+}
+
+message CodexMemberUsage {
+  string user_id = 1;
+  string display_name = 2;
+  string email = 3;
+  google.protobuf.Timestamp observed_at = 4;
+  repeated CodexUsageLimit limits = 5;
+}
+
+message CodexUsageLimit {
+  string limit_id = 1;
+  string limit_name = 2;
+  string plan_type = 3;
+  CodexUsageWindow primary = 4;
+  CodexUsageWindow secondary = 5;
+}
+
+message CodexUsageWindow {
+  double used_percent = 1;
+  optional int64 window_duration_mins = 2;
+  google.protobuf.Timestamp resets_at = 3;
 }

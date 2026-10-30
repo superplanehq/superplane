@@ -16,7 +16,7 @@ function sourceOptions(settings: Settings) {
     },
     {
       value: "subscription",
-      label: "Your ChatGPT subscription",
+      label: "ChatGPT subscriptions",
       visible: settings.subscription.offered || settings.source === "subscription",
       disabled: !settings.subscription.offered && settings.source !== "subscription",
     },
