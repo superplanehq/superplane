@@ -16,24 +16,12 @@ const SESSION_FILE = "codex_session";
 
 // Codex starts stdio MCP servers with a minimal environment. Forward by name,
 // not with mcp_servers.<id>.env, so tokens stay out of the codex argv.
-const SUPERPLANE_MCP_ENV_VARS = [
-  "SUPERPLANE_BASE_URL",
-  "SUPERPLANE_RUN_TOKEN",
-  "SUPERPLANE_TASK_DIR",
-  "SUPERPLANE_ACTIVITY_ID",
-  "SUPERPLANE_ANALYSIS_SPEC_FILE",
-  "SUPERPLANE_ANALYSIS_SCORE_FILE",
-  "SUPERPLANE_ARTIFACT_TOKEN",
-  "SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
-  "SUPERPLANE_VISUAL_EVIDENCE",
-  "SUPERPLANE_PUBLISH_LINKS",
-];
-
 const GLOBAL_MCP_SERVER = "superplane_global";
 const GLOBAL_MCP_ENV_VARS = [
   "SUPERPLANE_BASE_URL",
   "SUPERPLANE_RUNNER_TOKEN",
   "SUPERPLANE_TASK_DIR",
+  "SUPERPLANE_ANALYSIS_SPEC_FILE",
 ];
 
 function loadActivityStreamModule() {
@@ -161,20 +149,6 @@ function visualEvidenceEnabled(env = process.env) {
   return artifactEnabled(env) && !envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
 }
 
-function mergeConfidenceEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
-}
-
-function superplaneMCPScript(taskDir, env = process.env) {
-  if (planningEnabled(env)) {
-    return path.join(taskDir, "planning_session_mcp.js");
-  }
-  if (mergeConfidenceEnabled(env)) {
-    return path.join(taskDir, "merge_confidence_mcp.js");
-  }
-  return path.join(taskDir, "task_artifact_mcp.js");
-}
-
 function planningSystemPrompt(env = process.env) {
   return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
@@ -201,18 +175,14 @@ function codexExecArgs(
     args.push("resume", sessionID);
   }
   args.push("--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox");
+  args.push(...workspaceMCPConfigOverrides(env));
   if (planningEnabled(env)) {
-    args.push(...mcpConfigOverrides(mcpScriptPath, env));
     args.push(
       "-c",
       `developer_instructions=${tomlString(loadAnalysisProtocol(env))}`,
     );
-  } else if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
-    args.push(...mcpConfigOverrides(mcpScriptPath, env));
-  } else {
-    args.push(...workspaceMCPConfigOverrides(env));
   }
-  args.push(...globalMCPConfigOverrides(path.dirname(String(mcpScriptPath || "")), env));
+  args.push(...globalMCPConfigOverrides(taskDirFromMCPPath(mcpScriptPath), env));
   if (model) {
     args.push("-m", model);
   }
@@ -259,26 +229,9 @@ function codexSessionIDFromEvent(event) {
   ).trim();
 }
 
-function mcpConfigOverrides(mcpScriptPath, env = process.env) {
-  return [
-    "-c",
-    `mcp_servers.superplane.command=${tomlString("node")}`,
-    "-c",
-    `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
-    "-c",
-    `mcp_servers.superplane.env_vars=${tomlStringArray(SUPERPLANE_MCP_ENV_VARS)}`,
-    // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
-    // answer that prompt, so approve these planning tools explicitly.
-    ...(planningEnabled(env)
-      ? [
-          "-c",
-          'mcp_servers.superplane.tools.propose_update.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"',
-        ]
-      : []),
-    ...workspaceMCPConfigOverrides(env),
-  ];
+function taskDirFromMCPPath(value) {
+  const candidate = String(value || "");
+  return candidate.endsWith(".js") ? path.dirname(candidate) : candidate;
 }
 
 function loadGlobalMCPRegistry(taskDir) {
@@ -479,11 +432,10 @@ async function runPrompt(promptFile, model, thinking) {
     turn: promptCount + 1,
   });
   activity.start();
-  const mcpScript = superplaneMCPScript(sp);
   const codexArgs = codexExecArgs(
     process.env,
     model,
-    mcpScript,
+    sp,
     sessionID,
     thinking,
   );
@@ -585,7 +537,7 @@ async function runPrompt(promptFile, model, thinking) {
   accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
-    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+    await require(path.join(sp, "agent_message.js")).recordAgentMessage(
       safePayload.result,
     );
   }
@@ -1186,7 +1138,6 @@ module.exports = {
   codexSessionForPrompt,
   codexSessionIDFromEvent,
   planningEnabled,
-  superplaneMCPScript,
   planningSystemPrompt,
   planningAnalysisEnabled,
   workspaceMCPConfigOverrides,
