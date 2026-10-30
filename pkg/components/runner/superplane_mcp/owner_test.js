@@ -45,6 +45,15 @@ test("assign_owner puts the owner on the task route", async () => {
   assert.deepEqual(calls[0].body, { user: "@mijat", reason: "You changed pkg/payments." });
 });
 
+test("assign_owner can keep an existing owner", async () => {
+  const calls = [];
+  const client = createClient(env, recordingFetch(calls));
+
+  await registry.findTool("assign_owner").handler({ user: "mijat", only_if_unassigned: true }, client);
+
+  assert.deepEqual(calls[0].body, { user: "mijat", only_if_unassigned: true });
+});
+
 test("assign_owner sends a call with no reason", async () => {
   const calls = [];
   const client = createClient(env, recordingFetch(calls));
