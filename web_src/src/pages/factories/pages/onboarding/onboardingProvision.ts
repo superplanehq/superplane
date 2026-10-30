@@ -6,7 +6,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryAutomation,
-  FactoryLineStep,
+  FactoriesFactoryLineStep as FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import {
@@ -178,12 +178,29 @@ export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 export type CreateFactoryIntake = (input: {
   source: FactoriesFactoryIntakeSource;
   skipInitialImport?: boolean;
+  /** Start with automatic intake off. The initial import still runs. */
+  paused?: boolean;
   integrationId?: string;
   resourceId?: string;
   settings?: FactoriesFactoryIntakeSettings;
 }) => Promise<FactoriesFactoryIntake>;
 
 export type DeleteFactoryIntake = (intakeId: string) => Promise<unknown>;
+
+export type UpdateFactoryIntake = (input: { intakeId: string; paused?: boolean }) => Promise<FactoriesFactoryIntake>;
+
+// A retried finish reuses the intake it created before the failure. The
+// Automatic intake switch may have changed since, so the reused intake takes
+// the current choice instead of the one it was created with.
+async function reuseIntake(
+  existing: FactoriesFactoryIntake,
+  paused: boolean | undefined,
+  updateIntake: UpdateFactoryIntake,
+): Promise<FactoriesFactoryIntake> {
+  const wantPaused = Boolean(paused);
+  if (!existing.id || Boolean(existing.paused) === wantPaused) return existing;
+  return updateIntake({ intakeId: existing.id, paused: wantPaused });
+}
 
 function isBacklogIntake(intake: FactoriesFactoryIntake): boolean {
   return (
@@ -220,24 +237,29 @@ async function removeProvisionedIntake(
 export async function provisionGithubIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  updateIntake: UpdateFactoryIntake;
   skipInitialImport?: boolean;
+  paused?: boolean;
 }): Promise<FactoriesFactoryIntake> {
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === GITHUB_INTAKE_SOURCE);
   if (existing) {
-    return existing;
+    return reuseIntake(existing, args.paused, args.updateIntake);
   }
 
   return args.createIntake({
     source: GITHUB_INTAKE_SOURCE,
     ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
+    ...(args.paused ? { paused: true } : {}),
   });
 }
 
 export async function provisionJiraIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  updateIntake: UpdateFactoryIntake;
   skipInitialImport?: boolean;
+  paused?: boolean;
   deleteIntake: DeleteFactoryIntake;
   integrationId: string;
   resourceId: string;
@@ -246,7 +268,7 @@ export async function provisionJiraIntake(args: {
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
   if (existing && intakeBindingMatches(existing, args.integrationId, args.resourceId)) {
-    return existing;
+    return reuseIntake(existing, args.paused, args.updateIntake);
   }
   if (existing) {
     await removeProvisionedIntake(args.deleteIntake, existing);
@@ -255,6 +277,7 @@ export async function provisionJiraIntake(args: {
   const created = await args.createIntake({
     source: JIRA_INTAKE_SOURCE,
     ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
+    ...(args.paused ? { paused: true } : {}),
     integrationId: args.integrationId,
     resourceId: args.resourceId,
     ...(args.settings ? { settings: args.settings } : {}),
@@ -293,7 +316,9 @@ function linearIntakeMatches(intake: FactoriesFactoryIntake, integrationId: stri
 export async function provisionLinearIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  updateIntake: UpdateFactoryIntake;
   skipInitialImport?: boolean;
+  paused?: boolean;
   deleteIntake: DeleteFactoryIntake;
   integrationId: string;
   scope: LinearIntakeScope;
@@ -301,7 +326,7 @@ export async function provisionLinearIntake(args: {
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === LINEAR_INTAKE_SOURCE);
   if (existing && linearIntakeMatches(existing, args.integrationId, args.scope)) {
-    return existing;
+    return reuseIntake(existing, args.paused, args.updateIntake);
   }
   if (existing) {
     await removeProvisionedIntake(args.deleteIntake, existing);
@@ -310,6 +335,7 @@ export async function provisionLinearIntake(args: {
   return args.createIntake({
     source: LINEAR_INTAKE_SOURCE,
     ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
+    ...(args.paused ? { paused: true } : {}),
     integrationId: args.integrationId,
     settings: linearIntakeScopeToApi(args.scope),
   });
@@ -322,7 +348,9 @@ export async function provisionOnboardingIntake(args: {
   vcsProvider?: string;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  updateIntake: UpdateFactoryIntake;
   skipInitialImport?: boolean;
+  paused?: boolean;
   deleteIntake: DeleteFactoryIntake;
   issuesChoice: IssuesChoiceId | null;
   jira?: {
@@ -349,7 +377,9 @@ export async function provisionOnboardingIntake(args: {
     return provisionJiraIntake({
       listIntakes: args.listIntakes,
       createIntake: args.createIntake,
+      updateIntake: args.updateIntake,
       skipInitialImport: args.skipInitialImport,
+      paused: args.paused,
       deleteIntake: args.deleteIntake,
       integrationId: args.jira.integrationId,
       resourceId: args.jira.projectId,
@@ -363,7 +393,9 @@ export async function provisionOnboardingIntake(args: {
     return provisionLinearIntake({
       listIntakes: args.listIntakes,
       createIntake: args.createIntake,
+      updateIntake: args.updateIntake,
       skipInitialImport: args.skipInitialImport,
+      paused: args.paused,
       deleteIntake: args.deleteIntake,
       integrationId: args.linear.integrationId,
       scope: args.linear.scope,
@@ -374,7 +406,9 @@ export async function provisionOnboardingIntake(args: {
   return provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
+    updateIntake: args.updateIntake,
     skipInitialImport: args.skipInitialImport,
+    paused: args.paused,
   });
 }
 
