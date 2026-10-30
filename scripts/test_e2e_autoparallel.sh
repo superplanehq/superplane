@@ -10,8 +10,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/shard_args.sh"
 echo "Running e2e tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
 
 if [[ ! -d "./test/e2e" ]]; then
-  echo "No ./test/e2e directory found, nothing to run."
-  exit 0
+  echo "No ./test/e2e directory found." >&2
+  exit 1
 fi
 
 # Collect all top-level Test* functions from e2e test files.
@@ -31,22 +31,37 @@ while IFS= read -r file; do
 done < <(find ./test/e2e -maxdepth 1 -type f -name '*_test.go' | sort)
 
 if [[ "${#all_tests[@]}" -eq 0 ]]; then
-  echo "No e2e tests found in ./test/e2e, nothing to run."
-  exit 0
+  echo "No e2e tests found in ./test/e2e." >&2
+  exit 1
 fi
 
 # Deduplicate and sort test names.
 mapfile -t all_tests < <(printf '%s\n' "${all_tests[@]}" | sort -u)
 
+# Timings only supply weights; source discovery remains authoritative. New
+# tests get a conservative weight, and removed tests cannot enter a shard.
+weighted_tests="$(printf '%s\n' "${all_tests[@]}" | awk '
+  NR == FNR { if ($1 !~ /^#/ && NF == 2) durations[$1] = $2; next }
+  { print (($1 in durations) ? durations[$1] : 60), $1 }
+' "$(dirname "${BASH_SOURCE[0]}")/e2e_test_durations.tsv" - | sort -k1,1nr -k2,2)"
+
+shard_loads=()
+for ((shard=0; shard<SHARD_COUNT; shard++)); do
+  shard_loads+=(0)
+done
 selected_tests=()
-idx=0
-for test_name in "${all_tests[@]}"; do
-  shard=$(( (idx % SHARD_COUNT) + 1 ))
-  if [[ "$shard" -eq "$SHARD_INDEX" ]]; then
+while read -r seconds test_name; do
+  lightest=0
+  for ((shard=1; shard<SHARD_COUNT; shard++)); do
+    if (( shard_loads[shard] < shard_loads[lightest] )); then
+      lightest="$shard"
+    fi
+  done
+  shard_loads[$lightest]=$((shard_loads[lightest] + seconds))
+  if [[ $((lightest + 1)) -eq "$SHARD_INDEX" ]]; then
     selected_tests+=("$test_name")
   fi
-  idx=$((idx + 1))
-done
+done <<< "$weighted_tests"
 
 if [[ "${#selected_tests[@]}" -eq 0 ]]; then
   echo "No tests assigned to shard ${SHARD_INDEX}/${SHARD_COUNT}; exiting successfully."
@@ -54,6 +69,7 @@ if [[ "${#selected_tests[@]}" -eq 0 ]]; then
 fi
 
 echo "Selected tests for shard ${SHARD_INDEX}/${SHARD_COUNT}:"
+echo "Estimated test duration: ${shard_loads[$((SHARD_INDEX - 1))]}s"
 for t in "${selected_tests[@]}"; do
   echo "  - ${t}"
 done
