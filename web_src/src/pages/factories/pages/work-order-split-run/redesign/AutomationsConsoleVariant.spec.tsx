@@ -3,6 +3,11 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
+import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import cursorIcon from "@/assets/icons/integrations/cursor.svg";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
+
 import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../../__fixtures__/lineMetricsBoardOrders";
 import { OPEN_WORK_ORDER_CHECKS } from "../../../__fixtures__/workOrderCheckFixtures";
@@ -10,7 +15,7 @@ import { TWO_HOURS_AGO } from "../../../__fixtures__/factoryPageIds";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { buildSplitRunFooter } from "../splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "../splitRunMocks";
-import { CREATED_MANUALLY } from "../splitRunSource";
+import { CREATED_MANUALLY, splitRunSourceForOrder } from "../splitRunSource";
 
 describe("AutomationsConsoleVariant timeline markers", () => {
   it("fills finished columns and spins the live column", () => {
@@ -355,10 +360,16 @@ describe("AutomationsConsoleVariant intake", () => {
 
     const intake = screen.getByTestId("redesign-console-column-intake");
     expect(within(intake).getByText("Intake")).toBeInTheDocument();
-    expect(within(intake).getByTestId("redesign-console-column-marker-intake")).toHaveTextContent("GitHub");
+    const marker = within(intake).getByTestId("redesign-console-column-marker-intake");
+    expect(marker).toHaveTextContent("GitHub");
+    expect(marker.querySelector("img")).toHaveAttribute("src", githubIcon);
     const description = within(intake).getByTestId("redesign-console-task-description");
     expect(description).toHaveTextContent("Users see duplicate refund entries.");
     expect(within(description).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
+    expect(within(description).getByTestId("split-run-source-ticket")).toHaveAttribute(
+      "href",
+      "https://github.com/acme/payments-service/issues/103",
+    );
     expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(
       "Intake GitHub issues",
     );
@@ -405,9 +416,42 @@ describe("AutomationsConsoleVariant intake", () => {
       taskDescription: "Users see duplicate refund entries.",
     });
 
+    const marker = screen.getByTestId("redesign-console-column-marker-intake");
+    expect(marker).toHaveTextContent("SuperPlane");
+    expect(marker.querySelector("img")?.getAttribute("src")).toBe(superplaneMark);
     const description = screen.getByTestId("redesign-console-task-description");
     expect(within(description).getByTestId("split-run-source")).toHaveTextContent(SPLIT_RUN_RUNNING.owner.name);
     expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(CREATED_MANUALLY);
+    expect(within(description).queryByTestId("split-run-source-ticket")).not.toBeInTheDocument();
+  });
+
+  it("uses the current mark when the editable Intake has no source", () => {
+    renderConsole(SPLIT_RUN_RUNNING, { source: undefined, taskDescription: "", canEditDescription: true });
+
+    const marker = screen.getByTestId("redesign-console-column-marker-intake");
+    expect(marker).toHaveTextContent("SuperPlane");
+    expect(marker.querySelector("img")?.getAttribute("src")).toBe(superplaneMark);
+    const description = screen.getByTestId("redesign-console-task-description");
+    expect(within(description).getByTestId("split-run-description-edit")).toBeInTheDocument();
+  });
+
+  it.each([
+    { name: "Codex", iconSrc: superplaneMark, iconAlt: "SuperPlane" },
+    { name: "Cursor", iconSrc: cursorIcon, iconAlt: "Cursor" },
+    { name: "Claude Code", iconSrc: claudeIcon, iconAlt: "Claude" },
+  ])("uses the source logo and preserves the $name MCP client name", ({ name, iconSrc, iconAlt }) => {
+    renderConsole(SPLIT_RUN_RUNNING, {
+      source: splitRunSourceForOrder({ ...DRAFT_WORK_ORDER, mcpClient: { id: "superplane-local", name } }),
+    });
+
+    const marker = screen.getByTestId("redesign-console-column-marker-intake");
+    expect(marker).toHaveTextContent(iconAlt);
+    expect(marker.querySelector("img")?.getAttribute("src")).toBe(iconSrc);
+    const description = screen.getByTestId("redesign-console-task-description");
+    const source = within(description).getByTestId("split-run-source");
+    expect(within(source).getByRole("img", { name: iconAlt }).getAttribute("src")).toBe(iconSrc);
+    expect(source).toHaveTextContent(name);
+    expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(name);
     expect(within(description).queryByTestId("split-run-source-ticket")).not.toBeInTheDocument();
   });
 
