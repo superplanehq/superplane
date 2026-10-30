@@ -757,3 +757,38 @@ func TestBuildExistingAPIKeyWorkspaceWithoutModelSetup(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildCustomModelOverrideWithoutCatalogSnapshot(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	for _, flag := range []string{features.FeatureOrganizationBYOK, features.FeatureOrganizationBYOKCustomProvider} {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, flag))
+	}
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	catalog, err := support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderCustom, []string{"custom-original", "custom-override"})
+	require.NoError(t, err)
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderCustom, models.UsageFundingSourceBYOK, []string{"custom-original", "custom-override"})
+	require.NoError(t, err)
+	require.NoError(t, db.Delete(catalog).Error)
+	canvas, event, run := setupRunnerAppExecution(t, r, factory.ID, "runnerOpenRouter")
+	order, err := factory.CreateWorkOrder(db, "Run with a custom model", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+	execution, err := models.FindWorkOrderExecutionByRunID(db, run.ID)
+	require.NoError(t, err)
+	dispatch, err := models.FindWorkOrderLineDispatch(db, execution.LineDispatchID)
+	require.NoError(t, err)
+	for _, selected := range []string{"custom-override", "gpt-5"} {
+		require.NoError(t, db.Model(dispatch).Update("model", selected).Error)
+		resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID("agent").WithRootEvent(&event.ID).Build(map[string]any{
+			"model": "custom-original", "llmProvider": models.UsageProviderCustom, "credentials": map[string]any{"source": "integration"},
+		})
+		require.NoError(t, err)
+		want := "custom-original"
+		if selected == "custom-override" {
+			want = selected
+		}
+		assert.Equal(t, want, resolved["model"])
+	}
+}

@@ -73,7 +73,7 @@ func ListSelectableLLMModels(
 		return nil, grpcerrors.Internal(err, "failed to load model access")
 	}
 	if reg != nil && byokAllowed {
-		refreshConnectedBYOKModelCatalogs(tx, reg, organization.ID)
+		refreshMissingBYOKModelCatalogs(tx, reg, organization.ID)
 	}
 
 	listed, err := models.ListSelectableLLMModels(tx, organization.ID, factoryID)

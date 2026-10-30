@@ -8,8 +8,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// refreshConnectedBYOKModelCatalogs keeps successful snapshots on provider failures.
-func refreshConnectedBYOKModelCatalogs(tx *gorm.DB, reg *registry.Registry, orgID uuid.UUID) {
+// refreshMissingBYOKModelCatalogs warms unknown catalogs only. Provider catalog
+// endpoints refresh existing snapshots without making every picker wait on HTTP.
+func refreshMissingBYOKModelCatalogs(tx *gorm.DB, reg *registry.Registry, orgID uuid.UUID) {
 	for _, provider := range append(models.KnownHostedLLMProviders(), models.UsageProviderCustom) {
 		logger := log.WithFields(log.Fields{"organization_id": orgID.String(), "provider": provider})
 
@@ -28,6 +29,15 @@ func refreshConnectedBYOKModelCatalogs(tx *gorm.DB, reg *registry.Registry, orgI
 			continue
 		}
 		if integration == nil {
+			continue
+		}
+
+		catalog, err := models.FindIntegrationModelCatalog(tx, integration.ID)
+		if err != nil {
+			logger.WithError(err).Warn("load provider model catalog")
+			continue
+		}
+		if catalog != nil {
 			continue
 		}
 

@@ -67,19 +67,19 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 	require.Error(t, err)
 }
 
-func Test__ListSelectableLLMModels__RefreshesConnectedCatalog(t *testing.T) {
+func TestSelectableModelsReuseSnapshotsUntilProviderCatalogRefresh(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
-	t.Cleanup(func() {
-	})
 	saveEmptyHostedModelSelections(t, db, r.Organization.ID)
 
 	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "openai", support.RandomName("openai"), map[string]any{})
 	require.NoError(t, err)
 	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	requests := 0
 	r.Registry.Integrations["openai"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+			requests++
 			return []core.IntegrationResource{{ID: "gpt-5"}, {ID: "gpt-4.1"}}, nil
 		},
 	})
@@ -96,7 +96,14 @@ func Test__ListSelectableLLMModels__RefreshesConnectedCatalog(t *testing.T) {
 	require.NoError(t, err)
 	resp, err = ListSelectableLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
 	require.NoError(t, err)
-	assert.Len(t, resp.Models, 2, "successful refresh replaces an earlier empty snapshot")
+	assert.Empty(t, resp.Models, "a successful empty catalog stays known")
+	assert.Equal(t, 1, requests, "pickers must reuse snapshots without waiting on providers")
+	_, err = ListBYOKLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{Provider: "openai"})
+	require.NoError(t, err)
+	resp, err = ListSelectableLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
+	require.NoError(t, err)
+	assert.Len(t, resp.Models, 2)
+	assert.Equal(t, 2, requests, "explicit catalog requests refresh snapshots")
 }
 
 func saveEmptyHostedModelSelections(t *testing.T, db *gorm.DB, orgID uuid.UUID) {

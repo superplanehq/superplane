@@ -44,7 +44,9 @@ billing permissions still apply.
 Provider catalog requests save model IDs, display names, and observation time
 for each integration. A failed request preserves the last successful snapshot.
 Missing snapshots mean unknown availability. Successful empty responses mean the
-provider returned no models. Catalog availability does not authorize execution.
+provider returned no models. Pickers reuse saved snapshots. Provider catalog
+requests refresh them, so outages do not delay pickers that have saved data.
+Catalog availability does not authorize execution.
 
 Existing API-key automations keep their configured models and provider defaults
 when workspace policy is absent or inherited. Explicit workspace selections

@@ -181,7 +181,7 @@ func validateRefinementModel(tx *gorm.DB, factory *models.Factory, model string)
 			if node.ID != backlogRefinementNodeID {
 				continue
 			}
-			matches, err := models.RunnerMatchesModel(tx, factory.OrganizationID, node.ComponentName(), node.Configuration, model)
+			matches, err := models.RunnerMatchesModel(tx, factory.OrganizationID, &factory.ID, node.ComponentName(), node.Configuration, model)
 			if err != nil {
 				return err
 			}

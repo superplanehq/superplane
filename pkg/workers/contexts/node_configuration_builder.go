@@ -2417,7 +2417,7 @@ func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, m
 	if err != nil {
 		return nil, err
 	}
-	matches, err := models.RunnerMatchesModel(b.tx, canvas.OrganizationID, node.ComponentName(), resolved, override)
+	matches, err := models.RunnerMatchesModel(b.tx, canvas.OrganizationID, canvas.FactoryID, node.ComponentName(), resolved, override)
 	if err != nil {
 		return nil, err
 	}

@@ -150,9 +150,9 @@ func runnerWorkspacePolicy(tx *gorm.DB, factoryID *uuid.UUID, provider string) (
 }
 
 // RunnerMatchesModel routes shared overrides independently of workspace policy.
-// Unknown native IDs need discovery or a configured match; catalog absence never
-// prevents execution of the runner's existing configuration.
-func RunnerMatchesModel(tx *gorm.DB, orgID uuid.UUID, component string, configuration map[string]any, model string) (bool, error) {
+// Provider-scoped workspace selections, saved configuration, and discovery
+// identify opaque model IDs independently of the execution authorization check.
+func RunnerMatchesModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, component string, configuration map[string]any, model string) (bool, error) {
 	model = strings.TrimSpace(model)
 	if component == SuperPlaneRunnerComponent {
 		_, err := ParseHostedLLMModelKey(model)
@@ -172,6 +172,18 @@ func RunnerMatchesModel(tx *gorm.DB, orgID uuid.UUID, component string, configur
 	stored, _ := configuration["model"].(string)
 	if model == strings.TrimSpace(stored) {
 		return true, nil
+	}
+	// Saved workspace selections also identify opaque provider model IDs after
+	// an upgrade, before that integration has a catalog snapshot. Authorization
+	// still runs separately against the final model.
+	if factoryID != nil && *factoryID != uuid.Nil {
+		policy, err := FindFactoryLLMModelAllowlist(tx, *factoryID, provider, llmRunnerFundingSource(configuration))
+		if err != nil {
+			return false, err
+		}
+		if policy != nil && slices.Contains(policy.AllowedModels, model) {
+			return true, nil
+		}
 	}
 	switch provider {
 	case UsageProviderAnthropic:
