@@ -25,6 +25,8 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
@@ -96,6 +98,52 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 	staleToken, err := runneraction.MintCodexSubscriptionToken(signer, scope, time.Hour)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusConflict, checkpoint(staleToken, valid).Code)
+}
+
+func TestCodexCheckpointRejectsCompletedSetupAfterEarlyRelease(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+	require.NoError(t, err)
+	now := time.Now()
+	fleet := &models.RunnerFleet{ID: uuid.New(), Slug: "codex-test", ScopeType: models.RunnerFleetScopeInstallation, RunnerVersion: "test", CreatedAt: now, UpdatedAt: now}
+	require.NoError(t, fleet.Create(db))
+	runner := &models.Runner{ID: uuid.New(), FleetID: fleet.ID, State: models.RunnerStateIdle, Ephemeral: true, RunnerVersion: "test", CreatedAt: now, UpdatedAt: now}
+	require.NoError(t, db.Create(runner).Error)
+	task := &models.RunnerTask{ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued, PayloadCiphertext: []byte("payload"), QueuedAt: now, CreatedAt: now, UpdatedAt: now}
+	require.NoError(t, db.Create(task).Error)
+	require.NoError(t, connection.BeginLogin(db, task.ID, now))
+	require.NoError(t, task.Reserve(db, runner.ID))
+	require.NoError(t, task.Start(db, runner, "test-store", now))
+	signer := jwt.NewSigner("test-codex-completed")
+	token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{OrganizationID: r.Organization.ID, ConnectionID: connection.ID, TaskID: task.ID, Generation: connection.ReservationGeneration}, time.Hour)
+	require.NoError(t, err)
+	server := &Server{jwt: signer, encryptor: r.Encryptor}
+	checkpoint := func(refreshToken string) *httptest.ResponseRecorder {
+		body, err := json.Marshal(map[string]any{"bundle": map[string]any{"access_token": "access-token", "refresh_token": refreshToken, "id_token": "id-token"}, "final": true})
+		require.NoError(t, err)
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/checkpoint", bytes.NewReader(body))
+		request.Header.Set("Authorization", "Bearer "+token)
+		response := httptest.NewRecorder()
+		server.handleRunnerCodexSubscriptionCheckpoint(response, request)
+		return response
+	}
+	response := checkpoint("saved-refresh-token")
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+	original := append([]byte(nil), connection.BundleCiphertext...)
+	version := connection.CredentialVersion
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := task.Complete(tx, runner, "setup", datatypes.JSON(`{"codexSubscriptionSetupCleaned":true}`), 0, "", false, now)
+		return err
+	}))
+	response = checkpoint("late-refresh-token")
+	require.Equal(t, http.StatusConflict, response.Code, response.Body.String())
+	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+	assert.Equal(t, original, []byte(connection.BundleCiphertext))
+	assert.Equal(t, version, connection.CredentialVersion)
+	assert.Equal(t, models.CodexConnectionStatusReady, connection.Status)
 }
 
 func TestCodexRunCheckpointDoesNotReplaceTheRefreshToken(t *testing.T) {

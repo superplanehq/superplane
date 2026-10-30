@@ -533,6 +533,7 @@ func (s *Server) completeRunnerTask(
 
 	var completedTask *models.RunnerTask
 	var completedNow bool
+	var previousLogins []models.FactoryCodexConnection
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		currentRunner, err := models.FindRunner(tx, runner.ID)
 		if err != nil {
@@ -545,6 +546,17 @@ func (s *Server) completeRunnerTask(
 		task, err := models.FindRunnerTask(tx, taskID)
 		if err != nil {
 			return err
+		}
+		lease, err := models.FindCodexLeaseByTask(tx, task.ID)
+		if err != nil {
+			return err
+		}
+		if lease != nil && lease.Login() {
+			connection, err := models.FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
+			if err != nil {
+				return err
+			}
+			previousLogins = append(previousLogins, *connection)
 		}
 		completedNow, err = task.Complete(
 			tx,
@@ -567,6 +579,7 @@ func (s *Server) completeRunnerTask(
 		return err
 	}
 	if completedNow {
+		messages.PublishCodexConnectionChanges(database.DB(ctx), previousLogins)
 		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask, fleetSlug, fleetScope)
 		messages.PublishPlanningRunnerStatus(database.DB(ctx), completedTask)
 	}

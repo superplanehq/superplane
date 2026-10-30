@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
@@ -490,6 +491,55 @@ func TestRunnerWebSocketShutdownRequestTerminatesIdleRunner(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerStateTerminated, reloadedRunner.State)
 	assert.Equal(t, models.RunnerTerminationInterrupted, *reloadedRunner.TerminationReason)
+}
+
+func TestCompleteCodexSetupPublishesCommittedConnectionOnce(t *testing.T) {
+	resource := support.Setup(t)
+	defer resource.Close()
+	db := database.DB(t.Context())
+	runner, task, fleet, connectionID := createRunningRunnerTask(t, resource)
+	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
+	factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.BeginLogin(db, task.ID, time.Now()))
+	require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 1, []byte("saved"), "ada@example.com", true, time.Now()))
+	var notifications int
+	restore := messages.SetFactoryWorkOrderUpdatedPublisherForTest(func(factoryID, orderID, reason string) error {
+		if reason != "codex_connection" {
+			return nil
+		}
+		assert.Equal(t, factory.ID.String(), factoryID)
+		assert.Empty(t, orderID)
+		// A separate pooled connection must see the committed transition.
+		stored, err := models.FindFactoryCodexConnectionByID(database.DB(t.Context()), connection.ID)
+		if err != nil {
+			return err
+		}
+		assert.Equal(t, models.CodexConnectionStatusReady, stored.Status)
+		lease, err := models.FindCodexLeaseByTask(database.DB(t.Context()), task.ID)
+		if err != nil {
+			return err
+		}
+		assert.Nil(t, lease)
+		completed, err := models.FindRunnerTask(database.DB(t.Context()), task.ID)
+		if err != nil {
+			return err
+		}
+		assert.Equal(t, models.RunnerTaskStateSucceeded, completed.State)
+		notifications++
+		return nil
+	})
+	defer restore()
+	server, err := NewServer(jwt.NewSigner("secret"), resource.Encryptor, runnerlogs.StoreFS, nil)
+	require.NoError(t, err)
+	completion := completeMessage{RequestID: uuid.NewString(), TaskID: task.ID.String(), Result: json.RawMessage(`{"codexSubscriptionSetupCleaned":true}`)}
+	require.NoError(t, server.completeRunnerTask(t.Context(), runner, connectionID, completion, fleet.Slug, fleet.ScopeType))
+	require.Equal(t, 1, notifications)
+	completion.RequestID = uuid.NewString()
+	require.NoError(t, server.completeRunnerTask(t.Context(), runner, connectionID, completion, fleet.Slug, fleet.ScopeType))
+	assert.Equal(t, 1, notifications)
 }
 
 func TestCompleteRunnerTaskRetriesPendingRequest(t *testing.T) {
