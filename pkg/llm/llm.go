@@ -13,9 +13,10 @@ const (
 	ProviderOpenAI     = "openai"
 	ProviderOpenRouter = "openrouter"
 
-	defaultAnthropicBaseURL  = "https://api.anthropic.com/v1"
-	defaultOpenAIBaseURL     = "https://api.openai.com/v1"
-	defaultOpenRouterBaseURL = "https://openrouter.ai/api/v1"
+	defaultAnthropicBaseURL = "https://api.anthropic.com/v1"
+	defaultOpenAIBaseURL    = "https://api.openai.com/v1"
+	// DefaultOpenRouterBaseURL is the official OpenRouter API endpoint.
+	DefaultOpenRouterBaseURL = "https://openrouter.ai/api/v1"
 	defaultMaxTokens         = 4096
 )
 
@@ -26,9 +27,13 @@ type Credentials struct {
 	BaseURL string
 }
 
-// Model is one id from a provider list-models response.
+// Model is one model and its capabilities from a provider list-models response.
 type Model struct {
 	ID string
+	// ThinkingLevels is nil when the provider omits supported efforts.
+	ThinkingLevels       []string
+	DefaultThinkingLevel string
+	ReasoningMandatory   bool
 }
 
 // Usage is normalized token counts for one completion.
@@ -106,7 +111,7 @@ func New(httpClient core.HTTPContext, provider string, creds Credentials) (Clien
 	case ProviderOpenAI:
 		return newOpenAICompatClient(httpClient, ProviderOpenAI, defaultOpenAIBaseURL, creds), nil
 	case ProviderOpenRouter:
-		return newOpenAICompatClient(httpClient, ProviderOpenRouter, defaultOpenRouterBaseURL, creds), nil
+		return newOpenAICompatClient(httpClient, ProviderOpenRouter, DefaultOpenRouterBaseURL, creds), nil
 	default:
 		return nil, fmt.Errorf("unsupported llm provider: %s", provider)
 	}
