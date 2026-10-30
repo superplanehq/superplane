@@ -54,27 +54,25 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		return response.GetIntake()
 	}
 
-	t.Run("subscription intake defaults only a new intake to its eligible creator", func(t *testing.T) {
+	t.Run("subscription intake requires a connected default and retains it after disconnection", func(t *testing.T) {
 		db := database.DB(t.Context())
 		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 		f := newFactory(t)
 		subscription := true
 		require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
-		// Existing empty defaults must stay empty when a connection is added.
-		existing := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
-		assert.Empty(t, existing.Settings.GetDefaultOwnerId())
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{FactoryId: f.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		require.Error(t, err)
 		connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
 		require.NoError(t, err)
 		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
-		implicit := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
-		assert.Equal(t, r.User.String(), implicit.Settings.GetDefaultOwnerId())
-		// The published graph carries the owner before initial events can run.
-		assert.Equal(t, r.User.String(), liveIntakeNode(t, r.Organization.ID, implicit, "create-work-order").Configuration["defaultOwnerId"])
-		cleared := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
-		assert.Empty(t, cleared.Settings.GetDefaultOwnerId())
-		updated, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: existing.Id, Settings: &pb.FactoryIntake_Settings{Labels: []string{"urgent"}}})
+		intake := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(r.User.String())}})
+		require.Equal(t, r.User.String(), intake.Settings.GetDefaultOwnerId())
+		_, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: intake.Id, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
+		require.Error(t, err)
+		require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusDisconnected).Error)
+		updated, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: intake.Id, Settings: &pb.FactoryIntake_Settings{Labels: []string{"urgent"}, DefaultOwnerId: proto.String(r.User.String())}})
 		require.NoError(t, err)
-		assert.Empty(t, updated.Intake.Settings.GetDefaultOwnerId())
+		assert.Equal(t, r.User.String(), updated.Intake.Settings.GetDefaultOwnerId())
 	})
 
 	t.Run("default owner survives API saves and explicit clearing", func(t *testing.T) {
@@ -166,8 +164,6 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, codes.InvalidArgument, code)
 		}
-		_, err = CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{FactoryId: f.ID.String(), Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
-		require.Error(t, err)
 	})
 
 	t.Run("Sentry default owner survives API saves and explicit clearing", func(t *testing.T) {

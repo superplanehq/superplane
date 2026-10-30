@@ -11,18 +11,16 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 export function FirstRunModelSourceChoice({
   disabled,
   modelSource,
-  subscriptionOffered = false,
   providerKeysOffered = true,
   onSelectModelSource,
 }: {
   disabled: boolean;
   modelSource: OnboardingAgentCredentialChoice | null;
-  subscriptionOffered?: boolean;
   providerKeysOffered?: boolean;
   onSelectModelSource: (source: OnboardingAgentCredentialChoice) => void;
 }) {
   const copy = FIRST_RUN_COPY.agent;
-  const alternativeSelected = modelSource === "own-key" || modelSource === "subscription";
+  const alternativeSelected = modelSource === "own-key";
   return (
     <fieldset disabled={disabled} className="m-0 min-w-0 border-0 p-0" data-testid="first-run-model-source">
       <legend className="mb-3 text-[13px] font-medium">{copy.modelSourceHeading}</legend>
@@ -35,19 +33,21 @@ export function FirstRunModelSourceChoice({
           disabled={disabled}
           onSelect={() => onSelectModelSource("hosted")}
         />
-        <Button
-          type="button"
-          variant="link"
-          className={cn(
-            "h-auto justify-start rounded-none p-0 text-left text-[13px] font-normal underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50",
-            alternativeSelected ? "font-medium text-foreground underline" : "text-muted-foreground",
-          )}
-          aria-pressed={alternativeSelected}
-          aria-expanded={alternativeSelected}
-          onClick={() => onSelectModelSource(providerKeysOffered ? "own-key" : "subscription")}
-        >
-          {providerKeysOffered ? (subscriptionOffered ? copy.ownKeyOrSubscription : copy.ownKey) : copy.subscription}
-        </Button>
+        {providerKeysOffered ? (
+          <Button
+            type="button"
+            variant="link"
+            className={cn(
+              "h-auto justify-start rounded-none p-0 text-left text-[13px] font-normal underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50",
+              alternativeSelected ? "font-medium text-foreground underline" : "text-muted-foreground",
+            )}
+            aria-pressed={alternativeSelected}
+            aria-expanded={alternativeSelected}
+            onClick={() => onSelectModelSource("own-key")}
+          >
+            {copy.ownKey}
+          </Button>
+        ) : null}
       </div>
     </fieldset>
   );

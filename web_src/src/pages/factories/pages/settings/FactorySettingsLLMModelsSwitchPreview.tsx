@@ -292,7 +292,8 @@ function ProviderModelChecklist({ provider }: { provider: LLMModelsSwitchProvide
   );
 }
 
-function sourceLabel(source: "hosted" | LLMModelsSwitchProvider): string {
+function sourceLabel(source: "hosted" | "subscription" | LLMModelsSwitchProvider): string {
+  if (source === "subscription") return "Codex subscription";
   return source === "hosted" ? "SuperPlane" : byokProviderProductName(source);
 }
 
@@ -306,7 +307,7 @@ export function SwitchDialog({
   onSaveCustom,
   onSwitchToHosted,
 }: {
-  source: "hosted" | LLMModelsSwitchProvider;
+  source: "hosted" | "subscription" | LLMModelsSwitchProvider;
   dialog: LLMModelsSwitchDialog;
   onCancel: () => void;
   onContinueToKey: () => void;

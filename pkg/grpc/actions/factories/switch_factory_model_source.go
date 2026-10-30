@@ -31,11 +31,12 @@ import (
 const planningAgentNodeID = "planner-agent-no-issue"
 
 const (
-	modelSourceHosted     = "hosted"
-	modelSourceAnthropic  = "anthropic"
-	modelSourceOpenAI     = "openai"
-	modelSourceOpenRouter = "openrouter"
-	modelSourceCustom     = "custom"
+	modelSourceHosted       = "hosted"
+	modelSourceSubscription = "subscription"
+	modelSourceAnthropic    = "anthropic"
+	modelSourceOpenAI       = "openai"
+	modelSourceOpenRouter   = "openrouter"
+	modelSourceCustom       = "custom"
 )
 
 type workspaceAgentRewrite struct {
@@ -50,6 +51,8 @@ type workspaceAgentRewrite struct {
 
 func workspaceAgentRewriteFor(source, integrationName string, modelIDs []string) (workspaceAgentRewrite, error) {
 	switch strings.TrimSpace(source) {
+	case modelSourceSubscription:
+		return workspaceAgentRewrite{Component: "runnerCodex", CredentialsSource: "subscription", Harness: models.FactoryOnboardingAgentHarnessCodex}, nil
 	case modelSourceHosted:
 		return workspaceAgentRewrite{
 			Component: models.SuperPlaneRunnerComponent,
@@ -503,16 +506,19 @@ func switchFactoryModelSource(
 	baseURL string,
 	apiType string,
 ) ([]uuid.UUID, string, error) {
-	if factory.OnboardingConfigValue().CodexSubscription {
-		return nil, "", grpcerrors.FailedPrecondition(nil, "This workspace uses a ChatGPT subscription. Model source cannot change.")
-	}
-	var integration *models.Integration
-	if strings.TrimSpace(source) != modelSourceHosted {
-		provider := strings.TrimSpace(source)
-		if err := models.RequireOrganizationBYOKAccess(tx, factory.OrganizationID, provider); err != nil {
+	source = strings.TrimSpace(source)
+	subscription := source == modelSourceSubscription
+	if subscription {
+		if err := requireCodexConnection(tx, factory, versionOwnerID(ctx)); err != nil {
 			return nil, "", factoryErrorToStatus(err, "failed to switch model source")
 		}
-		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, reg.Encryptor, factory.OrganizationID, provider, apiKey, baseURL, apiType)
+	}
+	var integration *models.Integration
+	if source != modelSourceHosted && !subscription {
+		if err := models.RequireOrganizationBYOKAccess(tx, factory.OrganizationID, source); err != nil {
+			return nil, "", factoryErrorToStatus(err, "failed to switch model source")
+		}
+		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, reg.Encryptor, factory.OrganizationID, source, apiKey, baseURL, apiType)
 		if err != nil {
 			return nil, "", err
 		}
@@ -544,12 +550,12 @@ func switchFactoryModelSource(
 		return nil, "", err
 	}
 
-	patch := models.FactoryOnboardingPatch{AgentHarness: &rewrite.Harness}
+	patch := models.FactoryOnboardingPatch{AgentHarness: &rewrite.Harness, CodexSubscription: &subscription}
 	if integration != nil {
 		id := integration.ID.String()
 		patch.AgentIntegrationID = &id
 	}
-	if rewrite.Component == models.SuperPlaneRunnerComponent {
+	if rewrite.Component == models.SuperPlaneRunnerComponent || subscription {
 		cleared := ""
 		patch.AgentIntegrationID = &cleared
 	}
@@ -561,6 +567,17 @@ func switchFactoryModelSource(
 	changed, err := rewriteFactoryCanvases(tx, factory, ownerID, rewrite)
 	if err != nil {
 		return nil, "", err
+	}
+	if subscription {
+		repaired, err := fillSubscriptionIntakeOwners(tx, factory, ownerID)
+		if err != nil {
+			return nil, "", err
+		}
+		for _, canvasID := range repaired {
+			if !slices.Contains(changed, canvasID) {
+				changed = append(changed, canvasID)
+			}
+		}
 	}
 	return changed, integrationID, nil
 }
