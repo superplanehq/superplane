@@ -49,6 +49,11 @@ it("paginates registrations, resets the page for a date filter, and retries fail
   expect(requests.at(-1)?.searchParams.get("offset")).toBe("5");
   expect(screen.getByText("$60.00")).toBeInTheDocument();
   expect(screen.getByText("$12.00")).toBeInTheDocument();
+  expect(requests.at(-1)?.searchParams.get("exclude_internal")).toBe("true");
+  await user.click(screen.getByRole("checkbox", { name: "Exclude @superplane.com owners" }));
+  await screen.findByRole("link", { name: "Organization 0" });
+  expect(requests.at(-1)?.searchParams.get("exclude_internal")).toBe("false");
+  expect(requests.at(-1)?.searchParams.get("offset")).toBe("0");
   await user.click(screen.getByRole("combobox", { name: "Registration period" }));
   await user.click(screen.getByRole("option", { name: "Custom" }));
   fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-03-01" } });
@@ -57,6 +62,7 @@ it("paginates registrations, resets the page for a date filter, and retries fail
   await user.click(screen.getByRole("button", { name: "Apply dates" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load statistics");
   expect(requests.at(-1)?.searchParams.get("offset")).toBe("0");
+  expect(requests.at(-1)?.searchParams.get("exclude_internal")).toBe("false");
   const start = new Date(requests.at(-1)!.searchParams.get("start")!);
   const end = new Date(requests.at(-1)!.searchParams.get("end")!);
   expect(start.getDate()).toBe(1);
