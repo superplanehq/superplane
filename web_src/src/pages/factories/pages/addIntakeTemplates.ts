@@ -7,6 +7,7 @@ import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import {
+  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
@@ -37,6 +38,13 @@ export const ADD_INTAKE_COPY = {
  * Coming-soon sources stay visible and disabled.
  */
 export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
+  {
+    id: "custom-verification",
+    iconName: "sparkles",
+    name: "Custom automation",
+    description: "Run prompt and Bash steps for a Backlog task.",
+    featureId: FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  },
   {
     id: "scheduled-intake",
     iconName: "alarm-clock",

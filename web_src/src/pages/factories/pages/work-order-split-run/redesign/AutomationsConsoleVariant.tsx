@@ -341,12 +341,12 @@ function ColumnTimelineItem({
   onRerunStep?: (phase: SplitRunPhase) => void;
 }) {
   const emptyCopy = emptyColumnCopy(column.id, index, currentColumn, fixture);
-  const manualById = new Map(manualCustomAutomations.map((automation) => [automation.id, automation]));
+  const eligibleManualAutomations = eligibleColumnAutomations(manualCustomAutomations, column.id, fixture);
+  const manualById = new Map(eligibleManualAutomations.map((automation) => [automation.id, automation]));
   const runAppIds = new Set(
     column.automations.flatMap((automation) => automation.runs.flatMap((run) => run.appId ?? [])),
   );
-  const idleManualAutomations =
-    column.id === "verify" ? manualCustomAutomations.filter((automation) => !runAppIds.has(automation.id)) : [];
+  const idleManualAutomations = eligibleManualAutomations.filter((automation) => !runAppIds.has(automation.id));
   const automationCount = column.automations.length + idleManualAutomations.length;
   return (
     <TimelineItem step={step} className="group/column" data-testid={`redesign-console-column-${column.id}`}>
@@ -420,6 +420,18 @@ function ColumnTimelineItem({
       </TimelineContent>
     </TimelineItem>
   );
+}
+
+function eligibleColumnAutomations(
+  automations: readonly ManualCustomAutomation[],
+  columnId: ConsoleColumnId,
+  fixture: SplitRunFixture,
+) {
+  return automations.filter((automation) => {
+    const savedColumn = automation.columnKey ?? "verify";
+    if (savedColumn !== columnId) return false;
+    return savedColumn === "backlog" ? fixture.footer.kind === "draft" : fixture.canRunVerifyCustomAutomation;
+  });
 }
 
 /** Empty Backlog after Intake is not skipped; the creation stage already ran. */
