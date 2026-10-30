@@ -2,6 +2,7 @@ ARG UBUNTU_VERSION=22.04
 ARG GO_VERSION=1.26.10
 ARG PLAYWRIGHT_GO_VERSION=v0.6201.1
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
+ARG ARTIFACTS_STAGE=builder
 
 # Optional CI module caches. `make image.build` replaces these with
 # --build-context when tmp/go and tmp/go-build exist. Release builds keep
@@ -179,6 +180,14 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 # Used as the final image.
 # ----------------------------------------------------------------------------------------------------------------------
 
+# CI supplies a small context with compiled artifacts. Release builds use
+# the builder stage above. Both paths use the same runtime image definition.
+FROM scratch AS prebuilt
+COPY app /app
+COPY usr /usr
+
+FROM ${ARTIFACTS_STAGE} AS artifacts
+
 FROM ${RUNNER_IMAGE} AS runner
 
 ARG SUPERPLANE_VERSION=dev
@@ -207,18 +216,18 @@ WORKDIR /app
 RUN chown nobody /app
 
 # Copy every artifact needed to run the application from previous stages
-COPY --from=builder --chown=nobody:root /usr/bin/createdb /usr/bin/createdb
-COPY --from=builder --chown=nobody:root /usr/bin/migrate /usr/bin/migrate
-COPY --from=builder --chown=nobody:root /app/build/superplane /app/build/superplane
-COPY --from=builder --chown=nobody:root /app/docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY --from=builder --chown=nobody:root /app/db/migrations /app/db/migrations
-COPY --from=builder --chown=nobody:root /app/db/data_migrations /app/db/data_migrations
-COPY --from=builder --chown=nobody:root /app/pkg/web/assets/dist /app/pkg/web/assets/dist
-COPY --from=builder --chown=nobody:root /app/api/swagger /app/api/swagger
-COPY --from=builder --chown=nobody:root /app/rbac /app/rbac
-COPY --from=builder --chown=nobody:root /app/templates /app/templates
-COPY --from=builder --chown=nobody:root /app/LICENSE /app/NOTICE /app/
-COPY --from=builder --chown=nobody:root /app/ee/LICENSE /app/ee/LICENSE
+COPY --from=artifacts --chown=nobody:root /usr/bin/createdb /usr/bin/createdb
+COPY --from=artifacts --chown=nobody:root /usr/bin/migrate /usr/bin/migrate
+COPY --from=artifacts --chown=nobody:root /app/build/superplane /app/build/superplane
+COPY --from=artifacts --chown=nobody:root /app/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --from=artifacts --chown=nobody:root /app/db/migrations /app/db/migrations
+COPY --from=artifacts --chown=nobody:root /app/db/data_migrations /app/db/data_migrations
+COPY --from=artifacts --chown=nobody:root /app/pkg/web/assets/dist /app/pkg/web/assets/dist
+COPY --from=artifacts --chown=nobody:root /app/api/swagger /app/api/swagger
+COPY --from=artifacts --chown=nobody:root /app/rbac /app/rbac
+COPY --from=artifacts --chown=nobody:root /app/templates /app/templates
+COPY --from=artifacts --chown=nobody:root /app/LICENSE /app/NOTICE /app/
+COPY --from=artifacts --chown=nobody:root /app/ee/LICENSE /app/ee/LICENSE
 
 USER nobody
 
