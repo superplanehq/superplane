@@ -31,7 +31,7 @@ export function WorkspaceCodexMembers({
   factoryId: string;
   canUpdate: boolean;
   defaultOwnerId?: string;
-  onChangeDefaultOwner: (ownerId: string) => void;
+  onChangeDefaultOwner: (ownerId?: string) => void;
 }) {
   const query = useQuery({
     queryKey: ["factories", organizationId, factoryId, "codex-usage"],
@@ -55,6 +55,12 @@ export function WorkspaceCodexMembers({
 
   return (
     <section aria-label="Connected ChatGPT members" className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[13px] font-medium">Connected members</h2>
+        <Button type="button" variant="outline" size="sm" disabled={!canUpdate} onClick={() => onChangeDefaultOwner()}>
+          Change default task owner
+        </Button>
+      </div>
       {query.isPending ? (
         <p role="status" className="text-xs text-muted-foreground">
           Loading connected members...
@@ -201,26 +207,28 @@ function ConnectedMember({
 }
 
 function UsageSummary({ limits }: { limits: FactoriesCodexMemberUsage["limits"] }) {
-  const windows = (limits ?? []).flatMap((limit, index) => [
-    limit.primary ? { key: `${limit.limitId ?? index}-primary`, window: limit.primary, label: "Primary window" } : null,
-    limit.secondary
-      ? { key: `${limit.limitId ?? index}-secondary`, window: limit.secondary, label: "Secondary window" }
-      : null,
-  ]);
+  const windows = (limits ?? [])
+    .flatMap((limit, index) => [
+      limit.primary
+        ? { key: `${limit.limitId ?? index}-primary`, window: limit.primary, label: "Primary window" }
+        : null,
+      limit.secondary
+        ? { key: `${limit.limitId ?? index}-secondary`, window: limit.secondary, label: "Secondary window" }
+        : null,
+    ])
+    .filter((item) => item !== null);
   if (windows.length === 0) return <p className="text-sm text-muted-foreground">Usage unavailable</p>;
 
   return (
     <div className={`flex flex-col justify-center ${windows.length > 1 ? "gap-2" : "min-h-10"}`}>
-      {windows.map((item) =>
-        item ? (
-          <CodexQuotaRemaining
-            key={item.key}
-            window={item.window}
-            label={item.label}
-            showWindowLabel={windows.length > 1}
-          />
-        ) : null,
-      )}
+      {windows.map((item) => (
+        <CodexQuotaRemaining
+          key={item.key}
+          window={item.window}
+          label={item.label}
+          showWindowLabel={windows.length > 1}
+        />
+      ))}
     </div>
   );
 }
