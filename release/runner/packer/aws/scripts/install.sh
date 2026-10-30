@@ -19,8 +19,11 @@ esac
 
 apt-get update -qy
 apt-get install -qy --no-install-recommends \
+  apparmor-profiles \
+  apparmor-utils \
   bash \
   build-essential \
+  bubblewrap \
   ca-certificates \
   cmake \
   coreutils \
@@ -42,6 +45,12 @@ apt-get install -qy --no-install-recommends \
   unzip \
   wget \
   zip
+
+# Ubuntu 24.04 restricts user namespaces without the packaged bwrap profile.
+install -m 0644 \
+  /usr/share/apparmor/extra-profiles/bwrap-userns-restrict \
+  /etc/apparmor.d/bwrap-userns-restrict
+apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 
 # Ubuntu installs fd as fdfind. Runner tasks expect fd to be on PATH.
 apt-get install -qy --no-install-recommends fd-find
@@ -144,6 +153,23 @@ opencode --version
 codex --version
 playwright --version
 aws --version
+
+# Check the sandbox as the runner user so root privileges cannot hide failures.
+runuser -u ubuntu -- bash <<'EOF'
+set -euo pipefail
+sandbox_dir="$(mktemp -d)"
+trap 'rm -rf "$sandbox_dir"' EXIT
+cd "$sandbox_dir"
+printf 'sandbox-read-check\n' > readable
+codex sandbox linux -c 'sandbox_mode="read-only"' -- sh -eu -c '
+  test "$(cat readable)" = sandbox-read-check
+  if printf "changed\n" > readable; then
+    echo "Codex read-only sandbox allowed a file write" >&2
+    exit 1
+  fi
+'
+test "$(cat readable)" = sandbox-read-check
+EOF
 
 ffmpeg -version >/dev/null
 ffprobe -version >/dev/null

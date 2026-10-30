@@ -13,6 +13,17 @@ Manager. Fleet Manager must launch the instance with an SSM-capable IAM
 instance profile; the agent cannot register without one. With that profile,
 no SSH key is required.
 
+The image installs Bubblewrap and loads its Ubuntu 24.04 AppArmor profile.
+Planning uses these dependencies to enforce the Codex read-only sandbox.
+The build checks that the `ubuntu` user can read a file inside that sandbox
+and cannot overwrite it. A sandbox startup failure stops the image build.
+
+After an image change, build both architectures and update the production
+fleet AMI IDs in Launchpad. Apply that configuration through the production
+deployment pipeline. Building an AMI does not update Fleet Manager.
+Start a new planning run after deployment. An existing planning session
+continues to use its original runner.
+
 ## Build
 
 Install Packer 1.16.1 or later and export AWS credentials that can create an
