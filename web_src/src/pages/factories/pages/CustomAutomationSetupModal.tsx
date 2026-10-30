@@ -85,6 +85,8 @@ export function CustomAutomationSetupModal({
             name={model.name}
             icon={model.icon}
             mode={model.mode}
+            schedule={model.schedule}
+            onScheduleChange={model.setSchedule}
             draft={model.draft}
             organizationId={organizationId}
             factoryId={factoryId}

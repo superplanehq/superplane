@@ -139,7 +139,18 @@ func startCustomAutomation(
 	if err != nil {
 		return nil, err
 	}
-	trigger, err := models.FindCanvasNode(db, canvas.ID, customAutomationTriggerID)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	if err != nil {
+		return nil, err
+	}
+	triggerID := ""
+	for _, node := range version.Nodes {
+		if node.Type == models.NodeTypeTrigger {
+			triggerID = node.ID
+			break
+		}
+	}
+	trigger, err := models.FindCanvasNode(db, canvas.ID, triggerID)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +291,7 @@ func customAutomationCanvasMode(tx *gorm.DB, canvas *models.Canvas) (pb.FactoryC
 func customAutomationCanvasModeFromVersion(version *models.CanvasVersion) (pb.FactoryCustomAutomation_StartMode, error) {
 	for i := range version.Nodes {
 		node := version.Nodes[i]
-		if node.ID != customAutomationTriggerID {
+		if node.Type != models.NodeTypeTrigger {
 			continue
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)

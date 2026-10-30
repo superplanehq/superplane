@@ -1356,6 +1356,7 @@ message FactoryCustomAutomation {
     START_MODE_UNSPECIFIED = 0;
     START_MODE_MANUAL = 1;
     START_MODE_AUTOMATIC = 2;
+    START_MODE_SCHEDULED = 3;
   }
 
   message Step {
@@ -1373,12 +1374,18 @@ message FactoryCustomAutomation {
     repeated string secrets = 6;
   }
 
+  message Schedule {
+    string cron_expression = 1;
+    double utc_offset = 2;
+  }
+
   message Settings {
     StartMode start_mode = 1;
     FactoryAppTemplateAgent agent = 2;
     repeated Step steps = 3;
     string icon = 4;
     int32 execution_timeout_seconds = 5;
+    Schedule schedule = 6;
   }
 
   Factory.Automation automation = 1;

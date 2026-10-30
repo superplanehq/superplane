@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -377,6 +378,16 @@ func reconcileFactoryRepository(
 		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID {
 			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch) || changed
 		}
+		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID &&
+			slices.ContainsFunc(nodes, func(node models.Node) bool { return node.ComponentName() == "schedule" }) {
+			for i := range nodes {
+				if !isFactoryAgentHarness(nodes[i].ComponentName()) {
+					continue
+				}
+				managedRunnerNodeIDs[nodes[i].ID] = true
+				changed = refreshCustomAutomationCheckout(&nodes[i], factory) || changed
+			}
+		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
 			graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{
 				Nodes: nodes,
@@ -437,6 +448,23 @@ func reconcileFactoryRepository(
 	}
 
 	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
+}
+
+func refreshCustomAutomationCheckout(node *models.Node, factory *models.Factory) bool {
+	current, _ := node.Configuration["environment"].([]any)
+	checkout := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED)
+	// Only checkout variables belong to the workspace. Preserve user-added values.
+	updated := slices.DeleteFunc(slices.Clone(current), func(value any) bool {
+		entry, ok := value.(map[string]any)
+		return ok && slices.Contains([]string{"REPO", "REPO_URL", "SOURCE_REPO", "BASE"}, configString(entry, "name"))
+	})
+	updated = append(updated, checkout...)
+	if reflect.DeepEqual(current, updated) {
+		return false
+	}
+	node.Configuration = maps.Clone(node.Configuration)
+	node.Configuration["environment"] = updated
+	return true
 }
 
 func factoryTemplateVCSNodeIDs(templateID string) []string {

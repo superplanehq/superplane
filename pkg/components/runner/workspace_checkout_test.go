@@ -185,6 +185,17 @@ func TestWorkspaceCheckoutScriptClonesMainAndContext(t *testing.T) {
 	assert.Contains(t, output, "Checkout complete")
 }
 
+func TestWorkspaceCheckoutScriptScheduledRepositoryUsesDefaultBranch(t *testing.T) {
+	remote := initBareRepo(t, "develop")
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, remote, "develop", checkoutScriptOptions{
+		extraEnv: []string{"REPO=acme/app", "SOURCE_REPO=acme/app"},
+	})
+	require.NoError(t, err, output)
+	assert.Equal(t, "develop", strings.TrimSpace(runGitQuiet(t, "", filepath.Join(dir, "repo"), "branch", "--show-current")))
+	assert.FileExists(t, filepath.Join(dir, "repo", "README"))
+}
+
 func TestWorkspaceCheckoutScriptClonesGitHubContextReadOnly(t *testing.T) {
 	gitPath := requireGitAndNode(t)
 	main := initBareRepo(t, "main")
