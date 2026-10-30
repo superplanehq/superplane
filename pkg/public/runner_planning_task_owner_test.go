@@ -88,7 +88,7 @@ func decodeSuggestOwners(t *testing.T, rec *httptest.ResponseRecorder) suggestOw
 
 func TestRunnerPlanningAssignOwner(t *testing.T) {
 	r := support.Setup(t)
-	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	server, session, factoryModel, token := mustAutomatedTaskPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	owner := mustTaskOwnerMember(t, r, "payments-dev")
 	other := mustTaskOwnerMember(t, r, "other-dev")
@@ -222,6 +222,46 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 	})
 }
 
+func TestRunnerPlanningAssignOwnerKeepsOwnersOfManualTask(t *testing.T) {
+	r := support.Setup(t)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	mustTaskOwnerMember(t, r, "other-dev")
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+
+	for _, existing := range []struct {
+		name   string
+		owners []uuid.UUID
+	}{
+		{"creator owns the task", []uuid.UUID{r.User}},
+		{"task has no owner", nil},
+	} {
+		t.Run(existing.name, func(t *testing.T) {
+			require.NoError(t, order.UpdateAssignees(db, existing.owners, r.User))
+			eventsBefore, err := order.ListEvents(db, 0, nil)
+			require.NoError(t, err)
+
+			rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", `{"user":"other-dev","reason":"Owns the code."}`)
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			var body struct {
+				Status string            `json:"status"`
+				Owners []suggestedMember `json:"owners"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			assert.Equal(t, "kept", body.Status)
+			assert.Len(t, body.Owners, len(existing.owners))
+
+			persisted, err := factoryModel.FindWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, existing.owners, persisted.AssigneeIDs(), "the agent does not change the owners of a task that a person created")
+			eventsAfter, err := order.ListEvents(db, 0, nil)
+			require.NoError(t, err)
+			assert.Equal(t, eventsBefore, eventsAfter)
+		})
+	}
+}
+
 func assertAssignedOwner(t *testing.T, rec *httptest.ResponseRecorder, ownerID uuid.UUID) {
 	t.Helper()
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -236,7 +276,7 @@ func assertAssignedOwner(t *testing.T, rec *httptest.ResponseRecorder, ownerID u
 
 func TestRunnerPlanningAssignOwnerWithoutGitHub(t *testing.T) {
 	r := support.Setup(t)
-	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	server, session, factoryModel, token := mustAutomatedTaskPlanningRunnerSession(t, r)
 	unlinked := support.CreateUser(t, r, r.Organization.ID)
 
 	rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner",

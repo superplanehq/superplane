@@ -51,7 +51,7 @@ const ASSIGN_OWNER = {
   definition: {
     name: "assign_owner",
     description:
-      "Set the selected person as the only owner of this task. Replaces all current owners, including manually assigned owners. Returns assigned with the selected owner. Pass user as a user_id or github_login from suggest_owners. reason is optional.",
+      "Set the selected person as the only owner of this task. Replaces all current owners, including manually assigned owners. Returns assigned with the selected owner. In a planning session, a task that a person created keeps its owners and the result status is kept. Pass user as a user_id or github_login from suggest_owners. reason is optional.",
     inputSchema: {
       type: "object",
       properties: {

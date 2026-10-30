@@ -1237,14 +1237,27 @@ func (w failingResponseWriter) Write(p []byte) (int, error) {
 	return 0, errors.New("client gone")
 }
 
+// mustPlanningRunnerSession plans a task that the registry user created.
 func mustPlanningRunnerSession(t *testing.T, r *support.ResourceRegistry) (*Server, *models.FactoryPlanningSession, *models.Factory, string) {
+	t.Helper()
+	return mustPlanningRunnerSessionForTask(t, r, &r.User)
+}
+
+// mustAutomatedTaskPlanningRunnerSession plans a task that an automation
+// created, so the task has no creator.
+func mustAutomatedTaskPlanningRunnerSession(t *testing.T, r *support.ResourceRegistry) (*Server, *models.FactoryPlanningSession, *models.Factory, string) {
+	t.Helper()
+	return mustPlanningRunnerSessionForTask(t, r, nil)
+}
+
+func mustPlanningRunnerSessionForTask(t *testing.T, r *support.ResourceRegistry, createdBy *uuid.UUID) (*Server, *models.FactoryPlanningSession, *models.Factory, string) {
 	t.Helper()
 	server, signer := mustRunnerLiveLogServer(t, r)
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	canvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", createdBy, nil, nil)
 	require.NoError(t, err)
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
