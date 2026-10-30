@@ -1,15 +1,18 @@
 package e2e
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
@@ -309,13 +312,22 @@ func (s *settingsPermissionGuardSteps) givenMemberExists(label string) string {
 }
 
 func (s *settingsPermissionGuardSteps) givenSecretExists(name string) {
-	secretSteps := &SecretsSteps{t: s.t, session: s.session}
-	secretSteps.givenASecretExists(name, map[string]string{"KEY1": "value1", "KEY2": "value2"})
+	encryptor, err := crypto.ProcessEncryptor()
+	require.NoError(s.t, err)
+	raw, err := json.Marshal(map[string]string{"KEY1": "value1", "KEY2": "value2"})
+	require.NoError(s.t, err)
+	encrypted, err := encryptor.Encrypt(s.t.Context(), raw, []byte(name))
+	require.NoError(s.t, err)
+	_, err = models.CreateSecret(name, secrets.ProviderLocal, s.session.Account.ID.String(), models.DomainTypeOrganization, s.session.OrgID, encrypted)
+	require.NoError(s.t, err)
 }
 
 func (s *settingsPermissionGuardSteps) givenAPIKeyExists(name string) {
-	apiKeySteps := &apiKeySteps{t: s.t, session: s.session}
-	apiKeySteps.givenAPIKeyExists(name, "Permission guard test")
+	user, err := models.FindActiveUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+	description := "Permission guard test"
+	_, err = models.CreateAPIKey(database.DB(s.t.Context()), s.session.OrgID, name, &description, user.ID, nil, nil)
+	require.NoError(s.t, err)
 }
 
 func (s *settingsPermissionGuardSteps) givenIntegrationExists(name string) *models.Integration {
