@@ -34,9 +34,9 @@ function SavedRefinementModel({
   const update = useUpdateWorkOrder(organizationId, factoryId);
   if (order.data?.state !== "STATE_DRAFT") return null;
   const model = order.data.refinementModel ?? "";
-  const options = [{ value: "", label: "Auto" }, ...selection.options];
+  const options: typeof selection.options = [{ value: "", label: "Auto" }, ...selection.options];
   if (model && !options.some((option) => option.value === model))
-    options.push({ value: model, label: `${model} (unavailable)` });
+    options.push({ value: model, label: `${model} (unavailable)`, disabled: true });
   return (
     <WorkOrderRefinementModelSelect
       model={model}

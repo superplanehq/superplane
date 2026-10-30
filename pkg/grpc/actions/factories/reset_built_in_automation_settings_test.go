@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -211,12 +213,19 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 			canvas := resetTestTemplate(t, r, factory, scheduledIntakeTemplateID, provider, func(doc *yaml.Canvas) {
 				schedule := findYAMLNode(t, doc, "schedule")
 				schedule.Configuration = map[string]any{"type": "cron", "cronExpression": "15 6 * * 1", "timezone": "5.5"}
+				findYAMLNode(t, doc, "create-task").Configuration["defaultOwnerId"] = r.User.String()
 				agent := findYAMLNode(t, doc, "scheduled-agent")
 				agent.Configuration["executionTimeoutSeconds"] = 600
 				implementationStep(t, agent, "Propose a task")["prompt"] = "Find accessibility defects." + scheduledIntakeOutputInstructions
 			})
 			require.NoError(t, resetTestOrganization(t, r))
 			version := resetTestLiveVersion(t, canvas)
+			assert.Equal(t, r.User.String(), findIntakeNode(version.Nodes, "create-task").Configuration["defaultOwnerId"])
+			restored, err := materializeNonIntakeFactoryAppDefaults(database.DB(t.Context()), factory, canvas, version, nil)
+			require.NoError(t, err)
+			restoredDoc, err := yaml.CanvasFromYAML([]byte(restored.canvasYAML))
+			require.NoError(t, err)
+			assert.Equal(t, r.User.String(), findYAMLNode(t, restoredDoc, "create-task").Configuration["defaultOwnerId"])
 			schedule := findIntakeNode(version.Nodes, "schedule")
 			assert.Equal(t, "cron", schedule.Configuration["type"])
 			assert.Equal(t, "15 6 * * 1", schedule.Configuration["cronExpression"])
@@ -280,6 +289,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
 			settings := intakeSettingsOrDefault(source, intakeSettings{})
+			settings.DefaultOwnerID = r.User.String()
 			switch source {
 			case models.FactoryIntakeSourceGitHubIssues:
 				if tc.restrictAuthors {
@@ -362,7 +372,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				require.NoError(t, err)
 				defaultSpec := models.LiveCanvasSpec{Nodes: defaults.Nodes(), Edges: defaults.Edges()}
 				restored := serializeIntakeSettings(source, intakeSettingsFromGraph(source, resolveIntakeGraph(source, defaultSpec), defaultSpec))
-				assert.Empty(t, restored.GetDefaultOwnerId())
+				assert.Equal(t, settings.DefaultOwnerID, restored.GetDefaultOwnerId())
 				assert.Equal(t, expected.GetLabels(), restored.GetLabels())
 				assert.Equal(t, expected.GetLabelFilterMode(), restored.GetLabelFilterMode())
 				assert.Equal(t, expected.GetAssignment(), restored.GetAssignment())
@@ -642,4 +652,48 @@ func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {
 			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired system instruction")
 		})
 	}
+}
+
+func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing.T) {
+	r, factory := resetTestFactory(t)
+	db := database.DB(t.Context())
+	enableHostedSuperPlaneAgent(t, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	scheduled := resetTestTemplate(t, r, factory, scheduledIntakeTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+		findYAMLNode(t, doc, "create-task").Configuration["defaultOwnerId"] = r.User.String()
+	})
+	planner := support.CreateFactoryCanvas(t, r, factory.ID, "Planner")
+	resetTestPublishCanvas(t, r, planner, buildBacklogCanvas(backlogCanvasRequest{Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent}}))
+	repository := "acme/app"
+	subscription := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription, AppRepository: &repository}))
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "native-allowed"}, {Model: "native-excluded"}}, time.Now()))
+	inherit := false
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, datatypes.JSONSlice[string]{"native-allowed"}, &inherit)
+	require.NoError(t, err)
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceHosted, nil, &inherit)
+	require.NoError(t, err)
+	require.NoError(t, resetTestOrganization(t, r))
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	policy, err := ListFactoryLLMModels(ctx, r.Organization.ID.String(), &pb.ListFactoryLLMModelsRequest{FactoryId: factory.ID.String(), Provider: models.UsageProviderOpenAI, FundingSource: models.UsageFundingSourceSubscription})
+	require.NoError(t, err)
+	assert.False(t, policy.InheritParent)
+	assert.Equal(t, []string{"native-allowed"}, codexLineModelIDs(policy.Selected))
+	hostedPolicy, err := ListFactoryLLMModels(ctx, r.Organization.ID.String(), &pb.ListFactoryLLMModelsRequest{FactoryId: factory.ID.String(), Provider: models.UsageProviderOpenAI, FundingSource: models.UsageFundingSourceHosted})
+	require.NoError(t, err)
+	assert.False(t, hostedPolicy.InheritParent)
+	assert.Empty(t, hostedPolicy.Selected)
+	for _, canvas := range []*models.Canvas{scheduled, planner} {
+		for _, node := range resetTestLiveVersion(t, canvas).Nodes {
+			if !isFactoryAgentHarness(node.ComponentName()) {
+				continue
+			}
+			assert.Equal(t, "runnerCodex", node.ComponentName())
+			assert.Equal(t, map[string]any{"source": "subscription"}, node.Configuration["credentials"])
+		}
+	}
+	assert.Equal(t, r.User.String(), findIntakeNode(resetTestLiveVersion(t, scheduled).Nodes, "create-task").Configuration["defaultOwnerId"])
 }

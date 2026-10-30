@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   component: "runnerSuperPlane",
   model: "anthropic::claude-sonnet-4-6",
   provider: "all",
+  subscription: false,
   models: [
     {
       source: { id: "hosted", name: "SuperPlane" },
@@ -39,7 +40,14 @@ vi.mock("./pages/useColumnCanvasAgentEditor", () => ({
   useColumnCanvasAgentEditor: (_organizationId: string, canvasId: string | undefined) => {
     editorCanvas.id = canvasId;
     return {
-      agentNode: { id: "refine-task", component: state.component, configuration: { model: state.model } },
+      agentNode: {
+        id: "refine-task",
+        component: state.component,
+        configuration: {
+          model: state.model,
+          ...(state.subscription ? { credentials: { source: "subscription" } } : {}),
+        },
+      },
       isLoading: false,
     };
   },
@@ -71,6 +79,7 @@ describe("Manual task refinement models", () => {
     state.component = "runnerSuperPlane";
     state.model = "anthropic::claude-sonnet-4-6";
     state.provider = "all";
+    state.subscription = false;
   });
   afterEach(() => {
     cleanup();
@@ -131,4 +140,29 @@ describe("Manual task refinement models", () => {
     expect(result.current.defaultModel).toBe("sonnet");
     expect(result.current.options.map((option) => option.value)).toEqual(["claude-sonnet-4-6", "claude-opus-5-5"]);
   });
+
+  it.each(["", "native-model-excluded"])(
+    "retains the saved subscription default %s without offering an excluded choice",
+    (savedModel) => {
+      state.component = "runnerCodex";
+      state.provider = "openai";
+      state.subscription = true;
+      state.model = savedModel;
+      modelQuery.mockReturnValue({
+        data: [
+          {
+            source: { id: "subscription", name: "ChatGPT" },
+            provider: { id: "openai", name: "OpenAI" },
+            model: { id: "native-model-permitted", name: "Permitted model" },
+            key: "subscription::openai::native-model-permitted",
+            label: "Permitted model",
+          },
+        ],
+        isLoading: false,
+      });
+      const { result } = renderHook(() => useWorkOrderRefinementModels("org-1", "factory-1"));
+      expect(result.current.defaultModel).toBe(savedModel);
+      expect(result.current.options).toEqual([{ value: "native-model-permitted", label: "Permitted model" }]);
+    },
+  );
 });

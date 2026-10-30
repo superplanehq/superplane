@@ -254,7 +254,7 @@ func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testi
 	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6")
 	seedHostedModels(t, db, models.UsageProviderOpenRouter, "x-ai/grok-4.6")
 
-	app := createLineAppWithRunner(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	app := createLineAppWithRunner(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent, "hosted", models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenAI, "excluded-model"))
 	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
 	})
@@ -277,8 +277,8 @@ func Test__SerializeLineRunnerModels__NamesHostedSelectableKeys(t *testing.T) {
 	require.Len(t, modelsProto, 2)
 	assert.Equal(t, "hosted::openrouter::x-ai/grok-4.6", modelsProto[0].GetId())
 	assert.Equal(t, "x-ai/grok-4.6", modelsProto[0].GetName())
-	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetId())
-	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetName())
+	assert.Equal(t, "opus", modelsProto[1].GetId())
+	assert.Equal(t, "opus", modelsProto[1].GetName())
 }
 
 func TestLineRunnerModelsKeepSubscriptionAndAPIKeyCatalogsSeparate(t *testing.T) {

@@ -1,11 +1,17 @@
 import { Avatar } from "@/components/Avatar/avatar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
-import { buildOrgUserDisplayMap, getUserInitials, resolveOrgUserDisplay } from "@/lib/orgUserDisplay";
+import {
+  buildOrgUserDisplayMap,
+  getUserInitials,
+  resolveOrgUserDisplay,
+  type OrgUserDisplay,
+} from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, type KeyboardEvent } from "react";
 
 import { useOptionalFactoriesLayout } from "./layout/factoriesLayoutContext";
 import { useFactoryOwnerEligibility } from "@/hooks/useFactoryOwnerEligibility";
@@ -130,28 +136,23 @@ function OwnerPickerOptions({
                 {selectedIds.length === 0 ? <Check className="size-4" aria-hidden /> : null}
               </CommandItem>
               {userOptions.map((user) => {
-                const selected = selectedIds.includes(user.id);
                 const member = eligibility?.members?.find((member) => member.userId === user.id);
                 const ineligible = eligibility?.subscription === true && member?.eligible !== true;
                 return (
-                  <CommandItem
+                  <OwnerPickerOption
                     key={user.id}
-                    value={`${user.label} ${user.id}`}
-                    onSelect={() => selectUser(user.id)}
-                    disabled={disabled || ineligible}
-                    title={ineligible ? member?.reason || "This member is unavailable." : undefined}
-                  >
-                    <Avatar src={user.display.avatarUrl} initials={user.display.initials} alt="" className="size-6" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{user.label}</span>
-                      {ineligible ? (
-                        <span className="block text-xs text-muted-foreground">
-                          {member?.reason || "This member is unavailable."}
-                        </span>
-                      ) : null}
-                    </span>
-                    <Check className={cn("size-4", selected ? "opacity-100" : "opacity-0")} aria-hidden />
-                  </CommandItem>
+                    user={user.display}
+                    selected={selectedIds.includes(user.id)}
+                    disabled={disabled}
+                    unavailableReason={
+                      ineligible
+                        ? user.id === currentUserId
+                          ? member?.reason || "This member is unavailable."
+                          : "This user must connect a ChatGPT subscription in this workspace to be eligible."
+                        : undefined
+                    }
+                    onSelect={selectUser}
+                  />
                 );
               })}
             </CommandGroup>
@@ -159,5 +160,60 @@ function OwnerPickerOptions({
         )}
       </CommandList>
     </Command>
+  );
+}
+
+function OwnerPickerOption({
+  user,
+  selected,
+  disabled,
+  unavailableReason,
+  onSelect,
+}: {
+  user: OrgUserDisplay;
+  selected: boolean;
+  disabled: boolean;
+  unavailableReason?: string;
+  onSelect: (userId: string) => void;
+}) {
+  const ineligible = Boolean(unavailableReason);
+  const optionContent = (
+    <>
+      <Avatar src={user.avatarUrl} initials={user.initials} alt="" className="size-6" />
+      <span className="min-w-0 flex-1 truncate">{user.name}</span>
+      <Check className={cn("size-4", selected ? "opacity-100" : "opacity-0")} aria-hidden />
+    </>
+  );
+  const option = (
+    <CommandItem
+      value={`${user.name} ${user.id}`}
+      onSelect={() => onSelect(user.id)}
+      disabled={disabled || ineligible}
+      asChild={ineligible}
+      className={ineligible ? "data-[disabled=true]:pointer-events-auto" : undefined}
+    >
+      {ineligible ? (
+        <TooltipTrigger
+          asChild
+          tabIndex={0}
+          onKeyDown={(event: KeyboardEvent<HTMLElement>) => {
+            if (event.key === "Enter") event.preventDefault();
+          }}
+        >
+          <div>{optionContent}</div>
+        </TooltipTrigger>
+      ) : (
+        optionContent
+      )}
+    </CommandItem>
+  );
+  if (!ineligible) return option;
+  return (
+    <Tooltip>
+      {option}
+      <TooltipContent side="right" className="z-[80] max-w-64">
+        {unavailableReason}
+      </TooltipContent>
+    </Tooltip>
   );
 }

@@ -220,7 +220,7 @@ Codex reports.
    user can choose another model source.
 4. **Ready.** "ChatGPT is connected as {account}." Reconnect shows "Connect
    ChatGPT again."
-5. **Settings → LLM Models.** A "ChatGPT" badge and the read-only subscription
+5. **Settings → Models.** A "ChatGPT" badge and the read-only subscription
    model list.
 6. **Agent model field.** Model plus Thinking level (`minimal`–`xhigh` for
    OpenAI and Codex).

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -18,6 +19,58 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/runs"
 	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
 )
+
+func TestCanvasPublisherSubscriptionIntakePreservesDisconnectedDefaultAndValidatesReplacement(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	subscription := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	replacement := support.CreateUser(t, r, r.Organization.ID)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		componentCanvasNode("create-task", "Create task", "createWorkOrder", map[string]any{"title": "Incoming task", "defaultOwnerId": r.User.String()}),
+	}, nil)
+	canvas.FactoryID = &factory.ID
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	_, err = factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+	require.NoError(t, err)
+	savedConnection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(savedConnection).Updates(map[string]any{"status": models.CodexConnectionStatusDisconnected, "credential_version": 1}).Error)
+	// The saved member remains active while their personal connection is absent.
+	draft, err := models.CreateCommitVersionWithSpecInTransaction(db, canvas.ID, r.User, "Update task title", []models.Node{
+		componentNode("create-task", "Create task", "createWorkOrder", map[string]any{"title": "New title", "defaultOwnerId": r.User.String()}),
+	}, nil)
+	require.NoError(t, err)
+	live, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	publisher, err := NewCanvasPublisher(db, canvas, draft, live, canvasPublisherOptions(r))
+	require.NoError(t, err)
+	require.NoError(t, publisher.Publish(t.Context()))
+	retained, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, r.User.String(), retained.Nodes[0].Configuration["defaultOwnerId"])
+	draft, err = models.CreateCommitVersionWithSpecInTransaction(db, canvas.ID, r.User, "Replace intake owner", []models.Node{
+		componentNode("create-task", "Create task", "createWorkOrder", map[string]any{"title": "New title", "defaultOwnerId": replacement.ID.String()}),
+	}, nil)
+	require.NoError(t, err)
+	publisher, err = NewCanvasPublisher(db, canvas, draft, retained, canvasPublisherOptions(r))
+	require.NoError(t, err)
+	require.ErrorIs(t, publisher.Publish(t.Context()), models.ErrSubscriptionOwnerInvalid)
+	unchanged, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, retained.ID, unchanged.ID)
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, replacement.ID, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	require.NoError(t, publisher.Publish(t.Context()))
+	updated, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, draft.ID, updated.ID)
+	require.Equal(t, replacement.ID.String(), updated.Nodes[0].Configuration["defaultOwnerId"])
+}
 
 func Test__CanvasPublisherOptions_Validate(t *testing.T) {
 	r := support.Setup(t)

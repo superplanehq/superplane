@@ -194,6 +194,50 @@ func Test__OrganizationHostedModelAllowlist__RemovedWhenOrganizationIsDeleted(t 
 	assert.Nil(t, row)
 }
 
+func Test__FactoryLLMModelPolicy__InheritanceAndExplicitEmpty(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	parent := []string{"native-default", "native-model"}
+	for _, scenario := range []struct {
+		name            string
+		selected        []string
+		inherit         *bool
+		want            []string
+		wantInheritance bool
+	}{
+		{name: "legacy empty inherits", want: parent, wantInheritance: true},
+		{name: "legacy selection restricts", selected: []string{"native-model"}, want: []string{"native-model"}},
+		{name: "explicit empty disables", inherit: boolPointer(false), want: []string{}},
+		{name: "explicit selection restricts", inherit: boolPointer(false), selected: []string{"native-model"}, want: []string{"native-model"}},
+		{name: "explicit inheritance restores catalog", inherit: boolPointer(true), want: parent, wantInheritance: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			saved, err := models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, datatypes.JSONSlice[string](scenario.selected), scenario.inherit)
+			require.NoError(t, err)
+			assert.Equal(t, scenario.wantInheritance, saved.InheritsParent())
+			assert.Equal(t, scenario.inherit, saved.InheritParent)
+			resolved, err := models.ApplyFactoryLLMModelPolicy(db, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, parent)
+			require.NoError(t, err)
+			assert.Equal(t, scenario.want, resolved)
+			other, err := models.ApplyFactoryLLMModelPolicy(db, otherFactory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, parent)
+			require.NoError(t, err)
+			assert.Equal(t, parent, other)
+			byok, err := models.ApplyFactoryLLMModelPolicy(db, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceBYOK, parent)
+			require.NoError(t, err)
+			assert.Equal(t, parent, byok)
+		})
+	}
+
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, datatypes.JSONSlice[string]{"native-model"}, boolPointer(true))
+	require.ErrorIs(t, err, models.ErrInheritedModelSelection)
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceSubscription, nil, boolPointer(false))
+	require.Error(t, err)
+}
+
 func Test__CompactModelIDs(t *testing.T) {
 	assert.Equal(t, []string{"gpt-4o", "gpt-4.1"}, models.CompactModelIDs([]string{" gpt-4o ", "", "gpt-4o", "gpt-4.1"}))
 }

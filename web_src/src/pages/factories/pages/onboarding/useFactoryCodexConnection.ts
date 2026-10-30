@@ -6,12 +6,11 @@ import {
   type FactoriesFactoryCodexConnection,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { usePermissions } from "@/contexts/usePermissions";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { invalidateWorkspaceModelQueries } from "@/hooks/workspaceModelQueries";
 
 export function factoryCodexConnectionKey(organizationId: string, factoryId: string, memberId = "") {
   return ["factory-codex-connection", organizationId, factoryId, memberId] as const;
@@ -23,13 +22,28 @@ export function codexSubscriptionReady(connection: FactoriesFactoryCodexConnecti
 
 function invalidateSubscriptionCatalogs(queryClient: QueryClient, organizationId: string, factoryId: string) {
   return Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "owner-eligibility"] }),
-    queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "line-runner-models"] }),
-    queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "selectable-llm-models"] }),
+    invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId),
+    queryClient.invalidateQueries({
+      queryKey: ["factories", organizationId, factoryId, "owner-eligibility"],
+      refetchType: "all",
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ["factories", organizationId, factoryId, "line-runner-models"],
+      refetchType: "all",
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ["organizations", organizationId, "selectable-llm-models"],
+      refetchType: "all",
+    }),
   ]);
 }
 
-export function useFactoryCodexConnection(organizationId: string, factoryId: string, enabled: boolean) {
+export function useFactoryCodexConnection(
+  organizationId: string,
+  factoryId: string,
+  enabled: boolean,
+  refreshModels = true,
+) {
   const { canAct, currentUserId } = usePermissions();
   const canRefreshCatalog = canAct("factories", "read");
   const queryClient = useQueryClient();
@@ -53,15 +67,7 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
       );
       return response.data?.connection;
     },
-    refetchInterval: (current) => {
-      if (current.state.status === "error") return 2000;
-      const status = current.state.data?.status;
-      return current.state.data?.revocationPending ||
-        ["pending", "canceling", "finishing"].includes(status ?? "") ||
-        current.state.data?.reservationHeld
-        ? 2000
-        : false;
-    },
+    refetchInterval: (current) => codexConnectionPollInterval(current.state.data, current.state.status === "error"),
     refetchIntervalInBackground: true,
   });
 
@@ -133,17 +139,17 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
   });
 
   useEffect(() => {
-    if (!enabled || query.data?.status !== "ready") {
+    if (!enabled || !refreshModels || query.data?.status !== "ready") {
       refreshAttempted.current = false;
       return;
     }
     const availableModels = query.data.availableModels ?? [];
+    const catalog = JSON.stringify(availableModels);
+    if (invalidatedCatalog.current !== catalog) {
+      invalidatedCatalog.current = catalog;
+      void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
+    }
     if (availableModels.length > 0) {
-      const catalog = availableModels.join("\n");
-      if (invalidatedCatalog.current !== catalog) {
-        invalidatedCatalog.current = catalog;
-        void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
-      }
       return;
     }
     if (!canRefreshCatalog) return;
@@ -151,28 +157,16 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
       refreshAttempted.current = true;
       refreshCatalog.mutate();
     }
-  }, [canRefreshCatalog, enabled, organizationId, factoryId, query.data, queryClient, refreshCatalog]);
+  }, [canRefreshCatalog, enabled, refreshModels, organizationId, factoryId, query.data, queryClient, refreshCatalog]);
 
-  return { query, start, cancel, refreshCatalog, disconnect };
+  return { query, start, cancel, refreshCatalog, disconnect, refresh };
 }
 
-export function useCodexSubscriptionModel(organizationId: string, factoryId: string) {
-  const features = useExperimentalFeature(organizationId);
-  const enabled = !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
-  const connection = codex.query.data;
-  return {
-    codexSubscriptionOffered: enabled && connection?.eligible === true,
-    codexSubscriptionLoading: features.isLoading || (enabled && codex.query.isLoading),
-    codexConnection: connection,
-    codexSubscriptionReady: codexSubscriptionReady(connection),
-    startCodexConnection: () => {
-      codex.start.mutate();
-    },
-    cancelCodexConnection: () => {
-      codex.cancel.mutate();
-    },
-    codexStarting: codex.start.isPending,
-    codexCanceling: codex.cancel.isPending,
-  };
+function codexConnectionPollInterval(connection: FactoriesFactoryCodexConnection | undefined, failed: boolean) {
+  if (failed) return 2000;
+  const active =
+    connection?.revocationPending ||
+    ["pending", "canceling", "finishing"].includes(connection?.status ?? "") ||
+    connection?.reservationHeld;
+  return active ? 2000 : false;
 }

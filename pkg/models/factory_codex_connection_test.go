@@ -129,6 +129,46 @@ func TestCodexConnectionsArePersonalWithinAWorkspace(t *testing.T) {
 	assert.Equal(t, []byte("bundle"), reloadCodexConnection(t, db, first.ID).BundleCiphertext)
 }
 
+func TestSubscriptionWorkspacePolicyUsesEachMembersCatalog(t *testing.T) {
+	db, first, _, _ := newReadyCodexConnection(t)
+	secondUser := &models.User{ID: uuid.New(), OrganizationID: first.OrganizationID, Type: models.UserTypeHuman, Name: "Second member"}
+	require.NoError(t, db.Create(secondUser).Error)
+	second, err := models.CreateFactoryCodexConnection(db, first.OrganizationID, first.FactoryID, secondUser.ID, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(second).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("second-bundle")}).Error)
+	require.NoError(t, first.StoreUsage(db, nil, []models.CodexModel{{Model: "first-model"}, {Model: "excluded-model"}}, time.Now()))
+	require.NoError(t, second.StoreUsage(db, nil, []models.CodexModel{{Model: "second-model"}, {Model: "excluded-model"}}, time.Now()))
+	inherit := false
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, first.OrganizationID, first.FactoryID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, []string{"first-model", "second-model"}, &inherit)
+	require.NoError(t, err)
+	for _, member := range []struct {
+		connection *models.FactoryCodexConnection
+		expected   string
+	}{{first, "first-model"}, {second, "second-model"}} {
+		ids, err := models.FactoryCodexSubscriptionModels(db, first.OrganizationID, first.FactoryID, member.connection.OwnerUserID)
+		require.NoError(t, err)
+		assert.Equal(t, []string{member.expected}, ids)
+	}
+}
+
+func TestSubscriptionReservationRejectsNewRestrictedRunsAndPreservesExistingLease(t *testing.T) {
+	db, connection, _, _ := newReadyCodexConnection(t)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "permitted-model"}, {Model: "excluded-model"}}, time.Now()))
+	runID := support.CreateCodexOwnedRun(t, db, connection)
+	_, err := models.ReserveFactoryCodexConnection(db, connection.OrganizationID, connection.FactoryID, runID, uuid.New(), time.Now(), crypto.NewNoOpEncryptor(), "excluded-model")
+	require.NoError(t, err)
+	existing := codexLeases(t, db, connection.ID)
+	require.Len(t, existing, 1)
+	inherit := false
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, connection.OrganizationID, connection.FactoryID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, []string{"permitted-model"}, &inherit)
+	require.NoError(t, err)
+	for _, model := range []string{"excluded-model", ""} {
+		_, err := models.ReserveFactoryCodexConnection(db, connection.OrganizationID, connection.FactoryID, runID, uuid.New(), time.Now(), crypto.NewNoOpEncryptor(), model)
+		require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
+	}
+	assert.Equal(t, existing, codexLeases(t, db, connection.ID))
+}
+
 func TestSubscriptionReservationUsesStoredTaskAssociations(t *testing.T) {
 	db, connection, _, _ := newReadyCodexConnection(t)
 	f, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
