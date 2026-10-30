@@ -17,7 +17,8 @@ SBOM_OUTPUT="${BUILD_ROOT}/superplane-sbom.json"
 
 # Find the repository root (where go.mod is located)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Syft resolves files to physical paths; exclusions must use the same root.
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
 
 echo "* Generating SBOM for version ${VERSION}"
 echo "* Source: ${REPO_ROOT}"
@@ -39,9 +40,14 @@ fi
 # Create build directory if it doesn't exist
 mkdir -p "${BUILD_ROOT}"
 
-# Generate SBOM in SPDX JSON format from source files
-# This scans go.mod for Go dependencies and web_src/package-lock.json for npm dependencies
-"${SYFT_BIN}" dir:"${REPO_ROOT}" -o spdx-json="${SBOM_OUTPUT}"
+# Scan source manifests, including Go modules and npm lockfiles. Installed
+# dependencies, caches, and previous build output are not release inputs.
+SYFT_CHECK_FOR_APP_UPDATE=false "${SYFT_BIN}" dir:"${REPO_ROOT}" \
+  --exclude './.git/**' \
+  --exclude './tmp/**' \
+  --exclude './build/**' \
+  --exclude '**/node_modules/**' \
+  -o spdx-json="${SBOM_OUTPUT}"
 
 echo ""
 echo "Done."
