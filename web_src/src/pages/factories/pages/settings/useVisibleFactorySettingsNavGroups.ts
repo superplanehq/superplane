@@ -1,7 +1,7 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
-import { FEATURE_CODEX_SUBSCRIPTIONS, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
+import { FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 
 import {
   type FactorySettingsNavGroup,
@@ -23,9 +23,6 @@ function visibleFactorySettingsNavGroups(
   hasExperimentalFeature: (featureId: string) => boolean,
 ): FactorySettingsNavGroup[] {
   const hiddenNavItemIds = new Set<string>();
-  if (!hasExperimentalFeature(FEATURE_CODEX_SUBSCRIPTIONS)) {
-    hiddenNavItemIds.add("account-codex-usage");
-  }
   if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
     hiddenNavItemIds.add(WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID);
   }

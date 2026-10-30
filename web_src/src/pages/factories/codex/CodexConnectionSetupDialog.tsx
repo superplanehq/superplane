@@ -10,8 +10,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 import { getApiErrorMessage } from "@/lib/errors";
 import { codexSubscriptionReady, useFactoryCodexConnection } from "../pages/onboarding/useFactoryCodexConnection";
 import { CodexDeviceSignIn } from "./CodexDeviceSignIn";
@@ -72,26 +70,17 @@ function useConnectionCompletion(open: boolean, codex: CodexConnection, onConnec
   };
 }
 
-function CodexConnectionNotices({
-  codex,
-  featuresLoading,
-  offered,
-}: {
-  codex: CodexConnection;
-  featuresLoading: boolean;
-  offered: boolean;
-}) {
+function CodexConnectionNotices({ codex }: { codex: CodexConnection }) {
   const connection = codex.query.data;
   return (
     <>
-      {featuresLoading || codex.query.isLoading ? <p role="status">Loading Codex connection...</p> : null}
+      {codex.query.isLoading ? <p role="status">Loading Codex connection...</p> : null}
       {codex.query.isError ? (
         <p role="alert">Could not load your Codex connection. Close this dialog and try again.</p>
       ) : null}
       {connection?.revocationPending ? (
         <p role="status">Stopping your previous tasks. You can reconnect when cleanup finishes.</p>
       ) : null}
-      {!featuresLoading && !offered ? <p role="alert">Codex subscriptions are unavailable in this workspace.</p> : null}
       {connection?.eligible === false ? <p role="alert">Your account cannot connect Codex in this workspace.</p> : null}
       {codex.start.isError ? <p role="alert">Could not start Codex sign-in. Try again.</p> : null}
       {codex.cancel.isError ? <p role="alert">Could not cancel Codex sign-in. Try again.</p> : null}
@@ -116,13 +105,10 @@ export function CodexConnectionSetupDialog({
   onConnected?: () => void | Promise<void>;
 }) {
   const { isLoading: permissionsLoading } = usePermissions();
-  const features = useExperimentalFeature(organizationId);
-  const offered = features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const enabled = [open, !features.isLoading, offered].every(Boolean);
-  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
-  const completion = useConnectionCompletion(enabled && codex.query.data?.eligible === true, codex, onConnected);
+  const codex = useFactoryCodexConnection(organizationId, factoryId, open);
+  const completion = useConnectionCompletion(open && codex.query.data?.eligible === true, codex, onConnected);
   const disabled = [
-    !enabled,
+    !open,
     permissionsLoading,
     codex.query.isLoading,
     codex.query.data?.revocationPending,
@@ -145,7 +131,7 @@ export function CodexConnectionSetupDialog({
           <DialogTitle>Connect Codex</DialogTitle>
           <DialogDescription>Connect once to use Codex across this organization’s workspaces.</DialogDescription>
         </DialogHeader>
-        <CodexConnectionNotices codex={codex} featuresLoading={features.isLoading} offered={offered} />
+        <CodexConnectionNotices codex={codex} />
         <CodexDeviceSignIn
           selected
           disabled={disabled}
