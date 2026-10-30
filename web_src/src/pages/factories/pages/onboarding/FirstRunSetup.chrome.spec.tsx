@@ -211,7 +211,6 @@ describe("FirstRunSetup chrome", () => {
 
   it.each([
     { enabled: false, planActive: false },
-    { enabled: true, planActive: false },
     { enabled: true, planActive: true },
   ])("keeps repository and intake before the final model choice (%j)", async ({ enabled, planActive }) => {
     Object.assign(billingState, { enabled, planActive, byok: true, availablePlans: [] });
@@ -245,8 +244,7 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.saveIssues).toHaveBeenCalledWith("vcs"));
     expect(await screen.findByTestId("first-run-model-source")).toBeInTheDocument();
-    const steps = 5;
-    expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", `Step ${steps} of ${steps}`);
+    expect(screen.getByTestId("first-run-progress")).toHaveAttribute("aria-label", "Step 5 of 5");
     expect(model.finish).not.toHaveBeenCalled();
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
 
@@ -281,12 +279,7 @@ describe("FirstRunSetup chrome", () => {
       bringYourOwnKey: true,
       openSection: "agent",
     });
-    billingState.byok = true;
-    render(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=agent"]}>
-        <StatefulSetup model={model} />
-      </MemoryRouter>,
-    );
+    renderStatefulSetup(model);
     await user.click(screen.getByTestId("first-run-finish-setup"));
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
   });
@@ -302,32 +295,15 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
   });
 
-  it("reveals subscription sign-in with own-key choices and switches back to hosted models", async () => {
+  it("offers hosted and provider keys without subscription setup", async () => {
     const user = userEvent.setup();
-    const startCodexConnection = vi.fn();
-    renderStatefulSetup({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      bringYourOwnKey: true,
-      codexSubscriptionOffered: true,
-      startCodexConnection,
-    });
+    renderStatefulSetup({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKey: true });
 
-    expect(screen.queryByRole("button", { name: /Use your ChatGPT subscription/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Use your own key or subscription" }));
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.agent.ownKey }));
     expect(screen.getByTestId("agent-step")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Connect ChatGPT" }));
-
-    expect(startCodexConnection).toHaveBeenCalledOnce();
-    expect(screen.queryByTestId("agent-step")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
-
+    expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Use your ChatGPT subscription")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) }));
-    expect(screen.queryByTestId("first-run-codex-subscription")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-finish-setup")).toBeEnabled();
   });
 
@@ -354,16 +330,15 @@ describe("FirstRunSetup chrome", () => {
     await act(async () => complete());
   });
 
-  it.each(["own-key", "subscription"] as const)(
+  it.each(["own-key", "hosted"] as const)(
     "requires a provider model only for own-key credentials (%s)",
     (agentCredentialChoice) => {
       renderSetup(
         pageModel({
           hostedModelsAvailable: true,
+          hostedAgentReady: true,
           bringYourOwnKey: true,
           agentCredentialChoice,
-          codexSubscriptionOffered: true,
-          codexSubscriptionReady: true,
           agentModelPicker: {
             models: [],
             value: "",
@@ -406,23 +381,6 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
     expect(screen.queryByTestId("first-run-model-source")).not.toBeInTheDocument();
-  });
-
-  it("offers ChatGPT after intake without offering unavailable provider keys", async () => {
-    const user = userEvent.setup();
-    const model = pageModel({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      codexSubscriptionOffered: true,
-    });
-    renderSetup(model);
-    await user.click(screen.getByTestId("first-run-analyze-tickets"));
-
-    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
-    expect(model.finish).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: FIRST_RUN_COPY.agent.ownKey })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agent-step")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.agent.subscription })).toBeInTheDocument();
   });
 
   it("hides the model source when only a provider key can run the agent", () => {
@@ -469,7 +427,7 @@ describe("FirstRunSetup chrome", () => {
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
   });
 
-  it.each(["issues", "card"])("blocks unpaid setup for maintainers from %s", async (step) => {
+  it.each(["issues", "card", "agent"])("blocks unpaid setup for maintainers from %s", async (step) => {
     Object.assign(billingState, { enabled: true });
     billingState.availablePlans = [{ key: "pay_as_you_go", name: "Pay-as-you-go" }];
     canManageBilling = false;
@@ -547,15 +505,8 @@ describe("FirstRunSetup chrome", () => {
     }
   });
 
-  it.each(
-    ["issues", "billing"].flatMap((step) => [
-      { step, enabled: false, availablePlans: [{ key: "pay_as_you_go", name: "Pay-as-you-go" }] },
-      { step, enabled: true, availablePlans: [{ key: "free", name: "Free" }] },
-      { step, enabled: true, availablePlans: [] },
-      { step, enabled: true, availablePlans: undefined },
-    ]),
-  )("finishes without plan selection (%j)", async ({ step, enabled, availablePlans }) => {
-    Object.assign(billingState, { enabled, availablePlans });
+  it.each(["issues", "billing"])("finishes without plan selection when billing is disabled (%s)", async (step) => {
+    billingState.enabled = false;
     const user = userEvent.setup();
     const model = hostedVcsModel();
     renderSetup(model, `/org-1/workspaces/PAY/setup?step=${step}`);
@@ -567,8 +518,24 @@ describe("FirstRunSetup chrome", () => {
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
   });
 
+  it.each([{ availablePlans: undefined }, { availablePlans: [] }, { availablePlans: [{ key: "free", name: "Free" }] }])(
+    "returns unpaid agent setup to billing when starter plans are missing (%j)",
+    async ({ availablePlans }) => {
+      Object.assign(billingState, { enabled: true, availablePlans });
+      const model = hostedVcsModel();
+      renderSetup(model, "/org-1/workspaces/PAY/setup?step=agent");
+
+      expect(await screen.findByTestId("first-run-card")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("No starter plans are available");
+      expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+      expect(model.finish).not.toHaveBeenCalled();
+      await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
+      expect(refetchBilling).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it.each([false, true])("routes a restored billing URL through model access (own key: %s)", async (byok) => {
-    billingState.enabled = true;
+    Object.assign(billingState, { enabled: true, planActive: true });
     const model = hostedVcsModel({ bringYourOwnKey: byok });
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=billing&plan=team&subscribed=1&checkout_id=old");
     expect(screen.queryByTestId("first-run-card")).not.toBeInTheDocument();
@@ -580,6 +547,6 @@ describe("FirstRunSetup chrome", () => {
     } else {
       await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     }
-    expect(billingState.planActive).toBe(false);
+    expect(billingState.planActive).toBe(true);
   });
 });

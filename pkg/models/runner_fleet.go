@@ -427,6 +427,7 @@ func ListRunnerCountsByFleetState(tx *gorm.DB) ([]FleetStateCount, error) {
 
 func ListRunnerTaskCountsByFleetState(tx *gorm.DB) ([]FleetStateCount, error) {
 	return listCountsByFleetState(tx, &RunnerTask{}, []string{
+		RunnerTaskStatePending,
 		RunnerTaskStateQueued,
 		RunnerTaskStateReserved,
 		RunnerTaskStateRunning,

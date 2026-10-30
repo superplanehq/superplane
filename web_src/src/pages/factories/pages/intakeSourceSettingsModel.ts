@@ -404,7 +404,7 @@ export function githubIntakeLabelsForApi(settings: IntakeSourceSettings): string
 }
 
 export function intakeSourceSupportsDefaultOwner(sourceId: string | undefined): boolean {
-  return sourceId === "github-issues" || sourceId === "sentry-exceptions";
+  return sourceId !== undefined;
 }
 
 export function intakeSettingsToApi(
@@ -464,4 +464,8 @@ function assignmentFromApi(assignment: FactoriesFactoryIntakeSettings["assignmen
     return "unassigned";
   }
   return "any";
+}
+
+export function intakeSourceSettingsTitle(sourceId: string, name: string): string {
+  return sourceId === "github-issues" ? "Create tasks from GitHub issues" : `Intake ${name}`;
 }

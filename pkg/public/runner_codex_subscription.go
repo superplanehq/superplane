@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -44,7 +46,7 @@ func (s *Server) handleRunnerCodexSubscriptionCredentials(w http.ResponseWriter,
 	var bundle any
 	var version int64
 	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		connection, lockErr := models.LockFactoryCodexConnection(tx, scope.OrganizationID, scope.FactoryID)
+		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -111,10 +113,7 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 	}
 	var version int64
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		if eligibleErr := codexSubscriptionStillEligible(tx, scope.OrganizationID); eligibleErr != nil {
-			return eligibleErr
-		}
-		connection, lockErr := models.LockFactoryCodexConnection(tx, scope.OrganizationID, scope.FactoryID)
+		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -159,6 +158,7 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		writeCodexSubscriptionError(w, err)
 		return
 	}
+	_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(r.Context()), scope.OrganizationID)
 	_ = writeJSON(w, http.StatusOK, map[string]any{"accepted": true, "version": version})
 }
 
@@ -183,9 +183,12 @@ func (s *Server) handleRunnerCodexSubscriptionProgress(w http.ResponseWriter, r 
 		return
 	}
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		connection, lockErr := models.LockFactoryCodexConnection(tx, scope.OrganizationID, scope.FactoryID)
+		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
+		}
+		if _, err := scopedCodexLease(tx, connection, scope); err != nil {
+			return err
 		}
 		return connection.RecordDeviceCode(tx, scope.TaskID, scope.Generation, verificationURL, verificationCode, time.Now())
 	})
@@ -214,6 +217,7 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 	var accessToken string
 	var idToken string
 	var permanent *runneraction.CodexTokenRefreshError
+	var changedOrganizationID uuid.UUID
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		lease, err := models.FindCodexRunLeaseBySecret(tx, secret)
 		if err != nil {
@@ -223,8 +227,14 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		if err != nil {
 			return err
 		}
-		locked, err := models.LockFactoryCodexConnection(tx, connection.OrganizationID, connection.FactoryID)
+		if lease.FactoryID == nil {
+			return models.ErrCodexConnectionStale
+		}
+		locked, err := models.LockScopedFactoryCodexConnection(tx, connection.OrganizationID, lease.ConnectionID)
 		if err != nil {
+			return err
+		}
+		if _, err := scopedCodexLease(tx, locked, &runneraction.CodexSubscriptionScope{OrganizationID: locked.OrganizationID, FactoryID: *lease.FactoryID, ConnectionID: locked.ID, TaskID: lease.TaskID, Generation: lease.Generation}); err != nil {
 			return err
 		}
 		if locked.Status == models.CodexConnectionStatusReconnectRequired {
@@ -250,6 +260,7 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 				return err
 			}
 			permanent = tokenErr
+			changedOrganizationID = locked.OrganizationID
 			return nil
 		}
 		if refreshErr != nil {
@@ -279,6 +290,9 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		}
 		return nil
 	})
+	if err == nil && changedOrganizationID != uuid.Nil {
+		_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(r.Context()), changedOrganizationID)
+	}
 	if permanent != nil {
 		code := permanent.Code
 		if code == "" {
@@ -339,15 +353,31 @@ func readCodexSubscriptionBody(w http.ResponseWriter, r *http.Request) ([]byte, 
 }
 
 func scopedCodexLease(tx *gorm.DB, connection *models.FactoryCodexConnection, scope *runneraction.CodexSubscriptionScope) (*models.FactoryCodexLease, error) {
-	if connection.ID != scope.ConnectionID {
+	if connection.ID != scope.ConnectionID || connection.OrganizationID != scope.OrganizationID || connection.RevocationPendingAt != nil {
 		return nil, models.ErrCodexConnectionStale
 	}
-	return models.FindCodexLeaseForTask(tx, connection.ID, scope.TaskID, scope.Generation)
-}
-
-func codexSubscriptionStillEligible(tx *gorm.DB, organizationID uuid.UUID) error {
-	_, err := models.SoleHumanOrganizationMember(tx, organizationID)
-	return err
+	lease, err := models.FindCodexLeaseForTask(tx, connection.ID, scope.TaskID, scope.Generation)
+	if err != nil {
+		return nil, err
+	}
+	if lease.Login() {
+		if scope.FactoryID != uuid.Nil || lease.FactoryID != nil {
+			return nil, models.ErrCodexConnectionStale
+		}
+	} else if lease.FactoryID == nil || *lease.FactoryID != scope.FactoryID {
+		return nil, models.ErrCodexConnectionStale
+	}
+	if lease.Login() {
+		return lease, nil
+	}
+	task, err := models.FindRunnerTask(tx, lease.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	if err := task.RequireSubscriptionLeaseContinuation(tx); err != nil {
+		return nil, err
+	}
+	return lease, nil
 }
 
 func writeCodexSubscriptionError(w http.ResponseWriter, err error) {
@@ -359,7 +389,7 @@ func writeCodexSubscriptionError(w http.ResponseWriter, err error) {
 	case errors.Is(err, models.ErrCodexConnectionNotReady):
 		http.Error(w, "Connect ChatGPT before this task can run", http.StatusConflict)
 	case errors.Is(err, models.ErrCodexConnectionNotEligible), errors.Is(err, models.ErrCodexConnectionUnavailable):
-		http.Error(w, "This organization must have one member to use a ChatGPT subscription", http.StatusForbidden)
+		http.Error(w, "Connect a ChatGPT subscription as an active workspace member", http.StatusForbidden)
 	default:
 		http.Error(w, "ChatGPT subscription request failed", http.StatusInternalServerError)
 	}

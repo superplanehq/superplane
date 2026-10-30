@@ -45,6 +45,19 @@ func emitWorkOrderCreated(
 	onlyCanvas uuid.UUID,
 	refinementEnabledOverride *bool,
 ) error {
+	if factoryModel.OnboardingConfigValue().CodexSubscription {
+		owners, err := order.ListAssignees(tx)
+		if err != nil {
+			return err
+		}
+		if len(owners) != 1 {
+			return nil
+		}
+		eligible, err := models.SubscriptionOwnerEligible(tx, order.OrganizationID, order.FactoryID, owners[0].UserID)
+		if err != nil || !eligible {
+			return err
+		}
+	}
 	canvases, err := factoryModel.ListCanvases(tx)
 	if err != nil {
 		return err
@@ -201,9 +214,6 @@ func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (st
 	}
 	if repository == "" {
 		return "", "", ""
-	}
-	if defaultBranch == "" {
-		defaultBranch = "main"
 	}
 	provider := config.EffectiveVCSProvider()
 	if repositoryFromOrder {

@@ -4,11 +4,11 @@ import { CodexUsageConnections } from "./FactorySettingsAccountCodexUsagePage";
 import { FactorySettingsPageFrame } from "./FactorySettingsCard";
 
 const meta = {
-  title: "Pages/Factories/Settings/Account/Codex usage",
+  title: "Pages/Factories/Settings/Account/Codex",
   component: CodexUsageConnections,
   decorators: [
     (Story) => (
-      <FactorySettingsPageFrame title="Codex usage" subtitle="Saved usage for your ChatGPT subscriptions.">
+      <FactorySettingsPageFrame title="Codex">
         <Story />
       </FactorySettingsPageFrame>
     ),

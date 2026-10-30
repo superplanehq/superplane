@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-var taskStates = []string{"queued", "reserved", "running", "succeeded", "failed", "canceled", "lost"}
+var taskStates = []string{"pending", "queued", "reserved", "running", "succeeded", "failed", "canceled", "lost"}
 
 func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{

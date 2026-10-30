@@ -16,15 +16,30 @@ import {
 function GitHubIntakePreview({
   initiallyPaused = false,
   failPause = false,
+  allIssues = false,
+  labelsLoading = false,
+  readOnly = false,
 }: {
   initiallyPaused?: boolean;
   failPause?: boolean;
+  allIssues?: boolean;
+  labelsLoading?: boolean;
+  readOnly?: boolean;
 }) {
-  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  const [client] = useState(() => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(["organization", "users", factoryHistoryStoryOrganization], {
+      users: [
+        { metadata: { id: "alex" }, spec: { displayName: "Alex Morgan", email: "alex@example.com" } },
+        { metadata: { id: "sam" }, spec: { displayName: "Sam Rivera", email: "sam@example.com" } },
+      ],
+    });
+    return client;
+  });
   const [settings, setSettings] = useState({
     ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-    filterByLabel: true,
-    labels: ["superplane"],
+    filterByLabel: !allIssues,
+    labels: allIssues ? [] : ["superplane"],
   });
   const [paused, setPaused] = useState(initiallyPaused);
   const [pending, setPending] = useState(false);
@@ -34,6 +49,8 @@ function GitHubIntakePreview({
     <QueryClientProvider client={client}>
       <ComponentStoryShell className="h-screen bg-background">
         <IntakeSourceSettingsPopup
+          canEdit={!readOnly}
+          accessLoading={false}
           sourceId="github-issues"
           organizationId={factoryHistoryStoryOrganization}
           factoryId={factoryHistoryStoryFactory}
@@ -41,6 +58,7 @@ function GitHubIntakePreview({
           repository="superplanehq/superplane"
           settings={settings}
           labelOptions={["superplane", "bug", "needs-triage"]}
+          labelOptionsLoading={labelsLoading}
           paused={paused}
           savePending={pending}
           saveError={error}
@@ -84,7 +102,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Configuration: Story = {};
+export const AllIssues: Story = { args: { allIssues: true } };
+export const LabelsLoading: Story = { args: { labelsLoading: true } };
 export const Paused: Story = { args: { initiallyPaused: true } };
+export const ReadOnly: Story = { args: { readOnly: true } };
 export const PauseError: Story = {
   args: { failPause: true },
   play: async ({ canvasElement }) => {

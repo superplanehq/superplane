@@ -1,7 +1,10 @@
 package e2e
 
 import (
+	"net/http"
+	"slices"
 	"testing"
+	"time"
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
@@ -9,13 +12,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
-	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestAPIKeys(t *testing.T) {
-	t.Run("creating an API key with operator role", func(t *testing.T) {
+	t.Run("operator key can be created edited rotated and revoked", func(t *testing.T) {
 		steps := &apiKeySteps{t: t}
 		steps.start()
 		steps.visitAPIKeysPage()
@@ -24,9 +25,30 @@ func TestAPIKeys(t *testing.T) {
 		steps.fillDescription("Deploys from CI")
 		steps.selectRole("Operator")
 		steps.submitCreate()
-		steps.assertTokenDisplayed()
+		originalToken := steps.readDisplayedToken()
+		steps.assertTokenStatus(originalToken, http.StatusOK)
 		steps.dismissTokenModal()
 		steps.assertAPIKeySavedInDB("ci-deploy-bot", "Deploys from CI", models.RoleOrgOperator)
+
+		steps.visitAPIKeysPage()
+		steps.assertCreatorVisibleInListForAPIKey("ci-deploy-bot")
+		steps.clickAPIKeyLink("ci-deploy-bot")
+		steps.assertOnDetailPage("ci-deploy-bot")
+		steps.assertCreatorOnDetailPage()
+		steps.clickEditButton()
+		steps.clearAndFillEditName("edited-bot")
+		steps.clearAndFillEditDescription("Updated description")
+		steps.submitEdit()
+		steps.assertAPIKeyUpdatedInDB("edited-bot", "Updated description")
+
+		steps.clickRegenerateToken()
+		replacementToken := steps.readDisplayedToken()
+		steps.assertTokenStatus(originalToken, http.StatusUnauthorized)
+		steps.assertTokenStatus(replacementToken, http.StatusOK)
+		steps.dismissTokenModal()
+		steps.clickDeleteOnDetail()
+		steps.assertAPIKeyDeletedFromDB("edited-bot")
+		steps.assertTokenStatus(replacementToken, http.StatusUnauthorized)
 	})
 
 	t.Run("creating an API key with admin role", func(t *testing.T) {
@@ -38,74 +60,9 @@ func TestAPIKeys(t *testing.T) {
 		steps.fillDescription("Admin automation")
 		steps.selectRole("Admin")
 		steps.submitCreate()
-		steps.assertTokenDisplayed()
+		steps.readDisplayedToken()
 		steps.dismissTokenModal()
 		steps.assertAPIKeySavedInDB("admin-bot", "Admin automation", models.RoleOrgAdmin)
-	})
-
-	t.Run("viewing API keys in the list", func(t *testing.T) {
-		steps := &apiKeySteps{t: t}
-		steps.start()
-		steps.givenAPIKeyExists("list-test-bot", "For listing test")
-		steps.visitAPIKeysPage()
-		steps.assertAPIKeyVisibleInList("list-test-bot")
-		steps.assertCreatorVisibleInListForAPIKey("list-test-bot")
-	})
-
-	t.Run("navigating to API key detail", func(t *testing.T) {
-		steps := &apiKeySteps{t: t}
-		steps.start()
-		steps.givenAPIKeyExists("detail-test-bot", "For detail test")
-		steps.visitAPIKeysPage()
-		steps.clickAPIKeyLink("detail-test-bot")
-		steps.assertOnDetailPage("detail-test-bot")
-		steps.assertCreatorOnDetailPage()
-	})
-
-	t.Run("editing an API key", func(t *testing.T) {
-		steps := &apiKeySteps{t: t}
-		steps.start()
-		steps.givenAPIKeyExists("edit-test-bot", "Original description")
-		steps.visitAPIKeysPage()
-		steps.clickAPIKeyLink("edit-test-bot")
-		steps.clickEditButton()
-		steps.clearAndFillEditName("edited-bot")
-		steps.clearAndFillEditDescription("Updated description")
-		steps.submitEdit()
-		steps.assertAPIKeyNameInDB("edited-bot")
-	})
-
-	t.Run("deleting an API key", func(t *testing.T) {
-		steps := &apiKeySteps{t: t}
-		steps.start()
-		steps.givenAPIKeyExists("delete-test-bot", "Will be deleted")
-		steps.visitAPIKeysPage()
-		steps.assertAPIKeyVisibleInList("delete-test-bot")
-		steps.clickAPIKeyLink("delete-test-bot")
-		steps.clickDeleteOnDetail()
-		steps.assertAPIKeyDeletedFromDB("delete-test-bot")
-	})
-
-	t.Run("regenerating an API key token", func(t *testing.T) {
-		steps := &apiKeySteps{t: t}
-		steps.start()
-		steps.givenAPIKeyExists("regen-test-bot", "Token regen test")
-		steps.visitAPIKeysPage()
-		steps.clickAPIKeyLink("regen-test-bot")
-		steps.clickRegenerateToken()
-		steps.assertTokenDisplayed()
-	})
-
-	t.Run("operator cannot create or manage API keys", func(t *testing.T) {
-		steps := &apiKeySteps{t: t}
-		steps.start()
-		steps.givenAPIKeyExists("operator-test-bot", "Operator RBAC test")
-		steps.loginAsOperator()
-		steps.visitAPIKeysPage()
-		steps.assertCreateButtonDisabled()
-		steps.clickAPIKeyLink("operator-test-bot")
-		steps.assertEditButtonDisabled()
-		steps.assertDeleteButtonDisabled()
 	})
 }
 
@@ -123,7 +80,6 @@ func (s *apiKeySteps) start() {
 
 func (s *apiKeySteps) visitAPIKeysPage() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/settings/api-keys")
-	s.session.Sleep(500)
 }
 
 func (s *apiKeySteps) clickCreateAPIKey() {
@@ -131,21 +87,18 @@ func (s *apiKeySteps) clickCreateAPIKey() {
 	createBtn := page.GetByTestId("api-key-create-btn")
 	err := createBtn.First().Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
 }
 
 func (s *apiKeySteps) fillName(name string) {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-create-name").Fill(name)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *apiKeySteps) fillDescription(description string) {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-create-description").Fill(description)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *apiKeySteps) selectRole(roleLabel string) {
@@ -154,37 +107,44 @@ func (s *apiKeySteps) selectRole(roleLabel string) {
 	trigger := page.GetByTestId("api-key-create-role")
 	err := trigger.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
 
 	option := page.GetByRole("option", pw.PageGetByRoleOptions{Name: roleLabel, Exact: pw.Bool(true)})
 	err = option.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
 }
 
 func (s *apiKeySteps) submitCreate() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-create-submit").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(1000)
 }
 
-func (s *apiKeySteps) assertTokenDisplayed() {
-	page := s.session.Page()
-	tokenInput := page.GetByTestId("api-key-token-display")
-	err := tokenInput.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
-	require.NoError(s.t, err)
-
+func (s *apiKeySteps) readDisplayedToken() string {
+	tokenInput := s.session.Page().GetByTestId("api-key-token-display")
+	require.NoError(s.t, tokenInput.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
 	value, err := tokenInput.InputValue()
 	require.NoError(s.t, err)
 	require.NotEmpty(s.t, value, "token should not be empty")
+	return value
+}
+
+func (s *apiKeySteps) assertTokenStatus(token string, expectedStatus int) {
+	request, err := http.NewRequestWithContext(s.t.Context(), http.MethodGet, s.session.BaseURL+"/api/v1/canvases", nil)
+	require.NoError(s.t, err)
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("X-Organization-Id", s.session.OrgID.String())
+	// A separate client has no browser cookies that could authenticate a broken token.
+	client := &http.Client{Timeout: 10 * time.Second}
+	response, err := client.Do(request)
+	require.NoError(s.t, err)
+	defer response.Body.Close()
+	require.Equal(s.t, expectedStatus, response.StatusCode)
 }
 
 func (s *apiKeySteps) dismissTokenModal() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-token-done").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
 }
 
 func (s *apiKeySteps) assertAPIKeySavedInDB(name, description, expectedRole string) {
@@ -205,22 +165,13 @@ func (s *apiKeySteps) assertAPIKeySavedInDB(name, description, expectedRole stri
 	require.Equal(s.t, description, *found.Description)
 	require.NotEmpty(s.t, found.TokenHash, "token hash should be set")
 
-	// Verify the role was assigned correctly via casbin
-	var casbinRule struct {
-		V0 string
-		V1 string
-	}
-	err = database.Conn().
-		Table("casbin_rule").
-		Select("v0, v1").
-		Where("ptype = 'g' AND v0 = ? AND v2 LIKE ?", "/users/"+found.ID.String(), "/org/%").
-		First(&casbinRule).Error
+	authService, err := authorization.NewAuthService()
 	require.NoError(s.t, err)
-	require.Equal(s.t, "/roles/"+expectedRole, casbinRule.V1)
-}
-
-func (s *apiKeySteps) assertAPIKeyVisibleInList(name string) {
-	s.session.AssertText(name)
+	roles, err := authService.GetUserRolesForOrg(s.t.Context(), found.ID.String(), orgID)
+	require.NoError(s.t, err)
+	require.True(s.t, slices.ContainsFunc(roles, func(role *authorization.RoleDefinition) bool {
+		return role.Name == expectedRole
+	}), "API key should have role %s", expectedRole)
 }
 
 func (s *apiKeySteps) assertCreatorVisibleInListForAPIKey(name string) {
@@ -242,7 +193,6 @@ func (s *apiKeySteps) clickAPIKeyLink(name string) {
 	link := page.GetByTestId("api-key-link").GetByText(name, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
 	err := link.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(500)
 }
 
 func (s *apiKeySteps) assertOnDetailPage(name string) {
@@ -254,7 +204,6 @@ func (s *apiKeySteps) clickEditButton() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-detail-edit").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(300)
 }
 
 func (s *apiKeySteps) clearAndFillEditName(name string) {
@@ -262,7 +211,6 @@ func (s *apiKeySteps) clearAndFillEditName(name string) {
 	input := page.GetByTestId("api-key-detail-edit-name")
 	err := input.Fill(name)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *apiKeySteps) clearAndFillEditDescription(description string) {
@@ -270,7 +218,6 @@ func (s *apiKeySteps) clearAndFillEditDescription(description string) {
 	input := page.GetByTestId("api-key-detail-edit-description")
 	err := input.Fill(description)
 	require.NoError(s.t, err)
-	s.session.Sleep(200)
 }
 
 func (s *apiKeySteps) submitEdit() {
@@ -278,92 +225,46 @@ func (s *apiKeySteps) submitEdit() {
 	saveBtn := page.Locator("button:has-text('Save')").First()
 	err := saveBtn.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(1000)
 }
 
-func (s *apiKeySteps) assertAPIKeyNameInDB(name string) {
-	apiKeys, err := models.FindAPIKeysByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
-	require.NoError(s.t, err)
-
-	for _, apiKey := range apiKeys {
-		if apiKey.Name == name {
-			return
+func (s *apiKeySteps) assertAPIKeyUpdatedInDB(name, description string) {
+	require.Eventually(s.t, func() bool {
+		apiKeys, err := models.FindAPIKeysByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
+		if err != nil {
+			return false
 		}
-	}
-	require.Fail(s.t, "API key %q not found in DB", name)
+		for _, apiKey := range apiKeys {
+			if apiKey.Name == name && apiKey.Description != nil && *apiKey.Description == description {
+				return true
+			}
+		}
+		return false
+	}, 10*time.Second, 100*time.Millisecond, "API key update should persist")
 }
 
 func (s *apiKeySteps) clickDeleteOnDetail() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-detail-delete").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(1000)
 }
 
 func (s *apiKeySteps) assertAPIKeyDeletedFromDB(name string) {
-	apiKeys, err := models.FindAPIKeysByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
-	require.NoError(s.t, err)
-
-	for _, apiKey := range apiKeys {
-		if apiKey.Name == name {
-			require.Fail(s.t, "API key %q should have been deleted", name)
+	require.Eventually(s.t, func() bool {
+		apiKeys, err := models.FindAPIKeysByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
+		if err != nil {
+			return false
 		}
-	}
+		for _, apiKey := range apiKeys {
+			if apiKey.Name == name {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, 100*time.Millisecond, "API key should be deleted")
 }
 
 func (s *apiKeySteps) clickRegenerateToken() {
 	page := s.session.Page()
 	err := page.GetByTestId("api-key-detail-regenerate-token").Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(1000)
-}
-
-func (s *apiKeySteps) loginAsOperator() {
-	operatorEmail := support.RandomName("operator") + "@superplane.local"
-	operatorAccount, err := models.CreateAccount("Operator User", operatorEmail)
-	require.NoError(s.t, err)
-
-	operatorUser, err := models.CreateUser(s.session.OrgID, operatorAccount.ID, operatorEmail, "Operator User")
-	require.NoError(s.t, err)
-
-	authService, err := authorization.NewAuthService()
-	require.NoError(s.t, err)
-
-	err = authService.AssignRole(operatorUser.ID.String(), models.RoleOrgOperator, s.session.OrgID.String(), models.DomainTypeOrganization)
-	require.NoError(s.t, err)
-
-	s.session.Account = operatorAccount
-	s.session.Login()
-}
-
-func (s *apiKeySteps) assertCreateButtonDisabled() {
-	s.session.AssertDisabled(q.TestID("api-key-create-btn"))
-}
-
-func (s *apiKeySteps) assertEditButtonDisabled() {
-	s.session.AssertDisabled(q.TestID("api-key-detail-edit"))
-}
-
-func (s *apiKeySteps) assertDeleteButtonDisabled() {
-	s.session.AssertDisabled(q.TestID("api-key-detail-delete"))
-}
-
-// givenAPIKeyExists creates an API key directly in the DB for test setup.
-func (s *apiKeySteps) givenAPIKeyExists(name, description string) {
-	// Look up the human user to use as created_by (the FK references users.id, not accounts.id)
-	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), "e2e@superplane.local")
-	require.NoError(s.t, err)
-
-	desc := description
-	apiKey, err := models.CreateAPIKey(
-		database.Conn(),
-		s.session.OrgID,
-		name,
-		&desc,
-		user.ID,
-		nil,
-		nil,
-	)
-	require.NoError(s.t, err)
-	require.NotNil(s.t, apiKey)
 }

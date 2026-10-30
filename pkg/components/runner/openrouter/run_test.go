@@ -250,6 +250,25 @@ func TestBuildOpenCodeConfigAddsMergeConfidenceMCP(t *testing.T) {
 	assert.Equal(t, true, superplane["enabled"])
 }
 
+func TestBuildOpenCodeConfigAddsGlobalMCPNextToTheFlowServer(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
+		"SUPERPLANE_RUNNER_TOKEN":           "runner-token",
+	})
+	mcp, _ := config["mcp"].(map[string]any)
+	superplane, _ := mcp["superplane"].(map[string]any)
+	global, _ := mcp["superplane_global"].(map[string]any)
+
+	assert.Equal(t, []any{"node", "/task/merge_confidence_mcp.js"}, superplane["command"])
+	assert.Equal(t, []any{"node", "/task/superplane_mcp/server.js"}, global["command"])
+	assert.Equal(t, "local", global["type"])
+
+	config = jsBuildConfig(t, "/task", map[string]string{"SUPERPLANE_RUNNER_TOKEN": "runner-token"})
+	mcp, _ = config["mcp"].(map[string]any)
+	assert.Nil(t, mcp["superplane"])
+	assert.NotNil(t, mcp["superplane_global"])
+}
+
 func TestBuildOpenCodeConfigAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	config := jsBuildConfig(t, "/task", map[string]string{
 		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",

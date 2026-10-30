@@ -1,3 +1,4 @@
+import { isCodexActionCancelled } from "@/pages/factories/codex/codexActionContext";
 import type { FactoriesWorkOrder } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateWorkOrder } from "@/hooks/useFactoryData";
@@ -39,11 +40,13 @@ export function useCreateWorkOrderComposer({
   const [titleError, setTitleError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const hasSeededOwner = useRef(false);
+  const hasSelectedOwner = useRef(false);
 
   const canCreate = Boolean(title.trim()) && !isCreating;
 
   const setAssigneeIds = (ids: string[]) => {
     hasSeededOwner.current = true;
+    hasSelectedOwner.current = true;
     setAssigneeIdsInternal(ids);
   };
 
@@ -78,11 +81,12 @@ export function useCreateWorkOrderComposer({
       const order = await createWorkOrder.mutateAsync({
         title: trimmedTitle,
         description: trimmedDescription,
-        assigneeIds,
+        ...(hasSelectedOwner.current ? { assigneeIds, unassigned: assigneeIds.length === 0 } : {}),
         ...(draft?.model ? { model: draft.model } : {}),
       });
       goToOrder(order);
     } catch (error) {
+      if (isCodexActionCancelled(error)) return;
       showErrorToast(getApiErrorMessage(error, "Failed to create task"));
     } finally {
       setIsCreating(false);

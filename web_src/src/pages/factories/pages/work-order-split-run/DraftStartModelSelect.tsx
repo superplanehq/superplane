@@ -35,7 +35,9 @@ const START_THINKING_LEVELS = [
 ];
 
 /**
- * Picks the runner model and thinking for Start. `icon` is the chevron fused to Start,
+ * Picks the runner model and thinking for Start. Start assigns the task to
+ * the caller, so the list is the caller's catalog and not the saved owner's
+ * catalog. `icon` is the chevron fused to Start,
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
  * strip settings row. Closed labeled and ghost triggers show the model name
  * and the thinking word when one is chosen.
@@ -59,11 +61,12 @@ export function DraftStartModelSelect({
   disabled?: boolean;
   appearance?: Appearance;
 }) {
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName);
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true);
   const selectedName =
     model === DRAFT_START_MODEL_AUTO
       ? "Auto"
-      : (models.data?.models ?? []).find((item) => item.id === model)?.name || model;
+      : (models.data?.models ?? []).find((item) => item.id === model)?.name ||
+        (models.isLoading ? model : `${model} (unavailable)`);
   const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
   const showName = appearance !== "icon";
 

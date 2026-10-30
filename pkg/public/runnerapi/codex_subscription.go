@@ -19,12 +19,24 @@ func (s *Server) refreshCodexSubscriptionTaskToken(ctx context.Context, task *mo
 	if err != nil {
 		return nil, err
 	}
+	if lease != nil && lease.RevokedAt != nil {
+		return nil, models.ErrCodexConnectionStale
+	}
 	if lease == nil || lease.Login() {
 		return payload, nil
+	}
+	if lease.FactoryID == nil {
+		return nil, models.ErrCodexConnectionStale
+	}
+	if err := task.RequireSubscriptionLeaseAdmission(db); err != nil {
+		return nil, err
 	}
 	connection, err := models.FindFactoryCodexConnectionByID(db, lease.ConnectionID)
 	if err != nil {
 		return nil, err
+	}
+	if connection.RevocationPendingAt != nil || connection.Status != models.CodexConnectionStatusReady {
+		return nil, models.ErrCodexConnectionNotReady
 	}
 	var document map[string]json.RawMessage
 	var spec runnerpayload.TaskPayload
@@ -40,7 +52,7 @@ func (s *Server) refreshCodexSubscriptionTaskToken(ctx context.Context, task *mo
 	}
 	token, err := runneraction.MintCodexSubscriptionToken(s.signer, runneraction.CodexSubscriptionScope{
 		OrganizationID: connection.OrganizationID,
-		FactoryID:      connection.FactoryID,
+		FactoryID:      *lease.FactoryID,
 		ConnectionID:   connection.ID,
 		TaskID:         task.ID,
 		Generation:     lease.Generation,

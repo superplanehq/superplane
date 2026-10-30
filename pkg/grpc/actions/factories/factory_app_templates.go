@@ -336,9 +336,6 @@ func normalizeFactoryInstallParams(params map[string]string) map[string]string {
 	if normalized == nil {
 		normalized = map[string]string{}
 	}
-	if strings.TrimSpace(normalized["defaultBranch"]) == "" {
-		normalized["defaultBranch"] = "main"
-	}
 	if strings.TrimSpace(normalized["riskRules"]) == "" {
 		normalized["riskRules"] = defaultRiskScoreRules
 	}
@@ -615,6 +612,9 @@ func deriveFactoryTemplateInput(
 			input.installParams["prompt"] = scheduledIntakePromptFromSteps(settings.agentSteps["scheduled-agent"])
 		}
 		for _, node := range version.Nodes {
+			if node.ComponentName() == "createWorkOrder" {
+				input.installParams["defaultOwnerId"] = configString(node.Configuration, "defaultOwnerId")
+			}
 			if node.ComponentName() == "schedule" {
 				for _, key := range []string{"type", "hour", "minute", "timezone", "cronExpression"} {
 					if value, ok := node.Configuration[key]; ok {
@@ -713,6 +713,9 @@ func deriveFactoryInstallParams(nodes []models.Node) map[string]string {
 }
 
 func resetFactoryTemplateAgent(tx *gorm.DB, factory *models.Factory, nodes []models.Node) *factoryTemplateAgent {
+	if factory != nil && factory.OnboardingConfigValue().CodexSubscription {
+		return &factoryTemplateAgent{component: "runnerCodex", credentialSource: "subscription"}
+	}
 	if agent := hostedResetIntakeAgent(tx, factory); agent != nil {
 		return &factoryTemplateAgent{
 			component:        models.SuperPlaneRunnerComponent,
@@ -730,6 +733,9 @@ func hostedResetIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 }
 
 func resetFactoryIntakeAgent(tx *gorm.DB, factory *models.Factory, nodes []models.Node) *intakeAgent {
+	if factory != nil && factory.OnboardingConfigValue().CodexSubscription {
+		return &intakeAgent{Component: "runnerCodex", Credentials: map[string]any{"source": "subscription"}}
+	}
 	if agent := hostedResetIntakeAgent(tx, factory); agent != nil {
 		return agent
 	}
@@ -832,6 +838,9 @@ func materializeIntakeDefaults(
 	}
 	if savedSettings != nil {
 		request.Settings = settings
+	} else {
+		// Restoring template defaults must retain intake ownership.
+		request.Settings.DefaultOwnerID = settings.DefaultOwnerID
 	}
 	defaults, err := buildIntakeCanvas(request)
 	if err != nil {

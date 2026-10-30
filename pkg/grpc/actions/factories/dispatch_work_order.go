@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -48,13 +47,11 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(invalidArgument("line_name is required"), "failed to dispatch work order")
 	}
 
-	var actor *uuid.UUID
-	if userIDStr, ok := authentication.GetUserIdFromMetadata(ctx); ok {
-		parsed, err := uuid.Parse(userIDStr)
-		if err == nil {
-			actor = &parsed
-		}
+	callerID, err := codexCallerID(ctx)
+	if err != nil {
+		return nil, err
 	}
+	actor := &callerID
 
 	line, err := resolvedFactory.FindLineByName(db, lineName)
 	if err != nil {
@@ -179,8 +176,18 @@ func dispatchWorkOrderOnLineTx(
 
 	logger := logging.WithWorkOrder(logging.ForFactory(*factory), *order).
 		WithField("organization_id", factory.OrganizationID)
+	if order.PendingHandOff != nil {
+		return nil, grpcFailedPrecondition("Use Start to resume this pending handoff.")
+	}
 	if !order.IsDispatchable() {
 		return nil, models.ErrFactoryWorkOrderNotDispatchable
+	}
+
+	if err := assignWorkOrderStarter(tx, factory, order, actor); err != nil {
+		return nil, err
+	}
+	if err := order.RequireExecutionOwner(tx, false); err != nil {
+		return nil, err
 	}
 
 	currentLine, err := factory.FindLine(tx, lineID)
@@ -194,7 +201,7 @@ func dispatchWorkOrderOnLineTx(
 
 	model = strings.TrimSpace(model)
 	if model != "" {
-		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name)
+		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name, subscriptionOrderOwnerID(tx, order))
 		if err != nil {
 			return nil, err
 		}
@@ -208,6 +215,14 @@ func dispatchWorkOrderOnLineTx(
 	}
 	if err := validateLineThinkingLevel(tx, currentLine, normalizedThinking); err != nil {
 		return nil, err
+	}
+	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
+		return nil, err
+	}
+	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
+		if err := order.ClearStatusNote(tx, missingImplementBranchNoteKey); err != nil {
+			return nil, err
+		}
 	}
 
 	fromState := order.State
@@ -223,7 +238,7 @@ func dispatchWorkOrderOnLineTx(
 
 	var startedSteps []*models.FactoryLineStepResult
 	if replaceActive && startIndex > 0 {
-		_, started, err := order.RetryLineStep(tx, currentLine, startIndex)
+		_, started, err := order.RetryLineStep(tx, currentLine, startIndex, models.FactoryLineStartOptions{Model: model, ThinkingLevel: normalizedThinking})
 		if err != nil {
 			return nil, err
 		}
@@ -263,6 +278,110 @@ func dispatchWorkOrderOnLineTx(
 		fromState:    fromState,
 		logger:       logger,
 	}, nil
+}
+
+// requireSavedBranchForImplementation stops Implement when checkout would
+// discover a branch the later pull request cannot read. Create pull request
+// uses the saved task branch. An empty value fails after commits are pushed.
+// The check covers every step from the start index, so a line that reaches
+// Implement later cannot start without a saved branch. Read-only lines still
+// start and follow the remote default.
+func requireSavedBranchForImplementation(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	line *models.FactoryLine,
+	startIndex int,
+) error {
+	if line == nil || startIndex < 0 || startIndex >= len(line.Steps) {
+		return nil
+	}
+	appIDs := make([]uuid.UUID, 0, len(line.Steps)-startIndex)
+	for _, step := range line.Steps[startIndex:] {
+		appIDs = append(appIDs, step.AppID)
+	}
+	blocked, err := implementStepsMissingSavedBranch(tx, factory, order, appIDs)
+	if err != nil || !blocked {
+		return err
+	}
+	return invalidArgument(missingImplementBranchMessage)
+}
+
+const (
+	missingImplementBranchNoteKey = "missing-implement-branch"
+	missingImplementBranchMessage = "Set the default branch in Workspace settings → Repository before you start Implement."
+)
+
+// NoteMissingImplementBranch tells the task why the line stopped.
+func NoteMissingImplementBranch(tx *gorm.DB, order *models.FactoryWorkOrder) error {
+	if order == nil {
+		return nil
+	}
+	_, err := order.SetStatusNote(tx, models.FactoryWorkOrderStatusNoteParams{
+		Key:      missingImplementBranchNoteKey,
+		Headline: "Set the default branch",
+		Body:     missingImplementBranchMessage,
+	})
+	return err
+}
+
+// ImplementStepBlockedByMissingBranch reports whether this app is Implement
+// and the task has no branch to publish to. A database error is returned
+// separately so a caller can retry that lookup.
+func ImplementStepBlockedByMissingBranch(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	appID uuid.UUID,
+) (bool, error) {
+	return implementStepsMissingSavedBranch(tx, factory, order, []uuid.UUID{appID})
+}
+
+func implementStepsMissingSavedBranch(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	appIDs []uuid.UUID,
+) (bool, error) {
+	if factory == nil {
+		return false, nil
+	}
+	ids := make([]uuid.UUID, 0, len(appIDs))
+	for _, appID := range appIDs {
+		if appID != uuid.Nil {
+			ids = append(ids, appID)
+		}
+	}
+	if len(ids) == 0 {
+		return false, nil
+	}
+	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
+		return false, nil
+	}
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, ids)
+	if err != nil {
+		return false, err
+	}
+	for _, appID := range ids {
+		spec, ok := specs[appID]
+		if !ok {
+			continue
+		}
+		if models.FactoryAppTemplateID(spec.Nodes) == lineImplementationTemplateID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// resolvedWorkOrderDefaultBranch matches resolveOrderRepository. A task
+// snapshot is used only when it has both a repository and a branch.
+// Otherwise the workspace branch is the branch Implement will publish to.
+func resolvedWorkOrderDefaultBranch(order *models.FactoryWorkOrder, config models.FactoryOnboardingConfig) string {
+	if order != nil && strings.TrimSpace(derefString(order.Repository)) != "" && strings.TrimSpace(derefString(order.DefaultBranch)) != "" {
+		return strings.TrimSpace(derefString(order.DefaultBranch))
+	}
+	return strings.TrimSpace(config.DefaultBranch)
 }
 
 func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {

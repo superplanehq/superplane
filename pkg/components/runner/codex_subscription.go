@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -38,7 +39,7 @@ func MintCodexSubscriptionToken(signer *jwt.Signer, scope CodexSubscriptionScope
 	if ttl <= 0 {
 		ttl = time.Duration(DefaultExecutionTimeoutSeconds) * time.Second
 	}
-	if scope.OrganizationID == uuid.Nil || scope.FactoryID == uuid.Nil || scope.ConnectionID == uuid.Nil || scope.TaskID == uuid.Nil || scope.Generation < 1 {
+	if scope.OrganizationID == uuid.Nil || scope.ConnectionID == uuid.Nil || scope.TaskID == uuid.Nil || scope.Generation < 1 {
 		return "", fmt.Errorf("chatgpt subscription scope is incomplete")
 	}
 	return signer.GenerateWithClaims(ttl, map[string]string{
@@ -68,7 +69,8 @@ func ParseCodexSubscriptionToken(signer *jwt.Signer, token string) (*CodexSubscr
 	if err != nil {
 		return nil, err
 	}
-	scope.FactoryID, err = parsePlanningClaimUUID(claims, "factory_id")
+	factory, _ := claims["factory_id"].(string)
+	scope.FactoryID, err = uuid.Parse(factory)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +134,10 @@ func codexBundleString(value any, name string) string {
 }
 
 func codexAccountLabel(document map[string]any) string {
-	for _, key := range []string{"email", "account_id", "accountId"} {
+	if email := codexAccountEmail(document); email != "" {
+		return email
+	}
+	for _, key := range []string{"account_id", "accountId"} {
 		label := codexBundleString(document, key)
 		if label == "" || looksLikeCodexToken(label) {
 			continue
@@ -143,6 +148,32 @@ func codexAccountLabel(document map[string]any) string {
 		return label
 	}
 	return "ChatGPT account"
+}
+
+func codexAccountEmail(document map[string]any) string {
+	email := codexBundleString(document, "email")
+	if email == "" {
+		parts := strings.Split(codexBundleString(document, "id_token"), ".")
+		if len(parts) != 3 {
+			return ""
+		}
+		payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err != nil {
+			return ""
+		}
+		var claims struct {
+			Email string `json:"email"`
+		}
+		if json.Unmarshal(payload, &claims) != nil {
+			return ""
+		}
+		email = strings.TrimSpace(claims.Email)
+	}
+	address, err := mail.ParseAddress(email)
+	if err != nil || address.Address != email || len(email) > 254 {
+		return ""
+	}
+	return email
 }
 
 func looksLikeCodexToken(value string) bool {

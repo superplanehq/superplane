@@ -66,17 +66,13 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 		OrganizationID:    c.organizationID,
 		FleetID:           fleet.ID,
 		Backend:           models.RunnerTaskBackendIntegrated,
-		State:             models.RunnerTaskStateQueued,
+		State:             models.RunnerTaskStatePending,
 		PayloadCiphertext: encrypted,
 		QueuedAt:          now,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
-	if err := c.tx.Create(task).Error; err != nil {
-		return err
-	}
-	_ = runnercontrol.Publish(runnercontrol.Notification{FleetID: fleet.Slug})
-	return nil
+	return c.tx.Create(task).Error
 }
 
 func withDefaultLogUploadPolicy(payload []byte) ([]byte, error) {

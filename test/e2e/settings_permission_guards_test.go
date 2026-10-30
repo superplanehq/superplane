@@ -1,15 +1,18 @@
 package e2e
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
@@ -310,13 +313,22 @@ func (s *settingsPermissionGuardSteps) givenMemberExists(label string) string {
 }
 
 func (s *settingsPermissionGuardSteps) givenSecretExists(name string) {
-	secretSteps := &SecretsSteps{t: s.t, session: s.session}
-	secretSteps.givenASecretExists(name, map[string]string{"KEY1": "value1", "KEY2": "value2"})
+	encryptor, err := crypto.ProcessEncryptor()
+	require.NoError(s.t, err)
+	raw, err := json.Marshal(map[string]string{"KEY1": "value1", "KEY2": "value2"})
+	require.NoError(s.t, err)
+	encrypted, err := encryptor.Encrypt(s.t.Context(), raw, []byte(name))
+	require.NoError(s.t, err)
+	_, err = models.CreateSecret(name, secrets.ProviderLocal, s.session.Account.ID.String(), models.DomainTypeOrganization, s.session.OrgID, encrypted)
+	require.NoError(s.t, err)
 }
 
 func (s *settingsPermissionGuardSteps) givenAPIKeyExists(name string) {
-	apiKeySteps := &apiKeySteps{t: s.t, session: s.session}
-	apiKeySteps.givenAPIKeyExists(name, "Permission guard test")
+	user, err := models.FindActiveUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+	description := "Permission guard test"
+	_, err = models.CreateAPIKey(database.DB(s.t.Context()), s.session.OrgID, name, &description, user.ID, nil, nil)
+	require.NoError(s.t, err)
 }
 
 func (s *settingsPermissionGuardSteps) givenIntegrationExists(name string) *models.Integration {
@@ -342,4 +354,68 @@ func (s *settingsPermissionGuardSteps) visitFactoryWorkspaceSettings(factory *mo
 func (s *settingsPermissionGuardSteps) assertPermissionDenied() {
 	s.session.AssertVisible(q.TestID("permission-denied-page"))
 	s.session.AssertText("Permission denied")
+}
+
+type permissionSpec struct {
+	resource string
+	action   string
+}
+
+func organizationPermission(resource, action string) *permissionSpec {
+	return &permissionSpec{resource: resource, action: action}
+}
+
+func loginAsOperator(t *testing.T, sess *session.TestSession) {
+	account := createAccountForRole(t, sess, "operator", models.RoleOrgOperator)
+	sess.Account = account
+	sess.Login()
+}
+
+func loginWithOrganizationPermissions(t *testing.T, sess *session.TestSession, roleLabel string, permissions ...*permissionSpec) {
+	roleName := support.RandomName(roleLabel)
+	rolePermissions := make([]*authorization.Permission, 0, len(permissions))
+	for _, permission := range permissions {
+		rolePermissions = append(rolePermissions, &authorization.Permission{
+			Resource:   permission.resource,
+			Action:     permission.action,
+			DomainType: models.DomainTypeOrganization,
+		})
+	}
+
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+
+	err = authService.CreateCustomRole(sess.OrgID.String(), &authorization.RoleDefinition{
+		Name:        roleName,
+		DisplayName: roleLabel,
+		DomainType:  models.DomainTypeOrganization,
+		Description: "E2E permission guard role",
+		Permissions: rolePermissions,
+		InheritsFrom: &authorization.RoleDefinition{
+			Name:       models.RoleOrgOperator,
+			DomainType: models.DomainTypeOrganization,
+		},
+	})
+	require.NoError(t, err)
+
+	account := createAccountForRole(t, sess, roleLabel, roleName)
+	sess.Account = account
+	sess.Login()
+}
+
+func createAccountForRole(t *testing.T, sess *session.TestSession, label, roleName string) *models.Account {
+	email := support.RandomName(label) + "@superplane.local"
+	account, err := models.CreateAccount(label, email)
+	require.NoError(t, err)
+
+	user, err := models.CreateUser(sess.OrgID, account.ID, email, label)
+	require.NoError(t, err)
+
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+
+	err = authService.AssignRole(user.ID.String(), roleName, sess.OrgID.String(), models.DomainTypeOrganization)
+	require.NoError(t, err)
+
+	return account
 }

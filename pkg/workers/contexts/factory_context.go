@@ -436,6 +436,21 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	params core.WorkOrderParams,
 	sourceRunID uuid.UUID,
 ) (*models.FactoryWorkOrder, error) {
+	if factoryModel.OnboardingConfigValue().CodexSubscription {
+		order, err := factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, c.originFromSourceRun(sourceRunID))
+		if !errors.Is(err, models.ErrSubscriptionOwnerRequired) {
+			return order, err
+		}
+		// A run that started before the switch to subscriptions has no saved
+		// default owner. Create its task as before the switch.
+		superseded, supersededErr := models.RunUsesSupersededVersion(c.tx, sourceRunID)
+		if supersededErr != nil {
+			return nil, supersededErr
+		}
+		if !superseded {
+			return nil, err
+		}
+	}
 	assigneeIDs := []uuid.UUID{}
 	if params.DefaultOwnerID != "" {
 		user, err := models.FindActiveUserByIDInTransaction(c.tx, factoryModel.OrganizationID.String(), params.DefaultOwnerID)
@@ -443,7 +458,10 @@ func (c *FactoryContext) createFactoryWorkOrder(
 			return nil, fmt.Errorf("find default task owner: %w", err)
 		}
 		if err == nil && user.IsHuman() {
-			assigneeIDs = append(assigneeIDs, user.ID)
+			assigneeIDs, err = factoryModel.DefaultSubscriptionAssignees(c.tx, &user.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	if origin := c.originFromSourceRun(sourceRunID); origin != nil {

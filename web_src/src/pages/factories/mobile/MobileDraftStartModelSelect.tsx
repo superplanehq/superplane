@@ -53,7 +53,9 @@ export function MobileDraftStartModelSelect({
   const modelOptions = lineName
     ? runnerModelOptions(models.data?.models)
     : [{ value: DRAFT_START_MODEL_AUTO, label: "Auto" }];
-  const selectedName = modelOptions.find((option) => option.value === model)?.label || model;
+  const selectedName =
+    modelOptions.find((option) => option.value === model)?.label ||
+    (models.isLoading ? model : `${model} (unavailable)`);
   const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
 
   return (

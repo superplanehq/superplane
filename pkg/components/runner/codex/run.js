@@ -25,9 +25,15 @@ const SUPERPLANE_MCP_ENV_VARS = [
   "SUPERPLANE_ANALYSIS_SCORE_FILE",
   "SUPERPLANE_ARTIFACT_TOKEN",
   "SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
-  "SUPERPLANE_OWNER_TOKEN",
   "SUPERPLANE_VISUAL_EVIDENCE",
   "SUPERPLANE_PUBLISH_LINKS",
+];
+
+const GLOBAL_MCP_SERVER = "superplane_global";
+const GLOBAL_MCP_ENV_VARS = [
+  "SUPERPLANE_BASE_URL",
+  "SUPERPLANE_RUNNER_TOKEN",
+  "SUPERPLANE_TASK_DIR",
 ];
 
 function loadActivityStreamModule() {
@@ -212,16 +218,13 @@ function codexExecArgs(
     );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
-    if (
-      artifactEnabled(env) ||
-      mergeConfidenceEnabled(env) ||
-      envFlag(env, "SUPERPLANE_OWNER_TOKEN")
-    ) {
+    if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
       args.push(...mcpConfigOverrides(mcpScriptPath, env));
     } else {
       args.push(...workspaceMCPConfigOverrides(env));
     }
   }
+  args.push(...globalMCPConfigOverrides(path.dirname(String(mcpScriptPath || "")), env));
   if (model) {
     args.push("-m", model);
   }
@@ -276,14 +279,6 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
     "-c",
     `mcp_servers.superplane.env_vars=${tomlStringArray(SUPERPLANE_MCP_ENV_VARS)}`,
-    ...(envFlag(env, "SUPERPLANE_OWNER_TOKEN")
-      ? [
-          "-c",
-          'mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.assign_owner.approval_mode="approve"',
-        ]
-      : []),
     // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
     // answer that prompt, so approve only these planning tools, not shell writes.
     ...(planningEnabled(env)
@@ -292,13 +287,45 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
           'mcp_servers.superplane.tools.propose_update.approval_mode="approve"',
           "-c",
           'mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.assign_owner.approval_mode="approve"',
         ]
       : []),
     ...workspaceMCPConfigOverrides(env),
+  ];
+}
+
+function loadGlobalMCPRegistry(taskDir) {
+  const candidates = [
+    path.join(taskDir, "superplane_mcp", "registry.js"),
+    path.join(__dirname, "..", "superplane_mcp", "registry.js"),
+  ];
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return null;
+}
+
+// The global server lists only the tools that the run token allows. Approve
+// every known global tool: Codex exec cannot answer an approval prompt, and the
+// backend rejects a call outside the token scope.
+function globalMCPConfigOverrides(taskDir, env = process.env) {
+  if (!envFlag(env, "SUPERPLANE_RUNNER_TOKEN")) {
+    return [];
+  }
+  const registry = loadGlobalMCPRegistry(taskDir);
+  const toolNames = registry ? registry.allTools().map((tool) => tool.definition.name) : [];
+  return [
+    "-c",
+    `mcp_servers.${GLOBAL_MCP_SERVER}.command=${tomlString("node")}`,
+    "-c",
+    `mcp_servers.${GLOBAL_MCP_SERVER}.args=${tomlStringArray([path.join(taskDir, "superplane_mcp", "server.js")])}`,
+    "-c",
+    `mcp_servers.${GLOBAL_MCP_SERVER}.env_vars=${tomlStringArray(GLOBAL_MCP_ENV_VARS)}`,
+    ...toolNames.flatMap((name) => [
+      "-c",
+      `mcp_servers.${GLOBAL_MCP_SERVER}.tools.${tomlKey(name)}.approval_mode="approve"`,
+    ]),
   ];
 }
 
@@ -340,7 +367,7 @@ function workspaceMCPConfigOverrides(env = process.env) {
   for (const server of workspaceMCPServers(env)) {
     const name = String((server && server.name) || "").trim();
     const url = String((server && server.url) || "").trim();
-    if (!name || name === "superplane" || !url) {
+    if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER || !url) {
       continue;
     }
     const serverKey = tomlKey(name);
@@ -391,9 +418,39 @@ function main() {
   runPrompt(args[0], args[1] || "", args[2] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      writeStderr(`${err && err.message ? err.message : err}\n`);
+      const message = safeLogText(err && err.message ? err.message : err).slice(0, 8192);
+      writeStderr(`Codex error: ${message}\n`);
+      saveFailureResult(message);
       process.exit(1);
     });
+}
+
+function saveFailureResult(message) {
+  const resultFile = process.env.SUPERPLANE_RESULT_FILE;
+  if (!resultFile) {
+    return;
+  }
+  let previous = {};
+  try {
+    const saved = JSON.parse(fs.readFileSync(resultFile, "utf8"));
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+      previous = saved;
+    }
+  } catch (_err) {
+    // A failure before the first turn may not have a saved result.
+  }
+  const payload = {
+    ...previous,
+    type: "result",
+    is_error: true,
+    error: previous.is_error && previous.error ? previous.error : message,
+    result: previous.result || "",
+  };
+  try {
+    fs.writeFileSync(resultFile, `${safeLogText(JSON.stringify(payload))}\n`);
+  } catch (err) {
+    writeStderr(`Codex error result could not be saved: ${err.message}\n`);
+  }
 }
 
 async function runPrompt(promptFile, model, thinking) {
@@ -499,14 +556,20 @@ async function runPrompt(promptFile, model, thinking) {
     }
   });
 
-  const exitCode = await Promise.all([
+  const [processExitCode, , stderr] = await Promise.all([
     new Promise((resolve, reject) => {
       child.on("error", reject);
       child.on("close", (code) => resolve(code == null ? 1 : code));
     }),
     new Promise((resolve) => rl.on("close", resolve)),
     stderrDone,
-  ]).then(([code]) => code);
+  ]);
+
+  const exitCode = formatter.errorMessage() && processExitCode === 0 ? 1 : processExitCode;
+  if (exitCode !== 0 && !formatter.errorMessage()) {
+    const message = `Codex failed with exit code ${exitCode}.`;
+    formatter.reportError(stderr ? `${message}\n${stderr}` : message);
+  }
 
   formatter.flush(exitCode !== 0);
   activity.end(exitCode === 0 ? "passed" : "failed");
@@ -518,6 +581,8 @@ async function runPrompt(promptFile, model, thinking) {
   const rollout = readRolloutContext(childEnv.CODEX_HOME, readSessionID(sp));
   const payload = {
     type: "result",
+    is_error: exitCode !== 0,
+    ...(exitCode !== 0 ? { error: formatter.errorMessage() } : {}),
     result: formatter.lastText() || lastResult.result || lastResult.text || "",
     model: rollout.model || lastResult.model || model,
     thinkingLevel: rollout.effort || thinking,
@@ -677,23 +742,28 @@ function redactSubscription(value) {
 }
 
 function writeStdout(value) {
-  const activity = loadActivityStreamModule();
-  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stdout.write(redactSubscription(safe));
+  process.stdout.write(safeLogText(value));
 }
 
 function writeStderr(value) {
+  process.stderr.write(safeLogText(value));
+}
+
+function safeLogText(value) {
   const activity = loadActivityStreamModule();
   const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stderr.write(redactSubscription(safe));
+  return redactSubscription(safe);
 }
 
 function pipeRedactedStderr(stream) {
+  let tail = "";
   const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
   lines.on("line", (line) => {
-    writeStderr(`${line}\n`);
+    const safe = safeLogText(line);
+    tail = `${tail}${safe}\n`.slice(-8192);
+    writeStderr(`${safe}\n`);
   });
-  return new Promise((resolve) => lines.on("close", resolve));
+  return new Promise((resolve) => lines.on("close", () => resolve(tail.trim())));
 }
 
 function createCodexFormatter(telemetry, activityOverride) {
@@ -709,6 +779,17 @@ function createCodexFormatter(telemetry, activityOverride) {
   let contentSeq = 0;
   let roundOpen = false;
   let lastText = "";
+  let lastError = "";
+
+  function reportError(message) {
+    const safe = safeLogText(message).trim().slice(0, 8192) || "Codex failed without an error message.";
+    if (safe === lastError) {
+      return;
+    }
+    lastError = safe;
+    writeStderr(`Codex error: ${safe}\n`);
+    activity.notice("codex_error", safe);
+  }
 
   function itemType(item) {
     return String((item && (item.type || item.item_type)) || "").toLowerCase();
@@ -843,6 +924,11 @@ function createCodexFormatter(telemetry, activityOverride) {
 
   return {
     handleEvent(event) {
+      if (event.type === "error" || event.type === "turn.failed") {
+        reportError(event.message || (event.error && event.error.message) || "");
+        roundOpen = false;
+        return;
+      }
       if (event.type === "turn.completed" || event.type === "result") {
         tracker.updateCurrentUsage(extractUsage(event));
         roundOpen = false;
@@ -929,6 +1015,10 @@ function createCodexFormatter(telemetry, activityOverride) {
     lastText() {
       return lastText;
     },
+    errorMessage() {
+      return lastError;
+    },
+    reportError,
   };
 }
 

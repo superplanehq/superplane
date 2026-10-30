@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"gorm.io/datatypes"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -72,17 +74,18 @@ func Test__Build__OverlaysLineDispatchModelOnMatchingRunner(t *testing.T) {
 func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factoryModel.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
-	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}}, time.Now()))
-	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}, {Model: "gpt-5-codex"}}, time.Now()))
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-4.1"})
 	require.NoError(t, err)
 
 	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerCodex")
-	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)
 	linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
 	execution, err := models.FindWorkOrderExecutionByRunID(db, run.ID)
@@ -106,8 +109,110 @@ func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 			resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).
 				WithNodeID("agent").WithRootEvent(&rootEvent.ID).
 				Build(map[string]any{"model": "gpt-5-codex", "credentials": map[string]any{"source": tc.source}})
+			if tc.source == "subscription" && tc.model == "gpt-4.1" {
+				require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
+				return
+			}
+			if tc.source == "integration" {
+				require.ErrorIs(t, err, models.ErrSelectableLLMModelNotAllowed)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.expected, resolved["model"])
+		})
+	}
+	t.Run("a locked task retries queue admission", func(t *testing.T) {
+		require.NoError(t, db.Model(dispatch).Update("model", "gpt-5.4").Error)
+		node, err := models.FindCanvasNode(db, canvas.ID, "agent")
+		require.NoError(t, err)
+		node.Configuration = datatypes.NewJSONType(map[string]any{"model": "gpt-5-codex", "credentials": map[string]any{"source": "subscription"}})
+		locked := db.Begin()
+		require.NoError(t, locked.Error)
+		t.Cleanup(func() { locked.Rollback() })
+		require.NoError(t, order.LockForUpdate(locked))
+		_, err = BuildProcessQueueContext(nil, db, node, &models.CanvasNodeQueueItem{WorkflowID: canvas.ID, NodeID: "agent", RunID: run.ID, RootEventID: rootEvent.ID, EventID: rootEvent.ID}, nil, nil)
+		var busy *models.CodexConnectionBusyError
+		require.ErrorAs(t, err, &busy)
+		var invalidConfiguration *ConfigurationBuildError
+		assert.False(t, errors.As(err, &invalidConfiguration), "task contention must retry rather than create a failed execution")
+	})
+
+	t.Run("restricted defaults use permitted native models", func(t *testing.T) {
+		require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "zeta-model", IsDefault: true}, {Model: "beta-model"}, {Model: "alpha-model"}, {Model: "opus"}}, time.Now()))
+		require.NoError(t, db.Model(dispatch).Update("model", "").Error)
+		for _, tc := range []struct {
+			name     string
+			selected []string
+			inherit  bool
+			want     string
+			wantErr  bool
+		}{
+			{name: "native default", selected: []string{"zeta-model", "alpha-model"}, want: "zeta-model"},
+			{name: "first sorted permitted model", selected: []string{"beta-model", "alpha-model"}, want: "alpha-model"},
+			{name: "native identifier stays exact", selected: []string{"opus"}, want: "opus"},
+			{name: "explicit empty", selected: []string{}, wantErr: true},
+			{name: "no owner catalog overlap", selected: []string{"other-members-model"}, wantErr: true},
+			{name: "inherit keeps native default unset", inherit: true},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				_, err := models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factoryModel.ID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, tc.selected, &tc.inherit)
+				require.NoError(t, err)
+				resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID("agent").WithRootEvent(&rootEvent.ID).Build(map[string]any{
+					"model": "", "credentials": map[string]any{"source": "subscription"},
+				})
+				if tc.wantErr {
+					require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
+					assert.ErrorContains(t, err, "No ChatGPT models are enabled")
+					assert.ErrorContains(t, err, "Update Workspace Models")
+					return
+				}
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, resolved["model"])
+			})
+		}
+	})
+
+}
+
+func TestBuildEnforcesFinalWorkspaceBYOKModel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, []string{"claude-sonnet-4-6", "claude-opus-4-6"})
+	require.NoError(t, err)
+	canvas, rootEvent, _ := setupRunnerAppExecution(t, r, factory.ID, "runnerClaudeCode")
+	for _, tc := range []struct {
+		name     string
+		selected []string
+		model    string
+		want     string
+		wantErr  bool
+	}{
+		{name: "excluded concrete model", selected: []string{"claude-sonnet-4-6"}, model: "claude-opus-4-6", wantErr: true},
+		{name: "excluded alias", selected: []string{"claude-sonnet-4-6"}, model: "opus", wantErr: true},
+		{name: "permitted alias", selected: []string{"claude-sonnet-4-6"}, model: "sonnet", want: "claude-sonnet-4-6"},
+		{name: "blank chooses permitted concrete model", selected: []string{"claude-sonnet-4-6", "claude-opus-4-6"}, want: "claude-opus-4-6"},
+		{name: "explicit empty disables provider", selected: []string{}, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inherit := false
+			_, err := models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceBYOK, tc.selected, &inherit)
+			require.NoError(t, err)
+			resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID("agent").WithRootEvent(&rootEvent.ID).Build(map[string]any{
+				"model": tc.model, "credentials": map[string]any{"source": "integration"},
+			})
+			if tc.wantErr {
+				require.ErrorIs(t, err, models.ErrSelectableLLMModelNotAllowed)
+				if len(tc.selected) == 0 {
+					assert.ErrorContains(t, err, "No models are enabled")
+					assert.ErrorContains(t, err, "Update Workspace Models")
+				}
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, resolved["model"])
 		})
 	}
 }
@@ -307,7 +412,7 @@ func Test__Build__SkipsOverrideWhenModelIsNotOnNodeProvider(t *testing.T) {
 	assert.Equal(t, "claude-sonnet-4-6", resolved["model"])
 }
 
-func Test__Build__DoesNotOverlaySiblingCanvasModel(t *testing.T) {
+func Test__Build__RejectsExcludedDispatchModelInsteadOfUsingCanvasModel(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -345,14 +450,13 @@ func Test__Build__DoesNotOverlaySiblingCanvasModel(t *testing.T) {
 		WithNodeID("agent").
 		WithRootEvent(&rootEvent.ID)
 
-	resolved, err := builder.Build(map[string]any{
+	_, err = builder.Build(map[string]any{
 		"model": "opus",
 		"credentials": map[string]any{
 			"source": "integration",
 		},
 	})
-	require.NoError(t, err)
-	assert.Equal(t, "claude-opus-5-5", resolved["model"])
+	require.ErrorIs(t, err, models.ErrSelectableLLMModelNotAllowed)
 }
 
 func Test__Build__OverlaysLineDispatchModelOnSuperPlaneWithoutCanvasModel(t *testing.T) {

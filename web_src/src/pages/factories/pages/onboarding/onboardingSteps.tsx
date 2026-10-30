@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -9,6 +10,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useFirstRunVisual } from "./first-run/firstRunVisual";
 import { FIXTURE_REPOS, VCS_OPTIONS, vcsLabel, type IntegrationId, type VcsHostId } from "./onboardingFixtures";
+import type { RepositoryBranchPrompt } from "./repositoryBranchPrompt";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 export function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
@@ -64,7 +66,7 @@ export function ConnectOptionRow({
 }: {
   icon: ReactNode;
   title: string;
-  detail: string;
+  detail?: string;
   selected?: boolean;
   meta?: string;
   /** When set, show Connect / Connected on the right. */
@@ -109,7 +111,7 @@ export function ConnectOptionRow({
                 <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden />
               ) : null}
             </span>
-            <span className="mt-0.5 block text-[12px] text-muted-foreground">{detail}</span>
+            {detail ? <span className="mt-0.5 block text-[12px] text-muted-foreground">{detail}</span> : null}
           </span>
         </button>
         {connectLabel && !soon ? (
@@ -337,17 +339,56 @@ export function VcsStep({
   );
 }
 
+const DEFAULT_BRANCH_FIELD_ID = "onboarding-default-branch";
+
+export function RepositoryDefaultBranchPicker({ prompt }: { prompt: RepositoryBranchPrompt }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={DEFAULT_BRANCH_FIELD_ID}>Default branch</Label>
+      <p className="text-[13px] text-muted-foreground">Choose the default branch for this repository.</p>
+      {prompt.hasListedBranches ? (
+        <Select value={prompt.branch} onValueChange={prompt.onChange}>
+          <SelectTrigger
+            id={DEFAULT_BRANCH_FIELD_ID}
+            data-testid={DEFAULT_BRANCH_FIELD_ID}
+            className="w-full text-[13px]"
+          >
+            <SelectValue placeholder="Select a branch" />
+          </SelectTrigger>
+          <SelectContent>
+            {prompt.choices.map((name) => (
+              <SelectItem key={name} value={name}>
+                {name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Input
+          id={DEFAULT_BRANCH_FIELD_ID}
+          value={prompt.branch}
+          placeholder="Select a branch"
+          onChange={(event) => prompt.onChange(event.target.value)}
+          data-testid={DEFAULT_BRANCH_FIELD_ID}
+        />
+      )}
+    </div>
+  );
+}
+
 export function RepositoryStep({
   setup,
   repos,
   onSelect,
   onEditConnection,
+  branchPrompt,
 }: {
   setup: OnboardingSetupApi;
   repos?: string[];
   /** Selecting a repository is the answer for this step, so it also continues. */
   onSelect: (repo: string) => void;
   onEditConnection: () => void;
+  branchPrompt?: RepositoryBranchPrompt;
 }) {
   const host = setup.vcsHost;
   if (!host || !setup.connected.has(host)) {
@@ -359,6 +400,7 @@ export function RepositoryStep({
   return (
     <div className="space-y-3">
       <RepositoryPicker host={host} repos={availableRepos} selectedRepo={setup.selectedRepo} onSelect={onSelect} />
+      {branchPrompt ? <RepositoryDefaultBranchPicker prompt={branchPrompt} /> : null}
       <p className="text-[13px] text-muted-foreground">
         Do not see your repo?{" "}
         <button

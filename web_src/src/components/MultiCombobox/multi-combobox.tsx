@@ -15,6 +15,7 @@ export function MultiCombobox<T extends { id: string }>({
   className,
   placeholder,
   autoFocus,
+  disabled = false,
   "aria-label": ariaLabel,
   showButton = false,
   children,
@@ -33,6 +34,7 @@ export function MultiCombobox<T extends { id: string }>({
   className?: string;
   placeholder?: string;
   autoFocus?: boolean;
+  disabled?: boolean;
   "aria-label"?: string;
   showButton?: boolean;
   children: (value: T, isSelected: boolean) => React.ReactElement;
@@ -59,6 +61,13 @@ export function MultiCombobox<T extends { id: string }>({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const optionsPortalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (disabled) {
+      setIsOpen(false);
+      setQuery("");
+    }
+  }, [disabled]);
 
   const updateDropdownPosition = useCallback(() => {
     if (!containerRef.current) {
@@ -128,7 +137,7 @@ export function MultiCombobox<T extends { id: string }>({
     allowCustomValues && query.trim() !== "" && !hasMatches && customEmailSuggestion.length === 0 && createCustomValue;
 
   const handleSelect = (selectedOption: T) => {
-    if (!selectedOption) return;
+    if (disabled || !selectedOption) return;
 
     const newValues = [...value, selectedOption];
     onChange?.(newValues);
@@ -141,7 +150,7 @@ export function MultiCombobox<T extends { id: string }>({
   };
 
   const handleCreateCustomValue = () => {
-    if (!canCreateCustomValue) return;
+    if (disabled || !canCreateCustomValue) return;
 
     if (validateInput && !validateInput(query.trim())) {
       return;
@@ -159,16 +168,19 @@ export function MultiCombobox<T extends { id: string }>({
   };
 
   const handleRemove = (option: T) => {
+    if (disabled) return;
     const newValues = value.filter((v) => v.id !== option.id);
     onChange?.(newValues);
     onRemove?.(option);
   };
 
   const handleInputClick = () => {
+    if (disabled) return;
     setIsOpen(true);
   };
 
   const handleInputFocus = () => {
+    if (disabled) return;
     if (value.length === 0 || !justAddedTag) {
       setIsOpen(true);
     }
@@ -176,6 +188,7 @@ export function MultiCombobox<T extends { id: string }>({
   };
 
   const handleInputBlur = () => {
+    if (disabled) return;
     setTimeout(() => {
       if (canCreateCustomValue && query.trim() !== "") {
         if (!validateInput || validateInput(query.trim())) {
@@ -186,6 +199,7 @@ export function MultiCombobox<T extends { id: string }>({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (disabled) return;
     if (event.key === "Backspace" && query === "" && value.length > 0) {
       handleRemove(value[value.length - 1]);
     }
@@ -202,6 +216,7 @@ export function MultiCombobox<T extends { id: string }>({
     <div ref={containerRef} className="w-full relative">
       <Headless.Combobox
         {...props}
+        disabled={disabled}
         multiple={false}
         value={null}
         onChange={(selectedOption: T | null) => {
@@ -238,7 +253,7 @@ export function MultiCombobox<T extends { id: string }>({
               "data-invalid:border-red-500 data-invalid:hover:border-red-500 dark:data-invalid:border-red-500 dark:data-invalid:hover:border-red-500",
               "data-disabled:border-gray-950/20 dark:data-disabled:border-white/15 dark:data-disabled:bg-white/2.5",
               "dark:scheme-dark",
-              "cursor-text",
+              disabled ? "cursor-default" : "cursor-text",
             ])}
             onClick={handleInputClick}
           >
@@ -260,7 +275,9 @@ export function MultiCombobox<T extends { id: string }>({
                     {!isValid && <Icon name="warning" size="sm" className="text-red-500 dark:text-red-400" />}
                     <button
                       type="button"
+                      disabled={disabled}
                       data-testid={`remove-${option.id}`}
+                      aria-label={`Remove ${displayValue(option)}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemove(option);
@@ -276,11 +293,13 @@ export function MultiCombobox<T extends { id: string }>({
             <Headless.ComboboxInput
               ref={inputRef}
               autoFocus={autoFocus}
+              disabled={disabled}
               data-slot="control"
               aria-label={ariaLabel}
               value={query}
               displayValue={() => ""}
               onChange={(event) => {
+                if (disabled) return;
                 setQuery(event.target.value);
                 if (event.target.value.length > 0) {
                   setIsOpen(true);
@@ -298,13 +317,17 @@ export function MultiCombobox<T extends { id: string }>({
             />
           </div>
           {showButton && (
-            <Headless.ComboboxButton className="group absolute inset-y-0 right-0 flex items-center px-2">
+            <Headless.ComboboxButton
+              disabled={disabled}
+              className="group absolute inset-y-0 right-0 flex items-center px-2"
+            >
               <Icon name="expand_more" size="sm" />
             </Headless.ComboboxButton>
           )}
         </span>
 
         {isOpen &&
+          !disabled &&
           (query === "" || hasMatches) &&
           createPortal(
             <div

@@ -37,13 +37,6 @@ var followUpLoopScript string
 //go:embed attachment_limit.js
 var attachmentLimitScript string
 
-//go:embed task_owner_tools.js
-var taskOwnerToolsScript string
-
-func taskOwnerToolsFile() TaskFile {
-	return TaskFile{Path: "task_owner_tools.js", Content: taskOwnerToolsScript, Mode: "0644"}
-}
-
 // PlanningSessionMCPScript is the stdio MCP server exposing task-refinement
 // tools. Runners that speak MCP (Claude, Codex, OpenCode) ship it under
 // SUPERPLANE_TASK_DIR as planning_session_mcp.js.
@@ -105,7 +98,6 @@ func PlanningSessionReviewProtocolMarkdownFile() TaskFile {
 func PlanningSessionMCPFiles() []TaskFile {
 	return []TaskFile{
 		PlanningSessionMCPScriptFile(),
-		taskOwnerToolsFile(),
 		AttachmentLimitFile(),
 		PlanningSessionMCPConfigFile(),
 		PlanningSessionProtocolFile(),

@@ -44,7 +44,7 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureOrganizationBYOK, f.ID)
 		assert.Equal(t, "Organization BYOK", f.Label)
-		assert.Equal(t, "Show the organization LLM Models settings page", f.Description)
+		assert.Equal(t, "Show the organization Models settings page", f.Description)
 	})
 
 	t.Run("known id returns organization byok custom provider feature", func(t *testing.T) {
@@ -176,6 +176,8 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
+	assert.True(t, Exists(FeatureFactoryStepActions))
+	assert.False(t, IsReleased(FeatureFactoryStepActions))
 	assert.False(t, Exists("mobile_factory_board"))
 	assert.False(t, Exists("factory_risk_score"))
 	assert.False(t, Exists("factory_visual_evidence"))

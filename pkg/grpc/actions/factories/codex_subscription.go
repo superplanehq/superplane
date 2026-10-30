@@ -13,12 +13,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner/codex"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func DescribeFactoryCodexConnection(
@@ -66,18 +68,18 @@ func StartFactoryCodexConnection(
 
 	var connection *models.FactoryCodexConnection
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, lockErr := lockFactory(tx, orgID, req.GetFactoryId())
+		lockErr := validateCodexWorkspace(tx, orgID, req.GetFactoryId())
 		if lockErr != nil {
 			return lockErr
 		}
-		member, memberErr := models.SoleHumanOrganizationMember(tx, orgID)
+		member, memberErr := models.ActiveCodexMember(tx, orgID, callerID)
 		if memberErr != nil {
 			return memberErr
 		}
 		if member.ID != callerID {
 			return models.ErrCodexConnectionNotEligible
 		}
-		connection, lockErr = findOrCreateCodexConnection(tx, orgID, factory.ID, member.ID, time.Now())
+		connection, lockErr = findOrCreateCodexConnection(tx, orgID, member.ID, time.Now())
 		if lockErr != nil {
 			return lockErr
 		}
@@ -91,7 +93,6 @@ func StartFactoryCodexConnection(
 		}
 		token, tokenErr := runner.MintCodexSubscriptionToken(jwt.NewSigner(secret), runner.CodexSubscriptionScope{
 			OrganizationID: orgID,
-			FactoryID:      factory.ID,
 			ConnectionID:   connection.ID,
 			TaskID:         taskID,
 			Generation:     connection.ReservationGeneration,
@@ -104,6 +105,7 @@ func StartFactoryCodexConnection(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to start ChatGPT sign-in")
 	}
+	_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(ctx), connection.OrganizationID)
 	return &pb.StartFactoryCodexConnectionResponse{
 		Connection: serializeCodexConnection(connection, true, callerID),
 	}, nil
@@ -117,26 +119,23 @@ func refreshFactoryCodexCatalog(
 ) (*pb.StartFactoryCodexConnectionResponse, error) {
 	var connection *models.FactoryCodexConnection
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, err := lockFactory(tx, organizationID, factoryRef)
+		err := validateCodexWorkspace(tx, organizationID, factoryRef)
 		if err != nil {
 			return err
 		}
-		member, err := models.SoleHumanOrganizationMember(tx, organizationID)
+		member, err := models.ActiveCodexMember(tx, organizationID, callerID)
 		if err != nil {
 			return err
 		}
 		if member.ID != callerID {
 			return models.ErrCodexConnectionNotEligible
 		}
-		connection, err = models.LockFactoryCodexConnection(tx, organizationID, factory.ID)
+		connection, err = models.LockCodexConnection(tx, organizationID, callerID)
 		if err != nil {
 			return err
 		}
 		if connection.OwnerUserID != member.ID {
 			return models.ErrCodexConnectionNotEligible
-		}
-		if len(connection.AvailableModels) > 0 {
-			return nil
 		}
 
 		taskID := uuid.New()
@@ -145,7 +144,6 @@ func refreshFactoryCodexCatalog(
 		}
 		token, err := runner.MintCodexSubscriptionToken(jwt.NewSigner(secret), runner.CodexSubscriptionScope{
 			OrganizationID: organizationID,
-			FactoryID:      factory.ID,
 			ConnectionID:   connection.ID,
 			TaskID:         taskID,
 			Generation:     connection.ReservationGeneration,
@@ -158,6 +156,7 @@ func refreshFactoryCodexCatalog(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to refresh ChatGPT models")
 	}
+	_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(ctx), connection.OrganizationID)
 	return &pb.StartFactoryCodexConnectionResponse{
 		Connection: serializeCodexConnection(connection, true, callerID),
 	}, nil
@@ -210,15 +209,15 @@ func CancelFactoryCodexConnection(
 	var connection *models.FactoryCodexConnection
 	var eligible bool
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, lockErr := lockFactory(tx, orgID, req.GetFactoryId())
+		lockErr := validateCodexWorkspace(tx, orgID, req.GetFactoryId())
 		if lockErr != nil {
 			return lockErr
 		}
-		eligible, lockErr = codexEligible(tx, orgID)
+		eligible, lockErr = codexEligible(tx, orgID, callerID)
 		if lockErr != nil {
 			return lockErr
 		}
-		connection, lockErr = models.FindFactoryCodexConnection(tx, orgID, factory.ID)
+		connection, lockErr = models.FindCodexConnection(tx, orgID, callerID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -232,15 +231,19 @@ func CancelFactoryCodexConnection(
 		if cancelErr := tasks.RequestCancel(connection.LoginLease.TaskID.String()); cancelErr != nil && !errors.Is(cancelErr, models.ErrRunnerTaskNotFound) {
 			return cancelErr
 		}
-		return models.ReleaseCodexReservationForTask(tx, connection.LoginLease.TaskID, time.Now())
+		if err := models.ReleaseCodexReservationForTask(tx, connection.LoginLease.TaskID, time.Now()); err != nil {
+			return err
+		}
+		connection, lockErr = models.FindCodexConnection(tx, orgID, callerID)
+		if lockErr != nil {
+			return lockErr
+		}
+		return connection.AttachLoginLease(tx)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to cancel ChatGPT sign-in")
 	}
-	reloaded, _, _, reloadErr := loadCodexConnection(ctx, organizationID, req.GetFactoryId(), false)
-	if reloadErr == nil {
-		connection = reloaded
-	}
+	_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(ctx), connection.OrganizationID)
 	return &pb.CancelFactoryCodexConnectionResponse{
 		Connection: serializeCodexConnection(connection, eligible, callerID),
 	}, nil
@@ -261,18 +264,18 @@ func DisconnectFactoryCodexConnection(
 	}
 	var connection *models.FactoryCodexConnection
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, lockErr := lockFactory(tx, orgID, req.GetFactoryId())
+		lockErr := validateCodexWorkspace(tx, orgID, req.GetFactoryId())
 		if lockErr != nil {
 			return lockErr
 		}
-		member, memberErr := models.SoleHumanOrganizationMember(tx, orgID)
+		member, memberErr := models.ActiveCodexMember(tx, orgID, callerID)
 		if memberErr != nil {
 			return memberErr
 		}
 		if member.ID != callerID {
 			return models.ErrCodexConnectionNotEligible
 		}
-		connection, lockErr = models.LockFactoryCodexConnection(tx, orgID, factory.ID)
+		connection, lockErr = models.LockCodexConnection(tx, orgID, callerID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -284,6 +287,7 @@ func DisconnectFactoryCodexConnection(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to disconnect ChatGPT")
 	}
+	_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(ctx), connection.OrganizationID)
 	return &pb.DisconnectFactoryCodexConnectionResponse{
 		Connection: serializeCodexConnection(connection, true, callerID),
 	}, nil
@@ -304,22 +308,18 @@ func loadCodexConnection(
 	}
 	var connection *models.FactoryCodexConnection
 	var eligible bool
+	var beforeRelease []models.FactoryCodexConnection
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, lockErr := findFactory(tx, orgID, factoryRef)
+		lockErr := validateCodexWorkspace(tx, orgID, factoryRef)
 		if lockErr != nil {
 			return lockErr
 		}
 		var eligibleErr error
-		eligible, eligibleErr = codexEligible(tx, orgID)
+		eligible, eligibleErr = codexEligible(tx, orgID, callerID)
 		if eligibleErr != nil {
 			return eligibleErr
 		}
-		if release {
-			if releaseErr := models.ReleaseConfirmedCodexReservations(tx, time.Now()); releaseErr != nil {
-				return releaseErr
-			}
-		}
-		connection, lockErr = models.FindFactoryCodexConnection(tx, orgID, factory.ID)
+		connection, lockErr = models.FindCodexConnection(tx, orgID, callerID)
 		if errors.Is(lockErr, models.ErrCodexConnectionNotFound) {
 			connection = nil
 			return nil
@@ -327,11 +327,22 @@ func loadCodexConnection(
 		if lockErr != nil {
 			return lockErr
 		}
+		if release {
+			beforeRelease = []models.FactoryCodexConnection{*connection}
+			if err := models.ReleaseConfirmedCodexReservations(tx, time.Now(), connection.ID); err != nil {
+				return err
+			}
+			connection, lockErr = models.FindCodexConnection(tx, orgID, callerID)
+			if lockErr != nil {
+				return lockErr
+			}
+		}
 		return connection.AttachLoginLease(tx)
 	})
 	if err != nil {
 		return nil, false, uuid.Nil, factoryErrorToStatus(err, "failed to describe ChatGPT subscription")
 	}
+	messages.PublishCodexConnectionChanges(database.DB(ctx), beforeRelease)
 	return connection, eligible, callerID, nil
 }
 
@@ -348,26 +359,29 @@ func lockFactory(tx *gorm.DB, organizationID uuid.UUID, ref string) (*models.Fac
 
 func findOrCreateCodexConnection(
 	tx *gorm.DB,
-	organizationID, factoryID, ownerID uuid.UUID,
+	organizationID, ownerID uuid.UUID,
 	now time.Time,
 ) (*models.FactoryCodexConnection, error) {
-	connection, err := models.LockFactoryCodexConnection(tx, organizationID, factoryID)
+	connection, err := models.LockCodexConnection(tx, organizationID, ownerID)
 	if err == nil {
 		return connection, nil
 	}
 	if !errors.Is(err, models.ErrCodexConnectionNotFound) {
 		return nil, err
 	}
-	return models.CreateFactoryCodexConnection(tx, organizationID, factoryID, ownerID, now)
+	_, err = models.CreateCodexConnection(tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "organization_id"}, {Name: "owner_user_id"}}, DoNothing: true,
+	}), organizationID, ownerID, now)
+	if err != nil {
+		return nil, err
+	}
+	return models.LockCodexConnection(tx, organizationID, ownerID)
 }
 
-func codexEligible(tx *gorm.DB, organizationID uuid.UUID) (bool, error) {
-	_, err := models.SoleHumanOrganizationMember(tx, organizationID)
+func codexEligible(tx *gorm.DB, organizationID, callerID uuid.UUID) (bool, error) {
+	_, err := models.ActiveCodexMember(tx, organizationID, callerID)
 	if err == nil {
 		return true, nil
-	}
-	if errors.Is(err, models.ErrCodexConnectionNotEligible) || errors.Is(err, models.ErrCodexConnectionUnavailable) {
-		return false, nil
 	}
 	return false, err
 }
@@ -397,14 +411,18 @@ func serializeCodexConnection(
 		return view
 	}
 	view.Id = connection.ID.String()
+	view.RevocationPending = connection.RevocationPendingAt != nil
 	view.Status = connection.Status
+	if connection.Status == models.CodexConnectionStatusPending && connection.LoginCancellationRequested {
+		view.Status = models.CodexConnectionStatusCanceling
+	}
 	view.AccountLabel = connection.AccountLabel
 	view.ReservationHeld = connection.Reserved()
 	view.AvailableModels = models.CompactModelIDs(codexModelIDs(connection.AvailableModels))
 	if connection.LoginLease != nil {
 		view.ActiveTaskId = connection.LoginLease.TaskID.String()
 	}
-	if eligible && callerID == connection.OwnerUserID && connection.Status == models.CodexConnectionStatusPending {
+	if eligible && callerID == connection.OwnerUserID && view.Status == models.CodexConnectionStatusPending {
 		view.VerificationUrl = connection.VerificationURL
 		view.VerificationCode = connection.VerificationCode
 	}
@@ -417,4 +435,13 @@ func codexModelIDs(available []models.CodexModel) []string {
 		ids = append(ids, model.Model)
 	}
 	return ids
+}
+
+// Personal endpoints omit the workspace. Legacy adapters still validate their route.
+func validateCodexWorkspace(tx *gorm.DB, organizationID uuid.UUID, ref string) error {
+	if ref == "" {
+		return nil
+	}
+	_, err := findFactory(tx, organizationID, ref)
+	return err
 }

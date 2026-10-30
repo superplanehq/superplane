@@ -74,7 +74,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: One or more ordered bash commands or agent prompts.
 - **Credentials**: SuperPlane secret or OpenAI integration used as ` + "`OPENAI_API_KEY`" + `.
-- **Model**: Select a model from Organization LLM Models.
+- **Model**: Select a model from Workspace Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -147,7 +147,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	environment, err = injectCodexCredentials(ctx, environment, spec.Credentials, taskID, spec.ExecutionTimeoutSeconds)
+	environment, err = injectCodexCredentials(ctx, environment, spec.Credentials, taskID, spec.ExecutionTimeoutSeconds, spec.Model)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasVisualEvidence(environment))
 	dispatched.Steps = runner.AppendPublishLinkProtocol(dispatched.Steps, runner.HasPublishLinks(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
-	environment = runner.AttachTaskOwnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	task := buildCodexTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
@@ -167,6 +167,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	}
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
 	task.Files = runner.AppendMergeConfidenceMCP(environment, task.Files)
+	task.Files = runner.AppendGlobalMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps)
@@ -186,7 +187,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	return runner.AfterRunnerTaskCreated(ctx, createdTaskID)
 }
 
-func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials, taskID uuid.UUID, timeoutSeconds int) ([]runner.TaskEnvironmentVariable, error) {
+func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials, taskID uuid.UUID, timeoutSeconds int, model string) ([]runner.TaskEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenAIAPIKey, credentials.Secret)
@@ -195,17 +196,17 @@ func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.Task
 	case runner.CredentialsSourceHosted:
 		return nil, runner.RejectHostedCredentials(credentials)
 	case runner.CredentialsSourceSubscription:
-		return injectSubscriptionCredentials(ctx, environment, taskID, timeoutSeconds)
+		return injectSubscriptionCredentials(ctx, environment, taskID, timeoutSeconds, model)
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}
 }
 
-func injectSubscriptionCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, taskID uuid.UUID, timeoutSeconds int) ([]runner.TaskEnvironmentVariable, error) {
+func injectSubscriptionCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, taskID uuid.UUID, timeoutSeconds int, model string) ([]runner.TaskEnvironmentVariable, error) {
 	if ctx.CodexSubscription == nil {
 		return nil, fmt.Errorf("connect ChatGPT before this task can run")
 	}
-	lease, err := ctx.CodexSubscription.Reserve(taskID)
+	lease, err := ctx.CodexSubscription.Reserve(taskID, model)
 	if err != nil {
 		return nil, err
 	}

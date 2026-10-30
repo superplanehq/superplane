@@ -254,7 +254,7 @@ func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testi
 	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6")
 	seedHostedModels(t, db, models.UsageProviderOpenRouter, "x-ai/grok-4.6")
 
-	app := createLineAppWithRunner(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	app := createLineAppWithRunner(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent, "hosted", models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenAI, "excluded-model"))
 	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
 	})
@@ -277,8 +277,8 @@ func Test__SerializeLineRunnerModels__NamesHostedSelectableKeys(t *testing.T) {
 	require.Len(t, modelsProto, 2)
 	assert.Equal(t, "hosted::openrouter::x-ai/grok-4.6", modelsProto[0].GetId())
 	assert.Equal(t, "x-ai/grok-4.6", modelsProto[0].GetName())
-	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetId())
-	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetName())
+	assert.Equal(t, "opus", modelsProto[1].GetId())
+	assert.Equal(t, "opus", modelsProto[1].GetName())
 }
 
 func TestLineRunnerModelsKeepSubscriptionAndAPIKeyCatalogsSeparate(t *testing.T) {
@@ -289,15 +289,15 @@ func TestLineRunnerModelsKeepSubscriptionAndAPIKeyCatalogsSeparate(t *testing.T)
 	require.NoError(t, err)
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, []string{"gpt-4o"})
 	require.NoError(t, err)
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}}, time.Now()))
-	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusReady).Error)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	for _, source := range []string{"subscription", "integration", "secret"} {
 		app := createLineAppWithRunner(t, r, factory.ID, runnerCodex, source, "")
 		_, err = factory.CreateLine(db, source, []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"}})
 		require.NoError(t, err)
-		ids, hosted, err := listLineRunnerModels(db, r.Organization.ID, factory.ID, source)
+		ids, hosted, err := listLineRunnerModels(db, r.Organization.ID, factory.ID, source, r.User)
 		require.NoError(t, err)
 		assert.False(t, hosted)
 		if source == "subscription" {

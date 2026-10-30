@@ -1,63 +1,86 @@
 import {
-  factoriesCancelFactoryCodexConnection,
-  factoriesDescribeFactoryCodexConnection,
-  factoriesStartFactoryCodexConnection,
+  meCancelCodexConnection,
+  meDisconnectCodexConnection,
+  meDescribeCodexConnection,
+  meStartCodexConnection,
   type FactoriesFactoryCodexConnection,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { usePermissions } from "@/contexts/usePermissions";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { invalidateWorkspaceModelQueries } from "@/hooks/workspaceModelQueries";
 
-export function factoryCodexConnectionKey(organizationId: string, factoryId: string) {
-  return ["factory-codex-connection", organizationId, factoryId] as const;
+export function factoryCodexConnectionKey(organizationId: string, _factoryId: string, memberId = "") {
+  return ["factory-codex-connection", organizationId, memberId] as const;
 }
 
 export function codexSubscriptionReady(connection: FactoriesFactoryCodexConnection | undefined): boolean {
   return connection?.status === "ready" && connection.reservationHeld !== true;
 }
 
-export function useFactoryCodexConnection(organizationId: string, factoryId: string, enabled: boolean) {
-  const { canAct } = usePermissions();
-  const canRefreshCatalog = canAct("factories", "update");
+function invalidateSubscriptionCatalogs(queryClient: QueryClient, organizationId: string, factoryId: string) {
+  return Promise.all([
+    invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId),
+    queryClient.invalidateQueries({ queryKey: ["factories", organizationId], refetchType: "all" }),
+    queryClient.invalidateQueries({
+      queryKey: ["factories", organizationId, factoryId, "owner-eligibility"],
+      refetchType: "all",
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ["factories", organizationId, factoryId, "line-runner-models"],
+      refetchType: "all",
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ["organizations", organizationId, "selectable-llm-models"],
+      refetchType: "all",
+    }),
+  ]);
+}
+
+export function useFactoryCodexConnection(
+  organizationId: string,
+  factoryId: string,
+  enabled: boolean,
+  refreshModels = true,
+) {
+  const { currentUserId } = usePermissions();
   const queryClient = useQueryClient();
-  const queryKey = factoryCodexConnectionKey(organizationId, factoryId);
+  const queryKey = factoryCodexConnectionKey(organizationId, factoryId, currentUserId);
   const refreshAttempted = useRef(false);
   const invalidatedCatalog = useRef("");
+  useEffect(() => {
+    refreshAttempted.current = false;
+    invalidatedCatalog.current = "";
+  }, [organizationId, factoryId, currentUserId]);
   const query = useQuery({
     queryKey,
-    enabled: enabled && Boolean(organizationId && factoryId),
+    enabled: enabled && Boolean(organizationId),
     queryFn: async ({ signal }) => {
-      const response = await factoriesDescribeFactoryCodexConnection(
+      const response = await meDescribeCodexConnection(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId },
           signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
         }),
       );
       return response.data?.connection;
     },
-    refetchInterval: (current) => {
-      if (current.state.status === "error") return 2000;
-      const status = current.state.data?.status;
-      return status === "pending" || status === "finishing" || current.state.data?.reservationHeld ? 2000 : false;
-    },
+    refetchInterval: (current) => codexConnectionPollInterval(current.state.data, current.state.status === "error"),
     refetchIntervalInBackground: true,
   });
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey });
+    await invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
+    await queryClient.invalidateQueries({ queryKey: ["me", organizationId] });
   };
 
   const start = useMutation({
     mutationFn: async () => {
-      const response = await factoriesStartFactoryCodexConnection(
+      const response = await meStartCodexConnection(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId },
           body: {},
           signal: AbortSignal.timeout(15000),
         }),
@@ -70,10 +93,9 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
 
   const refreshCatalog = useMutation({
     mutationFn: async () => {
-      const response = await factoriesStartFactoryCodexConnection(
+      const response = await meStartCodexConnection(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId },
           body: { refreshCatalog: true },
           signal: AbortSignal.timeout(15000),
         }),
@@ -87,61 +109,58 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
 
   const cancel = useMutation({
     mutationFn: async () => {
-      const response = await factoriesCancelFactoryCodexConnection(
+      const response = await meCancelCodexConnection(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId },
           body: {},
           signal: AbortSignal.timeout(15000),
         }),
       );
       return response.data?.connection;
     },
+    onSuccess: async (connection) => {
+      if (!connection) return;
+      await queryClient.cancelQueries({ queryKey });
+      queryClient.setQueryData(queryKey, connection);
+    },
     onSettled: refresh,
     onError: () => showErrorToast("SuperPlane could not cancel ChatGPT sign-in. Try again."),
   });
 
+  const disconnect = useMutation({
+    mutationFn: async () => meDisconnectCodexConnection(withOrganizationHeader({ organizationId })),
+    onSettled: refresh,
+    onError: () => showErrorToast("Stop your tasks before you disconnect ChatGPT. Then try again."),
+  });
+
   useEffect(() => {
-    if (!enabled || query.data?.status !== "ready") {
+    if (!enabled || !refreshModels || query.data?.status !== "ready") {
       refreshAttempted.current = false;
       return;
     }
     const availableModels = query.data.availableModels ?? [];
+    const catalog = JSON.stringify(availableModels);
+    if (invalidatedCatalog.current !== catalog) {
+      invalidatedCatalog.current = catalog;
+      void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
+    }
     if (availableModels.length > 0) {
-      const catalog = availableModels.join("\n");
-      if (invalidatedCatalog.current !== catalog) {
-        invalidatedCatalog.current = catalog;
-        void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "selectable-llm-models"] });
-      }
       return;
     }
-    if (!canRefreshCatalog) return;
     if (!query.data.reservationHeld && !refreshAttempted.current && !refreshCatalog.isPending) {
       refreshAttempted.current = true;
       refreshCatalog.mutate();
     }
-  }, [canRefreshCatalog, enabled, organizationId, query.data, queryClient, refreshCatalog]);
+  }, [enabled, refreshModels, organizationId, factoryId, query.data, queryClient, refreshCatalog]);
 
-  return { query, start, cancel, refreshCatalog };
+  return { query, start, cancel, refreshCatalog, disconnect, refresh };
 }
 
-export function useCodexSubscriptionModel(organizationId: string, factoryId: string) {
-  const features = useExperimentalFeature(organizationId);
-  const enabled = !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
-  const connection = codex.query.data;
-  return {
-    codexSubscriptionOffered: enabled && connection?.eligible === true,
-    codexSubscriptionLoading: features.isLoading || (enabled && codex.query.isLoading),
-    codexConnection: connection,
-    codexSubscriptionReady: codexSubscriptionReady(connection),
-    startCodexConnection: () => {
-      codex.start.mutate();
-    },
-    cancelCodexConnection: () => {
-      codex.cancel.mutate();
-    },
-    codexStarting: codex.start.isPending,
-    codexCanceling: codex.cancel.isPending,
-  };
+function codexConnectionPollInterval(connection: FactoriesFactoryCodexConnection | undefined, failed: boolean) {
+  if (failed) return 2000;
+  const active =
+    connection?.revocationPending ||
+    ["pending", "canceling", "finishing"].includes(connection?.status ?? "") ||
+    connection?.reservationHeld;
+  return active ? 2000 : false;
 }

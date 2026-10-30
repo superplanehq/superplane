@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 import { canvasKeys } from "./useCanvasData";
 import { factoryQueryKeys } from "./useFactoryData";
+import { invalidateSubscriptionState, invalidateWorkspaceModelQueries } from "./workspaceModelQueries";
 import {
   applyWorkOrderToListCaches,
   cachedWorkOrderIdsFromLists,
@@ -389,6 +390,8 @@ function invalidateFactoryWorkOrdersOnReconnect(
   organizationId: string,
   factoryId: string,
 ) {
+  void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(organizationId, factoryId), exact: true });
+  invalidateSubscriptionState(queryClient, organizationId, factoryId);
   invalidateOrdersList(queryClient, organizationId, factoryId);
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.planningSessions(organizationId, factoryId),
@@ -410,6 +413,7 @@ export function invalidateFactoryWorkOrderQueries(
   factoryId: string,
   orderId?: string,
 ): void {
+  invalidateModelCatalogs(queryClient, organizationId, factoryId);
   invalidateOrdersList(queryClient, organizationId, factoryId);
   invalidateCachedCanvasRuns(queryClient, organizationId, factoryId, orderId);
 
@@ -450,16 +454,11 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       if (data.payload?.factoryId && data.payload.factoryId !== factoryId) {
         return;
       }
-      if (data.payload?.reason === "runner_capacity") {
-        invalidateOrdersList(queryClient, organizationId, factoryId);
-        void queryClient.invalidateQueries({
-          queryKey: factoryQueryKeys.planningSessions(organizationId, factoryId),
-        });
-        return;
-      }
+      if (refreshWorkspaceEvent(queryClient, organizationId, factoryId, data.payload?.reason)) return;
       if (!orderId) {
         return;
       }
+      invalidateModelCatalogs(queryClient, organizationId, factoryId);
       const version = (refreshVersion.current.get(orderId) ?? 0) + 1;
       refreshVersion.current.set(orderId, version);
       const isCurrent = () => refreshVersion.current.get(orderId) === version;
@@ -508,4 +507,35 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
     },
     enabled && url !== null,
   );
+}
+
+function invalidateModelCatalogs(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {
+  void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "line-runner-models"] });
+  void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "owner-eligibility"] });
+  void queryClient.invalidateQueries({
+    queryKey: ["organizations", organizationId, "selectable-llm-models", factoryId],
+  });
+}
+
+function refreshWorkspaceEvent(
+  queryClient: WorkOrderQueryClient,
+  organizationId: string,
+  factoryId: string,
+  reason?: string,
+): boolean {
+  switch (reason) {
+    case "codex_connection":
+      invalidateSubscriptionState(queryClient, organizationId, factoryId);
+      return true;
+    case "model_policy":
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(organizationId, factoryId) });
+      void invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId);
+      return true;
+    case "runner_capacity":
+      invalidateOrdersList(queryClient, organizationId, factoryId);
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.planningSessions(organizationId, factoryId) });
+      return true;
+    default:
+      return false;
+  }
 }

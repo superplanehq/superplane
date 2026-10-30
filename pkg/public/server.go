@@ -452,8 +452,16 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/merge-confidence/checks", s.handleRunnerMergeConfidenceCheck).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/tasks/suggest-owners", s.handleRunnerTaskSuggestOwners).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/tasks/owner", s.handleRunnerTaskAssignOwner).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tools", s.handleRunnerTools).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerListTasks).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerCreateTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/close", s.handleRunnerCloseTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/artifacts", s.handleRunnerRemoveArtifact).Methods(http.MethodDelete)
+	s.Router.HandleFunc("/api/v1/runner/task/suggest-owners", s.handleRunnerGlobalSuggestOwners).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/owner", s.handleRunnerGlobalAssignOwner).Methods(http.MethodPut)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts/links", s.handleRunnerArtifactLink).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/artifacts/markdown", s.handleRunnerArtifactMarkdown).Methods(http.MethodPost)
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
