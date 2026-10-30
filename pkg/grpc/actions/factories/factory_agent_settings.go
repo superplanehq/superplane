@@ -56,6 +56,12 @@ func (s *factoryAgentSettings) configure(node yaml.Node) yaml.Node {
 	if s == nil {
 		return node
 	}
+	// Subscription credentials come from the workspace source. An admin reset
+	// must not restore a retired hosted or BYOK source from saved node options.
+	credentials, _ := node.Configuration["credentials"].(map[string]any)
+	if node.Component == "runnerCodex" && credentials["source"] == "subscription" {
+		s = s.forCodexSubscription()
+	}
 	if node.Component != s.component {
 		for _, field := range []string{"credentials", "model", "maxTurns", "llmProvider", "hostedProvider"} {
 			delete(node.Configuration, field)
@@ -77,6 +83,24 @@ func (s *factoryAgentSettings) configure(node yaml.Node) yaml.Node {
 		}
 	}
 	return node
+}
+
+func (s *factoryAgentSettings) forCodexSubscription() *factoryAgentSettings {
+	snapshot := *s
+	snapshot.component = "runnerCodex"
+	snapshot.configuration = maps.Clone(s.configuration)
+	if snapshot.configuration == nil {
+		snapshot.configuration = map[string]any{}
+	}
+	credentials, _ := s.configuration["credentials"].(map[string]any)
+	if s.component != "runnerCodex" || credentials["source"] != "subscription" {
+		delete(snapshot.configuration, "model")
+	}
+	for _, field := range []string{"maxTurns", "llmProvider", "hostedProvider"} {
+		delete(snapshot.configuration, field)
+	}
+	snapshot.configuration["credentials"] = map[string]any{"source": "subscription"}
+	return &snapshot
 }
 
 type factoryTriggerSettings struct {

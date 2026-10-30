@@ -2,6 +2,7 @@ package factories
 
 import (
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
@@ -461,17 +463,110 @@ func Test__SwitchFactoryModelSource__CustomProviderRequiresTokenWhenURLChanges(t
 	assert.NotEqual(t, keptKey, saved.Configuration.Data()["apiKey"])
 }
 
-func TestSwitchFactoryModelSourceRejectsChatGPTSubscription(t *testing.T) {
+func TestSwitchFactoryModelSourceSubscriptionRequiresConnectionAndAllowsHostedReturn(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	enabled := true
-	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &enabled}))
-	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
-	require.NoError(t, err)
-
-	_, _, err = switchFactoryModelSource(t.Context(), db, nil, reloaded, "hosted", "", "", "")
+	app := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	ctx := onboardingContext(r)
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "")
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	unchanged, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.False(t, unchanged.OnboardingConfigValue().CodexSubscription)
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "")
+	require.NoError(t, err)
+	saved, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.True(t, saved.OnboardingConfigValue().CodexSubscription)
+	live, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+	require.NoError(t, err)
+	node := findIntakeNode(live.Nodes, "agent")
+	require.NotNil(t, node)
+	assert.Equal(t, "runnerCodex", node.ComponentName())
+	assert.Equal(t, map[string]any{"source": "subscription"}, node.Configuration["credentials"])
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "hosted", "", "", "")
+	require.NoError(t, err)
+	saved, err = models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.False(t, saved.OnboardingConfigValue().CodexSubscription)
+	assertHostedAgentNode(t, db, app.ID)
+	_, err = models.FindFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User)
+	require.NoError(t, err)
+}
+
+func TestSubscriptionSwitchRepairsIntakeDefaultsAtomically(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	ctx := onboardingContext(r)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	makeMember := func(connected bool) uuid.UUID {
+		t.Helper()
+		user := &models.User{ID: uuid.New(), OrganizationID: r.Organization.ID, Type: models.UserTypeHuman, Name: support.RandomName("member")}
+		require.NoError(t, db.Create(user).Error)
+		if connected {
+			connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, user.ID, time.Now())
+			require.NoError(t, err)
+			require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+		}
+		return user.ID
+	}
+	connectedOwner, disconnectedOwner := makeMember(true), makeMember(false)
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	intakes := []*pb.FactoryIntake{}
+	for _, owner := range []string{"", disconnectedOwner.String(), connectedOwner.String()} {
+		response, err := CreateFactoryIntake(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: &owner}})
+		require.NoError(t, err)
+		intakes = append(intakes, response.Intake)
+	}
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "")
+	require.NoError(t, err)
+	for i, expected := range []string{r.User.String(), r.User.String(), connectedOwner.String()} {
+		assert.Equal(t, expected, liveIntakeNode(t, r.Organization.ID, intakes[i], intakeCreateNodeID).Configuration["defaultOwnerId"])
+	}
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "hosted", "", "", "")
+	require.NoError(t, err)
+	assert.Equal(t, connectedOwner.String(), liveIntakeNode(t, r.Organization.ID, intakes[2], intakeCreateNodeID).Configuration["defaultOwnerId"])
+	// A malformed intake must roll back the source and every earlier rewrite.
+	intakeCanvas := uuid.MustParse(intakes[2].CanvasId)
+	live, err := models.FindLiveCanvasVersionInTransaction(db, intakeCanvas)
+	require.NoError(t, err)
+	appLive, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+	require.NoError(t, err)
+	originalNodes := slices.Clone(live.Nodes)
+	for _, malformed := range []string{"missing creator", "ambiguous creators"} {
+		t.Run(malformed, func(t *testing.T) {
+			nodes := []models.Node{}
+			for _, node := range originalNodes {
+				if malformed == "missing creator" && node.ComponentName() == "createWorkOrder" {
+					continue
+				}
+				nodes = append(nodes, node)
+				if malformed == "ambiguous creators" && node.ComponentName() == "createWorkOrder" {
+					duplicate := node
+					duplicate.ID = "another-task-creator"
+					nodes = append(nodes, duplicate)
+				}
+			}
+			require.NoError(t, db.Model(live).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+			_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "")
+			require.Error(t, err)
+			reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+			require.NoError(t, err)
+			assert.False(t, reloaded.OnboardingConfigValue().CodexSubscription)
+			assertCanvasLiveVersion(t, db, app.ID, appLive.ID)
+			assertHostedAgentNode(t, db, app.ID)
+		})
+	}
 }

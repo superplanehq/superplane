@@ -1,3 +1,5 @@
+import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
+import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import { Icon } from "@/components/Icon";
 import { ScheduledIntakeScheduleFields } from "./ScheduledIntakeScheduleFields";
 import { useScheduledIntakeSchedule } from "./useScheduledIntakeSchedule";
@@ -31,12 +33,13 @@ interface Props {
 
 export function ScheduledIntakeSetupDialog({ organizationId, factoryId, onClose, onCreated }: Props) {
   const enabled = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_SCHEDULED_INTAKE);
+  const owner = useIntakeOwnerDraft(organizationId, factoryId);
   const create = useCreateFactoryAutomation(organizationId, factoryId);
   const [name, setName] = useState("Scheduled intake");
   const schedule = useScheduledIntakeSchedule(organizationId, factoryId, enabled);
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [error, setError] = useState<string>();
-  const valid = Boolean(name.trim() && prompt.trim() && schedule.ready);
+  const valid = Boolean(name.trim() && prompt.trim() && schedule.ready && (!owner.required || owner.value));
   if (!enabled) return null;
 
   const submit = async () => {
@@ -46,7 +49,7 @@ export function ScheduledIntakeSetupDialog({ organizationId, factoryId, onClose,
       const automation = await create.mutateAsync({
         name: name.trim(),
         templateId: "scheduled-intake",
-        installParams: { ...schedule.params, prompt: prompt.trim() },
+        installParams: { ...schedule.params, prompt: prompt.trim(), ...owner.settings() },
       });
       if (automation.id) onCreated(automation.id);
     } catch (cause) {
@@ -88,6 +91,7 @@ export function ScheduledIntakeSetupDialog({ organizationId, factoryId, onClose,
                 required
               />
             </div>
+            <IntakeSetupDefaultOwner owner={owner} disabled={create.isPending} />
             <ScheduledIntakeScheduleFields schedule={schedule} />
             <div className="space-y-2">
               <Label htmlFor="scheduled-intake-prompt">What should the agent look for?</Label>

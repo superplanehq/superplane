@@ -1,7 +1,10 @@
+import { isCodexActionCancelled } from "../codex/codexActionContext";
+import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
+import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import { Button } from "@/components/ui/button";
 import { useCreateFactoryIntake, useImportFactoryIntakeItem } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
 import { DependabotIntakeImportStep } from "./DependabotIntakeImportStep";
@@ -34,11 +37,14 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
     ...DEFAULT_GITHUB_INTAKE_SETTINGS,
     name: "Dependabot alerts",
   });
+  const createdIntakeId = useRef<string | undefined>(undefined);
+  const importedIds = useRef(new Set<string>());
   const [step, setStep] = useState(0);
   const [importBusy, setImportBusy] = useState(false);
   const [importProgress, setImportProgress] = useState<{ done: number; total: number }>();
   const [error, setError] = useState<string>();
   const createIntake = useCreateFactoryIntake(props.organizationId, props.factoryId);
+  const owner = useIntakeOwnerDraft(props.organizationId, props.factoryId);
   const importItem = useImportFactoryIntakeItem(props.organizationId, props.factoryId);
   const repository = props.repository || DEPENDABOT_INTAKE_SETUP_COPY.repositoryFallback;
   const dependabotSeverities = normalizeDependabotSeverities(settings.dependabotSeverities);
@@ -47,21 +53,27 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
     setError(undefined);
     setImportBusy(true);
     try {
-      const intake = await createIntake.mutateAsync({
-        source: "SOURCE_DEPENDABOT_ALERTS",
-        settings: { dependabotSeverities },
-        skipInitialImport: true,
-      });
+      const intake = createdIntakeId.current
+        ? { id: createdIntakeId.current }
+        : await createIntake.mutateAsync({
+            source: "SOURCE_DEPENDABOT_ALERTS",
+            settings: { dependabotSeverities, ...owner.settings() },
+            skipInitialImport: true,
+          });
       if (!intake.id) {
         props.onCreated();
         return;
       }
+      createdIntakeId.current = intake.id;
       for (const [index, itemId] of packageIds.entries()) {
         setImportProgress({ done: index, total: packageIds.length });
+        if (importedIds.current.has(itemId)) continue;
         await importItem.mutateAsync({ intakeId: intake.id, itemId });
+        importedIds.current.add(itemId);
       }
       props.onCreated();
     } catch (cause) {
+      if (isCodexActionCancelled(cause)) return;
       setError(getApiErrorMessage(cause, DEPENDABOT_INTAKE_SETUP_COPY.createError));
     } finally {
       setImportProgress(undefined);
@@ -114,12 +126,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
 
       <div className="mt-8 space-y-4">
         <div className="space-y-5 rounded-xl border border-border bg-card px-4 py-4 text-left">
-          <div>
-            <p className="text-[13px] font-medium">{DEPENDABOT_INTAKE_SETUP_COPY.repositorySection}</p>
-            <p className="mt-1 text-[13px] text-muted-foreground" data-testid="dependabot-setup-repository">
-              {repository}
-            </p>
-          </div>
+          <DependabotRepository value={repository} />
           <DependabotIntakeFilterFields
             sourceId="dependabot-alerts"
             settings={settings}
@@ -127,6 +134,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
           />
         </div>
 
+        <IntakeSetupDefaultOwner owner={owner} />
         {!props.setupReady ? (
           <p className="workspace-body-text text-destructive" role="alert">
             {DEPENDABOT_INTAKE_SETUP_COPY.setupRequired}
@@ -136,7 +144,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
         <Button
           type="button"
           className="w-full"
-          disabled={!props.setupReady}
+          disabled={!props.setupReady || (owner.required && !owner.value)}
           onClick={() => setStep(1)}
           data-testid="dependabot-setup-finish"
         >
@@ -144,5 +152,16 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
         </Button>
       </div>
     </FirstRunShell>
+  );
+}
+
+function DependabotRepository({ value }: { value: string }) {
+  return (
+    <div>
+      <p className="text-[13px] font-medium">{DEPENDABOT_INTAKE_SETUP_COPY.repositorySection}</p>
+      <p className="mt-1 text-[13px] text-muted-foreground" data-testid="dependabot-setup-repository">
+        {value}
+      </p>
+    </div>
   );
 }
