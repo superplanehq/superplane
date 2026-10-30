@@ -21,6 +21,10 @@ connection serves that member in all organization workspaces. Access does not
 use an organization feature flag. No new services, environment variables, or
 Secret keys are required.
 
+Factories access is required for new sign-in, catalog refresh, and run admission.
+Disabling factories access does not interrupt existing leases. Membership and
+revocation checks still apply when runners fetch or refresh credentials.
+
 **Settings → Account → Codex** is available before connection. Its existing
 `account/codex-usage` URL remains valid. Connecting, refreshing, or disconnecting
 changes the personal connection only.
