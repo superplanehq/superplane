@@ -189,6 +189,13 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organizatio
 		return nil, fmt.Errorf("delete organization secrets: %w", err)
 	}
 
+	drained, err := models.DeleteDrainedOrganizationCodexConnections(tx, organization.ID)
+	if err != nil {
+		return nil, fmt.Errorf("delete organization Codex connections: %w", err)
+	}
+	if !drained {
+		return nil, nil
+	}
 	if err := tx.Unscoped().Where("organization_id = ?", organization.ID).Delete(&models.User{}).Error; err != nil {
 		return nil, fmt.Errorf("delete organization users: %w", err)
 	}

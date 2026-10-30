@@ -76,6 +76,11 @@ func (s *FactoryService) SwitchFactoryModelSource(ctx context.Context, req *pb.S
 	return actions.SwitchFactoryModelSource(ctx, s.registry, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryCodexUsage(ctx context.Context, req *pb.ListFactoryCodexUsageRequest) (*pb.ListFactoryCodexUsageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryCodexUsage(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DescribeFactoryCodexConnection(ctx context.Context, req *pb.DescribeFactoryCodexConnectionRequest) (*pb.DescribeFactoryCodexConnectionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeFactoryCodexConnection(ctx, organizationID, req)

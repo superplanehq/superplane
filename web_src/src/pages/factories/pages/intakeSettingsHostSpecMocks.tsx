@@ -86,3 +86,11 @@ vi.mock("@/contexts/usePermissions", () => ({
     },
   }),
 }));
+
+vi.mock("@/hooks/useFactoryOwnerEligibility", () => ({
+  useFactoryOwnerEligibility: () => ({
+    data: { members: [{ userId: "alice", eligible: true }] },
+    isPending: false,
+    isError: false,
+  }),
+}));

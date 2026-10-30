@@ -575,7 +575,7 @@ func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTas
 			return err
 		}
 		if err := task.reserveLocked(tx, r); err != nil {
-			if IsPermanentSubscriptionAdmissionError(err) {
+			if IsPermanentSubscriptionAdmissionError(err) || errors.Is(err, ErrSelectableLLMModelNotAllowed) {
 				reservation, err = task.rejectSubscriptionAdmission(tx, err)
 			}
 			return err
@@ -628,6 +628,9 @@ func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
 		return ErrRunnerTaskAlreadyAssigned
 	}
 	if err := t.RequireSubscriptionLeaseAdmission(tx); err != nil {
+		return err
+	}
+	if err := t.RequireModelPolicyAdmission(tx); err != nil {
 		return err
 	}
 

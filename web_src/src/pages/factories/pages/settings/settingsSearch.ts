@@ -118,6 +118,13 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "openrouter",
     "byok",
     "use your keys",
+    "your keys",
+    "your api key",
+    "chatgpt",
+    "subscription",
+    "superplane",
+    "select models",
+    "use all available models",
   ]),
 
   // Workspace · Usage
@@ -139,18 +146,6 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
 
   // Organization · Integrations (page-level; providers are added dynamically)
   entry("organization", "integrations", "Integrations", undefined, ["connect", "filter integrations", "integration"]),
-
-  // Organization · LLM Models
-  entry("organization", "models", "LLM Models", undefined, [
-    "llm",
-    "byok",
-    "openrouter",
-    "claude",
-    "openai",
-    "your keys",
-    "custom provider",
-    "select models",
-  ]),
 
   // Organization · API keys / Secrets / Billing / Spending
   entry("organization", "api-keys", "API keys", undefined, ["create api key", "token", "credentials", "programmatic"]),
