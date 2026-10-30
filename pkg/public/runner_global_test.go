@@ -67,7 +67,7 @@ func TestLegacyOwnerTokenKeepsTheLegacyRoutes(t *testing.T) {
 func TestPlanningRunnerTokenOwnsTheDraftTask(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv("JWT_SECRET", "test")
-	server, session, _, planningToken := mustPlanningRunnerSession(t, r)
+	server, session, _, planningToken := mustAutomatedTaskPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	require.NotNil(t, session.CanvasID)
 	require.NotNil(t, session.DraftWorkOrderID)

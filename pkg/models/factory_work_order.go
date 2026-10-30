@@ -116,6 +116,13 @@ func (o *FactoryWorkOrder) URLPath(factoryRouteSegment string) string {
 	return fmt.Sprintf("/%s/workspaces/%s/work-order/%d", o.OrganizationID, factoryRouteSegment, o.Number)
 }
 
+// CreatedByPerson reports whether a person created the task, from the UI,
+// the API, an MCP handoff, or an intake import. Automations and agents
+// create tasks without a creator.
+func (o *FactoryWorkOrder) CreatedByPerson() bool {
+	return o.CreatedByID != nil
+}
+
 func (o *FactoryWorkOrder) IsOpen() bool {
 	return o.State == FactoryWorkOrderStateOpen
 }

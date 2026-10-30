@@ -132,6 +132,10 @@ func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request,
 		http.Error(w, "The user cannot own tasks. Use a user_id or github_login from suggest_owners.", http.StatusBadRequest)
 		return
 	}
+	if planningKeepsOwners(target) {
+		writeKeptTaskOwners(w, target)
+		return
+	}
 
 	assignment := models.TaskOwnerAssignment{
 		UserID:           owner.UserID,
@@ -151,10 +155,7 @@ func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request,
 			return
 		}
 		target.order.Assignees = owners
-		writeJSON(w, http.StatusOK, map[string]any{
-			"status": "kept",
-			"owners": currentTaskOwners(target),
-		})
+		writeKeptTaskOwners(w, target)
 		return
 	}
 	if err != nil {
@@ -169,6 +170,20 @@ func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request,
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status": "assigned",
 		"owner":  taskowner.MemberOf(owner),
+	})
+}
+
+// planningKeepsOwners reports whether a planning session must keep the
+// owners of the task. A person who creates a task decides who owns it, so
+// the planning agent does not set or replace its owners.
+func planningKeepsOwners(target *taskOwnerTarget) bool {
+	return target.session != nil && target.order.CreatedByPerson()
+}
+
+func writeKeptTaskOwners(w http.ResponseWriter, target *taskOwnerTarget) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status": "kept",
+		"owners": currentTaskOwners(target),
 	})
 }
 
