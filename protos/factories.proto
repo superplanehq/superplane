@@ -1123,7 +1123,7 @@ message UpdateFactoryOnboardingResponse {
 
 message SwitchFactoryModelSourceRequest {
   string id = 1;
-  // hosted, anthropic, openai, openrouter, or custom.
+  // hosted, subscription, anthropic, openai, openrouter, or custom.
   string source = 2;
   // Provider API key. Required when this organization has no ready integration for the source.
   string api_key = 3;

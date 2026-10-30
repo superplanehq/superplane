@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
-import { FirstRunCodexSubscription } from "../onboarding/first-run/FirstRunCodexSubscription";
+import { CodexDeviceSignIn } from "../../codex/CodexDeviceSignIn";
 import type { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
 import { FactorySettingsCard } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
@@ -29,7 +29,7 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: ReturnTyp
       {codex.query.data?.revocationPending ? (
         <p role="status">Stopping your previous tasks. You can reconnect when cleanup finishes.</p>
       ) : null}
-      <FirstRunCodexSubscription
+      <CodexDeviceSignIn
         selected
         disabled={disabled}
         connection={codex.query.data}
