@@ -1,40 +1,57 @@
 export const THINKING_LEVEL_KEY = "thinkingLevel";
 
-export const THINKING_LEVEL_LOW = "low";
-export const THINKING_LEVEL_MEDIUM = "medium";
-export const THINKING_LEVEL_HIGH = "high";
-export const THINKING_LEVEL_MINIMAL = "minimal";
-export const THINKING_LEVEL_XHIGH = "xhigh";
 const OMITTED_DRAFT_START_THINKING = "auto";
 const STORED_THINKING_DEFAULT = "default";
 
-export const THINKING_LEVELS = [
-  { value: "", label: "Default" },
-  { value: THINKING_LEVEL_LOW, label: "Low" },
-  { value: THINKING_LEVEL_MEDIUM, label: "Medium" },
-  { value: THINKING_LEVEL_HIGH, label: "High" },
-] as const;
+export type ThinkingOption = { value: string; label: string };
 
-export const CODEX_THINKING_LEVELS = [
-  { value: "", label: "Default" },
-  { value: THINKING_LEVEL_MINIMAL, label: "Minimal" },
-  { value: THINKING_LEVEL_LOW, label: "Low" },
-  { value: THINKING_LEVEL_MEDIUM, label: "Medium" },
-  { value: THINKING_LEVEL_HIGH, label: "High" },
-  { value: THINKING_LEVEL_XHIGH, label: "Extra high" },
-] as const;
+/** Every level that an agent CLI can receive, in display order. A model supports a subset. */
+const THINKING_LEVEL_LABELS: ReadonlyArray<ThinkingOption> = [
+  { value: "none", label: "None" },
+  { value: "minimal", label: "Minimal" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "xhigh", label: "Extra high" },
+  { value: "max", label: "Max" },
+];
+
+const DEFAULT_THINKING_OPTION: ThinkingOption = { value: "", label: "Default" };
 
 export function normalizeThinkingLevel(value: unknown): string {
-  if (
-    value === THINKING_LEVEL_MINIMAL ||
-    value === THINKING_LEVEL_LOW ||
-    value === THINKING_LEVEL_MEDIUM ||
-    value === THINKING_LEVEL_HIGH ||
-    value === THINKING_LEVEL_XHIGH
-  ) {
-    return value;
+  if (typeof value !== "string") {
+    return "";
   }
-  return "";
+  const key = value.trim().toLowerCase();
+  return THINKING_LEVEL_LABELS.some((level) => level.value === key) ? key : "";
+}
+
+/** Known levels from a model catalog, in display order. */
+export function modelThinkingLevels(levels: ReadonlyArray<string> | undefined): string[] {
+  const keys = new Set((levels ?? []).map(normalizeThinkingLevel));
+  return THINKING_LEVEL_LABELS.filter((level) => keys.has(level.value)).map((level) => level.value);
+}
+
+/**
+ * Options for a model's Thinking menu. A model without levels has no options,
+ * so the caller hides the menu. `withDefault` adds the runner Default first.
+ */
+export function thinkingOptions(
+  levels: ReadonlyArray<string> | undefined,
+  { withDefault }: { withDefault: boolean },
+): ThinkingOption[] {
+  const supported = modelThinkingLevels(levels);
+  if (supported.length === 0) {
+    return [];
+  }
+  const options = THINKING_LEVEL_LABELS.filter((level) => supported.includes(level.value));
+  return withDefault ? [DEFAULT_THINKING_OPTION, ...options] : options;
+}
+
+/** Keeps a thinking level only when the model supports it. Otherwise the value is empty. */
+export function supportedThinkingLevel(value: string, levels: ReadonlyArray<string> | undefined): string {
+  const level = normalizeThinkingLevel(value);
+  return level !== "" && modelThinkingLevels(levels).includes(level) ? level : "";
 }
 
 export function draftStartThinkingPayload(selected: string): string | undefined {
@@ -54,7 +71,7 @@ export function visibleThinkingLevelLabel(value: string | undefined): string | u
   if (key === STORED_THINKING_DEFAULT) {
     return "Default";
   }
-  return CODEX_THINKING_LEVELS.find((level) => level.value === key)?.label;
+  return THINKING_LEVEL_LABELS.find((level) => level.value === key)?.label;
 }
 
 /** Model name plus a thinking word. No model name means no word. */

@@ -270,9 +270,9 @@ func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testi
 }
 
 func Test__SerializeLineRunnerModels__NamesHostedSelectableKeys(t *testing.T) {
-	modelsProto := serializeLineRunnerModels([]string{
-		models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenRouter, "x-ai/grok-4.6"),
-		"opus",
+	modelsProto := serializeLineRunnerModels([]lineRunnerModel{
+		{ID: models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenRouter, "x-ai/grok-4.6")},
+		{ID: "opus"},
 	})
 	require.Len(t, modelsProto, 2)
 	assert.Equal(t, "hosted::openrouter::x-ai/grok-4.6", modelsProto[0].GetId())
@@ -306,6 +306,51 @@ func TestLineRunnerModelsKeepSubscriptionAndAPIKeyCatalogsSeparate(t *testing.T)
 		}
 		assert.Equal(t, []string{"gpt-4o"}, ids)
 	}
+}
+
+func TestLineRunnerModelsReportModelThinkingLevels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-opus-5-5", "claude-haiku-4-5")
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{
+		Model: "gpt-5.4",
+		SupportedReasoningEfforts: []models.CodexReasoningEffortOption{
+			{ReasoningEffort: "high"}, {ReasoningEffort: "low"}, {ReasoningEffort: "xhigh"},
+		},
+	}}, time.Now()))
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	claude := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "hosted", "claude-opus-5-5")
+	codex := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "subscription", "")
+	_, err = factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: claude.ID, Entrypoint: "start"},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: codex.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	options, _, err := listLineRunnerModelOptions(db, r.Organization.ID, factory.ID, "ship", r.User)
+	require.NoError(t, err)
+	assert.Equal(t, []lineRunnerModel{
+		{ID: "claude-haiku-4-5", ThinkingLevels: []string{}},
+		{ID: "claude-opus-5-5", ThinkingLevels: []string{"low", "medium", "high", "xhigh", "max"}},
+		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh"}},
+	}, options)
+}
+
+func TestMergeLineRunnerModelsKeepsLevelsEveryRunnerAccepts(t *testing.T) {
+	merged := mergeLineRunnerModels([]lineRunnerModel{
+		{ID: "gpt-5.4", ThinkingLevels: []string{"none", "low", "high", "xhigh"}},
+		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh"}},
+		{ID: "claude-opus-5-5", ThinkingLevels: []string{"low", "max"}},
+	})
+
+	assert.Equal(t, []lineRunnerModel{
+		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh"}},
+		{ID: "claude-opus-5-5", ThinkingLevels: []string{"low", "max"}},
+	}, merged)
 }
 
 func Test__ListLineRunnerModels__NoRunnerNodesReturnsEmpty(t *testing.T) {
