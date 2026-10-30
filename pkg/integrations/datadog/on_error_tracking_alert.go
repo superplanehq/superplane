@@ -73,7 +73,7 @@ Select the alert transitions to keep. Empty keeps Triggered. A Re-Triggered aler
 
 The trigger emits:
 - **title**: error type and message when SuperPlane can load the issue. Otherwise the monitor title
-- **description**: markdown for the work order. SuperPlane loads the Error Tracking issue and includes the error message, file, function, service, versions, impact, ownership, and a sample stack trace when Datadog returns them. With ` + "`apm_read`" + ` or ` + "`logs_read_data`" + `, it also adds the error sample (time, environment, request, user, request ID, and trace link) and up to 25 logs that share the sample trace
+- **description**: markdown for the task. SuperPlane loads the Error Tracking issue and includes the error message, file, function, service, versions, impact, ownership, and a sample stack trace when Datadog returns them. With ` + "`apm_read`" + ` or ` + "`logs_read_data`" + `, it also adds the error sample (time, environment, request, user, request ID, and trace link) and up to 25 logs that share the sample trace
 - **body**: the same markdown as description, so an existing intake still receives the issue details
 - **link**: Datadog link from the alert
 - **alert_id**: alerting monitor ID

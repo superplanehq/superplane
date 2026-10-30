@@ -41,7 +41,7 @@ func (t *OnTask) Documentation() string {
 
 ## Use Cases
 
-- **Backlog intake**: Create a work order when a new task is added to a project
+- **Backlog intake**: Create a SuperPlane task when a new Productive task is added to a project
 - **Sync workflows**: Mirror Productive tasks into another tracker
 - **Notifications**: Alert a channel when a task is created or updated
 
