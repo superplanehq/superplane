@@ -6,6 +6,8 @@ const { stripVTControlCharacters } = require("node:util");
 
 const CHECKPOINT_TIMEOUT_MS = 30000;
 
+class CodexProcessStopError extends Error {}
+
 function subscriptionEnabled(env = process.env) {
   return Boolean(String(env.SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN || "").trim());
 }
@@ -151,7 +153,8 @@ async function restore(env = process.env, options = {}) {
 async function checkpoint(options = {}) {
   const env = options.env || process.env;
   // Read limits before the bundle: app-server can renew the saved credentials.
-  const usage = await readUsage(env).catch(() => {
+  const usage = await readUsage(env).catch((error) => {
+    if (error instanceof CodexProcessStopError) throw error;
     process.stderr.write(
       "Codex usage is unavailable. Credentials will still be saved.\n",
     );
@@ -184,6 +187,13 @@ function readUsage(env) {
       env: subscriptionChildEnv(env),
       stdio: ["pipe", "pipe", "ignore"],
     });
+    let closed = false;
+    const stopped = new Promise((resolve) => {
+      child.once("close", () => {
+        closed = true;
+        resolve();
+      });
+    });
     const lines = readline.createInterface({ input: child.stdout });
     const timeout = setTimeout(() => {
       if (limits !== undefined || models !== undefined) {
@@ -196,13 +206,33 @@ function readUsage(env) {
     let limits;
     let models;
     const modelCatalog = [];
-    function finish(error, usage) {
+    async function finish(error, usage) {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
       lines.close();
       child.stdin.destroy();
-      child.kill("SIGKILL");
+      try {
+        if (!closed && child.pid) {
+          if (child.exitCode === null && child.signalCode === null && !child.kill("SIGKILL")) {
+            throw new CodexProcessStopError("Codex usage process could not be stopped");
+          }
+          let stopTimeout;
+          try {
+            await Promise.race([
+              stopped,
+              new Promise((_, rejectStop) => {
+                stopTimeout = setTimeout(() => rejectStop(new CodexProcessStopError("Codex usage process did not stop")), 5000);
+              }),
+            ]);
+          } finally {
+            clearTimeout(stopTimeout);
+          }
+        }
+      } catch (_stopError) {
+        reject(new CodexProcessStopError("Codex usage process could not be stopped"));
+        return;
+      }
       if (error) reject(error);
       else resolve(usage);
     }
@@ -317,7 +347,7 @@ async function reportUsage(env = process.env) {
   }
 }
 
-async function login(env = process.env) {
+async function deviceLogin(env) {
   const home = codexHome(env);
   fs.mkdirSync(home, { recursive: true, mode: 0o700 });
   const childEnv = subscriptionChildEnv(env);
@@ -327,6 +357,7 @@ async function login(env = process.env) {
   });
   let output = "";
   let progressPost = Promise.resolve();
+  let progressError;
   const capture = (chunk) => {
     output += chunk.toString();
     const parsed = parseDeviceAuth(output);
@@ -338,8 +369,8 @@ async function login(env = process.env) {
         "/api/v1/runner/codex-subscription/progress",
         parsed,
       ).catch((err) => {
-        child.kill();
-        throw err;
+        progressError = err;
+        child.kill("SIGKILL");
       });
     }
   };
@@ -350,14 +381,34 @@ async function login(env = process.env) {
     child.on("close", (code) => resolve(code == null ? 1 : code));
   });
   await progressPost;
+  if (progressError) throw progressError;
   if (exitCode !== 0) {
     throw new Error("ChatGPT device sign-in failed");
   }
   if (!readBundle(env)) {
     throw new Error("ChatGPT device sign-in did not write credentials");
   }
-  await checkpoint({ env, final: true });
-  process.stdout.write("ChatGPT sign-in saved\n");
+}
+
+async function completeSetup(env, prepare, message) {
+  try {
+    await prepare();
+    await checkpoint({ env, final: true });
+  } catch (error) {
+    // Redact while the local auth bundle is still available.
+    throw new Error(sanitizeErrorMessage(error.message));
+  } finally {
+    fs.rmSync(codexHome(env), { recursive: true, force: true });
+  }
+  if (!env.SUPERPLANE_RESULT_FILE) {
+    throw new Error("SUPERPLANE_RESULT_FILE is required");
+  }
+  fs.writeFileSync(env.SUPERPLANE_RESULT_FILE, `${JSON.stringify({ codexSubscriptionSetupCleaned: true })}\n`);
+  process.stdout.write(`${message}\n`);
+}
+
+async function login(env = process.env) {
+  await completeSetup(env, () => deviceLogin(env), "ChatGPT sign-in saved");
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -368,8 +419,7 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
   if (command === "refresh") {
-    await restore(process.env, { final: true });
-    process.stdout.write("ChatGPT model catalog refreshed\n");
+    await completeSetup(process.env, () => restore(), "ChatGPT model catalog refreshed");
     return;
   }
   if (command === "checkpoint") {

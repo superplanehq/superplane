@@ -100,7 +100,13 @@ describe("Codex assignment continuation", () => {
       ),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Connect Codex" }));
-    connection = { status: "ready", eligible: true, availableModels: ["gpt-5.4"] };
+    for (const status of ["pending", "finishing", "ready"]) {
+      connection = { status, eligible: true, reservationHeld: true, availableModels: ["gpt-5.4"] };
+      await act(async () => client.setQueryData(factoryCodexConnectionKey("org", "factory", "me"), connection));
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    }
+    connection = { status: "ready", eligible: true, reservationHeld: false, availableModels: ["gpt-5.4"] };
     await act(async () => client.setQueryData(factoryCodexConnectionKey("org", "factory", "me"), connection));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Saved"));
     expect(save.mock.calls).toEqual([["My task draft"], ["My task draft"]]);

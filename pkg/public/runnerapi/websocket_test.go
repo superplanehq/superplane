@@ -3,6 +3,7 @@ package runnerapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,21 +12,26 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"go.opentelemetry.io/otel"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -490,6 +496,71 @@ func TestRunnerWebSocketShutdownRequestTerminatesIdleRunner(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerStateTerminated, reloadedRunner.State)
 	assert.Equal(t, models.RunnerTerminationInterrupted, *reloadedRunner.TerminationReason)
+}
+
+func TestCompleteRunnerTaskPublishesCommittedCodexReadiness(t *testing.T) {
+	for _, rollback := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rollback=%v", rollback), func(t *testing.T) {
+			resource := support.Setup(t)
+			defer resource.Close()
+			db := database.DB(t.Context())
+			runner, task, fleet, socketID := createRunningRunnerTask(t, resource)
+			factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now())
+			require.NoError(t, err)
+			require.NoError(t, connection.BeginLogin(db, task.ID, time.Now()))
+			require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 1, []byte("saved"), "private-account", true, time.Now()))
+			url, err := config.RabbitMQURL()
+			require.NoError(t, err)
+			broker, err := amqp.Dial(url)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = broker.Close() })
+			channel, err := broker.Channel()
+			require.NoError(t, err)
+			require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+			queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+			require.NoError(t, err)
+			require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderUpdatedRoutingKey, messages.CanvasExchange, false, nil))
+			server, err := NewServer(jwt.NewSigner("secret"), resource.Encryptor, runnerlogs.StoreFS, nil)
+			require.NoError(t, err)
+			completion := completeMessage{RequestID: uuid.NewString(), TaskID: task.ID.String(), Result: json.RawMessage(`{"codexSubscriptionSetupCleaned":true}`)}
+			if rollback {
+				// Fail after the task update, so the completion transaction rolls back.
+				require.NoError(t, db.Model(&models.RunnerTaskLogLifecycle{}).Where("task_id = ?", task.ID).Update("state", models.RunnerTaskLogStateArchived).Error)
+				require.Error(t, server.completeRunnerTask(t.Context(), runner, socketID, completion, fleet.Slug, fleet.ScopeType))
+				_, found, err := channel.Get(queue.Name, true)
+				require.NoError(t, err)
+				assert.False(t, found)
+				require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+				assert.Equal(t, models.CodexConnectionStatusFinishing, connection.Status)
+				return
+			}
+			require.NoError(t, server.completeRunnerTask(t.Context(), runner, socketID, completion, fleet.Slug, fleet.ScopeType))
+			require.Eventually(t, func() bool {
+				delivery, found, err := channel.Get(queue.Name, true)
+				require.NoError(t, err)
+				if !found {
+					return false
+				}
+				var event pb.FactoryWorkOrderUpdatedMessage
+				require.NoError(t, proto.Unmarshal(delivery.Body, &event))
+				assert.Equal(t, factory.ID.String(), event.FactoryId)
+				assert.Equal(t, "codex_connection", event.Reason)
+				assert.NotContains(t, string(delivery.Body), "private-account")
+				stored, err := models.FindFactoryCodexConnectionByID(database.DB(t.Context()), connection.ID)
+				require.NoError(t, err)
+				assert.Equal(t, models.CodexConnectionStatusReady, stored.Status)
+				assert.Nil(t, stored.LoginLease)
+				return true
+			}, time.Second, 10*time.Millisecond)
+			completion.RequestID = uuid.NewString()
+			require.NoError(t, server.completeRunnerTask(t.Context(), runner, socketID, completion, fleet.Slug, fleet.ScopeType))
+			_, found, err := channel.Get(queue.Name, true)
+			require.NoError(t, err)
+			assert.False(t, found, "completion replay must not repeat readiness")
+		})
+	}
 }
 
 func TestCompleteRunnerTaskRetriesPendingRequest(t *testing.T) {
