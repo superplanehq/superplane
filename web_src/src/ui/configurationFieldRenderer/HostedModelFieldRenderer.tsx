@@ -244,6 +244,28 @@ function commitModelAndThinking(
   onChange(modelValue);
 }
 
+function thinkingLevelsForModel(options: ModelOption[], model: string) {
+  return options.find((option) => option.value === model)?.thinkingLevels;
+}
+
+function modelThinkingPickerState(
+  options: ModelOption[],
+  model: string,
+  thinkingLevel: string,
+  placeholder: string,
+  modelOnly: boolean,
+) {
+  const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
+  // An unset model runs as the catalog default, so show that model's levels.
+  const effectiveModel = model !== "" ? model : (options.find((option) => option.isDefault)?.value ?? "");
+  const levels = thinkingLevelsForModel(options, effectiveModel);
+  const modelThinking = thinkingOptions(levels, { withDefault: true });
+  const showThinking = !modelOnly && modelThinking.length > 0;
+  const selectedThinking = supportedThinkingLevel(thinkingLevel, levels);
+  const thinkingLabel = modelThinking.find((level) => level.value === selectedThinking)?.label ?? "Default";
+  return { selectedLabel, modelThinking, showThinking, selectedThinking, thinkingLabel };
+}
+
 function ModelThinkingSelect({
   fieldName,
   model,
@@ -267,19 +289,18 @@ function ModelThinkingSelect({
   triggerClassName?: string;
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
-  const levelsFor = (value: string) => options.find((option) => option.value === value)?.thinkingLevels;
-  const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
-  // An unset model runs as the catalog default, so show that model's levels.
-  const effectiveModel = model !== "" ? model : (options.find((option) => option.isDefault)?.value ?? "");
-  const modelThinking = thinkingOptions(levelsFor(effectiveModel), { withDefault: true });
-  const showThinking = !modelOnly && modelThinking.length > 0;
-  const selectedThinking = supportedThinkingLevel(thinkingLevel, levelsFor(effectiveModel));
-  const thinkingLabel = modelThinking.find((level) => level.value === selectedThinking)?.label ?? "Default";
+  const { selectedLabel, modelThinking, showThinking, selectedThinking, thinkingLabel } = modelThinkingPickerState(
+    options,
+    model,
+    thinkingLevel,
+    placeholder,
+    modelOnly,
+  );
   const modelListTestId = fieldName ? toTestId(`field-${fieldName}-hosted-model-list`) : undefined;
   const thinkingTestId = fieldName ? toTestId(`field-${fieldName}-hosted-thinking`) : undefined;
   // A new model keeps the thinking level only when it supports that level.
   const commitModel = (nextModel: string) =>
-    onCommit(nextModel, supportedThinkingLevel(thinkingLevel, levelsFor(nextModel)));
+    onCommit(nextModel, supportedThinkingLevel(thinkingLevel, thinkingLevelsForModel(options, nextModel)));
 
   return (
     <DropdownMenu>
