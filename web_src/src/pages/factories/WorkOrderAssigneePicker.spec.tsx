@@ -115,7 +115,7 @@ it("keeps an ineligible selected owner visible and permits clearing", () => {
 });
 
 it.each(["hover", "focus"] as const)(
-  "keeps disconnected owners disabled and explains why on %s",
+  "keeps other disconnected members disabled and explains why on %s",
   async (interaction) => {
     const user = userEvent.setup();
     const reason = "Connect a ChatGPT subscription in this workspace.";
@@ -132,24 +132,19 @@ it.each(["hover", "focus"] as const)(
       },
     });
 
-    const currentUser = screen.getByRole("option", { name: "Alice Anderson" });
     const otherMember = screen.getByRole("option", { name: "Carol Clark" });
-    expect(currentUser).toHaveAttribute("aria-disabled", "true");
     expect(otherMember).toHaveAttribute("aria-disabled", "true");
-    expect(screen.queryByText(reason)).not.toBeInTheDocument();
-    fireEvent.click(currentUser);
     fireEvent.click(otherMember);
     expect(onChange).not.toHaveBeenCalled();
 
     if (interaction === "hover") {
-      await user.hover(currentUser);
+      await user.hover(otherMember);
     } else {
       await user.tab();
-      expect(currentUser).toHaveFocus();
+      expect(otherMember).toHaveFocus();
     }
 
-    expect(await screen.findByRole("tooltip")).toHaveTextContent(reason);
-    expect(currentUser).toHaveAccessibleDescription(reason);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("must connect a ChatGPT subscription");
     if (interaction === "focus") {
       await user.keyboard("{Enter}");
       expect(onChange).not.toHaveBeenCalled();
@@ -158,6 +153,25 @@ it.each(["hover", "focus"] as const)(
     expect(onChange).toHaveBeenCalledWith(["bob"]);
   },
 );
+
+it("lets a disconnected signed-in user select themselves so the connect flow can start", () => {
+  const reason = "Connect a ChatGPT subscription in this workspace.";
+  permissionsState.currentUserId = "alice";
+  const { onChange } = renderPicker({
+    eligibility: {
+      subscription: true,
+      ownershipChangeAllowed: true,
+      members: [{ userId: "alice", eligible: false, reason }],
+    },
+  });
+
+  const currentUser = screen.getByRole("option", { name: /Alice Anderson/ });
+  expect(currentUser).not.toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByText(reason)).toBeInTheDocument();
+  fireEvent.click(currentUser);
+
+  expect(onChange).toHaveBeenCalledWith(["alice"]);
+});
 
 it("blocks both clearing and assignment while the task stops", () => {
   permissionsState.currentUserId = "alice";

@@ -138,6 +138,7 @@ function OwnerPickerOptions({
               {userOptions.map((user) => {
                 const member = eligibility?.members?.find((member) => member.userId === user.id);
                 const ineligible = eligibility?.subscription === true && member?.eligible !== true;
+                const isCurrentUser = user.id === currentUserId;
                 return (
                   <OwnerPickerOption
                     key={user.id}
@@ -145,12 +146,11 @@ function OwnerPickerOptions({
                     selected={selectedIds.includes(user.id)}
                     disabled={disabled}
                     unavailableReason={
-                      ineligible
-                        ? user.id === currentUserId
-                          ? member?.reason || "This member is unavailable."
-                          : "This user must connect a ChatGPT subscription in this workspace to be eligible."
+                      ineligible && !isCurrentUser
+                        ? "This user must connect a ChatGPT subscription in this workspace to be eligible."
                         : undefined
                     }
+                    hint={ineligible && isCurrentUser ? member?.reason || "Connect a ChatGPT subscription." : undefined}
                     onSelect={selectUser}
                   />
                 );
@@ -168,19 +168,24 @@ function OwnerPickerOption({
   selected,
   disabled,
   unavailableReason,
+  hint,
   onSelect,
 }: {
   user: OrgUserDisplay;
   selected: boolean;
   disabled: boolean;
   unavailableReason?: string;
+  hint?: string;
   onSelect: (userId: string) => void;
 }) {
   const ineligible = Boolean(unavailableReason);
   const optionContent = (
     <>
       <Avatar src={user.avatarUrl} initials={user.initials} alt="" className="size-6" />
-      <span className="min-w-0 flex-1 truncate">{user.name}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">{user.name}</span>
+        {hint ? <span className="block text-xs text-muted-foreground">{hint}</span> : null}
+      </span>
       <Check className={cn("size-4", selected ? "opacity-100" : "opacity-0")} aria-hidden />
     </>
   );

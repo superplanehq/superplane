@@ -243,7 +243,19 @@ func UpsertFactoryLLMModelAllowlist(tx *gorm.DB, orgID, factoryID uuid.UUID, pro
 		}
 	}
 	if source != UsageFundingSourceSubscription {
-		if err := assertFactoryModelsInParent(tx, orgID, normalized, source, normalizedModels); err != nil {
+		// Saved IDs that the parent list no longer offers stay in the policy.
+		// Only new IDs must be in the parent list.
+		previous, err := FindFactoryLLMModelAllowlist(tx, factoryID, normalized, source)
+		if err != nil {
+			return nil, err
+		}
+		var added datatypes.JSONSlice[string]
+		for _, model := range normalizedModels {
+			if previous == nil || !slices.Contains(previous.AllowedModels, model) {
+				added = append(added, model)
+			}
+		}
+		if err := assertFactoryModelsInParent(tx, orgID, normalized, source, added); err != nil {
 			return nil, err
 		}
 	}

@@ -99,7 +99,9 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	hosted, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted)
 	require.NoError(t, err)
 	assert.Empty(t, hosted)
-	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"claude-sonnet-4-6", "claude-opus-4-6"})
+	require.NoError(t, err, "saved IDs that the parent no longer offers stay while new available IDs are added")
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"claude-sonnet-4-6", "claude-opus-4-6", "new-model"})
 	require.ErrorIs(t, err, models.ErrModelNotInParentList)
 
 	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")

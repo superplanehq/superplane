@@ -49,9 +49,15 @@ func RunnerAcceptsModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, comp
 
 // ResolveBYOKRunnerModel validates the final model after overrides and alias
 // resolution. Blank models use the first permitted concrete model.
+// Workspace model policy applies only to workspace automations. Standalone
+// automations keep their configured model, as they did before workspace
+// model policy existed.
 func ResolveBYOKRunnerModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, component string, configuration map[string]any) (string, error) {
 	model, _ := configuration["model"].(string)
 	model = strings.TrimSpace(model)
+	if factoryID == nil || *factoryID == uuid.Nil {
+		return model, nil
+	}
 	provider, ok := runnerLLMProvider(component, configuration)
 	if !ok {
 		return model, nil
