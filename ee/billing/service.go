@@ -4,6 +4,7 @@ package billing
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -40,6 +41,22 @@ func (*Service) InitializeOrganization(tx *gorm.DB, organizationID uuid.UUID) er
 	}
 	_, err := billingmodels.EnsureOrganizationBillingPlan(tx, organizationID)
 	return err
+}
+
+// InitializeDemoOrganization gives the first local organization a funded plan.
+// Owner setup calls it once, in the same transaction that creates Demo.
+func (*Service) InitializeDemoOrganization(tx *gorm.DB, organizationID, accountID uuid.UUID) error {
+	if os.Getenv("APP_ENV") != "development" || !billing.Enabled() {
+		return nil
+	}
+	if _, err := billingmodels.SetAdminOrganizationPlan(tx, organizationID, billingmodels.BillingPlanBusiness, nil); err != nil {
+		return fmt.Errorf("set development Demo billing plan: %w", err)
+	}
+	_, err := billingmodels.AddAdminLLMCreditGrant(tx, organizationID, billingmodels.CentsToMicros(100_000), "Development Demo credit", &accountID)
+	if err != nil {
+		return fmt.Errorf("grant development Demo credit: %w", err)
+	}
+	return nil
 }
 
 func (*Service) LocalDeletionGuard(tx *gorm.DB, organizationID uuid.UUID) (billing.DeletionGuard, error) {
