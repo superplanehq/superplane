@@ -2,11 +2,29 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../../linearIntakeScope";
+import { LINEAR_INTAKE_SETUP_COPY } from "../../linearIntakeSetupCopy";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { repositorySphereFor, sphereFor } from "./firstRunSphereFor";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
 
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: (_organizationId: string, _integrationId: string, resourceType: string) => ({
+    data:
+      resourceType === "team"
+        ? [{ id: "team-1", name: "Platform (PLT)" }]
+        : resourceType === "project"
+          ? [{ id: "project-1", name: "Checkout" }]
+          : [{ id: "label-1", name: "bug" }],
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+
 const copy = FIRST_RUN_COPY.tickets;
+const TEAM_SCOPE = { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" };
 
 describe("FirstRunTicketsScreen", () => {
   describe("source list", () => {
@@ -366,8 +384,9 @@ describe("FirstRunTicketsScreen", () => {
         jiraProjects: [{ id: "PAY", name: "Payments" }],
         jiraProjectId: "PAY",
         linearConnected: true,
-        linearProjects: [{ id: "project-1", name: "Platform" }],
-        linearProjectIds: ["project-1"],
+        organizationId: "org-1",
+        linearIntegrationId: "linear-1",
+        linearScope: TEAM_SCOPE,
         chrome: { stepIndex: 3, onBack },
         onSelectTicketSource: vi.fn(),
         onAnalyzeTickets: vi.fn(),
@@ -385,7 +404,7 @@ describe("FirstRunTicketsScreen", () => {
       await user.click(screen.getByTestId("first-run-confirm-projects"));
       rerender(<FirstRunTicketsScreen ticketSource="linear" {...props} />);
       expect(screen.getByTestId("first-run-step-project")).toHaveAttribute("data-state", "active");
-      expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
+      expect(screen.getByTestId("first-run-linear-scope")).toBeInTheDocument();
     });
 
     it("locks the Jira project picker while setup is saving", async () => {
@@ -415,65 +434,39 @@ describe("FirstRunTicketsScreen", () => {
   });
 
   describe("Linear issues card", () => {
-    it("keeps the project step open until at least one project is chosen", async () => {
+    it("keeps the project step open until a team is chosen", async () => {
       const user = userEvent.setup();
-      const onToggleLinearProject = vi.fn();
+      const onChangeLinearScope = vi.fn();
       const onAnalyzeTickets = vi.fn();
+      const props = {
+        ticketSource: "linear" as const,
+        linearConnected: true,
+        organizationId: "org-1",
+        linearIntegrationId: "linear-1",
+        onSelectTicketSource: vi.fn(),
+        onAnalyzeTickets,
+        onChangeLinearScope,
+      };
 
-      const { rerender } = render(
-        <FirstRunTicketsScreen
-          ticketSource="linear"
-          linearConnected
-          linearProjects={[{ id: "project-1", name: "Platform" }]}
-          linearProjectIds={[]}
-          onSelectTicketSource={vi.fn()}
-          onAnalyzeTickets={onAnalyzeTickets}
-          onToggleLinearProject={onToggleLinearProject}
-        />,
-      );
+      const { rerender } = render(<FirstRunTicketsScreen {...props} linearScope={EMPTY_LINEAR_INTAKE_SCOPE} />);
 
-      expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
+      expect(screen.getByTestId("first-run-linear-scope")).toBeInTheDocument();
       expect(screen.getByTestId("first-run-confirm-projects")).toBeDisabled();
-      await user.click(screen.getByTestId("linear-project-project-1"));
-      expect(onToggleLinearProject).toHaveBeenCalledWith("project-1");
+      expect(screen.queryByRole("group", { name: LINEAR_INTAKE_SETUP_COPY.projectsLabel })).not.toBeInTheDocument();
+      await user.click(screen.getByTestId("linear-team-team-1"));
+      expect(onChangeLinearScope).toHaveBeenCalledWith(TEAM_SCOPE);
 
-      rerender(
-        <FirstRunTicketsScreen
-          ticketSource="linear"
-          linearConnected
-          linearProjects={[{ id: "project-1", name: "Platform" }]}
-          linearProjectIds={["project-1"]}
-          onSelectTicketSource={vi.fn()}
-          onAnalyzeTickets={onAnalyzeTickets}
-          onToggleLinearProject={onToggleLinearProject}
-        />,
-      );
+      rerender(<FirstRunTicketsScreen {...props} linearScope={TEAM_SCOPE} />);
 
+      // A team is enough. Projects and labels only narrow it.
+      expect(screen.getByRole("group", { name: LINEAR_INTAKE_SETUP_COPY.projectsLabel })).toBeInTheDocument();
       await user.click(screen.getByTestId("first-run-confirm-projects"));
-      expect(screen.getByText(copy.linearProjectsDone(1))).toBeInTheDocument();
+      expect(screen.getByText(copy.linearScopeDone)).toBeInTheDocument();
       const analyze = screen.getByTestId("first-run-analyze-tickets");
       expect(analyze).toBeEnabled();
       await user.click(analyze);
       expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
     });
-
-    it.each([{ linearProjectsLoading: true }, { linearProjectsError: true }])(
-      "keeps the project step closed to confirmation while projects are %j",
-      (state) => {
-        render(
-          <FirstRunTicketsScreen
-            ticketSource="linear"
-            linearConnected
-            linearProjectIds={["project-gone"]}
-            onSelectTicketSource={vi.fn()}
-            onAnalyzeTickets={vi.fn()}
-            {...state}
-          />,
-        );
-
-        expect(screen.getByTestId("first-run-confirm-projects")).toBeDisabled();
-      },
-    );
 
     it("shows the lookup failure and keeps the scan stopped when Linear cannot be confirmed", async () => {
       const user = userEvent.setup();
@@ -483,8 +476,9 @@ describe("FirstRunTicketsScreen", () => {
           linearAvailable={false}
           linearChoiceBlock="lookup-failed"
           linearConnected
-          linearProjects={[{ id: "project-1", name: "Platform" }]}
-          linearProjectIds={["project-1"]}
+          organizationId="org-1"
+          linearIntegrationId="linear-1"
+          linearScope={TEAM_SCOPE}
           onSelectTicketSource={vi.fn()}
           onAnalyzeTickets={vi.fn()}
         />,

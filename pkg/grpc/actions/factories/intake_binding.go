@@ -55,12 +55,14 @@ func (b *intakeBinding) installation() *models.Integration {
 // setup records the connected version control integration and the backlog
 // repository, which is what a GitHub intake listens on. A source that setup
 // says nothing about stays unbound, and the user finishes it in the canvas.
+// Only a Linear intake reads linearTeamID. The other sources ignore it.
 func resolveIntakeBinding(
 	tx *gorm.DB,
 	factory *models.Factory,
 	source string,
 	integrationID string,
 	resourceID string,
+	linearTeamID string,
 ) (*intakeBinding, error) {
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		return resolveProductiveIntakeBinding(tx, factory, integrationID, resourceID)
@@ -75,7 +77,7 @@ func resolveIntakeBinding(
 		return resolveDatadogIntakeBinding(tx, factory, integrationID, resourceID)
 	}
 	if source == models.FactoryIntakeSourceLinearIssues {
-		return resolveLinearIntakeBinding(tx, factory, integrationID, resourceID)
+		return resolveLinearIntakeBinding(tx, factory, integrationID, resourceID, linearTeamID)
 	}
 	if source != models.FactoryIntakeSourceGitHubIssues && source != models.FactoryIntakeSourceDependabotAlerts {
 		return nil, nil
@@ -230,19 +232,25 @@ func resolveDatadogIntakeBinding(
 	}, nil
 }
 
+// resolveLinearIntakeBinding binds a Linear intake to its integration. The
+// scope is a team, or projects for an older intake. resourceID is the
+// comma-separated project list.
 func resolveLinearIntakeBinding(
 	tx *gorm.DB,
 	factory *models.Factory,
 	integrationID string,
 	resourceID string,
+	teamID string,
 ) (*intakeBinding, error) {
 	integrationID = strings.TrimSpace(integrationID)
+	teamID = strings.TrimSpace(teamID)
 	projectIDs := linearProjectIDsFromResource(resourceID)
-	if integrationID == "" && len(projectIDs) == 0 {
+	hasScope := teamID != "" || len(projectIDs) > 0
+	if integrationID == "" && !hasScope {
 		return nil, nil
 	}
-	if integrationID == "" || len(projectIDs) == 0 {
-		return nil, invalidArgument("Linear integration and project are required")
+	if integrationID == "" || !hasScope {
+		return nil, invalidArgument("Linear integration and team are required")
 	}
 
 	id, err := uuid.Parse(integrationID)
@@ -266,9 +274,20 @@ func resolveLinearIntakeBinding(
 			ID:   integration.ID.String(),
 			Name: integration.InstallationName,
 		},
-		Configuration: map[string]any{"projects": configurationAnyStrings(projectIDs)},
+		Configuration: linearBindingConfiguration(teamID, projectIDs),
 		Installation:  integration,
 	}, nil
+}
+
+// linearBindingConfiguration names the scope that the binding points at. A team
+// intake keeps its projects as an intake filter, and the trigger's own
+// projects stay empty. A project list here would turn the filter into a
+// trigger project filter that drops issues without a project.
+func linearBindingConfiguration(teamID string, projectIDs []string) map[string]any {
+	if teamID != "" {
+		return map[string]any{"team": teamID}
+	}
+	return map[string]any{"projects": configurationAnyStrings(projectIDs)}
 }
 
 func resolveSentryIntakeBinding(

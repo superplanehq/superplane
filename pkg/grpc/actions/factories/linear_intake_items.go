@@ -17,8 +17,8 @@ func newLinearIntakeItemSource(
 	trigger *models.Node,
 	integration *models.Integration,
 ) (intakeItemSource, error) {
-	projectIDs := configurationStrings(trigger.Configuration["projects"])
-	if len(projectIDs) == 0 {
+	scope := linearIssueScope(trigger.Configuration)
+	if scope.Validate() != nil {
 		return nil, errIntakeNotConnected
 	}
 
@@ -28,14 +28,14 @@ func newLinearIntakeItemSource(
 	}
 
 	return &linearIntakeItemSource{
-		linear:     client,
-		projectIDs: projectIDs,
-		labels:     linearLabelsFromConfiguration(trigger.Configuration["labels"]),
+		linear: client,
+		scope:  scope,
+		labels: linearLabelsFromConfiguration(trigger.Configuration["labels"]),
 	}, nil
 }
 
 func (s *linearIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
-	issues, err := s.linear.SearchProjectIssues(s.projectIDs, query, limit)
+	issues, err := s.linear.SearchIssues(s.scope, query, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -58,10 +58,8 @@ func (s *linearIntakeItemSource) Search(_ context.Context, query string, limit i
 
 func (s *linearIntakeItemSource) issueDisabledReason(issue linear.Issue) string {
 	reasons := []string{}
-	if issue.Project == nil {
-		reasons = append(reasons, "This issue has no project.")
-	} else if !s.ownsIssue(issue) {
-		reasons = append(reasons, "This issue is not in the selected projects.")
+	if reason := s.scopeDisabledReason(issue); reason != "" {
+		reasons = append(reasons, reason)
 	}
 	if issue.State != nil && (issue.State.Type == "completed" || issue.State.Type == "canceled") {
 		reasons = append(reasons, "This issue is closed or canceled.")
@@ -70,6 +68,16 @@ func (s *linearIntakeItemSource) issueDisabledReason(issue linear.Issue) string 
 		reasons = append(reasons, "This issue has no matching intake labels.")
 	}
 	return strings.Join(reasons, " ")
+}
+
+func (s *linearIntakeItemSource) scopeDisabledReason(issue linear.Issue) string {
+	if s.scope.Contains(issue) {
+		return ""
+	}
+	if s.scope.TeamID != "" && (issue.Team == nil || issue.Team.ID != s.scope.TeamID) {
+		return "This issue is not in the selected team."
+	}
+	return "This issue is not in the selected projects."
 }
 
 func (s *linearIntakeItemSource) IssueFiles(ctx context.Context, issueID, description string) ([]linear.IssueFile, []linear.IssueLink, error) {
@@ -92,7 +100,12 @@ func (s *linearIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem,
 }
 
 func (s *linearIntakeItemSource) AvailabilityScope() string {
-	return "linear:" + strings.Join(s.projectIDs, ",")
+	return fmt.Sprintf(
+		"linear:%s:%s:%t",
+		s.scope.TeamID,
+		strings.Join(s.scope.ProjectIDs, ","),
+		s.scope.IncludeNoProject,
+	)
 }
 
 func (s *linearIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool) {
@@ -105,25 +118,13 @@ func (s *linearIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, boo
 
 func (s *linearIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bool, error) {
 	issue, err := s.linear.GetIssue(strings.TrimSpace(id))
-	if err != nil || issue == nil || !s.ownsIssue(*issue) {
+	if err != nil || issue == nil || !s.scope.Contains(*issue) {
 		return false, nil
 	}
 	if issue.State != nil && (issue.State.Type == "completed" || issue.State.Type == "canceled") {
 		return false, nil
 	}
 	return true, nil
-}
-
-func (s *linearIntakeItemSource) ownsIssue(issue linear.Issue) bool {
-	if issue.Project == nil {
-		return false
-	}
-	for _, projectID := range s.projectIDs {
-		if issue.Project.ID == projectID {
-			return true
-		}
-	}
-	return false
 }
 
 func linearIssueItem(issue linear.Issue) IntakeItem {

@@ -310,8 +310,10 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.DatadogTriggeredAlerts, settings.DatadogRetriggeredAlerts = false, true
 				settings.DatadogEnvironments = []string{"production"}
 			case models.FactoryIntakeSourceLinearIssues:
+				settings.LinearTeamID = "team-one"
 				settings.LinearProjectIDs = []string{"project-one"}
-				settings.LinearLabels = []string{}
+				settings.LinearIncludeNoProject = false
+				settings.LinearLabels = []string{"bug"}
 			}
 			binding := &intakeBinding{Configuration: map[string]any{"repository": "acme/app", "project": "APP"}}
 			if source == models.FactoryIntakeSourceGitHubIssues {
@@ -383,6 +385,9 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 			actual := intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 			assert.Equal(t, expected, serializeIntakeSettings(source, actual))
+			if source == models.FactoryIntakeSourceLinearIssues {
+				assertResetLinearIntakeScope(t, version)
+			}
 			if source == models.FactoryIntakeSourceSentryExceptions {
 				assert.Equal(t, r.User.String(), listed.Intakes[0].GetSettings().GetDefaultOwnerId())
 				create := findIntakeNode(version.Nodes, resolveIntakeGraph(source, spec).CreateNodeID)
@@ -642,4 +647,25 @@ func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {
 			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired system instruction")
 		})
 	}
+}
+
+// assertResetLinearIntakeScope checks that a reset keeps the saved Linear team,
+// project filter, and "no project" choice in the published trigger and filter.
+func assertResetLinearIntakeScope(t *testing.T, version *models.CanvasVersion) {
+	t.Helper()
+
+	trigger := findIntakeNode(version.Nodes, intakeTriggerNodeID)
+	require.NotNil(t, trigger)
+	assert.Equal(t, "team-one", trigger.Configuration["team"])
+	assert.Equal(t, []any{}, trigger.Configuration["projects"])
+	assert.Equal(t, []any{"project-one"}, trigger.Configuration["intakeProjects"])
+	assert.Equal(t, false, trigger.Configuration["includeIssuesWithoutProject"])
+
+	filter := findIntakeNode(version.Nodes, intakeFilterNodeID)
+	require.NotNil(t, filter)
+	expression, _ := filter.Configuration["expression"].(string)
+	inProject := linearIntakeEvent("create", map[string]any{"projectId": "project-one"}, nil)
+	withoutProject := linearIntakeEvent("create", nil, nil)
+	assert.True(t, evalLinearIntakeFilter(t, expression, inProject))
+	assert.False(t, evalLinearIntakeFilter(t, expression, withoutProject))
 }

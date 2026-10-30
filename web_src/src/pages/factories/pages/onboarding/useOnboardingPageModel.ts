@@ -254,7 +254,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     githubOwner,
     jiraProjectId: jira.jiraProjectId,
     jiraCompletion: jira.jiraCompletion,
-    linearProjectIds: linear.linearProjectIds,
+    linearScope: linear.linearScope,
     onMissingDefaultBranch: args.onMissingDefaultBranch,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);

@@ -91,8 +91,15 @@ type intakeSettings struct {
 	// Environments that still create a task. Empty means every environment.
 	// Datadog intakes only.
 	DatadogEnvironments []string
-	// Projects that still create a task. Linear issue intakes only.
+	// Linear team that the intake listens to. Empty only for an older intake
+	// that listens to projects. Linear issue intakes only.
+	LinearTeamID string
+	// Projects that still create a task. Empty means every project of the
+	// team. Linear issue intakes only.
 	LinearProjectIDs []string
+	// Keep issues without a project when LinearProjectIDs is not empty.
+	// Linear issue intakes only.
+	LinearIncludeNoProject bool
 	// Label names that still create a task. Empty means every label.
 	// Linear issue intakes only.
 	LinearLabels []string
@@ -203,6 +210,7 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.DependabotSeverities = normalizeDependabotSeverities(s.DependabotSeverities)
 	s.TaskListIDs = normalizeTaskListIDs(s.TaskListIDs)
 	s.DatadogEnvironments = normalizeDatadogEnvironments(s.DatadogEnvironments)
+	s.LinearTeamID = strings.TrimSpace(s.LinearTeamID)
 	s.LinearProjectIDs = normalizeLinearValues(s.LinearProjectIDs)
 	s.LinearLabels = normalizeLinearValues(s.LinearLabels)
 
@@ -533,7 +541,8 @@ func intakeSettingsChangeTrigger(source string, current, updated intakeSettings)
 			current.DatadogRetriggeredAlerts != updated.DatadogRetriggeredAlerts
 	}
 	if source == models.FactoryIntakeSourceLinearIssues {
-		return !slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) ||
+		return current.LinearTeamID != updated.LinearTeamID ||
+			!slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) ||
 			!slices.Equal(current.LinearLabels, updated.LinearLabels)
 	}
 	if source == models.FactoryIntakeSourceProductiveTasks {
@@ -567,6 +576,10 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 		return true
 	}
 	if !slices.Equal(current.DatadogEnvironments, updated.DatadogEnvironments) {
+		return true
+	}
+	if current.LinearTeamID != updated.LinearTeamID ||
+		current.LinearIncludeNoProject != updated.LinearIncludeNoProject {
 		return true
 	}
 	if !slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) {
@@ -654,8 +667,7 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 				settings,
 			)
 		case models.FactoryIntakeSourceLinearIssues:
-			settings.LinearProjectIDs = configurationStrings(trigger.Configuration["projects"])
-			settings.LinearLabels = linearLabelsFromConfiguration(trigger.Configuration["labels"])
+			settings = linearScopeSettingsFromConfiguration(trigger.Configuration, settings)
 		default:
 			if source == models.FactoryIntakeSourceDependabotAlerts {
 				break
@@ -807,7 +819,9 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.DatadogEnvironments = settings.DatadogEnvironments
 	}
 	if source == models.FactoryIntakeSourceLinearIssues {
+		serialized.LinearTeamId = settings.LinearTeamID
 		serialized.LinearProjectIds = settings.LinearProjectIDs
+		serialized.LinearIncludeIssuesWithoutProject = proto.Bool(settings.LinearIncludeNoProject)
 		serialized.LinearLabels = settings.LinearLabels
 	}
 	return serialized
@@ -878,7 +892,13 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.DatadogRetriggeredAlerts = requested.GetDatadogRetriggeredAlerts()
 	}
 	updated.DatadogEnvironments = requested.GetDatadogEnvironments()
+	if requested.GetLinearTeamId() != "" {
+		updated.LinearTeamID = requested.GetLinearTeamId()
+	}
 	updated.LinearProjectIDs = requested.GetLinearProjectIds()
+	if requested.LinearIncludeIssuesWithoutProject != nil {
+		updated.LinearIncludeNoProject = requested.GetLinearIncludeIssuesWithoutProject()
+	}
 	updated.LinearLabels = requested.GetLinearLabels()
 
 	return updated.normalized()

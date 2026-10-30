@@ -200,7 +200,6 @@ function ticketSelection(model: OnboardingPageModel) {
 
 function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
   const { ticketSource, issuesChoice } = ticketSelection(model);
-  if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (issuesChoice === "jira" && (model.jiraProjectsLoading || model.jiraProjectsError)) return null;
   if (
     !issuesChoice ||
@@ -210,7 +209,7 @@ function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null
       jiraConnected: model.setup.connected.has("jira"),
       jiraProjectId: model.jiraProjectId,
       linearConnected: model.setup.connected.has("linear"),
-      linearProjectIds: model.linearProjectIds,
+      linearScope: model.linearScope,
     })
   ) {
     return null;
@@ -220,7 +219,6 @@ function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null
 
 function intakeLookupPending(model: OnboardingPageModel) {
   if (model.setup.issuesChoice === "jira") return model.jiraProjectsLoading;
-  if (model.setup.issuesChoice === "linear") return model.linearProjectsLoading;
   return false;
 }
 
