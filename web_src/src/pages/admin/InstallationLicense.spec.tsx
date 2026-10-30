@@ -69,7 +69,7 @@ describe("InstallationLicense", () => {
 
     expect(await screen.findByText("SuperPlane Community")).toBeInTheDocument();
     expect(screen.getByTestId("license-state")).toHaveTextContent("No license");
-    expect(screen.getAllByText("(not included)", { exact: false })).toHaveLength(2);
+    expect(screen.getAllByText("(not included)", { exact: false })).toHaveLength(3);
     expect(screen.getByTestId("license-install")).toBeDisabled();
     expect(screen.queryByTestId("license-remove")).not.toBeInTheDocument();
   });

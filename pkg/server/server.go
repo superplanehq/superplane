@@ -22,6 +22,7 @@ import (
 	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
 	"github.com/superplanehq/superplane/ee/billing/polar"
 	billingworkers "github.com/superplanehq/superplane/ee/billing/workers"
+	"github.com/superplanehq/superplane/ee/githubenterprise"
 	"github.com/superplanehq/superplane/ee/rbac"
 	"github.com/superplanehq/superplane/pkg/agents"
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
@@ -42,6 +43,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	githubintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/llm"
@@ -468,7 +470,14 @@ func buildGRPCServices(
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
+	features.Register(enterprise.GitHubEnterpriseCapability, githubenterprise.NewService(licenseService))
 	features.Register(enterprise.Billing, billingorganizations.New())
+
+	githubEnterprise, err := enterprise.Get[enterprise.GitHubEnterprise](features, enterprise.GitHubEnterpriseCapability)
+	if err != nil {
+		return nil, err
+	}
+	githubintegration.SetGitHubEnterprise(githubEnterprise)
 
 	return grpc.NewServices(grpc.ServicesConfig{
 		EmailService:     buildEmailService(encryptor),

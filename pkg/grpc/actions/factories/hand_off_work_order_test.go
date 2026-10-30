@@ -388,6 +388,12 @@ func Test__HandOffWorkOrder__VerifyRejectsUnsupportedPullRequestURL(t *testing.T
 		assertNamesSupportedPullRequestURL(t, err)
 	})
 
+	t.Run("enterprise url on a github.com workspace", func(t *testing.T) {
+		err := reject(t, githubFactory.ID.String(), "https://other.ghe.com/acme/app/pull/42")
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, grpcerrors.StatusMessage(err), "workspace GitHub host")
+	})
+
 	t.Run("malformed url", func(t *testing.T) {
 		err := reject(t, bitbucketFactory.ID.String(), "https://bitbucket.org/acme/app/pull/42")
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))

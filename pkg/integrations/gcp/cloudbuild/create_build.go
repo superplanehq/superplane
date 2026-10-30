@@ -13,6 +13,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 const (
@@ -77,7 +78,7 @@ func (c *CreateBuild) Documentation() string {
 ## Configuration
 
 - **Steps** (required): JSON array of build steps. Each step needs at minimum a ` + "`name`" + ` (builder image) and optional ` + "`args`" + `. Example: ` + "`[{\"name\":\"gcr.io/cloud-builders/docker\",\"args\":[\"build\",\"-t\",\"gcr.io/$PROJECT_ID/myapp\",\".\"]}]`" + `
-- **Source**: Optional JSON object for the build source. This is the most flexible option and supports ` + "`gitSource`" + `, ` + "`repoSource`" + `, or ` + "`storageSource`" + `. Example: ` + "`{\"gitSource\":{\"url\":\"https://github.com/org/repo.git\",\"revision\":\"main\"}}`" + `
+- **Source**: Optional JSON object for the build source. This is the most flexible option and supports ` + "`gitSource`" + `, ` + "`repoSource`" + `, or ` + "`storageSource`" + `. Example: ` + "`{\"gitSource\":{\"url\":\"" + githubcommon.DotCom().CloneURL("org/repo") + "\",\"revision\":\"main\"}}`" + `
 - **Connected Repository**: Optional Cloud Build 2nd-gen repository path. Select a location, connection, repository, and branch/tag/commit directly from GCP. SuperPlane sends ` + "`source.connectedRepository`" + ` and creates the build in the repository's region.
 - **Repository / Branch / Tag / Commit SHA**: Convenience shortcut for repository-backed builds. If the repository value looks like a Git URL (` + "`https://...`" + `, ` + "`ssh://...`" + `, or ` + "`git@...`" + `), SuperPlane creates ` + "`source.gitSource`" + `. Otherwise it treats the value as a Cloud Source Repository name and creates ` + "`source.repoSource`" + `. Choose exactly one revision field.
 - **Images**: Optional list of Docker image names to push after the build.
@@ -138,7 +139,7 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeText,
 			Required:    false,
 			Description: `Optional JSON object for the build source. Supports gitSource, repoSource, connectedRepository, or storageSource. Use this for advanced source configuration.`,
-			Placeholder: `{"gitSource":{"url":"https://github.com/org/repo.git","revision":"main"}}`,
+			Placeholder: `{"gitSource":{"url":"` + githubcommon.DotCom().CloneURL("org/repo") + `","revision":"main"}}`,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "useConnectedRepository", Values: []string{"", "false"}},
 			},
@@ -311,7 +312,7 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Manual repository shortcut. Use a Git URL for gitSource builds, or a Cloud Source Repository name for repoSource builds. Leave empty when using the connected repository selector or Source JSON.",
-			Placeholder: "e.g. https://github.com/org/repo.git",
+			Placeholder: "e.g. " + githubcommon.DotCom().CloneURL("org/repo"),
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "useConnectedRepository", Values: []string{"", "false"}},
 			},
@@ -820,7 +821,7 @@ func isGitRepositoryURL(value string) bool {
 		strings.HasPrefix(repo, "http://") ||
 		strings.HasPrefix(repo, "ssh://") ||
 		strings.HasPrefix(repo, "git@") ||
-		strings.Contains(repo, "github.com/") ||
+		strings.Contains(repo, githubcommon.DotCom().GitHost()+"/") ||
 		strings.Contains(repo, "gitlab.com/") ||
 		strings.Contains(repo, "bitbucket.org/") ||
 		strings.HasSuffix(repo, ".git")
@@ -836,7 +837,7 @@ func normalizeGitRepositoryURL(value string) string {
 		return repo
 	}
 
-	if strings.Contains(lower, "github.com/") ||
+	if strings.Contains(lower, githubcommon.DotCom().GitHost()+"/") ||
 		strings.Contains(lower, "gitlab.com/") ||
 		strings.Contains(lower, "bitbucket.org/") {
 		return "https://" + repo

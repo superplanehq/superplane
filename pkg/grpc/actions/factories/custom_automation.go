@@ -375,7 +375,7 @@ func buildCustomAutomationCanvas(
 		"executionTimeoutSeconds": settings.ExecutionTimeoutSeconds,
 		"steps":                   customAutomationStepConfiguration(settings.Steps),
 		"environmentFrom":         environmentFrom,
-		"environment":             customAutomationCheckoutEnvironment(factory),
+		"environment":             customAutomationCheckoutEnvironment(factory, githubHostForFactory(tx, factory)),
 	}
 	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
 		runnerConfiguration["credentials"] = credentials
@@ -420,10 +420,10 @@ func buildCustomAutomationCanvas(
 	}, nil
 }
 
-func customAutomationCheckoutEnvironment(factory *models.Factory) []any {
+func customAutomationCheckoutEnvironment(factory *models.Factory, githubHost string) []any {
 	config := factory.OnboardingConfigValue()
 	repository := strings.TrimSpace(config.AppRepository)
-	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository)
+	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository, githubHost)
 	env := []any{
 		checkoutEnvironmentVar("REPO", repository),
 		checkoutEnvironmentVar("REPO_URL", url),

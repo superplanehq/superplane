@@ -11,11 +11,27 @@ const GITHUB_SETUP_RETURN_PATH = "setupReturnPath";
 /** Label for the customer GitHub App path beside hosted Connect GitHub. */
 export const CREATE_PRIVATE_GITHUB_APP_LABEL = "Create your own GitHub App";
 
-export function privateGitHubAppCreateConfiguration(integrationName: string): { privateApp: true } | undefined {
+export type PrivateGitHubAppConfiguration = {
+  privateApp: true;
+  host?: string;
+  factoryOnboarding?: boolean;
+  setupReturnPath?: string;
+};
+
+export function privateGitHubAppCreateConfiguration(
+  integrationName: string,
+  extras?: { host?: string; factoryOnboarding?: boolean; returnTo?: string },
+): PrivateGitHubAppConfiguration | undefined {
   if (integrationName !== "github") {
     return undefined;
   }
-  return { ...PRIVATE_GITHUB_APP_CONFIG };
+  const host = extras?.host?.trim();
+  return {
+    ...PRIVATE_GITHUB_APP_CONFIG,
+    ...(host ? { host } : {}),
+    ...(extras?.factoryOnboarding ? { factoryOnboarding: true } : {}),
+    ...(extras?.returnTo ? { [GITHUB_SETUP_RETURN_PATH]: extras.returnTo } : {}),
+  };
 }
 
 export function githubPrivateAppSetupPath(organizationId: string, basePath?: string): string {
@@ -37,6 +53,8 @@ export async function connectPrivateGitHubApp(args: {
   organizationId: string;
   returnTo?: string;
   integrationsBasePath?: string;
+  host?: string;
+  factoryOnboarding?: boolean;
   existingNames: Set<string>;
   connected: OrganizationsIntegration[];
   currentUserId?: string;
@@ -46,12 +64,20 @@ export async function connectPrivateGitHubApp(args: {
     name: string;
     configuration?: Record<string, unknown>;
   }) => Promise<OrganizationsCreateIntegrationResponse>;
+  onCreated?: (integrationId: string) => Promise<void> | void;
+  stayAfterCreate?: boolean;
 }): Promise<boolean> {
-  if (args.useWizard) {
+  const host = args.host?.trim();
+  if (args.useWizard && !host) {
     startPrivateGitHubAppSetup(args);
     return true;
   }
 
+  const configuration = privateGitHubAppCreateConfiguration("github", {
+    host,
+    factoryOnboarding: args.factoryOnboarding,
+    returnTo: args.returnTo,
+  });
   const { result } = await createWithGeneratedName({
     baseName: "github",
     takenNames: args.existingNames,
@@ -59,15 +85,45 @@ export async function connectPrivateGitHubApp(args: {
       args.create({
         integrationName: "github",
         name,
-        configuration: {
-          ...PRIVATE_GITHUB_APP_CONFIG,
-          ...(args.returnTo ? { [GITHUB_SETUP_RETURN_PATH]: args.returnTo } : {}),
-        },
+        configuration,
       }),
   });
 
   rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-  const action = result.integration?.status?.browserAction;
+  return openCreatedPrivateGitHubApp({
+    organizationId: args.organizationId,
+    integrationsBasePath: args.integrationsBasePath,
+    useWizard: args.useWizard,
+    stayAfterCreate: args.stayAfterCreate,
+    integration: result.integration,
+    goTo: args.goTo,
+    onCreated: args.onCreated,
+  });
+}
+
+async function openCreatedPrivateGitHubApp(args: {
+  organizationId: string;
+  integrationsBasePath?: string;
+  useWizard: boolean;
+  stayAfterCreate?: boolean;
+  integration: OrganizationsCreateIntegrationResponse["integration"];
+  goTo: (path: string) => void;
+  onCreated?: (integrationId: string) => Promise<void> | void;
+}): Promise<boolean> {
+  const integrationId = args.integration?.metadata?.id?.trim() ?? "";
+  if (integrationId && args.onCreated) {
+    await args.onCreated(integrationId);
+  }
+  if (args.stayAfterCreate) {
+    return Boolean(integrationId);
+  }
+  if (args.useWizard && integrationId) {
+    args.goTo(
+      `${githubPrivateAppSetupPath(args.organizationId, args.integrationsBasePath)}?integrationId=${integrationId}`,
+    );
+    return true;
+  }
+  const action = args.integration?.status?.browserAction;
   if (!action?.url) {
     throw new Error("The private GitHub App setup page did not open.");
   }

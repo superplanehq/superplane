@@ -4,9 +4,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestChooseVerifiedDefaultBranch(t *testing.T) {
@@ -93,4 +96,31 @@ func TestDefaultBranchFromCacheOrProvider(t *testing.T) {
 	}))
 	assert.Equal(t, "trunk", defaultBranchFromCacheOrProvider("trunk", nil))
 	assert.Equal(t, "", defaultBranchFromCacheOrProvider("", nil))
+}
+
+func TestGitHubInstallationForRepositorySkipsCatalogWithoutBinding(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 101,
+		AccountLogin:   "acme",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, 101, []models.VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/app", DefaultBranch: "main"},
+	}))
+	integrationID := createReadyGitHubEnterpriseIntegration(t, r.Organization.ID, "acme.ghe.com")
+	integration, err := models.FindIntegrationInTransaction(db, r.Organization.ID, uuid.MustParse(integrationID))
+	require.NoError(t, err)
+	assert.Equal(t, models.ProviderGitHub, integration.AppName)
+
+	installationID, repositoryID := githubInstallationForRepository(
+		t.Context(),
+		db,
+		r.Organization.ID.String(),
+		integration,
+		"acme/app",
+	)
+	assert.Equal(t, int64(0), installationID)
+	assert.Equal(t, int64(0), repositoryID)
 }

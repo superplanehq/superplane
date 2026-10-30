@@ -14,6 +14,7 @@ import {
 } from "@/hooks/useFactoryIntakeData";
 import { resolveRepositoryDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
+import { githubHostFromIntegration } from "@/lib/githubHost";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
@@ -46,6 +47,11 @@ import { useOnboardingAgentPageState } from "./useOnboardingAgentPageState";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
+import {
+  githubEnterpriseOnboardingActions,
+  readOnboardingGithubEnterprise,
+  vcsOnboardingIntegrationIds,
+} from "./onboardingGithubEnterprise";
 import {
   apiIssuesSource,
   initialWizardStep,
@@ -202,19 +208,19 @@ type OnboardingGithubSavesAndFinishArgs = {
   agent: ReturnType<typeof useOnboardingAgentContext>;
 };
 
-function readyIntegrationId(selection: { ready?: boolean; id: string } | undefined): string {
-  return selection?.ready ? selection.id : "";
-}
-
 function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishArgs) {
   const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, deleteIntake, installer } =
     args.mutations;
-  const githubIntegrationId = readyIntegrationId(args.integrations.selections.github);
-  const bitbucketIntegrationId = readyIntegrationId(args.integrations.selections.bitbucket);
-  const branchIntegrationId =
-    args.setup.vcsHost === "bitbucket"
-      ? (args.integrations.selections.bitbucket?.id ?? "")
-      : (args.integrations.selections.github?.id ?? "");
+  const { githubIntegrationId, bitbucketIntegrationId, branchIntegrationId } = vcsOnboardingIntegrationIds({
+    githubSelectionId: args.integrations.selections.github?.id,
+    bitbucketReady: args.integrations.selections.bitbucket?.ready,
+    bitbucketId: args.integrations.selections.bitbucket?.id,
+    githubId: args.integrations.selections.github?.id,
+    vcsHost: args.setup.vcsHost,
+    vcsProvider: args.factory?.onboarding?.vcsProvider,
+    vcsIntegrationId: args.factory?.onboarding?.vcsIntegrationId,
+    rememberedIntegrationId: readOnboardingGithubEnterprise(args.factoryId).integrationId,
+  });
   const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, args.integrations.selections.jira);
   const linear = useOnboardingLinearBinding(args.organizationId, args.factoryId, args.integrations.selections.linear);
   const takenNames = useMemo(
@@ -292,8 +298,21 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     githubOwner,
     finishSetup,
     selectCatalogRepository,
-    selectBitbucketRepository,
     selectBitbucketForgeRepository,
+    selectBitbucketRepository,
+    ...githubEnterpriseOnboardingActions({
+      organizationId: args.organizationId,
+      factoryId: args.factoryId,
+      githubIntegrationId,
+      setSaving: args.setSaving,
+      updateOnboarding: updateOnboarding.mutateAsync,
+      rememberPreferredInstance: args.connect.rememberPreferredInstance,
+      refetchConnections: args.connect.refetchConnections,
+      setSelections: args.integrations.setSelections,
+      selectVcsHost: args.setup.selectVcsHost,
+      selectRepo: args.setup.selectRepo,
+      runSave,
+    }),
     jira,
     linear,
     installer,
@@ -315,6 +334,31 @@ function onboardingSetupOptions(
     persistVcsHostKey: factoryId,
     persistRepoKey: factoryId,
     persistInitialImportKey: factoryId,
+  };
+}
+
+function wiredVcsFields(
+  wired: ReturnType<typeof useOnboardingGithubSavesAndFinish>,
+  connectedIntegrations: Array<{
+    metadata?: { id?: string | null; integrationName?: string | null };
+    spec?: { configuration?: Record<string, unknown> | null };
+    status?: { properties?: { name?: string | null; value?: string | null }[] | null };
+  }>,
+) {
+  const githubIntegrationId = wired.githubIntegrationId;
+  const githubHost = githubHostFromIntegration(
+    connectedIntegrations.find((item) => item.metadata?.id === githubIntegrationId),
+  );
+  return {
+    selectCatalogRepository: wired.selectCatalogRepository,
+    selectBitbucketRepository: wired.selectBitbucketRepository,
+    selectBitbucketForgeRepository: wired.selectBitbucketForgeRepository,
+    selectGitHubEnterpriseRepository: wired.selectGitHubEnterpriseRepository,
+    bindGitHubEnterpriseIntegration: wired.bindGitHubEnterpriseIntegration,
+    githubIntegrationId,
+    githubHost,
+    bitbucketIntegrationId: wired.bitbucketIntegrationId,
+    branchIntegrationId: wired.branchIntegrationId,
   };
 }
 
@@ -433,11 +477,7 @@ export function useOnboardingPageModel(args: {
     openSection,
     setOpenSection,
     requestConnect,
-    selectCatalogRepository: wired.selectCatalogRepository,
-    selectBitbucketRepository: wired.selectBitbucketRepository,
-    selectBitbucketForgeRepository: wired.selectBitbucketForgeRepository,
-    bitbucketIntegrationId: wired.bitbucketIntegrationId,
-    branchIntegrationId: wired.branchIntegrationId,
+    ...wiredVcsFields(wired, connectedIntegrations),
     ...branchGate.model,
     integrationDialogs: createElement(OnboardingConnectDialogs, {
       connectDialogs: connect.dialogs,

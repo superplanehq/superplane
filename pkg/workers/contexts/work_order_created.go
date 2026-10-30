@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
@@ -219,7 +220,26 @@ func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (st
 	if repositoryFromOrder {
 		provider = orderRepositoryProvider(order)
 	}
-	return repository, models.VCSRepositoryCloneURL(provider, repository), defaultBranch
+	return repository, models.VCSRepositoryCloneURL(provider, repository, githubServerURL(tx, order.OrganizationID, config)), defaultBranch
+}
+
+func githubServerURL(tx *gorm.DB, organizationID uuid.UUID, config models.FactoryOnboardingConfig) string {
+	if strings.EqualFold(strings.TrimSpace(config.EffectiveVCSProvider()), models.ProviderBitbucket) {
+		return ""
+	}
+	id := strings.TrimSpace(config.VCSIntegrationID)
+	if id == "" {
+		return ""
+	}
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return ""
+	}
+	integration, err := models.FindIntegrationInTransaction(tx, organizationID, parsed)
+	if err != nil {
+		return ""
+	}
+	return githubcommon.HostFromModel(integration).WebURL()
 }
 
 // orderRepositoryProvider returns the Git host saved with the work order.

@@ -65,6 +65,21 @@ authentication:
     clientSecret: ""
 
 #
+# GitHub Enterprise Cloud (ghe.com) connections. This is separate from
+# authentication.github, which is GitHub OAuth login.
+# allowedHosts is a comma-separated list of hostnames or *.example.ghe.com
+# wildcards. Empty allows any hostname that SuperPlane accepts. github.com
+# is always allowed.
+# extraCACertsSecret is an optional Secret with a CA bundle for GitHub
+# Enterprise Server TLS. Mount it as SSL_CERT_FILE on the API, workers,
+# and runner.
+#
+githubEnterprise:
+  allowedHosts: ""
+  extraCACertsSecret: ""
+  extraCACertsKey: "ca-certificates.crt"
+
+#
 # Application encryption. The first master key is primary.
 # Use env://<id>:<base64> or gcp-kms://<CryptoKey URI>.
 # If secretName is set, supply ENCRYPTION_MASTER_KEYS in that Secret.

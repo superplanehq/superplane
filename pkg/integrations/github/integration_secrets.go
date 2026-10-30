@@ -24,16 +24,13 @@ const (
 	githubSetupName                     = "Set up GitHub"
 )
 
-const githubSecretUsage = `A GitHub token is available in the GITHUB_TOKEN environment variable.
-The gh CLI is already installed on this runner. Use gh. Do not download or install gh.
-gh reads GITHUB_TOKEN.
-Use normal HTTPS repository URLs such as https://github.com/<owner>/<repo>.git.
-Do not put the token in URLs, commands, Git configuration, or output.`
+func githubSecretUsage(host common.Host) string {
+	return host.SecretUsage()
+}
 
-const githubSetupScript = `set -euo pipefail
-: "${GITHUB_TOKEN:?GITHUB_TOKEN is required}"
-gh auth setup-git --hostname github.com --force
-`
+func githubSetupScript(host common.Host) string {
+	return host.SetupGitScript()
+}
 
 type httpContextTransport struct {
 	http core.HTTPContext
@@ -115,6 +112,7 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 	if err != nil {
 		return "", fmt.Errorf("failed to create apps transport: %v", err)
 	}
+	common.ApplyHostToInstallationTransport(itr, common.HostFromIntegration(integrationCtx))
 	if metadata.HostedApp {
 		if err := common.RestrictHostedAppTransport(itr, repositoryIDs); err != nil {
 			return "", err
@@ -199,6 +197,7 @@ func mintReadOnlyInstallationToken(
 	if err != nil {
 		return "", fmt.Errorf("failed to create apps transport: %v", err)
 	}
+	common.ApplyHostToInstallationTransport(transport, common.DotCom())
 	read := "read"
 	transport.InstallationTokenOptions = &githubauth.InstallationTokenOptions{
 		RepositoryIDs: repositoryIDs,
@@ -253,6 +252,7 @@ func appInstallationAccessToken(
 	if err != nil {
 		return "", fmt.Errorf("failed to create apps transport: %v", err)
 	}
+	common.ApplyHostToInstallationTransport(itr, common.HostFromProperties(properties))
 
 	token, err := itr.Token(context.Background())
 	if err != nil {
