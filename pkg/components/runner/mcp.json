@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "superplane": {
-      "command": "node",
-      "args": ["planning_session_mcp.js"]
-    }
-  }
-}

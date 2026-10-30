@@ -305,8 +305,9 @@ func TestBuildSuperPlaneTaskOpenRouterShipsPlanningMCP(t *testing.T) {
 		nil,
 	)
 	require.NoError(t, err)
-	assert.True(t, hasTaskFile(files, "planning_session_mcp.js"))
-	assert.True(t, hasTaskFile(files, "mcp.json"))
+	assert.True(t, hasTaskFile(files, "agent_message.js"))
+	assert.False(t, hasTaskFile(files, "planning_session_mcp.js"))
+	assert.False(t, hasTaskFile(files, "mcp.json"))
 	assert.True(t, hasTaskFile(files, "analysis_protocol.js"))
 	assert.True(t, hasTaskFile(files, "analysis_protocol_review.md"))
 	assert.False(t, hasTaskFile(files, "analysis_protocol.md"))
