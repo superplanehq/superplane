@@ -10,7 +10,7 @@ import (
 )
 
 func TestGlobalMCPNodeTests(t *testing.T) {
-	command := exec.Command("node", "--test", "server_test.js", "owner_test.js", "tasks_test.js", "artifacts_test.js", "stdio_test.js")
+	command := exec.Command("node", "--test", "server_test.js", "owner_test.js", "tasks_test.js", "artifacts_test.js", "flow_tools_test.js", "stdio_test.js")
 	command.Dir = "superplane_mcp"
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -39,6 +39,10 @@ func TestAppendGlobalMCP(t *testing.T) {
 			"superplane_mcp/modules/owner.js",
 			"superplane_mcp/modules/tasks.js",
 			"superplane_mcp/modules/artifacts.js",
+			"superplane_mcp/modules/plan.js",
+			"superplane_mcp/modules/evidence.js",
+			"superplane_mcp/modules/links.js",
+			"superplane_mcp/modules/merge.js",
 		} {
 			require.True(t, paths[path], path)
 		}

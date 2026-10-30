@@ -2,10 +2,11 @@
 
 /**
  * HTTP client for the runner API. The run token is the only credential.
+ * Tools that read local task files use client.env.
  */
 
 function createClient(env = process.env, fetchImpl = fetch) {
-  async function request(method, path, body) {
+  function connection() {
     const baseURL = String(env.SUPERPLANE_BASE_URL || "")
       .trim()
       .replace(/\/$/, "");
@@ -13,13 +14,13 @@ function createClient(env = process.env, fetchImpl = fetch) {
     if (!baseURL || !token) {
       throw new Error("SUPERPLANE_BASE_URL and SUPERPLANE_RUNNER_TOKEN are required");
     }
-    const headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
-    const init = { method, headers };
-    if (body !== undefined) {
-      headers["Content-Type"] = "application/json";
-      init.body = JSON.stringify(body);
-    }
-    const response = await fetchImpl(`${baseURL}${path}`, init);
+    return { baseURL, token };
+  }
+
+  async function send(path, init) {
+    const { baseURL, token } = connection();
+    const headers = { ...init.headers, Authorization: `Bearer ${token}`, Accept: "application/json" };
+    const response = await fetchImpl(`${baseURL}${path}`, { ...init, headers });
     const text = await response.text();
     const parsed = parseBody(text);
     if (!response.ok) {
@@ -32,7 +33,21 @@ function createClient(env = process.env, fetchImpl = fetch) {
     return parsed;
   }
 
-  return { request };
+  async function request(method, path, body) {
+    if (body === undefined) return send(path, { method, headers: {} });
+    return send(path, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  // upload streams a request body, for example a file read stream.
+  async function upload(path, headers, body) {
+    return send(path, { method: "POST", headers, body, duplex: "half" });
+  }
+
+  return { env, request, upload };
 }
 
 function parseBody(text) {

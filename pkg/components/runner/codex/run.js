@@ -34,6 +34,7 @@ const GLOBAL_MCP_ENV_VARS = [
   "SUPERPLANE_BASE_URL",
   "SUPERPLANE_RUNNER_TOKEN",
   "SUPERPLANE_TASK_DIR",
+  "SUPERPLANE_ANALYSIS_SPEC_FILE",
 ];
 
 function loadActivityStreamModule() {
@@ -165,6 +166,12 @@ function mergeConfidenceEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
 }
 
+// The global server serves the flow tools when the run has a runner token.
+// Runs without that token keep the per-flow superplane server.
+function legacyMCPEnabled(env = process.env) {
+  return !envFlag(env, "SUPERPLANE_RUNNER_TOKEN");
+}
+
 function superplaneMCPScript(taskDir, env = process.env) {
   if (planningEnabled(env)) {
     return path.join(taskDir, "planning_session_mcp.js");
@@ -201,13 +208,14 @@ function codexExecArgs(
     args.push("resume", sessionID);
   }
   args.push("--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox");
+  const legacyMCP = legacyMCPEnabled(env);
   if (planningEnabled(env)) {
-    args.push(...mcpConfigOverrides(mcpScriptPath, env));
+    args.push(...(legacyMCP ? mcpConfigOverrides(mcpScriptPath, env) : workspaceMCPConfigOverrides(env)));
     args.push(
       "-c",
       `developer_instructions=${tomlString(loadAnalysisProtocol(env))}`,
     );
-  } else if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
+  } else if (legacyMCP && (artifactEnabled(env) || mergeConfidenceEnabled(env))) {
     args.push(...mcpConfigOverrides(mcpScriptPath, env));
   } else {
     args.push(...workspaceMCPConfigOverrides(env));

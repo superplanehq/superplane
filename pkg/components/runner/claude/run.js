@@ -142,6 +142,10 @@ function allowedClaudeTools(env = process.env) {
     (name) => `mcp__${name}`,
   );
   const globalAllow = globalAllowedTools(env);
+  if (!legacyMCPEnabled(env)) {
+    const baseTools = planningMCPEnabled(env) ? PLANNING_READONLY_TOOLS : BASE_ALLOWED_TOOLS;
+    return [baseTools, ...globalAllow, ...workspaceAllow].join(",");
+  }
   if (planningMCPEnabled(env)) {
     return [
       PLANNING_READONLY_TOOLS,
@@ -167,6 +171,12 @@ function allowedClaudeTools(env = process.env) {
     return tools.join(",");
   }
   return [BASE_ALLOWED_TOOLS, ...globalAllow, ...workspaceAllow].join(",");
+}
+
+// The global server serves the flow tools when the run has a runner token.
+// Runs without that token keep the per-flow superplane server.
+function legacyMCPEnabled(env = process.env) {
+  return mcpToolsEnabled(env) && !globalMCPEnabled(env);
 }
 
 function disallowedClaudeTools(env = process.env) {
@@ -410,7 +420,6 @@ async function runPrompt(promptFile, model, thinking) {
     prompt = withoutEmbeddedAnalysisProtocol(prompt);
   }
   const planningToolsEnabled = planningMCPEnabled();
-  const toolsEnabled = mcpToolsEnabled();
   configureArtifactOutput(sp);
 
   const claudeArgs = [
@@ -433,7 +442,7 @@ async function runPrompt(promptFile, model, thinking) {
     claudeArgs[claudeArgs.length - 1] =
       SYSTEM_PROMPT + planningSystemPrompt();
   }
-  const mcpConfigPath = writeClaudeMCPConfig(sp, process.env, toolsEnabled);
+  const mcpConfigPath = writeClaudeMCPConfig(sp, process.env, legacyMCPEnabled());
   if (mcpConfigPath) {
     claudeArgs.push("--mcp-config", mcpConfigPath);
   }

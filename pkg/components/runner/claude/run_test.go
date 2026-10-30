@@ -88,48 +88,91 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.NotContains(t, tools, "Write")
 }
 
-func TestClaudeAllowsAndStartsTheGlobalMCPServer(t *testing.T) {
-	for name, env := range map[string]map[string]string{
-		"task run": {"SUPERPLANE_RUNNER_TOKEN": "runner-token"},
-		"planning": {
-			"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
-			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
-			"SUPERPLANE_RUNNER_TOKEN":          "runner-token",
-		},
-		"merge confidence": {
-			"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "merge-token",
-			"SUPERPLANE_RUNNER_TOKEN":           "runner-token",
-		},
+func TestClaudeStartsOnlyTheGlobalMCPServerWithARunnerToken(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		env   []string
+		tools string
+	}{
+		{name: "task run", env: []string{"SUPERPLANE_ARTIFACT_TOKEN=artifact-token", "SUPERPLANE_PUBLISH_LINKS=yes"}, tools: "Bash,Read,Edit,Write,mcp__superplane_global"},
+		{name: "planning", env: []string{"SUPERPLANE_PLANNING_SESSION_ID=session-1", "SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis"}, tools: "Read,Bash,mcp__superplane_global"},
+		{name: "merge confidence", env: []string{"SUPERPLANE_MERGE_CONFIDENCE_TOKEN=merge-token"}, tools: "Bash,Read,Edit,Write,mcp__superplane_global"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			tools := strings.Split(allowedClaudeToolsFromScript(t, env), ",")
-			assert.Contains(t, tools, "mcp__superplane_global")
-			assert.NotContains(t, tools, "mcp__superplane__suggest_owners")
+		t.Run(tc.name, func(t *testing.T) {
+			run := runClaudeWithFakeCLI(t, append(tc.env, "SUPERPLANE_RUNNER_TOKEN=runner-token")...)
 
-			taskDir := t.TempDir()
-			config := claudeMCPConfigFromScript(t, taskDir, env, false)
-			servers, _ := config["mcpServers"].(map[string]any)
-			global, _ := servers["superplane_global"].(map[string]any)
-			assert.Equal(t, []any{filepath.Join(taskDir, "superplane_mcp", "server.js")}, global["args"])
+			assert.Equal(t, tc.tools, run.allowedTools)
+			assert.Equal(t, map[string]any{
+				"superplane_global": map[string]any{"command": "node", "args": []any{filepath.Join(run.taskDir, "superplane_mcp", "server.js")}},
+			}, run.mcpServers)
 		})
 	}
 }
 
-func claudeMCPConfigFromScript(t *testing.T, taskDir string, env map[string]string, includeSuperplane bool) map[string]any {
+func TestClaudeStartsTheLegacyMCPServerWithoutARunnerToken(t *testing.T) {
+	run := runClaudeWithFakeCLI(t, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN=merge-token")
+
+	assert.Equal(t, "Bash,Read,Edit,Write,mcp__superplane,mcp__superplane__report_merge_check", run.allowedTools)
+	assert.Equal(t, map[string]any{
+		"superplane": map[string]any{"command": "node", "args": []any{filepath.Join(run.taskDir, "merge_confidence_mcp.js")}},
+	}, run.mcpServers)
+}
+
+type claudeRun struct {
+	taskDir      string
+	allowedTools string
+	mcpServers   map[string]any
+}
+
+func runClaudeWithFakeCLI(t *testing.T, env ...string) claudeRun {
 	t.Helper()
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	argsFile := filepath.Join(taskDir, "claude-args")
+	configCopy := filepath.Join(taskDir, "mcp-config-copy.json")
+	require.NoError(t, os.WriteFile(prompt, []byte("Do the task."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(taskDir, "planning_session_mcp.js"),
+		[]byte(`module.exports.recordAgentMessage = async () => {};`),
+		0o600,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(taskDir, "claude"),
+		[]byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$CLAUDE_ARGS_FILE\"\n"+
+			"while [ $# -gt 0 ]; do if [ \"$1\" = \"--mcp-config\" ]; then cp \"$2\" \"$MCP_CONFIG_COPY\"; fi; shift; done\n"+
+			"printf '%s\\n' '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"Done.\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}'\n"),
+		0o700,
+	))
+
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
-	payload, err := json.Marshal(env)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(append(os.Environ(),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+filepath.Join(taskDir, "result.json"),
+		"CLAUDE_ARGS_FILE="+argsFile,
+		"MCP_CONFIG_COPY="+configCopy,
+	), env...)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	rawArgs, err := os.ReadFile(argsFile)
 	require.NoError(t, err)
-	cmd := exec.Command("node", "-e", `const { writeClaudeMCPConfig } = require(process.argv[1]); process.stdout.write(writeClaudeMCPConfig(process.argv[2], JSON.parse(process.argv[3]), process.argv[4] === "true"));`, script, taskDir, string(payload), fmt.Sprint(includeSuperplane))
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, string(out))
-	require.NotEmpty(t, string(out))
-	content, err := os.ReadFile(string(out))
+	args := strings.Split(strings.TrimSpace(string(rawArgs)), "\n")
+	run := claudeRun{taskDir: taskDir}
+	for i, arg := range args {
+		if arg == "--allowedTools" && i+1 < len(args) {
+			run.allowedTools = args[i+1]
+		}
+	}
+	content, err := os.ReadFile(configCopy)
 	require.NoError(t, err)
 	var config map[string]any
 	require.NoError(t, json.Unmarshal(content, &config))
-	return config
+	run.mcpServers, _ = config["mcpServers"].(map[string]any)
+	return run
 }
 
 func TestAllowedClaudeToolsUsesProposeUpdateWithoutReviewEnv(t *testing.T) {
