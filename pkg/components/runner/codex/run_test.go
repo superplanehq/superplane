@@ -218,7 +218,7 @@ func TestCodexExecArgsAddsGlobalMCPWithApprovedTools(t *testing.T) {
 	}
 }
 
-func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
+func TestCodexExecArgsBypassesSandboxForAnalysis(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
 	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))
 	for _, session := range []string{"", "thread-1"} {
@@ -230,13 +230,14 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 				"SUPERPLANE_RUN_TOKEN":             "run-token-secret",
 			}, "gpt-5", "/task/planning_session_mcp.js", session)
 
-			assert.NotContains(t, args, "--dangerously-bypass-approvals-and-sandbox")
+			assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 			joined := strings.Join(args, " ")
-			assert.Contains(t, joined, `sandbox_mode="read-only"`)
-			assert.Contains(t, joined, `approval_policy="never"`)
+			assert.NotContains(t, joined, "sandbox_mode=")
+			assert.NotContains(t, joined, "approval_policy=")
 			assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
 			assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/planning_session_mcp.js"]`)
 			assert.Contains(t, joined, "developer_instructions")
+			assert.Contains(t, joined, "Do not edit or write repository files.")
 			assert.Contains(t, args, `mcp_servers.superplane.tools.propose_update.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)

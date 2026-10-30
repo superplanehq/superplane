@@ -179,9 +179,6 @@ function planningSystemPrompt(env = process.env) {
   return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
 
-// Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
-// --sandbox flag. Config overrides keep both new and resumed analysis turns
-// read-only without disabling shell commands and file reads.
 function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
@@ -203,26 +200,17 @@ function codexExecArgs(
   if (sessionID) {
     args.push("resume", sessionID);
   }
-  args.push("--json", "--skip-git-repo-check");
+  args.push("--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox");
   if (planningEnabled(env)) {
-    args.push(
-      "-c",
-      'sandbox_mode="read-only"',
-      "-c",
-      'approval_policy="never"',
-    );
     args.push(...mcpConfigOverrides(mcpScriptPath, env));
     args.push(
       "-c",
       `developer_instructions=${tomlString(loadAnalysisProtocol(env))}`,
     );
+  } else if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
+    args.push(...mcpConfigOverrides(mcpScriptPath, env));
   } else {
-    args.push("--dangerously-bypass-approvals-and-sandbox");
-    if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
-      args.push(...mcpConfigOverrides(mcpScriptPath, env));
-    } else {
-      args.push(...workspaceMCPConfigOverrides(env));
-    }
+    args.push(...workspaceMCPConfigOverrides(env));
   }
   args.push(...globalMCPConfigOverrides(path.dirname(String(mcpScriptPath || "")), env));
   if (model) {
@@ -280,7 +268,7 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
     "-c",
     `mcp_servers.superplane.env_vars=${tomlStringArray(SUPERPLANE_MCP_ENV_VARS)}`,
     // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
-    // answer that prompt, so approve only these planning tools, not shell writes.
+    // answer that prompt, so approve these planning tools explicitly.
     ...(planningEnabled(env)
       ? [
           "-c",
@@ -501,7 +489,6 @@ async function runPrompt(promptFile, model, thinking) {
   );
   if (planning) {
     writeStdout("Planning session tools enabled\n");
-    writeStdout("sandbox: read-only\n");
   }
   if (sessionID) {
     writeStdout("Continuing Codex session in the current directory\n");
