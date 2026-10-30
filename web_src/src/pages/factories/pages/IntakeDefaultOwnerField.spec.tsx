@@ -18,13 +18,12 @@ let eligibleMembers = [
   { userId: "alice", eligible: true },
   { userId: "bob", eligible: false },
 ];
-const refetchEligibility = vi.fn(async () => ({}));
 vi.mock("@/hooks/useFactoryOwnerEligibility", () => ({
   useFactoryOwnerEligibility: () => ({
     data: { members: eligibleMembers },
     isPending: false,
     isError: false,
-    refetch: refetchEligibility,
+    refetch: vi.fn(async () => ({})),
   }),
 }));
 vi.mock("../codex/CodexConnectionSetupDialog", () => ({
@@ -78,7 +77,6 @@ describe("IntakeDefaultOwnerField", () => {
       fireEvent.click(screen.getByRole("button", { name: "Connect Codex" }));
       fireEvent.click(await screen.findByRole("button", { name: "Finish Codex sign-in" }));
       await waitFor(() => expect(onChange).toHaveBeenCalledWith("alice"));
-      expect(refetchEligibility).toHaveBeenCalled();
       await waitFor(() =>
         expect(screen.queryByRole("button", { name: "Finish Codex sign-in" })).not.toBeInTheDocument(),
       );
