@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -22,9 +23,10 @@ const (
 	// Fallback when the chart does not set a version and GitHub lookup fails.
 	// Keep these equal to componentReleases in the SuperPlane Helm values.
 	defaultStableRunnerVersion       = "v0.2.1"
-	defaultStableFleetManagerVersion = "v0.1.5"
+	defaultStableFleetManagerVersion = "v0.1.7"
 	fleetManagerReleaseTagPrefix     = "fleet-manager/"
-	fleetManagerChartRepository      = "oci://ghcr.io/superplanehq/fleet-manager-chart"
+	fleetManagerChartRepositoryName  = "superplanehq/fleet-manager-chart"
+	fleetManagerChartRepository      = "oci://ghcr.io/" + fleetManagerChartRepositoryName
 	fleetManagerImageRepository      = "ghcr.io/superplanehq/fleet-manager"
 	runnerReleaseURLTemplate         = "https://github.com/superplanehq/superplane/releases/download/runner%2F{version}"
 	runnerReleaseLookupTimeout       = 3 * time.Second
@@ -38,15 +40,16 @@ const (
 )
 
 var (
-	runnerReleaseAPIBase         = "https://api.github.com/repos/superplanehq/superplane"
-	stableRunnerVersionPattern   = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
-	runnerReleaseCacheMu         sync.Mutex
-	runnerReleaseRefreshMu       sync.Mutex
-	cachedRunnerReleaseVersions  []string
-	cachedRunnerReleaseFetchedAt time.Time
-	cachedRunnerReleaseOK        bool
-	cachedRunnerReleaseFailedAt  time.Time
-	cachedRunnerReleaseFailure   error
+	runnerReleaseAPIBase          = "https://api.github.com/repos/superplanehq/superplane"
+	fleetManagerChartRegistryBase = "https://ghcr.io"
+	stableRunnerVersionPattern    = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
+	runnerReleaseCacheMu          sync.Mutex
+	runnerReleaseRefreshMu        sync.Mutex
+	cachedRunnerReleaseVersions   []string
+	cachedRunnerReleaseFetchedAt  time.Time
+	cachedRunnerReleaseOK         bool
+	cachedRunnerReleaseFailedAt   time.Time
+	cachedRunnerReleaseFailure    error
 
 	fleetManagerReleaseCacheMu        sync.Mutex
 	cachedFleetManagerVersions        []string
@@ -54,7 +57,14 @@ var (
 	cachedFleetManagerOK              bool
 	cachedFleetManagerReleaseFailedAt time.Time
 	cachedFleetManagerReleaseFailure  error
+	cachedFleetManagerCharts          = map[string]fleetManagerChartResult{}
 )
+
+type fleetManagerChartResult struct {
+	exists    bool
+	err       error
+	fetchedAt time.Time
+}
 
 type githubRunnerRelease struct {
 	TagName    string `json:"tag_name"`
@@ -213,10 +223,21 @@ func runnerVersionsForSetup(stableVersion string) (string, []string) {
 
 func installationFleetManagerVersion(configured string) string {
 	published, err := publishedFleetManagerVersions()
-	if err != nil || len(published) == 0 {
+	if err != nil {
 		return configured
 	}
-	return installationRunnerVersion(configured, published)
+
+	candidates := append([]string(nil), published...)
+	if !slices.Contains(candidates, configured) {
+		exists, chartErr := fleetManagerChartExists(configured)
+		if chartErr == nil && exists {
+			candidates = append(candidates, configured)
+		}
+	}
+	if len(candidates) == 0 {
+		return configured
+	}
+	return installationRunnerVersion(candidates[0], candidates)
 }
 
 func publishedFleetManagerVersions() ([]string, error) {
@@ -262,12 +283,25 @@ func fetchPublishedFleetManagerVersions() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(candidates) == 0 {
+		return nil, nil
+	}
 
-	published := make([]string, 0, len(candidates))
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return runnerVersionNewer(candidates[i], candidates[j])
+	})
+
+	token, err := fetchFleetManagerRegistryToken(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	var verificationErr error
 	for _, version := range candidates {
-		release, found, err := fetchRunnerReleaseByTag(ctx, client, fleetManagerReleaseTagPrefix+version)
-		if err != nil {
-			return nil, err
+		release, found, releaseErr := fetchRunnerReleaseByTag(ctx, client, fleetManagerReleaseTagPrefix+version)
+		if releaseErr != nil {
+			verificationErr = releaseErr
+			continue
 		}
 		if !found || release.Draft || release.Prerelease {
 			continue
@@ -276,9 +310,126 @@ func fetchPublishedFleetManagerVersions() ([]string, error) {
 		if !ok || !stableRunnerVersionPattern.MatchString(confirmed) || confirmed != version {
 			continue
 		}
-		published = append(published, version)
+		exists, chartErr := fleetManagerChartPublished(ctx, client, token, version)
+		storeFleetManagerChart(version, exists, chartErr)
+		if chartErr != nil {
+			verificationErr = chartErr
+			continue
+		}
+		if !exists {
+			continue
+		}
+		return []string{version}, nil
 	}
-	return published, nil
+	if verificationErr != nil {
+		return nil, verificationErr
+	}
+	return nil, nil
+}
+
+func fleetManagerChartExists(version string) (bool, error) {
+	if exists, ok, err := freshFleetManagerChart(version); ok {
+		return exists, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), runnerReleaseLookupTimeout)
+	defer cancel()
+
+	client := &http.Client{Timeout: runnerReleaseLookupTimeout}
+	token, err := fetchFleetManagerRegistryToken(ctx, client)
+	if err != nil {
+		storeFleetManagerChart(version, false, err)
+		return false, err
+	}
+	exists, err := fleetManagerChartPublished(ctx, client, token, version)
+	storeFleetManagerChart(version, exists, err)
+	return exists, err
+}
+
+func freshFleetManagerChart(version string) (bool, bool, error) {
+	fleetManagerReleaseCacheMu.Lock()
+	defer fleetManagerReleaseCacheMu.Unlock()
+
+	result, ok := cachedFleetManagerCharts[version]
+	if !ok {
+		return false, false, nil
+	}
+	if result.err != nil {
+		if time.Since(result.fetchedAt) < runnerReleaseFailureBackoff {
+			return false, true, result.err
+		}
+		return false, false, nil
+	}
+	if time.Since(result.fetchedAt) < runnerReleaseCacheTTL {
+		return result.exists, true, nil
+	}
+	return false, false, nil
+}
+
+func storeFleetManagerChart(version string, exists bool, err error) {
+	fleetManagerReleaseCacheMu.Lock()
+	defer fleetManagerReleaseCacheMu.Unlock()
+	cachedFleetManagerCharts[version] = fleetManagerChartResult{
+		exists:    exists,
+		err:       err,
+		fetchedAt: time.Now(),
+	}
+}
+
+func fetchFleetManagerRegistryToken(ctx context.Context, client *http.Client) (string, error) {
+	tokenURL := fleetManagerChartRegistryBase + "/token?scope=repository:" + fleetManagerChartRepositoryName + ":pull"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tokenURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "SuperPlane")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected registry token status %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", err
+	}
+	if payload.Token == "" {
+		return "", errors.New("registry token is empty")
+	}
+	return payload.Token, nil
+}
+
+func fleetManagerChartPublished(ctx context.Context, client *http.Client, token, version string) (bool, error) {
+	manifestURL := fleetManagerChartRegistryBase + "/v2/" + fleetManagerChartRepositoryName + "/manifests/" + url.PathEscape(strings.TrimPrefix(version, "v"))
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, manifestURL, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
+	req.Header.Set("User-Agent", "SuperPlane")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected chart status %d", resp.StatusCode)
+	}
 }
 
 func listStableTagVersions(ctx context.Context, client *http.Client, tagPrefix, refPrefix string) ([]string, error) {
@@ -321,6 +472,7 @@ func resetFleetManagerReleaseCache() {
 	cachedFleetManagerOK = false
 	cachedFleetManagerReleaseFailure = nil
 	cachedFleetManagerReleaseFailedAt = time.Time{}
+	cachedFleetManagerCharts = map[string]fleetManagerChartResult{}
 }
 
 func installationRunnerVersion(stableVersion string, published []string) string {
