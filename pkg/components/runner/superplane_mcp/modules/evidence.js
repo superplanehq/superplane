@@ -124,9 +124,11 @@ function inspectScreenshot(input, client) {
     sizeBytes: file.sizeBytes,
     sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
   };
-  const inspections = readInspections(env).inspections.filter((inspection) => inspection.path !== metadata.path);
-  inspections.push(metadata);
-  writeInspections({ inspections }, env);
+  if (client.recordInspection !== false) {
+    const inspections = readInspections(env).inspections.filter((inspection) => inspection.path !== metadata.path);
+    inspections.push(metadata);
+    writeInspections({ inspections }, env);
+  }
   return {
     content: [
       { type: "text", text: JSON.stringify(metadata) },

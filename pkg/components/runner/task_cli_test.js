@@ -7,7 +7,18 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
+const { createClient } = require("./superplane_mcp/client");
+const registry = require("./superplane_mcp/registry");
 const { main } = require("./task_cli");
+
+async function recordScreenshot(file, taskEnv) {
+  await registry.findTool("inspect_screenshot").handler(
+    { path: file },
+    createClient(taskEnv, async () => {
+      throw new Error("fetch must not run");
+    }),
+  );
+}
 
 async function readUpload(options) {
   const chunks = [];
@@ -130,8 +141,22 @@ test("superplane task artifact add-file uploads an image from the evidence direc
   assert.equal(blockedCode, 1);
   assert.match(blocked, /inspect_screenshot/);
 
-  const inspected = await main(
+  let inspected = "";
+  const inspectCode = await main(
     ["task", "evidence", "inspect", "--file", file],
+    taskEnv,
+    async () => {
+      throw new Error("fetch must not run");
+    },
+    { write: (chunk) => { inspected += chunk; } },
+    { write() {} },
+  );
+  assert.equal(inspectCode, 0);
+  assert.equal(JSON.parse(inspected).filename, "login.png");
+  assert.equal(fs.existsSync(path.join(taskDir, "visual-evidence-inspections.json")), false);
+
+  const stillBlocked = await main(
+    ["task", "artifact", "add-file", "--file", file, "--name", "Login"],
     taskEnv,
     async () => {
       throw new Error("fetch must not run");
@@ -139,7 +164,8 @@ test("superplane task artifact add-file uploads an image from the evidence direc
     { write() {} },
     { write() {} },
   );
-  assert.equal(inspected, 0);
+  assert.equal(stillBlocked, 1);
+  await recordScreenshot(file, taskEnv);
 
   const requests = [];
   let stdout = "";
@@ -177,16 +203,7 @@ test("superplane task artifact add-file uploads a video poster and the video", a
   fs.writeFileSync(poster, "png-bytes");
   fs.writeFileSync(video, "webm-bytes");
   const taskEnv = { ...env, SUPERPLANE_TASK_DIR: taskDir };
-  const inspected = await main(
-    ["task", "evidence", "inspect", "--file", poster],
-    taskEnv,
-    async () => {
-      throw new Error("fetch must not run");
-    },
-    { write() {} },
-    { write() {} },
-  );
-  assert.equal(inspected, 0);
+  await recordScreenshot(poster, taskEnv);
 
   const requests = [];
   let stdout = "";

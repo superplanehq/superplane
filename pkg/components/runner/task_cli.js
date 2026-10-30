@@ -232,7 +232,12 @@ function render(result) {
 async function callTool(name, input, env, fetchImpl) {
   const tool = registry.findTool(name);
   if (!tool) throw new Error(`unknown tool: ${name}`);
-  return tool.handler(input, createClient(env, fetchImpl));
+  const client = createClient(env, fetchImpl);
+  // A shell cannot return an image content block. Do not record an
+  // inspection here. inspect_screenshot records it when the model sees
+  // the image.
+  if (name === "inspect_screenshot" || name === "inspect_attachment") client.recordInspection = false;
+  return tool.handler(input, client);
 }
 
 async function main(argv, env = process.env, fetchImpl = fetch, stdout = process.stdout, stderr = process.stderr) {
