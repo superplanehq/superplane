@@ -30,8 +30,11 @@ import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 import type { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
 
-/** One model in a picker. `thinkingLevels` comes from the model catalog. */
-type ModelOption = { value: string; label: string; thinkingLevels?: string[] };
+/**
+ * One model in a picker. `thinkingLevels` comes from the model catalog.
+ * `isDefault` marks the model that the provider uses when the saved model is unset.
+ */
+type ModelOption = { value: string; label: string; thinkingLevels?: string[]; isDefault?: boolean };
 
 export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) => {
   const provider = props.field.typeOptions?.hostedModel?.provider ?? "";
@@ -213,7 +216,7 @@ function ProviderBYOKModelField({
 }
 
 function subscriptionModelOptions(
-  models: Array<{ id?: string; name?: string; thinkingLevels?: string[] }> | undefined,
+  models: Array<{ id?: string; name?: string; thinkingLevels?: string[]; isDefault?: boolean }> | undefined,
 ) {
   return (models ?? [])
     .filter((model) => (model.id ?? "") !== "")
@@ -221,6 +224,7 @@ function subscriptionModelOptions(
       value: model.id ?? "",
       label: model.name || model.id || "",
       thinkingLevels: model.thinkingLevels,
+      isDefault: model.isDefault,
     }));
 }
 
@@ -265,9 +269,11 @@ function ModelThinkingSelect({
 }) {
   const levelsFor = (value: string) => options.find((option) => option.value === value)?.thinkingLevels;
   const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
-  const modelThinking = thinkingOptions(levelsFor(model), { withDefault: true });
+  // An unset model runs as the catalog default, so show that model's levels.
+  const effectiveModel = model !== "" ? model : (options.find((option) => option.isDefault)?.value ?? "");
+  const modelThinking = thinkingOptions(levelsFor(effectiveModel), { withDefault: true });
   const showThinking = !modelOnly && modelThinking.length > 0;
-  const selectedThinking = supportedThinkingLevel(thinkingLevel, levelsFor(model));
+  const selectedThinking = supportedThinkingLevel(thinkingLevel, levelsFor(effectiveModel));
   const thinkingLabel = modelThinking.find((level) => level.value === selectedThinking)?.label ?? "Default";
   const modelListTestId = fieldName ? toTestId(`field-${fieldName}-hosted-model-list`) : undefined;
   const thinkingTestId = fieldName ? toTestId(`field-${fieldName}-hosted-thinking`) : undefined;

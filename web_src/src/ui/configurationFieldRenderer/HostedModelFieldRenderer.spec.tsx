@@ -87,6 +87,50 @@ describe("subscription model picker", () => {
   });
 });
 
+describe("subscription default model thinking", () => {
+  beforeAll(installPointerCapturePolyfills);
+
+  it("shows the thinking levels of the catalog default model and keeps the model unset", async () => {
+    vi.mocked(useFactoryCodexConnection).mockReturnValue({
+      query: {
+        data: {
+          status: "ready",
+          availableModels: ["gpt-5.4", "gpt-5.3"],
+          availableModelOptions: [
+            { id: "gpt-5.4", name: "gpt-5.4", thinkingLevels: ["low", "high"], isDefault: true },
+            { id: "gpt-5.3", name: "gpt-5.3", thinkingLevels: [] },
+          ],
+        },
+        isLoading: false,
+        isError: false,
+      },
+    } as unknown as ReturnType<typeof useFactoryCodexConnection>);
+    mockSelectableModels([]);
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField("openai")}
+        value=""
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        organizationId="org-1"
+        factoryId="factory-1"
+        allValues={{ credentials: { source: "subscription" }, thinkingLevel: "high" }}
+      />,
+    );
+
+    const trigger = screen.getByTestId("field-model-hosted-model");
+    expect(trigger).toHaveTextContent("Default");
+    expect(trigger).toHaveTextContent("High");
+
+    const user = userEvent.setup();
+    await user.click(trigger);
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "Low");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "low" });
+  });
+});
+
 describe("HostedModelFieldRenderer", () => {
   beforeAll(installPointerCapturePolyfills);
 

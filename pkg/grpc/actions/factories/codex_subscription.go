@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -445,9 +446,21 @@ func serializeCodexModelOptions(available []models.CodexModel) []*pb.FactoryLLMM
 	ids := models.CompactModelIDs(codexModelIDs(available))
 	out := make([]*pb.FactoryLLMModel, 0, len(ids))
 	for _, id := range ids {
-		out = append(out, &pb.FactoryLLMModel{Id: id, Name: id, ThinkingLevels: thinkingLevels(id)})
+		out = append(out, &pb.FactoryLLMModel{
+			Id:             id,
+			Name:           id,
+			ThinkingLevels: thinkingLevels(id),
+			IsDefault:      codexModelIsDefault(available, id),
+		})
 	}
 	return out
+}
+
+// codexModelIsDefault reports whether the Codex catalog marks the model as its default.
+func codexModelIsDefault(available []models.CodexModel, id string) bool {
+	return slices.ContainsFunc(available, func(model models.CodexModel) bool {
+		return model.IsDefault && strings.TrimSpace(model.Model) == strings.TrimSpace(id)
+	})
 }
 
 func codexModelIDs(available []models.CodexModel) []string {

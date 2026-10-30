@@ -105,3 +105,24 @@ func TestCancelFactoryCodexConnectionReportsCancellationUntilRunnerDeletion(t *t
 		})
 	}
 }
+
+func TestSerializeCodexModelOptionsMarksCatalogDefault(t *testing.T) {
+	options := serializeCodexModelOptions([]models.CodexModel{
+		{ID: "gpt-5.3", Model: "gpt-5.3"},
+		{
+			ID:                        "gpt-5.4",
+			Model:                     "gpt-5.4",
+			SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "low"}, {ReasoningEffort: "high"}},
+			IsDefault:                 true,
+		},
+	})
+
+	require.Len(t, options, 2)
+	byID := map[string]*pb.FactoryLLMModel{}
+	for _, option := range options {
+		byID[option.Id] = option
+	}
+	assert.True(t, byID["gpt-5.4"].IsDefault)
+	assert.Equal(t, []string{"low", "high"}, byID["gpt-5.4"].ThinkingLevels)
+	assert.False(t, byID["gpt-5.3"].IsDefault)
+}

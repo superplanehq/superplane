@@ -2993,6 +2993,9 @@ message FactoryLLMModel {
   // Thinking levels that the model supports, in display order. Empty means
   // that the model has no thinking control.
   repeated string thinking_levels = 3;
+  // True when the provider catalog marks this model as its default. Pickers use
+  // it to show the thinking levels of an unset model.
+  bool is_default = 4;
 }
 
 message ListFactoryLLMModelsResponse {
