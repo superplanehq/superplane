@@ -126,13 +126,14 @@ function ConnectedOwnerSelect({
   const displays = buildOrgUserDisplayMap(users);
   const { currentUserId } = usePermissions();
   const members = eligibility.data?.members ?? [];
+  const hasConnectedMembers = members.some((member) => member.userId && member.eligible);
   const selected = members.find((member) => member.userId === value);
   return (
     <>
       <Select
         value={value}
         onValueChange={onChange}
-        disabled={disabled || eligibility.isPending || eligibility.isError}
+        disabled={disabled || eligibility.isPending || eligibility.isError || !hasConnectedMembers}
         required
       >
         <SelectTrigger aria-labelledby={labelId} aria-describedby={helpId}>
@@ -153,6 +154,9 @@ function ConnectedOwnerSelect({
             ))}
         </SelectContent>
       </Select>
+      {!eligibility.isPending && !eligibility.isError && !hasConnectedMembers ? (
+        <p className="text-sm text-muted-foreground">No members have ChatGPT connected.</p>
+      ) : null}
       {eligibility.isError ? (
         <p role="alert" className="text-sm text-destructive">
           SuperPlane could not load connected members.{" "}
