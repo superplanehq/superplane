@@ -1,3 +1,5 @@
+import { ScheduledIntakeOwnerSettings } from "./ScheduledIntakeOwnerSettings";
+import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
 import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
 import type { RunHistoryIntakeSource } from "./automationRunHistory/intakeRunData";
@@ -308,6 +310,15 @@ export function ColumnAutomationViewHost({
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
   const nodeIds = automation.graph?.specNodes?.map((node) => node.id) ?? [];
   const intakeSource = scheduledIntakeHistorySource(automation.graph);
+  const generalSettings = useScheduledOwnerSettings({
+    organizationId,
+    factoryId,
+    intakeSource,
+    graph: automation.graph,
+    saveNode: agent.saveNode,
+    general,
+  });
+
   if (columnAutomationUsesSplitConfig(nodeIds)) {
     return (
       <MergeConfidenceConfigModal
@@ -345,7 +356,7 @@ export function ColumnAutomationViewHost({
       canvasId={canvasId}
       runHrefFor={(runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })}
       onClose={onClose}
-      general={general}
+      general={generalSettings}
       agent={
         agent.agentNode
           ? {
@@ -433,4 +444,34 @@ function viewEmptyMessage(loading: boolean, error: boolean): string {
     return COLUMN_AUTOMATIONS_COPY.viewLoading;
   }
   return error ? COLUMN_AUTOMATIONS_COPY.viewError : COLUMN_AUTOMATIONS_COPY.viewEmpty;
+}
+
+function useScheduledOwnerSettings({
+  organizationId,
+  factoryId,
+  intakeSource,
+  graph,
+  saveNode,
+  general,
+}: {
+  organizationId: string;
+  factoryId: string;
+  intakeSource: RunHistoryIntakeSource | undefined;
+  graph: IntakeAutomationGraph;
+  saveNode: ReturnType<typeof useColumnCanvasAgentEditor>["saveNode"];
+  general?: ReactNode;
+}) {
+  const layout = useOptionalFactoriesLayout();
+  if (general) return general;
+  const node = graph.specNodes?.find((node) => node.component === "createWorkOrder");
+  if (!layout?.factory?.onboarding?.codexSubscription) return undefined;
+  if (intakeSource !== "scheduled-intake" || !node) return undefined;
+  return (
+    <ScheduledIntakeOwnerSettings
+      organizationId={organizationId}
+      factoryId={factoryId}
+      node={node}
+      onSave={(update) => saveNode(update, { notify: false })}
+    />
+  );
 }

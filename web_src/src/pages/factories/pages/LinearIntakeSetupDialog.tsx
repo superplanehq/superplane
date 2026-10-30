@@ -1,3 +1,4 @@
+import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import type { OrganizationsIntegration } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,7 @@ export function LinearIntakeSetupDialog(props: LinearIntakeSetupDialogProps) {
             ) : null}
           </div>
         )}
+        <IntakeSetupDefaultOwner owner={setup.owner} disabled={setup.createIntake.isPending} />
       </IntakeSetupWizard>
       <IntegrationCreateDialog
         open={setup.connectOpen}

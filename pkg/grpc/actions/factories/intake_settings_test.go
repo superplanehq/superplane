@@ -1332,7 +1332,7 @@ func Test__applyIntakeSettingsToGraph_Datadog(t *testing.T) {
 
 func TestIntakeDefaultOwnerGraphUpdates(t *testing.T) {
 	owner := "3ea1cf96-c943-4891-8e90-172519547bee"
-	for _, source := range []string{models.FactoryIntakeSourceGitHubIssues, models.FactoryIntakeSourceSentryExceptions} {
+	for _, source := range []string{models.FactoryIntakeSourceGitHubIssues, models.FactoryIntakeSourceSentryExceptions, models.FactoryIntakeSourceJiraIssues, models.FactoryIntakeSourceDependabotAlerts, models.FactoryIntakeSourcePagerDutyIncidents, models.FactoryIntakeSourceProductiveTasks, models.FactoryIntakeSourceDatadog, models.FactoryIntakeSourceLinearIssues} {
 		t.Run(source, func(t *testing.T) {
 			nodes := []models.Node{{ID: "custom-create", Configuration: map[string]any{"title": "keep", "defaultOwnerId": owner}}}
 			graph := intakeGraph{CreateNodeID: "custom-create"}
@@ -1356,7 +1356,7 @@ func TestIntakeDefaultOwnerGraphUpdates(t *testing.T) {
 	}
 
 	t.Run("unsupported sources reject the field and do not read it", func(t *testing.T) {
-		source := models.FactoryIntakeSourceJiraIssues
+		source := "unsupported"
 		nodes := []models.Node{{ID: "custom-create", Configuration: map[string]any{"defaultOwnerId": owner}}}
 		graph := intakeGraph{CreateNodeID: "custom-create"}
 		assert.Empty(t, intakeSettingsFromGraph(source, graph, models.LiveCanvasSpec{Nodes: nodes}).DefaultOwnerID)

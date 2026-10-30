@@ -8,9 +8,26 @@ import { GitHubIntakeSetupDialog } from "./GitHubIntakeSetupDialog";
 import { GITHUB_INTAKE_SETUP_COPY } from "./githubIntakeSetupCopy";
 
 const mocks = vi.hoisted(() => ({
+  subscription: false,
   createIntake: vi.fn(),
 }));
 
+vi.mock("../layout/factoriesLayoutContext", () => ({
+  useOptionalFactoriesLayout: () => ({ factory: { onboarding: { codexSubscription: mocks.subscription } } }),
+}));
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganizationUsers: () => ({
+    data: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    isLoading: false,
+  }),
+}));
+vi.mock("@/hooks/useFactoryOwnerEligibility", () => ({
+  useFactoryOwnerEligibility: () => ({
+    data: { members: [{ userId: "alice", eligible: true }] },
+    isPending: false,
+    isError: false,
+  }),
+}));
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useCreateFactoryIntake: () => ({ mutateAsync: mocks.createIntake, isPending: false }),
 }));
@@ -31,10 +48,28 @@ function renderDialog(onCreated = vi.fn()) {
 
 describe("GitHubIntakeSetupDialog", () => {
   beforeEach(() => {
+    mocks.subscription = false;
     mocks.createIntake.mockReset();
     mocks.createIntake.mockResolvedValue({ id: "intake-1", canvasId: "canvas-1" });
   });
 
+  it("requires and submits a connected default owner in subscription mode", async () => {
+    mocks.subscription = true;
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByTestId("github-setup-finish"));
+    expect(mocks.createIntake).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Select a default task owner");
+    await user.click(screen.getByRole("combobox", { name: /Default task owner/ }));
+    await user.click(await screen.findByRole("option", { name: "Alice" }));
+    await user.click(screen.getByTestId("github-setup-finish"));
+    await waitFor(() =>
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_GITHUB_ISSUES",
+        settings: { defaultOwnerId: "alice" },
+      }),
+    );
+  });
   it("shows the repository and import checkbox checked by default", () => {
     renderDialog();
 

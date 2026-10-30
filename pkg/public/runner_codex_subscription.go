@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -44,7 +46,7 @@ func (s *Server) handleRunnerCodexSubscriptionCredentials(w http.ResponseWriter,
 	var bundle any
 	var version int64
 	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.FactoryID, scope.ConnectionID)
+		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -111,7 +113,7 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 	}
 	var version int64
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.FactoryID, scope.ConnectionID)
+		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -156,7 +158,7 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		writeCodexSubscriptionError(w, err)
 		return
 	}
-	_ = messages.PublishFactoryCodexConnectionUpdated(scope.FactoryID.String())
+	_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(r.Context()), scope.OrganizationID)
 	_ = writeJSON(w, http.StatusOK, map[string]any{"accepted": true, "version": version})
 }
 
@@ -181,7 +183,7 @@ func (s *Server) handleRunnerCodexSubscriptionProgress(w http.ResponseWriter, r 
 		return
 	}
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.FactoryID, scope.ConnectionID)
+		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -215,6 +217,7 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 	var accessToken string
 	var idToken string
 	var permanent *runneraction.CodexTokenRefreshError
+	var changedOrganizationID uuid.UUID
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		lease, err := models.FindCodexRunLeaseBySecret(tx, secret)
 		if err != nil {
@@ -224,11 +227,14 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		if err != nil {
 			return err
 		}
-		locked, err := models.LockScopedFactoryCodexConnection(tx, connection.OrganizationID, connection.FactoryID, lease.ConnectionID)
+		if lease.FactoryID == nil {
+			return models.ErrCodexConnectionStale
+		}
+		locked, err := models.LockScopedFactoryCodexConnection(tx, connection.OrganizationID, lease.ConnectionID)
 		if err != nil {
 			return err
 		}
-		if _, err := models.FindCodexLeaseForTask(tx, locked.ID, lease.TaskID, lease.Generation); err != nil {
+		if _, err := scopedCodexLease(tx, locked, &runneraction.CodexSubscriptionScope{OrganizationID: locked.OrganizationID, FactoryID: *lease.FactoryID, ConnectionID: locked.ID, TaskID: lease.TaskID, Generation: lease.Generation}); err != nil {
 			return err
 		}
 		if locked.Status == models.CodexConnectionStatusReconnectRequired {
@@ -254,6 +260,7 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 				return err
 			}
 			permanent = tokenErr
+			changedOrganizationID = locked.OrganizationID
 			return nil
 		}
 		if refreshErr != nil {
@@ -283,6 +290,9 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		}
 		return nil
 	})
+	if err == nil && changedOrganizationID != uuid.Nil {
+		_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(r.Context()), changedOrganizationID)
+	}
 	if permanent != nil {
 		code := permanent.Code
 		if code == "" {
@@ -343,10 +353,31 @@ func readCodexSubscriptionBody(w http.ResponseWriter, r *http.Request) ([]byte, 
 }
 
 func scopedCodexLease(tx *gorm.DB, connection *models.FactoryCodexConnection, scope *runneraction.CodexSubscriptionScope) (*models.FactoryCodexLease, error) {
-	if connection.ID != scope.ConnectionID || connection.OrganizationID != scope.OrganizationID || connection.FactoryID != scope.FactoryID || connection.RevocationPendingAt != nil {
+	if connection.ID != scope.ConnectionID || connection.OrganizationID != scope.OrganizationID || connection.RevocationPendingAt != nil {
 		return nil, models.ErrCodexConnectionStale
 	}
-	return models.FindCodexLeaseForTask(tx, connection.ID, scope.TaskID, scope.Generation)
+	lease, err := models.FindCodexLeaseForTask(tx, connection.ID, scope.TaskID, scope.Generation)
+	if err != nil {
+		return nil, err
+	}
+	if lease.Login() {
+		if scope.FactoryID != uuid.Nil || lease.FactoryID != nil {
+			return nil, models.ErrCodexConnectionStale
+		}
+	} else if lease.FactoryID == nil || *lease.FactoryID != scope.FactoryID {
+		return nil, models.ErrCodexConnectionStale
+	}
+	if lease.Login() {
+		return lease, nil
+	}
+	task, err := models.FindRunnerTask(tx, lease.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	if err := task.RequireSubscriptionLeaseContinuation(tx); err != nil {
+		return nil, err
+	}
+	return lease, nil
 }
 
 func writeCodexSubscriptionError(w http.ResponseWriter, err error) {

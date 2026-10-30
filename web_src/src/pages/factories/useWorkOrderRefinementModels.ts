@@ -81,7 +81,10 @@ function refinementModelSelection(
   usage: { defaultHostedProvider?: string; defaultHostedModel?: string } | undefined,
 ): WorkOrderRefinementModelSelection {
   if (refinementCatalogSource(configuration, false) === SELECTABLE_LLM_SOURCE_SUBSCRIPTION) {
-    return { defaultModel: "", options: models.map((model) => ({ value: model.model.id, label: model.label })) };
+    return {
+      defaultModel: modelValue(configuration.model),
+      options: models.map((model) => ({ value: model.model.id, label: model.label })),
+    };
   }
   const current = modelValue(configuration.model);
   const provider = field?.typeOptions?.hostedModel?.provider ?? "";
@@ -121,7 +124,7 @@ function byokModelSelection(
   return {
     defaultModel: current,
     options: providerModels.length
-      ? byokRunnerModelOptions(providerModels, current).map((option) => ({
+      ? byokRunnerModelOptions(providerModels).map((option) => ({
           ...option,
           label: shortClaudeModelLabel(option.value) ?? option.label,
         }))

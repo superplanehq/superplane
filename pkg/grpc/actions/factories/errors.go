@@ -39,6 +39,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	}
 
 	switch {
+	case errors.Is(err, errCodexConnectionRequired):
+		return grpcerrors.FailedPreconditionWithReason("Connect your Codex account to take ownership of this task.", "CODEX_CONNECTION_REQUIRED")
 	case errors.Is(err, billing.ErrPaymentMethodRequired):
 		return grpcerrors.FailedPrecondition(err, "Add a payment method before you complete workspace setup.")
 	case errors.Is(err, billing.ErrHostedSubscriptionRequired), errors.Is(err, billing.ErrHostedPaymentPastDue), errors.Is(err, billing.ErrHostedSubscriptionPaused):
@@ -234,7 +236,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	case errors.Is(err, models.ErrSelectableLLMModelIncomplete):
 		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
 	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
-		return grpcerrors.FailedPrecondition(err, "This workspace does not allow the selected model.")
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, ghdependabot.ErrAlertsDisabled):
 		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsDisabledMessage)
 	case errors.Is(err, ghdependabot.ErrAlertsUnreadable):
@@ -293,6 +295,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 }
 
 var errInvalidArgument = errors.New("invalid argument")
+var errCodexConnectionRequired = errors.New("connect your Codex account to continue")
 var errCustomAutomationsDisabled = errors.New("custom automations are not enabled")
 var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
