@@ -73,7 +73,7 @@ describe("IntakeDefaultOwnerField", () => {
       eligibleMembers = members;
       const onChange = vi.fn();
       try {
-        render(
+        const { rerender } = render(
           <IntakeDefaultOwnerField organizationId="org" factoryId="factory" value="" required onChange={onChange} />,
         );
         expect(screen.getByRole("combobox", { name: /Default task owner/ })).toBeDisabled();
@@ -84,6 +84,19 @@ describe("IntakeDefaultOwnerField", () => {
         await waitFor(() =>
           expect(screen.queryByRole("button", { name: "Finish Codex sign-in" })).not.toBeInTheDocument(),
         );
+        eligibleMembers = [{ userId: "alice", eligible: true }];
+        rerender(
+          <IntakeDefaultOwnerField
+            organizationId="org"
+            factoryId="factory"
+            value="alice"
+            required
+            onChange={onChange}
+          />,
+        );
+        expect(screen.getByRole("combobox", { name: /Default task owner/ })).toBeEnabled();
+        expect(screen.getByRole("combobox", { name: /Default task owner/ })).toHaveTextContent("Alice");
+        expect(screen.queryByText("No members have ChatGPT connected.")).not.toBeInTheDocument();
       } finally {
         eligibleMembers = [
           { userId: "alice", eligible: true },
