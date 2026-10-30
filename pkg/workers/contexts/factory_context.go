@@ -436,6 +436,9 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	params core.WorkOrderParams,
 	sourceRunID uuid.UUID,
 ) (*models.FactoryWorkOrder, error) {
+	if factoryModel.OnboardingConfigValue().CodexSubscription {
+		return factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, c.originFromSourceRun(sourceRunID))
+	}
 	assigneeIDs := []uuid.UUID{}
 	if params.DefaultOwnerID != "" {
 		user, err := models.FindActiveUserByIDInTransaction(c.tx, factoryModel.OrganizationID.String(), params.DefaultOwnerID)

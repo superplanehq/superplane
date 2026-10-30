@@ -80,6 +80,7 @@ export function ModelSourceBody({
           reconnectRequired={subscriptionReconnectRequired}
         />
         <div className="border-t border-border pt-4">{hostedModels}</div>
+        <ChangeModelSource current={null} providers={providers} onChoose={onChoose} disabled={!canUpdate} />
       </div>
     );
   }

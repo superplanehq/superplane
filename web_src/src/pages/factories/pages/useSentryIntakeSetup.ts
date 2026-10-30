@@ -1,3 +1,4 @@
+import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import {
   useAvailableIntegrations,
@@ -26,6 +27,7 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
   const { connectedQuery, sentryIntegrations, sentryDefinition, existingNames } = useSentryConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const owner = useIntakeOwnerDraft(organizationId, factoryId);
   const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
     enabled: Boolean(integrationId),
   });
@@ -92,6 +94,7 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
         integrationId,
         resourceId: projectIds.join(","),
         settings: {
+          ...owner.settings(),
           sentryProjectIds: projectIds,
         },
         ...(skipInitialImport ? { skipInitialImport: true } : {}),
@@ -104,6 +107,7 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
   };
 
   return {
+    owner,
     step,
     setStep,
     integrationId,

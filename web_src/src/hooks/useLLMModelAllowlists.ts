@@ -313,6 +313,9 @@ export function useSwitchFactoryModelSource(organizationId: string, factoryId: s
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "intakes"] });
+      void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "owner-eligibility"] });
+      void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "line-runner-models"] });
       void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "byok-models"] });
       void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "selectable-llm-models"] });
     },
