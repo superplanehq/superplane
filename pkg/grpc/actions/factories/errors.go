@@ -287,6 +287,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, models.ErrCodexConnectionActive):
 		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionUnavailable):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	default:
 		return grpcerrors.Internal(err, internalMessage)
 	}

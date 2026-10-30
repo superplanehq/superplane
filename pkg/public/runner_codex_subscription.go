@@ -390,6 +390,8 @@ func writeCodexSubscriptionError(w http.ResponseWriter, err error) {
 		http.Error(w, "Connect ChatGPT before this task can run", http.StatusConflict)
 	case errors.Is(err, models.ErrCodexConnectionNotEligible):
 		http.Error(w, "Connect a ChatGPT subscription as an active workspace member", http.StatusForbidden)
+	case errors.Is(err, models.ErrCodexConnectionUnavailable):
+		http.Error(w, err.Error(), http.StatusForbidden)
 	default:
 		http.Error(w, "ChatGPT subscription request failed", http.StatusInternalServerError)
 	}

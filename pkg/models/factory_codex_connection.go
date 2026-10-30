@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -31,6 +32,7 @@ var (
 	ErrCodexConnectionNotReady    = newSubscriptionAdmissionError("connect ChatGPT before this task can run")
 	ErrCodexConnectionStale       = newSubscriptionAdmissionError("the ChatGPT sign-in update is out of date")
 	ErrCodexConnectionActive      = errors.New("stop the running tasks before you disconnect ChatGPT")
+	ErrCodexConnectionUnavailable = newSubscriptionAdmissionError("ChatGPT subscription requires factories access for this organization")
 )
 
 // CodexConnectionBusyError names the task that holds the subscription.
@@ -732,9 +734,16 @@ func (c *FactoryCodexConnection) MarkReconnectRequired(tx *gorm.DB, now time.Tim
 	return nil
 }
 
-// ActiveCodexMember locks membership before connection mutation. Removal uses
-// the same order, so it cannot race sign-in or subscription admission.
+// ActiveCodexMember requires factories access and locks membership before connection
+// mutation. Removal uses the same order, so it cannot race sign-in or subscription admission.
 func ActiveCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, error) {
+	enabled, err := OrganizationHasExperimentalFeatures(tx, organizationID, features.FeatureFactories)
+	if err != nil {
+		return nil, err
+	}
+	if !enabled {
+		return nil, ErrCodexConnectionUnavailable
+	}
 	return activeHumanCodexMember(tx, organizationID, userID)
 }
 
