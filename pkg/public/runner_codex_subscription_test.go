@@ -147,6 +147,37 @@ func TestCodexRunCheckpointDoesNotReplaceTheRefreshToken(t *testing.T) {
 	}
 }
 
+func TestCodexRunningTaskKeepsCredentialsAfterWorkspaceModelPolicyChange(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	connection, factory, _ := readyCodexRun(t, r)
+	var lease models.FactoryCodexLease
+	require.NoError(t, db.Where("connection_id = ? AND purpose = ?", connection.ID, models.CodexLeasePurposeRun).First(&lease).Error)
+	inherit := false
+	_, err := models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, []string{}, &inherit)
+	require.NoError(t, err)
+	signer := jwt.NewSigner("test-codex-run")
+	token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factory.ID,
+		ConnectionID:   connection.ID,
+		TaskID:         lease.TaskID,
+		Generation:     lease.Generation,
+	}, time.Hour)
+	require.NoError(t, err)
+	server := &Server{jwt: signer, encryptor: r.Encryptor}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	response := httptest.NewRecorder()
+	server.handleRunnerCodexSubscriptionCredentials(response, request)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("id = ?", lease.ID).Update("revoked_at", time.Now()).Error)
+	revoked := httptest.NewRecorder()
+	server.handleRunnerCodexSubscriptionCredentials(revoked, request)
+	assert.Equal(t, http.StatusConflict, revoked.Code, "revocation must still stop a running task")
+}
+
 func TestCodexRefreshIsSingleFlightAndHidesTheRefreshToken(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

@@ -374,7 +374,7 @@ func scopedCodexLease(tx *gorm.DB, connection *models.FactoryCodexConnection, sc
 	if err != nil {
 		return nil, err
 	}
-	if err := task.RequireSubscriptionLeaseAdmission(tx); err != nil {
+	if err := task.RequireSubscriptionLeaseContinuation(tx); err != nil {
 		return nil, err
 	}
 	return lease, nil

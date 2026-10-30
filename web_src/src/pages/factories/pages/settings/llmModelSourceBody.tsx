@@ -28,16 +28,22 @@ type ModelSourceBodyProps = {
   integrationsHref: string;
   codex: ReturnType<typeof useFactoryCodexConnection>;
   onChooseProvider: (provider: LLMModelsSwitchProvider) => void;
+  onChangeDefaultOwner?: () => void;
 };
 
 export function ModelSourceBody(props: ModelSourceBodyProps) {
-  const { source, organizationId, factoryId, canUpdate, codex } = props;
+  const { source, organizationId, factoryId, canUpdate, codex, onChangeDefaultOwner } = props;
   const editorProps = { organizationId, factoryId, canUpdate };
   if (source === "subscription")
     return (
       <div className="space-y-5" data-testid="llm-models-codex-subscription">
         <FactoryCodexSubscriptionConnection codex={codex} />
         <p className="text-xs text-muted-foreground">{COPY.subscriptionHelper}</p>
+        {onChangeDefaultOwner ? (
+          <Button type="button" variant="outline" size="sm" disabled={!canUpdate} onClick={onChangeDefaultOwner}>
+            Change default task owner
+          </Button>
+        ) : null}
         <WorkspaceModelPolicyEditor
           {...editorProps}
           provider="openai"

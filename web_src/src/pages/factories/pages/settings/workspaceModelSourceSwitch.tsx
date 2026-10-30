@@ -1,6 +1,13 @@
 import type { useModelSourceSwitch } from "./useModelSourceSwitch";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IntakeDefaultOwnerField } from "../IntakeDefaultOwnerField";
 import { useFactoryOwnerEligibility } from "@/hooks/useFactoryOwnerEligibility";
@@ -26,6 +33,7 @@ export function ModelSourceSwitchDialogs({
   switcher: ReturnType<typeof useModelSourceSwitch>;
 }) {
   const eligibility = useFactoryOwnerEligibility(organizationId, factoryId, undefined, true);
+  const changingOwner = source === "subscription";
   const selectedEligible =
     eligibility.data?.members?.some((member) => member.userId === switcher.defaultOwnerId && member.eligible) === true;
   return (
@@ -36,9 +44,13 @@ export function ModelSourceSwitchDialogs({
           if (!open) switcher.setSubscriptionDialog(null);
         }}
       >
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Switch to Codex</DialogTitle>
+            <DialogTitle>{changingOwner ? "Change default task owner" : "Switch to Codex"}</DialogTitle>
+            <DialogDescription>
+              This replaces the default task owner of every intake in this workspace. This includes scheduled intakes
+              and intakes that have a different owner now. New tasks use the Codex subscription of the new owner.
+            </DialogDescription>
           </DialogHeader>
           <IntakeDefaultOwnerField
             organizationId={organizationId}
@@ -59,7 +71,7 @@ export function ModelSourceSwitchDialogs({
               disabled={!selectedEligible || switcher.saving || eligibility.isFetching}
               onClick={() => void switcher.saveSwitch("subscription")}
             >
-              Switch to Codex
+              {changingOwner ? "Save default owner" : "Switch to Codex"}
             </Button>
           </DialogFooter>
         </DialogContent>

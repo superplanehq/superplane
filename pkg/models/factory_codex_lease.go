@@ -147,9 +147,22 @@ func (c *FactoryCodexConnection) AttachLoginLease(tx *gorm.DB) error {
 	return nil
 }
 
-// RequireSubscriptionLeaseAdmission rechecks revocation and membership before
-// allocating a runner. It does not serialize the execution of separate leases.
+// RequireSubscriptionLeaseAdmission rechecks revocation, membership, and the
+// workspace model policy before allocating a runner. It does not serialize the
+// execution of separate leases.
 func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
+	return t.requireSubscriptionLease(tx, true)
+}
+
+// RequireSubscriptionLeaseContinuation rechecks revocation, membership, the
+// workspace, and the run owner for a task that already runs. It does not apply
+// the current model policy. A policy change must not stop a running task from
+// refreshing its token.
+func (t *RunnerTask) RequireSubscriptionLeaseContinuation(tx *gorm.DB) error {
+	return t.requireSubscriptionLease(tx, false)
+}
+
+func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool) error {
 	lease, err := FindCodexLeaseByTask(tx, t.ID)
 	if err != nil {
 		return err
@@ -225,6 +238,9 @@ func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
 	}
 	if ownerID != connection.OwnerUserID {
 		return ErrSubscriptionOwnerInvalid
+	}
+	if !checkModelPolicy {
+		return nil
 	}
 	model, _ := execution.Configuration.Data()["model"].(string)
 	resolved, err := connection.resolvePermittedModel(tx, *lease.FactoryID, model)

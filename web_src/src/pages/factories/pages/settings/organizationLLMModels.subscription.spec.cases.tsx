@@ -61,6 +61,26 @@ export function subscriptionModelSourceSwitchCases({
     expect(screen.getByRole("tab", { name: "SuperPlane" })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("warns about replacing intake owners and changes the default owner while Codex stays active", async () => {
+    setConnection({ status: "ready", eligible: true, availableModels: ["gpt-5.4"] });
+    renderPage("AGENT_HARNESS_CODEX", true);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Change default task owner" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/replaces the default task owner of every intake/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("combobox", { name: "Default task owner (required)" }));
+    await user.click(await screen.findByRole("option", { name: "Other member" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save default owner" }));
+    expect(switchSource).toHaveBeenCalledWith({ source: "subscription", defaultOwnerId: "other", apiKey: undefined });
+  });
+
+  it("warns about replacing intake owners before the first switch to Codex", async () => {
+    renderPage("AGENT_HARNESS_SUPERPLANE");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Your ChatGPT subscription" }));
+    expect(await screen.findByText(/replaces the default task owner of every intake/)).toBeInTheDocument();
+  });
+
   it("switches a subscription workspace back to hosted models", async () => {
     setConnection({ status: "ready", eligible: true, availableModels: ["gpt-5.4"] });
     renderPage("AGENT_HARNESS_CODEX", true);
