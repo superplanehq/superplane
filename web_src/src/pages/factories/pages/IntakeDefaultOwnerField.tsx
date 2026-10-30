@@ -21,6 +21,7 @@ export function IntakeDefaultOwnerField({
   prospectiveSubscription = false,
   title = "Default task owner",
   description = "Assign this person when intake creates a task.",
+  onConnectCodex,
 }: {
   organizationId: string;
   value: string;
@@ -31,6 +32,7 @@ export function IntakeDefaultOwnerField({
   prospectiveSubscription?: boolean;
   title?: string;
   description?: string;
+  onConnectCodex?: () => void;
 }) {
   const labelId = useId();
   const helpId = useId();
@@ -53,6 +55,7 @@ export function IntakeDefaultOwnerField({
           prospectiveSubscription={prospectiveSubscription}
           labelId={labelId}
           helpId={helpId}
+          onConnectCodex={onConnectCodex}
         />
       ) : (
         <OptionalOwnerSelect
@@ -111,6 +114,7 @@ function ConnectedOwnerSelect({
   prospectiveSubscription,
   labelId,
   helpId,
+  onConnectCodex,
 }: {
   organizationId: string;
   factoryId: string;
@@ -120,6 +124,7 @@ function ConnectedOwnerSelect({
   prospectiveSubscription: boolean;
   labelId: string;
   helpId: string;
+  onConnectCodex?: () => void;
 }) {
   const eligibility = useFactoryOwnerEligibility(organizationId, factoryId, undefined, prospectiveSubscription);
   const { data: users = [] } = useOrganizationUsers(organizationId);
@@ -175,6 +180,7 @@ function ConnectedOwnerSelect({
           organizationId={organizationId}
           factoryId={factoryId}
           disabled={disabled}
+          onConnectCodex={onConnectCodex}
           onConnected={async () => {
             // Setup refreshes eligibility before invoking this continuation.
             if (currentUserId) onChange(currentUserId);
@@ -190,20 +196,28 @@ function ConnectCodexPrompt({
   factoryId,
   disabled,
   onConnected,
+  onConnectCodex,
 }: {
   organizationId: string;
   factoryId: string;
   disabled: boolean;
   onConnected: () => Promise<void>;
+  onConnectCodex?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
       <p>Connect Codex before you select a default task owner.</p>
-      <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={disabled}
+        onClick={onConnectCodex ?? (() => setOpen(true))}
+      >
         Connect Codex
       </Button>
-      {open ? (
+      {!onConnectCodex && open ? (
         <CodexConnectionSetupDialog
           organizationId={organizationId}
           factoryId={factoryId}
