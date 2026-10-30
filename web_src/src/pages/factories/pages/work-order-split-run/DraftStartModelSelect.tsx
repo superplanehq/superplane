@@ -1,19 +1,15 @@
 import { useFactoryTaskIdentity } from "../../factoryTaskContext";
 import { Bot, ChevronDown } from "lucide-react";
+import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import {
-  THINKING_LEVEL_HIGH,
-  THINKING_LEVEL_LOW,
-  THINKING_LEVEL_MEDIUM,
-  modelNameWithThinking,
-} from "@/lib/thinkingLevel";
+import { modelNameWithThinking, supportedThinkingLevel, thinkingOptions } from "@/lib/thinkingLevel";
 
-import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
+import { DRAFT_START_MODEL_AUTO, draftStartThinkingLevels } from "./draftStartModel";
 
 type Appearance = "icon" | "labeled" | "ghost";
 
@@ -29,17 +25,12 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
   ghost: "gap-1.5 text-muted-foreground hover:text-foreground",
 };
 
-const START_THINKING_LEVELS = [
-  { value: THINKING_LEVEL_LOW, label: "Low" },
-  { value: THINKING_LEVEL_MEDIUM, label: "Medium" },
-  { value: THINKING_LEVEL_HIGH, label: "High" },
-];
-
 /**
  * Picks the runner model and thinking for Start. `icon` is the chevron fused to Start,
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
  * strip settings row. Closed labeled and ghost triggers show the model name
- * and the thinking word when one is chosen.
+ * and the thinking word when one is chosen. Thinking lists the levels of the
+ * selected model and is hidden for Auto or a model without levels.
  */
 export function DraftStartModelSelect({
   organizationId,
@@ -64,11 +55,21 @@ export function DraftStartModelSelect({
 }) {
   const task = useFactoryTaskIdentity();
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId ?? task.orderId);
+  const runnerModels = models.data?.models;
   const selectedName =
-    model === DRAFT_START_MODEL_AUTO
-      ? "Auto"
-      : (models.data?.models ?? []).find((item) => item.id === model)?.name || model;
-  const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
+    model === DRAFT_START_MODEL_AUTO ? "Auto" : (runnerModels ?? []).find((item) => item.id === model)?.name || model;
+  const levels = draftStartThinkingLevels(runnerModels, model);
+  const thinking = thinkingOptions(levels, { withDefault: false });
+  const selectedThinking = supportedThinkingLevel(thinkingLevel, levels);
+  const closedLabel = modelNameWithThinking(selectedName, selectedThinking);
+  const catalogLoaded = runnerModels !== undefined;
+
+  // A refreshed catalog can drop the chosen level. Clear it so Start never sends a hidden choice.
+  useEffect(() => {
+    if (catalogLoaded && thinkingLevel !== selectedThinking) {
+      onChange({ model, thinkingLevel: selectedThinking });
+    }
+  }, [catalogLoaded, model, thinkingLevel, selectedThinking, onChange]);
   const showName = appearance !== "icon";
 
   return (
@@ -95,19 +96,26 @@ export function DraftStartModelSelect({
           value={model}
           options={[
             { value: DRAFT_START_MODEL_AUTO, label: "Auto" },
-            ...(models.data?.models ?? [])
+            ...(runnerModels ?? [])
               .filter((item) => (item.id ?? "") !== "")
               .map((item) => ({ value: item.id ?? "", label: item.name || item.id || "" })),
           ]}
-          onValueChange={(nextModel) => onChange({ model: nextModel, thinkingLevel })}
+          onValueChange={(nextModel) =>
+            onChange({
+              model: nextModel,
+              thinkingLevel: supportedThinkingLevel(thinkingLevel, draftStartThinkingLevels(runnerModels, nextModel)),
+            })
+          }
         />
-        <DropdownMenuValueSub
-          label="Thinking"
-          testId="split-run-draft-thinking"
-          value={thinkingLevel}
-          options={START_THINKING_LEVELS}
-          onValueChange={(nextThinking) => onChange({ model, thinkingLevel: nextThinking })}
-        />
+        {thinking.length > 0 ? (
+          <DropdownMenuValueSub
+            label="Thinking"
+            testId="split-run-draft-thinking"
+            value={selectedThinking}
+            options={thinking}
+            onValueChange={(nextThinking) => onChange({ model, thinkingLevel: nextThinking })}
+          />
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
