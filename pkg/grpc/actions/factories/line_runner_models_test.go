@@ -83,9 +83,9 @@ func Test__ListLineRunnerModels__CustomProviderUsesItsAllowlistOnOpenCode(t *tes
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.JSONSlice[string]{"openrouter-only"})
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.JSONSlice[string]{"openrouter-only"})
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderCustom, datatypes.JSONSlice[string]{"zeta-model", "alpha-model"})
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderCustom, datatypes.JSONSlice[string]{"zeta-model", "alpha-model"})
 	require.NoError(t, err)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
@@ -173,25 +173,25 @@ func Test__ListLineRunnerModels__BYOKLineSkipsHostedFunding(t *testing.T) {
 	assert.False(t, usesHostedFunding)
 }
 
-func Test__ListLineRunnerModels__StoredBYOKModelsRespectAllowlists(t *testing.T) {
+func Test__ListLineRunnerModels__StoredBYOKModelsRespectWorkspacePolicy(t *testing.T) {
 	for _, tc := range []struct {
-		name               string
-		organizationModels []string
-		factoryModels      []string
-		want               []string
+		name          string
+		catalogModels []string
+		factoryModels []string
+		want          []string
 	}{
-		{name: "missing organization allowlist"},
-		{name: "empty organization allowlist", organizationModels: []string{}},
+		{name: "missing catalog", want: []string{"claude-opus-4-6", "claude-sonnet-4-6"}},
+		{name: "empty catalog", catalogModels: []string{}, want: []string{"claude-opus-4-6", "claude-sonnet-4-6"}},
 		{
-			name:               "organization excludes stored model",
-			organizationModels: []string{"claude-sonnet-4-6"},
-			want:               []string{"claude-sonnet-4-6"},
+			name:          "catalog excludes stored model",
+			catalogModels: []string{"claude-sonnet-4-6"},
+			want:          []string{"claude-opus-4-6", "claude-sonnet-4-6"},
 		},
 		{
-			name:               "factory excludes stored model",
-			organizationModels: []string{"claude-opus-4-6", "claude-sonnet-4-6"},
-			factoryModels:      []string{"claude-sonnet-4-6"},
-			want:               []string{"claude-sonnet-4-6"},
+			name:          "factory excludes stored model",
+			catalogModels: []string{"claude-opus-4-6", "claude-sonnet-4-6"},
+			factoryModels: []string{"claude-sonnet-4-6"},
+			want:          []string{"claude-sonnet-4-6"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -200,8 +200,8 @@ func Test__ListLineRunnerModels__StoredBYOKModelsRespectAllowlists(t *testing.T)
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 			factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 			require.NoError(t, err)
-			if tc.organizationModels != nil {
-				_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, tc.organizationModels)
+			if tc.catalogModels != nil {
+				_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderAnthropic, tc.catalogModels)
 				require.NoError(t, err)
 			}
 			if tc.factoryModels != nil {
@@ -231,7 +231,7 @@ func Test__ListLineRunnerModels__DropsStoredBYOKModelWithoutAccess(t *testing.T)
 	upsertHostedOnboardingProvider(t, db)
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"opus"})
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"opus"})
 	require.NoError(t, err)
 
 	planning := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "integration", "opus")
@@ -287,7 +287,7 @@ func TestLineRunnerModelsKeepSubscriptionAndAPIKeyCatalogsSeparate(t *testing.T)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, []string{"gpt-4o"})
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderOpenAI, []string{"gpt-4o"})
 	require.NoError(t, err)
 	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)

@@ -73,6 +73,7 @@ func Test__Build__OverlaysLineDispatchModelOnMatchingRunner(t *testing.T) {
 
 func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -81,7 +82,9 @@ func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}, {Model: "gpt-5-codex"}}, time.Now()))
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-4.1"})
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-4.1"})
+	require.NoError(t, err)
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factoryModel.ID, models.UsageProviderOpenAI, models.UsageFundingSourceBYOK, []string{"gpt-4.1"})
 	require.NoError(t, err)
 
 	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerCodex")
@@ -100,6 +103,7 @@ func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 		expected string
 	}{
 		{"subscription catalog model", "gpt-5.4", "subscription", "gpt-5.4"},
+		{"other provider override keeps subscription model", "claude-sonnet-4-6", "subscription", "gpt-5-codex"},
 		{"API key model excluded from subscription catalog", "gpt-4.1", "subscription", "gpt-5-codex"},
 		{"subscription model excluded from API key allowlist", "gpt-5.4", "integration", "gpt-5-codex"},
 		{"automatic model", "", "subscription", "gpt-5-codex"},
@@ -180,7 +184,7 @@ func TestBuildEnforcesFinalWorkspaceBYOKModel(t *testing.T) {
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, []string{"claude-sonnet-4-6", "claude-opus-4-6"})
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderAnthropic, []string{"claude-sonnet-4-6", "claude-opus-4-6"})
 	require.NoError(t, err)
 	canvas, rootEvent, _ := setupRunnerAppExecution(t, r, factory.ID, "runnerClaudeCode")
 	for _, tc := range []struct {
@@ -195,11 +199,18 @@ func TestBuildEnforcesFinalWorkspaceBYOKModel(t *testing.T) {
 		{name: "permitted alias", selected: []string{"claude-sonnet-4-6"}, model: "sonnet", want: "claude-sonnet-4-6"},
 		{name: "blank chooses permitted concrete model", selected: []string{"claude-sonnet-4-6", "claude-opus-4-6"}, want: "claude-opus-4-6"},
 		{name: "explicit empty disables provider", selected: []string{}, wantErr: true},
+		{name: "alias uses saved policy without a catalog", selected: []string{"claude-opus-4-6"}, model: "opus", want: "claude-opus-4-6"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			inherit := false
 			_, err := models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceBYOK, tc.selected, &inherit)
 			require.NoError(t, err)
+			if tc.name == "alias uses saved policy without a catalog" {
+				integration, err := models.FindReadyBYOKIntegration(db, r.Organization.ID, models.UsageProviderAnthropic)
+				require.NoError(t, err)
+				require.NoError(t, db.Where("integration_id = ?", integration.ID).Delete(&models.IntegrationModelCatalog{}).Error)
+			}
+
 			resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID("agent").WithRootEvent(&rootEvent.ID).Build(map[string]any{
 				"model": tc.model, "credentials": map[string]any{"source": "integration"},
 			})
@@ -360,6 +371,7 @@ func Test__Build__KeepsCanvasModelWhenDispatchIsAuto(t *testing.T) {
 
 func Test__Build__SkipsOverrideWhenModelIsNotOnNodeProvider(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -402,20 +414,23 @@ func Test__Build__SkipsOverrideWhenModelIsNotOnNodeProvider(t *testing.T) {
 		WithNodeID("agent").
 		WithRootEvent(&rootEvent.ID)
 
-	resolved, err := builder.Build(map[string]any{
-		"model": "claude-sonnet-4-6",
-		"credentials": map[string]any{
-			"source": "hosted",
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "claude-sonnet-4-6", resolved["model"])
+	for _, source := range []string{"hosted", "integration", "secret"} {
+		resolved, err := builder.Build(map[string]any{"model": "claude-sonnet-4-6", "credentials": map[string]any{"source": source}})
+		require.NoError(t, err)
+		assert.Equal(t, "claude-sonnet-4-6", resolved["model"], "a GPT override must not reach the Claude runner")
+	}
+
 }
 
 func Test__Build__RejectsExcludedDispatchModelInsteadOfUsingCanvasModel(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderAnthropic, []string{"claude-opus-5-5"})
+	require.NoError(t, err)
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factoryModel.ID, models.UsageProviderAnthropic, models.UsageFundingSourceBYOK, []string{"claude-opus-5-5"})
 	require.NoError(t, err)
 
 	canvas, rootEvent, run := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerClaudeCode")
@@ -621,6 +636,7 @@ func setupRunnerAppExecution(
 
 func Test__Build__ResolvesClaudeAliasFromTheNodeSource(t *testing.T) {
 	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -631,7 +647,7 @@ func Test__Build__ResolvesClaudeAliasFromTheNodeSource(t *testing.T) {
 		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-5"},
 	})
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(
+	_, err = support.SaveProviderModelCatalog(
 		db,
 		r.Organization.ID,
 		models.UsageProviderAnthropic,
@@ -640,8 +656,6 @@ func Test__Build__ResolvesClaudeAliasFromTheNodeSource(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
-		_ = db.Where("organization_id = ? AND provider = ?", r.Organization.ID, models.UsageProviderAnthropic).
-			Delete(&models.OrganizationBYOKModelAllowlist{})
 	})
 
 	canvas, rootEvent, _ := setupRunnerAppExecution(t, r, factoryModel.ID, "runnerClaudeCode")
@@ -716,4 +730,30 @@ func createFactoryRunnerApp(
 		}).Error
 	}))
 	return canvas
+}
+
+// Existing API-key automations must not depend on a Settings visit, provider
+// catalog, workspace model policy, or personal Codex connection.
+func TestBuildExistingAPIKeyWorkspaceWithoutModelSetup(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	for _, tc := range []struct{ component, model string }{
+		{"runnerCodex", "gpt-5"}, {"runnerClaudeCode", "claude-sonnet-4-6"}, {"runnerOpenRouter", "openai/gpt-5"},
+	} {
+		t.Run(tc.component, func(t *testing.T) {
+			canvas, root, _ := setupRunnerAppExecution(t, r, factory.ID, tc.component)
+			for _, source := range []string{"integration", "secret"} {
+				for _, model := range []string{tc.model, ""} {
+					resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID("agent").WithRootEvent(&root.ID).Build(map[string]any{
+						"model": model, "credentials": map[string]any{"source": source},
+					})
+					require.NoError(t, err)
+					assert.Equal(t, model, resolved["model"])
+				}
+			}
+		})
+	}
 }

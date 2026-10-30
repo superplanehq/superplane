@@ -87,6 +87,24 @@ func TestScheduledIntakeCreation(t *testing.T) {
 			}
 		})
 	}
+	t.Run("API-key owner remains optional with a retained subscription default", func(t *testing.T) {
+		savedDefault := r.User.String()
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexDefaultOwnerID: &savedDefault}))
+		for _, owner := range []string{savedDefault, ""} {
+			if owner == "" {
+				delete(request.InstallParams, "defaultOwnerId")
+			} else {
+				request.InstallParams["defaultOwnerId"] = owner
+			}
+			response, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
+			require.NoError(t, err)
+			version, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(response.Automation.Id))
+			require.NoError(t, err)
+			require.Equal(t, owner, findIntakeNode(version.Nodes, "create-task").Configuration["defaultOwnerId"])
+		}
+		emptyDefault := ""
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexDefaultOwnerID: &emptyDefault}))
+	})
 	t.Run("subscription requires a connected default before publishing", func(t *testing.T) {
 		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 		subscription := true

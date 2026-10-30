@@ -168,7 +168,18 @@ func factoryLLMPolicyParent(ctx context.Context, tx *gorm.DB, factory *models.Fa
 		}
 	}
 	parent, err := models.ResolveSelectableLLMModels(tx, factory.OrganizationID, nil, provider, source)
-	return parent, nil, err
+	if err != nil {
+		return nil, nil, err
+	}
+	names := map[string]string{}
+	if source == models.UsageFundingSourceBYOK {
+		catalog, err := models.FindProviderModelCatalog(tx, factory.OrganizationID, provider)
+		if err != nil {
+			return nil, nil, err
+		}
+		names = catalog.ModelNames()
+	}
+	return parent, names, nil
 }
 
 func validateSubscriptionPolicyAdditions(requested, available []string, previous *models.FactoryLLMModelAllowlist) error {

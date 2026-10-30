@@ -1,5 +1,4 @@
 import { ScheduledIntakeOwnerSettings } from "./ScheduledIntakeOwnerSettings";
-import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
 import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
 import type { RunHistoryIntakeSource } from "./automationRunHistory/intakeRunData";
@@ -461,10 +460,8 @@ function useScheduledOwnerSettings({
   saveNode: ReturnType<typeof useColumnCanvasAgentEditor>["saveNode"];
   general?: ReactNode;
 }) {
-  const layout = useOptionalFactoriesLayout();
   if (general) return general;
   const node = graph.specNodes?.find((node) => node.component === "createWorkOrder");
-  if (!layout?.factory?.onboarding?.codexSubscription) return undefined;
   if (intakeSource !== "scheduled-intake" || !node) return undefined;
   return (
     <ScheduledIntakeOwnerSettings

@@ -348,10 +348,10 @@ func TestSwitchFactoryModelSourceKeepsPermittedAgentAndPlannerModels(t *testing.
 		catalogUnavailable bool
 		want               string
 	}{
-		{name: "first connection initializes parent", want: "claude-opus-5-5"},
+		{name: "first connection discovers catalog", want: "claude-opus-5-5"},
 		{name: "workspace subset", organizationModels: catalog, workspaceModels: []string{"native-permitted-model"}, restrictWorkspace: true, want: "native-permitted-model"},
-		{name: "organization subset", organizationModels: []string{"native-permitted-model"}, want: "native-permitted-model"},
-		{name: "saved empty organization policy", organizationModels: []string{}},
+		{name: "stale catalog refreshes", organizationModels: []string{"native-permitted-model"}, want: "claude-opus-5-5"},
+		{name: "empty catalog refreshes", organizationModels: []string{}, want: "claude-opus-5-5"},
 		{name: "disabled workspace provider", organizationModels: catalog, restrictWorkspace: true},
 		{name: "unavailable catalog keeps saved restriction", organizationModels: catalog, workspaceModels: []string{"native-permitted-model"}, restrictWorkspace: true, catalogUnavailable: true, want: "native-permitted-model"},
 	} {
@@ -366,7 +366,7 @@ func TestSwitchFactoryModelSourceKeepsPermittedAgentAndPlannerModels(t *testing.
 			live.Nodes = append(live.Nodes, models.Node{ID: planningAgentNodeID, Name: "Planner", Type: models.NodeTypeComponent, Ref: models.NodeRef{Component: &models.ComponentRef{Name: models.SuperPlaneRunnerComponent}}, Configuration: map[string]any{}})
 			require.NoError(t, db.Model(live).Update("nodes", datatypes.NewJSONSlice(live.Nodes)).Error)
 			if scenario.organizationModels != nil {
-				_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string](scenario.organizationModels))
+				_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string](scenario.organizationModels))
 				require.NoError(t, err)
 			}
 			if scenario.restrictWorkspace {
@@ -384,9 +384,9 @@ func TestSwitchFactoryModelSourceKeepsPermittedAgentAndPlannerModels(t *testing.
 			require.NoError(t, err)
 			policy, err := ListFactoryLLMModels(t.Context(), r.Organization.ID.String(), &pb.ListFactoryLLMModelsRequest{FactoryId: factory.ID.String(), Provider: models.UsageProviderAnthropic, FundingSource: models.UsageFundingSourceBYOK})
 			require.NoError(t, err)
-			expectedParent := scenario.organizationModels
-			if expectedParent == nil {
-				expectedParent = catalog
+			expectedParent := catalog
+			if scenario.catalogUnavailable {
+				expectedParent = scenario.organizationModels
 			}
 			assert.ElementsMatch(t, expectedParent, codexLineModelIDs(policy.Parent))
 			current, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
@@ -626,6 +626,16 @@ func TestSubscriptionSwitchReplacesAllIntakeDefaultsAtomically(t *testing.T) {
 	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "hosted", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, connectedOwner.String(), liveIntakeNode(t, r.Organization.ID, intakes[2], intakeCreateNodeID).Configuration["defaultOwnerId"])
+	for _, intake := range append(intakes, inherited.Intake, overridden.Intake) {
+		expected := connectedOwner.String()
+		if intake.Id == overridden.Intake.Id {
+			expected = explicitOwner
+		}
+		assert.Equal(t, expected, liveIntakeNode(t, r.Organization.ID, intake, intakeCreateNodeID).Configuration["defaultOwnerId"])
+	}
+	unassigned, err := CreateFactoryIntake(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true})
+	require.NoError(t, err)
+	assert.Empty(t, unassigned.Intake.GetSettings().GetDefaultOwnerId())
 	// A malformed intake must roll back the source and every earlier rewrite.
 	intakeCanvas := uuid.MustParse(intakes[2].CanvasId)
 	live, err := models.FindLiveCanvasVersionInTransaction(db, intakeCanvas)

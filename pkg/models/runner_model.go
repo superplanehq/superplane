@@ -10,7 +10,35 @@ import (
 	"gorm.io/gorm"
 )
 
-// RunnerAcceptsModel checks the provider and funding source of the executing node.
+// RunnerInvokesModel excludes command-only nodes from model policy checks.
+// Missing steps retain the legacy prompt configuration behavior.
+func RunnerInvokesModel(configuration map[string]any) bool {
+	raw, exists := configuration["steps"]
+	if !exists {
+		return true
+	}
+	switch steps := raw.(type) {
+	case []any:
+		for _, value := range steps {
+			step, ok := value.(map[string]any)
+			if !ok || step["type"] != "bash" {
+				return true
+			}
+		}
+	case []map[string]any:
+		for _, step := range steps {
+			if step["type"] != "bash" {
+				return true
+			}
+		}
+	default:
+		return true
+	}
+	return false
+}
+
+// RunnerAcceptsModel checks execution policy for the executing funding source.
+// Shared overrides must first match the runner provider with RunnerMatchesModel.
 func RunnerAcceptsModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, component string, configuration map[string]any, model string, ownerIDs ...uuid.UUID) (bool, error) {
 	if component == SuperPlaneRunnerComponent {
 		parsed, err := ParseHostedLLMModelKey(model)
@@ -44,18 +72,26 @@ func RunnerAcceptsModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, comp
 	case "secret", "integration":
 		funding = UsageFundingSourceBYOK
 	}
+	if funding == UsageFundingSourceBYOK {
+		enabled, err := OrganizationBYOKAccess(tx, orgID, provider)
+		if err != nil || !enabled {
+			return false, err
+		}
+		policy, err := runnerWorkspacePolicy(tx, factoryID, provider)
+		if err != nil {
+			return false, err
+		}
+		return policy.InheritsParent() || slices.Contains(policy.AllowedModels, strings.TrimSpace(model)), nil
+	}
 	return ModelIsSelectable(tx, orgID, factoryID, provider, funding, model)
 }
 
-// ResolveBYOKRunnerModel validates the final model after overrides and alias
-// resolution. Blank models use the first permitted concrete model.
-// Workspace model policy applies only to workspace automations. Standalone
-// automations keep their configured model, as they did before workspace
-// model policy existed.
+// ResolveBYOKRunnerModel applies explicit workspace execution policy. Provider
+// discovery is optional; inherited policy preserves the CLI's existing default.
 func ResolveBYOKRunnerModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, component string, configuration map[string]any) (string, error) {
 	model, _ := configuration["model"].(string)
 	model = strings.TrimSpace(model)
-	if factoryID == nil || *factoryID == uuid.Nil {
+	if !RunnerInvokesModel(configuration) {
 		return model, nil
 	}
 	provider, ok := runnerLLMProvider(component, configuration)
@@ -66,11 +102,27 @@ func ResolveBYOKRunnerModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, 
 	if credentials["source"] != "integration" && credentials["source"] != "secret" {
 		return model, nil
 	}
-	permitted, err := ResolveSelectableLLMModels(tx, orgID, factoryID, provider, UsageFundingSourceBYOK)
+	if factoryID != nil && *factoryID != uuid.Nil {
+		if err := RequireOrganizationBYOKAccess(tx, orgID, provider); err != nil {
+			if errors.Is(err, ErrBYOKAccessDenied) {
+				return "", fmt.Errorf("%w: %w", ErrSelectableLLMModelNotAllowed, err)
+			}
+			return "", err
+		}
+	}
+	policy, err := runnerWorkspacePolicy(tx, factoryID, provider)
 	if err != nil {
 		return "", err
 	}
+	if policy.InheritsParent() {
+		return model, nil
+	}
+	permitted := CompactModelIDs(policy.AllowedModels)
+	if len(permitted) == 0 {
+		return "", fmt.Errorf("No models are enabled for this provider. Update Workspace Models: %w", ErrSelectableLLMModelNotAllowed)
+	}
 	if model != "" {
+		model = ConcreteClaudeModelID(model, permitted)
 		if !slices.Contains(permitted, model) {
 			return "", ErrSelectableLLMModelNotAllowed
 		}
@@ -84,10 +136,67 @@ func ResolveBYOKRunnerModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, 
 		}
 	}
 	if len(concrete) == 0 {
-		return "", fmt.Errorf("No models are enabled for this provider. Update Workspace Models: %w", ErrSelectableLLMModelNotAllowed)
+		return "", ErrSelectableLLMModelNotAllowed
 	}
 	slices.Sort(concrete)
 	return concrete[0], nil
+}
+
+func runnerWorkspacePolicy(tx *gorm.DB, factoryID *uuid.UUID, provider string) (*FactoryLLMModelAllowlist, error) {
+	if factoryID == nil || *factoryID == uuid.Nil {
+		return nil, nil
+	}
+	return FindFactoryLLMModelAllowlist(tx, *factoryID, provider, UsageFundingSourceBYOK)
+}
+
+// RunnerMatchesModel routes shared overrides independently of workspace policy.
+// Unknown native IDs need discovery or a configured match; catalog absence never
+// prevents execution of the runner's existing configuration.
+func RunnerMatchesModel(tx *gorm.DB, orgID uuid.UUID, component string, configuration map[string]any, model string) (bool, error) {
+	model = strings.TrimSpace(model)
+	if component == SuperPlaneRunnerComponent {
+		_, err := ParseHostedLLMModelKey(model)
+		return err == nil, nil
+	}
+	provider, ok := runnerLLMProvider(component, configuration)
+	if !ok {
+		return false, nil
+	}
+	credentials, _ := configuration["credentials"].(map[string]any)
+	if credentials["source"] == "subscription" {
+		return component == "runnerCodex" && !strings.Contains(model, "/") && !strings.Contains(model, "::") && !strings.HasPrefix(model, "claude-") && !IsClaudeFamilyAlias(model), nil
+	}
+	if strings.Contains(model, "::") {
+		return false, nil
+	}
+	stored, _ := configuration["model"].(string)
+	if model == strings.TrimSpace(stored) {
+		return true, nil
+	}
+	switch provider {
+	case UsageProviderAnthropic:
+		if strings.HasPrefix(model, "claude-") || IsClaudeFamilyAlias(model) && !strings.Contains(model, "/") {
+			return true, nil
+		}
+	case UsageProviderOpenAI:
+		if strings.HasPrefix(model, "gpt-") || strings.HasPrefix(model, "codex-") || len(model) > 1 && model[0] == 'o' && model[1] >= '0' && model[1] <= '9' {
+			return true, nil
+		}
+	case UsageProviderOpenRouter:
+		if strings.Contains(model, "/") {
+			return true, nil
+		}
+	}
+	ids, err := parentSelectableLLMModels(tx, orgID, provider, llmRunnerFundingSource(configuration))
+	return slices.Contains(ids, model), err
+}
+
+func llmRunnerFundingSource(configuration map[string]any) string {
+	credentials, _ := configuration["credentials"].(map[string]any)
+	if credentials["source"] == "integration" || credentials["source"] == "secret" {
+		return UsageFundingSourceBYOK
+	}
+	return UsageFundingSourceHosted
 }
 
 // RequireModelPolicyAdmission checks queued payloads without changing their
@@ -101,6 +210,9 @@ func (t *RunnerTask) RequireModelPolicyAdmission(tx *gorm.DB) error {
 		return err
 	}
 	configuration := execution.Configuration.Data()
+	if !RunnerInvokesModel(configuration) {
+		return nil
+	}
 	credentials, _ := configuration["credentials"].(map[string]any)
 	if credentials["source"] == "subscription" {
 		return nil // Subscription admission also validates the owner and lease.
@@ -128,11 +240,26 @@ func (t *RunnerTask) RequireModelPolicyAdmission(tx *gorm.DB) error {
 	}
 	model, _ := configuration["model"].(string)
 	if credentials["source"] == "integration" || credentials["source"] == "secret" {
-		resolved, err := ResolveBYOKRunnerModel(tx, canvas.OrganizationID, canvas.FactoryID, component, configuration)
+		provider, ok := runnerLLMProvider(component, configuration)
+		if !ok {
+			return nil
+		}
+		if canvas.FactoryID != nil {
+			if err := RequireOrganizationBYOKAccess(tx, canvas.OrganizationID, provider); err != nil {
+				if errors.Is(err, ErrBYOKAccessDenied) {
+					return fmt.Errorf("%w: %w", ErrSelectableLLMModelNotAllowed, err)
+				}
+				return err
+			}
+		}
+		policy, err := runnerWorkspacePolicy(tx, canvas.FactoryID, provider)
 		if err != nil {
 			return err
 		}
-		if strings.TrimSpace(model) != resolved {
+		if policy.InheritsParent() {
+			return nil
+		}
+		if !slices.Contains(policy.AllowedModels, strings.TrimSpace(model)) {
 			return ErrSelectableLLMModelNotAllowed
 		}
 		return nil

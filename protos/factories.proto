@@ -796,7 +796,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update factory LLM models";
-      description: "Sets the workspace subset of parent models. An empty list inherits the parent list.";
+      description: "Sets workspace model selection. Explicit empty selection disables model execution.";
       tags: "Factory";
     };
   }

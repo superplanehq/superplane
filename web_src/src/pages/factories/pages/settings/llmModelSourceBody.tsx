@@ -155,7 +155,7 @@ function HostedModelPolicies(props: { organizationId: string; factoryId: string;
   if (empty)
     return (
       <p role="status" className="text-[13px] text-muted-foreground">
-        No SuperPlane models are available. Ask an organization admin to make models available.
+        No SuperPlane models are available. Ask an installation admin to enable hosted models.
       </p>
     );
   return (

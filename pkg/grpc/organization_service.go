@@ -119,22 +119,9 @@ func (s *OrganizationService) ListBYOKLLMModels(
 	return organizations.ListBYOKLLMModels(ctx, s.registry, orgID, req)
 }
 
-func (s *OrganizationService) UpdateBYOKLLMModels(
-	ctx context.Context,
-	req *pb.UpdateBYOKLLMModelsRequest,
-) (*pb.UpdateBYOKLLMModelsResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UpdateBYOKLLMModels(ctx, orgID, req)
-}
-
 func (s *OrganizationService) ListOrganizationHostedLLMModels(ctx context.Context, _ *pb.ListOrganizationHostedLLMModelsRequest) (*pb.ListOrganizationHostedLLMModelsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.ListOrganizationHostedLLMModels(ctx, orgID)
-}
-
-func (s *OrganizationService) UpdateOrganizationHostedLLMModels(ctx context.Context, req *pb.UpdateOrganizationHostedLLMModelsRequest) (*pb.UpdateOrganizationHostedLLMModelsResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UpdateOrganizationHostedLLMModels(ctx, orgID, req)
 }
 
 func (s *OrganizationService) ListHostedCreditProducts(

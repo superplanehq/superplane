@@ -82,19 +82,15 @@ export function IntakeSourceDefaultOwner({
   onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
 }) {
   const layout = useOptionalFactoriesLayout();
-  if (
-    !layout?.factory?.onboarding?.codexSubscription ||
-    !intakeSourceSupportsDefaultOwner(sourceId) ||
-    !organizationId
-  ) {
+  if (!intakeSourceSupportsDefaultOwner(sourceId) || !organizationId) {
     return null;
   }
 
   return (
     <IntakeDefaultOwnerField
       organizationId={organizationId}
-      factoryId={layout.factoryId}
-      required
+      factoryId={layout?.factoryId}
+      required={layout?.factory?.onboarding?.codexSubscription === true}
       value={draft.defaultOwnerId}
       disabled={disabled}
       onChange={(defaultOwnerId) => onDraftChange((current) => ({ ...current, defaultOwnerId }))}
@@ -216,12 +212,11 @@ function ConnectCodexPrompt({
 }
 
 export function IntakeSetupDefaultOwner({ owner, disabled }: { owner: IntakeOwnerDraft; disabled?: boolean }) {
-  if (!owner.required) return null;
   return (
     <IntakeDefaultOwnerField
       organizationId={owner.organizationId}
       factoryId={owner.factoryId}
-      required
+      required={owner.required}
       value={owner.value}
       onChange={owner.setValue}
       disabled={disabled}

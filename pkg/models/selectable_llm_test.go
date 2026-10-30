@@ -64,7 +64,6 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = database.Conn().Where("provider <> ?", "").Delete(&models.HostedLLMProvider{})
-		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
 		_ = database.Conn().Where("factory_id = ?", factory.ID).Delete(&models.FactoryLLMModelAllowlist{})
 	})
 
@@ -79,7 +78,7 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6", "claude-opus-4-6"},
 	})
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
 		"claude-sonnet-4-6",
 	})
 	require.NoError(t, err)
@@ -117,14 +116,10 @@ func Test__ListSelectableLLMModels__HidesCustomModelsWithoutFlags(t *testing.T) 
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
-	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderCustom, datatypes.JSONSlice[string]{
+	_, err := support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderCustom, datatypes.JSONSlice[string]{
 		"kimi-k3",
 	})
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = database.Conn().Where("organization_id = ? AND provider = ?", r.Organization.ID, models.UsageProviderCustom).
-			Delete(&models.OrganizationBYOKModelAllowlist{})
-	})
 
 	const customKey = "byok::custom::kimi-k3"
 

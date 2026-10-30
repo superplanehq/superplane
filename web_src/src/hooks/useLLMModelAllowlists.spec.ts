@@ -1,18 +1,15 @@
 import { QueryClient, QueryClientProvider, useQueries } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
-const { organizationsUpdateByokllmModels, factoriesUpdateFactoryLlmModels, factoriesListFactoryLlmModels, identity } =
-  vi.hoisted(() => ({
-    organizationsUpdateByokllmModels: vi.fn(),
-    factoriesUpdateFactoryLlmModels: vi.fn(),
-    factoriesListFactoryLlmModels: vi.fn(),
-    identity: { currentUserId: "member-1" },
-  }));
+const { factoriesUpdateFactoryLlmModels, factoriesListFactoryLlmModels, identity } = vi.hoisted(() => ({
+  factoriesUpdateFactoryLlmModels: vi.fn(),
+  factoriesListFactoryLlmModels: vi.fn(),
+  identity: { currentUserId: "member-1" },
+}));
 
 vi.mock("@/api-client", () => ({
-  organizationsUpdateByokllmModels,
   factoriesUpdateFactoryLlmModels,
   factoriesListFactoryLlmModels,
 }));
@@ -21,8 +18,6 @@ vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => identity }))
 
 import {
   factoryLLMModelsQueryKey,
-  isFactoryBYOKModelsQuery,
-  useUpdateBYOKLLMModels,
   useUpdateFactoryLLMModels,
   useSwitchFactoryModelSource,
   useFactoryLLMModels,
@@ -33,70 +28,6 @@ function createWrapper(queryClient: QueryClient) {
     return createElement(QueryClientProvider, { client: queryClient }, children);
   };
 }
-
-describe("isFactoryBYOKModelsQuery", () => {
-  it("matches factory BYOK model list keys for the organization and provider", () => {
-    expect(
-      isFactoryBYOKModelsQuery(
-        factoryLLMModelsQueryKey("org-1", "factory-1", "anthropic", "byok"),
-        "org-1",
-        "anthropic",
-      ),
-    ).toBe(true);
-  });
-
-  it("rejects hosted factory keys and other organizations", () => {
-    expect(
-      isFactoryBYOKModelsQuery(
-        factoryLLMModelsQueryKey("org-1", "factory-1", "anthropic", "hosted"),
-        "org-1",
-        "anthropic",
-      ),
-    ).toBe(false);
-    expect(
-      isFactoryBYOKModelsQuery(
-        factoryLLMModelsQueryKey("org-2", "factory-1", "anthropic", "byok"),
-        "org-1",
-        "anthropic",
-      ),
-    ).toBe(false);
-  });
-});
-
-describe("useUpdateBYOKLLMModels", () => {
-  beforeEach(() => {
-    organizationsUpdateByokllmModels.mockReset();
-  });
-
-  it("invalidates BYOK lists and selectable models after a save", async () => {
-    organizationsUpdateByokllmModels.mockResolvedValue({
-      data: { selected: [{ id: "anthropic/claude-sonnet-4-6", name: "anthropic/claude-sonnet-4-6" }] },
-    });
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-    });
-    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
-    const { result } = renderHook(() => useUpdateBYOKLLMModels("org-1"), { wrapper: createWrapper(queryClient) });
-
-    await result.current.mutateAsync({
-      provider: "openrouter",
-      allowedModels: ["anthropic/claude-sonnet-4-6"],
-    });
-
-    await waitFor(() => {
-      expect(invalidateQueries).toHaveBeenCalled();
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["organizations", "org-1", "byok-models", "openrouter"],
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["organizations", "org-1", "selectable-llm-models"],
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      predicate: expect.any(Function),
-    });
-  });
-});
 
 describe("workspace model saves", () => {
   afterEach(() => vi.restoreAllMocks());
