@@ -242,10 +242,19 @@ function organizationScopedRouteTree() {
       <Route
         path="settings/llm-spend"
         element={withAuthOnly(() => (
-          <LegacyOrganizationSettingsRedirect destination="llm-spend" />
+          <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+            <LegacyOrganizationSettingsRedirect destination="llm-spend" />
+          </RequireExperimentalFeature>
         ))}
       />
-      <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
+      <Route
+        path="settings/*"
+        element={withAuthOnly(() => (
+          <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+            <OrganizationSettings />
+          </RequireExperimentalFeature>
+        ))}
+      />
     </Route>
   );
 }

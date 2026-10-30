@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
@@ -73,6 +74,7 @@ type apiKeySteps struct {
 func (s *apiKeySteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
+	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactories))
 	s.session.Login()
 }
 
