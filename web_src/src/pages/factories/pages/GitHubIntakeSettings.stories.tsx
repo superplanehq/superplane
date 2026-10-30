@@ -18,11 +18,13 @@ function GitHubIntakePreview({
   failPause = false,
   allIssues = false,
   labelsLoading = false,
+  readOnly = false,
 }: {
   initiallyPaused?: boolean;
   failPause?: boolean;
   allIssues?: boolean;
   labelsLoading?: boolean;
+  readOnly?: boolean;
 }) {
   const [client] = useState(() => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -47,6 +49,8 @@ function GitHubIntakePreview({
     <QueryClientProvider client={client}>
       <ComponentStoryShell className="h-screen bg-background">
         <IntakeSourceSettingsPopup
+          canEdit={!readOnly}
+          accessLoading={false}
           sourceId="github-issues"
           organizationId={factoryHistoryStoryOrganization}
           factoryId={factoryHistoryStoryFactory}
@@ -101,6 +105,7 @@ export const Configuration: Story = {};
 export const AllIssues: Story = { args: { allIssues: true } };
 export const LabelsLoading: Story = { args: { labelsLoading: true } };
 export const Paused: Story = { args: { initiallyPaused: true } };
+export const ReadOnly: Story = { args: { readOnly: true } };
 export const PauseError: Story = {
   args: { failPause: true },
   play: async ({ canvasElement }) => {

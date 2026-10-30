@@ -1,6 +1,8 @@
 import { useDeleteFactoryIntake, useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { showSuccessToast } from "@/lib/toast";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { dependabotRepositoryValue } from "@/lib/dependabotRepository";
@@ -47,6 +49,8 @@ function SourceIntakeSettings({
   page = false,
   onClose,
 }: IntakeSettingsHostProps) {
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { canEdit, canReadIntegrations } = intakeSettingsAccess(canAct, permissionsLoading);
   const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
   const agent = useColumnCanvasAgentEditor(organizationId, intake.appId);
   const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
@@ -62,7 +66,7 @@ function SourceIntakeSettings({
   // without knowing the repository they belong to.
   const repositoryLabels = useIntegrationResources(
     organizationId,
-    repository ? (vcsIntegrationId ?? "") : "",
+    repository && canReadIntegrations ? (vcsIntegrationId ?? "") : "",
     "label",
     repository ? { repository } : undefined,
   );
@@ -72,7 +76,7 @@ function SourceIntakeSettings({
   );
   const saveError =
     actions.pauseError ??
-    (updateIntake.error ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError) : undefined);
+    (updateIntake.error ? intakeActionErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError) : undefined);
   const watchedRepository =
     intake.source.id === "dependabot-alerts"
       ? dependabotRepositoryValue(
@@ -84,6 +88,8 @@ function SourceIntakeSettings({
   return (
     <IntakeSourceSettingsPopup
       settings={intake.settings}
+      canEdit={canEdit}
+      accessLoading={permissionsLoading}
       paused={actions.paused}
       onPausedChange={intake.source.id === "github-issues" ? actions.changePaused : undefined}
       sourceId={intake.source.id}
@@ -126,6 +132,13 @@ function SourceIntakeSettings({
   );
 }
 
+function intakeSettingsAccess(canAct: (resource: string, action: string) => boolean, loading: boolean) {
+  return {
+    canEdit: !loading && canAct("factories", "update"),
+    canReadIntegrations: !loading && canAct("integrations", "read"),
+  };
+}
+
 function useIntakeSettingsActions({
   intake,
   updateIntake,
@@ -150,7 +163,7 @@ function useIntakeSettingsActions({
         await updateIntake.mutateAsync({ intakeId: intake.intakeId, paused: next });
         setPaused(next);
       } catch (error) {
-        setPauseError(getApiErrorMessage(error, "SuperPlane could not update the intake. Try again."));
+        setPauseError(intakeActionErrorMessage(error, "SuperPlane could not update the intake. Try again."));
         throw error;
       }
     },
@@ -169,6 +182,7 @@ function useIntakeSettingsActions({
         ...sentryProjectRebind(intake, next),
       });
       await automationRefetch();
+      showSuccessToast("Intake settings saved.");
     },
     [automationRefetch, intake, updateIntake],
   );
@@ -179,12 +193,19 @@ function useIntakeSettingsActions({
       await deleteIntake.mutateAsync(intake.intakeId);
       onClose();
     } catch (error) {
-      setDeleteError(getApiErrorMessage(error, INTAKE_SETTINGS_COPY.deleteError));
+      setDeleteError(intakeActionErrorMessage(error, INTAKE_SETTINGS_COPY.deleteError));
       throw error;
     }
   }, [deleteIntake, intake.intakeId, onClose]);
 
   return { deleteError, saveSettings, removeIntake, paused, changePaused, pauseError };
+}
+
+function intakeActionErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === "object" && "status" in error && error.status === 404) {
+    return "This intake could not be found or you do not have access. Refresh the page or ask an organization admin.";
+  }
+  return getApiErrorMessage(error, fallback);
 }
 
 function datadogServiceRebind(
