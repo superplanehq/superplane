@@ -50,8 +50,10 @@ build_frontend() {
   local asset_base_url="$2"
 
   echo "Building ${variant} frontend"
+  mkdir -p "${build_dir}/${variant}"
   compose_exec -e VITE_BASE_URL="${BASE_URL:-https://app.superplane.com}" \
-    -e VITE_ASSET_BASE_URL="$asset_base_url" app bash -lc \
+    -e VITE_ASSET_BASE_URL="$asset_base_url" app bash /app/scripts/with-host-owned-output \
+    "/app/${build_dir}/${variant}" bash -lc \
     "cd web_src && NODE_OPTIONS=--max-old-space-size=4096 npx vite build --outDir '/app/${build_dir}/${variant}'"
 }
 

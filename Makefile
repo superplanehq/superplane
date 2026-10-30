@@ -632,12 +632,14 @@ image.ci.up:
 
 image.prepare:
 	$(MAKE) pb.gen
-	$(COMPOSE) exec -T app bash -lc '\
+	mkdir -p "$(IMAGE_BUILD_DIR)"
+	$(COMPOSE) exec -T app bash /app/scripts/with-host-owned-output "$(IMAGE_BUILD_DIR)" bash -lec '\
 	  test "$$(go env GOOS)/$$(go env GOARCH)" = "$(IMAGE_PLATFORM)" || { \
 	    echo "Build container must match IMAGE_PLATFORM=$(IMAGE_PLATFORM)" >&2; exit 1; \
 	  }; \
-	  go build -o "$(IMAGE_BUILD_DIR)/app/build/superplane" cmd/server/main.go'
-	$(COMPOSE) exec -T app bash -lc 'mkdir -p "$(IMAGE_BUILD_DIR)/usr/bin" && cp /usr/bin/createdb /usr/bin/migrate "$(IMAGE_BUILD_DIR)/usr/bin/"'
+	  go build -o "$(IMAGE_BUILD_DIR)/app/build/superplane" cmd/server/main.go; \
+	  mkdir -p "$(IMAGE_BUILD_DIR)/usr/bin"; \
+	  cp /usr/bin/createdb /usr/bin/migrate "$(IMAGE_BUILD_DIR)/usr/bin/"'
 	$(COMPOSE) exec -T app bash -lc 'cd web_src && NODE_OPTIONS=--max-old-space-size=4096 npx tsc -b'
 
 image.package:
@@ -647,6 +649,7 @@ image.package:
 
 test.image:
 	bash scripts/build_image_test.sh
+	$(COMPOSE) exec -T app bash /app/scripts/build_image_ownership_test.sh
 
 image.auth:
 	@test -n "$$GHCR_PUSH_TOKEN" || (echo "GHCR_PUSH_TOKEN is empty" >&2; exit 1)
