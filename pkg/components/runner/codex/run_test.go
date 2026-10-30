@@ -144,14 +144,12 @@ func TestCodexExecEnvRejectsMissingAPIKey(t *testing.T) {
 
 func TestCodexExecArgsAddsMergeConfidenceMCP(t *testing.T) {
 	args := codexExecArgsFromScript(t, map[string]string{
-		"SUPERPLANE_BASE_URL":               "http://superplane.test",
-		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "merge-confidence-secret",
+		"SUPERPLANE_BASE_URL": "http://superplane.test",
 	}, "gpt-5", "/task/merge_confidence_mcp.js")
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 	assert.NotContains(t, joined, "mcp_servers.superplane")
-	assert.NotContains(t, joined, "merge-confidence-secret")
 }
 
 func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
@@ -177,8 +175,7 @@ func TestCodexExecArgsStartsOnlyTheGlobalMCPWithARunnerToken(t *testing.T) {
 			"SUPERPLANE_RUNNER_TOKEN":          "runner-token-secret",
 		},
 		"merge confidence": {
-			"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "merge-token",
-			"SUPERPLANE_RUNNER_TOKEN":           "runner-token-secret",
+			"SUPERPLANE_RUNNER_TOKEN": "runner-token-secret",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

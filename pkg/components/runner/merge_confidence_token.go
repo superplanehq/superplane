@@ -4,29 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
-	MergeConfidenceTokenPurpose = "merge_confidence"
-
 	// EnvSuperplaneMergeConfidenceOrderID is set on the merge confidence
 	// agent node. The runner reads it, then removes it from the task
-	// environment. The work order id travels in the signed token instead.
+	// environment. The work order id stays in memory and is copied into
+	// the runner token.
 	EnvSuperplaneMergeConfidenceOrderID = "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID"
-	EnvSuperplaneMergeConfidenceToken   = "SUPERPLANE_MERGE_CONFIDENCE_TOKEN"
+
+	// legacyMergeConfidenceToken is the old credential name. Strip it so a
+	// canvas cannot pass that value into the agent.
+	legacyMergeConfidenceToken = "SUPERPLANE_MERGE_CONFIDENCE_TOKEN"
 )
 
-// MergeConfidenceScope is the runner token for one merge confidence agent run.
+// MergeConfidenceScope is the check list for one merge confidence agent run.
 // EnabledChecks is the list from the agent prompt. The server reports a check
 // only when its name is in this list.
 type MergeConfidenceScope struct {
@@ -114,75 +113,6 @@ func uniqueMergeConfidenceChecks(names []string) []string {
 	return enabled
 }
 
-func MintMergeConfidenceToken(signer *jwt.Signer, scope MergeConfidenceScope, ttl time.Duration) (string, error) {
-	if signer == nil {
-		return "", fmt.Errorf("jwt signer is required")
-	}
-	if ttl <= 0 {
-		ttl = time.Duration(DefaultExecutionTimeoutSeconds) * time.Second
-	}
-	if scope.OrganizationID == uuid.Nil || scope.FactoryID == uuid.Nil || scope.WorkOrderID == uuid.Nil || scope.CanvasRunID == uuid.Nil || scope.NodeExecutionID == uuid.Nil {
-		return "", fmt.Errorf("merge confidence scope is incomplete")
-	}
-	claims := map[string]string{
-		"purpose":           MergeConfidenceTokenPurpose,
-		"org_id":            scope.OrganizationID.String(),
-		"factory_id":        scope.FactoryID.String(),
-		"work_order_id":     scope.WorkOrderID.String(),
-		"canvas_run_id":     scope.CanvasRunID.String(),
-		"node_execution_id": scope.NodeExecutionID.String(),
-		"enabled_checks":    strings.Join(scope.EnabledChecks, ","),
-	}
-	if len(scope.CheckLabels) > 0 {
-		encoded, err := json.Marshal(scope.CheckLabels)
-		if err != nil {
-			return "", fmt.Errorf("merge confidence check names: %w", err)
-		}
-		claims["check_labels"] = string(encoded)
-	}
-	return signer.GenerateWithClaims(ttl, claims)
-}
-
-func ParseMergeConfidenceToken(signer *jwt.Signer, token string) (*MergeConfidenceScope, error) {
-	if signer == nil {
-		return nil, fmt.Errorf("jwt signer is required")
-	}
-	claims, err := signer.ValidateAndGetClaims(token)
-	if err != nil {
-		return nil, err
-	}
-	purpose, _ := claims["purpose"].(string)
-	if purpose != MergeConfidenceTokenPurpose {
-		return nil, fmt.Errorf("invalid merge confidence token purpose")
-	}
-	scope := MergeConfidenceScope{}
-	scope.OrganizationID, err = parsePlanningClaimUUID(claims, "org_id")
-	if err != nil {
-		return nil, err
-	}
-	scope.FactoryID, err = parsePlanningClaimUUID(claims, "factory_id")
-	if err != nil {
-		return nil, err
-	}
-	scope.WorkOrderID, err = parsePlanningClaimUUID(claims, "work_order_id")
-	if err != nil {
-		return nil, err
-	}
-	scope.CanvasRunID, err = parsePlanningClaimUUID(claims, "canvas_run_id")
-	if err != nil {
-		return nil, err
-	}
-	scope.NodeExecutionID, err = parsePlanningClaimUUID(claims, "node_execution_id")
-	if err != nil {
-		return nil, err
-	}
-	raw, _ := claims["enabled_checks"].(string)
-	scope.EnabledChecks = parseMergeConfidenceChecksClaim(raw)
-	labels, _ := claims["check_labels"].(string)
-	scope.CheckLabels = parseMergeConfidenceCheckLabels(labels)
-	return &scope, nil
-}
-
 func parseMergeConfidenceCheckLabels(raw string) map[string]string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -212,69 +142,66 @@ func parseMergeConfidenceChecksClaim(raw string) []string {
 	return enabled
 }
 
-func HasMergeConfidenceToken(environment []TaskEnvironmentVariable) bool {
-	value, ok := environmentValue(environment, EnvSuperplaneMergeConfidenceToken)
-	return ok && value != ""
-}
-
-// AttachMergeConfidenceEnv mints a runner token when the node carries a work
-// order id. Other agent runs are unchanged. The work order id is removed from
-// the task environment after the token is minted.
-func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, steps []AgentStep, timeoutSeconds int) ([]TaskEnvironmentVariable, error) {
-	environment = withoutEnvironmentName(environment, EnvSuperplaneMergeConfidenceToken)
+// AttachMergeConfidenceEnv reads the work order id and returns the check
+// list in memory. Other agent runs are unchanged. The work order id is
+// removed from the task environment.
+func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, steps []AgentStep) ([]TaskEnvironmentVariable, *MergeConfidenceScope, error) {
+	environment = withoutEnvironmentName(environment, legacyMergeConfidenceToken)
 	orderID, ok := environmentValue(environment, EnvSuperplaneMergeConfidenceOrderID)
 	if !ok {
-		return environment, nil
+		return environment, nil, nil
 	}
 	environment = withoutEnvironmentName(environment, EnvSuperplaneMergeConfidenceOrderID)
 
 	workOrderID, err := uuid.Parse(orderID)
 	if err != nil {
-		return nil, fmt.Errorf("merge confidence work order id is invalid")
+		return nil, nil, fmt.Errorf("merge confidence work order id is invalid")
 	}
 	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
 	if err != nil {
-		return nil, fmt.Errorf("merge confidence organization is invalid")
+		return nil, nil, fmt.Errorf("merge confidence organization is invalid")
 	}
 	canvasID, err := uuid.Parse(strings.TrimSpace(ctx.WorkflowID))
 	if err != nil {
-		return nil, fmt.Errorf("merge confidence canvas is invalid")
+		return nil, nil, fmt.Errorf("merge confidence canvas is invalid")
 	}
 	if ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
-		return nil, fmt.Errorf("merge confidence run is incomplete")
+		return nil, nil, fmt.Errorf("merge confidence run is incomplete")
 	}
 
 	canvas, err := models.FindCanvasInTransaction(database.DB(context.Background()), orgID, canvasID)
 	if err != nil {
-		return nil, fmt.Errorf("merge confidence canvas: %w", err)
+		return nil, nil, fmt.Errorf("merge confidence canvas: %w", err)
 	}
 	if canvas.FactoryID == nil || *canvas.FactoryID == uuid.Nil {
-		return nil, fmt.Errorf("merge confidence requires a factory canvas")
+		return nil, nil, fmt.Errorf("merge confidence requires a factory canvas")
 	}
 
 	factory, err := models.FindFactory(database.DB(context.Background()), orgID, *canvas.FactoryID)
 	if err != nil {
-		return nil, fmt.Errorf("merge confidence workspace: %w", err)
+		return nil, nil, fmt.Errorf("merge confidence workspace: %w", err)
 	}
 	if factory.OnboardingConfigValue().CodexSubscription {
 		order, err := models.FindSubscriptionWorkOrderForRun(database.DB(context.Background()), orgID, factory.ID, ctx.RunID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		workOrderID = order.ID
 	}
 
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
 	if baseURL == "" {
-		return nil, fmt.Errorf("merge confidence requires a SuperPlane URL")
-	}
-	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
-	if secret == "" {
-		return nil, fmt.Errorf("merge confidence requires JWT_SECRET")
+		return nil, nil, fmt.Errorf("merge confidence requires a SuperPlane URL")
 	}
 
 	enabled, labels := MergeConfidenceChecksFromSteps(steps)
-	token, err := MintMergeConfidenceToken(jwt.NewSigner(secret), MergeConfidenceScope{
+	if _, exists := environmentValue(environment, EnvSuperplaneBaseURL); !exists {
+		environment = append(environment, TaskEnvironmentVariable{
+			Name:  EnvSuperplaneBaseURL,
+			Value: baseURL,
+		})
+	}
+	return environment, &MergeConfidenceScope{
 		OrganizationID:  orgID,
 		FactoryID:       *canvas.FactoryID,
 		WorkOrderID:     workOrderID,
@@ -282,21 +209,7 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvir
 		NodeExecutionID: ctx.ID,
 		EnabledChecks:   enabled,
 		CheckLabels:     labels,
-	}, time.Duration(timeoutSeconds)*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("mint merge confidence token: %w", err)
-	}
-
-	if _, exists := environmentValue(environment, EnvSuperplaneBaseURL); !exists {
-		environment = append(environment, TaskEnvironmentVariable{
-			Name:  EnvSuperplaneBaseURL,
-			Value: baseURL,
-		})
-	}
-	return append(environment, TaskEnvironmentVariable{
-		Name:  EnvSuperplaneMergeConfidenceToken,
-		Value: token,
-	}), nil
+	}, nil
 }
 
 func agentStepPrompts(steps []AgentStep) []string {

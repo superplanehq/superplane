@@ -22,7 +22,7 @@ func TestRunnerListsTasksByState(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, factory, draft := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	require.NotEmpty(t, token)
 
 	db := database.DB(t.Context())
@@ -62,7 +62,7 @@ func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, factory, _ := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":" Ship the fix ","description":"Stop the retry loop."}`)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
@@ -95,7 +95,7 @@ func TestRunnerClosesThisTaskOnce(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	db := database.DB(t.Context())
 	_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
 	require.NoError(t, err)
@@ -124,7 +124,7 @@ func TestRunnerRemovesOneArtifactByKeyOrTitle(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, _, order := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	db := database.DB(t.Context())
 	mustMarkdownArtifact(t, order, "plan", "PLAN.md")
 	mustMarkdownArtifact(t, order, "", "NOTES.md")
@@ -166,7 +166,7 @@ func TestPlanningRunnerEditsTheSessionDraft(t *testing.T) {
 	env := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplanePlanningID, Value: session.ID.String()},
 		{Name: runner.EnvSuperplaneRunToken, Value: planningToken},
-	}, 60)
+	}, 60, nil)
 	token := runnerTokenFrom(env)
 	require.NotEmpty(t, token)
 

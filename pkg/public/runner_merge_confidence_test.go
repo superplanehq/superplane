@@ -1,9 +1,7 @@
 package public
 
 import (
-	"bytes"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -42,57 +40,42 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	nodeExecution := createExecutionForCanvasRun(t, run, rootEvent.ID, nodeID)
 	require.NoError(t, db.Model(nodeExecution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
 
-	token, err := runneraction.MintMergeConfidenceToken(signer, runneraction.MergeConfidenceScope{
+	t.Setenv("JWT_SECRET", "test")
+	ctx := core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://app.test"}
+	token := runnerTokenFrom(runneraction.AttachRunnerEnv(ctx, nil, 60, &runneraction.MergeConfidenceScope{
 		OrganizationID:  r.Organization.ID,
 		FactoryID:       factoryModel.ID,
 		WorkOrderID:     order.ID,
 		CanvasRunID:     run.ID,
 		NodeExecutionID: nodeExecution.ID,
 		EnabledChecks:   []string{"risk"},
-	}, time.Hour)
+	}))
+	require.NotEmpty(t, token)
+	parsed, err := runneraction.ParseRunnerToken(signer, token)
 	require.NoError(t, err)
-	unknownRun, err := runneraction.MintMergeConfidenceToken(signer, runneraction.MergeConfidenceScope{
-		OrganizationID:  r.Organization.ID,
-		FactoryID:       factoryModel.ID,
-		WorkOrderID:     order.ID,
-		CanvasRunID:     uuid.New(),
-		NodeExecutionID: nodeExecution.ID,
-		EnabledChecks:   []string{"risk"},
-	}, time.Hour)
+	assert.Equal(t, order.ID, parsed.WorkOrderID)
+	owners := suggestRunnerOwners(t, server, token, `{}`)
+	require.Equal(t, http.StatusOK, owners.Code, owners.Body.String())
+	assert.NotEmpty(t, decodeSuggestOwners(t, owners).Members)
+
+	unknownScope := *parsed
+	unknownScope.CanvasRunID = uuid.New()
+	unknownRun, err := runneraction.MintRunnerToken(signer, unknownScope, time.Hour)
 	require.NoError(t, err)
-	t.Setenv("JWT_SECRET", "test")
-	ownerToken := assertRunnerOwnerAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://app.test"}, []runneraction.TaskEnvironmentVariable{{Name: runneraction.EnvSuperplaneMergeConfidenceToken, Value: token}}, order.ID)
 
-	unauthorized := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
-		`{"check":"risk","score":4,"summary":"Higher risk because the pull request raises the limit."}`,
-	)))
-	unauthorizedRec := httptest.NewRecorder()
-	server.Router.ServeHTTP(unauthorizedRec, unauthorized)
-	assert.Equal(t, http.StatusUnauthorized, unauthorizedRec.Code)
+	const reportPath = "/api/v1/runner/task/merge-checks"
+	const reportBody = `{"check":"risk","score":4,"summary":"Higher risk because the pull request raises the limit."}`
+	unauthorized := runnerRequest(t, server, http.MethodPost, "", reportPath, reportBody)
+	assert.Equal(t, http.StatusUnauthorized, unauthorized.Code)
 
-	disabled := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
-		`{"check":"performance","score":5,"summary":"No performance practice applies."}`,
-	)))
-	disabled.Header.Set("Authorization", "Bearer "+token)
-	disabledRec := httptest.NewRecorder()
-	server.Router.ServeHTTP(disabledRec, disabled)
-	assert.Equal(t, http.StatusBadRequest, disabledRec.Code)
+	disabled := runnerRequest(t, server, http.MethodPost, token, reportPath, `{"check":"performance","score":5,"summary":"No performance practice applies."}`)
+	assert.Equal(t, http.StatusBadRequest, disabled.Code)
 
-	missingRun := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
-		`{"check":"risk","score":4,"summary":"Higher risk because the pull request raises the limit."}`,
-	)))
-	missingRun.Header.Set("Authorization", "Bearer "+unknownRun)
-	missingRunRec := httptest.NewRecorder()
-	server.Router.ServeHTTP(missingRunRec, missingRun)
-	assert.Equal(t, http.StatusNotFound, missingRunRec.Code)
+	missingRun := runnerRequest(t, server, http.MethodPost, unknownRun, reportPath, reportBody)
+	assert.Equal(t, http.StatusForbidden, missingRun.Code)
 
-	report := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
-		`{"check":"risk","score":4,"summary":"Higher risk because the pull request raises the limit."}`,
-	)))
-	report.Header.Set("Authorization", "Bearer "+token)
-	reportRec := httptest.NewRecorder()
-	server.Router.ServeHTTP(reportRec, report)
-	require.Equal(t, http.StatusOK, reportRec.Code, reportRec.Body.String())
+	report := runnerRequest(t, server, http.MethodPost, token, reportPath, reportBody)
+	require.Equal(t, http.StatusOK, report.Code, report.Body.String())
 
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
@@ -113,15 +96,10 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	assert.Equal(t, "Assess risk", automation.NodeName)
 
 	require.NoError(t, db.Model(nodeExecution).Update("state", models.CanvasNodeExecutionStateFinished).Error)
-	ownerRec := assignRunnerOwner(t, server, ownerToken, `{"user":"`+r.User.String()+`","reason":"Owns pkg."}`)
+	ownerRec := assignRunnerOwner(t, server, token, `{"user":"`+r.User.String()+`","reason":"Owns pkg."}`)
 	assert.Equal(t, http.StatusForbidden, ownerRec.Code)
-	late := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
-		`{"check":"risk","score":1,"summary":"Lower risk because the pull request is introducing user interface changes only."}`,
-	)))
-	late.Header.Set("Authorization", "Bearer "+token)
-	lateRec := httptest.NewRecorder()
-	server.Router.ServeHTTP(lateRec, late)
-	assert.Equal(t, http.StatusNotFound, lateRec.Code)
+	late := runnerRequest(t, server, http.MethodPost, token, reportPath, `{"check":"risk","score":1,"summary":"Lower risk because the pull request is introducing user interface changes only."}`)
+	assert.Equal(t, http.StatusForbidden, late.Code)
 
 	checks, err = order.ListChecks(db)
 	require.NoError(t, err)
