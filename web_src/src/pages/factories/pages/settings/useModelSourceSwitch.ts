@@ -54,8 +54,8 @@ export function useModelSourceSwitch(
   return {
     dialog,
     setDialog,
-    openDialog: (step: "choose" | "subscription" = "choose") => {
-      setDefaultOwnerId(savedDefaultOwnerId);
+    openDialog: (step: "choose" | "subscription" = "choose", ownerId?: string) => {
+      setDefaultOwnerId(ownerId ?? savedDefaultOwnerId);
       setSubscriptionError(null);
       setDialog({ step });
     },
