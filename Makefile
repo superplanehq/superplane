@@ -160,6 +160,47 @@ dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
 	@$(COMPOSE) exec app go build cmd/server/main.go
 
+# CI jobs prepare only the tools, generated code, and services they use.
+# Keep local development setup above unchanged.
+.PHONY: ci.app.up ci.setup.modules ci.setup.go ci.setup.ui ci.setup.test-db ci.setup.unit ci.setup.e2e test.sharding
+ci.app.up:
+	@mkdir -p $(GO_CACHE_DIRS) tmp/screenshots
+	$(COMPOSE) --progress plain up -d --no-deps --wait --build --pull always app
+
+ci.setup.modules:
+	$(COMPOSE) exec -T app bash /app/scripts/go-mod-download
+
+ci.setup.go:
+	$(MAKE) ci.app.up
+	$(MAKE) pb.gen.go
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.client.gen
+	$(MAKE) ci.setup.modules
+
+ci.setup.ui:
+	$(MAKE) ci.app.up
+	$(MAKE) dev.setup.npm
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.web.client.gen
+
+ci.setup.test-db:
+	$(COMPOSE) up -d --wait db rabbitmq
+	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) db.migrate DB_NAME=superplane_test
+
+ci.setup.unit:
+	$(MAKE) ci.setup.go
+	$(MAKE) ci.setup.test-db
+
+ci.setup.e2e:
+	$(MAKE) ci.setup.ui
+	$(MAKE) pb.gen.go
+	$(MAKE) ci.setup.modules
+	$(MAKE) ci.setup.test-db
+
+test.sharding:
+	$(COMPOSE) exec -T app bash scripts/test_sharding_test.sh
+
 .PHONY: dev.setup.runner.fleet
 dev.setup.runner.fleet:
 	@$(MAKE) dev.test.is.running
@@ -377,7 +418,7 @@ check.lint.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
 
 check.lint.ui.knip:
-	$(COMPOSE) exec app bash -c "cd web_src && npm ci && npm run lint:knip"
+	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:knip"
 
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
@@ -531,13 +572,17 @@ MODULES := authorization,organizations,integrations,factories,secrets,users,grou
 REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,api_keys,agents,files,admin/fleets,admin/keys
 
 pb.gen: dev.test.is.running
-	$(MAKE) pb.gen.models
-	$(MAKE) pb.gen.gateway
-	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+	$(MAKE) pb.gen.go
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
 	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc 'date +%s%N > /app/.air-rebuild'
+
+.PHONY: pb.gen.go
+pb.gen.go: dev.test.is.running
+	$(MAKE) pb.gen.models
+	$(MAKE) pb.gen.gateway
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
 
 pb.gen.models:
 	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
@@ -619,6 +664,35 @@ image.build:
 	  --build-arg VITE_ASSET_BASE_URL=$(VITE_ASSET_BASE_URL) \
 	  --build-arg FRONTEND_PREBUILT=$(FRONTEND_PREBUILT) \
 	  --progress plain -t $(IMAGE):$(IMAGE_TAG) .
+
+# CI builds in the app container so Go can use its mounted caches directly.
+# Select arm64 explicitly when validating this path on an ARM development host.
+IMAGE_PLATFORM?=linux/amd64
+IMAGE_BUILD_DIR?=tmp/image-artifacts
+
+.PHONY: image.ci.up image.prepare image.package test.image
+image.ci.up: ci.app.up
+
+image.prepare:
+	$(MAKE) pb.gen
+	mkdir -p "$(IMAGE_BUILD_DIR)"
+	$(COMPOSE) exec -T app bash /app/scripts/with-host-owned-output "$(IMAGE_BUILD_DIR)" bash -lec '\
+	  test "$$(go env GOOS)/$$(go env GOARCH)" = "$(IMAGE_PLATFORM)" || { \
+	    echo "Build container must match IMAGE_PLATFORM=$(IMAGE_PLATFORM)" >&2; exit 1; \
+	  }; \
+	  go build -o "$(IMAGE_BUILD_DIR)/app/build/superplane" cmd/server/main.go; \
+	  mkdir -p "$(IMAGE_BUILD_DIR)/usr/bin"; \
+	  cp /usr/bin/createdb /usr/bin/migrate "$(IMAGE_BUILD_DIR)/usr/bin/"'
+	$(COMPOSE) exec -T app bash -lc 'cd web_src && NODE_OPTIONS=--max-old-space-size=4096 npx tsc -b'
+
+image.package:
+	docker build -f Dockerfile --target runner --platform $(IMAGE_PLATFORM) \
+	  --build-arg ARTIFACTS_STAGE=prebuilt \
+	  --progress plain -t $(IMAGE):$(IMAGE_TAG) "$(IMAGE_BUILD_DIR)"
+
+test.image:
+	bash scripts/build_image_test.sh
+	$(COMPOSE) exec -T app bash /app/scripts/build_image_ownership_test.sh
 
 image.auth:
 	@test -n "$$GHCR_PUSH_TOKEN" || (echo "GHCR_PUSH_TOKEN is empty" >&2; exit 1)

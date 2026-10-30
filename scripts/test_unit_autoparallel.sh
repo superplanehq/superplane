@@ -10,6 +10,14 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/shard_args.sh"
 echo "Running unit tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
 
 module_prefix="$(go list -m)"
+# Package discovery does not need VCS metadata. CI mounts a checkout owned by
+# the host into a root container, where Git can reject repository ownership.
+# Capture the command separately: process substitution hides its exit status.
+packages="$(go list -buildvcs=false ./pkg/... ./ee/...)"
+if [[ -z "$packages" ]]; then
+  echo 'No packages found under ./pkg or ./ee.' >&2
+  exit 1
+fi
 
 # Weigh each package by its test file count, so that heavy packages do not
 # cluster on one shard.
@@ -18,12 +26,7 @@ while IFS= read -r import_path; do
   package_dir="./${import_path#"$module_prefix"/}"
   test_file_count="$(find "$package_dir" -maxdepth 1 -type f -name '*_test.go' | wc -l | tr -d ' ')"
   weighted_packages+=("${test_file_count}:${package_dir}")
-done < <(go list ./pkg/... ./ee/...)
-
-if [[ "${#weighted_packages[@]}" -eq 0 ]]; then
-  echo "No packages found under ./pkg or ./ee, nothing to run."
-  exit 0
-fi
+done <<< "$packages"
 
 # Heaviest package first, so the greedy assignment below stays balanced.
 sorted_packages=()
@@ -56,8 +59,8 @@ for entry in "${sorted_packages[@]}"; do
 done
 
 if [[ "${#shard_packages[@]}" -eq 0 ]]; then
-  echo "No packages assigned to shard ${SHARD_INDEX}/${SHARD_COUNT}; exiting successfully."
-  exit 0
+  echo "No packages assigned to shard ${SHARD_INDEX}/${SHARD_COUNT}." >&2
+  exit 1
 fi
 
 echo "Selected packages for shard ${SHARD_INDEX}/${SHARD_COUNT}:"
@@ -67,6 +70,7 @@ done
 echo ""
 
 # gotestsum expects the package patterns separated by spaces.
+rm -f junit-report.xml
 gotestsum \
   --format short \
   --junitfile junit-report.xml \
@@ -75,6 +79,11 @@ gotestsum \
   -p 1 \
   -coverprofile=coverage-go.out \
   -covermode=atomic
+
+if ! grep -q '<testcase ' junit-report.xml; then
+  echo 'Unit test shard produced no test cases.' >&2
+  exit 1
+fi
 
 go tool cover -func=coverage-go.out | grep '^total:'
 

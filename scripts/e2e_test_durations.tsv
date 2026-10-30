@@ -1,0 +1,24 @@
+# Root test durations in seconds, rounded from Semaphore JUnit reports.
+# Pipeline 704b9479-2884-4010-99d7-bb794d72e82f (2026-10-30).
+# Refresh after significant E2E changes; new tests receive a 60-second weight.
+TestAPIKeys	21
+TestAccountBlocking	63
+TestAdminDashboard	57
+TestAdminOwnerSetupPromotion	14
+TestApprovalDeletionCancelsRun	3
+TestFactories	39
+TestGitHubInstallRequest	19
+TestGoogleSSONoAccountSignup	30
+TestInvitations	46
+TestLinesPhaseRunFitsIntoView	13
+TestLoginPage	35
+TestMagicCodeLogin	64
+TestMemberSeatReuse	18
+TestMembersInvitations	12
+TestOrganizationEntry	17
+TestOwnerSetupFlow	36
+TestPersonalAPITokens	20
+TestRunApp	7
+TestSeatPurchaseTabs	85
+TestSecrets	7
+TestSettingsPermissionGuards	46
