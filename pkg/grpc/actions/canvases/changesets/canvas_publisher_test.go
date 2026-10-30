@@ -36,7 +36,7 @@ func TestCanvasPublisherSubscriptionIntakePreservesDisconnectedDefaultAndValidat
 	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
 	_, err = factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
 	require.NoError(t, err)
-	savedConnection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	savedConnection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(savedConnection).Updates(map[string]any{"status": models.CodexConnectionStatusDisconnected, "credential_version": 1}).Error)
 	// The saved member remains active while their personal connection is absent.
@@ -62,7 +62,7 @@ func TestCanvasPublisherSubscriptionIntakePreservesDisconnectedDefaultAndValidat
 	unchanged, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
 	require.NoError(t, err)
 	require.Equal(t, retained.ID, unchanged.ID)
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, replacement.ID, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, replacement.ID, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	require.NoError(t, publisher.Publish(t.Context()))

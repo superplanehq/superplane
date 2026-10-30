@@ -47,7 +47,7 @@ func TestOnboardingRetryChangesSubscriptionCredentials(t *testing.T) {
 			require.NoError(t, err)
 			now := time.Now()
 			require.NoError(t, db.Create(&models.FactoryCodexConnection{
-				ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID,
+				ID: uuid.New(), OrganizationID: r.Organization.ID,
 				OwnerUserID: r.User, Status: models.CodexConnectionStatusReady,
 				CreatedAt: now, UpdatedAt: now,
 			}).Error)
@@ -91,7 +91,7 @@ func TestOnboardingClearsOldSubscriptionChoiceAndRejectsNewChoice(t *testing.T) 
 	subscription := true
 	harness := models.FactoryOnboardingAgentHarnessCodex
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription, AgentHarness: &harness}))
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), CodexSubscription: &subscription})
 	require.Error(t, err)
@@ -99,7 +99,7 @@ func TestOnboardingClearsOldSubscriptionChoiceAndRejectsNewChoice(t *testing.T) 
 	require.NoError(t, err)
 	assert.False(t, response.Factory.Onboarding.CodexSubscription)
 	assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED, response.Factory.Onboarding.AgentHarness)
-	kept, err := models.FindFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User)
+	kept, err := models.FindCodexConnection(db, r.Organization.ID, r.User)
 	require.NoError(t, err)
 	assert.Equal(t, connection.ID, kept.ID)
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription, AgentHarness: &harness}))

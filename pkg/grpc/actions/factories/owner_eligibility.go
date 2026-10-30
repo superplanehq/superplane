@@ -91,7 +91,7 @@ func ListFactoryOwnerEligibility(ctx context.Context, organizationID string, req
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to load owner eligibility")
 	}
-	response := &pb.ListFactoryOwnerEligibilityResponse{Subscription: factory.OnboardingConfigValue().CodexSubscription, OwnershipChangeAllowed: true}
+	response := &pb.ListFactoryOwnerEligibilityResponse{Subscription: (factory.OnboardingConfigValue().CodexSubscription || req.GetProspectiveSubscription()), OwnershipChangeAllowed: true}
 	if req.GetOrderId() != "" && response.Subscription {
 		order, err := findWorkOrder(db, factory, req.GetOrderId())
 		if err != nil {
@@ -118,7 +118,7 @@ func ListFactoryOwnerEligibility(ctx context.Context, organizationID string, req
 				return nil, factoryErrorToStatus(err, "failed to load owner eligibility")
 			}
 			if !member.Eligible {
-				member.Reason = "Connect a ChatGPT subscription in this workspace."
+				member.Reason = "Connect Codex in this organization."
 			}
 		}
 		response.Members = append(response.Members, member)

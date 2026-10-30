@@ -1,14 +1,35 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "bun:test";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router";
 
-import { meListCodexUsage, type MeCodexUsageConnection } from "@/api-client";
+import {
+  meDescribeCodexConnection,
+  meStartCodexConnection,
+  meListCodexUsage,
+  type FactoriesFactoryCodexConnection,
+  type MeCodexUsageConnection,
+} from "@/api-client";
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
 import { CodexUsageConnections, FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCodexUsagePage";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 
-vi.mock("@/api-client", () => ({ meListCodexUsage: vi.fn() }));
+vi.mock("@/api-client", () => ({
+  meListCodexUsage: vi.fn(),
+  meDescribeCodexConnection: vi.fn(),
+  meStartCodexConnection: vi.fn(),
+}));
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => true, isLoading: false }),
+}));
+beforeEach(() => {
+  vi.mocked(meDescribeCodexConnection).mockResolvedValue({
+    data: { connection: { status: "disconnected", eligible: true } },
+  } as never);
+  vi.mocked(meStartCodexConnection)
+    .mockReset()
+    .mockResolvedValue({ data: {} } as never);
+});
 
 function renderUsageRoute(queryClient: QueryClient) {
   return render(
@@ -89,14 +110,14 @@ describe("Codex usage", () => {
     expect(screen.getByText(/Last updated/)).toBeInTheDocument();
   });
 
-  it("does not invent a percentage when no quota snapshot exists", () => {
+  it("shows unavailable usage without a snapshot and hides usage without a connection", () => {
     const view = render(
       <CodexUsageConnections connections={[{ id: "connection-1", accountLabel: "ada@example.com" }]} />,
     );
     expect(screen.getByText(/Usage unavailable/)).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     view.rerender(<CodexUsageConnections connections={[]} />);
-    expect(screen.getByText("No ChatGPT subscription connected")).toBeInTheDocument();
+    expect(view.container).toBeEmptyDOMElement();
   });
 
   it("loads saved usage for the organization and lets the user retry a failed request", async () => {
@@ -128,13 +149,59 @@ describe("Codex usage", () => {
     queryClient.clear();
   });
 
-  it("opens Account settings when a direct usage URL has no connection", async () => {
+  it("keeps disconnected settings open and starts personal sign-in", async () => {
     vi.mocked(meListCodexUsage).mockResolvedValue({ data: { connections: [] }, error: undefined });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = renderUsageRoute(queryClient);
     try {
-      expect(await screen.findByRole("heading", { name: "Account settings" })).toBeInTheDocument();
-      expect(screen.queryByText("Codex usage")).not.toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Codex" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Account settings" })).not.toBeInTheDocument();
+      const connect = await screen.findByRole("button", { name: "Connect ChatGPT" });
+      await waitFor(() => expect(connect).toBeEnabled());
+      connect.click();
+      await waitFor(() => expect(meStartCodexConnection).toHaveBeenCalledTimes(1));
+    } finally {
+      view.unmount();
+      queryClient.clear();
+    }
+  });
+
+  it("keeps the connected view busy until the refresh task finishes", async () => {
+    let connection: FactoriesFactoryCodexConnection = {
+      status: "ready",
+      eligible: true,
+      accountLabel: "ada@example.com",
+      availableModels: ["gpt-5.6-sol"],
+      reservationHeld: false,
+    };
+    vi.mocked(meDescribeCodexConnection).mockImplementation(async () => ({ data: { connection } }) as never);
+    vi.mocked(meStartCodexConnection).mockImplementation(async () => {
+      connection = { ...connection, reservationHeld: true };
+      return { data: { connection } } as never;
+    });
+    vi.mocked(meListCodexUsage).mockResolvedValue({ data: { connections: [] } } as never);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderUsageRoute(queryClient);
+    try {
+      const refresh = await screen.findByRole("button", { name: "Refresh usage and models" });
+      await waitFor(() => expect(refresh).toBeEnabled());
+      refresh.click();
+      await waitFor(() => expect(meStartCodexConnection).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+
+      expect(screen.getByRole("status")).toHaveTextContent("Connected");
+      expect(screen.getByText("ada@example.com")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Refresh usage and models" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Refresh usage and models" })).toHaveAttribute("aria-busy", "true");
+      expect(screen.getByRole("button", { name: "Disconnect ChatGPT" })).toBeDisabled();
+      expect(screen.queryByText(/Wait for connection setup to finish/)).not.toBeInTheDocument();
+
+      connection = { ...connection, reservationHeld: false };
+      await act(() => queryClient.invalidateQueries({ queryKey: ["factory-codex-connection", "org-1"] }));
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Refresh usage and models" })).toBeEnabled());
+      expect(screen.getByRole("button", { name: "Refresh usage and models" })).toHaveAttribute("aria-busy", "false");
+      expect(screen.getByRole("button", { name: "Disconnect ChatGPT" })).toBeEnabled();
     } finally {
       view.unmount();
       queryClient.clear();

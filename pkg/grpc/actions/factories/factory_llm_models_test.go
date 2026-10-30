@@ -62,7 +62,7 @@ func TestFactoryLLMModelsSeparatesConfiguredAndEffectiveSelections(t *testing.T)
 	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }
 
-func TestFactorySubscriptionPolicyRetainsOtherMembersUnavailableModels(t *testing.T) {
+func TestFactorySubscriptionPolicyCombinesConnectedMembersCatalogs(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
@@ -76,7 +76,7 @@ func TestFactorySubscriptionPolicyRetainsOtherMembersUnavailableModels(t *testin
 		{id: r.User, models: []models.CodexModel{{Model: "gpt-native-a", DisplayName: "Readable native model"}, {Model: "gpt-native-shared"}}},
 		{id: other.ID, models: []models.CodexModel{{Model: "gpt-native-b"}, {Model: "gpt-native-shared"}}},
 	} {
-		connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, member.id, time.Now())
+		connection, err := models.CreateCodexConnection(db, r.Organization.ID, member.id, time.Now())
 		require.NoError(t, err)
 		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 		require.NoError(t, connection.StoreUsage(db, nil, member.models, time.Now()))
@@ -88,16 +88,20 @@ func TestFactorySubscriptionPolicyRetainsOtherMembersUnavailableModels(t *testin
 	require.NoError(t, err)
 	listed, err := ListFactoryLLMModels(ctx, r.Organization.ID.String(), &pb.ListFactoryLLMModelsRequest{FactoryId: factory.ID.String(), Provider: "openai", FundingSource: "subscription"})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"gpt-native-a", "gpt-native-shared"}, codexLineModelIDs(listed.Parent))
+	assert.ElementsMatch(t, []string{"gpt-native-a", "gpt-native-b", "gpt-native-shared"}, codexLineModelIDs(listed.Parent))
 	assert.Equal(t, []string{"gpt-native-b"}, codexLineModelIDs(listed.ConfiguredModels))
-	assert.Equal(t, "Readable native model", listed.Parent[0].Name)
+	for _, model := range listed.Parent {
+		if model.Id == "gpt-native-a" {
+			assert.Equal(t, "Readable native model", model.Name)
+		}
+	}
 	assert.Equal(t, "gpt-native-b", listed.ConfiguredModels[0].Name)
-	assert.Empty(t, listed.Selected)
+	assert.Equal(t, []string{"gpt-native-b"}, codexLineModelIDs(listed.Selected))
 
 	request.AllowedModels = []string{"gpt-native-b", "gpt-native-a"}
 	updated, err := UpdateFactoryLLMModels(ctx, r.Organization.ID.String(), request)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"gpt-native-a"}, codexLineModelIDs(updated.Selected))
+	assert.ElementsMatch(t, []string{"gpt-native-a", "gpt-native-b"}, codexLineModelIDs(updated.Selected))
 	request.AllowedModels = append(request.AllowedModels, "unknown-native-id")
 	_, err = UpdateFactoryLLMModels(ctx, r.Organization.ID.String(), request)
 	require.Error(t, err)
@@ -105,6 +109,9 @@ func TestFactorySubscriptionPolicyRetainsOtherMembersUnavailableModels(t *testin
 	request.AllowedModels = []string{"gpt-native-a"}
 	_, err = UpdateFactoryLLMModels(ctx, r.Organization.ID.String(), request)
 	require.NoError(t, err)
+	otherConnection, err := models.FindCodexConnection(db, r.Organization.ID, other.ID)
+	require.NoError(t, err)
+	require.NoError(t, otherConnection.Disconnect(db, time.Now()))
 	request.AllowedModels = []string{"gpt-native-b"}
 	_, err = UpdateFactoryLLMModels(ctx, r.Organization.ID.String(), request)
 	require.Error(t, err, "a removed unavailable ID must be validated when added again")

@@ -29,6 +29,7 @@ const (
 // OpenAI refresh token on that runner.
 type FactoryCodexLease struct {
 	ID               uuid.UUID
+	FactoryID        *uuid.UUID
 	ConnectionID     uuid.UUID
 	TaskID           uuid.UUID
 	Generation       int64
@@ -65,7 +66,7 @@ func FindCodexLoginLease(tx *gorm.DB, connectionID uuid.UUID) (*FactoryCodexLeas
 // Callers use the snapshot to publish changes after their transaction commits.
 func ListCodexLoginConnections(tx *gorm.DB) ([]FactoryCodexConnection, error) {
 	var connections []FactoryCodexConnection
-	err := tx.Select("id", "factory_id", "status", "reservation_generation").
+	err := tx.Select("id", "organization_id", "status", "reservation_generation").
 		Where("id IN (?)", tx.Model(&FactoryCodexLease{}).Select("connection_id").Where("purpose = ?", CodexLeasePurposeLogin)).
 		Find(&connections).Error
 	return connections, err
@@ -193,8 +194,20 @@ func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
 	if connection.RevocationPendingAt != nil {
 		return ErrCodexConnectionStale
 	}
+	if t.OrganizationID != connection.OrganizationID {
+		return ErrCodexConnectionStale
+	}
 	if lease.Login() {
+		if lease.FactoryID != nil {
+			return ErrCodexConnectionStale
+		}
 		return nil
+	}
+	if lease.FactoryID == nil || *lease.FactoryID == uuid.Nil {
+		return ErrCodexConnectionStale
+	}
+	if _, err := FindFactory(tx, connection.OrganizationID, *lease.FactoryID); err != nil {
+		return ErrCodexConnectionStale
 	}
 	if connection.Status != CodexConnectionStatusReady || len(connection.BundleCiphertext) == 0 {
 		return ErrCodexConnectionNotReady
@@ -206,7 +219,7 @@ func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	ownerID, err := RequireSubscriptionRunOwner(tx, connection.OrganizationID, connection.FactoryID, execution.RunID)
+	ownerID, err := RequireSubscriptionRunOwner(tx, connection.OrganizationID, *lease.FactoryID, execution.RunID)
 	if err != nil {
 		return err
 	}
@@ -214,7 +227,7 @@ func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
 		return ErrSubscriptionOwnerInvalid
 	}
 	model, _ := execution.Configuration.Data()["model"].(string)
-	resolved, err := connection.resolvePermittedModel(tx, model)
+	resolved, err := connection.resolvePermittedModel(tx, *lease.FactoryID, model)
 	if err != nil {
 		return err
 	}
@@ -228,6 +241,7 @@ func (c *FactoryCodexConnection) createLease(
 	tx *gorm.DB,
 	taskID uuid.UUID,
 	purpose string,
+	factoryID *uuid.UUID,
 	encryptor crypto.Encryptor,
 	now time.Time,
 ) (*FactoryCodexLease, error) {
@@ -235,6 +249,7 @@ func (c *FactoryCodexConnection) createLease(
 	lease := &FactoryCodexLease{
 		ID:             uuid.New(),
 		ConnectionID:   c.ID,
+		FactoryID:      factoryID,
 		TaskID:         taskID,
 		Generation:     generation,
 		Purpose:        purpose,

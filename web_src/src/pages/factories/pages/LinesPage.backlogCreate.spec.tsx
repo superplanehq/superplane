@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
-  factoriesDescribeFactoryCodexConnection,
+  meDescribeCodexConnection,
   factoriesListFactoryOwnerEligibility,
   type FactoriesFactory,
   type FactoriesFactoryCodexConnection,
@@ -21,7 +21,7 @@ import { factoryCodexConnectionKey } from "./onboarding/useFactoryCodexConnectio
 
 vi.mock("@/api-client", () => ({
   ...unmockedSrc<Record<string, unknown>>("api-client/index.ts"),
-  factoriesDescribeFactoryCodexConnection: vi.fn(),
+  meDescribeCodexConnection: vi.fn(),
   factoriesListFactoryOwnerEligibility: vi.fn(),
 }));
 
@@ -223,7 +223,7 @@ describe("LinesPage backlog create", () => {
     importFactoryIntakeItem.mockReset();
     enabledExperimentalFeatures.clear();
     codexConnection = { status: "disconnected", eligible: true };
-    vi.mocked(factoriesDescribeFactoryCodexConnection)
+    vi.mocked(meDescribeCodexConnection)
       .mockReset()
       .mockImplementation(async () => ({ data: { connection: codexConnection } }) as never);
     vi.mocked(factoriesListFactoryOwnerEligibility)

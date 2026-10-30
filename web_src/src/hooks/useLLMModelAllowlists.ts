@@ -294,7 +294,13 @@ export function useUpdateFactoryLLMModels(organizationId: string, factoryId: str
 export function useSwitchFactoryModelSource(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { source: string; apiKey?: string; baseUrl?: string; apiType?: string }) => {
+    mutationFn: async (input: {
+      source: string;
+      apiKey?: string;
+      baseUrl?: string;
+      apiType?: string;
+      defaultOwnerId?: string;
+    }) => {
       const response = await fetch(`/api/v1/factories/${factoryId}/model-source`, {
         method: "POST",
         credentials: "include",
@@ -304,6 +310,7 @@ export function useSwitchFactoryModelSource(organizationId: string, factoryId: s
         },
         body: JSON.stringify({
           source: input.source,
+          defaultOwnerId: input.defaultOwnerId ?? "",
           apiKey: input.apiKey ?? "",
           baseUrl: input.baseUrl ?? "",
           apiType: input.apiType ?? "",

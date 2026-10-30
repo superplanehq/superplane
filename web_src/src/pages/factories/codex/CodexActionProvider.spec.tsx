@@ -1,22 +1,23 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { useState } from "react";
 
-import { factoriesDescribeFactoryCodexConnection, type FactoriesFactoryCodexConnection } from "@/api-client";
+import { meCancelCodexConnection, meDescribeCodexConnection, type FactoriesFactoryCodexConnection } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getApiErrorMessage } from "@/lib/errors";
 import { unmockedSrc } from "@/test/unmockedModule";
-import { factoryCodexConnectionKey } from "../pages/onboarding/useFactoryCodexConnection";
+import { factoryCodexConnectionKey, useFactoryCodexConnection } from "../pages/onboarding/useFactoryCodexConnection";
 import { CodexActionProvider } from "./CodexActionProvider";
 import { CodexConnectionSetupDialog } from "./CodexConnectionSetupDialog";
 import { isCodexActionCancelled, useCodexActionGuard } from "./codexActionContext";
 
 vi.mock("@/api-client", () => ({
   ...unmockedSrc<Record<string, unknown>>("api-client/index.ts"),
-  factoriesDescribeFactoryCodexConnection: vi.fn(),
+  meDescribeCodexConnection: vi.fn(),
+  meCancelCodexConnection: vi.fn(),
 }));
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, currentUserId: "me", isLoading: false }),
@@ -79,7 +80,10 @@ function mount(save: (title: string) => Promise<void>) {
 describe("Codex assignment continuation", () => {
   beforeEach(() => {
     connection = { status: "disconnected", eligible: true };
-    vi.mocked(factoriesDescribeFactoryCodexConnection)
+    vi.mocked(meCancelCodexConnection)
+      .mockReset()
+      .mockResolvedValue({ data: {} } as never);
+    vi.mocked(meDescribeCodexConnection)
       .mockReset()
       .mockImplementation(async () => ({ data: { connection } }) as never);
   });
@@ -111,21 +115,25 @@ describe("Codex assignment continuation", () => {
     await user.click(screen.getByRole("button", { name: "Create task" }));
     await screen.findByRole("heading", { name: "Connect Codex to continue" });
     if (stage === "setup") await user.click(screen.getByRole("button", { name: "Connect Codex" }));
-    await user.click(screen.getByRole("button", { name: /^Cancel$/ }));
+    await user.click(screen.getByRole("button", { name: stage === "setup" ? /^Close setup$/ : /^Cancel$/ }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("My task draft");
     expect(save).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
-  it("does not continue when setup is dismissed during the final refresh", async () => {
+  it.each(["close", "unmount"] as const)("does not continue after %s during the final refresh", async (dismissal) => {
     const onConnected = vi.fn();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
+    const view = render(
       <QueryClientProvider client={client}>
         <DismissibleCodexSetup onConnected={onConnected} />
       </QueryClientProvider>,
     );
+    // Another workspace keeps the shared status query active after this dialog closes.
+    const observer = renderHook(() => useFactoryCodexConnection("org", "other-workspace", true), {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByRole("button", { name: "Connect ChatGPT" })).toBeEnabled());
     connection = { status: "ready", eligible: true, availableModels: ["gpt-5.4"] };
@@ -133,14 +141,39 @@ describe("Codex assignment continuation", () => {
     const refresh = new Promise<{ data: { connection: FactoriesFactoryCodexConnection } }>((resolve) => {
       completeRefresh = resolve;
     });
-    vi.mocked(factoriesDescribeFactoryCodexConnection).mockImplementation(() => refresh as never);
+    vi.mocked(meDescribeCodexConnection).mockImplementation(() => refresh as never);
     await act(async () => client.setQueryData(factoryCodexConnectionKey("org", "factory", "me"), connection));
-    await user.click(screen.getByRole("button", { name: /^Cancel$/ }));
+    await waitFor(() =>
+      expect(client.getQueryState(factoryCodexConnectionKey("org", "factory", "me"))?.fetchStatus).toBe("fetching"),
+    );
+    if (dismissal === "unmount") view.unmount();
+    else await user.click(screen.getByRole("button", { name: /^Close setup$/ }));
     await act(async () => completeRefresh({ data: { connection } }));
     await waitFor(() => expect(client.isFetching()).toBe(0));
     expect(onConnected).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    observer.unmount();
   });
+
+  it.each(["Close setup", "Cancel sign-in"])(
+    "cancels the shared sign-in only through its explicit control: %s",
+    async (action) => {
+      connection = { status: "pending", eligible: true, reservationHeld: true };
+      const onConnected = vi.fn();
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={client}>
+          <DismissibleCodexSetup onConnected={onConnected} />
+        </QueryClientProvider>,
+      );
+      const button = await screen.findByRole("button", { name: action });
+      await waitFor(() => expect(button).toBeEnabled());
+      await userEvent.setup().click(button);
+      if (action === "Cancel sign-in") await waitFor(() => expect(meCancelCodexConnection).toHaveBeenCalledTimes(1));
+      else expect(meCancelCodexConnection).not.toHaveBeenCalled();
+      expect(onConnected).not.toHaveBeenCalled();
+    },
+  );
 
   it("keeps an active-run ownership denial and does not offer a connection", async () => {
     mount(vi.fn().mockRejectedValue({ message: "Stop the active run before changing its owner." }));

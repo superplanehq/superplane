@@ -143,7 +143,7 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"gpt-4.1", "gpt-4o"}, byok)
 
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	used := 0.0
 	duration := int64(300)

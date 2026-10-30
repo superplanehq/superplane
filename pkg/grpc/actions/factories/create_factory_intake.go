@@ -91,6 +91,7 @@ func CreateFactoryIntake(
 		return nil, factoryErrorToStatus(invalidArgument("pause is not supported for this intake"), "failed to create factory intake")
 	}
 
+	req.Settings = seedSubscriptionIntakeOwner(factory, req.GetSettings())
 	if err := validateIntakeDefaultOwner(db, factory, source, "", req.GetSettings()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"maps"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -74,9 +73,9 @@ func validateIntakeDefaultOwner(tx *gorm.DB, factory *models.Factory, source, cu
 	return nil
 }
 
-// Fill the defaults before activating subscription intake. A connected choice
-// remains authoritative; a stale or absent choice is repaired by the admin.
-func fillSubscriptionIntakeOwners(tx *gorm.DB, factory *models.Factory, ownerID uuid.UUID) ([]uuid.UUID, error) {
+// Explicit source confirmation replaces every intake default owner. The actor
+// remains the audit author even when another member supplies the subscription.
+func replaceSubscriptionIntakeOwners(tx *gorm.DB, factory *models.Factory, ownerID, authorID uuid.UUID) ([]uuid.UUID, error) {
 	intakes, err := factory.ListIntakes(tx)
 	if err != nil {
 		return nil, err
@@ -121,16 +120,7 @@ func fillSubscriptionIntakeOwners(tx *gorm.DB, factory *models.Factory, ownerID 
 		if node == nil || node.ComponentName() != "createWorkOrder" {
 			return nil, invalidArgument("intake automation has no task creation node to update")
 		}
-		current, _ := node.Configuration["defaultOwnerId"].(string)
-		if id, err := uuid.Parse(strings.TrimSpace(current)); err == nil {
-			connected, err := models.SubscriptionOwnerEligible(tx, factory.OrganizationID, factory.ID, id)
-			if err != nil {
-				return nil, err
-			}
-			if connected {
-				continue
-			}
-		}
+
 		nodes := slices.Clone(live.Nodes)
 		for j := range nodes {
 			if nodes[j].ID != target {
@@ -142,7 +132,7 @@ func fillSubscriptionIntakeOwners(tx *gorm.DB, factory *models.Factory, ownerID 
 			}
 			nodes[j].Configuration["defaultOwnerId"] = ownerID.String()
 		}
-		version, err := models.CreateCommitVersionWithSpecInTransaction(tx, canvas.ID, ownerID, "Set intake task owner", nodes, nil)
+		version, err := models.CreateCommitVersionWithSpecInTransaction(tx, canvas.ID, authorID, "Set intake task owner", nodes, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -155,4 +145,20 @@ func fillSubscriptionIntakeOwners(tx *gorm.DB, factory *models.Factory, ownerID 
 		changed = append(changed, canvas.ID)
 	}
 	return changed, nil
+}
+
+// seedSubscriptionIntakeOwner preserves an explicit choice. An unavailable
+// saved default requires a new selection rather than another member's account.
+func seedSubscriptionIntakeOwner(factory *models.Factory, settings *pb.FactoryIntake_Settings) *pb.FactoryIntake_Settings {
+	if !factory.OnboardingConfigValue().CodexSubscription {
+		return settings
+	}
+	if settings == nil {
+		settings = &pb.FactoryIntake_Settings{}
+	}
+	if settings.DefaultOwnerId == nil {
+		ownerID := factory.OnboardingConfigValue().CodexDefaultOwnerID
+		settings.DefaultOwnerId = &ownerID
+	}
+	return settings
 }

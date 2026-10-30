@@ -1131,6 +1131,8 @@ message SwitchFactoryModelSourceRequest {
   string base_url = 4;
   // API type for a custom provider: anthropic, openai, or openai-compatible.
   string api_type = 5;
+  // Required for subscription switches. Replaces every intake default owner.
+  string default_owner_id = 6;
 }
 
 message SwitchFactoryModelSourceResponse {
@@ -1210,6 +1212,7 @@ message FactoryOnboarding {
   string app_repository_external_id = 15;
   // True when setup uses a ChatGPT subscription instead of an API key.
   bool codex_subscription = 16;
+  string codex_default_owner_id = 17;
 }
 
 // Automations the workspace Git host can run. Computed from vcs_provider.
@@ -3449,6 +3452,7 @@ message ResumeHandOffWorkOrderResponse {
 message ListFactoryOwnerEligibilityRequest {
   string factory_id = 1;
   string order_id = 2;
+  bool prospective_subscription = 3;
 }
 
 message FactoryOwnerEligibility {

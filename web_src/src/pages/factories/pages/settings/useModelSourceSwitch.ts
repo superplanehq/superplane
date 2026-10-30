@@ -9,8 +9,11 @@ export function useModelSourceSwitch(
   organizationId: string,
   factoryId: string,
   onSaved: (target: LLMModelsSwitchTarget | "subscription") => void,
+  savedDefaultOwnerId = "",
 ) {
-  const [subscriptionDialog, setSubscriptionDialog] = useState<"warn" | "connect" | null>(null);
+  const [subscriptionDialog, setSubscriptionDialog] = useState<"warn" | null>(null);
+  const [defaultOwnerId, setDefaultOwnerId] = useState(savedDefaultOwnerId);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<LLMModelsSwitchDialog>(null);
   const [switchedNotice, setSwitchedNotice] = useState<string | null>(null);
   const switchSource = useSwitchFactoryModelSource(organizationId, factoryId);
@@ -22,6 +25,7 @@ export function useModelSourceSwitch(
     try {
       await switchSource.mutateAsync({
         source: target,
+        ...(target === "subscription" ? { defaultOwnerId } : {}),
         apiKey: connection?.apiKey,
         ...(target === "custom" ? { baseUrl: connection?.baseUrl, apiType: connection?.apiType } : {}),
       });
@@ -40,7 +44,9 @@ export function useModelSourceSwitch(
       showSuccessToast("Model source saved.");
       return true;
     } catch (switchError) {
-      showErrorToast(getApiErrorMessage(switchError, "Unable to switch the model source."));
+      const message = getApiErrorMessage(switchError, "Unable to switch the model source.");
+      if (target === "subscription") setSubscriptionError(message);
+      showErrorToast(message);
       return false;
     }
   };
@@ -48,6 +54,9 @@ export function useModelSourceSwitch(
   return {
     dialog,
     setDialog,
+    defaultOwnerId,
+    setDefaultOwnerId,
+    subscriptionError,
     subscriptionDialog,
     setSubscriptionDialog,
     switchedNotice,

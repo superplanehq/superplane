@@ -52,6 +52,9 @@ func scheduledIntakeCanvas(db *gorm.DB, factory *models.Factory, name string, pa
 		return nil, invalidArgument("Connect an agent or configure SuperPlane-hosted models before you add scheduled intake.")
 	}
 	owner := strings.TrimSpace(params["defaultOwnerId"])
+	if _, explicit := params["defaultOwnerId"]; !explicit && config.CodexSubscription {
+		owner = config.CodexDefaultOwnerID
+	}
 	if err := validateIntakeDefaultOwner(db, factory, models.FactoryIntakeSourceGitHubIssues, "", &pb.FactoryIntake_Settings{DefaultOwnerId: &owner}); err != nil {
 		return nil, err
 	}

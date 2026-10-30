@@ -56,7 +56,7 @@ describe("useFactoryWebsocket subscription recovery", () => {
       ["me", "org-1", "codex-usage", "member-1"],
     ];
     const unrelatedKeys = [
-      ...scopedKeys("org-1", "other-factory"),
+      ...scopedKeys("org-1", "other-factory").filter((key) => key[0] !== "factory-codex-connection"),
       ...scopedKeys("other-org", "factory-1"),
       meKeys.me("other-org"),
       ["me", "other-org", "codex-usage", "member-1"],

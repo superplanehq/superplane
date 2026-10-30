@@ -33,7 +33,7 @@ func SubscriptionOwnerEligible(tx *gorm.DB, organizationID, factoryID, userID uu
 		}
 		return false, err
 	}
-	c, err := FindFactoryCodexConnection(tx, organizationID, factoryID, userID)
+	c, err := FindCodexConnection(tx, organizationID, userID)
 	if errors.Is(err, ErrCodexConnectionNotFound) {
 		return false, nil
 	}
@@ -76,7 +76,7 @@ func (o *FactoryWorkOrder) RequireSubscriptionOwner(tx *gorm.DB, nonblocking boo
 			}
 			return uuid.Nil, err
 		}
-		c, lookupErr := FindFactoryCodexConnection(tx, o.OrganizationID, o.FactoryID, owners[0].UserID)
+		c, lookupErr := FindCodexConnection(tx, o.OrganizationID, owners[0].UserID)
 		if lookupErr != nil && !errors.Is(lookupErr, ErrCodexConnectionNotFound) {
 			return uuid.Nil, lookupErr
 		}

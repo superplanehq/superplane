@@ -1,25 +1,31 @@
 import { useEffect, useState } from "react";
-import { Navigate, useParams } from "react-router";
 
 import { type MeCodexUsageConnection, type MeCodexUsageWindow } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useCodexUsage } from "@/hooks/useCodexUsage";
-import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
+import { FactoryCodexSubscriptionConnection } from "./FactoryCodexSubscriptionConnection";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
 export function FactorySettingsAccountCodexUsagePage() {
-  const { organizationId } = useFactorySettingsLayout();
-  const { factoryKey = "" } = useParams<{ factoryKey: string }>();
-  const query = useCodexUsage(organizationId);
-
-  if (query.isSuccess && !query.isFetching && query.data.length === 0) {
-    return <Navigate to={factorySettingsSectionPath(organizationId, factoryKey, "account", "profile")} replace />;
-  }
+  const { organizationId, factoryId } = useFactorySettingsLayout();
+  const features = useExperimentalFeature(organizationId);
+  const enabled = !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS);
+  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
+  const query = useCodexUsage(organizationId, enabled);
 
   return (
-    <FactorySettingsPageFrame title="Codex usage">
+    <FactorySettingsPageFrame title="Codex">
+      <FactorySettingsCard
+        title="Your Codex connection"
+        description="Connect once to use Codex across this organization’s workspaces."
+      >
+        <FactoryCodexSubscriptionConnection codex={codex} />
+      </FactorySettingsCard>
       {query.isPending ? <p role="status">Loading Codex usage…</p> : null}
       {query.isError ? (
         <FactorySettingsCard title="Could not load Codex usage.">
@@ -34,15 +40,6 @@ export function FactorySettingsAccountCodexUsagePage() {
 }
 
 export function CodexUsageConnections({ connections }: { connections: MeCodexUsageConnection[] }) {
-  if (!connections.length) {
-    return (
-      <FactorySettingsCard
-        title="No ChatGPT subscription connected"
-        description="Connect your ChatGPT subscription to see Codex usage here."
-      />
-    );
-  }
-
   return connections.map((connection) => (
     <FactorySettingsCard
       key={connection.id}

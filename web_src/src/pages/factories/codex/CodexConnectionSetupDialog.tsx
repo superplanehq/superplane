@@ -29,6 +29,15 @@ function useConnectionCompletion(open: boolean, codex: CodexConnection, onConnec
   connectedCallback.current = onConnected;
 
   useEffect(() => {
+    openRef.current = open;
+    return () => {
+      openRef.current = false;
+      version.current += 1;
+      started.current = false;
+    };
+  }, [open]);
+
+  useEffect(() => {
     if (!open) {
       version.current += 1;
       started.current = false;
@@ -106,10 +115,10 @@ export function CodexConnectionSetupDialog({
   onOpenChange: (open: boolean) => void;
   onConnected?: () => void | Promise<void>;
 }) {
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { isLoading: permissionsLoading } = usePermissions();
   const features = useExperimentalFeature(organizationId);
   const offered = features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const enabled = [open, !features.isLoading, offered, canAct("factories", "read")].every(Boolean);
+  const enabled = [open, !features.isLoading, offered].every(Boolean);
   const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
   const completion = useConnectionCompletion(enabled && codex.query.data?.eligible === true, codex, onConnected);
   const disabled = [
@@ -121,7 +130,6 @@ export function CodexConnectionSetupDialog({
   ].some(Boolean);
   const close = () => {
     completion.cancel();
-    if (codex.query.data?.status === "pending") codex.cancel.mutate();
     onOpenChange(false);
   };
 
@@ -135,9 +143,7 @@ export function CodexConnectionSetupDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Connect Codex</DialogTitle>
-          <DialogDescription>
-            Sign in with your Codex account to use your subscription in this workspace.
-          </DialogDescription>
+          <DialogDescription>Connect once to use Codex across this organization’s workspaces.</DialogDescription>
         </DialogHeader>
         <CodexConnectionNotices codex={codex} featuresLoading={features.isLoading} offered={offered} />
         <CodexDeviceSignIn
@@ -160,7 +166,7 @@ export function CodexConnectionSetupDialog({
         ) : null}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={close}>
-            Cancel
+            Close setup
           </Button>
         </DialogFooter>
       </DialogContent>

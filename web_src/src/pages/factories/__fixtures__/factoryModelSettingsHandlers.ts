@@ -1,5 +1,6 @@
 import { storybookHostedLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import type { FactoriesFixture } from "./factoryPageResponses";
+import { ORGANIZATION_USERS, STORYBOOK_ME_USER_ID } from "./factoryPageIds";
 import type { FactoriesRoute } from "./handlers";
 
 const pattern = (suffix: string) => new RegExp(`^/api/v1/factories/([^/]+)/${suffix}$`);
@@ -56,7 +57,20 @@ function workspaceModelPolicyRoute(fixture: FactoriesFixture): FactoriesRoute {
 function personalConnectionRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
-      pattern: pattern("codex-connection"),
+      pattern: pattern("owner-eligibility"),
+      resolve: () => ({
+        json: {
+          subscription: true,
+          ownershipChangeAllowed: true,
+          members: ORGANIZATION_USERS.map((user) => ({
+            userId: user.id,
+            eligible: user.id === STORYBOOK_ME_USER_ID && fixture.codexConnection?.status === "ready",
+          })),
+        },
+      }),
+    },
+    {
+      pattern: /\/api\/v1\/me\/codex-connection$/,
       resolve: (_match, method, body) => {
         fixture.codexConnection ??= { eligible: true, status: "disconnected" };
         if (method === "DELETE") fixture.codexConnection = { eligible: true, status: "disconnected" };
@@ -71,7 +85,7 @@ function personalConnectionRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       },
     },
     {
-      pattern: pattern("codex-connection:cancel"),
+      pattern: /\/api\/v1\/me\/codex-connection:cancel$/,
       resolve: () => {
         fixture.codexConnection = { eligible: true, status: "disconnected" };
         return { json: { connection: fixture.codexConnection } };
@@ -97,6 +111,8 @@ function modelSourceRoute(fixture: FactoriesFixture): FactoriesRoute {
       factory.onboarding = {
         ...factory.onboarding,
         codexSubscription: source === "subscription",
+        codexDefaultOwnerId:
+          source === "subscription" ? String(body?.defaultOwnerId ?? "") : factory.onboarding?.codexDefaultOwnerId,
         agentHarness: harnessForSource(source),
         agentIntegrationId: ownKey ? `int-${source}` : undefined,
       };

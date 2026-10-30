@@ -1,8 +1,8 @@
 import {
-  factoriesCancelFactoryCodexConnection,
-  factoriesDisconnectFactoryCodexConnection,
-  factoriesDescribeFactoryCodexConnection,
-  factoriesStartFactoryCodexConnection,
+  meCancelCodexConnection,
+  meDisconnectCodexConnection,
+  meDescribeCodexConnection,
+  meStartCodexConnection,
   type FactoriesFactoryCodexConnection,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -12,8 +12,8 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import { useEffect, useRef } from "react";
 import { invalidateWorkspaceModelQueries } from "@/hooks/workspaceModelQueries";
 
-export function factoryCodexConnectionKey(organizationId: string, factoryId: string, memberId = "") {
-  return ["factory-codex-connection", organizationId, factoryId, memberId] as const;
+export function factoryCodexConnectionKey(organizationId: string, _factoryId: string, memberId = "") {
+  return ["factory-codex-connection", organizationId, memberId] as const;
 }
 
 export function codexSubscriptionReady(connection: FactoriesFactoryCodexConnection | undefined): boolean {
@@ -23,6 +23,7 @@ export function codexSubscriptionReady(connection: FactoriesFactoryCodexConnecti
 function invalidateSubscriptionCatalogs(queryClient: QueryClient, organizationId: string, factoryId: string) {
   return Promise.all([
     invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId),
+    queryClient.invalidateQueries({ queryKey: ["factories", organizationId], refetchType: "all" }),
     queryClient.invalidateQueries({
       queryKey: ["factories", organizationId, factoryId, "owner-eligibility"],
       refetchType: "all",
@@ -44,8 +45,7 @@ export function useFactoryCodexConnection(
   enabled: boolean,
   refreshModels = true,
 ) {
-  const { canAct, currentUserId } = usePermissions();
-  const canRefreshCatalog = canAct("factories", "read");
+  const { currentUserId } = usePermissions();
   const queryClient = useQueryClient();
   const queryKey = factoryCodexConnectionKey(organizationId, factoryId, currentUserId);
   const refreshAttempted = useRef(false);
@@ -56,12 +56,11 @@ export function useFactoryCodexConnection(
   }, [organizationId, factoryId, currentUserId]);
   const query = useQuery({
     queryKey,
-    enabled: enabled && Boolean(organizationId && factoryId),
+    enabled: enabled && Boolean(organizationId),
     queryFn: async ({ signal }) => {
-      const response = await factoriesDescribeFactoryCodexConnection(
+      const response = await meDescribeCodexConnection(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId },
           signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
         }),
       );
@@ -79,10 +78,9 @@ export function useFactoryCodexConnection(
 
   const start = useMutation({
     mutationFn: async () => {
-      const response = await factoriesStartFactoryCodexConnection(
+      const response = await meStartCodexConnection(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId },
           body: {},
           signal: AbortSignal.timeout(15000),
         }),
@@ -95,10 +93,9 @@ export function useFactoryCodexConnection(
 
   const refreshCatalog = useMutation({
     mutationFn: async () => {
-      const response = await factoriesStartFactoryCodexConnection(
+      const response = await meStartCodexConnection(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId },
           body: { refreshCatalog: true },
           signal: AbortSignal.timeout(15000),
         }),
@@ -112,10 +109,9 @@ export function useFactoryCodexConnection(
 
   const cancel = useMutation({
     mutationFn: async () => {
-      const response = await factoriesCancelFactoryCodexConnection(
+      const response = await meCancelCodexConnection(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId },
           body: {},
           signal: AbortSignal.timeout(15000),
         }),
@@ -132,8 +128,7 @@ export function useFactoryCodexConnection(
   });
 
   const disconnect = useMutation({
-    mutationFn: async () =>
-      factoriesDisconnectFactoryCodexConnection(withOrganizationHeader({ organizationId, path: { factoryId } })),
+    mutationFn: async () => meDisconnectCodexConnection(withOrganizationHeader({ organizationId })),
     onSettled: refresh,
     onError: () => showErrorToast("Stop your tasks before you disconnect ChatGPT. Then try again."),
   });
@@ -152,12 +147,11 @@ export function useFactoryCodexConnection(
     if (availableModels.length > 0) {
       return;
     }
-    if (!canRefreshCatalog) return;
     if (!query.data.reservationHeld && !refreshAttempted.current && !refreshCatalog.isPending) {
       refreshAttempted.current = true;
       refreshCatalog.mutate();
     }
-  }, [canRefreshCatalog, enabled, refreshModels, organizationId, factoryId, query.data, queryClient, refreshCatalog]);
+  }, [enabled, refreshModels, organizationId, factoryId, query.data, queryClient, refreshCatalog]);
 
   return { query, start, cancel, refreshCatalog, disconnect, refresh };
 }

@@ -1,5 +1,6 @@
 import { isCodexActionCancelled } from "@/pages/factories/codex/codexActionContext";
 import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useState } from "react";
 
@@ -26,7 +27,7 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
         });
       } catch (error) {
         if (isCodexActionCancelled(error)) return;
-        showErrorToast("Failed to dispatch task.");
+        showErrorToast(getApiErrorMessage(error, "Failed to dispatch task."));
       } finally {
         setDispatchingOrderIds((current) => withoutOrderId(current, orderId));
       }

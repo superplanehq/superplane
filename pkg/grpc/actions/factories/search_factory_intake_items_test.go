@@ -358,7 +358,7 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		orders, err := factory.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{})
 		require.NoError(t, err)
 		assert.Empty(t, orders)
-		connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+		connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 		require.NoError(t, err)
 		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 		response, err := ImportFactoryIntakeItem(ctx, deps, orgID, req)

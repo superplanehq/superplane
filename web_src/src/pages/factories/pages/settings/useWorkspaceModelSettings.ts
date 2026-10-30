@@ -71,7 +71,12 @@ export function useWorkspaceModelSettings() {
   const providers = useModelProviderConnections(organizationId, factoryId, canRead);
   const selection = useCommittedModelSource(factory, providers);
   const subscription = useCodexSubscriptionCatalog(organizationId, factoryId, selection.subscriptionSelected);
-  const switcher = useModelSourceSwitch(organizationId, factoryId, selection.onSaved);
+  const switcher = useModelSourceSwitch(
+    organizationId,
+    factoryId,
+    selection.onSaved,
+    factory.onboarding?.codexDefaultOwnerId,
+  );
   const integrationsHref = useIntegrationsBasePath(organizationId);
   const chooseSource = (target: string) => {
     if (target === selection.source || !canUpdate || switcher.saving) return;
@@ -113,7 +118,7 @@ function useCodexSubscriptionCatalog(organizationId: string, factoryId: string, 
     Boolean,
   );
   const codex = useFactoryCodexConnection(organizationId, factoryId, selected || enabled, selected);
-  return { offered: enabled && codex.query.data?.eligible === true, codex };
+  return { offered: enabled, codex };
 }
 
 function resolveCurrentProvider(

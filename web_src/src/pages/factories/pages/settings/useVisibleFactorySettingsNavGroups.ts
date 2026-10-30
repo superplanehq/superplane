@@ -1,7 +1,6 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
-import { useCodexUsage } from "@/hooks/useCodexUsage";
 import { FEATURE_CODEX_SUBSCRIPTIONS, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 
 import {
@@ -15,17 +14,16 @@ import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
 const WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID = "workspace-superplane-mcp-server";
 
 /**
- * Drops nav items whose experimental features or connections are absent, and skips any group
+ * Drops nav items whose experimental features are absent, and skips any group
  * left with no items. The source groups stay static so other consumers
  * (e.g. route lookups) keep seeing the full, approved list.
  */
 function visibleFactorySettingsNavGroups(
   groups: FactorySettingsNavGroup[],
   hasExperimentalFeature: (featureId: string) => boolean,
-  hasCodexConnection: boolean,
 ): FactorySettingsNavGroup[] {
   const hiddenNavItemIds = new Set<string>();
-  if (!hasExperimentalFeature(FEATURE_CODEX_SUBSCRIPTIONS) || !hasCodexConnection) {
+  if (!hasExperimentalFeature(FEATURE_CODEX_SUBSCRIPTIONS)) {
     hiddenNavItemIds.add("account-codex-usage");
   }
   if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
@@ -45,19 +43,15 @@ function visibleFactorySettingsNavGroups(
 
 /**
  * Settings nav groups the current user can open: permission-gated items are
- * removed, then items with unavailable experimental features or connections.
+ * removed, then items with unavailable experimental features.
  */
 export function useVisibleFactorySettingsNavGroups(organizationId: string): FactorySettingsNavGroup[] {
   const settingsNavGroups = useFactorySettingsNavGroups();
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
-  const { has: hasExperimentalFeature, isLoading: featuresLoading } = useExperimentalFeature(organizationId);
-  const codexUsage = useCodexUsage(
-    organizationId,
-    !featuresLoading && hasExperimentalFeature(FEATURE_CODEX_SUBSCRIPTIONS),
-  );
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const billingProductEnabled = useBillingProductEnabled();
   const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, hasPermission, permissionsLoading);
-  const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature, Boolean(codexUsage.data?.length));
+  const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
   if (billingProductEnabled) {
     return visible;
   }

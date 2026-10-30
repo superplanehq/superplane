@@ -78,7 +78,7 @@ func TestRunnerAdmissionRejectsQueuedModelRemovedFromWorkspace(t *testing.T) {
 				"metadata":      datatypes.NewJSONType(map[string]any{models.CanvasNodeExecutionFrozenComponentKey: scenario.component}),
 			}).Error)
 			inherit := false
-			_, err = models.UpsertFactoryLLMModelAllowlist(db, connection.OrganizationID, connection.FactoryID, models.UsageProviderOpenAI, funding, []string{"permitted-model"}, &inherit)
+			_, err = models.UpsertFactoryLLMModelAllowlist(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), models.UsageProviderOpenAI, funding, []string{"permitted-model"}, &inherit)
 			require.NoError(t, err)
 			runner := &models.Runner{ID: uuid.New(), FleetID: previousRunner.FleetID, State: models.RunnerStateIdle, RunnerVersion: previousRunner.RunnerVersion}
 			require.NoError(t, db.Create(runner).Error)
@@ -137,7 +137,7 @@ func TestRunnerAdmissionRejectsInvalidSubscriptionAndContinuesFleetScan(t *testi
 					require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "allowed-model"}}, time.Now()))
 					selected = []string{"allowed-model"}
 				}
-				_, err := models.UpsertFactoryLLMModelAllowlist(db, connection.OrganizationID, connection.FactoryID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, selected, &inherit)
+				_, err := models.UpsertFactoryLLMModelAllowlist(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, selected, &inherit)
 				require.NoError(t, err)
 			case "missing task association":
 				expectedError = models.ErrSubscriptionTaskAssociation
@@ -173,7 +173,7 @@ func TestRunnerAdmissionRejectsInvalidSubscriptionAndContinuesFleetScan(t *testi
 }
 
 func TestRunnerAdmissionStopsAfterTenCandidatesAndResumesOnNextCall(t *testing.T) {
-	db, connection, first, runner, _ := queuedSubscriptionRunnerTask(t)
+	db, connection, first, runner, order := queuedSubscriptionRunnerTask(t)
 	now := time.Now()
 	require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", first.ID).Update("revoked_at", now).Error)
 	for i := 1; i < 10; i++ {
@@ -183,7 +183,7 @@ func TestRunnerAdmissionStopsAfterTenCandidatesAndResumesOnNextCall(t *testing.T
 		require.NoError(t, db.Create(&task).Error)
 		require.NoError(t, db.Create(&models.FactoryCodexLease{
 			ID: uuid.New(), ConnectionID: connection.ID, TaskID: task.ID,
-			Generation: int64(i + 1), Purpose: models.CodexLeasePurposeRun, RevokedAt: &now,
+			FactoryID: &order.FactoryID, Generation: int64(i + 1), Purpose: models.CodexLeasePurposeRun, RevokedAt: &now,
 		}).Error)
 	}
 	healthy := *first
@@ -287,9 +287,9 @@ func queuedSubscriptionRunnerTask(t *testing.T) (*gorm.DB, *models.FactoryCodexC
 	runner := &models.Runner{ID: uuid.New(), FleetID: previousRunner.FleetID, State: models.RunnerStateIdle, RunnerVersion: previousRunner.RunnerVersion}
 	require.NoError(t, db.Create(runner).Error)
 	runID := support.CreateCodexOwnedRun(t, db, connection, task.ID)
-	_, err := models.ReserveFactoryCodexConnection(db, connection.OrganizationID, connection.FactoryID, runID, task.ID, time.Now(), crypto.NewNoOpEncryptor())
+	_, err := models.ReserveFactoryCodexConnection(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), runID, task.ID, time.Now(), crypto.NewNoOpEncryptor())
 	require.NoError(t, err)
-	order, err := models.FindSubscriptionWorkOrderForRun(db, connection.OrganizationID, connection.FactoryID, runID)
+	order, err := models.FindSubscriptionWorkOrderForRun(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), runID)
 	require.NoError(t, err)
 	return db, connection, task, runner, order
 }

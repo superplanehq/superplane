@@ -49,7 +49,9 @@ export function WorkspaceModelPolicyEditor(props: PolicyEditorProps) {
         modelLabels={editor.labels}
         unavailableModels={editor.configuredIds.filter((id) => !editor.availableIds.includes(id))}
         unavailableLabel={
-          props.fundingSource === "subscription" ? "Unavailable in your subscription" : "Unavailable from this provider"
+          props.fundingSource === "subscription"
+            ? "Unavailable from connected members"
+            : "Unavailable from this provider"
         }
         selected={editor.selected}
         query={editor.search}
@@ -81,7 +83,7 @@ function ModelPolicyError({ label, onReload }: { label: string; onReload: () => 
 }
 
 const EMPTY_CATALOG_MESSAGES = {
-  subscription: "Connect ChatGPT or refresh your models to load your subscription catalog.",
+  subscription: "Connect Codex or ask a connected member to refresh their models.",
   hosted: "Ask an organization admin to make models available.",
   byok: "Check the provider integration, then reload the models.",
 };

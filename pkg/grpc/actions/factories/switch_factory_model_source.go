@@ -505,12 +505,25 @@ func switchFactoryModelSource(
 	apiKey string,
 	baseURL string,
 	apiType string,
+	defaultOwnerID string,
 ) ([]uuid.UUID, string, error) {
 	source = strings.TrimSpace(source)
 	subscription := source == modelSourceSubscription
 	if subscription {
-		if err := requireCodexConnection(tx, factory, versionOwnerID(ctx)); err != nil {
-			return nil, "", factoryErrorToStatus(err, "failed to switch model source")
+		if _, err := models.ActiveCodexMember(tx, factory.OrganizationID, versionOwnerID(ctx)); err != nil {
+			return nil, "", err
+		}
+		ownerID, err := uuid.Parse(strings.TrimSpace(defaultOwnerID))
+		if err != nil || ownerID == uuid.Nil {
+			return nil, "", factoryErrorToStatus(invalidArgument("Select a default task owner with Codex connected"), "failed to switch model source")
+		}
+		defaultOwnerID = ownerID.String()
+		eligible, err := models.SubscriptionOwnerEligible(tx.Clauses(clause.Locking{Strength: "SHARE"}).Session(&gorm.Session{}), factory.OrganizationID, factory.ID, ownerID)
+		if err != nil {
+			return nil, "", err
+		}
+		if !eligible {
+			return nil, "", factoryErrorToStatus(invalidArgument("The default task owner is unavailable. Select an active member with Codex connected."), "failed to switch model source")
 		}
 	}
 	var integration *models.Integration
@@ -562,6 +575,9 @@ func switchFactoryModelSource(
 	}
 
 	patch := models.FactoryOnboardingPatch{AgentHarness: &rewrite.Harness, CodexSubscription: &subscription}
+	if subscription {
+		patch.CodexDefaultOwnerID = &defaultOwnerID
+	}
 	if integration != nil {
 		id := integration.ID.String()
 		patch.AgentIntegrationID = &id
@@ -580,7 +596,7 @@ func switchFactoryModelSource(
 		return nil, "", err
 	}
 	if subscription {
-		repaired, err := fillSubscriptionIntakeOwners(tx, factory, ownerID)
+		repaired, err := replaceSubscriptionIntakeOwners(tx, factory, uuid.MustParse(defaultOwnerID), ownerID)
 		if err != nil {
 			return nil, "", err
 		}
@@ -661,6 +677,7 @@ func SwitchFactoryModelSourceInTransaction(
 	apiKey string,
 	baseURL string,
 	apiType string,
+	defaultOwnerIDs ...string,
 ) ([]uuid.UUID, string, error) {
 	if reg == nil {
 		return nil, "", fmt.Errorf("integration registry is required")
@@ -671,15 +688,19 @@ func SwitchFactoryModelSourceInTransaction(
 		return nil, "", err
 	}
 
+	defaultOwnerID := ""
+	if len(defaultOwnerIDs) > 0 {
+		defaultOwnerID = defaultOwnerIDs[0]
+	}
 	var changed []uuid.UUID
 	var integrationID string
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, err := findFactory(tx, orgID, factoryID)
+		factory, err := lockFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err
 		}
 		var savedID string
-		changed, savedID, err = switchFactoryModelSource(ctx, tx, reg, factory, source, apiKey, baseURL, apiType)
+		changed, savedID, err = switchFactoryModelSource(ctx, tx, reg, factory, source, apiKey, baseURL, apiType, defaultOwnerID)
 		integrationID = savedID
 		return err
 	})

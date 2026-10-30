@@ -123,7 +123,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
       },
       {
         id: "account-codex-usage",
-        label: "Codex usage",
+        label: "Codex",
         Icon: BarChart3,
         scope: "account",
         section: "codex-usage",

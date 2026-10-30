@@ -511,7 +511,7 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
 
 function invalidateSubscriptionState(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {
   void invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId);
-  void queryClient.invalidateQueries({ queryKey: ["factory-codex-connection", organizationId, factoryId] });
+  void queryClient.invalidateQueries({ queryKey: ["factory-codex-connection", organizationId] });
   void queryClient.invalidateQueries({ queryKey: ["me", organizationId] });
 }
 

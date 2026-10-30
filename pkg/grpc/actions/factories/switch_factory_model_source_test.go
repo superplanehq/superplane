@@ -535,16 +535,16 @@ func TestSwitchFactoryModelSourceSubscriptionRequiresConnectionAndAllowsHostedRe
 	require.NoError(t, err)
 	app := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
 	ctx := onboardingContext(r)
-	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "")
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "", r.User.String())
 	require.Error(t, err)
-	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	unchanged, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 	require.NoError(t, err)
 	assert.False(t, unchanged.OnboardingConfigValue().CodexSubscription)
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
-	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "")
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "", r.User.String())
 	require.NoError(t, err)
 	saved, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 	require.NoError(t, err)
@@ -561,11 +561,11 @@ func TestSwitchFactoryModelSourceSubscriptionRequiresConnectionAndAllowsHostedRe
 	require.NoError(t, err)
 	assert.False(t, saved.OnboardingConfigValue().CodexSubscription)
 	assertHostedAgentNode(t, db, app.ID)
-	_, err = models.FindFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User)
+	_, err = models.FindCodexConnection(db, r.Organization.ID, r.User)
 	require.NoError(t, err)
 }
 
-func TestSubscriptionSwitchRepairsIntakeDefaultsAtomically(t *testing.T) {
+func TestSubscriptionSwitchReplacesAllIntakeDefaultsAtomically(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	ctx := onboardingContext(r)
@@ -578,25 +578,49 @@ func TestSubscriptionSwitchRepairsIntakeDefaultsAtomically(t *testing.T) {
 		user := &models.User{ID: uuid.New(), OrganizationID: r.Organization.ID, Type: models.UserTypeHuman, Name: support.RandomName("member")}
 		require.NoError(t, db.Create(user).Error)
 		if connected {
-			connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, user.ID, time.Now())
+			connection, err := models.CreateCodexConnection(db, r.Organization.ID, user.ID, time.Now())
 			require.NoError(t, err)
 			require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 		}
 		return user.ID
 	}
 	connectedOwner, disconnectedOwner := makeMember(true), makeMember(false)
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
-	require.NoError(t, err)
-	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	intakes := []*pb.FactoryIntake{}
 	for _, owner := range []string{"", disconnectedOwner.String(), connectedOwner.String()} {
 		response, err := CreateFactoryIntake(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: &owner}})
 		require.NoError(t, err)
 		intakes = append(intakes, response.Intake)
 	}
-	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "")
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "", connectedOwner.String())
 	require.NoError(t, err)
-	for i, expected := range []string{r.User.String(), r.User.String(), connectedOwner.String()} {
+	saved, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, connectedOwner.String(), saved.OnboardingConfigValue().CodexDefaultOwnerID)
+	for _, intake := range intakes {
+		version, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(intake.CanvasId))
+		require.NoError(t, err)
+		require.NotNil(t, version.OwnerID)
+		assert.Equal(t, r.User, *version.OwnerID, "the acting admin remains the audit author")
+	}
+	// A future intake inherits the saved default; an explicit choice still wins.
+	inherited, err := CreateFactoryIntake(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true})
+	require.NoError(t, err)
+	assert.Equal(t, connectedOwner.String(), inherited.Intake.GetSettings().GetDefaultOwnerId())
+	explicitOwner := makeMember(true).String()
+	overridden, err := CreateFactoryIntake(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: &explicitOwner}})
+	require.NoError(t, err)
+	assert.Equal(t, explicitOwner, overridden.Intake.GetSettings().GetDefaultOwnerId())
+	selectedConnection, err := models.FindCodexConnection(db, r.Organization.ID, connectedOwner)
+	require.NoError(t, err)
+	require.NoError(t, selectedConnection.Disconnect(db, time.Now()))
+	_, err = CreateFactoryIntake(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true})
+	require.ErrorContains(t, err, "Select a default task owner")
+	// A stale Models selection cannot activate a disconnected subscription.
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "", connectedOwner.String())
+	require.Error(t, err)
+	require.NoError(t, db.Model(selectedConnection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("reconnected-bundle")}).Error)
+
+	for i, expected := range []string{connectedOwner.String(), connectedOwner.String(), connectedOwner.String()} {
 		assert.Equal(t, expected, liveIntakeNode(t, r.Organization.ID, intakes[i], intakeCreateNodeID).Configuration["defaultOwnerId"])
 	}
 	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "hosted", "", "", "")
@@ -624,7 +648,7 @@ func TestSubscriptionSwitchRepairsIntakeDefaultsAtomically(t *testing.T) {
 				}
 			}
 			require.NoError(t, db.Model(live).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
-			_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "")
+			_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), "subscription", "", "", "", connectedOwner.String())
 			require.Error(t, err)
 			reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 			require.NoError(t, err)

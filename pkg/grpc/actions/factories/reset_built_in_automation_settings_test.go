@@ -659,15 +659,20 @@ func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing
 	db := database.DB(t.Context())
 	enableHostedSuperPlaneAgent(t, db)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	otherOwner := support.CreateUser(t, r, r.Organization.ID)
+	otherConnection, err := models.CreateCodexConnection(db, r.Organization.ID, otherOwner.ID, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(otherConnection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("other-bundle")}).Error)
 	scheduled := resetTestTemplate(t, r, factory, scheduledIntakeTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
-		findYAMLNode(t, doc, "create-task").Configuration["defaultOwnerId"] = r.User.String()
+		findYAMLNode(t, doc, "create-task").Configuration["defaultOwnerId"] = otherOwner.ID.String()
 	})
 	planner := support.CreateFactoryCanvas(t, r, factory.ID, "Planner")
 	resetTestPublishCanvas(t, r, planner, buildBacklogCanvas(backlogCanvasRequest{Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent}}))
 	repository := "acme/app"
 	subscription := true
-	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription, AppRepository: &repository}))
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	defaultOwnerID := r.User.String()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription, CodexDefaultOwnerID: &defaultOwnerID, AppRepository: &repository}))
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "native-allowed"}, {Model: "native-excluded"}}, time.Now()))
@@ -695,5 +700,8 @@ func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing
 			assert.Equal(t, map[string]any{"source": "subscription"}, node.Configuration["credentials"])
 		}
 	}
-	assert.Equal(t, r.User.String(), findIntakeNode(resetTestLiveVersion(t, scheduled).Nodes, "create-task").Configuration["defaultOwnerId"])
+	assert.Equal(t, otherOwner.ID.String(), findIntakeNode(resetTestLiveVersion(t, scheduled).Nodes, "create-task").Configuration["defaultOwnerId"])
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, defaultOwnerID, reloaded.OnboardingConfigValue().CodexDefaultOwnerID)
 }

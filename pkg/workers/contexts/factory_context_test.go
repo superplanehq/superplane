@@ -2438,7 +2438,7 @@ func TestFactoryContextDefaultOwner(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, database.Conn().Delete(member).Error)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	for _, tc := range []struct {

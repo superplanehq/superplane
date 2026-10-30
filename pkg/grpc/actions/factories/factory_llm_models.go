@@ -147,18 +147,19 @@ func factoryLLMPolicyParent(ctx context.Context, tx *gorm.DB, factory *models.Fa
 		if _, err := models.ActiveCodexMember(tx, factory.OrganizationID, callerID); err != nil {
 			return nil, nil, err
 		}
-		available, err := models.FactoryCodexAvailableSubscriptionModels(tx, factory.OrganizationID, factory.ID, callerID)
-		if err != nil || len(available) == 0 {
-			return available, nil, err
-		}
-		connection, err := models.FindFactoryCodexConnection(tx, factory.OrganizationID, factory.ID, callerID)
+		connections, err := models.ListEligibleCodexConnections(tx, factory.OrganizationID)
 		if err != nil {
 			return nil, nil, err
 		}
-		names := make(map[string]string, len(connection.AvailableModels))
-		for _, model := range connection.AvailableModels {
-			names[model.Model] = strings.TrimSpace(model.DisplayName)
+		var available []string
+		names := map[string]string{}
+		for _, connection := range connections {
+			for _, model := range connection.AvailableModels {
+				available = append(available, model.Model)
+				names[model.Model] = strings.TrimSpace(model.DisplayName)
+			}
 		}
+		available = models.CompactModelIDs(available)
 		return available, names, nil
 	}
 	if source == models.UsageFundingSourceBYOK {

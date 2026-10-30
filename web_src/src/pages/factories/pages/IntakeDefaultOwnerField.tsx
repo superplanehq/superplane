@@ -18,6 +18,7 @@ export function IntakeDefaultOwnerField({
   disabled = false,
   factoryId,
   required = false,
+  prospectiveSubscription = false,
   title = "Default task owner",
   description = "Assign this person when intake creates a task.",
 }: {
@@ -27,6 +28,7 @@ export function IntakeDefaultOwnerField({
   disabled?: boolean;
   factoryId?: string;
   required?: boolean;
+  prospectiveSubscription?: boolean;
   title?: string;
   description?: string;
 }) {
@@ -48,6 +50,7 @@ export function IntakeDefaultOwnerField({
           value={value}
           onChange={onChange}
           disabled={disabled}
+          prospectiveSubscription={prospectiveSubscription}
           labelId={labelId}
           helpId={helpId}
         />
@@ -105,6 +108,7 @@ function ConnectedOwnerSelect({
   value,
   onChange,
   disabled,
+  prospectiveSubscription,
   labelId,
   helpId,
 }: {
@@ -113,10 +117,11 @@ function ConnectedOwnerSelect({
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
+  prospectiveSubscription: boolean;
   labelId: string;
   helpId: string;
 }) {
-  const eligibility = useFactoryOwnerEligibility(organizationId, factoryId);
+  const eligibility = useFactoryOwnerEligibility(organizationId, factoryId, undefined, prospectiveSubscription);
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const displays = buildOrgUserDisplayMap(users);
   const { currentUserId } = usePermissions();
@@ -159,13 +164,15 @@ function ConnectedOwnerSelect({
       {value && selected && !selected.eligible ? (
         <p className="text-sm text-muted-foreground">This owner must reconnect Codex before tasks can run.</p>
       ) : null}
-      {!eligibility.isPending && !eligibility.isError && !members.some((member) => member.eligible) ? (
+      {!eligibility.isPending &&
+      !eligibility.isError &&
+      !members.some((member) => member.userId === currentUserId && member.eligible) ? (
         <ConnectCodexPrompt
           organizationId={organizationId}
           factoryId={factoryId}
           disabled={disabled}
           onConnected={async () => {
-            await eligibility.refetch();
+            // Setup refreshes eligibility before invoking this continuation.
             if (currentUserId) onChange(currentUserId);
           }}
         />

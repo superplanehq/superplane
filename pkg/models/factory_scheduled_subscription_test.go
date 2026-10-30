@@ -17,7 +17,7 @@ import (
 
 func TestScheduledSubscriptionReservationUsesPersistedVersionBeforeTaskExists(t *testing.T) {
 	db, connection, _, _ := newReadyCodexConnection(t)
-	factory, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
+	factory, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
 	require.NoError(t, err)
 	enabled := true
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &enabled}))
@@ -66,7 +66,7 @@ func TestScheduledSubscriptionRejectsUntrustedOrAmbiguousRunAssociations(t *test
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			db, connection, _, _ := newReadyCodexConnection(t)
-			factory, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
+			factory, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
 			require.NoError(t, err)
 			enabled := true
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &enabled}))

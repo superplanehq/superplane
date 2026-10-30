@@ -10,30 +10,27 @@ import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 type CodexConnection = ReturnType<typeof useFactoryCodexConnection>;
 
 function useCodexConnectionState(codex: CodexConnection) {
-  const { canAct, isLoading } = usePermissions();
+  const { isLoading } = usePermissions();
   const { organizationId } = useFactorySettingsLayout();
   const features = useExperimentalFeature(organizationId);
   const connection = codex.query.data;
   const offered = [!features.isLoading, features.has(FEATURE_CODEX_SUBSCRIPTIONS), connection?.eligible === true].every(
     Boolean,
   );
-  const disabled = [
-    !canAct("factories", "read"),
-    isLoading,
-    codex.query.isLoading,
-    connection?.revocationPending === true,
-    !offered,
-  ].some(Boolean);
+  const disabled = [isLoading, codex.query.isLoading, connection?.revocationPending === true, !offered].some(Boolean);
+  const ready = connection?.status === "ready";
   const signingIn =
-    ["pending", "finishing", "canceling"].includes(connection?.status ?? "") || connection?.reservationHeld === true;
-  const ready = connection?.status === "ready" && !signingIn;
+    !ready &&
+    (["pending", "finishing", "canceling"].includes(connection?.status ?? "") || connection?.reservationHeld === true);
+  const refreshing = ready && (codex.refreshCatalog.isPending || connection?.reservationHeld === true);
   const reconnect = connection?.status === "reconnect_required";
 
   return {
     connection,
-    disabled,
+    disabled: disabled || refreshing,
     signingIn,
     ready,
+    refreshing,
     reconnect,
     status: connectionStatus(features.isLoading || codex.query.isLoading, connection),
   };
@@ -47,7 +44,7 @@ function connectionStatus(loading: boolean, connection: FactoriesFactoryCodexCon
 }
 
 export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConnection }) {
-  const { connection, disabled, signingIn, ready, reconnect, status } = useCodexConnectionState(codex);
+  const { connection, disabled, signingIn, ready, refreshing, reconnect, status } = useCodexConnectionState(codex);
 
   if (signingIn)
     return (
@@ -81,11 +78,12 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
                 type="button"
                 variant="outline"
                 size="sm"
-                loading={codex.refreshCatalog.isPending}
+                loading={refreshing}
+                aria-busy={refreshing}
                 disabled={disabled}
                 onClick={() => codex.refreshCatalog.mutate()}
               >
-                Refresh models
+                Refresh usage and models
               </LoadingButton>
               <LoadingButton
                 type="button"
@@ -99,16 +97,30 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
               </LoadingButton>
             </>
           ) : (
-            <LoadingButton
-              type="button"
-              variant="outline"
-              size="sm"
-              loading={codex.start.isPending}
-              disabled={disabled}
-              onClick={() => codex.start.mutate()}
-            >
-              {reconnect ? "Reconnect ChatGPT" : "Connect ChatGPT"}
-            </LoadingButton>
+            <>
+              <LoadingButton
+                type="button"
+                variant="outline"
+                size="sm"
+                loading={codex.start.isPending}
+                disabled={disabled}
+                onClick={() => codex.start.mutate()}
+              >
+                {reconnect ? "Reconnect ChatGPT" : "Connect ChatGPT"}
+              </LoadingButton>
+              {reconnect ? (
+                <LoadingButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  loading={codex.disconnect.isPending}
+                  disabled={disabled}
+                  onClick={() => codex.disconnect.mutate()}
+                >
+                  Disconnect ChatGPT
+                </LoadingButton>
+              ) : null}
+            </>
           )}
         </div>
       </div>

@@ -29,7 +29,7 @@ func TestSubscriptionConnectionsAndCatalogsFollowTheTaskOwner(t *testing.T) {
 	subscription := true
 	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
 	owner := support.CreateUser(t, r, r.Organization.ID)
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, owner.ID, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, owner.ID, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("owner-bundle"), "account_label": "private-owner-account"}).Error)
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "owner-model"}}, time.Now()))
@@ -93,7 +93,7 @@ func TestSubscriptionConnectionsAndCatalogsFollowTheTaskOwner(t *testing.T) {
 	assert.Equal(t, []uuid.UUID{owner.ID}, persisted.AssigneeIDs())
 	_, err = DispatchWorkOrder(caller, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{FactoryId: f.ID.String(), OrderId: created.Order.Id, LineName: "ship", Model: "owner-model"})
 	requireCodexConnectionRequired(t, err)
-	callerConnection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
+	callerConnection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(callerConnection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("caller-bundle")}).Error)
 	require.NoError(t, callerConnection.StoreUsage(db, nil, []models.CodexModel{{Model: "starter-model"}}, time.Now()))
@@ -154,7 +154,7 @@ func TestSubscriptionStartReassignsOpenTasksAndStepRetries(t *testing.T) {
 	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
 	previous := support.CreateUser(t, r, r.Organization.ID)
 	for _, userID := range []uuid.UUID{previous.ID, r.User} {
-		connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, userID, time.Now())
+		connection, err := models.CreateCodexConnection(db, r.Organization.ID, userID, time.Now())
 		require.NoError(t, err)
 		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 		catalog := []models.CodexModel{{Model: "shared-model"}}

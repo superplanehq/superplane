@@ -5,7 +5,10 @@ import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
 export function useIntakeOwnerDraft(organizationId: string, factoryId: string) {
   const layout = useOptionalFactoriesLayout();
   const required = layout?.factory?.onboarding?.codexSubscription === true;
-  const [value, setValue] = useState("");
+  const scope = `${organizationId}:${factoryId}`;
+  const [choice, setChoice] = useState<{ scope: string; value: string } | null>(null);
+  const value = choice?.scope === scope ? choice.value : (layout?.factory?.onboarding?.codexDefaultOwnerId ?? "");
+  const setValue = (next: string) => setChoice({ scope, value: next });
   return {
     organizationId,
     factoryId,

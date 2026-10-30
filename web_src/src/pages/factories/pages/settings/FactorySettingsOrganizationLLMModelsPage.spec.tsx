@@ -3,9 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
-  factoriesCancelFactoryCodexConnection,
-  factoriesDescribeFactoryCodexConnection,
-  factoriesStartFactoryCodexConnection,
+  meCancelCodexConnection,
+  factoriesListFactoryOwnerEligibility,
+  meDescribeCodexConnection,
+  meStartCodexConnection,
   type FactoriesFactoryCodexConnection,
 } from "@/api-client";
 import { showErrorToast } from "@/lib/toast";
@@ -75,15 +76,26 @@ vi.mock("@/hooks/useLLMModelAllowlists", () => ({
 }));
 vi.mock("@/api-client", () => ({
   ...unmockedSrc<Record<string, unknown>>("api-client/index.ts"),
-  factoriesDescribeFactoryCodexConnection: vi.fn(),
-  factoriesStartFactoryCodexConnection: vi.fn(),
-  factoriesCancelFactoryCodexConnection: vi.fn(),
+  meDescribeCodexConnection: vi.fn(),
+  meStartCodexConnection: vi.fn(),
+  meCancelCodexConnection: vi.fn(),
+  factoriesListFactoryOwnerEligibility: vi.fn(),
 }));
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: (resource: string, action: string) =>
       (resource === "factories" && (action === "read" ? canConnect : canUpdate)) ||
       (resource === "integrations" && canUpdate),
+    isLoading: false,
+    currentUserId: "me",
+  }),
+}));
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganizationUsers: () => ({
+    data: [
+      { metadata: { id: "me" }, spec: { displayName: "Current member" } },
+      { metadata: { id: "other" }, spec: { displayName: "Other member" } },
+    ],
     isLoading: false,
   }),
 }));
@@ -99,15 +111,30 @@ describe("workspace LLM model settings", () => {
     policy("anthropic", "hosted", ["claude-sonnet-4-6", "claude-opus-4-6"]);
     policy("openai", "byok", ["gpt-5", "gpt-4.1"]);
     codexConnection = { status: "disconnected", eligible: true };
-    vi.mocked(factoriesDescribeFactoryCodexConnection)
+    vi.mocked(meDescribeCodexConnection)
       .mockReset()
       .mockImplementation(async () => ({ data: { connection: codexConnection } }) as never);
-    vi.mocked(factoriesStartFactoryCodexConnection)
+    vi.mocked(meStartCodexConnection)
       .mockReset()
       .mockResolvedValue({ data: {} } as never);
-    vi.mocked(factoriesCancelFactoryCodexConnection)
+    vi.mocked(meCancelCodexConnection)
       .mockReset()
       .mockResolvedValue({ data: {} } as never);
+    vi.mocked(factoriesListFactoryOwnerEligibility)
+      .mockReset()
+      .mockImplementation(
+        async () =>
+          ({
+            data: {
+              subscription: true,
+              ownershipChangeAllowed: true,
+              members: [
+                { userId: "me", eligible: codexConnection?.status === "ready" },
+                { userId: "other", eligible: true },
+              ],
+            },
+          }) as never,
+      );
     saveModels.mockReset().mockResolvedValue({});
     switchSource.mockReset().mockResolvedValue({});
     vi.mocked(showErrorToast).mockClear();
@@ -194,7 +221,7 @@ describe("workspace LLM model settings", () => {
     renderPage("AGENT_HARNESS_CODEX", true);
     const unavailable = await screen.findByRole("checkbox", { name: /native-model-unavailable/ });
     expect(unavailable).toBeChecked();
-    expect(screen.getByText("Unavailable in your subscription")).toBeInTheDocument();
+    expect(screen.getByText("Unavailable from connected members")).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole("checkbox", { name: /gpt-5.4/i }));
     expect(
@@ -253,7 +280,7 @@ describe("workspace LLM model settings", () => {
     renderPage("AGENT_HARNESS_CODEX", true);
     const connect = await screen.findByRole("button", { name: "Reconnect ChatGPT" });
     await userEvent.setup().click(connect);
-    expect(factoriesStartFactoryCodexConnection).toHaveBeenCalledTimes(1);
+    expect(meStartCodexConnection).toHaveBeenCalledTimes(1);
     expect(switchSource).not.toHaveBeenCalled();
   });
 

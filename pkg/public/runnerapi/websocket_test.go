@@ -51,7 +51,7 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 				require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
 				factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
 				require.NoError(t, err)
-				subscription, err = models.CreateFactoryCodexConnection(db, resource.Organization.ID, factory.ID, resource.User, time.Now().Add(-time.Hour))
+				subscription, err = models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now().Add(-time.Hour))
 				require.NoError(t, err)
 				require.NoError(t, db.Model(subscription).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 				subscription, err = models.ReserveFactoryCodexConnection(db, resource.Organization.ID, factory.ID, support.CreateCodexOwnedRun(t, db, subscription, taskID), taskID, time.Now().Add(-time.Hour), resource.Encryptor)
