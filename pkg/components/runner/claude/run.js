@@ -861,17 +861,6 @@ function formatSystem(event) {
     parts.push(`cwd=${event.cwd}`);
   }
   println(parts.join(" · "));
-  const tools = Array.isArray(event.tools)
-    ? event.tools.map((tool) => String(tool))
-    : [];
-  const planningTools = tools.filter((tool) =>
-    tool.includes("mcp__superplane"),
-  );
-  println(
-    planningTools.length > 0
-      ? `planning tools: ${planningTools.join(", ")}`
-      : "planning tools: none",
-  );
   if (event.mcp_server_errors) {
     println(`mcp errors: ${JSON.stringify(event.mcp_server_errors)}`);
   }
