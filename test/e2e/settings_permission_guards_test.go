@@ -342,3 +342,67 @@ func (s *settingsPermissionGuardSteps) assertPermissionDenied() {
 	s.session.AssertVisible(q.TestID("permission-denied-page"))
 	s.session.AssertText("Permission denied")
 }
+
+type permissionSpec struct {
+	resource string
+	action   string
+}
+
+func organizationPermission(resource, action string) *permissionSpec {
+	return &permissionSpec{resource: resource, action: action}
+}
+
+func loginAsOperator(t *testing.T, sess *session.TestSession) {
+	account := createAccountForRole(t, sess, "operator", models.RoleOrgOperator)
+	sess.Account = account
+	sess.Login()
+}
+
+func loginWithOrganizationPermissions(t *testing.T, sess *session.TestSession, roleLabel string, permissions ...*permissionSpec) {
+	roleName := support.RandomName(roleLabel)
+	rolePermissions := make([]*authorization.Permission, 0, len(permissions))
+	for _, permission := range permissions {
+		rolePermissions = append(rolePermissions, &authorization.Permission{
+			Resource:   permission.resource,
+			Action:     permission.action,
+			DomainType: models.DomainTypeOrganization,
+		})
+	}
+
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+
+	err = authService.CreateCustomRole(sess.OrgID.String(), &authorization.RoleDefinition{
+		Name:        roleName,
+		DisplayName: roleLabel,
+		DomainType:  models.DomainTypeOrganization,
+		Description: "E2E permission guard role",
+		Permissions: rolePermissions,
+		InheritsFrom: &authorization.RoleDefinition{
+			Name:       models.RoleOrgOperator,
+			DomainType: models.DomainTypeOrganization,
+		},
+	})
+	require.NoError(t, err)
+
+	account := createAccountForRole(t, sess, roleLabel, roleName)
+	sess.Account = account
+	sess.Login()
+}
+
+func createAccountForRole(t *testing.T, sess *session.TestSession, label, roleName string) *models.Account {
+	email := support.RandomName(label) + "@superplane.local"
+	account, err := models.CreateAccount(label, email)
+	require.NoError(t, err)
+
+	user, err := models.CreateUser(sess.OrgID, account.ID, email, label)
+	require.NoError(t, err)
+
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+
+	err = authService.AssignRole(user.ID.String(), roleName, sess.OrgID.String(), models.DomainTypeOrganization)
+	require.NoError(t, err)
+
+	return account
+}

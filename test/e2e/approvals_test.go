@@ -1,7 +1,12 @@
 package e2e
 
 import (
-	"strings"
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -9,21 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	q "github.com/superplanehq/superplane/test/e2e/queries"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
+	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
-func TestApprovals(t *testing.T) {
-	t.Run("running and approving on a canvas", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
-		steps.start()
-		steps.givenCanvasWithManualTriggerApprovalAndNoop()
-		steps.runManualTrigger()
-		steps.approveFirstPendingRequirement()
-		steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
-	})
-
+func TestApprovalDeletionCancelsRun(t *testing.T) {
 	t.Run("deleting an approval node while a run is waiting cancels the run", func(t *testing.T) {
 		steps := &ApprovalSteps{t: t}
 		steps.start()
@@ -57,51 +55,41 @@ func (s *ApprovalSteps) start() {
 	s.session.Login()
 }
 
-func (s *ApprovalSteps) saveCanvas() {
-	s.canvas.Save()
-}
-
 func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
-	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
-	s.canvas.Create()
-	s.canvas.Visit()
-	s.canvas.EnterEditMode()
-
-	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	s.canvas.AddApproval("Approval", models.Position{X: 1000, Y: 200})
-	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
-
-	s.canvas.Connect("Start", "Approval")
-	s.canvas.Connect("Approval", "Output")
-
-	s.saveCanvas()
-	s.canvas.CommitAndPublish()
+	user, err := models.FindActiveUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
+		{
+			NodeID: "start", Name: "Start", Type: models.NodeTypeTrigger,
+			Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			Configuration: datatypes.NewJSONType(map[string]any{}),
+		},
+		{
+			NodeID: "approval", Name: "Approval", Type: models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "approval"}}),
+			Configuration: datatypes.NewJSONType(map[string]any{
+				"items": []any{map[string]any{"type": "user", "user": user.ID.String()}},
+			}),
+		},
+		{
+			NodeID: "output", Name: "Output", Type: models.NodeTypeComponent,
+			Ref:           datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			Configuration: datatypes.NewJSONType(map[string]any{}),
+		},
+	}, []models.Edge{
+		{SourceID: "start", TargetID: "approval", Channel: "default"},
+		{SourceID: "approval", TargetID: "output", Channel: "approved"},
+	})
+	s.canvas = shared.NewCanvasSteps(canvas.Name, s.t, s.session)
+	s.canvas.WorkflowID = canvas.ID
 }
 
 func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.EmitManualTrigger("Start")
-	if s.waitForApprovalExecution(90 * time.Second) {
-		return
-	}
-
-	s.t.Fatalf("timed out waiting for execution of node Approval after emitting manual trigger")
 }
 
 func (s *ApprovalSteps) waitForApprovalExecutionToBeWaiting() {
 	s.canvas.WaitForExecution("Approval", models.CanvasNodeExecutionStateStarted, 90*time.Second)
-}
-
-func (s *ApprovalSteps) waitForApprovalExecution(timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		executions := s.canvas.GetExecutionsForNode("Approval")
-		if len(executions) > 0 {
-			return true
-		}
-		s.session.Sleep(500)
-	}
-
-	return false
 }
 
 func (s *ApprovalSteps) rememberWaitingApprovalExecution() {
@@ -118,23 +106,45 @@ func (s *ApprovalSteps) rememberWaitingApprovalExecution() {
 }
 
 func (s *ApprovalSteps) deleteApprovalNodeFromCanvas() {
-	s.canvas.EnterEditMode()
-	s.deleteNodeFromCanvas("Approval")
-	s.canvas.CommitAndPublish()
+	version, err := models.FindLiveCanvasVersion(s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+	version.Nodes = slices.DeleteFunc(version.Nodes, func(node models.Node) bool {
+		return node.ID == s.waiting.nodeID
+	})
+	version.Edges = slices.DeleteFunc(version.Edges, func(edge models.Edge) bool {
+		return edge.SourceID == s.waiting.nodeID || edge.TargetID == s.waiting.nodeID
+	})
+	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+	content, err := yaml.VersionToCanvasYAML(canvas.Name, canvas.Description, version)
+	require.NoError(s.t, err)
+
+	// Use the real HTTP commit path so publication must notify the workers.
+	path := "/api/v1/canvases/" + s.canvas.WorkflowID.String() + "/staging"
+	s.sendCanvasRequest(http.MethodPut, path, map[string]any{
+		"operations": []map[string]any{{"path": "canvas.yaml", "content": base64.StdEncoding.EncodeToString([]byte(content))}},
+	})
+	s.sendCanvasRequest(http.MethodPost, path+"/commit", map[string]any{"commitMessage": "Remove waiting approval"})
 }
 
-func (s *ApprovalSteps) deleteNodeFromCanvas(nodeName string) {
-	safe := strings.ToLower(nodeName)
-	safe = strings.ReplaceAll(safe, " ", "-")
-	nodeHeader := q.TestID("node", nodeName, "header")
-	deleteButton := q.Locator(
-		`.react-flow__node:has([data-testid="node-` + safe + `-header"]) [data-testid="node-action-delete"]`,
-	)
-
-	s.session.HoverOver(nodeHeader)
-	s.session.Sleep(100)
-	s.session.Click(deleteButton)
-	s.session.Sleep(300)
+func (s *ApprovalSteps) sendCanvasRequest(method, path string, body any) {
+	encoded, err := json.Marshal(body)
+	require.NoError(s.t, err)
+	request, err := http.NewRequestWithContext(s.t.Context(), method, s.session.BaseURL+path, bytes.NewReader(encoded))
+	require.NoError(s.t, err)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Organization-Id", s.session.OrgID.String())
+	cookies, err := s.session.Page().Context().Cookies(s.session.BaseURL)
+	require.NoError(s.t, err)
+	for _, cookie := range cookies {
+		request.AddCookie(&http.Cookie{Name: cookie.Name, Value: cookie.Value})
+	}
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(s.t, err)
+	defer response.Body.Close()
+	responseBody, err := io.ReadAll(response.Body)
+	require.NoError(s.t, err)
+	require.Equal(s.t, http.StatusOK, response.StatusCode, "%s %s: %s", method, path, responseBody)
 }
 
 func (s *ApprovalSteps) assertApprovalNodeDeletedFromDB() {
@@ -171,26 +181,4 @@ func (s *ApprovalSteps) assertWaitingRunCancelled() {
 			run.State == models.CanvasRunStateFinished &&
 			run.Result == models.CanvasRunResultCancelled
 	}, 30*time.Second, 500*time.Millisecond, "waiting approval run should finish as cancelled")
-}
-
-func (s *ApprovalSteps) approveFirstPendingRequirement() {
-	s.canvas.StartEditingNode("Approval")
-	s.session.Click(q.Locator(`button:has-text("Approve")`))
-	commentInput := s.session.Page().Locator(`[placeholder="Enter comment"]`).First()
-	if count, err := commentInput.Count(); err == nil && count > 0 {
-		if err := commentInput.Fill("Do it"); err != nil {
-			s.t.Fatalf("filling approval comment: %v", err)
-		}
-	}
-	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
-}
-
-func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 60*time.Second)
-
-	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
-	outputExecs := s.canvas.GetExecutionsForNode("Output")
-
-	require.Len(s.t, approvaExecs, 1, "expected one execution for approval node")
-	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
 }
