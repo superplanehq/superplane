@@ -2,6 +2,7 @@ package codex
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -262,6 +263,7 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 }
 (async () => {
   await restore();
+  if ((fs.statSync(child.CODEX_HOME).mode & 0o777) !== 0o700 || (fs.statSync(child.CODEX_HOME + "/auth.json").mode & 0o777) !== 0o600) throw new Error("restore permissions are unsafe");
   const auth = fs.readFileSync(process.env.SUPERPLANE_TASK_DIR + "/codex-home/auth.json", "utf8");
   const redacted = redactSecrets("token " + JSON.parse(auth).refresh_token);
   if (redacted.includes(JSON.parse(auth).refresh_token)) {
@@ -291,6 +293,7 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 		"SUPERPLANE_BASE_URL="+server.URL,
 		"SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=runner-token",
 		"OPENAI_API_KEY=sk-secret",
+		"SUPERPLANE_RESULT_FILE="+filepath.Join(taskDir, "result.json"),
 		"OPENAI_BASE_URL=https://api.openai.com/v1",
 	)
 	out, err := cmd.CombinedOutput()
@@ -324,10 +327,90 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 	assert.Equal(t, "https://auth.openai.com/codex/device", progress["verificationUrl"])
 	assert.Equal(t, "CODE-1234", progress["verificationCode"])
 
-	info, err := os.Stat(filepath.Join(taskDir, "codex-home", "auth.json"))
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
-	home, err := os.Stat(filepath.Join(taskDir, "codex-home"))
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o700), home.Mode().Perm())
+	_, err = os.Stat(filepath.Join(taskDir, "codex-home"))
+	require.True(t, os.IsNotExist(err), "successful login must remove temporary credentials")
+}
+
+func TestSubscriptionSetupCommandsConfirmCleanupBeforeSuccess(t *testing.T) {
+	for _, command := range []string{"login", "refresh"} {
+		for _, failure := range []string{"", "removal", "checkpoint", "result", "shutdown"} {
+			t.Run(command+"/"+failure, func(t *testing.T) {
+				taskDir := t.TempDir()
+				home := filepath.Join(taskDir, "codex-home")
+				resultFile := filepath.Join(taskDir, "result.json")
+				require.NoError(t, os.WriteFile(resultFile, []byte(`{"unrelated":"preserved","codexSubscriptionSetupCleaned":true}`), 0o600))
+				binDir := filepath.Join(taskDir, "bin")
+				require.NoError(t, os.Mkdir(binDir, 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(binDir, "codex"), []byte(`#!/usr/bin/env node
+const fs = require("fs");
+const bundle = { access_token: "access-secret-value", refresh_token: "refresh-secret-value", id_token: "id-secret-value" };
+if (process.argv[2] === "login") {
+  fs.writeFileSync(process.env.CODEX_HOME + "/auth.json", JSON.stringify(bundle));
+  process.stdout.write("https://auth.openai.com/codex/device\nCODE-1234\n");
+} else {
+  fs.writeFileSync(process.env.SUPERPLANE_TASK_DIR + "/child.pid", String(process.pid));
+  require("readline").createInterface({ input: process.stdin }).on("line", line => {
+    const request = JSON.parse(line);
+    if (!request.id) return;
+    const result = request.method === "model/list" ? { data: [{ model: "gpt-5.4" }] } : {};
+    process.stdout.write(JSON.stringify({ id: request.id, result }) + "\n");
+  });
+}
+`), 0o700))
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/api/v1/runner/codex-subscription/credentials" {
+						_ = json.NewEncoder(w).Encode(map[string]any{"bundle": map[string]any{"refresh_token": "refresh-secret-value"}})
+						return
+					}
+					if r.URL.Path == "/api/v1/runner/codex-subscription/checkpoint" {
+						pid, err := os.ReadFile(filepath.Join(taskDir, "child.pid"))
+						require.NoError(t, err)
+						_, err = os.Stat("/proc/" + string(pid))
+						assert.True(t, os.IsNotExist(err), "Codex must close before the final checkpoint")
+						if failure == "checkpoint" {
+							http.Error(w, "rejected", http.StatusConflict)
+							return
+						}
+					}
+					_ = json.NewEncoder(w).Encode(map[string]any{"accepted": true, "version": 1})
+				}))
+				t.Cleanup(server.Close)
+				_, callerFile, _, ok := runtime.Caller(0)
+				require.True(t, ok)
+				// Preload a filesystem fault at the real CLI boundary. Permissions are unreliable as root.
+				preload := filepath.Join(taskDir, "fault.js")
+				require.NoError(t, os.WriteFile(preload, []byte(`const fs = require("fs");
+const write = fs.writeFileSync;
+fs.writeFileSync = function(file, contents, ...args) {
+  if (file === process.env.SUPERPLANE_RESULT_FILE && JSON.parse(contents).codexSubscriptionSetupCleaned === true && fs.existsSync(process.env.CODEX_HOME)) throw new Error("credentials still present");
+  if (file === process.env.SUPERPLANE_RESULT_FILE && JSON.parse(contents).codexSubscriptionSetupCleaned === true && process.env.FAIL_RESULT === "true") throw new Error("cannot save refresh-secret-value");
+  return write.call(this, file, contents, ...args);
+};
+if (process.env.FAIL_REMOVAL === "true") fs.rmSync = () => { throw new Error("cannot remove refresh-secret-value"); };
+if (process.env.FAIL_SHUTDOWN === "true") require("child_process").ChildProcess.prototype.kill = () => { throw new Error("cannot stop refresh-secret-value"); };
+`), 0o600))
+				cmd := exec.Command("node", "--require", preload, filepath.Join(filepath.Dir(callerFile), "codex_subscription.js"), command)
+				cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"), "SUPERPLANE_TASK_DIR="+taskDir, "CODEX_HOME="+home,
+					"SUPERPLANE_RESULT_FILE="+resultFile, "SUPERPLANE_BASE_URL="+server.URL, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=runner-token", fmt.Sprint("FAIL_REMOVAL=", failure == "removal"), fmt.Sprint("FAIL_SHUTDOWN=", failure == "shutdown"), fmt.Sprint("FAIL_RESULT=", failure == "result"))
+				out, err := cmd.CombinedOutput()
+				assert.NotContains(t, string(out), "refresh-secret-value")
+				contents, readErr := os.ReadFile(resultFile)
+				require.NoError(t, readErr)
+				var result map[string]any
+				require.NoError(t, json.Unmarshal(contents, &result))
+				if failure != "" {
+					require.Error(t, err, string(out))
+					assert.NotEqual(t, true, result["codexSubscriptionSetupCleaned"])
+					assert.Equal(t, true, result["is_error"])
+					assert.NotContains(t, string(contents), "refresh-secret-value")
+					return
+				}
+				require.NoError(t, err, string(out))
+				assert.Equal(t, true, result["codexSubscriptionSetupCleaned"])
+				assert.Equal(t, "preserved", result["unrelated"])
+				_, err = os.Stat(home)
+				assert.True(t, os.IsNotExist(err))
+			})
+		}
+	}
 }

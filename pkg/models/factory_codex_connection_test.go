@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -392,6 +393,115 @@ func TestCodexRunLeaseCannotReplaceTheRefreshToken(t *testing.T) {
 	assert.Equal(t, []byte("bundle"), []byte(released.BundleCiphertext))
 }
 
+func TestCodexSetupCompletionReleasesBeforeProviderDeletion(t *testing.T) {
+	for _, refresh := range []bool{false, true} {
+		t.Run(fmt.Sprint("refresh=", refresh), func(t *testing.T) {
+			db, connection, task, runner := newDisconnectedCodexLogin(t)
+			now := time.Now()
+			if refresh {
+				require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 1, []byte("previous"), "ada@example.com", true, now))
+				require.NoError(t, markRunnerTask(db, task, models.RunnerTaskStateSucceeded, &runner.ID, now))
+				require.NoError(t, runner.MarkProviderDeleted(db, now))
+				connection = reloadCodexConnection(t, db, connection.ID)
+				require.NoError(t, connection.BeginCatalogRefresh(db, task.ID, now))
+			}
+			require.NoError(t, clearProviderDeletion(db, runner))
+			require.NoError(t, db.Model(runner).Updates(map[string]any{"state": models.RunnerStateIdle, "ephemeral": true, "terminated_at": nil, "termination_reason": nil}).Error)
+			require.NoError(t, db.Model(task).Updates(map[string]any{"state": models.RunnerTaskStateQueued, "runner_id": nil, "finished_at": nil}).Error)
+			require.NoError(t, task.Reserve(db, runner.ID))
+			require.NoError(t, task.Start(db, runner, "test-store", now))
+			generation := connection.ReservationGeneration
+			require.NoError(t, connection.StoreBundle(db, task.ID, generation, connection.CredentialVersion+1, []byte("saved"), "ada@example.com", true, now))
+			require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4", IsDefault: true}}, now))
+			assert.Len(t, codexLeases(t, db, connection.ID), 1, "saving alone must retain the lock")
+			complete := func() bool {
+				var changed bool
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					var err error
+					changed, err = task.Complete(tx, runner, "setup-completion", datatypes.JSON(`{"codexSubscriptionSetupCleaned":true}`), 0, "", false, now)
+					return err
+				}))
+				return changed
+			}
+			require.True(t, complete())
+			released := reloadCodexConnection(t, db, connection.ID)
+			require.Equal(t, models.CodexConnectionStatusReady, released.Status)
+			require.Empty(t, codexLeases(t, db, connection.ID))
+			require.Nil(t, reloadRunner(t, db, runner.ID).ProviderDeletedAt)
+			assert.Equal(t, models.RunnerStateTerminated, reloadRunner(t, db, runner.ID).State)
+			newTask := &models.RunnerTask{ID: uuid.New(), OrganizationID: connection.OrganizationID, FleetID: task.FleetID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued, PayloadCiphertext: []byte("run"), QueuedAt: now, CreatedAt: now, UpdatedAt: now}
+			require.NoError(t, db.Create(newTask).Error)
+			_, err := reserveCodexRun(t, db, released, newTask.ID, now)
+			require.NoError(t, err)
+			leases := codexLeases(t, db, connection.ID)
+			require.ErrorIs(t, connection.StoreBundle(db, task.ID, generation, connection.CredentialVersion+1, []byte("late"), "other", true, now), models.ErrCodexConnectionStale)
+			assert.False(t, complete())
+			require.NoError(t, runner.MarkProviderDeleted(db, now))
+			require.NoError(t, runner.MarkProviderDeleted(db, now))
+			assert.Equal(t, leases, codexLeases(t, db, connection.ID))
+			after := reloadCodexConnection(t, db, connection.ID)
+			assert.Equal(t, released.Status, after.Status)
+			assert.Equal(t, released.CredentialVersion, after.CredentialVersion)
+			assert.Equal(t, released.BundleCiphertext, after.BundleCiphertext)
+			assert.Equal(t, "ada@example.com", after.AccountLabel)
+			assert.Equal(t, released.AvailableModels, after.AvailableModels)
+		})
+	}
+}
+
+func TestCodexSetupCompletionRequiresCleanupAndCurrentFinalCheckpoint(t *testing.T) {
+	for _, result := range []string{`{}`, `{"codexSubscriptionSetupCleaned":false}`, `{"codexSubscriptionSetupCleaned":"true"}`, `{"codexSubscriptionSetupCleaned":1}`, `[]`, `null`, `{"codexSubscriptionSetupCleaned":true}`} {
+		for _, checkpoint := range []string{"missing", "current", "superseded"} {
+			if result == `{"codexSubscriptionSetupCleaned":true}` && checkpoint == "current" {
+				continue
+			}
+			t.Run(result+checkpoint, func(t *testing.T) {
+				db, connection, task, runner := newDisconnectedCodexLogin(t)
+				now := time.Now()
+				if checkpoint != "missing" {
+					require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 1, []byte("saved"), "ada@example.com", true, now))
+				}
+				if checkpoint == "superseded" {
+					require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 2, []byte("unfinished"), "ada@example.com", false, now))
+				}
+				require.NoError(t, markRunnerTask(db, task, models.RunnerTaskStateSucceeded, &runner.ID, now))
+				require.NoError(t, db.Model(task).Update("result", datatypes.JSON(result)).Error)
+				require.NoError(t, models.ReleaseCodexReservationForTask(db, task.ID, now))
+				assert.Len(t, codexLeases(t, db, connection.ID), 1)
+				require.NoError(t, runner.MarkProviderDeleted(db, now))
+				assert.Empty(t, codexLeases(t, db, connection.ID))
+				expected := models.CodexConnectionStatusReconnectRequired
+				if checkpoint == "current" {
+					expected = models.CodexConnectionStatusReady
+				}
+				assert.Equal(t, expected, reloadCodexConnection(t, db, connection.ID).Status)
+			})
+		}
+	}
+}
+
+func TestCodexCleanedSetupCannotReleaseRevokedConnection(t *testing.T) {
+	for _, revokeLease := range []bool{false, true} {
+		t.Run(fmt.Sprint("lease=", revokeLease), func(t *testing.T) {
+			db, connection, task, runner := newDisconnectedCodexLogin(t)
+			now := time.Now()
+			require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 1, []byte("saved"), "ada@example.com", true, now))
+			require.NoError(t, markRunnerTask(db, task, models.RunnerTaskStateSucceeded, &runner.ID, now))
+			require.NoError(t, db.Model(task).Update("result", datatypes.JSON(`{"codexSubscriptionSetupCleaned":true}`)).Error)
+			if revokeLease {
+				require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", task.ID).Update("revoked_at", now).Error)
+			} else {
+				require.NoError(t, db.Model(connection).Updates(map[string]any{"revocation_pending_at": now, "status": models.CodexConnectionStatusDisconnected}).Error)
+			}
+			require.NoError(t, models.ReleaseCodexReservationForTask(db, task.ID, now))
+			assert.Len(t, codexLeases(t, db, connection.ID), 1)
+			require.NoError(t, runner.MarkProviderDeleted(db, now))
+			assert.Empty(t, codexLeases(t, db, connection.ID))
+			assert.NotEqual(t, models.CodexConnectionStatusReady, reloadCodexConnection(t, db, connection.ID).Status)
+		})
+	}
+}
+
 func TestCodexLoginSuccessWithoutFinalCheckpointRequiresReconnect(t *testing.T) {
 	db, connection, task, runner := newReservedCodexLogin(t)
 	now := time.Now()
@@ -440,13 +550,16 @@ func TestCodexConnectionCancelBeforeCheckpointRestoresPreviousStatus(t *testing.
 }
 
 func TestCodexLoginRecoversFinalCheckpointAfterTaskFailure(t *testing.T) {
-	for _, state := range []string{models.RunnerTaskStateFailed, models.RunnerTaskStateLost} {
+	for _, state := range []string{models.RunnerTaskStateFailed, models.RunnerTaskStateLost, models.RunnerTaskStateCanceled} {
 		t.Run(state, func(t *testing.T) {
 			db, connection, task, runner := newReservedCodexLogin(t)
 			now := time.Now()
 			require.NoError(t, clearProviderDeletion(db, runner))
 			require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, connection.CredentialVersion+1, []byte("saved-login"), "ada@example.com", true, now))
 			require.NoError(t, markRunnerTask(db, task, state, &runner.ID, now))
+			require.NoError(t, db.Model(task).Update("result", datatypes.JSON(`{"codexSubscriptionSetupCleaned":true}`)).Error)
+			require.NoError(t, models.ReleaseCodexReservationForTask(db, task.ID, now))
+			assert.Len(t, codexLeases(t, db, connection.ID), 1)
 			require.NoError(t, runner.MarkProviderDeleted(db, now))
 
 			recovered := reloadCodexConnection(t, db, connection.ID)

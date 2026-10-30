@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -502,8 +503,8 @@ func MarkCodexConnectionUncertain(tx *gorm.DB, taskID uuid.UUID, now time.Time) 
 }
 
 // ReleaseCodexReservationForTask releases the lease for one runner task.
-// A run lease ends when the task is terminal. A login lease also waits until
-// its VM is confirmed deleted.
+// A run lease ends when the task is terminal. A successful login can confirm
+// local cleanup; other login leases wait for provider deletion.
 func ReleaseCodexReservationForTask(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
 	lease, err := FindCodexLeaseByTask(tx, taskID)
 	if err != nil || lease == nil {
@@ -597,6 +598,12 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 	if !lease.Login() && lease.RevokedAt == nil {
 		return deleteCodexLease(tx, &lease)
 	}
+	if lease.Login() && lease.RevokedAt == nil && connection.RevocationPendingAt == nil &&
+		task.State == RunnerTaskStateSucceeded && codexSetupCleaned(task.Result) &&
+		connection.FinalCheckpointVersion > lease.StartedVersion &&
+		connection.FinalCheckpointVersion == connection.CredentialVersion {
+		return connection.finishLoginLease(tx, &lease, CodexConnectionStatusReady, now)
+	}
 	if task.RunnerID != nil {
 		runner, runnerErr := FindRunner(tx, *task.RunnerID)
 		if runnerErr != nil && !errors.Is(runnerErr, ErrRunnerNotFound) {
@@ -613,6 +620,15 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 		return deleteCodexLease(tx, &lease)
 	}
 	return connection.finishLoginLease(tx, &lease, codexLoginLeaseOutcome(&connection, &lease, task), now)
+}
+
+func codexSetupCleaned(result datatypes.JSON) bool {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(result, &fields); err != nil {
+		return false
+	}
+	var cleaned bool
+	return json.Unmarshal(fields["codexSubscriptionSetupCleaned"], &cleaned) == nil && cleaned
 }
 
 func codexLoginLeaseOutcome(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) string {

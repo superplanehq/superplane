@@ -3,6 +3,7 @@ import { showErrorToast } from "@/lib/toast";
 import { CopyButton } from "@/ui/CopyButton";
 import type { FactoriesFactoryCodexConnection } from "@/api-client";
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { ConnectOptionRow, IntegrationChoiceIcon } from "../pages/onboarding/onboardingSteps";
 import { CODEX_CONNECTION_COPY } from "./codexConnectionCopy";
@@ -98,7 +99,10 @@ function FinishingSignIn({ connection }: { connection?: FactoriesFactoryCodexCon
 
   return (
     <>
-      <p>{signInCleanupMessage(connection?.status)}</p>
+      <p className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        {signInCleanupMessage(connection?.status)}
+      </p>
       {delayed ? <p>{copy.subscriptionDelayed}</p> : null}
     </>
   );

@@ -67,11 +67,25 @@ describe("CodexDeviceSignIn", () => {
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
-  it("waits for cleanup without offering to cancel a saved sign-in", () => {
-    renderPanel({ status: "finishing", reservationHeld: true });
+  it("shows accessible finishing feedback until the login reservation is released", () => {
+    const view = renderPanel({ status: "finishing", reservationHeld: true });
 
-    expect(screen.getByText(copy.subscriptionFinishing)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(copy.subscriptionFinishing);
     expect(screen.queryByRole("button", { name: copy.subscriptionCancel })).not.toBeInTheDocument();
+    view.rerender(
+      <CodexDeviceSignIn
+        selected
+        disabled={false}
+        starting={false}
+        canceling={false}
+        connection={{ status: "ready", reservationHeld: false }}
+        onSelect={vi.fn()}
+        onStart={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("ChatGPT is connected.");
+    expect(screen.queryByText(copy.subscriptionFinishing)).not.toBeInTheDocument();
   });
 
   it("shows cancellation progress and hides the device code until cleanup finishes", () => {

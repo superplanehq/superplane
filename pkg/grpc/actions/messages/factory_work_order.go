@@ -39,7 +39,7 @@ func PublishFactoryWorkOrderUpdated(factoryID, orderID, reason string) error {
 
 // PublishFactoryCodexConnectionUpdated contains no personal account data.
 func PublishFactoryCodexConnectionUpdated(factoryID string) error {
-	return PublishFactoryWorkOrderUpdated(factoryID, "", "codex_connection")
+	return publishFactoryWorkOrderUpdated(factoryID, "", "codex_connection")
 }
 
 // PublishCodexConnectionChanges runs after commit. Login completion can change

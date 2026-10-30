@@ -5,6 +5,9 @@ const readline = require("readline");
 const { stripVTControlCharacters } = require("node:util");
 
 const CHECKPOINT_TIMEOUT_MS = 30000;
+const knownSecrets = new Set();
+
+class CodexShutdownError extends Error {}
 
 function subscriptionEnabled(env = process.env) {
   return Boolean(String(env.SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN || "").trim());
@@ -36,11 +39,8 @@ function subscriptionChildEnv(env = process.env) {
 
 function redactSecrets(text, env = process.env) {
   let output = String(text ?? "");
-  const bundle = readBundle(env);
-  if (!bundle) {
-    return output;
-  }
-  for (const secret of secretValues(bundle)) {
+  readBundle(env);
+  for (const secret of knownSecrets) {
     if (secret) {
       output = output.split(secret).join("[redacted]");
     }
@@ -81,7 +81,9 @@ function secretValues(value, found = []) {
 
 function readBundle(env = process.env) {
   try {
-    return JSON.parse(fs.readFileSync(authPath(env), "utf8"));
+    const bundle = JSON.parse(fs.readFileSync(authPath(env), "utf8"));
+    for (const secret of secretValues(bundle)) knownSecrets.add(secret);
+    return bundle;
   } catch (_err) {
     return null;
   }
@@ -151,7 +153,8 @@ async function restore(env = process.env, options = {}) {
 async function checkpoint(options = {}) {
   const env = options.env || process.env;
   // Read limits before the bundle: app-server can renew the saved credentials.
-  const usage = await readUsage(env).catch(() => {
+  const usage = await readUsage(env).catch((error) => {
+    if (options.setup && error instanceof CodexShutdownError) throw error;
     process.stderr.write(
       "Codex usage is unavailable. Credentials will still be saved.\n",
     );
@@ -193,6 +196,9 @@ function readUsage(env) {
       finish(new Error("Codex usage request timed out"));
     }, 10000);
     let settled = false;
+    let closed = false;
+    let stopTimeout;
+    let snapshot;
     let limits;
     let models;
     const modelCatalog = [];
@@ -202,9 +208,20 @@ function readUsage(env) {
       clearTimeout(timeout);
       lines.close();
       child.stdin.destroy();
-      child.kill("SIGKILL");
-      if (error) reject(error);
-      else resolve(usage);
+      snapshot = { error, usage };
+      if (closed) return complete();
+      stopTimeout = setTimeout(() => reject(new CodexShutdownError("Codex usage process did not stop")), 5000);
+      try {
+        child.kill("SIGKILL");
+      } catch (_error) {
+        clearTimeout(stopTimeout);
+        reject(new CodexShutdownError("Codex usage process could not be stopped"));
+      }
+    }
+    function complete() {
+      clearTimeout(stopTimeout);
+      if (snapshot.error) reject(snapshot.error);
+      else resolve(snapshot.usage);
     }
     function send(message) {
       child.stdin.write(`${JSON.stringify(message)}\n`);
@@ -218,7 +235,11 @@ function readUsage(env) {
     child.stdin.on("error", () =>
       finish(new Error("Codex usage connection failed")),
     );
-    child.on("close", () => finish(new Error("Codex usage process stopped")));
+    child.on("close", () => {
+      closed = true;
+      if (settled) return complete();
+      finish(new Error("Codex usage process stopped"));
+    });
     lines.on("line", (line) => {
       try {
         const message = JSON.parse(line);
@@ -356,19 +377,42 @@ async function login(env = process.env) {
   if (!readBundle(env)) {
     throw new Error("ChatGPT device sign-in did not write credentials");
   }
-  await checkpoint({ env, final: true });
+  await finishSetup(env);
   process.stdout.write("ChatGPT sign-in saved\n");
+}
+
+function writeSetupResult(env, cleaned) {
+  const resultFile = env.SUPERPLANE_RESULT_FILE;
+  if (!resultFile) throw new Error("SUPERPLANE_RESULT_FILE is required");
+  let result = {};
+  if (fs.existsSync(resultFile)) {
+    result = JSON.parse(fs.readFileSync(resultFile, "utf8"));
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+      throw new Error("ChatGPT subscription result is invalid");
+    }
+  }
+  delete result.codexSubscriptionSetupCleaned;
+  if (cleaned) result.codexSubscriptionSetupCleaned = true;
+  fs.writeFileSync(resultFile, `${JSON.stringify(result)}\n`);
+}
+
+async function finishSetup(env) {
+  await checkpoint({ env, final: true, setup: true });
+  fs.rmSync(codexHome(env), { recursive: true, force: true });
+  writeSetupResult(env, true);
 }
 
 async function main(argv = process.argv.slice(2)) {
   const command = argv[0];
+  if (command === "login" || command === "refresh") writeSetupResult(process.env, false);
   if (command === "restore") {
     await restore();
     process.stdout.write("ChatGPT sign-in restored\n");
     return;
   }
   if (command === "refresh") {
-    await restore(process.env, { final: true });
+    await restore();
+    await finishSetup(process.env);
     process.stdout.write("ChatGPT model catalog refreshed\n");
     return;
   }
