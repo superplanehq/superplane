@@ -18,10 +18,11 @@ async function suggestOwners(input, client) {
 
 async function assignOwner(input, client) {
   const user = String((input && input.user) || "").trim();
-  const reason = String((input && input.reason) || "").trim();
   if (!user) throw new Error("user is required");
-  if (!reason) throw new Error("reason is required");
-  return client.request("PUT", "/api/v1/runner/task/owner", { user, reason });
+  const reason = String((input && input.reason) || "").trim();
+  const body = { user };
+  if (reason) body.reason = reason;
+  return client.request("PUT", "/api/v1/runner/task/owner", body);
 }
 
 const SUGGEST_OWNERS = {
@@ -49,7 +50,7 @@ const ASSIGN_OWNER = {
   definition: {
     name: "assign_owner",
     description:
-      "Set the selected person as the only owner of this task. Replaces all current owners, including manually assigned owners. Returns assigned with the selected owner. Pass user as a user_id or github_login from suggest_owners.",
+      "Set the selected person as the only owner of this task. Replaces all current owners, including manually assigned owners. Returns assigned with the selected owner. Pass user as a user_id or github_login from suggest_owners. reason is optional.",
     inputSchema: {
       type: "object",
       properties: {
@@ -60,10 +61,10 @@ const ASSIGN_OWNER = {
         reason: {
           type: "string",
           description:
-            "One sentence that SuperPlane shows on the task timeline, for example: You changed pkg/payments/charge.go 3 times in the last 30 days.",
+            "Optional. One sentence that SuperPlane shows on the task, for example: You changed pkg/payments/charge.go 3 times in the last 30 days.",
         },
       },
-      required: ["user", "reason"],
+      required: ["user"],
     },
   },
   handler: assignOwner,

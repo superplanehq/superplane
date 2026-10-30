@@ -124,10 +124,6 @@ func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	reason := models.NormalizeTaskOwnerReason(req.Reason)
-	if reason == "" {
-		http.Error(w, "reason is required. Write one sentence that names the code.", http.StatusBadRequest)
-		return
-	}
 
 	owner, ok := models.FindTaskOwnerCandidate(target.candidates, req.User)
 	if !ok {
@@ -135,11 +131,15 @@ func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	err := assignTaskOwner(database.DB(r.Context()), target.order, models.TaskOwnerAssignment{
+	assignment := models.TaskOwnerAssignment{
 		UserID: owner.UserID,
 		Source: models.TaskOwnerSourceAgent,
 		Reason: reason,
-	})
+	}
+	if target.canvasRunID != uuid.Nil {
+		assignment.Run = &factoryevents.RunRef{ID: target.canvasRunID}
+	}
+	err := assignTaskOwner(database.DB(r.Context()), target.order, assignment)
 	if err != nil {
 		if target.session != nil {
 			writeRunnerPlanningError(w, r, target.session, err)

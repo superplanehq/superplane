@@ -295,6 +295,7 @@ func (o *FactoryWorkOrder) recordCheckReported(
 			Format:        check.Format,
 			Level:         check.Level,
 			PreviousScore: check.PreviousScore,
+			Summary:       check.Summary,
 		},
 		Automation: automation,
 		Run:        run,
