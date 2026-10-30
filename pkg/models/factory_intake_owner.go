@@ -66,7 +66,7 @@ func FindSubscriptionIntakeOwnerForRun(tx *gorm.DB, organizationID, factoryID, r
 		return uuid.Nil, err
 	}
 	if _, err := ActiveCodexMember(tx, organizationID, ownerID); err != nil {
-		if errors.Is(err, ErrCodexConnectionNotEligible) || errors.Is(err, ErrCodexConnectionUnavailable) {
+		if errors.Is(err, ErrCodexConnectionNotEligible) {
 			return uuid.Nil, ErrSubscriptionOwnerInvalid
 		}
 		return uuid.Nil, err
@@ -122,7 +122,7 @@ func ValidateSubscriptionIntakeOwners(tx *gorm.DB, canvas *Canvas, draft, live *
 		return err
 	}
 	if _, err := ActiveCodexMember(tx, canvas.OrganizationID, ownerID); err != nil {
-		if errors.Is(err, ErrCodexConnectionNotEligible) || errors.Is(err, ErrCodexConnectionUnavailable) {
+		if errors.Is(err, ErrCodexConnectionNotEligible) {
 			return ErrSubscriptionOwnerInvalid
 		}
 		return err

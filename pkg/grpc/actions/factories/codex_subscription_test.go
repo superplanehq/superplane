@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -20,7 +19,6 @@ import (
 func TestPersonalCodexConnectionDoesNotActivateWorkspace(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	ctx := onboardingContext(r)
@@ -63,7 +61,6 @@ func TestCancelFactoryCodexConnectionReportsCancellationUntilRunnerDeletion(t *t
 		t.Run(test.status, func(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 			require.NoError(t, err)
 			fleet := models.DefaultInstallationRunnerFleets("test")[0]

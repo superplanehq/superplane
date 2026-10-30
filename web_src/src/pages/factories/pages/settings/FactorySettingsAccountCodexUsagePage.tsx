@@ -4,18 +4,14 @@ import { Button } from "@/components/ui/button";
 import { useCodexUsage } from "@/hooks/useCodexUsage";
 import { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
 import { FactoryCodexSubscriptionConnection } from "./FactoryCodexSubscriptionConnection";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
 export function FactorySettingsAccountCodexUsagePage() {
   const { organizationId, factoryId } = useFactorySettingsLayout();
-  const features = useExperimentalFeature(organizationId);
-  const enabled = !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
-  const query = useCodexUsage(organizationId, enabled);
+  const codex = useFactoryCodexConnection(organizationId, factoryId, true);
+  const query = useCodexUsage(organizationId);
 
   return (
     <FactorySettingsPageFrame title="Codex">
