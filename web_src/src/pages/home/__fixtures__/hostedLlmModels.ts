@@ -4,6 +4,12 @@ const STORYBOOK_HOSTED_MODELS: Record<string, string[]> = {
   openrouter: ["anthropic/claude-sonnet-4-6"],
 };
 
+const STORYBOOK_THINKING_LEVELS: Record<string, string[]> = {
+  "claude-sonnet-4-6": ["low", "medium", "high", "max"],
+  "gpt-5": ["minimal", "low", "medium", "high"],
+  "anthropic/claude-sonnet-4-6": ["low", "medium", "high"],
+};
+
 const STORYBOOK_PROVIDER_NAMES: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
@@ -26,6 +32,7 @@ export function storybookSelectableLlmModels(byokByProvider?: Record<string, str
     model: { id: string; name: string };
     key: string;
     label: string;
+    thinkingLevels: string[];
   }> = [];
   for (const [provider, ids] of Object.entries(STORYBOOK_HOSTED_MODELS)) {
     const providerName = STORYBOOK_PROVIDER_NAMES[provider] ?? provider;
@@ -53,5 +60,6 @@ function selectableStoryModel(
     model: { id, name: id },
     key: `${sourceId}::${provider}::${id}`,
     label: provider === "openrouter" ? id : `${provider}/${id}`,
+    thinkingLevels: STORYBOOK_THINKING_LEVELS[id] ?? [],
   };
 }
