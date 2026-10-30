@@ -30,7 +30,6 @@ import (
 func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	_, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	now := time.Now()
@@ -178,6 +177,53 @@ func TestCodexRunningTaskKeepsCredentialsAfterWorkspaceModelPolicyChange(t *test
 	assert.Equal(t, http.StatusConflict, revoked.Code, "revocation must still stop a running task")
 }
 
+func TestCodexRunningTaskKeepsCredentialsAfterFactoriesDisabled(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	connection, factory, secret := readyCodexRun(t, r)
+	lease, err := models.FindCodexRunLeaseBySecret(db, secret)
+	require.NoError(t, err)
+	signer := jwt.NewSigner("test-codex-run")
+	token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
+		OrganizationID: r.Organization.ID, FactoryID: factory.ID, ConnectionID: connection.ID,
+		TaskID: lease.TaskID, Generation: lease.Generation,
+	}, time.Hour)
+	require.NoError(t, err)
+	nextAccess := codexTestAccessToken(time.Now().Add(time.Hour))
+	server := &Server{
+		jwt: signer, encryptor: r.Encryptor,
+		codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
+			return runneraction.CodexTokenSet{AccessToken: nextAccess, RefreshToken: "openai-refresh-2", IDToken: "id-token-2"}, nil
+		},
+	}
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	credentials := func() *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
+		request.Header.Set("Authorization", "Bearer "+token)
+		response := httptest.NewRecorder()
+		server.handleRunnerCodexSubscriptionCredentials(response, request)
+		return response
+	}
+	refresh := func() *httptest.ResponseRecorder {
+		body, err := json.Marshal(map[string]string{"refresh_token": secret})
+		require.NoError(t, err)
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", bytes.NewReader(body))
+		response := httptest.NewRecorder()
+		server.handleRunnerCodexSubscriptionRefresh(response, request)
+		return response
+	}
+	response := credentials()
+	assert.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	response = refresh()
+	assert.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	assert.Contains(t, response.Body.String(), nextAccess)
+	assert.NotContains(t, response.Body.String(), "openai-refresh-2")
+
+	require.NoError(t, db.Model(lease).Update("revoked_at", time.Now()).Error)
+	assert.Equal(t, http.StatusConflict, credentials().Code, "revocation must still stop credential access")
+	assert.Equal(t, http.StatusUnauthorized, refresh().Code, "revocation must still stop token refresh")
+}
+
 func TestCodexRefreshIsSingleFlightAndHidesTheRefreshToken(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
@@ -283,7 +329,6 @@ func TestCodexRefreshFailureRequiresReconnect(t *testing.T) {
 func readyCodexRun(t *testing.T, r *support.ResourceRegistry) (*models.FactoryCodexConnection, *models.Factory, string) {
 	t.Helper()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	now := time.Now()
