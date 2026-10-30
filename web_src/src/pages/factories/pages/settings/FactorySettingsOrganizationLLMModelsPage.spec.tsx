@@ -20,7 +20,7 @@ const saveModels = vi.fn();
 const switchSource = vi.fn();
 let canUpdate = true;
 let canConnect = true;
-let enabledFeatures = ["organization_byok", "codex_subscriptions"];
+let enabledFeatures = ["organization_byok"];
 let codexConnection: FactoriesFactoryCodexConnection | undefined;
 type Model = { id: string; name: string };
 type Policy = { parent: Model[]; selected: Model[]; inheritParent: boolean; configuredModels: Model[] };
@@ -107,7 +107,7 @@ describe("workspace LLM model settings", () => {
   beforeEach(() => {
     canUpdate = true;
     canConnect = true;
-    enabledFeatures = ["organization_byok", "codex_subscriptions"];
+    enabledFeatures = ["organization_byok"];
     connectedProviders.clear();
     for (const key of Object.keys(policies)) delete policies[key];
     policy("anthropic", "hosted", ["claude-sonnet-4-6", "claude-opus-4-6"]);
