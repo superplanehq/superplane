@@ -108,11 +108,13 @@ export function subscriptionModelSourceSwitchCases({
     setConnection({ status: "ready", eligible: true, availableModels: ["gpt-5.4"] });
     renderPage("AGENT_HARNESS_CODEX", true);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Change default task owner" }));
+    await user.click(await screen.findByRole("button", { name: "Options for Other member" }));
+    await user.click(screen.getByRole("menuitem", { name: "Set as default task owner" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/Replaces every default owner, including scheduled intakes/)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("combobox", { name: "Default task owner (required)" }));
-    await user.click(await screen.findByRole("option", { name: "Other member" }));
+    expect(within(dialog).getByRole("combobox", { name: "Default task owner (required)" })).toHaveTextContent(
+      "Other member",
+    );
     await user.click(within(dialog).getByRole("button", { name: "Save default owner" }));
     expect(switchSource).toHaveBeenCalledWith({ source: "subscription", defaultOwnerId: "other", apiKey: undefined });
   });
