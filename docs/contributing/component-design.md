@@ -17,7 +17,7 @@ This guide establishes **product design principles and quality standards** for S
 - Code patterns and syntax
 - Backend/frontend architecture
 
-For implementation, see [component-implementations.md](component-implementations.md) and [component-customization.md](component-customization.md).
+For implementation, see [component-implementations.md](component-implementations.md).
 
 ## Table of Contents
 
@@ -556,8 +556,6 @@ Each component has a **State Registry** that controls:
 
 Most components use the default states. Only create custom states when the defaults don't capture meaningful distinctions.
 
-For implementation details, see [Component Customization Guide](component-customization.md#example-1-creating-a-custom-state-registry-approval-component).
-
 ### States
 
 #### Default States
@@ -844,8 +842,6 @@ The Details tab is where users come to diagnose problems — make errors impossi
 3. **Supporting details** — Additional context (2-3 items max)
 4. **Error** — Always last (if present)
 
-For implementation details, see [Component Customization Guide](component-customization.md).
-
 ---
 
 ## Error Handling
@@ -1008,4 +1004,3 @@ Use this checklist when designing or reviewing components.
 ## References
 
 - [Component Implementation Patterns](component-implementations.md) - Backend implementation best practices
-- [Component Customization Guide](component-customization.md) - Frontend customization patterns
