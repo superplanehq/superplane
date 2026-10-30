@@ -5,16 +5,17 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import type { LLMModelsSwitchDialog, LLMModelsSwitchTarget } from "./FactorySettingsLLMModelsSwitchPreview";
 import { byokProviderProductName } from "./organizationLLMModelsCopy";
 
+type ModelSourceDialog = { step: "choose" } | { step: "subscription" } | { step: "connect" } | LLMModelsSwitchDialog;
+
 export function useModelSourceSwitch(
   organizationId: string,
   factoryId: string,
   onSaved: (target: LLMModelsSwitchTarget | "subscription") => void,
   savedDefaultOwnerId = "",
 ) {
-  const [subscriptionDialog, setSubscriptionDialog] = useState<"warn" | null>(null);
   const [defaultOwnerId, setDefaultOwnerId] = useState(savedDefaultOwnerId);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<LLMModelsSwitchDialog>(null);
+  const [dialog, setDialog] = useState<ModelSourceDialog>(null);
   const [switchedNotice, setSwitchedNotice] = useState<string | null>(null);
   const switchSource = useSwitchFactoryModelSource(organizationId, factoryId);
 
@@ -31,7 +32,6 @@ export function useModelSourceSwitch(
       });
       onSaved(target);
       setDialog(null);
-      setSubscriptionDialog(null);
       setSwitchedNotice(
         target === "subscription"
           ? "Automations in this workspace now use Codex subscriptions."
@@ -54,11 +54,21 @@ export function useModelSourceSwitch(
   return {
     dialog,
     setDialog,
+    openDialog: (step: "choose" | "subscription" = "choose", ownerId?: string) => {
+      setDefaultOwnerId(ownerId ?? savedDefaultOwnerId);
+      setSubscriptionError(null);
+      setDialog({ step });
+    },
+    closeDialog: () => {
+      setSubscriptionError(null);
+      setDialog(null);
+    },
     defaultOwnerId,
-    setDefaultOwnerId,
+    setDefaultOwnerId: (ownerId: string) => {
+      setSubscriptionError(null);
+      setDefaultOwnerId(ownerId);
+    },
     subscriptionError,
-    subscriptionDialog,
-    setSubscriptionDialog,
     switchedNotice,
     saveSwitch,
     saving: switchSource.isPending,

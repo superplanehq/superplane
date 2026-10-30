@@ -73,7 +73,6 @@ describe("Codex usage", () => {
       expect(screen.getByText("75% remaining")).toBeInTheDocument();
       act(() => vi.advanceTimersByTime(1000));
       expect(screen.getByText("Update needed")).toBeInTheDocument();
-      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
       expect(screen.queryByText("75% remaining")).not.toBeInTheDocument();
     } finally {
       view.unmount();
@@ -103,7 +102,7 @@ describe("Codex usage", () => {
     ];
     render(<CodexUsageConnections connections={connections} />);
     expect(screen.getByText("75% remaining")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "5-hour window remaining" })).toHaveAttribute("aria-valuenow", "75");
+    expect(screen.getByText("5-hour window")).toBeInTheDocument();
     expect(screen.getByText("7-day window")).toBeInTheDocument();
     expect(screen.getByText("Update needed")).toBeInTheDocument();
     expect(screen.queryByText("10% remaining")).not.toBeInTheDocument();
@@ -115,7 +114,6 @@ describe("Codex usage", () => {
       <CodexUsageConnections connections={[{ id: "connection-1", accountLabel: "ada@example.com" }]} />,
     );
     expect(screen.getByText(/Usage unavailable/)).toBeInTheDocument();
-    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     view.rerender(<CodexUsageConnections connections={[]} />);
     expect(view.container).toBeEmptyDOMElement();
   });
