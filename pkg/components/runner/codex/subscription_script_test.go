@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -386,11 +387,16 @@ if (process.argv[2] === "app-server") {
 					require.NoError(t, err)
 					writer, err := strconv.Atoi(string(writerBytes))
 					require.NoError(t, err)
-					state, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(writer), "stat"))
-					if !os.IsNotExist(err) {
-						require.NoError(t, err)
-						assert.Equal(t, "Z", strings.Fields(string(state))[2], "the native Codex child must also stop before checkpointing")
-					}
+					// The native child can finish exiting after the launcher closes.
+					assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+						state, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(writer), "stat"))
+						if os.IsNotExist(err) {
+							return
+						}
+						if assert.NoError(collect, err) {
+							assert.Equal(collect, "Z", strings.Fields(string(state))[2])
+						}
+					}, 5*time.Second, 10*time.Millisecond, "the native Codex child must stop after its process group is killed")
 					var body map[string]any
 					require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 					assert.Equal(t, true, body["final"])
