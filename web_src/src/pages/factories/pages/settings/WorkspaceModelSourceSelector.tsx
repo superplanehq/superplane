@@ -1,4 +1,6 @@
-import { TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { useWorkspaceModelSettings } from "./useWorkspaceModelSettings";
 
 type Settings = ReturnType<typeof useWorkspaceModelSettings>;
@@ -25,25 +27,42 @@ function sourceOptions(settings: Settings) {
 
 export function WorkspaceModelSourceSelector({ settings }: { settings: Settings }) {
   return (
-    <TabsList
-      aria-label="Model source"
-      className="h-auto w-full flex-col items-stretch rounded-xl sm:w-fit sm:flex-row sm:rounded-full"
-    >
-      {sourceOptions(settings).map((option) => (
-        <TabsTrigger
-          key={option.value}
-          value={option.value}
-          disabled={!settings.canUpdate || settings.switcher.saving || option.disabled}
-          className="justify-start rounded-lg sm:justify-center sm:rounded-full"
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" && event.key !== " ") return;
-            event.preventDefault();
-            settings.chooseSource(option.value);
-          }}
-        >
-          {option.label}
-        </TabsTrigger>
-      ))}
-    </TabsList>
+    <div role="group" aria-label="Model source" className="grid gap-3 sm:grid-cols-3">
+      {sourceOptions(settings).map((option) => {
+        const active = settings.source === option.value;
+        return (
+          <div
+            key={option.value}
+            className={cn(
+              "flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3 sm:flex-col sm:items-start",
+              active && "border-foreground/40 bg-muted/40",
+            )}
+          >
+            <span className="text-[13px] font-medium">{option.label}</span>
+            {active ? (
+              <span
+                role="status"
+                aria-label={`${option.label} is active`}
+                className="flex h-7 items-center gap-1.5 text-xs"
+              >
+                <Check className="size-3.5" aria-hidden />
+                Active
+              </span>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label={`Switch to ${option.label}`}
+                disabled={!settings.canUpdate || settings.switcher.saving || option.disabled}
+                onClick={() => settings.chooseSource(option.value)}
+              >
+                Switch
+              </Button>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
