@@ -14,17 +14,26 @@ vi.mock("@/hooks/useOrganizationData", () => ({
 }));
 vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ currentUserId: "alice" }) }));
 
+let eligibleMembers = [
+  { userId: "alice", eligible: true },
+  { userId: "bob", eligible: false },
+];
+const refetchEligibility = vi.fn(async () => ({}));
 vi.mock("@/hooks/useFactoryOwnerEligibility", () => ({
   useFactoryOwnerEligibility: () => ({
-    data: {
-      members: [
-        { userId: "alice", eligible: true },
-        { userId: "bob", eligible: false },
-      ],
-    },
+    data: { members: eligibleMembers },
     isPending: false,
     isError: false,
+    refetch: refetchEligibility,
   }),
+}));
+vi.mock("../codex/CodexConnectionSetupDialog", () => ({
+  CodexConnectionSetupDialog: ({ open, onConnected }: { open: boolean; onConnected?: () => Promise<void> }) =>
+    open ? (
+      <button type="button" onClick={() => void onConnected?.()}>
+        Finish Codex sign-in
+      </button>
+    ) : null,
 }));
 
 describe("IntakeDefaultOwnerField", () => {
@@ -58,5 +67,26 @@ describe("IntakeDefaultOwnerField", () => {
     fireEvent.click(screen.getByRole("button", { name: "Default task owner" }));
     fireEvent.click(await screen.findByRole("option", { name: "No owner" }));
     expect(onChange).toHaveBeenLastCalledWith("");
+  });
+  it("connects Codex from the empty owner picker and selects the signed-in member", async () => {
+    eligibleMembers = [{ userId: "bob", eligible: false }];
+    const onChange = vi.fn();
+    try {
+      render(
+        <IntakeDefaultOwnerField organizationId="org" factoryId="factory" value="" required onChange={onChange} />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Connect Codex" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Finish Codex sign-in" }));
+      await waitFor(() => expect(onChange).toHaveBeenCalledWith("alice"));
+      expect(refetchEligibility).toHaveBeenCalled();
+      await waitFor(() =>
+        expect(screen.queryByRole("button", { name: "Finish Codex sign-in" })).not.toBeInTheDocument(),
+      );
+    } finally {
+      eligibleMembers = [
+        { userId: "alice", eligible: true },
+        { userId: "bob", eligible: false },
+      ];
+    }
   });
 });

@@ -74,6 +74,21 @@ func FindSubscriptionIntakeOwnerForRun(tx *gorm.DB, organizationID, factoryID, r
 	return ownerID, nil
 }
 
+// RunUsesSupersededVersion reports whether a newer live version replaced the
+// version that the run started on. A model source switch publishes such a
+// version, so a run that started before the switch reports true.
+func RunUsesSupersededVersion(tx *gorm.DB, runID uuid.UUID) (bool, error) {
+	run, err := FindUnscopedCanvasRun(tx, runID)
+	if err != nil {
+		return false, err
+	}
+	var canvas Canvas
+	if err := tx.Select("live_version_id").Where("id = ?", run.WorkflowID).First(&canvas).Error; err != nil {
+		return false, err
+	}
+	return canvas.LiveVersionID != nil && *canvas.LiveVersionID != run.VersionID, nil
+}
+
 // CreateIntakeWorkOrder preserves a configured active owner after their Codex
 // disconnects. Interactive creation continues to require a connected owner.
 func (f *Factory) CreateIntakeWorkOrder(tx *gorm.DB, title, description string, sourceRunID uuid.UUID, origin *WorkOrderOrigin) (*FactoryWorkOrder, error) {

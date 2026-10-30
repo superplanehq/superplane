@@ -1,4 +1,4 @@
-import { useId, type Dispatch, type SetStateAction } from "react";
+import { useId, useState, type Dispatch, type SetStateAction } from "react";
 import { useFactoryOwnerEligibility } from "@/hooks/useFactoryOwnerEligibility";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -6,6 +6,8 @@ import type { IntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { buildOrgUserDisplayMap } from "@/lib/orgUserDisplay";
+import { usePermissions } from "@/contexts/usePermissions";
+import { CodexConnectionSetupDialog } from "../codex/CodexConnectionSetupDialog";
 import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
 import { intakeSourceSupportsDefaultOwner, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 
@@ -117,6 +119,7 @@ function ConnectedOwnerSelect({
   const eligibility = useFactoryOwnerEligibility(organizationId, factoryId);
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const displays = buildOrgUserDisplayMap(users);
+  const { currentUserId } = usePermissions();
   const members = eligibility.data?.members ?? [];
   const selected = members.find((member) => member.userId === value);
   return (
@@ -157,9 +160,51 @@ function ConnectedOwnerSelect({
         <p className="text-sm text-muted-foreground">This owner must reconnect Codex before tasks can run.</p>
       ) : null}
       {!eligibility.isPending && !eligibility.isError && !members.some((member) => member.eligible) ? (
-        <p className="text-sm text-muted-foreground">Connect Codex before you select a default task owner.</p>
+        <ConnectCodexPrompt
+          organizationId={organizationId}
+          factoryId={factoryId}
+          disabled={disabled}
+          onConnected={async () => {
+            await eligibility.refetch();
+            if (currentUserId) onChange(currentUserId);
+          }}
+        />
       ) : null}
     </>
+  );
+}
+
+function ConnectCodexPrompt({
+  organizationId,
+  factoryId,
+  disabled,
+  onConnected,
+}: {
+  organizationId: string;
+  factoryId: string;
+  disabled: boolean;
+  onConnected: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+      <p>Connect Codex before you select a default task owner.</p>
+      <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => setOpen(true)}>
+        Connect Codex
+      </Button>
+      {open ? (
+        <CodexConnectionSetupDialog
+          organizationId={organizationId}
+          factoryId={factoryId}
+          open
+          onOpenChange={setOpen}
+          onConnected={async () => {
+            await onConnected();
+            setOpen(false);
+          }}
+        />
+      ) : null}
+    </div>
   );
 }
 

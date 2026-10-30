@@ -2521,3 +2521,55 @@ func TestFactoryContextDefaultOwner(t *testing.T) {
 		})
 	}
 }
+
+func TestFactoryContextCreateWorkOrderKeepsRunStartedBeforeSubscriptionSwitch(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+
+	for _, tc := range []struct {
+		name       string
+		superseded bool
+		wantErr    error
+	}{
+		{name: "run on a replaced version creates its task", superseded: true},
+		{name: "run on the live version still needs an owner", wantErr: models.ErrSubscriptionOwnerRequired},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			subscription := false
+			require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+			canvas, execution, run := setupFactoryAppExecution(t, r, f.ID)
+			version, err := models.FindCanvasVersionInTransaction(db, canvas.ID, run.VersionID)
+			require.NoError(t, err)
+			version.Nodes = datatypes.JSONSlice[models.Node]{{
+				ID: "create-work-order", Type: models.NodeTypeComponent,
+				Ref: models.NodeRef{Component: &models.ComponentRef{Name: "createWorkOrder"}},
+			}}
+			require.NoError(t, models.SaveCanvasVersionInTransaction(db, version))
+			_, err = f.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+			require.NoError(t, err)
+
+			subscription = true
+			require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+			if tc.superseded {
+				next, err := models.CreateCommitVersionWithSpecInTransaction(db, canvas.ID, r.User, "Switch model source", nil, nil)
+				require.NoError(t, err)
+				require.NoError(t, models.PromoteToLiveInTransaction(db, next, next.Nodes, next.Edges))
+			}
+
+			order, created, err := NewFactoryContext(db, canvas, execution).CreateWorkOrder(core.WorkOrderParams{Title: tc.name})
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.False(t, created)
+				return
+			}
+			require.NoError(t, err)
+			require.True(t, created)
+			_, err = f.FindWorkOrder(db, uuid.MustParse(order.ID))
+			require.NoError(t, err)
+		})
+	}
+}
