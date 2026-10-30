@@ -151,7 +151,7 @@ service Organizations {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List selectable LLM models";
-      description: "Returns SuperPlane-hosted and selected BYOK models a picker may show";
+      description: "Returns installation and connected provider models filtered by workspace selection";
       tags: "Organization";
     };
   }
@@ -162,19 +162,7 @@ service Organizations {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List BYOK LLM models";
-      description: "Returns the organization selected-model list and candidate models from the connected provider key";
-      tags: "Organization";
-    };
-  }
-
-  rpc UpdateBYOKLLMModels(UpdateBYOKLLMModelsRequest) returns (UpdateBYOKLLMModelsResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/organizations/{id}/byok-models"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update BYOK LLM models";
-      description: "Replaces the organization selected-model list for one BYOK provider";
+      description: "Returns the connected provider catalog and models selected by workspace policy";
       tags: "Organization";
     };
   }
@@ -185,19 +173,7 @@ service Organizations {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List organization hosted models";
-      description: "Returns installation model candidates and the organization selection for every hosted provider";
-      tags: "Organization";
-    };
-  }
-
-  rpc UpdateOrganizationHostedLLMModels(UpdateOrganizationHostedLLMModelsRequest) returns (UpdateOrganizationHostedLLMModelsResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/organizations/{id}/hosted-models"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update organization hosted models";
-      description: "Replaces the organization selection for every hosted provider";
+      description: "Returns enabled installation models for every hosted provider";
       tags: "Organization";
     };
   }
@@ -727,16 +703,6 @@ message ListBYOKLLMModelsResponse {
   repeated HostedLLMModel candidates = 4;
 }
 
-message UpdateBYOKLLMModelsRequest {
-  string id = 1;
-  string provider = 2;
-  repeated string allowed_models = 3;
-}
-
-message UpdateBYOKLLMModelsResponse {
-  repeated HostedLLMModel selected = 1;
-}
-
 message OrganizationHostedLLMModel {
   string key = 1;
   string label = 2;
@@ -749,18 +715,8 @@ message ListOrganizationHostedLLMModelsRequest {
 
 message ListOrganizationHostedLLMModelsResponse {
   repeated OrganizationHostedLLMModel candidates = 1;
-  // Effective organization selection, including inherited candidates for unsaved providers.
+  // Available installation models. Workspace filtering uses the scoped listing APIs.
   repeated OrganizationHostedLLMModel selected = 2;
-}
-
-message UpdateOrganizationHostedLLMModelsRequest {
-  string id = 1;
-  // Selectable keys from the installation candidates. An empty list disables all hosted models.
-  repeated string allowed_models = 2;
-}
-
-message UpdateOrganizationHostedLLMModelsResponse {
-  repeated OrganizationHostedLLMModel selected = 1;
 }
 
 message ListHostedCreditProductsRequest {

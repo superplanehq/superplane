@@ -7,12 +7,15 @@ import { FEATURE_FACTORY_SCHEDULED_INTAKE } from "@/lib/experimentalFeatures";
 
 const mocks = vi.hoisted(() => ({
   subscription: false,
+  retainedOwner: "",
   enabled: true,
   create: vi.fn(),
   previewError: null as Error | null,
 }));
 vi.mock("../layout/factoriesLayoutContext", () => ({
-  useOptionalFactoriesLayout: () => ({ factory: { onboarding: { codexSubscription: mocks.subscription } } }),
+  useOptionalFactoriesLayout: () => ({
+    factory: { onboarding: { codexSubscription: mocks.subscription, codexDefaultOwnerId: mocks.retainedOwner } },
+  }),
 }));
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganizationUsers: () => ({
@@ -43,6 +46,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
 
 beforeEach(() => {
   mocks.subscription = false;
+  mocks.retainedOwner = "";
   mocks.enabled = true;
   mocks.previewError = null;
   mocks.create.mockReset();
@@ -74,6 +78,22 @@ describe("Scheduled intake", () => {
     );
     expect(screen.getByRole("button", { name: "Create intake" })).toBeDisabled();
     await user.click(screen.getByRole("combobox", { name: /Default task owner/ }));
+    await user.click(await screen.findByRole("option", { name: "Alice" }));
+    await user.click(screen.getByRole("button", { name: "Create intake" }));
+    await waitFor(() =>
+      expect(mocks.create).toHaveBeenCalledWith(
+        expect.objectContaining({ installParams: expect.objectContaining({ defaultOwnerId: "alice" }) }),
+      ),
+    );
+  });
+  it("submits an optional scheduled owner without reusing the subscription default", async () => {
+    mocks.retainedOwner = "retained-owner";
+    const user = userEvent.setup();
+    render(
+      <ScheduledIntakeSetupDialog organizationId="org" factoryId="factory" onClose={vi.fn()} onCreated={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: "Default task owner" })).toHaveTextContent("No owner");
+    await user.click(screen.getByRole("button", { name: "Default task owner" }));
     await user.click(await screen.findByRole("option", { name: "Alice" }));
     await user.click(screen.getByRole("button", { name: "Create intake" }));
     await waitFor(() =>

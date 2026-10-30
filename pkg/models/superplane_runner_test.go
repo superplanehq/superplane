@@ -224,13 +224,15 @@ func Test__ResolveRunnableHostedLLMModel__UsesAllowedModelWhenDefaultIsExcluded(
 	r := support.Setup(t)
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	inherit := false
 	t.Cleanup(func() {
-		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
 		_ = db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
 		_ = db.Where("provider = ?", models.UsageProviderOpenAI).Delete(&models.HostedLLMProvider{})
 	})
 
-	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider:      models.UsageProviderAnthropic,
 		Enabled:       true,
 		APIKey:        []byte("test-hosted-key"),
@@ -250,21 +252,21 @@ func Test__ResolveRunnableHostedLLMModel__UsesAllowedModelWhenDefaultIsExcluded(
 	})
 	require.NoError(t, err)
 
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-4-6"})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"claude-opus-4-6"}, &inherit)
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-5"})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"gpt-5"}, &inherit)
 	require.NoError(t, err)
 
-	require.NoError(t, models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, nil))
-	runnable, err := models.ResolveRunnableHostedLLMModel(db, r.Organization.ID, nil)
+	require.NoError(t, models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, &factory.ID))
+	runnable, err := models.ResolveRunnableHostedLLMModel(db, r.Organization.ID, &factory.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.DefaultHostedLLMModel{Provider: "anthropic", Model: "claude-opus-4-6"}, runnable)
 
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{}, &inherit)
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{}, &inherit)
 	require.NoError(t, err)
-	err = models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, nil)
+	err = models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, &factory.ID)
 	assert.ErrorIs(t, err, models.ErrSuperPlaneRunnerModelNotAllowed)
 }
 
@@ -273,12 +275,14 @@ func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(
 	r := support.Setup(t)
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	inherit := false
 	t.Cleanup(func() {
-		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
 		_ = db.Where("provider IN ?", []string{models.UsageProviderAnthropic, models.UsageProviderOpenAI, models.UsageProviderOpenRouter}).Delete(&models.HostedLLMProvider{})
 	})
 
-	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider:      models.UsageProviderAnthropic,
 		Enabled:       true,
 		APIKey:        []byte("test-hosted-key"),
@@ -305,14 +309,14 @@ func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(
 	})
 	require.NoError(t, err)
 
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{}, &inherit)
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{}, &inherit)
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.JSONSlice[string]{"openai/gpt-4.1"})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenRouter, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"openai/gpt-4.1"}, &inherit)
 	require.NoError(t, err)
 
-	err = models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, nil)
+	err = models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, &factory.ID)
 	assert.ErrorIs(t, err, models.ErrSuperPlaneRunnerModelNotAllowed)
 
 	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
@@ -324,8 +328,8 @@ func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, nil))
-	runnable, err := models.ResolveRunnableHostedLLMModel(db, r.Organization.ID, nil)
+	require.NoError(t, models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, &factory.ID))
+	runnable, err := models.ResolveRunnableHostedLLMModel(db, r.Organization.ID, &factory.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.DefaultHostedLLMModel{Provider: "openrouter", Model: "openai/gpt-4.1"}, runnable)
 
@@ -336,9 +340,9 @@ func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(
 		AllowedModels: datatypes.JSONSlice[string]{"openai/gpt-4.1", "openai/gpt-4.1-mini"},
 	})
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-5"})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"gpt-5"}, &inherit)
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.JSONSlice[string]{"openai/gpt-4.1-mini"})
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenRouter, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"openai/gpt-4.1-mini"}, &inherit)
 	require.NoError(t, err)
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
 		DefaultHostedProvider: stringPtr("openrouter"),
@@ -346,7 +350,7 @@ func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(
 	})
 	require.NoError(t, err)
 
-	runnable, err = models.ResolveRunnableHostedLLMModel(db, r.Organization.ID, nil)
+	runnable, err = models.ResolveRunnableHostedLLMModel(db, r.Organization.ID, &factory.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.DefaultHostedLLMModel{Provider: "openai", Model: "gpt-5"}, runnable)
 }

@@ -22,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   projectsError: false,
 }));
 
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganizationUsers: () => ({ data: [], isLoading: false, isError: false }),
+}));
 vi.mock("@/api-client/sdk.gen", () => ({
   organizationsDeleteIntegration: mocks.deleteIntegration,
 }));

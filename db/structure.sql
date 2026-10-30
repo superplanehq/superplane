@@ -1256,6 +1256,17 @@ CREATE TABLE public.installation_metadata (
 
 
 --
+-- Name: integration_model_catalogs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.integration_model_catalogs (
+    integration_id uuid NOT NULL,
+    models jsonb DEFAULT '[]'::jsonb NOT NULL,
+    observed_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: linear_webhook_receipts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1388,19 +1399,6 @@ CREATE TABLE public.organization_billing_plans (
 
 
 --
--- Name: organization_byok_model_allowlists; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.organization_byok_model_allowlists (
-    organization_id uuid NOT NULL,
-    provider text NOT NULL,
-    allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organization_byok_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text])))
-);
-
-
---
 -- Name: organization_feature_grants; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1408,19 +1406,6 @@ CREATE TABLE public.organization_feature_grants (
     organization_id uuid NOT NULL,
     feature_key text NOT NULL,
     enabled boolean DEFAULT true NOT NULL
-);
-
-
---
--- Name: organization_hosted_model_allowlists; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.organization_hosted_model_allowlists (
-    organization_id uuid NOT NULL,
-    provider text NOT NULL,
-    allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organization_hosted_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
 );
 
 
@@ -3010,6 +2995,14 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
+-- Name: integration_model_catalogs integration_model_catalogs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_model_catalogs
+    ADD CONSTRAINT integration_model_catalogs_pkey PRIMARY KEY (integration_id);
+
+
+--
 -- Name: linear_webhook_receipts linear_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3058,27 +3051,11 @@ ALTER TABLE ONLY public.organization_billing_plans
 
 
 --
--- Name: organization_byok_model_allowlists organization_byok_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_byok_model_allowlists
-    ADD CONSTRAINT organization_byok_model_allowlists_pkey PRIMARY KEY (organization_id, provider);
-
-
---
 -- Name: organization_feature_grants organization_feature_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.organization_feature_grants
     ADD CONSTRAINT organization_feature_grants_pkey PRIMARY KEY (organization_id, feature_key);
-
-
---
--- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_hosted_model_allowlists
-    ADD CONSTRAINT organization_hosted_model_allowlists_pkey PRIMARY KEY (organization_id, provider);
 
 
 --
@@ -5912,6 +5889,14 @@ ALTER TABLE ONLY public.installation_licenses
 
 
 --
+-- Name: integration_model_catalogs integration_model_catalogs_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_model_catalogs
+    ADD CONSTRAINT integration_model_catalogs_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.app_installations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_billing_checkouts organization_billing_checkouts_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5933,14 +5918,6 @@ ALTER TABLE ONLY public.organization_billing_plans
 
 ALTER TABLE ONLY public.organization_feature_grants
     ADD CONSTRAINT organization_feature_grants_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
-
-
---
--- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_hosted_model_allowlists
-    ADD CONSTRAINT organization_hosted_model_allowlists_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -6543,7 +6520,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261030121001	f
+20261030143043	f
 \.
 
 

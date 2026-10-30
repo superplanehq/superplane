@@ -23,22 +23,10 @@ var byokIntegrationAppNames = map[string]string{
 	UsageProviderCustom:     CustomLLMAppName,
 }
 
-var ErrModelNotInParentList = errors.New("model is not in the parent selected-model list")
+var ErrModelNotInParentList = errors.New("model is not available from this provider")
 var ErrInheritedModelSelection = errors.New("inherited model policy cannot include selected models")
 
-// OrganizationBYOKModelAllowlist is the org-selected BYOK model list for one provider.
-type OrganizationBYOKModelAllowlist struct {
-	OrganizationID uuid.UUID `gorm:"primaryKey"`
-	Provider       string    `gorm:"primaryKey"`
-	AllowedModels  datatypes.JSONSlice[string]
-	UpdatedAt      time.Time
-}
-
-func (OrganizationBYOKModelAllowlist) TableName() string {
-	return "organization_byok_model_allowlists"
-}
-
-// FactoryLLMModelAllowlist is a workspace subset of parent models.
+// FactoryLLMModelAllowlist stores workspace model selection for one provider.
 // A nil InheritParent preserves legacy behavior: an empty list inherits.
 type FactoryLLMModelAllowlist struct {
 	FactoryID     uuid.UUID `gorm:"primaryKey"`
@@ -71,6 +59,15 @@ func NormalizeBYOKLLMProvider(provider string) (string, error) {
 	return "", fmt.Errorf("unsupported byok llm provider: %s", provider)
 }
 
+func IsBYOKIntegration(appName string) bool {
+	for _, app := range byokIntegrationAppNames {
+		if app == appName {
+			return true
+		}
+	}
+	return false
+}
+
 func BYOKIntegrationAppName(provider string) (string, error) {
 	normalized, err := NormalizeBYOKLLMProvider(provider)
 	if err != nil {
@@ -81,110 +78,6 @@ func BYOKIntegrationAppName(provider string) (string, error) {
 		return "", fmt.Errorf("unsupported byok llm provider: %s", provider)
 	}
 	return appName, nil
-}
-
-func FindOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider string) (*OrganizationBYOKModelAllowlist, error) {
-	normalized, err := NormalizeBYOKLLMProvider(provider)
-	if err != nil {
-		return nil, err
-	}
-
-	var row OrganizationBYOKModelAllowlist
-	err = tx.Where("organization_id = ? AND provider = ?", orgID, normalized).First(&row).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return &OrganizationBYOKModelAllowlist{
-				OrganizationID: orgID,
-				Provider:       normalized,
-			}, nil
-		}
-		return nil, err
-	}
-	return &row, nil
-}
-
-// OrganizationBYOKModelAllowlistExists is false until the organization saves
-// a model list for the provider. An empty saved list still counts as saved.
-func OrganizationBYOKModelAllowlistExists(tx *gorm.DB, orgID uuid.UUID, provider string) (bool, error) {
-	normalized, err := NormalizeBYOKLLMProvider(provider)
-	if err != nil {
-		return false, err
-	}
-
-	var count int64
-	err = tx.Model(&OrganizationBYOKModelAllowlist{}).
-		Where("organization_id = ? AND provider = ?", orgID, normalized).
-		Count(&count).
-		Error
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
-// CreateOrganizationBYOKModelAllowlistIfAbsent inserts the allowlist only when
-// the organization has not saved one yet. An existing row, including an empty
-// list, stays unchanged.
-func CreateOrganizationBYOKModelAllowlistIfAbsent(
-	tx *gorm.DB,
-	orgID uuid.UUID,
-	provider string,
-	models datatypes.JSONSlice[string],
-) error {
-	normalized, err := NormalizeBYOKLLMProvider(provider)
-	if err != nil {
-		return err
-	}
-	normalizedModels, err := normalizeAllowedModels(models)
-	if err != nil {
-		return err
-	}
-	if len(normalizedModels) == 0 {
-		return nil
-	}
-
-	row := OrganizationBYOKModelAllowlist{
-		OrganizationID: orgID,
-		Provider:       normalized,
-		AllowedModels:  normalizedModels,
-		UpdatedAt:      time.Now(),
-	}
-	return tx.Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "organization_id"},
-			{Name: "provider"},
-		},
-		DoNothing: true,
-	}).Create(&row).Error
-}
-
-func UpsertOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider string, models datatypes.JSONSlice[string]) (*OrganizationBYOKModelAllowlist, error) {
-	normalized, err := NormalizeBYOKLLMProvider(provider)
-	if err != nil {
-		return nil, err
-	}
-	normalizedModels, err := normalizeAllowedModels(models)
-	if err != nil {
-		return nil, err
-	}
-
-	row := OrganizationBYOKModelAllowlist{
-		OrganizationID: orgID,
-		Provider:       normalized,
-		AllowedModels:  normalizedModels,
-		UpdatedAt:      time.Now(),
-	}
-	err = tx.Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "organization_id"},
-			{Name: "provider"},
-		},
-		DoUpdates: clause.AssignmentColumns([]string{"allowed_models", "updated_at"}),
-	}).Create(&row).Error
-	if err != nil {
-		return nil, err
-	}
-	return FindOrganizationBYOKModelAllowlist(tx, orgID, normalized)
 }
 
 func FindFactoryLLMModelAllowlist(tx *gorm.DB, factoryID uuid.UUID, provider, fundingSource string) (*FactoryLLMModelAllowlist, error) {
@@ -302,7 +195,7 @@ func assertFactoryModelsInParent(tx *gorm.DB, orgID uuid.UUID, provider, funding
 	return nil
 }
 
-// ResolveSelectableLLMModels returns the models a picker and run gate may use.
+// ResolveSelectableLLMModels returns discovered models for display.
 // Missing policies inherit. Explicit policies can disable every model.
 func ResolveSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provider, fundingSource string) ([]string, error) {
 	source, err := normalizeLLMFundingSource(fundingSource)
@@ -367,21 +260,17 @@ func parentSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, provider, fundingSo
 		if !row.OffersHostedModels() {
 			return nil, nil
 		}
-		selection, err := FindOrganizationHostedModelAllowlist(tx, orgID, provider)
-		if err != nil {
-			return nil, err
-		}
-		if selection == nil {
-			return compactModelIDs(row.AllowedModels), nil
-		}
-		return IntersectModelIDs(row.AllowedModels, selection.AllowedModels), nil
+		return compactModelIDs(row.AllowedModels), nil
 	}
-
-	row, err := FindOrganizationBYOKModelAllowlist(tx, orgID, provider)
-	if err != nil {
+	catalog, err := FindProviderModelCatalog(tx, orgID, provider)
+	if err != nil || catalog == nil {
 		return nil, err
 	}
-	return compactModelIDs(row.AllowedModels), nil
+	ids := make([]string, 0, len(catalog.Models))
+	for _, model := range catalog.Models {
+		ids = append(ids, model.ID)
+	}
+	return CompactModelIDs(ids), nil
 }
 
 func FindReadyBYOKIntegration(tx *gorm.DB, orgID uuid.UUID, provider string) (*Integration, error) {

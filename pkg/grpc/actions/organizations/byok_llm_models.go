@@ -15,7 +15,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -47,12 +46,9 @@ func ListBYOKLLMModels(
 		return &pb.ListBYOKLLMModelsResponse{Selected: serializeHostedLLMModels(selected)}, nil
 	}
 
-	candidates, err := listBYOKCandidateModels(tx, reg, integration)
+	candidates, err := refreshBYOKModelCatalog(tx, reg, integration)
 	if err != nil {
 		return nil, classifyBYOKListError(err)
-	}
-	if err := enableAllBYOKModelsByDefault(tx, scope.OrganizationID, scope.Provider, candidates); err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list byok models")
 	}
 	selected, err := resolveBYOKSelectedModels(tx, scope)
 	if err != nil {
@@ -81,42 +77,7 @@ func resolveBYOKSelectedModels(tx *gorm.DB, scope llmModelListScope) ([]string, 
 	return selected, nil
 }
 
-func UpdateBYOKLLMModels(
-	ctx context.Context,
-	orgID string,
-	req *pb.UpdateBYOKLLMModelsRequest,
-) (*pb.UpdateBYOKLLMModelsResponse, error) {
-	organizationID, err := resolveOrganizationID(ctx, orgID)
-	if err != nil {
-		return nil, err
-	}
-	provider, err := models.NormalizeBYOKLLMProvider(req.GetProvider())
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, err.Error())
-	}
-	if err := ensureBYOKAccess(database.DB(ctx), organizationID, provider, "failed to update byok models"); err != nil {
-		return nil, err
-	}
-
-	saved, err := models.UpsertOrganizationBYOKModelAllowlist(
-		database.DB(ctx),
-		organizationID,
-		req.GetProvider(),
-		datatypes.JSONSlice[string](req.GetAllowedModels()),
-	)
-	if err != nil {
-		if strings.Contains(err.Error(), "unsupported") || strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "empty") {
-			return nil, grpcerrors.InvalidArgument(err, err.Error())
-		}
-		return nil, grpcerrors.Internal(err, "failed to update byok models")
-	}
-
-	return &pb.UpdateBYOKLLMModelsResponse{
-		Selected: serializeHostedLLMModels(saved.AllowedModels),
-	}, nil
-}
-
-func listBYOKCandidateModels(tx *gorm.DB, reg *registry.Registry, instance *models.Integration) ([]*pb.HostedLLMModel, error) {
+func refreshBYOKModelCatalog(tx *gorm.DB, reg *registry.Registry, instance *models.Integration) ([]*pb.HostedLLMModel, error) {
 	if reg == nil {
 		return nil, fmt.Errorf("integration registry is required")
 	}
@@ -147,27 +108,36 @@ func listBYOKCandidateModels(tx *gorm.DB, reg *registry.Registry, instance *mode
 		return nil, err
 	}
 
-	out := make([]*pb.HostedLLMModel, 0, len(resources))
-	seen := map[string]struct{}{}
+	observed := providerCatalogModels(resources)
+	if err := models.StoreIntegrationModelCatalog(tx, instance.ID, observed); err != nil {
+		return nil, err
+	}
+	out := make([]*pb.HostedLLMModel, 0, len(observed))
+	for _, model := range observed {
+		out = append(out, &pb.HostedLLMModel{Id: model.ID, Name: model.Name})
+	}
+	return out, nil
+}
+
+func providerCatalogModels(resources []core.IntegrationResource) []models.SelectableLLMNamedID {
+	out := make([]models.SelectableLLMNamedID, 0, len(resources))
+	seen := map[string]bool{}
 	for _, resource := range resources {
 		id := strings.TrimSpace(resource.ID)
 		if id == "" {
 			id = strings.TrimSpace(resource.Name)
 		}
-		if id == "" {
+		if id == "" || seen[id] {
 			continue
 		}
-		if _, dup := seen[id]; dup {
-			continue
-		}
-		seen[id] = struct{}{}
+		seen[id] = true
 		name := strings.TrimSpace(resource.Name)
 		if name == "" {
 			name = id
 		}
-		out = append(out, &pb.HostedLLMModel{Id: id, Name: name})
+		out = append(out, models.SelectableLLMNamedID{ID: id, Name: name})
 	}
-	return out, nil
+	return out
 }
 
 // ListConnectedBYOKModelIDs returns the model ids that the integration key can use.
@@ -176,7 +146,7 @@ func ListConnectedBYOKModelIDs(tx *gorm.DB, reg *registry.Registry, integration 
 		return nil, grpcerrors.Internal(fmt.Errorf("integration is required"), "failed to list byok models")
 	}
 
-	candidates, err := listBYOKCandidateModels(tx, reg, integration)
+	candidates, err := refreshBYOKModelCatalog(tx, reg, integration)
 	if err != nil {
 		return nil, classifyBYOKListError(err)
 	}
@@ -202,7 +172,7 @@ func ensureBYOKAccess(tx *gorm.DB, orgID uuid.UUID, provider, internalMessage st
 	return nil
 }
 
-// classifyBYOKListError maps a failure from listBYOKCandidateModels to a
+// classifyBYOKListError maps a failure from refreshBYOKModelCatalog to a
 // client-safe gRPC error. Provider auth failures, transport errors, timeouts,
 // and provider outages are user-fixable or transient, so they are reported as
 // FailedPrecondition rather than Internal. Rate-limited requests are reported

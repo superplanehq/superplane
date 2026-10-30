@@ -27,14 +27,14 @@ export function ScheduledIntakeOwnerSettings({
   const [value, setValue] = useState(initialOwnerId ?? String(node.configuration?.defaultOwnerId ?? ""));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
-  if (!layout?.factory?.onboarding?.codexSubscription) return null;
+  const required = layout?.factory?.onboarding?.codexSubscription === true;
   const canUpdate = canAct("factories", "update");
   return (
     <div className="space-y-4 p-6">
       <IntakeDefaultOwnerField
         organizationId={organizationId}
         factoryId={factoryId}
-        required
+        required={required}
         value={value}
         onChange={setValue}
         disabled={pending || !canUpdate}
@@ -45,7 +45,7 @@ export function ScheduledIntakeOwnerSettings({
         </p>
       ) : null}
       <Button
-        disabled={!value || pending || !canUpdate}
+        disabled={(required && !value) || pending || !canUpdate}
         onClick={async () => {
           setError(undefined);
           setPending(true);

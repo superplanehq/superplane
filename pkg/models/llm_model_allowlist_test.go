@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
@@ -15,43 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
-
-func Test__OrganizationBYOKModelAllowlist(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
-	db := database.Conn()
-
-	empty, err := models.FindOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic)
-	require.NoError(t, err)
-	assert.Empty(t, empty.AllowedModels)
-
-	exists, err := models.OrganizationBYOKModelAllowlistExists(db, r.Organization.ID, models.UsageProviderAnthropic)
-	require.NoError(t, err)
-	assert.False(t, exists)
-
-	saved, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
-		"claude-sonnet-4-6",
-		"claude-opus-4-6",
-	})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"claude-sonnet-4-6", "claude-opus-4-6"}, []string(saved.AllowedModels))
-
-	exists, err = models.OrganizationBYOKModelAllowlistExists(db, r.Organization.ID, models.UsageProviderAnthropic)
-	require.NoError(t, err)
-	assert.True(t, exists)
-
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{})
-	require.NoError(t, err)
-	exists, err = models.OrganizationBYOKModelAllowlistExists(db, r.Organization.ID, models.UsageProviderAnthropic)
-	require.NoError(t, err)
-	assert.True(t, exists)
-
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
-		"claude-sonnet-4-6",
-		"claude-sonnet-4-6",
-	})
-	require.Error(t, err)
-}
 
 func Test__ResolveSelectableLLMModels(t *testing.T) {
 	r := support.Setup(t)
@@ -62,8 +23,6 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
-		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
-		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
 		_ = database.Conn().Where("factory_id = ?", factory.ID).Delete(&models.FactoryLLMModelAllowlist{})
 	})
 
@@ -94,39 +53,11 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"claude-sonnet-4-6"}, hosted)
 
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-4-6"})
+	allowed, err := models.ModelIsSelectable(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, "claude-opus-4-6")
 	require.NoError(t, err)
-	hosted, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted)
-	require.NoError(t, err)
-	assert.Empty(t, hosted)
-	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"claude-sonnet-4-6", "claude-opus-4-6"})
-	require.NoError(t, err, "saved IDs that the parent no longer offers stay while new available IDs are added")
-	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"claude-sonnet-4-6", "claude-opus-4-6", "new-model"})
-	require.ErrorIs(t, err, models.ErrModelNotInParentList)
+	assert.False(t, allowed)
 
-	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	for _, factoryID := range []*uuid.UUID{nil, &factory.ID, &otherFactory.ID} {
-		allowed, err := models.ModelIsSelectable(db, r.Organization.ID, factoryID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, "claude-sonnet-4-6")
-		require.NoError(t, err)
-		assert.False(t, allowed)
-	}
-
-	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
-		Provider: models.UsageProviderAnthropic, Enabled: true, APIKey: []byte("encrypted"),
-		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6", "claude-opus-4-6", "new-model"},
-	})
-	require.NoError(t, err)
-	hosted, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, nil, models.UsageProviderAnthropic, models.UsageFundingSourceHosted)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"claude-opus-4-6"}, hosted)
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{})
-	require.NoError(t, err)
-	hosted, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, nil, models.UsageProviderAnthropic, models.UsageFundingSourceHosted)
-	require.NoError(t, err)
-	assert.Empty(t, hosted)
-
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{
 		"gpt-4.1",
 		"gpt-4o",
 	})
@@ -156,44 +87,21 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	assert.Equal(t, []string{"gpt-4.1", "gpt-4o"}, byok)
 	allowedSubscriptionModel, err := models.RunnerAcceptsModel(db, r.Organization.ID, &factory.ID, "runnerCodex", map[string]any{"credentials": map[string]any{"source": "integration"}}, "gpt-5.4")
 	require.NoError(t, err)
-	assert.False(t, allowedSubscriptionModel)
+	assert.True(t, allowedSubscriptionModel, "API-key execution is independent of personal catalogs")
 	allowedSubscriptionModel, err = models.RunnerAcceptsModel(db, r.Organization.ID, &factory.ID, "runnerCodex", map[string]any{"credentials": map[string]any{"source": "subscription"}}, "gpt-5.4", r.User)
 	require.NoError(t, err)
 	assert.True(t, allowedSubscriptionModel)
-	byok, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, &otherFactory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceBYOK)
+	byok, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, &factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceBYOK)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"gpt-4.1", "gpt-4o"}, byok)
 
-	allowed, err := models.ModelIsSelectable(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, "claude-opus-4-6")
+	allowed, err = models.ModelIsSelectable(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, "claude-opus-4-6")
 	require.NoError(t, err)
 	assert.False(t, allowed)
 
 	allowed, err = models.ModelIsSelectable(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, "")
 	require.NoError(t, err)
 	assert.False(t, allowed)
-}
-
-func Test__OrganizationHostedModelAllowlist__RemovedWhenOrganizationIsDeleted(t *testing.T) {
-	db := database.Conn()
-	organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), "")
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = db.Exec("DELETE FROM organization_hosted_model_allowlists WHERE organization_id = ?", organization.ID)
-		_ = db.Exec("DELETE FROM organization_invite_links WHERE organization_id = ?", organization.ID)
-		_ = db.Exec("DELETE FROM organization_billing_plans WHERE organization_id = ?", organization.ID)
-		_ = db.Unscoped().Delete(organization)
-	})
-
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-4-6"})
-	require.NoError(t, err)
-
-	require.NoError(t, db.Exec("DELETE FROM organization_invite_links WHERE organization_id = ?", organization.ID).Error)
-	require.NoError(t, db.Exec("DELETE FROM organization_billing_plans WHERE organization_id = ?", organization.ID).Error)
-	require.NoError(t, db.Unscoped().Delete(organization).Error)
-
-	row, err := models.FindOrganizationHostedModelAllowlist(db, organization.ID, models.UsageProviderAnthropic)
-	require.NoError(t, err)
-	assert.Nil(t, row)
 }
 
 func Test__FactoryLLMModelPolicy__InheritanceAndExplicitEmpty(t *testing.T) {
@@ -256,4 +164,38 @@ func Test__BYOKIntegrationAppName(t *testing.T) {
 	name, err = models.BYOKIntegrationAppName(models.UsageProviderCustom)
 	require.NoError(t, err)
 	assert.Equal(t, models.CustomLLMAppName, name)
+}
+
+func TestLegacyOrganizationSelectionsDoNotRestrictWorkspaceModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	tx := db.Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
+	// Old rows can remain visible during a coordinated upgrade. They are neither
+	// provider discovery data nor workspace execution policy.
+	for _, table := range []string{"organization_byok_model_allowlists", "organization_hosted_model_allowlists"} {
+		require.NoError(t, tx.Exec("CREATE TEMP TABLE "+table+" (organization_id uuid, provider text, allowed_models jsonb) ON COMMIT DROP").Error)
+	}
+	_, err = models.UpsertHostedLLMProvider(tx, models.HostedLLMProvider{Provider: models.UsageProviderAnthropic, Enabled: true, APIKey: []byte("key"), AllowedModels: []string{"claude-sonnet-4-6", "claude-opus-4-6"}})
+	require.NoError(t, err)
+	_, err = support.SaveProviderModelCatalog(tx, r.Organization.ID, models.UsageProviderAnthropic, []string{"claude-sonnet-4-6", "claude-opus-4-6"})
+	require.NoError(t, err)
+	for _, oldSelection := range []string{`[]`, `["claude-sonnet-4-6"]`} {
+		for _, table := range []string{"organization_byok_model_allowlists", "organization_hosted_model_allowlists"} {
+			require.NoError(t, tx.Exec("DELETE FROM "+table).Error)
+			require.NoError(t, tx.Exec("INSERT INTO "+table+" VALUES (?, ?, ?::jsonb)", r.Organization.ID, models.UsageProviderAnthropic, oldSelection).Error)
+		}
+		for _, funding := range []string{models.UsageFundingSourceHosted, models.UsageFundingSourceBYOK} {
+			catalog, err := models.ResolveSelectableLLMModels(tx, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, funding)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []string{"claude-sonnet-4-6", "claude-opus-4-6"}, catalog)
+		}
+		model, err := models.ResolveBYOKRunnerModel(tx, r.Organization.ID, &factory.ID, "runnerClaudeCode", map[string]any{"model": "claude-opus-4-6", "credentials": map[string]any{"source": "integration"}})
+		require.NoError(t, err)
+		assert.Equal(t, "claude-opus-4-6", model)
+	}
 }
