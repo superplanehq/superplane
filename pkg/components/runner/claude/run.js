@@ -366,7 +366,7 @@ function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
     .toLowerCase();
-  if (level === "low" || level === "medium" || level === "high") {
+  if (["low", "medium", "high", "xhigh", "max"].includes(level)) {
     return ["--effort", level];
   }
   return [];

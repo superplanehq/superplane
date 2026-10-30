@@ -21,6 +21,7 @@ function model(partial: Partial<SelectableLLMModel> & Pick<SelectableLLMModel, "
     source: { id: "hosted", name: "SuperPlane" },
     provider: { id: "anthropic", name: "Anthropic" },
     model: { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
+    thinkingLevels: [],
     ...partial,
   };
 }
@@ -116,14 +117,18 @@ describe("byokRunnerModelOptions", () => {
         key: "byok::anthropic::claude-sonnet-4-6",
         label: "anthropic/claude-sonnet-4-6",
         source: { id: "byok", name: "Your keys" },
+        thinkingLevels: ["low", "medium", "high", "max"],
       }),
     ];
-    expect(byokRunnerModelOptions(listed, "")).toEqual([
-      { value: "claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" },
-    ]);
+    const sonnet = {
+      value: "claude-sonnet-4-6",
+      label: "anthropic/claude-sonnet-4-6",
+      thinkingLevels: ["low", "medium", "high", "max"],
+    };
+    expect(byokRunnerModelOptions(listed, "")).toEqual([sonnet]);
     expect(byokRunnerModelOptions(listed, "opus")).toEqual([
-      { value: "claude-opus-5-5", label: "claude-opus-5-5" },
-      { value: "claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" },
+      { value: "claude-opus-5-5", label: "claude-opus-5-5", thinkingLevels: [] },
+      sonnet,
     ]);
   });
 });

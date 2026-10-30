@@ -61,7 +61,7 @@ func applyRunClaudeCodeSpecDefaults(spec *RunClaudeCodeSpec) {
 	if spec.ExecutionTimeoutSeconds <= 0 {
 		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
 	}
-	if thinking, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel); err == nil {
+	if thinking, err := runner.NormalizeClaudeCodeThinkingLevel(spec.ThinkingLevel); err == nil {
 		spec.ThinkingLevel = thinking
 	}
 	migrateLegacyClaudeCodeSteps(spec)
@@ -116,7 +116,7 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
 	}
-	_, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel)
+	_, err := runner.NormalizeClaudeCodeThinkingLevel(spec.ThinkingLevel)
 	return err
 }
 
