@@ -83,6 +83,7 @@ function useConnectionCompletion({
       version.current += 1;
     },
     retry: () => {
+      canceled.current = false;
       started.current = false;
       setError(null);
     },
@@ -125,6 +126,7 @@ export function useCodexConnectionSetup({ organizationId, factoryId, open, onCon
       if (codex.query.data?.status === "pending") await codex.cancel.mutateAsync();
       return true;
     } catch {
+      completion.retry();
       closingRef.current = false;
       setClosing(false);
       return false;

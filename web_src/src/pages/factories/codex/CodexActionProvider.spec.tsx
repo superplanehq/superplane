@@ -235,6 +235,48 @@ describe("Codex assignment continuation", () => {
     expect(onConnected).not.toHaveBeenCalled();
   });
 
+  it.each(["during", "after"] as const)(
+    "resumes the action when sign-in finishes %s a failed cancellation",
+    async (timing) => {
+      connection = { status: "pending", eligible: true, reservationHeld: true };
+      let failCancellation!: (error: Error) => void;
+      const cancellation = new Promise<never>((_resolve, reject) => {
+        failCancellation = reject;
+      });
+      vi.mocked(meCancelCodexConnection).mockImplementationOnce(() => cancellation as never);
+      const save = vi.fn().mockRejectedValueOnce(connectionRequired).mockResolvedValue(undefined);
+      const client = mount(save);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Create task" }));
+      await user.click(await screen.findByRole("button", { name: "Connect Codex" }));
+      await screen.findByText("Wait for the ChatGPT sign-in code.");
+      await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled());
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(meCancelCodexConnection).toHaveBeenCalledTimes(1);
+
+      if (timing === "during") {
+        connection = { status: "ready", eligible: true, availableModels: ["gpt-5.4"] };
+        await act(async () => client.setQueryData(factoryCodexConnectionKey("org", "factory", "me"), connection));
+        await screen.findByText("ChatGPT is connected.");
+      }
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("dialog", { name: "Connect Codex" })).toBeInTheDocument();
+
+      await act(async () => failCancellation(new Error("Could not cancel sign-in.")));
+      if (timing === "after") {
+        expect(await screen.findByRole("alert")).toHaveTextContent(/could not cancel/i);
+        connection = { status: "ready", eligible: true, availableModels: ["gpt-5.4"] };
+        await act(async () => client.setQueryData(factoryCodexConnectionKey("org", "factory", "me"), connection));
+      }
+
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Saved"));
+      expect(save.mock.calls).toEqual([["My task draft"], ["My task draft"]]);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await act(async () => client.invalidateQueries({ queryKey: factoryCodexConnectionKey("org", "factory", "me") }));
+      expect(save).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it("keeps an active-run ownership denial and does not offer a connection", async () => {
     mount(vi.fn().mockRejectedValue({ message: "Stop the active run before changing its owner." }));
     await userEvent.setup().click(screen.getByRole("button", { name: "Create task" }));

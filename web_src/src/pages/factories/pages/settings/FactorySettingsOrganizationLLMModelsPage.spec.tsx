@@ -341,7 +341,8 @@ describe("workspace LLM model settings", () => {
     renderPage("AGENT_HARNESS_CODEX", true);
     expect(await screen.findByText("Other member")).toBeInTheDocument();
     expect(screen.getByText("other@example.com")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "5-hour window remaining" })).toHaveAttribute("aria-valuenow", "75");
+    expect(screen.getByText("5-hour window")).toBeInTheDocument();
+    expect(screen.getByText("75% remaining")).toBeInTheDocument();
     expect(screen.queryByText("personal@example.com")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /(?:Connect|Reconnect|Disconnect) ChatGPT|Refresh usage/ }),
