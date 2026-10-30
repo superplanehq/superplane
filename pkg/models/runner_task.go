@@ -14,6 +14,7 @@ const (
 	RunnerTaskBackendLegacy     = "legacy"
 	RunnerTaskBackendIntegrated = "integrated"
 
+	RunnerTaskStatePending   = "pending"
 	RunnerTaskStateQueued    = "queued"
 	RunnerTaskStateReserved  = "reserved"
 	RunnerTaskStateRunning   = "running"
@@ -27,6 +28,8 @@ const (
 	RunnerTaskLogStateArchiving  = "archiving"
 	RunnerTaskLogStateArchived   = "archived"
 )
+
+const runnerTaskReservationAttemptLimit = 10
 
 var (
 	ErrRunnerTaskNotFound           = errors.New("runner task not found")
@@ -58,6 +61,7 @@ type RunnerTask struct {
 	ErrorMessage      *string
 	CancelRequestedAt *time.Time
 	QueuedAt          time.Time
+	ReadyAt           *time.Time
 	ReservedAt        *time.Time
 	StartedAt         *time.Time
 	FinishedAt        *time.Time
@@ -77,6 +81,30 @@ type RunnerTask struct {
 	CompletionHash *string
 }
 
+// RunnerTaskReservationResult carries changes that callers publish after commit.
+type RunnerTaskReservationResult struct {
+	Task             *RunnerTask
+	FailedTasks      []*RunnerTask
+	LoginConnections []FactoryCodexConnection
+}
+
+// FindExecution resolves the execution that created this task through its KV.
+func (t *RunnerTask) FindExecution(tx *gorm.DB) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+	query := tx.Model(&CanvasNodeExecution{}).
+		Select("workflow_node_executions.*").
+		Joins(`JOIN workflow_node_execution_kvs kv ON kv.execution_id = workflow_node_executions.id
+			AND kv.workflow_id = workflow_node_executions.workflow_id AND kv.node_id = workflow_node_executions.node_id`).
+		Where("kv.key = ? AND kv.value = ?", "task_id", t.ID.String())
+	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+		Where("workflows.organization_id = ?", t.OrganizationID).
+		First(&execution).Error
+	if err != nil {
+		return nil, err
+	}
+	return &execution, nil
+}
+
 func FindRunnerTask(tx *gorm.DB, id uuid.UUID) (*RunnerTask, error) {
 	var task RunnerTask
 	err := tx.Where("id = ?", id).First(&task).Error
@@ -87,6 +115,10 @@ func FindRunnerTask(tx *gorm.DB, id uuid.UUID) (*RunnerTask, error) {
 		return nil, err
 	}
 	return &task, nil
+}
+
+func (t *RunnerTask) CanCancelImmediately() bool {
+	return t.RunnerID == nil && (t.State == RunnerTaskStatePending || t.State == RunnerTaskStateQueued)
 }
 
 func (t *RunnerTask) IsTerminal() bool {
@@ -103,7 +135,7 @@ func (t *RunnerTask) IsTerminal() bool {
 
 /*
  * RequestCancel is idempotent.
- * A queued task can be canceled immediately because no runner has observed it.
+ * Pending and queued tasks can be canceled immediately because no runner has observed them.
  * Assigned tasks retain their state and expose a cancellation request to the connected runner.
  */
 func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
@@ -111,9 +143,9 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 		return nil
 	}
 
-	if t.State == RunnerTaskStateQueued && t.RunnerID == nil {
+	if t.CanCancelImmediately() {
 		result := tx.Model(t).
-			Where("state = ? AND runner_id IS NULL", RunnerTaskStateQueued).
+			Where("state IN ? AND runner_id IS NULL", []string{RunnerTaskStatePending, RunnerTaskStateQueued}).
 			Updates(map[string]any{
 				"state":       RunnerTaskStateCanceled,
 				"finished_at": now,
@@ -155,32 +187,63 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 	return nil
 }
 
-func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
-	if t.State != RunnerTaskStateQueued || t.RunnerID != nil {
-		return ErrRunnerTaskNotReservable
+// FailQueued rejects an attempt that no runner has observed. Failure and lease
+// release commit together, including when called without an outer transaction.
+func (t *RunnerTask) FailQueued(tx *gorm.DB, message string, now time.Time) error {
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&RunnerTask{}).
+			Where("id = ? AND state = ? AND runner_id IS NULL", t.ID, RunnerTaskStateQueued).
+			Updates(map[string]any{
+				"state":         RunnerTaskStateFailed,
+				"error_message": message,
+				"finished_at":   now,
+				"updated_at":    now,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrRunnerTaskNotReservable
+		}
+		return ReleaseCodexReservationForTask(tx, t.ID, now)
+	})
+	if err != nil {
+		return err
 	}
-
-	now := time.Now()
-	result := tx.Model(t).
-		Where("state = ? AND runner_id IS NULL", RunnerTaskStateQueued).
-		Updates(map[string]any{
-			"runner_id":   runnerID,
-			"state":       RunnerTaskStateReserved,
-			"reserved_at": now,
-			"updated_at":  now,
-		})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrRunnerTaskNotReservable
-	}
-
-	t.RunnerID = &runnerID
-	t.State = RunnerTaskStateReserved
-	t.ReservedAt = &now
+	t.State = RunnerTaskStateFailed
+	t.ErrorMessage = &message
+	t.FinishedAt = &now
 	t.UpdatedAt = now
 	return nil
+}
+
+// Reserve assigns a task that already holds an organization slot. It can
+// be called with or without an existing transaction.
+func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		current, err := FindRunnerTask(tx, t.ID)
+		if err != nil {
+			return err
+		}
+		runner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runnerID)
+		if err != nil {
+			return err
+		}
+		current, err = FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE"}), t.ID)
+		if err != nil {
+			return err
+		}
+		if current.RunnerID != nil && *current.RunnerID == runnerID &&
+			(current.State == RunnerTaskStateReserved || current.State == RunnerTaskStateRunning) {
+			*t = *current
+			return nil
+		}
+		if err := current.reserveLocked(tx, runner); err != nil {
+			return err
+		}
+		*t = *current
+		return nil
+	})
 }
 
 func (r *Runner) FindActiveTask(tx *gorm.DB) (*RunnerTask, error) {
@@ -202,27 +265,68 @@ func (r *Runner) FindActiveTask(tx *gorm.DB) (*RunnerTask, error) {
 	return &task, nil
 }
 
-func (r *Runner) ReserveNextTask(tx *gorm.DB) (*RunnerTask, error) {
-	var task RunnerTask
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("fleet_id = ? AND backend = ? AND state = ? AND runner_id IS NULL",
-			r.FleetID,
-			RunnerTaskBackendIntegrated,
-			RunnerTaskStateQueued,
-		).
-		Order("queued_at ASC, id ASC").
-		First(&task).
-		Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrRunnerTaskNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := task.Reserve(tx, r.ID); err != nil {
-		return nil, err
-	}
-	return &task, nil
+func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, error) {
+	var reservation RunnerTaskReservationResult
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		// Keep runner-before-task lock ordering across assignment and completion.
+		currentRunner, err := LockRunner(tx, r.ID)
+		if err != nil {
+			return err
+		}
+		active, err := currentRunner.FindActiveTask(tx)
+		if err == nil {
+			reservation.Task = active
+			return nil
+		}
+		if !errors.Is(err, ErrRunnerTaskNotFound) {
+			return err
+		}
+		if currentRunner.State != RunnerStatePending && currentRunner.State != RunnerStateIdle {
+			return nil
+		}
+
+		var skippedTasks, skippedOrganizations []uuid.UUID
+		for range runnerTaskReservationAttemptLimit {
+			query := tx.Where("fleet_id = ? AND backend = ? AND state = ? AND runner_id IS NULL AND cancel_requested_at IS NULL",
+				currentRunner.FleetID, RunnerTaskBackendIntegrated, RunnerTaskStateQueued)
+			if len(skippedTasks) > 0 {
+				query = query.Where("id NOT IN ?", skippedTasks)
+			}
+			if len(skippedOrganizations) > 0 {
+				query = query.Where("organization_id NOT IN ?", skippedOrganizations)
+			}
+			var candidate RunnerTask
+			if err := query.Order("queued_at ASC, id ASC").First(&candidate).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil
+				}
+				return err
+			}
+			attempt, err := currentRunner.reserveCandidate(tx, &candidate)
+			if errors.Is(err, ErrRunnerTaskNotReservable) {
+				skippedTasks = append(skippedTasks, candidate.ID)
+				continue
+			}
+			var busy *CodexConnectionBusyError
+			if errors.As(err, &busy) {
+				// Preserve this organization's queue order while allowing others
+				// to proceed. Retry it on the next notification or heartbeat.
+				skippedOrganizations = append(skippedOrganizations, candidate.OrganizationID)
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			reservation.FailedTasks = append(reservation.FailedTasks, attempt.FailedTasks...)
+			reservation.LoginConnections = append(reservation.LoginConnections, attempt.LoginConnections...)
+			if attempt.Task != nil {
+				reservation.Task = attempt.Task
+				return nil
+			}
+		}
+		return nil
+	})
+	return reservation, err
 }
 
 func (t *RunnerTask) Start(tx *gorm.DB, runner *Runner, activeLogStore string, now time.Time) error {
@@ -231,6 +335,16 @@ func (t *RunnerTask) Start(tx *gorm.DB, runner *Runner, activeLogStore string, n
 	}
 	if activeLogStore == "" {
 		return ErrRunnerTaskLogStoreRequired
+	}
+
+	// Keep the same runner-before-task lock order as cancellation and termination.
+	currentRunner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
+	if err != nil {
+		return err
+	}
+	*runner = *currentRunner
+	if runner.State != RunnerStateIdle {
+		return ErrRunnerTaskNotStartable
 	}
 
 	taskResult := tx.Model(t).
@@ -287,6 +401,13 @@ func (t *RunnerTask) Complete(
 	canceled bool,
 	now time.Time,
 ) (bool, error) {
+	// Lock the runner before the task so completion cannot deadlock with cancellation.
+	currentRunner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
+	if err != nil {
+		return false, err
+	}
+	*runner = *currentRunner
+
 	var current RunnerTask
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ? AND runner_id = ?", t.ID, runner.ID).
@@ -370,6 +491,9 @@ func (t *RunnerTask) Complete(
 	t.FinishedAt = &now
 	t.UpdatedAt = now
 	runner.UpdatedAt = now
+	if err := ReleaseCodexReservationForTask(tx, t.ID, now); err != nil {
+		return false, err
+	}
 	return true, nil
 }
 
@@ -435,5 +559,96 @@ func (t *RunnerTask) markLogsArchivable(tx *gorm.DB, now time.Time) error {
 	if result.RowsAffected != 1 {
 		return ErrTaskLogLifecycleNotFound
 	}
+	return nil
+}
+
+func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTaskReservationResult, error) {
+	var reservation RunnerTaskReservationResult
+	// Release task and subscription locks on a retryable rejection, even when
+	// the caller keeps an outer transaction open.
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		task, err := FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}), candidate.ID)
+		if errors.Is(err, ErrRunnerTaskNotFound) {
+			return ErrRunnerTaskNotReservable
+		}
+		if err != nil {
+			return err
+		}
+		if err := task.reserveLocked(tx, r); err != nil {
+			if IsPermanentSubscriptionAdmissionError(err) {
+				reservation, err = task.rejectSubscriptionAdmission(tx, err)
+			}
+			return err
+		}
+		reservation.Task = task
+		return nil
+	})
+	return reservation, err
+}
+
+func (t *RunnerTask) rejectSubscriptionAdmission(tx *gorm.DB, admissionError error) (RunnerTaskReservationResult, error) {
+	var result RunnerTaskReservationResult
+	lease, err := FindCodexLeaseByTask(tx, t.ID)
+	if err != nil {
+		return result, err
+	}
+	if lease != nil && lease.Login() {
+		connection, err := FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
+		if err != nil && !errors.Is(err, ErrCodexConnectionNotFound) {
+			return result, err
+		}
+		if connection != nil {
+			result.LoginConnections = append(result.LoginConnections, *connection)
+		}
+	}
+	if err := t.FailQueued(tx, admissionError.Error(), time.Now()); err != nil {
+		return RunnerTaskReservationResult{}, err
+	}
+	result.FailedTasks = append(result.FailedTasks, t)
+	return result, nil
+}
+
+func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
+	if t.State != RunnerTaskStateQueued || t.RunnerID != nil || t.CancelRequestedAt != nil {
+		return ErrRunnerTaskNotReservable
+	}
+	if t.Backend != RunnerTaskBackendIntegrated {
+		return ErrRunnerTaskBackendMismatch
+	}
+	if t.FleetID != runner.FleetID {
+		return ErrRunnerTaskFleetMismatch
+	}
+	if runner.State != RunnerStatePending && runner.State != RunnerStateIdle {
+		return ErrRunnerTaskNotReservable
+	}
+	if _, err := runner.FindActiveTask(tx); !errors.Is(err, ErrRunnerTaskNotFound) {
+		if err != nil {
+			return err
+		}
+		return ErrRunnerTaskAlreadyAssigned
+	}
+	if err := t.RequireSubscriptionLeaseAdmission(tx); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	result := tx.Model(t).
+		Where("state = ? AND runner_id IS NULL AND cancel_requested_at IS NULL", RunnerTaskStateQueued).
+		Updates(map[string]any{
+			"runner_id":   runner.ID,
+			"state":       RunnerTaskStateReserved,
+			"reserved_at": now,
+			"updated_at":  now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrRunnerTaskNotReservable
+	}
+	t.RunnerID = &runner.ID
+	t.State = RunnerTaskStateReserved
+	t.ReservedAt = &now
+	t.UpdatedAt = now
 	return nil
 }

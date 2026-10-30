@@ -103,9 +103,9 @@ function hasUnsavedSettings(draft: ImplementSettingsDraft): boolean {
   );
 }
 
-export function useImplementSettingsDraft(nodes: SuperplaneComponentsNode[] | undefined, enabled: boolean) {
-  const agent = enabled ? nodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID) : undefined;
-  const pullRequest = enabled ? findImplementPullRequest(nodes ?? []) : undefined;
+export function useImplementSettingsDraft(nodes: SuperplaneComponentsNode[] | undefined) {
+  const agent = nodes?.find((node) => node.id === IMPLEMENT_AGENT_NODE_ID);
+  const pullRequest = findImplementPullRequest(nodes ?? []);
   const [draft, setDraft] = useState<ImplementSettingsDraft | null>(() =>
     agent && nodes ? createImplementSettingsDraft(agent, nodes) : null,
   );

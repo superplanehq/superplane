@@ -1,3 +1,4 @@
+import { useFactoryTaskIdentity } from "../../factoryTaskContext";
 import { Bot, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ const START_THINKING_LEVELS = [
 export function DraftStartModelSelect({
   organizationId,
   factoryId,
+  orderId,
   lineName,
   model,
   thinkingLevel,
@@ -52,6 +54,7 @@ export function DraftStartModelSelect({
 }: {
   organizationId?: string;
   factoryId?: string;
+  orderId?: string;
   lineName?: string;
   model: string;
   thinkingLevel: string;
@@ -59,9 +62,12 @@ export function DraftStartModelSelect({
   disabled?: boolean;
   appearance?: Appearance;
 }) {
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName);
+  const task = useFactoryTaskIdentity();
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId ?? task.orderId);
   const selectedName =
-    model === DRAFT_START_MODEL_AUTO ? "Auto" : (models.data ?? []).find((item) => item.id === model)?.name || model;
+    model === DRAFT_START_MODEL_AUTO
+      ? "Auto"
+      : (models.data?.models ?? []).find((item) => item.id === model)?.name || model;
   const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
   const showName = appearance !== "icon";
 
@@ -89,7 +95,7 @@ export function DraftStartModelSelect({
           value={model}
           options={[
             { value: DRAFT_START_MODEL_AUTO, label: "Auto" },
-            ...(models.data ?? [])
+            ...(models.data?.models ?? [])
               .filter((item) => (item.id ?? "") !== "")
               .map((item) => ({ value: item.id ?? "", label: item.name || item.id || "" })),
           ]}

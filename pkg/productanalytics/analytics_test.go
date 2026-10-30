@@ -62,6 +62,31 @@ func TestClientCaptureAddsFactoryEnvelope(t *testing.T) {
 	assert.Equal(t, "manual", capture.Properties["creation_source"])
 }
 
+func TestDeletionAndPaymentEnvelopes(t *testing.T) {
+	for _, name := range []EventName{"account_deleted", "organization_deleted", "factory_deleted", "payment_method_removed"} {
+		t.Run(string(name), func(t *testing.T) {
+			queue := &recordingQueue{}
+			client := newClient(queue)
+			event := Event{Name: name, EventID: StableEventID(name, "entity"), DistinctID: "actor", ActorType: ActorUser, Source: SourceAPI}
+			client.Capture(event)
+			if name == "account_deleted" {
+				require.Len(t, queue.messages, 1)
+				capture := queue.messages[0].(posthog.Capture)
+				assert.Empty(t, capture.Groups)
+				assert.NotContains(t, capture.Properties, "organization_id")
+			} else {
+				assert.Empty(t, queue.messages)
+			}
+			event.OrganizationID = "organization"
+			client.Capture(event)
+			require.NotEmpty(t, queue.messages)
+			capture := queue.messages[len(queue.messages)-1].(posthog.Capture)
+			assert.Equal(t, "organization", capture.Groups[OrganizationGroup])
+			assert.Equal(t, StableEventID(name, "entity").String(), capture.Uuid)
+		})
+	}
+}
+
 func TestClientCaptureRejectsIncompleteEvents(t *testing.T) {
 	queue := &recordingQueue{}
 	client := newClient(queue)
@@ -69,6 +94,32 @@ func TestClientCaptureRejectsIncompleteEvents(t *testing.T) {
 	client.Capture(Event{Name: EventFactoryTaskCreated})
 
 	assert.Empty(t, queue.messages)
+}
+
+func TestClientCaptureForwardsPersonProperties(t *testing.T) {
+	queue := &recordingQueue{}
+	client := newClient(queue)
+
+	client.Capture(Event{
+		Name:           EventOrganizationCreated,
+		EventID:        uuid.New(),
+		DistinctID:     "account-123",
+		OrganizationID: "organization-123",
+		ActorType:      ActorUser,
+		Source:         SourceUI,
+		Properties: Properties{
+			"email": "metrics@example.com",
+			"name":  "Metrics User",
+			"$set":  Properties{"email": "metrics@example.com", "name": "Metrics User"},
+		},
+	})
+
+	require.Len(t, queue.messages, 1)
+	capture, ok := queue.messages[0].(posthog.Capture)
+	require.True(t, ok)
+	assert.Equal(t, "metrics@example.com", capture.Properties["email"])
+	assert.Equal(t, "Metrics User", capture.Properties["name"])
+	assert.Equal(t, Properties{"email": "metrics@example.com", "name": "Metrics User"}, capture.Properties["$set"])
 }
 
 func TestNoopClientDoesNotEnableAnalytics(t *testing.T) {

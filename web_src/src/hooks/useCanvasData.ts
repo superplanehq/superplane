@@ -127,6 +127,8 @@ function consoleDataFromYaml(
 }
 
 // Query Keys
+const INCLUDE_TASK_QUERY_TOKEN = "includeTask";
+
 export const canvasKeys = {
   all: ["canvases"] as const,
   lists: () => [...canvasKeys.all, "list"] as const,
@@ -160,8 +162,13 @@ export const canvasKeys = {
       "infinite",
       ...(filters?.states?.length ? ["states", ...filters.states] : []),
       ...(filters?.results?.length ? ["results", ...filters.results] : []),
+      ...(filters?.includeTask ? [INCLUDE_TASK_QUERY_TOKEN] : []),
+      ...(filters?.search || filters?.triggerIds?.length
+        ? ["searchFilters", { search: filters.search, triggerIds: filters.triggerIds }]
+        : []),
     ] as const,
-  run: (canvasId: string, runId: string) => [...canvasKeys.runs(), canvasId, runId] as const,
+  run: (canvasId: string, runId: string, includeTask = false) =>
+    [...canvasKeys.runs(), canvasId, runId, ...(includeTask ? [INCLUDE_TASK_QUERY_TOKEN] : [])] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
   nodeQueueItems: () => [...canvasKeys.all, "nodeQueueItems"] as const,
@@ -734,15 +741,18 @@ export const useDeleteCanvas = (organizationId: string) => {
 };
 
 export type CanvasRunsFilters = {
+  search?: string;
+  triggerIds?: string[];
   states?: CanvasesCanvasRunState[];
   results?: CanvasesCanvasRunResult[];
+  includeTask?: boolean;
 };
 
-export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
+export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true, includeTask = false) => {
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: canvasKeys.run(canvasId, runId!),
+    queryKey: canvasKeys.run(canvasId, runId!, includeTask),
     queryFn: async () => {
       const response = await canvasesDescribeRun(
         withOrganizationHeader({
@@ -750,6 +760,7 @@ export const useDescribeRun = (canvasId: string, runId: string | null, enabled =
             canvasId,
             runId: runId!,
           },
+          ...(includeTask ? { query: { includeTask: true } } : {}),
         }),
       );
       const described = response.data;
@@ -757,7 +768,9 @@ export const useDescribeRun = (canvasId: string, runId: string | null, enabled =
         return described;
       }
 
-      const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, runId!));
+      const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(
+        canvasKeys.run(canvasId, runId!, includeTask),
+      );
       return upsertRunIntoDescribeRunData(current, described.run);
     },
     refetchOnWindowFocus: false,
@@ -777,7 +790,7 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
 
   return useInfiniteQuery({
     queryKey,
-    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+    queryFn: async ({ pageParam, signal }) => {
       // Full refetches (invalidate / refetch()) walk every already-
       // loaded cursor sequentially — TanStack Query's infinite behavior. To
       // avoid re-issuing N ListRuns calls during a resync for a canvas whose
@@ -799,10 +812,14 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
       const response = await canvasesListRuns(
         withOrganizationHeader({
           path: { canvasId },
+          signal,
           query: {
             limit,
             ...(filters.states?.length ? { states: filters.states } : {}),
             ...(filters.results?.length ? { results: filters.results } : {}),
+            ...(filters.includeTask ? { includeTask: true } : {}),
+            ...(filters.search ? { search: filters.search } : {}),
+            ...(filters.triggerIds?.length ? { triggerIds: filters.triggerIds } : {}),
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),

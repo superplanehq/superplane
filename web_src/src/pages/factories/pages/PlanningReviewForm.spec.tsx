@@ -10,7 +10,7 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 
 import { HEADER_MCP_RESOURCE, INLINE_SKILL } from "../__fixtures__/agentResourceFixtures";
@@ -119,7 +119,6 @@ function renderForm(
   draft: PlanningReviewDraft,
   props: {
     onChange?: (draft: PlanningReviewDraft) => void;
-    showVisualEvidenceSetting?: boolean;
     factoryId?: string;
     factoryKey?: string;
   } = {},
@@ -134,7 +133,6 @@ function renderForm(
             organizationId="org-1"
             factoryId={props.factoryId}
             factoryKey={props.factoryKey}
-            showVisualEvidenceSetting={props.showVisualEvidenceSetting}
           />
         </ThemeProvider>
       </MemoryRouter>
@@ -341,41 +339,12 @@ describe("PlanningReviewForm model options", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("shows and saves the visual evidence setting when enabled for the automation", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-
-    renderForm(PLANNING_REVIEW_DRAFT, { onChange, showVisualEvidenceSetting: true });
-
-    const settings = screen.getByTestId("planning-review-settings");
-    expect(settings.className).toContain("grid-cols-3");
-    const toggle = screen.getByRole("switch", { name: "Include visual evidence" });
-    expect(toggle).not.toBeChecked();
-    await user.click(toggle);
-    expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        components: [
-          expect.objectContaining({
-            configuration: expect.objectContaining({ includeVisualEvidence: true }),
-          }),
-        ],
-      }),
-    );
-  });
-
-  it("hides the visual evidence setting for other automations", () => {
-    renderForm(PLANNING_REVIEW_DRAFT);
-
-    expect(screen.queryByRole("switch", { name: "Include visual evidence" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-settings").className).toContain("grid-cols-2");
-  });
-
   it("writes disabledAgentResourceIds when a resource is turned off", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     vi.mocked(useExperimentalFeature).mockReturnValue({
-      has: (feature: string) => feature === FEATURE_WORKSPACE_MCP || feature === FEATURE_WORKSPACE_SKILLS,
-      enabledExperimentalFeatures: [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS],
+      has: (feature: string) => feature === FEATURE_WORKSPACE_SKILLS,
+      enabledExperimentalFeatures: [FEATURE_WORKSPACE_SKILLS],
       isLoading: false,
       organizationReady: true,
     });

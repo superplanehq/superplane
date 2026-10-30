@@ -196,6 +196,53 @@ service Factories {
     };
   }
 
+  rpc CreateFactoryCustomAutomation(CreateFactoryCustomAutomationRequest) returns (CreateFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/custom-automations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create custom automation";
+      description: "Creates a managed Verify-column automation with prompt and bash steps";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactoryCustomAutomation(DescribeFactoryCustomAutomationRequest) returns (DescribeFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe custom automation";
+      description: "Returns the focused settings for a managed Verify-column automation";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryCustomAutomation(UpdateFactoryCustomAutomationRequest) returns (UpdateFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update custom automation";
+      description: "Updates the focused settings and managed graph for a Verify-column automation";
+      tags: "Factory";
+    };
+  }
+
+  rpc RunFactoryCustomAutomation(RunFactoryCustomAutomationRequest) returns (RunFactoryCustomAutomationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/custom-automations/{automation_id}:run"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Run custom automation";
+      description: "Starts one managed Verify-column automation for one task";
+      tags: "Factory";
+    };
+  }
+
   rpc PreviewFactorySchedule(PreviewFactoryScheduleRequest) returns (PreviewFactoryScheduleResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/scheduled-intake/preview"
@@ -426,6 +473,20 @@ service Factories {
     };
   }
 
+  rpc ContinueFactoryPullRequestFixes(
+    ContinueFactoryPullRequestFixesRequest
+  ) returns (ContinueFactoryPullRequestFixesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/continue-fixes"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Continue factory pull request fixes";
+      description: "Resumes paused automatic fixes for a tracked pull request with a fresh attempt budget";
+      tags: "Factory";
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -531,6 +592,18 @@ service Factories {
     };
   }
 
+  rpc SuggestTaskOwners(SuggestTaskOwnersRequest) returns (SuggestTaskOwnersResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/suggest-owners"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Suggest owners for a task";
+      description: "Lists members who can own a task and ranks code owners for the given paths";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateWorkOrder(UpdateWorkOrderRequest) returns (UpdateWorkOrderResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{factory_id}/orders/{order_id}"
@@ -622,6 +695,18 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create work order artifact";
       description: "Attaches a typed artifact to a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc RemoveWorkOrderArtifact(RemoveWorkOrderArtifactRequest) returns (RemoveWorkOrderArtifactResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts/remove"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove one work order artifact";
+      description: "Removes one artifact from a work order by key or title";
       tags: "Factory";
     };
   }
@@ -877,6 +962,60 @@ service Factories {
     };
   }
 
+  rpc ListFactoryOwnerEligibility(ListFactoryOwnerEligibilityRequest) returns (ListFactoryOwnerEligibilityResponse) {
+    option (google.api.http) = { get: "/api/v1/factories/{factory_id}/owner-eligibility" };
+  }
+
+  rpc ResumeHandOffWorkOrder(ResumeHandOffWorkOrderRequest) returns (ResumeHandOffWorkOrderResponse) {
+    option (google.api.http) = { post: "/api/v1/factories/{factory_id}/work-orders/{order_id}:resume-handoff" body: "*" };
+  }
+
+  rpc DescribeFactoryCodexConnection(DescribeFactoryCodexConnectionRequest) returns (DescribeFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/codex-connection"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe ChatGPT subscription";
+      description: "Returns the factory ChatGPT subscription status. Credentials are never included.";
+      tags: "Factory";
+    };
+  }
+
+  rpc StartFactoryCodexConnection(StartFactoryCodexConnectionRequest) returns (StartFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/codex-connection"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start ChatGPT subscription sign-in";
+      description: "Starts a temporary runner that signs in to ChatGPT with a device code";
+      tags: "Factory";
+    };
+  }
+
+  rpc CancelFactoryCodexConnection(CancelFactoryCodexConnectionRequest) returns (CancelFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/codex-connection:cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel ChatGPT subscription sign-in";
+      description: "Cancels a pending ChatGPT device sign-in";
+      tags: "Factory";
+    };
+  }
+
+  rpc DisconnectFactoryCodexConnection(DisconnectFactoryCodexConnectionRequest) returns (DisconnectFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/codex-connection"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Disconnect ChatGPT subscription";
+      description: "Removes the saved ChatGPT subscription when no task is using it";
+      tags: "Factory";
+    };
+  }
+
   rpc FindPlanningSessionByWorkOrder(FindPlanningSessionByWorkOrderRequest) returns (FindPlanningSessionByWorkOrderResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"
@@ -972,6 +1111,8 @@ message UpdateFactoryOnboardingRequest {
   optional string provisioned_line_id = 9;
   // When true, validate readiness and set onboarding_completed_at.
   optional bool complete = 10;
+  // When true, this workspace uses a ChatGPT subscription for Codex.
+  optional bool codex_subscription = 12;
   // Default branch of the app repository.
   optional string default_branch = 11;
 }
@@ -1003,6 +1144,10 @@ message UpdateFactoryRepositoryRequest {
   string repository = 2;
   // Default branch resolved from the selected repository.
   string default_branch = 3;
+  // When unset or true, unfinished tasks that still follow the previous
+  // repository move to the saved repository and branch. False keeps those
+  // tasks on their current repository and branch.
+  optional bool retarget_tasks = 4;
 }
 
 message UpdateFactoryRepositoryResponse {
@@ -1063,6 +1208,8 @@ message FactoryOnboarding {
   string vcs_provider = 14;
   // Bitbucket repository UUID. GitHub leaves this empty.
   string app_repository_external_id = 15;
+  // True when setup uses a ChatGPT subscription instead of an API key.
+  bool codex_subscription = 16;
 }
 
 // Automations the workspace Git host can run. Computed from vcs_provider.
@@ -1202,6 +1349,82 @@ message CreateFactoryAutomationRequest {
 
 message CreateFactoryAutomationResponse {
   Factory.Automation automation = 1;
+}
+
+message FactoryCustomAutomation {
+  enum StartMode {
+    START_MODE_UNSPECIFIED = 0;
+    START_MODE_MANUAL = 1;
+    START_MODE_AUTOMATIC = 2;
+  }
+
+  message Step {
+    enum Type {
+      TYPE_UNSPECIFIED = 0;
+      TYPE_PROMPT = 1;
+      TYPE_BASH = 2;
+    }
+
+    string name = 1;
+    Type type = 2;
+    string prompt = 3;
+    string command = 4;
+    string working_directory = 5;
+    repeated string secrets = 6;
+  }
+
+  message Settings {
+    StartMode start_mode = 1;
+    FactoryAppTemplateAgent agent = 2;
+    repeated Step steps = 3;
+    string icon = 4;
+    int32 execution_timeout_seconds = 5;
+  }
+
+  Factory.Automation automation = 1;
+  Settings settings = 2;
+  string provider = 3;
+}
+
+message CreateFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string name = 2;
+  FactoryCustomAutomation.Settings settings = 3;
+}
+
+message CreateFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
+}
+
+message DescribeFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+}
+
+message DescribeFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
+}
+
+message UpdateFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+  string name = 3;
+  FactoryCustomAutomation.Settings settings = 4;
+}
+
+message UpdateFactoryCustomAutomationResponse {
+  FactoryCustomAutomation custom_automation = 1;
+}
+
+message RunFactoryCustomAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+  string work_order_id = 3;
+}
+
+message RunFactoryCustomAutomationResponse {
+  string run_id = 1;
+  string event_id = 2;
 }
 
 message PreviewFactoryScheduleRequest {
@@ -1463,6 +1686,9 @@ message CreateFactoryIntakeRequest {
   // Optional intake settings applied when the canvas is created. Used by
   // the Jira wizard and first-run tickets step to store the completion column.
   optional FactoryIntake.Settings settings = 8;
+  // When true, the intake starts paused: live items are ignored until
+  // automatic intake is turned on. The initial import still runs.
+  bool paused = 9;
 }
 
 message CreateFactoryIntakeResponse {
@@ -1756,6 +1982,18 @@ message MergeFactoryPullRequestResponse {
   FactoryPullRequest pull_request = 1;
 }
 
+message ContinueFactoryPullRequestFixesRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  // Run of the paused activity that reached the attempt limit.
+  string run_id = 3;
+}
+
+message ContinueFactoryPullRequestFixesResponse {
+  // Root event that restarts the checks automation.
+  string event_id = 1;
+}
+
 message FactoryIntakeItem {
   string id = 1;
   string key = 2;
@@ -1838,6 +2076,9 @@ message CreateWorkOrderRequest {
   string description = 3;
   repeated string assignee_ids = 4;
   string model = 5;
+  // In subscription workspaces, explicitly leave the task without an owner.
+  // Otherwise, omitted assignee_ids defaults to the eligible creator.
+  bool unassigned = 6;
 }
 
 message CreateWorkOrderResponse {
@@ -1927,6 +2168,8 @@ message WorkOrder {
   // MCP client that created this task through a hand-off. Empty for
   // tasks that did not come from an MCP client.
   WorkOrderMcpClient mcp_client = 26;
+  string refinement_model = 27;
+  PendingHandOff pending_handoff = 28;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -1961,6 +2204,8 @@ message WorkOrderSummary {
   WorkOrderMcpClient mcp_client = 21;
   // Canvas run that created this task. Needed to link intake history rows.
   string source_run_id = 22;
+  string refinement_model = 23;
+  PendingHandOff pending_handoff = 24;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -2130,7 +2375,7 @@ message WorkOrderExecution {
   repeated string models = 13;
   // Why the step failed before it could run. Set only for SuperPlane
   // hosted credit failures: no_hosted_credit,
-  // hosted_subscription_required, or workspace_budget_empty.
+  // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
 }
 
@@ -2161,11 +2406,47 @@ message UpdateWorkOrderAssigneesResponse {
   WorkOrder order = 1;
 }
 
+message SuggestTaskOwnersRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  repeated string paths = 3;
+}
+
+message SuggestTaskOwnersResponse {
+  repeated string paths = 1;
+  repeated TaskOwnerMember current_owners = 2;
+  repeated TaskCodeOwner code_owners = 3;
+  repeated TaskOwnerMember members = 4;
+  string history_note = 5;
+}
+
+message TaskOwnerMember {
+  string user_id = 1;
+  string name = 2;
+  string email = 3;
+  string github_login = 4;
+  repeated string roles = 5;
+  int32 open_tasks = 6;
+}
+
+message TaskCodeOwner {
+  string user_id = 1;
+  string name = 2;
+  string github_login = 3;
+  repeated string roles = 4;
+  int32 commits = 5;
+  google.protobuf.Timestamp last_commit_at = 6;
+  repeated string paths = 7;
+  int32 open_tasks = 8;
+  double score = 9;
+}
+
 message UpdateWorkOrderRequest {
   string factory_id = 1;
   string order_id = 2;
   optional string title = 3;
   optional string description = 4;
+  optional string refinement_model = 5;
 }
 
 message UpdateWorkOrderResponse {
@@ -2290,6 +2571,18 @@ message CreateWorkOrderArtifactRequest {
 
 message CreateWorkOrderArtifactResponse {
   WorkOrderArtifact artifact = 1;
+}
+
+message RemoveWorkOrderArtifactRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string key = 3;
+  string title = 4;
+}
+
+message RemoveWorkOrderArtifactResponse {
+  string id = 1;
+  string title = 2;
 }
 
 message WorkOrderArtifact {
@@ -2631,6 +2924,12 @@ message DescribeFactoryUsageResponse {
   bool factory_remaining_credit_warning = 12;
   int64 total_duration_seconds = 13;
   repeated UsageByMachineType by_machine_type = 14;
+  // Exact hosted credit gate for new runs. Whole-cent balances round down,
+  // so clients must use this flag instead of remaining_credit_cents.
+  bool hosted_credit_available = 15;
+  // Exact workspace hosted budget gate for new runs. True when the workspace
+  // has no cap or its capped remainder is still positive.
+  bool factory_hosted_budget_available = 16;
 }
 
 message ListFactoryWorkOrderRunUsageRequest {
@@ -2683,10 +2982,12 @@ message ExportFactoryWorkOrderRunUsageResponse {
 message ListFactoryLineRunnerModelsRequest {
   string factory_id = 1;
   string line_name = 2;
+  string order_id = 3;
 }
 
 message ListFactoryLineRunnerModelsResponse {
   repeated FactoryLLMModel models = 1;
+  bool uses_hosted_funding = 2;
 }
 
 message ListFactoryLLMModelsRequest {
@@ -2960,6 +3261,7 @@ message PlanningSessionActivity {
 message PlanningSessionSurveyQuestion {
   string prompt = 1;
   repeated string options = 2;
+  string recommended_option = 3;
 }
 
 message PlanningSessionSurvey {
@@ -2975,6 +3277,10 @@ message PlanningSessionSummary {
   string wait_state = 3;
   string execution_id = 4;
   PlanningSessionSurvey survey = 5;
+  // Integrated runner task state, independent of the agent node state.
+  string runner_state = 6;
+  // True when the organization parallelism limit blocks a pending task.
+  bool blocked_by_parallelism_limit = 7;
 }
 
 message PlanningSession {
@@ -2993,6 +3299,10 @@ message PlanningSession {
   string selectable_model_key = 13;
   PlanningSessionKind kind = 14;
   repeated PlanningSessionActivity activities = 15;
+  // Integrated runner task state, independent of the agent node state.
+  string runner_state = 16;
+  // True when the organization parallelism limit blocks a pending task.
+  bool blocked_by_parallelism_limit = 17;
 }
 
 enum PlanningSessionKind {
@@ -3039,6 +3349,57 @@ message AnswerPlanningSessionSurveyResponse {
   PlanningSession session = 1;
 }
 
+message FactoryCodexConnection {
+  string id = 1;
+  // pending, canceling, finishing, ready, reconnect_required, or disconnected.
+  string status = 2;
+  string verification_url = 3;
+  string verification_code = 4;
+  string account_label = 5;
+  string active_task_id = 6;
+  // True when this organization can use a ChatGPT subscription.
+  bool eligible = 7;
+  // True while a login runner or a factory task still holds the connection.
+  bool reservation_held = 8;
+  // Models available to this ChatGPT subscription.
+  repeated string available_models = 9;
+  bool revocation_pending = 10;
+}
+
+message DescribeFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message DescribeFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
+message StartFactoryCodexConnectionRequest {
+  string factory_id = 1;
+  // Refresh the model catalog without starting a new device sign-in.
+  bool refresh_catalog = 2;
+}
+
+message StartFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
+message CancelFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message CancelFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
+message DisconnectFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message DisconnectFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
 message FindPlanningSessionByWorkOrderRequest {
   string factory_id = 1;
   string work_order_id = 2;
@@ -3056,6 +3417,7 @@ message FactoryMCPClient {
   string user_email = 5;
   google.protobuf.Timestamp created_at = 6;
   string user_avatar_url = 7;
+  int32 workspace_count = 8;
 }
 
 message ListFactoryMCPClientsRequest {
@@ -3072,3 +3434,39 @@ message RevokeFactoryMCPClientRequest {
 }
 
 message RevokeFactoryMCPClientResponse {}
+
+message PendingHandOff {
+  string line_id = 1;
+  string column = 2;
+  string pull_request_url = 3;
+}
+
+message ResumeHandOffWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string model = 3;
+  string thinking_level = 4;
+}
+
+message ResumeHandOffWorkOrderResponse {
+  WorkOrder order = 1;
+  string column = 2;
+}
+
+message ListFactoryOwnerEligibilityRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message FactoryOwnerEligibility {
+  string user_id = 1;
+  bool eligible = 2;
+  string reason = 3;
+}
+
+message ListFactoryOwnerEligibilityResponse {
+  repeated FactoryOwnerEligibility members = 1;
+  bool ownership_change_allowed = 2;
+  string restriction_reason = 3;
+  bool subscription = 4;
+}

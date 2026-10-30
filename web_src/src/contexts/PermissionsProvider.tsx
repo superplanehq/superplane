@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useMe } from "@/hooks/useMe";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 
 import { PermissionsContext } from "./permissionsContextState";
 
@@ -13,6 +14,7 @@ export function PermissionsProvider({ children, organizationId: organizationIdOv
   const routeOrganizationId = useOrganizationId();
   const organizationId = organizationIdOverride ?? routeOrganizationId;
   const { data: me, isLoading: meLoading } = useMe(true, organizationId);
+  const inSupportSession = useIsSupportSession();
 
   const permissions = useMemo(() => me?.permissions ?? [], [me?.permissions]);
   const browserNotificationPreferences = useMemo(
@@ -36,12 +38,20 @@ export function PermissionsProvider({ children, organizationId: organizationIdOv
     );
   }, [permissions]);
 
-  const canAct = useCallback(
+  const hasPermission = useCallback(
     (resource: string, action: string) => {
       if (!resource || !action) return false;
       return permissionSet.has(`${resource.toLowerCase()}:${action.toLowerCase()}`);
     },
     [permissionSet],
+  );
+
+  const canAct = useCallback(
+    (resource: string, action: string) => {
+      if (inSupportSession && action.toLowerCase() !== "read") return false;
+      return hasPermission(resource, action);
+    },
+    [hasPermission, inSupportSession],
   );
 
   const isLoading = !organizationId || meLoading;
@@ -52,6 +62,7 @@ export function PermissionsProvider({ children, organizationId: organizationIdOv
         permissions,
         isLoading,
         canAct,
+        hasPermission,
         currentUserId: me?.id,
         browserNotificationPreferences,
       }}

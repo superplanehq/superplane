@@ -40,7 +40,9 @@ describe("pullRequestReviewNote", () => {
   });
 
   it("ignores notes without a link", () => {
-    expect(pullRequestReviewNote({ headline: "Implement did not pass", cta: { label: "Debug" } })).toBeUndefined();
+    expect(
+      pullRequestReviewNote({ headline: "Implement did not pass", cta: { label: "View run details" } }),
+    ).toBeUndefined();
     expect(pullRequestReviewNote({ headline: "No pull request" })).toBeUndefined();
   });
 
@@ -53,8 +55,8 @@ describe("pullRequestReviewNote", () => {
     ).toBeUndefined();
     expect(
       pullRequestReviewNote({
-        headline: "Debug",
-        cta: { label: "Debug", href: "/org/workspaces/key/apps/app-1/runs/run-1" },
+        headline: "View run details",
+        cta: { label: "View run details", href: "/org/workspaces/key/apps/app-1/runs/run-1" },
       }),
     ).toBeUndefined();
   });

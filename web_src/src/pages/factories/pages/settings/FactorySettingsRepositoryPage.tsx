@@ -1,4 +1,14 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/alertDialog";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
@@ -32,8 +42,18 @@ export function FactorySettingsRepositoryPage() {
     catalogRepositories: choices.catalogRepositories,
   });
   const canUpdate = canAct("factories", "update");
+  const [confirmTasks, setConfirmTasks] = useState(false);
 
   usePageTitle(["Repository", "Settings", factory.name ?? "Workspace"]);
+  const requestSave = () => {
+    const repositoryChanged = !sameRepositoryName(draft.repository, draft.savedRepository);
+    const branchChanged = draft.branch.trim() !== draft.savedBranch;
+    if (repositoryChanged || branchChanged) {
+      setConfirmTasks(true);
+      return;
+    }
+    void draft.save(true);
+  };
 
   return (
     <FactorySettingsPageFrame title="Repository" subtitle={repositorySettingsSubtitle(choices.bitbucket)}>
@@ -69,7 +89,7 @@ export function FactorySettingsRepositoryPage() {
                 permissionsLoading ||
                 draft.isSaving
               }
-              onClick={draft.save}
+              onClick={requestSave}
               data-testid="factory-settings-repository-save"
             >
               Save repository
@@ -77,8 +97,102 @@ export function FactorySettingsRepositoryPage() {
           </PermissionTooltip>
         </div>
       </FactorySettingsCard>
+      <UpdateUnfinishedTasksDialog
+        open={confirmTasks}
+        previousRepository={draft.savedRepository}
+        nextRepository={draft.repository}
+        previousBranch={draft.savedBranch}
+        nextBranch={draft.branch.trim()}
+        onOpenChange={setConfirmTasks}
+        onConfirm={() => {
+          setConfirmTasks(false);
+          void draft.save(true);
+        }}
+        onKeepTasks={() => {
+          setConfirmTasks(false);
+          void draft.save(false);
+        }}
+      />
     </FactorySettingsPageFrame>
   );
+}
+
+function UpdateUnfinishedTasksDialog(props: {
+  open: boolean;
+  previousRepository: string;
+  nextRepository: string;
+  previousBranch: string;
+  nextBranch: string;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+  onKeepTasks: () => void;
+}) {
+  return (
+    <AlertDialog open={props.open} onOpenChange={props.onOpenChange}>
+      <AlertDialogContent data-testid="factory-settings-update-tasks-dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Update unfinished tasks</AlertDialogTitle>
+          <AlertDialogDescription>{unfinishedTasksDescription(props)}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="factory-settings-update-tasks-cancel">Cancel</AlertDialogCancel>
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="factory-settings-update-tasks-keep"
+            onClick={props.onKeepTasks}
+          >
+            Save without updating tasks
+          </Button>
+          <AlertDialogAction onClick={props.onConfirm} data-testid="factory-settings-update-tasks-confirm">
+            Update tasks
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function unfinishedTasksDescription(props: {
+  previousRepository: string;
+  nextRepository: string;
+  previousBranch: string;
+  nextBranch: string;
+}) {
+  const previousRepository = props.previousRepository.trim();
+  const nextRepository = props.nextRepository.trim();
+  const previousBranch = props.previousBranch.trim();
+  const repositoryChanged = previousRepository !== "" && !sameRepositoryName(previousRepository, nextRepository);
+  const move = repositoryChanged
+    ? repositoryTaskMove(previousRepository, nextRepository, previousBranch, props.nextBranch)
+    : branchTaskMove(previousBranch, props.nextBranch);
+  return `${move} Save without updating tasks keeps current tasks on their repository and branch.`;
+}
+
+function repositoryTaskMove(
+  previousRepository: string,
+  nextRepository: string,
+  previousBranch: string,
+  nextBranch: string,
+) {
+  if (previousBranch && previousBranch !== nextBranch) {
+    return `Unfinished tasks on "${previousRepository}" with no branch, or with "${previousBranch}", will use "${nextRepository}" and "${nextBranch}". Closed tasks stay unchanged.`;
+  }
+  if (previousBranch) {
+    return `Unfinished tasks on "${previousRepository}" will use "${nextRepository}". Closed tasks stay unchanged.`;
+  }
+  return `Unfinished tasks on "${previousRepository}" with no branch will use "${nextRepository}" and "${nextBranch}". Closed tasks stay unchanged.`;
+}
+
+function branchTaskMove(previousBranch: string, nextBranch: string) {
+  if (previousBranch) {
+    return `Unfinished tasks with no branch, or with "${previousBranch}", will use "${nextBranch}". Closed tasks stay unchanged.`;
+  }
+  return `Unfinished tasks with no branch will use "${nextBranch}". Closed tasks stay unchanged.`;
+}
+
+function sameRepositoryName(left: string, right: string) {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
 }
 
 function repositorySettingsSubtitle(bitbucket: boolean) {

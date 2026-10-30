@@ -2,13 +2,18 @@ package authorization_test
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func Test__AuthService_BasicPermissions(t *testing.T) {
@@ -178,6 +183,129 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 		err := r.AuthService.AssignRole(userID, "invalid_role", orgID, models.DomainTypeOrganization)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid role")
+	})
+}
+
+func Test__AuthService_RemoveRoleInTransaction(t *testing.T) {
+	r := support.Setup(t)
+	orgID := r.Organization.ID.String()
+
+	assignAdmin := func(t *testing.T) string {
+		t.Helper()
+		userID := uuid.NewString()
+		require.NoError(t, r.AuthService.AssignRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization))
+		return userID
+	}
+	hasAdminRole := func(t *testing.T, userID string) bool {
+		t.Helper()
+		roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), userID, orgID)
+		require.NoError(t, err)
+		return slices.ContainsFunc(roles, func(role *authorization.RoleDefinition) bool {
+			return role.Name == models.RoleOrgAdmin
+		})
+	}
+
+	t.Run("rolled back transaction keeps the role", func(t *testing.T) {
+		userID := assignAdmin(t)
+		rollback := errors.New("rollback")
+
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			require.NoError(t, r.AuthService.RemoveRoleInTransaction(tx, userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization))
+			return rollback
+		})
+
+		require.ErrorIs(t, err, rollback)
+		assert.True(t, hasAdminRole(t, userID))
+	})
+
+	t.Run("committed transaction removes the role", func(t *testing.T) {
+		userID := assignAdmin(t)
+
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			return r.AuthService.RemoveRoleInTransaction(tx, userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		})
+
+		require.NoError(t, err)
+		assert.False(t, hasAdminRole(t, userID))
+	})
+}
+
+func Test__AuthService_RemoveUserFromOrganizationInTransaction(t *testing.T) {
+	r := support.Setup(t)
+	orgID := r.Organization.ID.String()
+	otherOrgID := uuid.NewString()
+
+	roleNames := func(t *testing.T, userID, orgID string) []string {
+		t.Helper()
+		roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), userID, orgID)
+		require.NoError(t, err)
+		names := []string{}
+		for _, role := range roles {
+			names = append(names, role.Name)
+		}
+		return names
+	}
+	allowed := func(t *testing.T, userID, orgID, resource, action string) bool {
+		t.Helper()
+		ok, err := r.AuthService.CheckOrganizationPermission(context.Background(), userID, orgID, resource, action)
+		require.NoError(t, err)
+		return ok
+	}
+	groupUsers := func(t *testing.T, group string) []string {
+		t.Helper()
+		users, err := r.AuthService.GetGroupUsers(context.Background(), orgID, models.DomainTypeOrganization, group)
+		require.NoError(t, err)
+		return users
+	}
+	setupMember := func(t *testing.T, group string) (string, string) {
+		t.Helper()
+		require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, group, models.RoleOrgAdmin, "Admins", "Admins"))
+		userID := uuid.NewString()
+		otherMember := uuid.NewString()
+		require.NoError(t, r.AuthService.AssignRole(userID, models.RoleOrgOperator, orgID, models.DomainTypeOrganization))
+		require.NoError(t, r.AuthService.AddUserToGroup(orgID, models.DomainTypeOrganization, userID, group))
+		require.NoError(t, r.AuthService.AddUserToGroup(orgID, models.DomainTypeOrganization, otherMember, group))
+		return userID, otherMember
+	}
+
+	t.Run("committed removal clears direct roles and group memberships in the organization only", func(t *testing.T) {
+		userID, otherMember := setupMember(t, "committed-admins")
+		require.NoError(t, r.AuthService.AssignRole(userID, models.RoleOrgAdmin, otherOrgID, models.DomainTypeOrganization))
+
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			return r.AuthService.RemoveUserFromOrganizationInTransaction(tx, userID, orgID)
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, roleNames(t, userID, orgID))
+		assert.False(t, allowed(t, userID, orgID, "org", "update"))
+		assert.False(t, allowed(t, userID, orgID, "members", "update"))
+		role, err := r.AuthService.GetGroupRole(context.Background(), orgID, models.DomainTypeOrganization, "committed-admins")
+		require.NoError(t, err)
+		assert.Equal(t, models.RoleOrgAdmin, role)
+		assert.Equal(t, []string{otherMember}, groupUsers(t, "committed-admins"))
+		assert.True(t, allowed(t, otherMember, orgID, "members", "update"))
+		assert.Contains(t, roleNames(t, userID, otherOrgID), models.RoleOrgAdmin)
+		assert.True(t, allowed(t, userID, otherOrgID, "org", "update"))
+
+		require.NoError(t, r.AuthService.AddUserToGroup(orgID, models.DomainTypeOrganization, userID, "committed-admins"))
+		assert.ElementsMatch(t, []string{userID, otherMember}, groupUsers(t, "committed-admins"))
+	})
+
+	t.Run("rolled back removal keeps direct roles and group memberships", func(t *testing.T) {
+		userID, otherMember := setupMember(t, "rollback-admins")
+		rolesBefore := roleNames(t, userID, orgID)
+		rollback := errors.New("rollback")
+
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			require.NoError(t, r.AuthService.RemoveUserFromOrganizationInTransaction(tx, userID, orgID))
+			return rollback
+		})
+
+		require.ErrorIs(t, err, rollback)
+		assert.ElementsMatch(t, rolesBefore, roleNames(t, userID, orgID))
+		assert.ElementsMatch(t, []string{userID, otherMember}, groupUsers(t, "rollback-admins"))
+		assert.True(t, allowed(t, userID, orgID, "members", "update"))
 	})
 }
 

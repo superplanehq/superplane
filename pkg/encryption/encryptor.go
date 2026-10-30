@@ -32,7 +32,7 @@ func (e *applicationEncryptor) ForDB(tx *gorm.DB) crypto.Encryptor {
 }
 
 // ForDB binds application encryption key lookups to the caller's DB handle.
-// Legacy and no-op encryptors do not query the data key table.
+// Other encryptors do not query the data key table.
 func ForDB(tx *gorm.DB, encryptor crypto.Encryptor) crypto.Encryptor {
 	if tx == nil {
 		return encryptor

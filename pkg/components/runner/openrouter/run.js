@@ -111,6 +111,10 @@ function planningEnabled(env = process.env) {
   );
 }
 
+// The global runner MCP server lists only the tools that the run token
+// allows, and the backend checks the scope on every call.
+const GLOBAL_MCP_SERVER = "superplane_global";
+
 function workspaceMCPConfigPath(env = process.env) {
   const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
   const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
@@ -143,7 +147,7 @@ function workspaceMCPServers(env = process.env) {
     for (const server of servers) {
       const name = String((server && server.name) || "").trim();
       const url = String((server && server.url) || "").trim();
-      if (!name || name === "superplane" || !url) {
+      if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER || !url) {
         continue;
       }
       const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
@@ -195,6 +199,11 @@ function planningAnalysisEnabled(env = process.env) {
 
 function artifactEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
+}
+
+function visualEvidenceEnabled(env = process.env) {
+  if (envFlag(env, "SUPERPLANE_VISUAL_EVIDENCE")) return true;
+  return artifactEnabled(env) && !envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
 }
 
 function mergeConfidenceEnabled(env = process.env) {
@@ -517,6 +526,16 @@ function buildOpenCodeConfig({
       },
     };
   }
+  if (envFlag(env, "SUPERPLANE_RUNNER_TOKEN") && taskDir) {
+    config.mcp = {
+      ...(config.mcp || {}),
+      [GLOBAL_MCP_SERVER]: {
+        type: "local",
+        command: ["node", path.join(taskDir, "superplane_mcp", "server.js")],
+        enabled: true,
+      },
+    };
+  }
   applyWorkspaceMCPDenylist(config, workspaceMCPServers(env));
   const protocol = planningSystemPrompt(env);
   if (protocol && taskDir) {
@@ -728,7 +747,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
         text,
       ));
   const planning = planningEnabled(env);
-  if (artifactEnabled(env)) {
+  if (visualEvidenceEnabled(env)) {
     const outputDir = path.join(sp, "evidence");
     fs.mkdirSync(outputDir, { recursive: true });
     env.PLAYWRIGHT_MCP_OUTPUT_DIR = outputDir;

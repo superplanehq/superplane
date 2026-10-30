@@ -52,6 +52,7 @@ Do not reinvent these pieces:
 | --- | --- |
 | Billing unit | Ledger stores tokens by type and USD cents. Money is the source of truth. |
 | Welcome grant | Once per organization, not per user. |
+| Admin-assigned plans | Business Manual and custom admin-assigned plans can stay active without a Polar subscription. Billing sync and inactive subscription webhooks must preserve them. See the [locked plan rule](team-plan-seats-and-billing.md#admin-assigned-plans-without-a-polar-subscription). |
 | Hosted catalog | Admin picks one hosted provider and an allowlist of models. |
 | BYOK catalog | User connects keys. SuperPlane lists models. The list guides the picker. It does not gate a run. |
 | BYOK cost | Store estimated or provider-reported dollars. Mark `funding_source=byok`. |
@@ -150,7 +151,7 @@ hosted run gate. Polar does not proxy inference and does not ingest usage in
 this phase.
 
 - One Polar customer per organization (`external_id` = org UUID).
-- Prepaid one-time credit packs ($25 / $100 / $500) discovered by product
+- Prepaid one-time credit packs ($50 / $100 / $500) discovered by product
   metadata `superplane_credit_pack=true`.
 - `order.paid` inserts an `organization_llm_credit_grants` row of kind `topup`.
   Wallet credit equals pack face value. Tax is extra on the Polar invoice.
@@ -158,6 +159,26 @@ this phase.
   is configured. Hide those actions when Polar env is empty (self-hosted).
 - Polar usage meters and PAYG invoices are deferred. SuperPlane remaining
   credit stays the source of truth.
+
+#### Credit purchase fees
+
+Installation admins set the percentage and fixed USD processing fee on the
+global **Credits** page. Both values default to zero. These fees apply only
+to new credit top-ups, not subscription payments or hosted usage markup.
+
+The top-up dialog shows hosted credit, processing fee, and subtotal before
+the buyer continues to Polar. The subtotal is rounded up to cents:
+`(credit cents + fixed fee cents) * 10000 / (10000 - fee basis points)`.
+Polar receives a fixed price for that checkout, with tax added separately.
+The catalog product price stays unchanged. International extras and fees on
+tax remain SuperPlane costs.
+
+Versioned order metadata records the credit amount and subtotal. The signed
+payment event grants the credit amount, excluding the processing fee and tax.
+Partial refunds reverse credits in proportion to the cumulative pre-tax
+refund. Full refunds reverse the full original grant. Later fee changes do
+not change existing purchases. Unmarked legacy orders retain their original
+credit and refund behavior.
 
 #### Polar API version
 

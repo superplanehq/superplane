@@ -1,6 +1,6 @@
 /**
- * Lane colours for the line board. Vivid uses the picker swatch. Dim uses a
- * quieter wash in both light and dark mode.
+ * Lane colours for the line board. Vivid uses the full accent in light mode
+ * and a dark surface mix. Dim uses a quieter wash in both light and dark mode.
  */
 
 import {
@@ -25,17 +25,17 @@ export interface LineBoardColumnColor {
 export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
   {
     id: "lime",
-    label: "Lime",
-    className: "bg-lime-300 dark:bg-lime-800",
-    laneClassName: "bg-lime-100 dark:bg-lime-950/40",
-    borderClassName: "border-lime-400 dark:border-lime-800/45",
+    label: "Mint",
+    className: "line-board-color-lime line-board-column-vivid bg-[var(--board-column-vivid)]",
+    laneClassName: "line-board-color-lime line-board-column-soft bg-[var(--board-column-soft)]",
+    borderClassName: "line-board-color-lime line-board-column-bordered border-[var(--board-column-border)]",
   },
   {
     id: "yellow",
-    label: "Yellow",
-    className: "bg-amber-300 dark:bg-amber-800",
-    laneClassName: "bg-amber-100 dark:bg-amber-950/40",
-    borderClassName: "border-amber-400 dark:border-amber-800/45",
+    label: "Peach",
+    className: "line-board-color-yellow line-board-column-vivid bg-[var(--board-column-vivid)]",
+    laneClassName: "line-board-color-yellow line-board-column-soft bg-[var(--board-column-soft)]",
+    borderClassName: "line-board-color-yellow line-board-column-bordered border-[var(--board-column-border)]",
   },
   {
     id: "teal",
@@ -47,9 +47,9 @@ export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
   {
     id: "sky",
     label: "Sky",
-    className: "bg-sky-300 dark:bg-sky-800",
-    laneClassName: "bg-sky-100 dark:bg-sky-950/40",
-    borderClassName: "border-sky-400 dark:border-sky-800/45",
+    className: "line-board-color-sky line-board-column-vivid bg-[var(--board-column-vivid)]",
+    laneClassName: "line-board-color-sky line-board-column-soft bg-[var(--board-column-soft)]",
+    borderClassName: "line-board-color-sky line-board-column-bordered border-[var(--board-column-border)]",
   },
   {
     id: "purple",
@@ -61,9 +61,9 @@ export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
   {
     id: "slate",
     label: "Slate",
-    className: "bg-slate-300 dark:bg-slate-600",
-    laneClassName: "bg-slate-100 dark:bg-slate-800/50",
-    borderClassName: "border-slate-400 dark:border-slate-600/45",
+    className: "line-board-color-slate line-board-column-vivid bg-[var(--board-column-vivid)]",
+    laneClassName: "line-board-color-slate line-board-column-soft bg-[var(--board-column-soft)]",
+    borderClassName: "line-board-color-slate line-board-column-bordered border-[var(--board-column-border)]",
   },
 ];
 
@@ -97,7 +97,7 @@ export function lineBoardColumnLaneProps(
     return muted ? { className: muted } : {};
   }
   if (view === "borders") {
-    return { className: muted ? `${muted} ${color.borderClassName}` : color.borderClassName };
+    return { surfaceClassName: "bg-card", className: color.borderClassName };
   }
   if (view === "vivid") {
     return { surfaceClassName: color.className };

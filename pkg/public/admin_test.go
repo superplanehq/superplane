@@ -3,21 +3,25 @@ package public
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/ee/billing/pricebook"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
@@ -143,53 +147,53 @@ func TestAdminListOrganizationsRemainingCredit(t *testing.T) {
 	require.NoError(t, err)
 
 	expired := time.Now().Add(-time.Hour).UTC()
-	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
+	require.NoError(t, db.Create(&billingmodels.OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: high.ID,
-		Kind:           models.LLMCreditGrantKindWelcome,
-		AmountMicros:   models.CentsToMicros(5000),
+		Kind:           billingmodels.LLMCreditGrantKindWelcome,
+		AmountMicros:   billingmodels.CentsToMicros(5000),
 		CreatedAt:      expired.Add(-2 * time.Hour),
 		ExpiresAt:      &expired,
 	}).Error)
-	insertHostedSpend(t, db, high.ID, models.CentsToMicros(2000), expired.Add(-time.Minute))
-	insertHostedSpend(t, db, high.ID, models.CentsToMicros(500), time.Now())
-	insertHostedSpendWithSource(t, db, high.ID, models.CentsToMicros(9000), time.Now(), models.UsageFundingSourceBYOK)
-	_, err = models.AddTopupLLMCreditGrant(db, high.ID, models.CentsToMicros(8000), uuid.NewString())
+	insertHostedSpend(t, db, high.ID, billingmodels.CentsToMicros(2000), expired.Add(-time.Minute))
+	insertHostedSpend(t, db, high.ID, billingmodels.CentsToMicros(500), time.Now())
+	insertHostedSpendWithSource(t, db, high.ID, billingmodels.CentsToMicros(9000), time.Now(), models.UsageFundingSourceBYOK)
+	_, err = billingmodels.AddTopupLLMCreditGrant(db, high.ID, billingmodels.CentsToMicros(8000), uuid.NewString())
 	require.NoError(t, err)
 
-	_, err = models.AddAdminLLMCreditGrant(db, alpha.ID, models.CentsToMicros(1500), "support", nil)
+	_, err = billingmodels.AddAdminLLMCreditGrant(db, alpha.ID, billingmodels.CentsToMicros(1500), "support", nil)
 	require.NoError(t, err)
-	_, err = models.AddAdminLLMCreditGrant(db, beta.ID, models.CentsToMicros(1500), "support", nil)
+	_, err = billingmodels.AddAdminLLMCreditGrant(db, beta.ID, billingmodels.CentsToMicros(1500), "support", nil)
 	require.NoError(t, err)
 
 	sameA, err := models.CreateOrganization("CreditSort SameA", "")
 	require.NoError(t, err)
 	sameZ, err := models.CreateOrganization("CreditSort SameZ", "")
 	require.NoError(t, err)
-	_, err = models.AddAdminLLMCreditGrant(db, sameA.ID, 12_500, "support", nil)
+	_, err = billingmodels.AddAdminLLMCreditGrant(db, sameA.ID, 12_500, "support", nil)
 	require.NoError(t, err)
-	_, err = models.AddAdminLLMCreditGrant(db, sameZ.ID, 19_999, "support", nil)
+	_, err = billingmodels.AddAdminLLMCreditGrant(db, sameZ.ID, 19_999, "support", nil)
 	require.NoError(t, err)
 
 	other, err := models.CreateOrganization("CreditSort Other", "")
 	require.NoError(t, err)
 	otherExpired := time.Now().Add(-2 * time.Hour).UTC()
-	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
+	require.NoError(t, db.Create(&billingmodels.OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: other.ID,
-		Kind:           models.LLMCreditGrantKindWelcome,
-		AmountMicros:   models.CentsToMicros(1000),
+		Kind:           billingmodels.LLMCreditGrantKindWelcome,
+		AmountMicros:   billingmodels.CentsToMicros(1000),
 		CreatedAt:      otherExpired.Add(-2 * time.Hour),
 		ExpiresAt:      &otherExpired,
 	}).Error)
-	insertHostedSpend(t, db, other.ID, models.CentsToMicros(400), otherExpired.Add(-time.Minute))
-	insertHostedSpend(t, db, other.ID, models.CentsToMicros(100), time.Now())
-	_, err = models.AddTopupLLMCreditGrant(db, other.ID, models.CentsToMicros(300), uuid.NewString())
+	insertHostedSpend(t, db, other.ID, billingmodels.CentsToMicros(400), otherExpired.Add(-time.Minute))
+	insertHostedSpend(t, db, other.ID, billingmodels.CentsToMicros(100), time.Now())
+	_, err = billingmodels.AddTopupLLMCreditGrant(db, other.ID, billingmodels.CentsToMicros(300), uuid.NewString())
 	require.NoError(t, err)
 
 	expected := map[string]int64{}
 	for _, org := range []*models.Organization{high, alpha, beta, none, sameA, sameZ, other} {
-		summary, err := models.DescribeOrganizationLLMCredit(db, org.ID)
+		summary, err := billingmodels.DescribeOrganizationLLMCredit(db, org.ID)
 		require.NoError(t, err)
 		expected[org.ID.String()] = pricebook.MicrosToCents(summary.RemainingMicros)
 	}
@@ -235,6 +239,117 @@ func organizationIDs(items []adminOrgItem) []string {
 		ids[i] = item.ID
 	}
 	return ids
+}
+
+func TestAdminListOrganizationPlans(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	db := database.DB(t.Context())
+	custom := billingmodels.BillingPlan{Key: "custom_admin_list_" + uuid.NewString()[:8], Name: "a Custom Plan", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &custom))
+	other := billingmodels.BillingPlan{Key: "other_admin_list_" + uuid.NewString()[:8], Name: "A CUSTOM PLAN", Category: "paid", Visibility: "public", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &other))
+	create := func(name, key string) *models.Organization {
+		org, err := models.CreateOrganization("PlanSort "+name, "")
+		require.NoError(t, err)
+		if key != "" {
+			_, err = billingmodels.SetAdminOrganizationPlan(db, org.ID, key, nil)
+			require.NoError(t, err)
+		}
+		return org
+	}
+	zebra := create("Zebra", custom.Key)
+	alpha := create("Alpha", other.Key)
+	twinA := create("Twin", custom.Key)
+	twinB := create("Twin", other.Key)
+	none := create("Missing", "")
+	require.NoError(t, db.Where("organization_id = ?", none.ID).Delete(&billingmodels.OrganizationBillingPlan{}).Error)
+	trial := create("Trial", "trial")
+	expired := create("Expired", "trial")
+	past := time.Now().Add(-time.Hour)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", expired.ID).Update("trial_ends_at", past).Error)
+	ended := create("Ended", custom.Key)
+	require.NoError(t, db.Model(&billingmodels.OrganizationBillingPlan{}).Where("organization_id = ?", ended.ID).Updates(map[string]any{
+		"plan_source": billingmodels.BillingPlanSourcePolar, "cancel_at_period_end": true, "current_period_end": past,
+		"polar_subscription_status": billingmodels.PolarSubscriptionStatusCanceled,
+	}).Error)
+	pinCustom := create("Pinned Custom", custom.Key)
+	pinTrial := create("Pinned Trial", "trial")
+	require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, pinCustom.ID).Code)
+	require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, pinTrial.ID).Code)
+
+	twins := []string{twinA.ID.String(), twinB.ID.String()}
+	slices.Sort(twins)
+	paidIDs := append([]string{alpha.ID.String()}, twins...)
+	paidIDs = append(paidIDs, zebra.ID.String())
+	noneIDs := []string{ended.ID.String(), expired.ID.String(), none.ID.String()}
+	expectedPlans := map[string][2]string{
+		alpha.ID.String(): {other.Key, other.Name}, zebra.ID.String(): {custom.Key, custom.Name},
+		twinA.ID.String(): {custom.Key, custom.Name}, twinB.ID.String(): {other.Key, other.Name},
+		none.ID.String(): {"none", "None"}, expired.ID.String(): {"none", "None"}, ended.ID.String(): {"none", "None"},
+		trial.ID.String(): {"trial", "Trial"}, pinCustom.ID.String(): {custom.Key, custom.Name}, pinTrial.ID.String(): {"trial", "Trial"},
+	}
+	request := func(t *testing.T, query string) adminOrganizationListResponse {
+		t.Helper()
+		page := listAdminOrganizations(t, server, token, query)
+		for _, item := range append(append([]adminOrgItem{}, page.Items...), page.Pinned...) {
+			assert.Equal(t, expectedPlans[item.ID], [2]string{item.PlanKey, item.PlanName}, item.ID)
+		}
+		return page
+	}
+	for _, test := range []struct {
+		direction string
+		ids       []string
+	}{
+		{"asc", append(append(append([]string{}, paidIDs...), noneIDs...), trial.ID.String())},
+		{"desc", append(append([]string{trial.ID.String()}, noneIDs...), paidIDs...)},
+	} {
+		t.Run(test.direction, func(t *testing.T) {
+			for offset, id := range test.ids {
+				page := request(t, fmt.Sprintf("search=PlanSort&sort_by=plan_name&sort_direction=%s&limit=1&offset=%d", test.direction, offset))
+				require.Len(t, page.Items, 1)
+				assert.Equal(t, id, page.Items[0].ID)
+				assert.Equal(t, int64(8), page.Total)
+				assert.Equal(t, int64(10), page.MatchTotal)
+				require.Len(t, page.Pinned, 2)
+				assert.Equal(t, pinTrial.ID.String(), page.Pinned[0].ID)
+				assert.Equal(t, pinCustom.ID.String(), page.Pinned[1].ID)
+			}
+		})
+	}
+	page := request(t, "search=PlanSort%20Twin&sort_by=plan_name&sort_direction=desc&limit=1&offset=1")
+	require.Len(t, page.Items, 1)
+	assert.Equal(t, twins[1], page.Items[0].ID)
+	assert.Equal(t, int64(2), page.Total)
+	request(t, "search=PlanSort&sort_by=name&sort_direction=asc&limit=2")
+	for _, org := range []*models.Organization{none, expired, ended} {
+		stored, err := billingmodels.FindOrganizationBillingPlan(db, org.ID)
+		require.NoError(t, err)
+		require.NotNil(t, stored)
+		assert.Equal(t, "none", stored.Catalog.Key)
+	}
+}
+
+func TestAdminListOrganizationPlanResolutionErrors(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	db := database.DB(t.Context())
+	const callback = "test:fail_admin_plan_resolution"
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "organization_billing_plans" {
+			tx.AddError(errors.New("plan storage detail"))
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+	for _, query := range []string{"sort_by=name", "sort_by=plan_name"} {
+		response := execRequest(server, requestParams{method: http.MethodGet, path: "/admin/api/organizations?" + query, authCookie: token})
+		assert.Equal(t, http.StatusInternalServerError, response.Code)
+		assert.Equal(t, "Failed to list organizations\n", response.Body.String())
+	}
+	require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, r.Organization.ID).Code)
+	response := execRequest(server, requestParams{
+		method: http.MethodGet, path: "/admin/api/organizations?search=no-matching-organization", authCookie: token,
+	})
+	assert.Equal(t, http.StatusInternalServerError, response.Code)
+	assert.Equal(t, "Failed to list organizations\n", response.Body.String())
 }
 
 func insertHostedSpend(t *testing.T, db *gorm.DB, orgID uuid.UUID, costMicros int64, occurredAt time.Time) {
@@ -629,9 +744,56 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, result.AllowPrivateNetworkAccess)
 		assert.True(t, result.SignupsEnabled)
+		assert.Equal(t, 7, result.InvitationDurationDays)
 		assert.NotEmpty(t, result.EffectiveBlockedHTTPHosts)
 		assert.NotEmpty(t, result.EffectivePrivateIPRanges)
 		assert.False(t, result.SMTPEnabled)
+	})
+
+	t.Run("admin can configure invitation duration", func(t *testing.T) {
+		for _, days := range []int{0, -1, 366, 14} {
+			body, err := json.Marshal(map[string]int{"invitation_duration_days": days})
+			require.NoError(t, err)
+			response := execRequest(server, requestParams{
+				method: "PATCH", path: "/admin/api/installation/network-settings",
+				body: body, authCookie: token, contentType: "application/json",
+			})
+			if days != 14 {
+				require.Equal(t, http.StatusBadRequest, response.Code)
+				continue
+			}
+			require.Equal(t, http.StatusOK, response.Code)
+		}
+		response := execRequest(server, requestParams{
+			method: "GET", path: "/admin/api/installation/network-settings", authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		var result map[string]any
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		require.Equal(t, float64(14), result["invitation_duration_days"])
+	})
+
+	t.Run("admin can configure past due grace", func(t *testing.T) {
+		for _, days := range []int{-1, 22, 0, 21, 7} {
+			body, err := json.Marshal(map[string]int{"past_due_grace_days": days})
+			require.NoError(t, err)
+			response := execRequest(server, requestParams{
+				method: "PATCH", path: "/admin/api/installation/network-settings",
+				body: body, authCookie: token, contentType: "application/json",
+			})
+			if days < 0 || days > 21 {
+				require.Equal(t, http.StatusBadRequest, response.Code)
+				continue
+			}
+			require.Equal(t, http.StatusOK, response.Code)
+		}
+		response := execRequest(server, requestParams{
+			method: "GET", path: "/admin/api/installation/network-settings", authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		var result map[string]any
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		require.Equal(t, float64(7), result["past_due_grace_days"])
 	})
 
 	t.Run("admin can update installation network settings", func(t *testing.T) {
@@ -908,10 +1070,10 @@ func TestAdminListOrgUsers(t *testing.T) {
 	})
 }
 
-func TestStartImpersonation(t *testing.T) {
+func TestStartSupportSession(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
-	t.Run("starts impersonation with a different account", func(t *testing.T) {
+	t.Run("starts a support session with a different account", func(t *testing.T) {
 		otherAccount, err := models.CreateAccount("Other User", "other@example.com")
 		require.NoError(t, err)
 
@@ -921,7 +1083,7 @@ func TestStartImpersonation(t *testing.T) {
 
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        "/admin/api/impersonate/start",
+			path:        "/admin/api/support-session/start",
 			body:        body,
 			authCookie:  token,
 			contentType: "application/json",
@@ -937,39 +1099,39 @@ func TestStartImpersonation(t *testing.T) {
 		cookies := response.Result().Cookies()
 		found := false
 		for _, c := range cookies {
-			if c.Name == "impersonation_token" {
+			if c.Name == "support_session_token" {
 				found = true
 				assert.NotEmpty(t, c.Value)
 				assert.True(t, c.HttpOnly)
 				break
 			}
 		}
-		assert.True(t, found, "impersonation_token cookie should be set")
+		assert.True(t, found, "support_session_token cookie should be set")
 	})
 
-	t.Run("rejects self-impersonation", func(t *testing.T) {
+	t.Run("rejects a support session for own account", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{
 			"account_id": r.Account.ID.String(),
 		})
 
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        "/admin/api/impersonate/start",
+			path:        "/admin/api/support-session/start",
 			body:        body,
 			authCookie:  token,
 			contentType: "application/json",
 		})
 
 		assert.Equal(t, http.StatusBadRequest, response.Code)
-		assert.Contains(t, response.Body.String(), "Cannot impersonate yourself")
+		assert.Contains(t, response.Body.String(), "You cannot start a support session for your own account")
 	})
 
-	t.Run("rejects impersonation with missing account_id", func(t *testing.T) {
+	t.Run("rejects a support session with missing account_id", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{})
 
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        "/admin/api/impersonate/start",
+			path:        "/admin/api/support-session/start",
 			body:        body,
 			authCookie:  token,
 			contentType: "application/json",
@@ -978,14 +1140,14 @@ func TestStartImpersonation(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 	})
 
-	t.Run("rejects impersonation with non-existent account", func(t *testing.T) {
+	t.Run("rejects a support session with non-existent account", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{
 			"account_id": "00000000-0000-0000-0000-000000000000",
 		})
 
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        "/admin/api/impersonate/start",
+			path:        "/admin/api/support-session/start",
 			body:        body,
 			authCookie:  token,
 			contentType: "application/json",
@@ -995,13 +1157,13 @@ func TestStartImpersonation(t *testing.T) {
 	})
 }
 
-func TestEndImpersonation(t *testing.T) {
+func TestEndSupportSession(t *testing.T) {
 	server, _, token := setupAdminTestServer(t)
 
-	t.Run("ends impersonation and clears cookie", func(t *testing.T) {
+	t.Run("ends the support session and clears cookie", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "POST",
-			path:       "/admin/api/impersonate/end",
+			path:       "/admin/api/support-session/end",
 			authCookie: token,
 		})
 
@@ -1012,10 +1174,10 @@ func TestEndImpersonation(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "/admin", result["redirect_url"])
 
-		// Check impersonation cookie was cleared
+		// Check support session cookie was cleared
 		cookies := response.Result().Cookies()
 		for _, c := range cookies {
-			if c.Name == "impersonation_token" {
+			if c.Name == "support_session_token" {
 				assert.Equal(t, "", c.Value)
 				assert.Equal(t, -1, c.MaxAge)
 			}
@@ -1023,13 +1185,13 @@ func TestEndImpersonation(t *testing.T) {
 	})
 }
 
-func TestImpersonationStatus(t *testing.T) {
+func TestSupportSessionStatus(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
-	t.Run("returns inactive when no impersonation cookie", func(t *testing.T) {
+	t.Run("returns inactive when no support session cookie", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "GET",
-			path:       "/admin/api/impersonate/status",
+			path:       "/admin/api/support-session/status",
 			authCookie: token,
 		})
 
@@ -1041,22 +1203,22 @@ func TestImpersonationStatus(t *testing.T) {
 		assert.Equal(t, false, result["active"])
 	})
 
-	t.Run("returns active when valid impersonation cookie exists", func(t *testing.T) {
+	t.Run("returns active when valid support session cookie exists", func(t *testing.T) {
 		otherAccount, err := models.CreateAccount("Status Target", "status-target@example.com")
 		require.NoError(t, err)
 
 		signer := jwt.NewSigner("test-client-secret")
-		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-			"type":                    "impersonation",
-			"admin_account_id":        r.Account.ID.String(),
-			"impersonated_account_id": otherAccount.ID.String(),
-			"sub":                     r.Account.ID.String(),
+		sessionToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+			"type":              "support_session",
+			"admin_account_id":  r.Account.ID.String(),
+			"target_account_id": otherAccount.ID.String(),
+			"sub":               r.Account.ID.String(),
 		})
 		require.NoError(t, err)
 
-		req := httptest.NewRequest(http.MethodGet, "/admin/api/impersonate/status", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/api/support-session/status", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
-		req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impToken})
+		req.AddCookie(&http.Cookie{Name: "support_session_token", Value: sessionToken})
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
@@ -1075,18 +1237,18 @@ func TestImpersonationStatus(t *testing.T) {
 		require.NoError(t, err)
 
 		signer := jwt.NewSigner("test-client-secret")
-		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-			"type":                    "impersonation",
-			"admin_account_id":        r.Account.ID.String(),
-			"impersonated_account_id": target.ID.String(),
-			"sub":                     r.Account.ID.String(),
+		sessionToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+			"type":              "support_session",
+			"admin_account_id":  r.Account.ID.String(),
+			"target_account_id": target.ID.String(),
+			"sub":               r.Account.ID.String(),
 		})
 		require.NoError(t, err)
 		require.NoError(t, target.Block(database.Conn(), time.Now()))
 
-		req := httptest.NewRequest(http.MethodGet, "/admin/api/impersonate/status", nil)
+		req := httptest.NewRequest(http.MethodGet, "/admin/api/support-session/status", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
-		req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impToken})
+		req.AddCookie(&http.Cookie{Name: "support_session_token", Value: sessionToken})
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
@@ -1097,7 +1259,7 @@ func TestImpersonationStatus(t *testing.T) {
 		assert.Equal(t, false, result["active"])
 
 		for _, cookie := range res.Result().Cookies() {
-			if cookie.Name == "impersonation_token" {
+			if cookie.Name == "support_session_token" {
 				assert.Equal(t, "", cookie.Value)
 				assert.Equal(t, -1, cookie.MaxAge)
 			}
@@ -1126,7 +1288,7 @@ func TestGetAccountIncludesInstallationAdmin(t *testing.T) {
 	})
 
 	t.Run("billing_enabled is false when product billing is off", func(t *testing.T) {
-		t.Setenv(models.BillingEnabledEnv, "no")
+		t.Setenv(billingmodels.BillingEnabledEnv, "no")
 		response := execRequest(server, requestParams{
 			method:     "GET",
 			path:       "/account",
@@ -1161,30 +1323,30 @@ func TestGetAccountIncludesInstallationAdmin(t *testing.T) {
 	})
 }
 
-// makeImpersonationRequest creates an HTTP request carrying both the admin's
-// account_token and a valid impersonation_token for the given target account.
-func makeImpersonationRequest(
+// makeSupportSessionRequest creates an HTTP request carrying both the admin's
+// account_token and a valid support_session_token for the given target account.
+func makeSupportSessionRequest(
 	t *testing.T,
 	method, path, adminToken string,
 	adminAccountID, targetAccountID string,
 ) *http.Request {
 	t.Helper()
 	signer := jwt.NewSigner("test-client-secret")
-	impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-		"type":                    "impersonation",
-		"admin_account_id":        adminAccountID,
-		"impersonated_account_id": targetAccountID,
-		"sub":                     adminAccountID,
+	sessionToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+		"type":              "support_session",
+		"admin_account_id":  adminAccountID,
+		"target_account_id": targetAccountID,
+		"sub":               adminAccountID,
 	})
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(method, path, nil)
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: adminToken})
-	req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impToken})
+	req.AddCookie(&http.Cookie{Name: "support_session_token", Value: sessionToken})
 	return req
 }
 
-func TestImpersonationEffectiveAccount(t *testing.T) {
+func TestSupportSessionEffectiveAccount(t *testing.T) {
 	server, r, adminToken := setupAdminTestServer(t)
 
 	otherAccount, err := models.CreateAccount("Target User", "target@example.com")
@@ -1193,8 +1355,8 @@ func TestImpersonationEffectiveAccount(t *testing.T) {
 	_, err = models.CreateUser(r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
 	require.NoError(t, err)
 
-	t.Run("GET /account returns impersonated user data during impersonation", func(t *testing.T) {
-		req := makeImpersonationRequest(t, http.MethodGet, "/account",
+	t.Run("GET /account returns target user data during a support session", func(t *testing.T) {
+		req := makeSupportSessionRequest(t, http.MethodGet, "/account",
 			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res := httptest.NewRecorder()
@@ -1205,13 +1367,13 @@ func TestImpersonationEffectiveAccount(t *testing.T) {
 		var result map[string]any
 		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &result))
 
-		assert.Equal(t, otherAccount.ID.String(), result["id"], "should return impersonated account ID")
-		assert.Equal(t, otherAccount.Email, result["email"], "should return impersonated email")
-		assert.Equal(t, false, result["installation_admin"], "impersonated user is not admin")
+		assert.Equal(t, otherAccount.ID.String(), result["id"], "should return target account ID")
+		assert.Equal(t, otherAccount.Email, result["email"], "should return target email")
+		assert.Equal(t, false, result["installation_admin"], "target user is not admin")
 	})
 
-	t.Run("GET /organizations returns impersonated user orgs during impersonation", func(t *testing.T) {
-		req := makeImpersonationRequest(t, http.MethodGet, "/organizations",
+	t.Run("GET /organizations returns target user orgs during a support session", func(t *testing.T) {
+		req := makeSupportSessionRequest(t, http.MethodGet, "/organizations",
 			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res := httptest.NewRecorder()
@@ -1224,22 +1386,67 @@ func TestImpersonationEffectiveAccount(t *testing.T) {
 
 		for _, org := range orgs {
 			assert.Equal(t, r.Organization.ID.String(), org["id"],
-				"should only see the impersonated user's organizations")
+				"should only see the target user's organizations")
 		}
 	})
 
-	t.Run("admin endpoints still use real admin account during impersonation", func(t *testing.T) {
-		req := makeImpersonationRequest(t, http.MethodGet, "/admin/api/organizations",
+	t.Run("admin endpoints still use real admin account during a support session", func(t *testing.T) {
+		req := makeSupportSessionRequest(t, http.MethodGet, "/admin/api/organizations",
 			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
 
-		assert.Equal(t, http.StatusOK, res.Code, "admin endpoint should still work during impersonation")
+		assert.Equal(t, http.StatusOK, res.Code, "admin endpoint should still work during a support session")
 	})
 }
 
-func TestImpersonationSecurityGuardrails(t *testing.T) {
+func TestSupportSessionIsReadOnly(t *testing.T) {
+	server, r, adminToken := setupAdminTestServer(t)
+
+	target, err := models.CreateAccount("Target User", "read-only-target@example.com")
+	require.NoError(t, err)
+	_, err = models.CreateUser(r.Organization.ID, target.ID, target.Email, target.Name)
+	require.NoError(t, err)
+
+	request := func(method, path string) *httptest.ResponseRecorder {
+		req := makeSupportSessionRequest(t, method, path, adminToken, r.Account.ID.String(), target.ID.String())
+		res := httptest.NewRecorder()
+		server.Router.ServeHTTP(res, req)
+		return res
+	}
+
+	t.Run("organization creation is rejected", func(t *testing.T) {
+		res := request(http.MethodPost, "/organizations")
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), middleware.SupportSessionReadOnlyMessage)
+	})
+
+	t.Run("admin actions are rejected", func(t *testing.T) {
+		res := request(http.MethodPost, "/admin/api/accounts/"+target.ID.String()+"/block")
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		refreshed, err := models.FindAccountByID(target.ID.String())
+		require.NoError(t, err)
+		assert.False(t, refreshed.IsBlocked())
+	})
+
+	t.Run("app install routes that write on GET are rejected", func(t *testing.T) {
+		for _, path := range []string{"/sentry/app/install?state=abc", "/sentry/app/setup", "/github/app/manifest"} {
+			res := request(http.MethodGet, server.BasePath+path)
+			assert.Equal(t, http.StatusForbidden, res.Code, path)
+		}
+	})
+
+	t.Run("ending the session is allowed", func(t *testing.T) {
+		res := request(http.MethodPost, "/admin/api/support-session/end")
+
+		assert.Equal(t, http.StatusOK, res.Code)
+	})
+}
+
+func TestSupportSessionSecurityGuardrails(t *testing.T) {
 	server, r, adminToken := setupAdminTestServer(t)
 
 	otherAccount, err := models.CreateAccount("Target", "target-sec@example.com")
@@ -1247,21 +1454,21 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 
 	signer := jwt.NewSigner("test-client-secret")
 
-	t.Run("non-admin with impersonation cookie is ignored", func(t *testing.T) {
+	t.Run("non-admin with support session cookie is ignored", func(t *testing.T) {
 		regularToken, err := authentication.GenerateAccountToken(signer, otherAccount.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
-		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-			"type":                    "impersonation",
-			"admin_account_id":        otherAccount.ID.String(),
-			"impersonated_account_id": r.Account.ID.String(),
-			"sub":                     otherAccount.ID.String(),
+		sessionToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+			"type":              "support_session",
+			"admin_account_id":  otherAccount.ID.String(),
+			"target_account_id": r.Account.ID.String(),
+			"sub":               otherAccount.ID.String(),
 		})
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/account", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: regularToken})
-		req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impToken})
+		req.AddCookie(&http.Cookie{Name: "support_session_token", Value: sessionToken})
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
@@ -1272,21 +1479,21 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &result))
 
 		assert.Equal(t, otherAccount.ID.String(), result["id"],
-			"non-admin impersonation cookie must be ignored")
+			"non-admin support session cookie must be ignored")
 	})
 
-	t.Run("impersonation cookie with mismatched admin ID is ignored", func(t *testing.T) {
-		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-			"type":                    "impersonation",
-			"admin_account_id":        "00000000-0000-0000-0000-000000000000",
-			"impersonated_account_id": otherAccount.ID.String(),
-			"sub":                     "00000000-0000-0000-0000-000000000000",
+	t.Run("support session cookie with mismatched admin ID is ignored", func(t *testing.T) {
+		sessionToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+			"type":              "support_session",
+			"admin_account_id":  "00000000-0000-0000-0000-000000000000",
+			"target_account_id": otherAccount.ID.String(),
+			"sub":               "00000000-0000-0000-0000-000000000000",
 		})
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/account", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: adminToken})
-		req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impToken})
+		req.AddCookie(&http.Cookie{Name: "support_session_token", Value: sessionToken})
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
@@ -1297,22 +1504,22 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &result))
 
 		assert.Equal(t, r.Account.ID.String(), result["id"],
-			"mismatched admin ID should cause impersonation to be ignored")
+			"mismatched admin ID should cause the support session to be ignored")
 	})
 
-	t.Run("impersonation cookie signed with wrong secret is ignored", func(t *testing.T) {
+	t.Run("support session cookie signed with wrong secret is ignored", func(t *testing.T) {
 		wrongSigner := jwt.NewSigner("wrong-secret")
-		impToken, err := wrongSigner.GenerateWithClaims(time.Hour, map[string]string{
-			"type":                    "impersonation",
-			"admin_account_id":        r.Account.ID.String(),
-			"impersonated_account_id": otherAccount.ID.String(),
-			"sub":                     r.Account.ID.String(),
+		sessionToken, err := wrongSigner.GenerateWithClaims(time.Hour, map[string]string{
+			"type":              "support_session",
+			"admin_account_id":  r.Account.ID.String(),
+			"target_account_id": otherAccount.ID.String(),
+			"sub":               r.Account.ID.String(),
 		})
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/account", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: adminToken})
-		req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impToken})
+		req.AddCookie(&http.Cookie{Name: "support_session_token", Value: sessionToken})
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
@@ -1326,8 +1533,8 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 			"forged token should be ignored")
 	})
 
-	t.Run("impersonation stops working after admin is demoted", func(t *testing.T) {
-		req := makeImpersonationRequest(t, http.MethodGet, "/account",
+	t.Run("support session stops working after admin is demoted", func(t *testing.T) {
+		req := makeSupportSessionRequest(t, http.MethodGet, "/account",
 			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res := httptest.NewRecorder()
@@ -1336,11 +1543,11 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 
 		var before map[string]any
 		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &before))
-		assert.Equal(t, otherAccount.ID.String(), before["id"], "impersonation should be active")
+		assert.Equal(t, otherAccount.ID.String(), before["id"], "support session should be active")
 
 		require.NoError(t, models.DemoteFromInstallationAdmin(r.Account.ID.String()))
 
-		req2 := makeImpersonationRequest(t, http.MethodGet, "/account",
+		req2 := makeSupportSessionRequest(t, http.MethodGet, "/account",
 			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res2 := httptest.NewRecorder()
@@ -1350,7 +1557,7 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		var after map[string]any
 		require.NoError(t, json.Unmarshal(res2.Body.Bytes(), &after))
 		assert.Equal(t, r.Account.ID.String(), after["id"],
-			"after demotion, should return admin's own account, not impersonated")
+			"after demotion, should return admin's own account, not the target")
 
 		require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
 	})
@@ -1394,7 +1601,6 @@ func TestAdminListOrgExperimentalFeatures(t *testing.T) {
 
 	t.Run("returns an empty enabled list when none are on", func(t *testing.T) {
 		require.NoError(t, models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureFactories))
-		require.NoError(t, models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureWorkspaceAgent))
 
 		response := execRequest(server, requestParams{
 			method:     "GET",
@@ -1497,63 +1703,6 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	})
 }
 
-func TestAdminListRunnerTasks(t *testing.T) {
-	server, _, token := setupAdminTestServer(t)
-
-	t.Run("broker not configured", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "")
-		t.Setenv("TASK_BROKER_FLEET_ID", "")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "")
-
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/admin/api/runner/tasks",
-			authCookie: token,
-		})
-		assert.Equal(t, http.StatusOK, response.Code)
-
-		var body map[string]any
-		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		assert.Equal(t, false, body["configured"])
-		assert.Equal(t, []any{}, body["tasks"])
-	})
-
-	t.Run("returns active tasks from broker", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, http.MethodGet, r.Method)
-			assert.Equal(t, "/v1/tasks", r.URL.Path)
-			assert.Equal(t, "Bearer broker-token", r.Header.Get("Authorization"))
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"tasks":[{"id":"active-1","status":"queued","fleet_id":"fleet-1","created_at":"2026-05-24T12:00:00Z"}]}`))
-		}))
-		defer upstream.Close()
-
-		t.Setenv("TASK_BROKER_BASE_URL", upstream.URL)
-		t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "broker-token")
-
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/admin/api/runner/tasks",
-			authCookie: token,
-		})
-		assert.Equal(t, http.StatusOK, response.Code)
-
-		var body struct {
-			Configured bool `json:"configured"`
-			Tasks      []struct {
-				ID     string `json:"id"`
-				Status string `json:"status"`
-			} `json:"tasks"`
-		}
-		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		assert.True(t, body.Configured)
-		require.Len(t, body.Tasks, 1)
-		assert.Equal(t, "active-1", body.Tasks[0].ID)
-		assert.Equal(t, "queued", body.Tasks[0].Status)
-	})
-}
-
 func TestAdminBlockAndUnblockAccount(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
@@ -1592,19 +1741,19 @@ func TestAdminBlockAndUnblockAccount(t *testing.T) {
 		assert.True(t, body.Items[0].Blocked)
 	})
 
-	t.Run("rejects impersonating a blocked account", func(t *testing.T) {
+	t.Run("rejects a support session for a blocked account", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{
 			"account_id": target.ID.String(),
 		})
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        "/admin/api/impersonate/start",
+			path:        "/admin/api/support-session/start",
 			body:        body,
 			authCookie:  token,
 			contentType: "application/json",
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
-		assert.Contains(t, response.Body.String(), "Cannot impersonate a blocked account")
+		assert.Contains(t, response.Body.String(), "You cannot start a support session for a blocked account")
 	})
 
 	t.Run("unblocks an account", func(t *testing.T) {
@@ -1635,6 +1784,7 @@ func TestAdminDeleteAccount(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Run("deletes the account, its organization, and its workspaces", func(t *testing.T) {
+		recorder := useAnalytics(t)
 		target, err := models.CreateAccount("Delete Target", "delete-target@example.com")
 		require.NoError(t, err)
 		organization, err := models.CreateOrganization(support.RandomName("org"), "")
@@ -1669,6 +1819,13 @@ func TestAdminDeleteAccount(t *testing.T) {
 		var remainingFactories int64
 		require.NoError(t, database.Conn().Model(&models.Factory{}).Where("id = ?", factory.ID).Count(&remainingFactories).Error)
 		assert.Zero(t, remainingFactories)
+		events := recorder.snapshot()
+		require.Len(t, events, 2)
+		assert.Equal(t, "account_deleted", string(events[0].Name))
+		assert.Equal(t, r.Account.ID.String(), events[0].DistinctID)
+		assert.Equal(t, target.ID.String(), events[0].Properties["account_id"])
+		assert.Equal(t, r.Account.ID.String(), events[0].Properties["actor_account_id"])
+		assert.Equal(t, "admin", events[0].Properties["deletion_source"])
 	})
 
 	t.Run("keeps organizations that have another owner", func(t *testing.T) {
@@ -1688,12 +1845,14 @@ func TestAdminDeleteAccount(t *testing.T) {
 	})
 
 	t.Run("rejects self-delete", func(t *testing.T) {
+		recorder := useAnalytics(t)
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
 			path:       "/admin/api/accounts/" + r.Account.ID.String(),
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Empty(t, recorder.snapshot())
 
 		_, err := models.FindAccountByID(r.Account.ID.String())
 		require.NoError(t, err)
@@ -1706,5 +1865,20 @@ func TestAdminDeleteAccount(t *testing.T) {
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("tracks a deleted account without organizations", func(t *testing.T) {
+		recorder := useAnalytics(t)
+		target, err := models.CreateAccount("No workspace", support.RandomName("account")+"@example.com")
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{method: "DELETE", path: "/admin/api/accounts/" + target.ID.String(), authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		events := recorder.snapshot()
+		require.Len(t, events, 1)
+		assert.Equal(t, "account_deleted", string(events[0].Name))
+		assert.Equal(t, r.Account.ID.String(), events[0].DistinctID)
+		assert.Equal(t, target.ID.String(), events[0].Properties["account_id"])
+		assert.Empty(t, events[0].OrganizationID)
+		assert.Empty(t, events[0].Properties["deleted_organization_ids"])
 	})
 }

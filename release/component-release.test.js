@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -15,7 +16,9 @@ const {
   parseVersion,
   publishGitHubRelease,
   stageGitHubRelease,
+  validateFinalization,
   verifyManifest,
+  verifyPublishedPrerelease,
 } = require("./component-release");
 
 function git(repository, args) {
@@ -88,6 +91,68 @@ test("accepts stable and prerelease versions", () => {
 test("rejects build metadata and malformed prereleases", () => {
   for (const version of ["1.2.3", "v1.2", "v1.2.3+build.1", "v1.2.3-"]) {
     assert.throws(() => parseVersion(version), /version/);
+  }
+});
+
+test("validates release candidate finalization pairs", () => {
+  assert.equal(validateFinalization("v1.0.0-rc8", "v1.0.0"), "v1.0.0");
+  assert.equal(
+    validateFinalization("v2.3.4-rc.12", "v2.3.4"),
+    "v2.3.4",
+  );
+
+  assert.throws(
+    () => validateFinalization("v1.0.0", "v1.0.0"),
+    /candidate version must be a prerelease/,
+  );
+  assert.throws(
+    () => validateFinalization("v1.0.0-rc8", "v1.0.1"),
+    /stable version must be v1.0.0/,
+  );
+  assert.throws(
+    () => validateFinalization("v1.0.0-rc8", "v1.0.0-final"),
+    /stable version must not be a prerelease/,
+  );
+});
+
+test("verifies a published release candidate at the expected commit", async () => {
+  const sha = "a".repeat(40);
+  let release = {
+    draft: false,
+    prerelease: true,
+    tag_name: "v1.0.0-rc8",
+    target_commitish: sha,
+  };
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify(release));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const options = {
+    apiURL: `http://127.0.0.1:${address.port}`,
+    repository: "superplanehq/superplane",
+    component: "superplane",
+    version: "v1.0.0-rc8",
+    sha,
+  };
+
+  try {
+    await verifyPublishedPrerelease(options);
+
+    release = { ...release, draft: true };
+    await assert.rejects(
+      verifyPublishedPrerelease(options),
+      /is not a published prerelease/,
+    );
+
+    release = { ...release, draft: false, target_commitish: "b".repeat(40) };
+    await assert.rejects(
+      verifyPublishedPrerelease(options),
+      /does not match source SHA/,
+    );
+  } finally {
+    server.close();
   }
 });
 
@@ -344,6 +409,19 @@ test("manifest verification rejects altered assets", () => {
     assetNames: ["runner-linux-amd64.tar.gz", "checksums.txt"],
   });
 
+  assert.throws(
+    () =>
+      verifyManifest(manifest, {
+        component: "runner",
+        version: "v1.2.3",
+        sha: "a".repeat(40),
+        workflowID: "workflow-2",
+        directory,
+        assetNames: ["runner-linux-amd64.tar.gz", "checksums.txt"],
+      }),
+    /manifest identity/,
+  );
+
   fs.writeFileSync(
     path.join(directory, "runner-linux-amd64.tar.gz"),
     "changed",
@@ -373,6 +451,52 @@ test("manifest verification rejects altered assets", () => {
       }),
     /filenames/,
   );
+});
+
+function sha256OfZeros(size) {
+  const hash = crypto.createHash("sha256");
+  const chunk = Buffer.alloc(8 * 1024 * 1024);
+  let remaining = size;
+  while (remaining > 0) {
+    const length = Math.min(chunk.length, remaining);
+    hash.update(length === chunk.length ? chunk : chunk.subarray(0, length));
+    remaining -= length;
+  }
+  return hash.digest("hex");
+}
+
+test("manifest records the checksum of an asset larger than 2 GiB", () => {
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "component-release-large-asset-"),
+  );
+  const assetSize = 2 * 1024 * 1024 * 1024 + 1;
+  const asset = fs.openSync(path.join(directory, "runner.oci.tar"), "w");
+  try {
+    fs.ftruncateSync(asset, assetSize);
+  } finally {
+    fs.closeSync(asset);
+  }
+  fs.writeFileSync(
+    path.join(directory, "release-notes.md"),
+    "## runner/v1.2.3\n",
+  );
+
+  try {
+    const manifest = createManifest({
+      component: "runner",
+      version: "v1.2.3",
+      sha: "a".repeat(40),
+      workflowID: "workflow-1",
+      pipelineID: "pipeline-1",
+      directory,
+      assetNames: ["runner.oci.tar"],
+    });
+
+    assert.equal(manifest.assets[0].size, assetSize);
+    assert.equal(manifest.assets[0].sha256, sha256OfZeros(assetSize));
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("manifest binds stable notes and excludes them from prereleases", () => {
@@ -629,6 +753,34 @@ test("Fleet Manager releases record image and chart digests", async () => {
 
   assert.match(payload.body, /Fleet Manager image digest: `sha256:d{64}`/);
   assert.match(payload.body, /Fleet Manager chart digest: `sha256:e{64}`/);
+});
+
+test("Fleet Manager releases require image and chart digests", async () => {
+  const common = {
+    apiURL: "http://127.0.0.1:1",
+    repository: "superplanehq/superplane",
+    token: "test-token",
+    releaseID: "44",
+    component: "fleet-manager",
+    version: "v1.2.3",
+    sha: "c".repeat(40),
+    releaseNotes: "## Fleet Manager changes\n\n- Publish the chart.",
+  };
+
+  await assert.rejects(
+    publishGitHubRelease({
+      ...common,
+      imageDigest: `sha256:${"d".repeat(64)}`,
+    }),
+    /fleet-manager releases require a chart digest/,
+  );
+  await assert.rejects(
+    publishGitHubRelease({
+      ...common,
+      chartDigest: `sha256:${"e".repeat(64)}`,
+    }),
+    /fleet-manager releases require an image digest/,
+  );
 });
 
 test("SuperPlane releases record image and chart digests", async () => {

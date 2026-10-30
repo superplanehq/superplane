@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -39,7 +40,7 @@ var ErrFactoryKeyRequired = errors.New("factory key is required")
 var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
 var ErrFactoryURLIDAlreadyExists = errors.New("factory url id already exists")
-var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
+var ErrFactoryHostedSpendBudgetNegative = billing.ErrFactoryHostedSpendBudgetNegative
 var ErrFactoryOnboardingNotComplete = errors.New("factory onboarding is not complete")
 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
@@ -168,6 +169,12 @@ func (f *Factory) RouteSegment() string {
 		return ""
 	}
 	return strings.ToLower(f.Key) + "-" + f.URLID
+}
+
+func (f *Factory) LockForUpdate(tx *gorm.DB) error {
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND organization_id = ?", f.ID, f.OrganizationID).
+		First(f).Error
 }
 
 var newFactoryURLID = generateFactoryURLID
@@ -544,23 +551,14 @@ func (f *Factory) Update(tx *gorm.DB, name, description, key *string) error {
 }
 
 func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error {
-	if budgetCents != nil && *budgetCents < 0 {
-		return ErrFactoryHostedSpendBudgetNegative
+	if err := billing.UpdateFactoryHostedBudget(tx, f.OrganizationID, f.ID, budgetCents); err != nil {
+		return err
 	}
-
-	now := time.Now()
-	err := tx.Model(f).
-		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
-		Select("hosted_spend_budget_cents", "updated_at").
-		Updates(map[string]any{
-			"hosted_spend_budget_cents": budgetCents,
-			"updated_at":                now,
-		}).Error
+	saved, err := FindFactory(tx, f.OrganizationID, f.ID)
 	if err != nil {
 		return err
 	}
-	f.HostedSpendBudgetCents = budgetCents
-	f.UpdatedAt = now
+	*f = *saved
 	return nil
 }
 
@@ -876,6 +874,56 @@ func (f *Factory) SnapshotWorkOrderRepository(tx *gorm.DB, repository, defaultBr
 		Error
 }
 
+// RetargetUnfinishedWorkOrderBranches moves draft and open tasks that still
+// follow the previous workspace repository onto the repository just saved.
+// A repository change moves those tasks even when the branch name stays the
+// same. A branch change moves tasks that have no branch or the previous
+// branch. A task on another repository keeps that pair. A task with a
+// running line stays unchanged. Closed tasks stay unchanged. An empty next
+// repository does nothing. An empty next branch does not clear a task branch.
+func (f *Factory) RetargetUnfinishedWorkOrderBranches(
+	tx *gorm.DB,
+	previousRepository, nextRepository, previousBranch, nextBranch, nextProvider string,
+) error {
+	previousRepository = strings.TrimSpace(previousRepository)
+	nextRepository = strings.TrimSpace(nextRepository)
+	previousBranch = strings.TrimSpace(previousBranch)
+	nextBranch = strings.TrimSpace(nextBranch)
+	nextProvider = strings.TrimSpace(nextProvider)
+	if nextRepository == "" {
+		return nil
+	}
+	repositoryChanged := !strings.EqualFold(previousRepository, nextRepository)
+	branchChanged := nextBranch != "" && nextBranch != previousBranch
+	if !repositoryChanged && !branchChanged {
+		return nil
+	}
+	if nextProvider == "" {
+		nextProvider = ProviderGitHub
+	}
+	updates := map[string]any{
+		"repository":   nextRepository,
+		"vcs_provider": nextProvider,
+		"updated_at":   time.Now(),
+	}
+	if nextBranch != "" {
+		updates["default_branch"] = nextBranch
+	}
+
+	return tx.Model(&FactoryWorkOrder{}).
+		Where("factory_id = ?", f.ID).
+		Where("state IN ?", []string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen}).
+		Where("default_branch IS NULL OR default_branch = '' OR default_branch = ?", previousBranch).
+		Where("repository IS NULL OR repository = '' OR LOWER(repository) = LOWER(?)", previousRepository).
+		Where(`NOT EXISTS (
+			SELECT 1 FROM factory_work_order_line_dispatches
+			WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			AND factory_work_order_line_dispatches.state = ?
+		)`, FactoryWorkOrderLineDispatchStateActive).
+		Updates(updates).
+		Error
+}
+
 func (f *Factory) CreateWorkOrderWithOrigin(
 	tx *gorm.DB,
 	title, description string,
@@ -896,6 +944,20 @@ func (f *Factory) createWorkOrder(
 	origin *WorkOrderOrigin,
 	autoStartLineID *uuid.UUID,
 ) (*FactoryWorkOrder, error) {
+	if f.OnboardingConfigValue().CodexSubscription {
+		if len(assignees) > 1 {
+			return nil, ErrSubscriptionOwnerRequired
+		}
+		if len(assignees) == 1 {
+			eligible, err := SubscriptionOwnerEligible(tx, f.OrganizationID, f.ID, assignees[0])
+			if err != nil {
+				return nil, err
+			}
+			if !eligible {
+				return nil, ErrSubscriptionOwnerInvalid
+			}
+		}
+	}
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
@@ -952,7 +1014,7 @@ func (f *Factory) createWorkOrder(
 	}
 
 	if len(assignees) > 0 {
-		if err := order.ReplaceAssignees(tx, assignees); err != nil {
+		if err := order.replaceAssignees(tx, assignees); err != nil {
 			return nil, err
 		}
 	}
@@ -1167,6 +1229,34 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 		return nil, err
 	}
 
+	return orders, nil
+}
+
+// ListWorkOrderSummaries returns one bounded page of task identity fields.
+// It does not load descriptions, owners, checks, or pull requests.
+// Limit above DefaultFactoryWorkOrderListLimit is clamped. Order is
+// updated_at DESC, id DESC. There is no offset.
+func (f *Factory) ListWorkOrderSummaries(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
+	limit := filters.Limit
+	if limit <= 0 || limit > DefaultFactoryWorkOrderListLimit {
+		limit = DefaultFactoryWorkOrderListLimit
+	}
+
+	var orders []FactoryWorkOrder
+	err := f.workOrdersQuery(tx, filters).
+		Select(
+			"factory_work_orders.id",
+			"factory_work_orders.number",
+			"factory_work_orders.title",
+			"factory_work_orders.state",
+		).
+		Order("factory_work_orders.updated_at DESC").
+		Order("factory_work_orders.id DESC").
+		Limit(limit).
+		Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
 	return orders, nil
 }
 

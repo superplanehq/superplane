@@ -1,14 +1,13 @@
 package runner
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-	"strings"
+	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -43,8 +42,8 @@ func TestIntegratedRunnerTaskRecordsSelectedFleetUsage(t *testing.T) {
 	started := time.Now()
 	finished := started.Add(1500 * time.Millisecond)
 	exitCode := 0
-	tasks := &fakeRunnerTaskContext{
-		task: &core.RunnerTask{
+	tasks := &contexts.RunnerTaskContext{
+		Task: &core.RunnerTask{
 			ID:         "task-integrated",
 			State:      "succeeded",
 			ExitCode:   &exitCode,
@@ -60,12 +59,12 @@ func TestIntegratedRunnerTaskRecordsSelectedFleetUsage(t *testing.T) {
 		Configuration:  configuration,
 		ExecutionState: state,
 		Requests:       scheduled,
-	}, tasks.task.ID, core.RunnerTaskBackendIntegrated))
+	}, tasks.Task.ID))
 	assert.Equal(t, "aws-large-amd64", state.KVs[executionKVMachineType])
 	assert.Equal(t, "aws-large-amd64", state.KVs[executionKVFleetID])
 
 	recorder := &recordingUsage{}
-	require.NoError(t, pollBrokerTask(core.ActionHookContext{
+	require.NoError(t, pollTask(core.ActionHookContext{
 		Configuration:  configuration,
 		Parameters:     scheduled.Params,
 		ExecutionState: state,
@@ -85,15 +84,15 @@ func TestIntegratedRunnerTaskRecordsSelectedFleetUsage(t *testing.T) {
 	)
 }
 
-func TestPollBrokerTaskRecordsUsageWhenSuperPlaneAlreadyFinished(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+func TestPollTaskRecordsUsageWhenSuperPlaneAlreadyFinished(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: canceledTaskWithUsage()}
 
 	recorder := &recordingUsage{}
 	state := &contexts.ExecutionStateContext{Finished: true}
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{canceledBrokerTaskWithUsageResponse()}}
+	httpContext := &contexts.HTTPContext{}
 
-	err := pollBrokerTask(core.ActionHookContext{
+	err := pollTask(core.ActionHookContext{
+		RunnerTasks: tasks,
 		Parameters: map[string]any{
 			"task_id":         "task-1",
 			"organization_id": "org-1",
@@ -113,16 +112,16 @@ func TestPollBrokerTaskRecordsUsageWhenSuperPlaneAlreadyFinished(t *testing.T) {
 	assert.True(t, state.Finished)
 }
 
-func TestPollBrokerTaskKeepsPollingWhenFinishedAndBrokerNotTerminal(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+func TestPollTaskKeepsPollingWhenFinishedAndBrokerNotTerminal(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "task-1", State: "running"}}
 
 	recorder := &recordingUsage{}
 	requests := &contexts.RequestContext{}
 	state := &contexts.ExecutionStateContext{Finished: true}
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{runningBrokerTaskResponse()}}
+	httpContext := &contexts.HTTPContext{}
 
-	err := pollBrokerTask(core.ActionHookContext{
+	err := pollTask(core.ActionHookContext{
+		RunnerTasks: tasks,
 		Parameters: map[string]any{
 			"task_id":         "task-1",
 			"organization_id": "org-1",
@@ -143,18 +142,16 @@ func TestPollBrokerTaskKeepsPollingWhenFinishedAndBrokerNotTerminal(t *testing.T
 	assert.Equal(t, pollInterval, requests.Duration)
 }
 
-func TestPollBrokerTaskKeepsPollingWhenFinishedAndFetchFails(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+func TestPollTaskKeepsPollingWhenFinishedAndFetchFails(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{FindErr: errors.New("task unavailable")}
 
 	recorder := &recordingUsage{}
 	requests := &contexts.RequestContext{}
 	state := &contexts.ExecutionStateContext{Finished: true}
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`error`))},
-	}}
+	httpContext := &contexts.HTTPContext{}
 
-	err := pollBrokerTask(core.ActionHookContext{
+	err := pollTask(core.ActionHookContext{
+		RunnerTasks: tasks,
 		Parameters: map[string]any{
 			"task_id":         "task-1",
 			"organization_id": "org-1",
@@ -172,18 +169,15 @@ func TestPollBrokerTaskKeepsPollingWhenFinishedAndFetchFails(t *testing.T) {
 	assert.Equal(t, "task-1", requests.Params["task_id"])
 }
 
-func TestCancelBrokerTaskRecordsUsageWhenBrokerAlreadyTerminal(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+func TestCancelTaskRecordsUsageWhenTaskAlreadyTerminal(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: canceledTaskWithUsage()}
 
 	recorder := &recordingUsage{}
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{"task_id": "task-1"}}
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
-		canceledBrokerTaskWithUsageResponse(),
-	}}
+	httpContext := &contexts.HTTPContext{}
 
-	err := cancelBrokerTask(core.ExecutionContext{
+	err := cancelTask(core.ExecutionContext{
+		RunnerTasks:    tasks,
 		HTTP:           httpContext,
 		ExecutionState: state,
 		Usage:          recorder,
@@ -198,19 +192,16 @@ func TestCancelBrokerTaskRecordsUsageWhenBrokerAlreadyTerminal(t *testing.T) {
 	assert.False(t, state.Cancelled)
 }
 
-func TestCancelBrokerTaskCancelsAnalysisWhenBrokerAlreadyTerminal(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+func TestCancelTaskCancelsAnalysisWhenTaskAlreadyTerminal(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: canceledTaskWithUsage()}
 
 	recorder := &recordingUsage{}
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{"task_id": "task-1"}}
 	markAnalysisSession(state)
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
-		canceledBrokerTaskWithUsageResponse(),
-	}}
+	httpContext := &contexts.HTTPContext{}
 
-	err := cancelBrokerTask(core.ExecutionContext{
+	err := cancelTask(core.ExecutionContext{
+		RunnerTasks:    tasks,
 		HTTP:           httpContext,
 		ExecutionState: state,
 		Usage:          recorder,
@@ -225,19 +216,16 @@ func TestCancelBrokerTaskCancelsAnalysisWhenBrokerAlreadyTerminal(t *testing.T) 
 	assert.Empty(t, state.Channel)
 }
 
-func TestCancelBrokerTaskSchedulesPollWhenBrokerNotTerminal(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+func TestCancelTaskSchedulesPollWhenTaskNotTerminal(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "task-1", State: "running"}}
 
 	recorder := &recordingUsage{}
 	requests := &contexts.RequestContext{}
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{"task_id": "task-1"}}
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
-		runningBrokerTaskResponse(),
-	}}
+	httpContext := &contexts.HTTPContext{}
 
-	err := cancelBrokerTask(core.ExecutionContext{
+	err := cancelTask(core.ExecutionContext{
+		RunnerTasks:    tasks,
 		HTTP:           httpContext,
 		ExecutionState: state,
 		Usage:          recorder,
@@ -263,20 +251,128 @@ func hostedClaudeConfiguration() map[string]any {
 	}
 }
 
-func runningBrokerTaskResponse() *http.Response {
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader(`{"id":"task-1","status":"running"}`)),
-	}
+func canceledTaskWithUsage() *core.RunnerTask {
+	started := time.Now().Add(-2 * time.Second)
+	finished := time.Now()
+	exitCode := 130
+	return &core.RunnerTask{ID: "task-1", State: "canceled", ExitCode: &exitCode, StartedAt: &started, FinishedAt: &finished,
+		Result: json.RawMessage(`{"usage":{"input_tokens":1200,"output_tokens":80},"model":"claude-sonnet-4-6"}`)}
 }
 
-func canceledBrokerTaskWithUsageResponse() *http.Response {
-	claimed := time.Now().Add(-2 * time.Second).UTC().Format(time.RFC3339Nano)
-	finished := time.Now().UTC().Format(time.RFC3339Nano)
-	body := fmt.Sprintf(
-		`{"id":"task-1","status":"canceled","exit_code":130,"claimed_at":%q,"finished_at":%q,"result":{"usage":{"input_tokens":1200,"output_tokens":80},"model":"claude-sonnet-4-6"}}`,
-		claimed,
-		finished,
-	)
-	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}
+func TestPollTaskFinishesLostTask(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "task-lost", State: "lost"}}
+	state := &contexts.ExecutionStateContext{}
+	require.NoError(t, pollTask(core.ActionHookContext{
+		RunnerTasks: tasks, ExecutionState: state, Parameters: map[string]any{"task_id": "task-lost"},
+	}, "runner.finished"))
+	assert.Equal(t, FailedOutputChannel, state.Channel)
+	require.Len(t, state.Payloads, 1)
+	payload := state.Payloads[0].(map[string]any)
+	result := payload["data"].(map[string]any)
+	assert.Equal(t, "failed", result["status"])
+	assert.Equal(t, "runner task was lost", result["error"])
+}
+
+func TestPollTaskExposesCodexFailureCause(t *testing.T) {
+	const providerError = "Your ChatGPT subscription has reached its usage limit."
+	for _, tc := range []struct {
+		name              string
+		finishedEventType string
+		runnerError       string
+		result            json.RawMessage
+		expectedError     string
+	}{
+		{
+			name:          "provider error without a runner error",
+			result:        json.RawMessage(`{"type":"result","is_error":true,"error":"` + providerError + `","result":"private task output"}`),
+			expectedError: providerError,
+		},
+		{
+			name:          "provider error replaces shell exit code",
+			runnerError:   "exit code 1",
+			result:        json.RawMessage(`{"type":"result","is_error":true,"error":"` + providerError + `"}`),
+			expectedError: providerError,
+		},
+		{
+			name:          "provider error replaces process exit status",
+			runnerError:   "exit status 1",
+			result:        json.RawMessage(`{"type":"result","is_error":true,"error":"` + providerError + `"}`),
+			expectedError: providerError,
+		},
+		{
+			name:          "runner timeout takes precedence",
+			runnerError:   "execution timed out",
+			result:        json.RawMessage(`{"type":"result","is_error":true,"error":"` + providerError + `"}`),
+			expectedError: "execution timed out",
+		},
+		{
+			name:          "a previous successful turn does not supply an error",
+			runnerError:   "exit code 1",
+			result:        json.RawMessage(`{"type":"result","is_error":false,"error":"stale error"}`),
+			expectedError: "exit code 1",
+		},
+		{
+			name:              "other components keep their result as ordinary output",
+			finishedEventType: RunBashFinishedEventType,
+			runnerError:       "exit code 1",
+			result:            json.RawMessage(`{"type":"result","is_error":true,"error":"ordinary output field"}`),
+			expectedError:     "exit code 1",
+		},
+		{
+			name: "failure without a retained cause still produces a warning",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			finishedEventType := tc.finishedEventType
+			if finishedEventType == "" {
+				finishedEventType = "runnerCodex.finished"
+			}
+			logger, hook := logtest.NewNullLogger()
+			state := &contexts.ExecutionStateContext{}
+			ctx := core.ActionHookContext{
+				RunnerTasks: &contexts.RunnerTaskContext{Task: &core.RunnerTask{
+					ID: "task-1", State: "failed", ExitCode: intPtr(1),
+					ErrorMessage: tc.runnerError, Result: tc.result,
+				}},
+				ExecutionState: state,
+				Parameters:     map[string]any{"task_id": "task-1", "organization_id": "org-1"},
+				Logger: log.NewEntry(logger).WithFields(log.Fields{
+					"execution": "execution-1", "root_event": "root-1",
+				}),
+			}
+
+			require.NoError(t, pollTask(ctx, finishedEventType))
+			assert.Equal(t, FailedOutputChannel, state.Channel)
+			require.Len(t, state.Payloads, 1)
+			payload := state.Payloads[0].(map[string]any)["data"].(map[string]any)
+			if tc.expectedError == "" {
+				assert.NotContains(t, payload, "error")
+			} else {
+				assert.Equal(t, tc.expectedError, payload["error"])
+			}
+
+			require.Len(t, hook.AllEntries(), 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, log.WarnLevel, entry.Level)
+			assert.Equal(t, "runner.task", entry.Data["component"])
+			assert.Equal(t, "org-1", entry.Data["organization_id"])
+			assert.Equal(t, "task-1", entry.Data["task_id"])
+			assert.Equal(t, "execution-1", entry.Data["execution"])
+			assert.Equal(t, "root-1", entry.Data["root_event"])
+			assert.Equal(t, "failed", entry.Data["status"])
+			assert.Equal(t, 1, entry.Data["exit_code"])
+			if tc.expectedError == "" {
+				assert.NotContains(t, entry.Data, "error")
+			} else {
+				assert.Equal(t, tc.expectedError, entry.Data["error"])
+			}
+			assert.NotContains(t, entry.Data, "result")
+			logged, err := json.Marshal(entry.Data)
+			require.NoError(t, err)
+			assert.NotContains(t, string(logged), "private task output")
+
+			require.NoError(t, pollTask(ctx, finishedEventType))
+			assert.Len(t, hook.AllEntries(), 1, "completed execution must not log the failure again")
+		})
+	}
 }

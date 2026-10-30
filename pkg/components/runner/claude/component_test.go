@@ -3,9 +3,6 @@ package claude
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,31 +26,26 @@ func credentialsSecret(secret, key string) map[string]any {
 }
 
 type createTaskRequest struct {
-	FleetID       string                             `json:"fleet_id"`
-	RunMode       string                             `json:"run_mode,omitempty"`
-	Script        string                             `json:"script,omitempty"`
-	MessageChain  json.RawMessage                    `json:"message_chain,omitempty"`
-	Commands      []runner.BrokerCommand             `json:"commands,omitempty"`
-	SetupCommands []string                           `json:"setup_commands,omitempty"`
-	Environment   []runner.BrokerEnvironmentVariable `json:"environment,omitempty"`
-	Files         []runner.BrokerTaskFile            `json:"files,omitempty"`
-	ExecutionMode string                             `json:"execution_mode,omitempty"`
-	DockerImage   string                             `json:"docker_image,omitempty"`
+	FleetID       string                           `json:"fleet_id"`
+	RunMode       string                           `json:"run_mode,omitempty"`
+	Script        string                           `json:"script,omitempty"`
+	MessageChain  json.RawMessage                  `json:"message_chain,omitempty"`
+	Commands      []runner.TaskCommand             `json:"commands,omitempty"`
+	SetupCommands []string                         `json:"setup_commands,omitempty"`
+	Environment   []runner.TaskEnvironmentVariable `json:"environment,omitempty"`
+	Files         []runner.TaskFile                `json:"files,omitempty"`
+	ExecutionMode string                           `json:"execution_mode,omitempty"`
+	DockerImage   string                           `json:"docker_image,omitempty"`
 }
 
-func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
+func TestRunClaudeCodeExecuteSendsPerStepCommandsToRunner(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
 
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-1"}`))},
-		},
-	}
+	httpContext := &contexts.HTTPContext{}
 
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"model":       "sonnet",
@@ -77,15 +69,15 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 		Requests:       &contexts.RequestContext{},
 	})
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
+	require.Len(t, httpContext.Requests, 0)
 
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
+	body := tasks.Payload
+	require.NotEmpty(t, body)
 
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
-	assert.Equal(t, testRunnerMachineType, req.FleetID)
+	assert.Equal(t, testRunnerMachineType, tasks.FleetID)
 	assert.Empty(t, req.RunMode)
 	assert.Empty(t, req.Script)
 	assert.Empty(t, req.SetupCommands)
@@ -122,18 +114,13 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 }
 
 func TestRunClaudeCodeExecuteExtendsPromptsWithIntegrationUsageAndSetup(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	tasks := &contexts.RunnerTaskContext{}
 
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-usage-1"}`))},
-		},
-	}
+	httpContext := &contexts.HTTPContext{}
 
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"model":       "sonnet",
@@ -172,8 +159,8 @@ func TestRunClaudeCodeExecuteExtendsPromptsWithIntegrationUsageAndSetup(t *testi
 	})
 	require.NoError(t, err)
 
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
+	body := tasks.Payload
+	require.NotEmpty(t, body)
 
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
@@ -196,18 +183,13 @@ func TestRunClaudeCodeExecuteExtendsPromptsWithIntegrationUsageAndSetup(t *testi
 }
 
 func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	tasks := &contexts.RunnerTaskContext{}
 
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-legacy-1"}`))},
-		},
-	}
+	httpContext := &contexts.HTTPContext{}
 
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType":           testRunnerMachineType,
 			"prompt":                "implement the issue",
@@ -229,8 +211,8 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
+	body := tasks.Payload
+	require.NotEmpty(t, body)
 
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
@@ -251,13 +233,44 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	assert.Equal(t, "git push", requireTaskFile(t, req.Files, "steps/03-after.sh").Content)
 }
 
-func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
+func TestRunClaudeCodeExecuteSkipsAPIKeyWhenStepsAreBashOnly(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
 
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
+		Configuration: map[string]any{
+			"machineType": testRunnerMachineType,
+			"steps": []map[string]any{
+				{"name": "Deploy", "type": "bash", "command": "echo deploy"},
+			},
+			"credentials": map[string]any{
+				"source":      "integration",
+				"integration": map[string]any{"name": "claude"},
+			},
+		},
+		HTTP:           &contexts.HTTPContext{},
+		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{}},
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.NoError(t, err)
+
+	var req createTaskRequest
+	require.NoError(t, json.Unmarshal(tasks.Payload, &req))
+	assert.Equal(t, "Deploy", req.Commands[len(req.Commands)-1].Name)
+	for _, variable := range req.Environment {
+		assert.NotEqual(t, envAnthropicAPIKey, variable.Name)
+	}
+}
+
+func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
+
+	component := &RunClaudeCode{}
+	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"steps": []map[string]any{
@@ -280,18 +293,13 @@ func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
 // connects a key must be able to run without an administrator selecting models
 // first, and an agent CLI alias such as "opus" must reach the provider as it is.
 func TestRunClaudeCodeExecuteDoesNotGateBYOKModels(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	tasks := &contexts.RunnerTaskContext{}
 
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-byok-1"}`))},
-		},
-	}
+	httpContext := &contexts.HTTPContext{}
 
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"model":       "opus",
@@ -310,18 +318,20 @@ func TestRunClaudeCodeExecuteDoesNotGateBYOKModels(t *testing.T) {
 		Requests:       &contexts.RequestContext{},
 	})
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
+	require.Len(t, httpContext.Requests, 0)
 
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
+	body := tasks.Payload
+	require.NotEmpty(t, body)
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 	assert.Equal(t, "sk-byok", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 }
 
 func TestRunClaudeCodeExecuteRejectsHostedCredentials(t *testing.T) {
+	tasks := &contexts.RunnerTaskContext{}
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
+		RunnerTasks: tasks,
 		Configuration: map[string]any{
 			"machineType": testRunnerMachineType,
 			"model":       "claude-sonnet-4-6",
@@ -346,12 +356,12 @@ func TestRunClaudeCodeProcessTaskStatusIncludesResult(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 0
-	task := &runner.Task{
-		Status:   "succeeded",
+	task := &core.RunnerTask{
+		State:    "succeeded",
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"result":"done","session_id":"abc"}`),
 	}
-	require.NoError(t, runner.ProcessBrokerTaskStatus(state, task, FinishedEventType, ""))
+	require.NoError(t, runner.ProcessTaskStatus(state, task, FinishedEventType, ""))
 	require.Equal(t, runner.PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)

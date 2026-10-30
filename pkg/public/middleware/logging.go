@@ -96,7 +96,7 @@ func appendRequestIdentity(fields log.Fields, logged *requestLogFields) {
 	setLogField(fields, "organization_id", logged.organizationID)
 	setLogField(fields, "user_id", logged.userID)
 	setLogField(fields, "account_id", logged.accountID)
-	setLogField(fields, "impersonator_account_id", logged.impersonatorAccountID)
+	setLogField(fields, "support_admin_account_id", logged.supportAdminAccountID)
 }
 
 func setLogField(fields log.Fields, key string, value string) {

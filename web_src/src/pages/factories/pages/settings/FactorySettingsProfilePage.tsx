@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Avatar } from "@/components/Avatar/avatar";
 import { Icon } from "@/components/Icon";
 import { PersonalApiTokenDialogs, PersonalApiTokensTable } from "@/components/PersonalApiTokens";
+import { SupportSessionReadOnly } from "@/components/SupportSessionReadOnly";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/useAccount";
 import { useMe } from "@/hooks/useMe";
@@ -24,15 +25,17 @@ export function FactorySettingsProfilePage() {
   return (
     <>
       <FactorySettingsPageFrame title="General" subtitle="Update your personal account information and preferences.">
-        <ProfileBody
-          isLoading={isLoading}
-          errorMessage={errorMessage}
-          user={user}
-          avatarUrl={account?.avatar_url}
-          canChangePassword={canChangePassword}
-          tokensPanel={tokensPanel}
-          onChangePassword={() => setPasswordModalOpen(true)}
-        />
+        <SupportSessionReadOnly>
+          <ProfileBody
+            isLoading={isLoading}
+            errorMessage={errorMessage}
+            user={user}
+            avatarUrl={account?.avatar_url}
+            canChangePassword={canChangePassword}
+            tokensPanel={tokensPanel}
+            onChangePassword={() => setPasswordModalOpen(true)}
+          />
+        </SupportSessionReadOnly>
       </FactorySettingsPageFrame>
       <PersonalApiTokenDialogs panel={tokensPanel} />
       {canChangePassword ? <ChangePasswordDialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen} /> : null}

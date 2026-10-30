@@ -4,7 +4,8 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
-import { RepositoryPicker } from "../onboardingSteps";
+import { RepositoryDefaultBranchPicker, RepositoryPicker } from "../onboardingSteps";
+import { repositoryBranchChosen, type RepositoryBranchPrompt } from "../repositoryBranchPrompt";
 import { BitbucketCopyInstallLink } from "./BitbucketCopyInstallLink";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
@@ -57,6 +58,7 @@ type FirstRunBitbucketForgeScreenProps = {
   onSelectRepository: (repository: string) => void;
   onClearRepository?: () => void;
   onContinue: () => void;
+  branchPrompt?: RepositoryBranchPrompt;
   onSelectIdentity?: (providerUserId: string) => void;
   onConnectAnotherAccount?: () => void;
 };
@@ -217,6 +219,7 @@ function BitbucketChooseRepositoryScreen(props: FirstRunBitbucketForgeScreenProp
     onSelectRepository,
     onClearRepository,
     onContinue,
+    branchPrompt,
     onRetryLookup,
     onGrantAccess,
     retrying,
@@ -281,9 +284,10 @@ function BitbucketChooseRepositoryScreen(props: FirstRunBitbucketForgeScreenProp
             </>
           )}
           <NewWorkspaceCheck active={attemptActive} />
+          {workspace && branchPrompt ? <RepositoryDefaultBranchPicker prompt={branchPrompt} /> : null}
           <BitbucketContinue
             workspace={workspace}
-            repositorySelected={repositorySelected}
+            repositorySelected={repositorySelected && repositoryBranchChosen(branchPrompt)}
             busy={busy}
             saving={saving}
             onContinue={onContinue}

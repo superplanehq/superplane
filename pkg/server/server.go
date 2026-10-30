@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-
 	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
 	_ "net/http/pprof"
 	"os"
@@ -18,11 +17,17 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	eebilling "github.com/superplanehq/superplane/ee/billing"
+	billinghttp "github.com/superplanehq/superplane/ee/billing/http"
+	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
+	"github.com/superplanehq/superplane/ee/billing/polar"
+	billingworkers "github.com/superplanehq/superplane/ee/billing/workers"
 	"github.com/superplanehq/superplane/ee/rbac"
 	"github.com/superplanehq/superplane/pkg/agents"
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/blob"
 	blobazure "github.com/superplanehq/superplane/pkg/blob/azure"
@@ -60,30 +65,6 @@ import (
 
 var _ = registryimports.Loaded
 
-var agentProviderOverride = struct {
-	sync.Mutex
-	provider agents.Provider
-}{}
-
-func SetAgentProviderForTests(provider agents.Provider) func() {
-	agentProviderOverride.Lock()
-	previous := agentProviderOverride.provider
-	agentProviderOverride.provider = provider
-	agentProviderOverride.Unlock()
-
-	return func() {
-		agentProviderOverride.Lock()
-		agentProviderOverride.provider = previous
-		agentProviderOverride.Unlock()
-	}
-}
-
-func getAgentProviderOverride() agents.Provider {
-	agentProviderOverride.Lock()
-	defer agentProviderOverride.Unlock()
-	return agentProviderOverride.provider
-}
-
 var licenseServiceOverride = struct {
 	sync.Mutex
 	service *licensing.Service
@@ -111,11 +92,6 @@ func getLicenseServiceOverride() *licensing.Service {
 }
 
 func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
-	if provider := getAgentProviderOverride(); provider != nil {
-		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
-		return provider, agents.NewService(provider, authService)
-	}
-
 	cfg := config.LoadAnthropicAgentConfig()
 	if !cfg.Enabled() {
 		log.Info("Anthropic managed agents disabled: missing ANTHROPIC_* env vars")
@@ -197,6 +173,7 @@ func startWorkers(
 	baseURL string,
 	authService authorization.Authorization,
 	agentProvider agents.Provider,
+	nodeRequestExecutor *workers.NodeRequestExecutor,
 ) {
 	log.Println("Starting Workers")
 
@@ -218,6 +195,11 @@ func startWorkers(
 			time.Minute,
 		)
 		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_RUNNER_TASK_SCHEDULER") == "yes" {
+		log.Println("Starting Runner Task Scheduler")
+		go workers.NewRunnerTaskScheduler(time.Second).Start(context.Background())
 	}
 
 	if os.Getenv("START_RUNNER_CLEANUP_WORKER") == "yes" {
@@ -275,8 +257,7 @@ func startWorkers(
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Node Request Worker")
 
-		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
+		w := workers.NewNodeRequestWorker(nodeRequestExecutor)
 		go w.Start(context.Background())
 	}
 
@@ -378,7 +359,14 @@ func startWorkers(
 	if os.Getenv("START_PRICE_BOOK_SYNC_WORKER") == "yes" {
 		log.Println("Starting Price Book Sync Worker")
 
-		w := workers.NewPriceBookSyncWorker(encryptor, registry)
+		w := billingworkers.NewPriceBookSyncWorker(encryptor, registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_SEAT_RENEWAL_SYNC_WORKER") == "yes" {
+		log.Println("Starting Seat Renewal Sync Worker")
+
+		w := billingworkers.NewSeatRenewalSyncWorker()
 		go w.Start(context.Background())
 	}
 
@@ -414,13 +402,7 @@ func startWorkers(
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
-	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
-		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
-		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
-		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
-		FromName:          os.Getenv("EMAIL_FROM_NAME"),
-		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
-	})
+	emailService := buildEmailService(encryptor)
 	discord := services.NewDiscordWebhookClient(os.Getenv("DISCORD_FEEDBACK_WEBHOOK_URL"))
 
 	if emailService == nil && !discord.Enabled() {
@@ -483,25 +465,25 @@ func buildGRPCServices(
 	jwtSigner *jwt.Signer,
 	licenseService *licensing.Service,
 	keyStore *encryption.Store,
-	migrationsEnabled bool,
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
+	features.Register(enterprise.Billing, billingorganizations.New())
 
 	return grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:                     baseURL,
-		WebhooksBaseURL:             webhooksBaseURL,
-		RunnerAPIBaseURL:            runnerAPIBaseURL,
-		Encryptor:                   encryptor,
-		EncryptionStore:             keyStore,
-		EncryptionMigrationsEnabled: migrationsEnabled,
-		AuthService:                 authService,
-		Registry:                    registry,
-		OIDCProvider:                oidcProvider,
-		AgentService:                agentService,
-		JWTSigner:                   jwtSigner,
-		Entitlements:                licenseService,
-		Enterprise:                  features,
+		EmailService:     buildEmailService(encryptor),
+		BaseURL:          baseURL,
+		WebhooksBaseURL:  webhooksBaseURL,
+		RunnerAPIBaseURL: runnerAPIBaseURL,
+		Encryptor:        encryptor,
+		EncryptionStore:  keyStore,
+		AuthService:      authService,
+		Registry:         registry,
+		OIDCProvider:     oidcProvider,
+		AgentService:     agentService,
+		JWTSigner:        jwtSigner,
+		Entitlements:     licenseService,
+		Enterprise:       features,
 	})
 }
 
@@ -541,8 +523,8 @@ func (s *processShutdown) stop() {
 	closeProductAnalytics()
 }
 
-func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string, shutdown *processShutdown) {
-	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
+func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string, shutdown *processShutdown, nodeRequestExecutor *workers.NodeRequestExecutor) {
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName, nodeRequestExecutor)
 	if err != nil {
 		log.Fatalf("failed to create runner API server: %v", err)
 	}
@@ -564,8 +546,9 @@ func registerRunnerAPI(
 	encryptor crypto.Encryptor,
 	activeLogStoreName string,
 	shutdown *processShutdown,
+	nodeRequestExecutor *workers.NodeRequestExecutor,
 ) {
-	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName, nodeRequestExecutor)
 	if err != nil {
 		log.Fatalf("failed to create integrated runner API server: %v", err)
 	}
@@ -600,6 +583,7 @@ func startPublicAPI(
 	grpcServices *grpc.Services,
 	activeLogStoreName string,
 	shutdown *processShutdown,
+	nodeRequestExecutor *workers.NodeRequestExecutor,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
 
@@ -626,6 +610,9 @@ func startPublicAPI(
 	}
 
 	server.SetLicenseService(licenseService)
+	server.SetBillingHTTPRegistrar(billinghttp.New(encryptor, registry, func() (string, string) {
+		return baseURL, webhooksBaseURL
+	}))
 
 	// Start the EventDistributer worker if enabled
 	if os.Getenv("START_EVENT_DISTRIBUTER") == "yes" {
@@ -656,7 +643,8 @@ func startPublicAPI(
 
 	if os.Getenv("START_RUNNER_API") == "yes" {
 		log.Println("Registering Runner API routes on Public API")
-		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName, shutdown)
+		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName, shutdown,
+			nodeRequestExecutor)
 	}
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
@@ -756,6 +744,7 @@ func startPprofServer() {
 }
 
 func Start() {
+	billing.Bind(eebilling.New(polar.NewRuntime()))
 	configureLogging()
 	setupOtel()
 	startPprofServer()
@@ -764,11 +753,8 @@ func Start() {
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
 
-	if err := models.BindLegacyBillingProduct(database.Conn(), os.Getenv("POLAR_BUSINESS_PRODUCT_ID")); err != nil {
-		log.Fatalf("bind legacy billing product: %v", err)
-	}
-	if err := models.LoadCurrentPriceBook(database.Conn()); err != nil {
-		log.WithError(err).Warn("failed to load usage price book; using in-memory rates")
+	if err := billing.Initialize(database.Conn()); err != nil {
+		log.Fatalf("initialize billing: %v", err)
 	}
 
 	log.SetLevel(log.DebugLevel)
@@ -883,22 +869,20 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
-	migrationsEnabled := keyStore != nil && !encryptionConfig.legacyWrites
-	if migrationsEnabled {
-		if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
-			rabbitMQURL, err := config.RabbitMQURL()
-			if err != nil {
-				panic(err)
-			}
-			worker := workers.NewApplicationEncryptionMigrationWorker(rabbitMQURL, encryptorInstance, registry, models.ApplicationEncryptedStorage())
-			go worker.Start(context.Background())
+	if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
+		rabbitMQURL, err := config.RabbitMQURL()
+		if err != nil {
+			panic(err)
 		}
+		worker := workers.NewApplicationEncryptionMigrationWorker(rabbitMQURL, encryptorInstance, registry, models.ApplicationEncryptedStorage())
+		go worker.Start(context.Background())
 	}
 
 	agentProvider, agentService := buildAgentService(authService)
 
 	var grpcServices *grpc.Services
 	shutdown := &processShutdown{}
+	nodeRequestExecutor := workers.NewNodeRequestExecutor(encryptorInstance, registry, webhooksBaseURL, authService)
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		services, err := buildGRPCServices(
 			baseURL,
@@ -912,7 +896,6 @@ func Start() {
 			jwtSigner,
 			licenseService,
 			keyStore,
-			migrationsEnabled,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)
@@ -931,9 +914,11 @@ func Start() {
 			grpcServices,
 			activeLogStoreName,
 			shutdown,
+			nodeRequestExecutor,
 		)
 	} else if os.Getenv("START_RUNNER_API") == "yes" {
-		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName, shutdown)
+		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName, shutdown,
+			nodeRequestExecutor)
 	}
 
 	startWorkers(
@@ -943,6 +928,7 @@ func Start() {
 		baseURL,
 		authService,
 		agentProvider,
+		nodeRequestExecutor,
 	)
 
 	log.Println("SuperPlane is UP.")
@@ -1051,3 +1037,13 @@ func newRunnerActiveLogStore() (runnerlogs.Store, error) {
  * and also from emitting large events.
  */
 var DefaultMaxHTTPResponseBytes int64 = 8 * 1024 * 1024
+
+func buildEmailService(encryptor crypto.Encryptor) services.EmailService {
+	return services.BuildEmailService(encryptor, services.EmailServiceConfig{
+		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
+		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
+		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+		FromName:          os.Getenv("EMAIL_FROM_NAME"),
+		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
+	})
+}

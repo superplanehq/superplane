@@ -102,7 +102,22 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 const PLANNING_READONLY_TOOLS = "Read,Bash";
 
 function analysisAllowedTools() {
-  return ["mcp__superplane__propose_update", "mcp__superplane__inspect_attachment"];
+  return [
+    "mcp__superplane__propose_update",
+    "mcp__superplane__inspect_attachment",
+  ];
+}
+
+// The global runner MCP server lists only the tools that the run token
+// allows, and the backend checks the scope on every call.
+const GLOBAL_MCP_SERVER = "superplane_global";
+
+function globalMCPEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_RUNNER_TOKEN");
+}
+
+function globalAllowedTools(env = process.env) {
+  return globalMCPEnabled(env) ? [`mcp__${GLOBAL_MCP_SERVER}`] : [];
 }
 const ARTIFACT_ALLOWED_TOOLS = [
   "mcp__superplane__inspect_screenshot",
@@ -126,10 +141,12 @@ function allowedClaudeTools(env = process.env) {
   const workspaceAllow = Object.keys(workspaceMCPServers(env)).map(
     (name) => `mcp__${name}`,
   );
+  const globalAllow = globalAllowedTools(env);
   if (planningMCPEnabled(env)) {
     return [
       PLANNING_READONLY_TOOLS,
       "mcp__superplane",
+      ...globalAllow,
       ...workspaceAllow,
       ...analysisAllowedTools(env),
     ].join(",");
@@ -138,22 +155,18 @@ function allowedClaudeTools(env = process.env) {
     return [
       BASE_ALLOWED_TOOLS,
       "mcp__superplane",
+      ...globalAllow,
       ...workspaceAllow,
       "mcp__superplane__report_merge_check",
     ].join(",");
   }
-  if (artifactMCPEnabled(env)) {
-    return [
-      BASE_ALLOWED_TOOLS,
-      "mcp__superplane",
-      ...workspaceAllow,
-      ...ARTIFACT_ALLOWED_TOOLS,
-    ].join(",");
+  if (taskToolsEnabled(env)) {
+    const tools = [BASE_ALLOWED_TOOLS, "mcp__superplane", ...globalAllow, ...workspaceAllow];
+    if (artifactMCPEnabled(env)) tools.push(...ARTIFACT_ALLOWED_TOOLS);
+    if (publishLinksEnabled(env)) tools.push("mcp__superplane__publish_link");
+    return tools.join(",");
   }
-  if (workspaceAllow.length === 0) {
-    return BASE_ALLOWED_TOOLS;
-  }
-  return [BASE_ALLOWED_TOOLS, ...workspaceAllow].join(",");
+  return [BASE_ALLOWED_TOOLS, ...globalAllow, ...workspaceAllow].join(",");
 }
 
 function disallowedClaudeTools(env = process.env) {
@@ -186,7 +199,11 @@ function claudePermissionMode(env = process.env) {
 }
 
 function mcpToolsEnabled(env = process.env) {
-  return planningMCPEnabled(env) || artifactMCPEnabled(env) || mergeConfidenceMCPEnabled(env);
+  return (
+    planningMCPEnabled(env) ||
+    taskToolsEnabled(env) ||
+    mergeConfidenceMCPEnabled(env)
+  );
 }
 
 function planningMCPEnabled(env = process.env) {
@@ -196,8 +213,21 @@ function planningMCPEnabled(env = process.env) {
   );
 }
 
+function visualEvidenceEnabled(env = process.env) {
+  if (envFlag(env, "SUPERPLANE_VISUAL_EVIDENCE")) return true;
+  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN") && !publishLinksEnabled(env);
+}
+
+function publishLinksEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
+}
+
 function artifactMCPEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
+  return visualEvidenceEnabled(env);
+}
+
+function taskToolsEnabled(env = process.env) {
+  return artifactMCPEnabled(env) || publishLinksEnabled(env);
 }
 
 function mergeConfidenceMCPEnabled(env = process.env) {
@@ -253,7 +283,7 @@ function workspaceMCPServers(env = process.env) {
     const out = {};
     for (const server of servers) {
       const name = String((server && server.name) || "").trim();
-      if (!name || name === "superplane") {
+      if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER) {
         continue;
       }
       out[name] = {
@@ -282,6 +312,12 @@ function writeClaudeMCPConfig(taskDir, env = process.env, includeSuperplane = fa
     mcpServers.superplane = {
       command: "node",
       args: [artifactMCPPath(taskDir, env)],
+    };
+  }
+  if (globalMCPEnabled(env)) {
+    mcpServers[GLOBAL_MCP_SERVER] = {
+      command: "node",
+      args: [path.join(taskDir, "superplane_mcp", "server.js")],
     };
   }
   const names = Object.keys(mcpServers);
@@ -825,17 +861,6 @@ function formatSystem(event) {
     parts.push(`cwd=${event.cwd}`);
   }
   println(parts.join(" · "));
-  const tools = Array.isArray(event.tools)
-    ? event.tools.map((tool) => String(tool))
-    : [];
-  const planningTools = tools.filter((tool) =>
-    tool.includes("mcp__superplane"),
-  );
-  println(
-    planningTools.length > 0
-      ? `planning tools: ${planningTools.join(", ")}`
-      : "planning tools: none",
-  );
   if (event.mcp_server_errors) {
     println(`mcp errors: ${JSON.stringify(event.mcp_server_errors)}`);
   }

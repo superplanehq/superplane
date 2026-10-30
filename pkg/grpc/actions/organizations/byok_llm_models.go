@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -9,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -30,7 +30,7 @@ func ListBYOKLLMModels(
 	if err != nil {
 		return nil, err
 	}
-	if err := ensureCustomProviderEnabled(tx, scope.OrganizationID, scope.Provider, "failed to list byok models"); err != nil {
+	if err := ensureBYOKAccess(tx, scope.OrganizationID, scope.Provider, "failed to list byok models"); err != nil {
 		return nil, err
 	}
 
@@ -94,7 +94,7 @@ func UpdateBYOKLLMModels(
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, err.Error())
 	}
-	if err := ensureCustomProviderEnabled(database.DB(ctx), organizationID, provider, "failed to update byok models"); err != nil {
+	if err := ensureBYOKAccess(database.DB(ctx), organizationID, provider, "failed to update byok models"); err != nil {
 		return nil, err
 	}
 
@@ -192,31 +192,22 @@ func ListConnectedBYOKModelIDs(tx *gorm.DB, reg *registry.Registry, integration 
 	return ids, nil
 }
 
+func ensureBYOKAccess(tx *gorm.DB, orgID uuid.UUID, provider, internalMessage string) error {
+	if err := models.RequireOrganizationBYOKAccess(tx, orgID, provider); err != nil {
+		if errors.Is(err, models.ErrBYOKAccessDenied) {
+			return grpcerrors.PermissionDenied(err, err.Error())
+		}
+		return grpcerrors.Internal(err, internalMessage)
+	}
+	return nil
+}
+
 // classifyBYOKListError maps a failure from listBYOKCandidateModels to a
 // client-safe gRPC error. Provider auth failures, transport errors, timeouts,
 // and provider outages are user-fixable or transient, so they are reported as
 // FailedPrecondition rather than Internal. Rate-limited requests are reported
 // as ResourceExhausted. Anything else keeps the safe Internal default so real
 // bugs still surface as a 500 and page the on-call.
-func ensureCustomProviderEnabled(tx *gorm.DB, orgID uuid.UUID, provider, internalMessage string) error {
-	if provider != models.UsageProviderCustom {
-		return nil
-	}
-	enabled, err := models.OrganizationHasExperimentalFeatures(
-		tx,
-		orgID,
-		features.FeatureOrganizationBYOK,
-		features.FeatureOrganizationBYOKCustomProvider,
-	)
-	if err != nil {
-		return grpcerrors.Internal(err, internalMessage)
-	}
-	if !enabled {
-		return grpcerrors.PermissionDenied(nil, "Custom provider is not enabled for this organization.")
-	}
-	return nil
-}
-
 func classifyBYOKListError(err error) error {
 	switch {
 	case core.IsProviderRateLimited(err):

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -21,7 +22,13 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
 	}
 
+	var capacity billing.CapacityAlert
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		// Serialize with invitation acceptance, which takes the same lock.
+		if _, err := models.LockOrganization(tx, orgUUID); err != nil {
+			return err
+		}
+
 		user, err := models.FindActiveUserByIDInTransaction(tx, orgID, userID)
 		if err != nil {
 			return err
@@ -33,21 +40,24 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 			}
 		}
 
-		roles, err := authService.GetUserRolesForOrg(ctx, user.ID.String(), orgID)
-		if err != nil {
-			log.Errorf("Error determing user roles for %s: %v", user.ID.String(), err)
-			return grpcerrors.Internal(err, "error determing user roles")
+		// Operator invitations grant no member management, so they stay valid.
+		if err := models.CancelPendingOrganizationInvitationsByInviter(tx, orgUUID, user.ID, models.RoleOrgOperator); err != nil {
+			return err
 		}
 
-		for _, role := range roles {
-			err = authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
-			if err != nil {
-				log.Errorf("Error removing role %s for %s: %v", role.Name, user.ID.String(), err)
-				return grpcerrors.Internal(err, "error removing role")
-			}
+		// Group memberships are separate from direct roles. Both must go,
+		// or a later invitation restores the old authority.
+		if err := authService.RemoveUserFromOrganizationInTransaction(tx, user.ID.String(), orgID); err != nil {
+			log.Errorf("Error removing organization grants for %s: %v", user.ID.String(), err)
+			return grpcerrors.Internal(err, "error removing role")
 		}
 
-		return user.SoftDelete(tx, time.Now(), "")
+		if err := user.SoftDelete(tx, time.Now(), ""); err != nil {
+			return err
+		}
+
+		capacity, err = billing.RecheckSeatCapacity(tx, orgUUID, "removal")
+		return err
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -63,5 +73,8 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, grpcerrors.Internal(err, "error deleting user")
 	}
 
+	billing.CapacityAlerts{capacity}.Emit()
+	// The freed seat stays paid and reusable. Removal never changes the
+	// Polar seat count, so it needs no billing service.
 	return &pb.RemoveUserResponse{}, nil
 }

@@ -10,7 +10,7 @@ import { idleStream, implementPhase, implementStage, RUNNING_RUNNER } from "./Li
 vi.mock("../useSplitRunLiveCanvas", () => ({ useSplitRunLiveCanvas: vi.fn() }));
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({ useLiveLogStream: vi.fn() }));
 
-const FAILED_RUN_HREF = "/demo/workspaces/newwo/automations/app?run=run-1";
+const FAILED_RUN_HREF = "/demo/workspaces/newwo/automations/app/runs/run-1?from=task&orderNumber=78";
 
 it("shows the runner setup error when no transcript exists", async () => {
   const message =
@@ -38,6 +38,9 @@ it("shows the runner setup error when no transcript exists", async () => {
   );
 
   expect(await screen.findByRole("alert")).toHaveTextContent(message);
-  expect(screen.getByRole("link", { name: "Debug" })).toHaveAttribute("href", FAILED_RUN_HREF);
+  expect(screen.getByRole("link", { name: "View run details" })).toHaveAttribute(
+    "href",
+    `${FAILED_RUN_HREF}&activity=exec-implementation`,
+  );
   expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
 });

@@ -115,9 +115,13 @@ func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Invalid activity provider", http.StatusBadRequest)
 		return
 	}
-	if err := session.UpsertActivity(database.DB(r.Context()), activity); err != nil {
+	written, err := session.UpsertActivity(database.DB(r.Context()), activity)
+	if err != nil {
 		writeRunnerPlanningError(w, r, session, err)
 		return
+	}
+	if written {
+		messages.PublishPlanningBoardStatus(session)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "stored"})
 }
@@ -491,7 +495,8 @@ func maybeAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanning
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
 		return
 	}
-	_, dispatchedOrder, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, order.CreatedByID, 0, false, "", "")
+	// Auto-start is a system action and preserves the draft's owners.
+	_, dispatchedOrder, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, nil, 0, false, "", "")
 	if err != nil {
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
 		return

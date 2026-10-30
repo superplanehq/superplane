@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/metadata"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -131,6 +132,7 @@ func Test__EndPlanningSession__OverridesPendingCompletionWithCancellation(t *tes
 
 func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -179,6 +181,7 @@ func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 
 func Test__SendPlanningSessionMessage__RestartsCancelledAnalysisRun(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -223,6 +226,7 @@ func Test__SendPlanningSessionMessage__RestartsCancelledAnalysisRun(t *testing.T
 
 func Test__SendPlanningSessionMessage__KeepsLiveAnalysisOnTheCurrentRun(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -378,6 +382,35 @@ func Test__SendPlanningSessionMessage__StoresSenderUserID(t *testing.T) {
 	assert.Equal(t, r.User.String(), described.Session.Messages[0].UserId)
 }
 
+func Test__DescribePlanningSession__SupportSessionDoesNotHeartbeat(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	staleHeartbeat := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	require.NoError(t, db.Model(session).Update("heartbeat_at", staleHeartbeat).Error)
+	request := &pb.DescribePlanningSessionRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+	}
+
+	supportCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"x-user-id", r.User.String(),
+		authentication.SupportSessionMetadataKey, "true",
+	))
+	_, err := DescribePlanningSession(supportCtx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.True(t, reloaded.HeartbeatAt.Equal(staleHeartbeat))
+
+	userCtx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	_, err = DescribePlanningSession(userCtx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	reloaded, err = models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.True(t, reloaded.HeartbeatAt.After(staleHeartbeat))
+}
+
 func Test__AnswerPlanningSessionSurvey__StoresSenderUserID(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -458,6 +491,7 @@ func draftAssigneeIDs(t *testing.T, db *gorm.DB, session *models.FactoryPlanning
 
 func openAnalysisSession(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.FactoryPlanningSession {
 	t.Helper()
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)

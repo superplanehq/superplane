@@ -1,25 +1,30 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, FactoryOnboardingAgentHarness } from "@/api-client";
-import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
-import { TooltipProvider } from "@/ui/tooltip";
+import {
+  factoriesCancelFactoryCodexConnection,
+  factoriesDescribeFactoryCodexConnection,
+  factoriesStartFactoryCodexConnection,
+  type FactoriesFactoryCodexConnection,
+} from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { unmockedSrc } from "@/test/unmockedModule";
 
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
-import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
-import { FactorySettingsOrganizationLLMModelsPage } from "./FactorySettingsOrganizationLLMModelsPage";
+import { renderPage } from "./organizationLLMModels.spec.render";
+import { factoryCodexConnectionKey } from "../onboarding/useFactoryCodexConnection";
 
 const saveModels = vi.fn();
 const saveHostedModels = vi.fn();
 const switchSource = vi.fn();
 let canUpdate = true;
-let enabledFeatures: string[] = [];
+let enabledFeatures: string[] = ["organization_byok"];
+let productAllowed = true;
 let hostedModels: Array<{ key: string; label: string; provider: string }> = [];
 let selectedHostedModels: typeof hostedModels = [];
+let codexConnection: FactoriesFactoryCodexConnection | undefined;
 
 type BYOKQuery = {
   data: {
@@ -34,6 +39,24 @@ type BYOKQuery = {
 };
 
 const byokByProvider: Record<string, BYOKQuery> = {};
+
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  useOrganizationBilling: () => ({
+    data: { productFeatures: { byo_key: productAllowed } },
+    isSuccess: true,
+    isPending: false,
+  }),
+}));
+
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({
+    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+  }),
+}));
 
 vi.mock("@/hooks/usePageTitle", () => ({
   usePageTitle: vi.fn(),
@@ -69,6 +92,13 @@ vi.mock("@/hooks/useLLMModelAllowlists", () => ({
 
 vi.mock("@/hooks/useSelectableLLMModels", () => ({
   useSelectableLLMModels: () => ({ data: hostedModels, isLoading: false, isError: false }),
+}));
+
+vi.mock("@/api-client", () => ({
+  ...unmockedSrc<Record<string, unknown>>("api-client/index.ts"),
+  factoriesDescribeFactoryCodexConnection: vi.fn(),
+  factoriesStartFactoryCodexConnection: vi.fn(),
+  factoriesCancelFactoryCodexConnection: vi.fn(),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -107,33 +137,25 @@ function setConnected(provider: string, candidateIds: string[], selectedIds = ca
   };
 }
 
-function renderPage(agentHarness?: FactoryOnboardingAgentHarness) {
-  const factory: FactoriesFactory = { ...REFUND_FACTORY, onboarding: { ...REFUND_FACTORY.onboarding, agentHarness } };
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter>
-        <TooltipProvider>
-          <IntegrationsBasePathProvider basePath="/org-1/workspaces/RF/settings/organization/integrations">
-            <FactorySettingsLayoutContext.Provider
-              value={{ organizationId: "org-1", factoryId: REFUND_FACTORY.id ?? "factory-1", factory }}
-            >
-              <FactorySettingsOrganizationLLMModelsPage />
-            </FactorySettingsLayoutContext.Provider>
-          </IntegrationsBasePathProvider>
-        </TooltipProvider>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-}
-
 describe("FactorySettingsOrganizationLLMModelsPage", () => {
   beforeEach(() => {
     canUpdate = true;
-    enabledFeatures = [];
+    enabledFeatures = ["organization_byok", "codex_subscriptions"];
+    productAllowed = true;
     hostedModels = [
       { key: "hosted::anthropic::claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6", provider: "anthropic" },
     ];
     selectedHostedModels = [...hostedModels];
+    codexConnection = undefined;
+    vi.mocked(factoriesDescribeFactoryCodexConnection)
+      .mockReset()
+      .mockImplementation(async () => ({ data: { connection: codexConnection } }) as never);
+    vi.mocked(factoriesStartFactoryCodexConnection)
+      .mockReset()
+      .mockResolvedValue({ data: {} } as never);
+    vi.mocked(factoriesCancelFactoryCodexConnection)
+      .mockReset()
+      .mockResolvedValue({ data: {} } as never);
     saveHostedModels.mockReset();
     vi.mocked(showErrorToast).mockClear();
     vi.mocked(showSuccessToast).mockClear();
@@ -157,6 +179,36 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("SuperPlane");
     expect(screen.getByTestId("llm-models-hosted")).toHaveTextContent("anthropic/claude-sonnet-4-6");
     expect(screen.queryByText("claude-opus-4-6")).not.toBeInTheDocument();
+  });
+
+  it("starts ChatGPT reconnection from completed workspace settings", async () => {
+    codexConnection = { status: "reconnect_required", eligible: true };
+    renderPage("AGENT_HARNESS_CODEX", true);
+    const connect = await screen.findByRole("button", { name: "Connect ChatGPT" });
+    await waitFor(() => expect(connect).toBeEnabled());
+    await userEvent.setup().click(connect);
+    expect(factoriesStartFactoryCodexConnection).toHaveBeenCalledTimes(1);
+    expect(switchSource).not.toHaveBeenCalled();
+  });
+
+  it("shows the ChatGPT device code and can cancel sign-in from settings", async () => {
+    codexConnection = {
+      status: "pending",
+      eligible: true,
+      verificationUrl: "https://auth.openai.com/codex/device",
+      verificationCode: "ABCD-1234",
+    };
+    renderPage("AGENT_HARNESS_CODEX", true);
+    expect(await screen.findByText("ABCD-1234")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cancel sign-in" }));
+    expect(factoriesCancelFactoryCodexConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables ChatGPT reconnection for readers", async () => {
+    canUpdate = false;
+    codexConnection = { status: "reconnect_required", eligible: true };
+    renderPage("AGENT_HARNESS_CODEX", true);
+    expect(await screen.findByRole("button", { name: "Connect ChatGPT" })).toBeDisabled();
   });
 
   it("keeps the organization hosted model list when the workspace uses its own key", () => {
@@ -183,6 +235,50 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
       "/org-1/workspaces/RF/settings/organization/integrations/int-anthropic",
     );
     expect(screen.getByText("2 of 2 models selected").className).not.toContain("text-red");
+  });
+
+  it("shows every model from the connected ChatGPT subscription", async () => {
+    codexConnection = {
+      status: "ready",
+      availableModels: ["gpt-5.4", "gpt-5.3-codex"],
+    };
+    renderPage("AGENT_HARNESS_CODEX", true);
+
+    expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("ChatGPT");
+    const subscription = await screen.findByTestId("llm-models-codex-subscription");
+    expect(subscription).toHaveTextContent("All models available to this ChatGPT subscription are enabled.");
+    expect(within(subscription).getByRole("checkbox", { name: "gpt-5.4" })).toBeChecked();
+    expect(within(subscription).getByRole("checkbox", { name: "gpt-5.3-codex" })).toBeChecked();
+    expect(screen.queryByTestId("llm-models-change-source")).not.toBeInTheDocument();
+  });
+
+  it.each(["reconnect_required", "disconnected"])(
+    "keeps the subscription source when ChatGPT is %s",
+    async (status) => {
+      setConnected("openai", ["gpt-5"]);
+      codexConnection = { status, availableModels: ["gpt-5.4"] };
+      renderPage("AGENT_HARNESS_CODEX", true);
+      expect(
+        await screen.findByText("Connect ChatGPT again in workspace setup to load subscription models."),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("ChatGPT");
+      expect(screen.queryByTestId("llm-models-provider-openai")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("llm-models-change-source")).not.toBeInTheDocument();
+    },
+  );
+
+  it("does not refresh a saved ChatGPT catalog when the workspace uses hosted models", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(factoryCodexConnectionKey("org-1", REFUND_FACTORY.id ?? "factory-1"), {
+      status: "ready",
+      availableModels: [],
+    });
+    await act(async () => {
+      renderPage("AGENT_HARNESS_SUPERPLANE", false, client);
+    });
+    expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("SuperPlane");
+    expect(factoriesDescribeFactoryCodexConnection).not.toHaveBeenCalled();
+    expect(factoriesStartFactoryCodexConnection).not.toHaveBeenCalled();
   });
 
   it("saves hosted selectable keys and disables Save when the selection is unchanged", async () => {
@@ -416,6 +512,26 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     await user.click(screen.getByRole("button", { name: "Use SuperPlane" }));
     expect(screen.getByRole("heading", { name: "Switch automations to SuperPlane?" })).toBeInTheDocument();
     expect(screen.queryByTestId("llm-models-switch-api-key")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
+    expect(switchSource).toHaveBeenCalledWith({ source: "hosted", apiKey: undefined });
+  });
+
+  it("hides provider controls when the product permission is denied", () => {
+    productAllowed = false;
+    renderPage("AGENT_HARNESS_SUPERPLANE");
+    expect(screen.queryByTestId("llm-models-connect-anthropic")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("llm-models-connect-custom")).not.toBeInTheDocument();
+  });
+
+  it.each(["rollout", "permission"])("switches an existing key to hosted models without BYOK %s", async (gate) => {
+    if (gate === "rollout") enabledFeatures = [];
+    if (gate === "permission") productAllowed = false;
+    setConnected("anthropic", ["claude-opus-4-6"]);
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+    expect(screen.queryByTestId("llm-models-provider-anthropic")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("llm-models-empty-banner")).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Use SuperPlane" }));
     await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
     expect(switchSource).toHaveBeenCalledWith({ source: "hosted", apiKey: undefined });
   });

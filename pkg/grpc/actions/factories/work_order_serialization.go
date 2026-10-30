@@ -217,13 +217,13 @@ func planningSessionSummariesByWorkOrder(db *gorm.DB, ids []uuid.UUID) (map[uuid
 	for _, session := range sessionsByOrder {
 		sessions = append(sessions, session)
 	}
-	executionIDs, err := planningSessionExecutionIDs(db, sessions)
+	runtimes, err := planningSessionRuntimes(db, sessions)
 	if err != nil {
 		return nil, err
 	}
 	summaries := make(map[uuid.UUID]*pb.PlanningSessionSummary, len(sessionsByOrder))
 	for orderID, session := range sessionsByOrder {
-		summaries[orderID] = serializePlanningSessionSummary(session, executionIDs[session.ID])
+		summaries[orderID] = serializePlanningSessionSummary(session, runtimes[session.ID])
 	}
 	return summaries, nil
 }

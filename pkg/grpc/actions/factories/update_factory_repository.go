@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
@@ -24,12 +25,19 @@ const (
 	legacyDefaultBranchExpression = "{{ install_params.defaultBranch }}"
 	orderRepositoryExpression     = "{{ task().repository }}"
 	orderDefaultBranchExpression  = "{{ task().default_branch }}"
+	// Exact token baked into older Implement commands. Replace the token only.
+	// A substring replace of "main" would change unrelated text.
+	legacyCheckoutBaseToken = "${BASE:-main}"
+	remoteHeadCheckoutBase  = "${BASE:-$(git symbolic-ref -q --short refs/remotes/origin/HEAD | sed 's#^origin/##' || true)}"
 )
 
 // UpdateFactoryRepository changes the repository that factory-managed
-// automations use. It snapshots active work orders before publishing the
-// generated canvas changes, so an in-progress order stays on its original
-// repository and branch.
+// automations use. It snapshots work orders before publishing canvas changes.
+// Closed tasks keep that snapshot. When retarget_tasks is unset or true,
+// unfinished tasks that still use the previous repository, and have no
+// branch or the previous branch, move to the saved repository and branch.
+// A false value keeps those tasks unchanged. A task with a running line
+// stays unchanged.
 func UpdateFactoryRepository(
 	ctx context.Context,
 	deps IntakeDependencies,
@@ -191,6 +199,7 @@ func UpdateFactoryRepository(
 			previous.BacklogRepository,
 			previousBranch,
 			selectedRepository,
+			retargetTasksRequested(req.RetargetTasks),
 		)
 	})
 	if err != nil {
@@ -249,6 +258,13 @@ func factoryDefaultBranchFromNodes(nodes []models.Node) string {
 	return defaultBranch
 }
 
+func retargetTasksRequested(flag *bool) bool {
+	if flag == nil {
+		return true
+	}
+	return *flag
+}
+
 func reconcileFactoryRepository(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -257,6 +273,7 @@ func reconcileFactoryRepository(
 	actorID uuid.UUID,
 	previousVCSIntegrationID, vcsIntegrationID string,
 	previousAppRepository, previousBacklogRepository, previousDefaultBranch, repository string,
+	retargetTasks bool,
 ) error {
 	canvasesForFactory, err := factory.ListCanvases(tx)
 	if err != nil {
@@ -269,6 +286,20 @@ func reconcileFactoryRepository(
 	handlers, err := factory.ListPRFeedbackHandlers(tx)
 	if err != nil {
 		return err
+	}
+	config := factory.OnboardingConfigValue()
+	nextBranch := strings.TrimSpace(config.DefaultBranch)
+	if retargetTasks {
+		if err := factory.RetargetUnfinishedWorkOrderBranches(
+			tx,
+			previousAppRepository,
+			repository,
+			previousDefaultBranch,
+			nextBranch,
+			config.EffectiveVCSProvider(),
+		); err != nil {
+			return err
+		}
 	}
 	previousIntegrationName, integrationName := "", ""
 	if previousVCSIntegrationID != "" && previousVCSIntegrationID != vcsIntegrationID {
@@ -336,7 +367,15 @@ func reconcileFactoryRepository(
 			case "visual-evidence":
 				managedRunnerNodeIDs["capture-visual-evidence"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
+			case scheduledIntakeTemplateID:
+				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch) || changed
 			}
+			if template.id == "line-implementation" {
+				changed = replaceLegacyCheckoutBaseToken(nodes, managedRunnerNodeIDs) || changed
+			}
+		}
+		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID {
+			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch) || changed
 		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
 			graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{
@@ -609,6 +648,114 @@ func replaceConfigurationValues(value any, replacements []configurationReplaceme
 			}
 		}
 		return current, false
+	default:
+		return value, false
+	}
+}
+
+// replaceWorkspaceCheckoutTarget keeps a baked checkout on the workspace
+// repository and branch together. A repository change rewrites the repository
+// slug and its clone URL. A branch change rewrites only BASE.
+func replaceWorkspaceCheckoutTarget(nodes []models.Node, provider, previousRepository, nextRepository, previousBranch, nextBranch string) bool {
+	changed := replaceLiteralCheckoutBase(nodes, previousBranch, nextBranch)
+	previousRepository = strings.TrimSpace(previousRepository)
+	nextRepository = strings.TrimSpace(nextRepository)
+	if previousRepository == "" || nextRepository == "" || sameRepository(previousRepository, nextRepository) {
+		return changed
+	}
+	return replaceNodeConfigurationValues(nodes, []configurationReplacement{
+		{from: previousRepository, to: nextRepository},
+		{from: runner.WorkspaceContextRepoURL(provider, previousRepository), to: runner.WorkspaceContextRepoURL(provider, nextRepository)},
+	}) || changed
+}
+
+// replaceLiteralCheckoutBase rewrites a BASE value that is exactly the previous
+// workspace branch. It leaves every other scalar unchanged.
+func replaceLiteralCheckoutBase(nodes []models.Node, previousBranch, nextBranch string) bool {
+	previousBranch = strings.TrimSpace(previousBranch)
+	nextBranch = strings.TrimSpace(nextBranch)
+	if nextBranch == "" || previousBranch == nextBranch {
+		return false
+	}
+
+	changed := false
+	for i := range nodes {
+		environment, ok := nodes[i].Configuration["environment"].([]any)
+		if !ok {
+			continue
+		}
+		nextEnvironment := slices.Clone(environment)
+		updated := false
+		for j, item := range nextEnvironment {
+			entry, ok := item.(map[string]any)
+			if !ok || entry["name"] != "BASE" {
+				continue
+			}
+			value, _ := entry["value"].(string)
+			if strings.TrimSpace(value) != previousBranch {
+				continue
+			}
+			cloned := maps.Clone(entry)
+			cloned["value"] = nextBranch
+			nextEnvironment[j] = cloned
+			updated = true
+		}
+		if !updated {
+			continue
+		}
+		nodes[i].Configuration = maps.Clone(nodes[i].Configuration)
+		nodes[i].Configuration["environment"] = nextEnvironment
+		changed = true
+	}
+	return changed
+}
+
+// replaceLegacyCheckoutBaseToken rewrites the exact ${BASE:-main} token inside
+// managed Implement commands. It does not replace the word main.
+func replaceLegacyCheckoutBaseToken(nodes []models.Node, managedNodeIDs map[string]bool) bool {
+	changed := false
+	for i := range nodes {
+		if !managedNodeIDs[nodes[i].ID] {
+			continue
+		}
+		configuration, nodeChanged := replaceCommandToken(nodes[i].Configuration, legacyCheckoutBaseToken, remoteHeadCheckoutBase)
+		if !nodeChanged {
+			continue
+		}
+		nodes[i].Configuration = configuration.(map[string]any)
+		changed = true
+	}
+	return changed
+}
+
+func replaceCommandToken(value any, token, replacement string) (any, bool) {
+	switch current := value.(type) {
+	case map[string]any:
+		cloned := maps.Clone(current)
+		changed := false
+		for key, child := range cloned {
+			if key == "command" {
+				text, ok := child.(string)
+				if ok && strings.Contains(text, token) {
+					cloned[key] = strings.ReplaceAll(text, token, replacement)
+					changed = true
+					continue
+				}
+			}
+			next, childChanged := replaceCommandToken(child, token, replacement)
+			cloned[key] = next
+			changed = changed || childChanged
+		}
+		return cloned, changed
+	case []any:
+		cloned := slices.Clone(current)
+		changed := false
+		for i, child := range cloned {
+			next, childChanged := replaceCommandToken(child, token, replacement)
+			cloned[i] = next
+			changed = changed || childChanged
+		}
+		return cloned, changed
 	default:
 		return value, false
 	}

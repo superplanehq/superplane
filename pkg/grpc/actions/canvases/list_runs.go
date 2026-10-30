@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,13 +20,16 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (*pb.ListRunsResponse, error) {
-	limit = getLimit(limit)
-	beforeTime := getBefore(before)
-	filters, err := buildCanvasRunFilters(states, results)
+func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, req *pb.ListRunsRequest) (*pb.ListRunsResponse, error) {
+	limit := getLimit(req.Limit)
+	beforeTime := getBefore(req.Before)
+	filters, err := buildCanvasRunFilters(req.States, req.Results)
 	if err != nil {
 		return nil, err
 	}
+
+	filters.Search = req.Search
+	filters.TriggerIDs = req.TriggerIds
 
 	runs, err := listCanvasRuns(ctx, db, canvas.ID, int(limit), beforeTime, filters)
 	if err != nil {
@@ -55,6 +59,11 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 		return nil, err
 	}
 	AttachCanvasRunUsage(db, serialized)
+	if req.GetIncludeTask() {
+		if err := attachCanvasRunTasks(db, canvas, runs, serialized); err != nil {
+			return nil, err
+		}
+	}
 
 	return &pb.ListRunsResponse{
 		Runs:          serialized,
@@ -142,6 +151,9 @@ func SerializeCanvasRuns(
 		result = append(result, serializedRun)
 	}
 
+	if err := attachExecutionSummaries(db, runs, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -164,7 +176,14 @@ func SerializeCanvasRun(
 		parent = *parentRun
 	}
 
-	return serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, parent, childRunsByExecutionID)
+	serialized, err := serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, parent, childRunsByExecutionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := attachExecutionSummaries(db, []models.CanvasRun{run}, []*pb.CanvasRun{serialized}); err != nil {
+		return nil, err
+	}
+	return serialized, nil
 }
 
 func serializeCanvasRunWithQueueItemInputs(
@@ -201,6 +220,7 @@ func serializeCanvasRunWithQueueItemInputs(
 	serialized := &pb.CanvasRun{
 		Id:         run.ID.String(),
 		CanvasId:   run.WorkflowID.String(),
+		NodeId:     run.NodeID,
 		VersionId:  run.VersionID.String(),
 		RootEvent:  serializedRootEvent,
 		State:      RunStateToProto(run.State),
@@ -410,6 +430,106 @@ func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {
 	return nil
 }
 
+func attachCanvasRunTasks(db *gorm.DB, canvas *models.Canvas, runs []models.CanvasRun, serialized []*pb.CanvasRun) error {
+	labels, err := models.ResolveCanvasRunTasks(db, canvas, runs)
+	if err != nil {
+		return grpcerrors.Internal(err, "failed to load run tasks")
+	}
+	extra, err := existingTaskLabels(db, serialized, labels)
+	if err != nil {
+		return err
+	}
+	for runID, label := range extra {
+		labels[runID] = label
+	}
+
+	for _, run := range serialized {
+		if run == nil {
+			continue
+		}
+		runID, err := uuid.Parse(run.GetId())
+		if err != nil {
+			continue
+		}
+		label, ok := labels[runID]
+		if !ok {
+			continue
+		}
+		run.Task = &pb.CanvasRunTask{
+			Id:    label.ID.String(),
+			Key:   label.Key,
+			Title: label.Title,
+		}
+	}
+	return nil
+}
+
+func existingTaskLabels(db *gorm.DB, serialized []*pb.CanvasRun, labels map[uuid.UUID]models.CanvasRunTaskLabel) (map[uuid.UUID]models.CanvasRunTaskLabel, error) {
+	orderIDs := map[uuid.UUID]uuid.UUID{}
+	for _, run := range serialized {
+		if run == nil {
+			continue
+		}
+		runID, err := uuid.Parse(run.GetId())
+		if err != nil {
+			continue
+		}
+		if _, ok := labels[runID]; ok {
+			continue
+		}
+		orderID, ok := recordedExistingTaskID(run)
+		if !ok {
+			continue
+		}
+		orderIDs[runID] = orderID
+	}
+	return models.CanvasRunTaskLabelsForOrders(db, orderIDs)
+}
+
+func recordedExistingTaskID(run *pb.CanvasRun) (uuid.UUID, bool) {
+	executions := append([]*pb.CanvasNodeExecutionRef{}, run.GetExecutions()...)
+	sort.SliceStable(executions, func(i, j int) bool {
+		return executionCreatedAt(executions[i]).Before(executionCreatedAt(executions[j]))
+	})
+	lastByNode := map[string]*pb.CanvasNodeExecutionRef{}
+	for _, execution := range executions {
+		if execution.GetNodeId() == "" {
+			continue
+		}
+		lastByNode[execution.GetNodeId()] = execution
+	}
+	var chosen uuid.UUID
+	var chosenAt time.Time
+	found := false
+	for _, execution := range executions {
+		if lastByNode[execution.GetNodeId()] != execution {
+			continue
+		}
+		if execution.GetComponentName() != "createWorkOrder" || execution.GetResult() != pb.CanvasNodeExecution_RESULT_PASSED {
+			continue
+		}
+		orderID, err := uuid.Parse(execution.GetExistingTaskId())
+		if err != nil || orderID == uuid.Nil {
+			continue
+		}
+		createdAt := executionCreatedAt(execution)
+		if found && !createdAt.After(chosenAt) {
+			continue
+		}
+		chosen = orderID
+		chosenAt = createdAt
+		found = true
+	}
+	return chosen, found
+}
+
+func executionCreatedAt(execution *pb.CanvasNodeExecutionRef) time.Time {
+	if execution == nil || execution.GetCreatedAt() == nil {
+		return time.Time{}
+	}
+	return execution.GetCreatedAt().AsTime()
+}
+
 func AttachCanvasRunUsage(db *gorm.DB, runs []*pb.CanvasRun) {
 	ids := make([]uuid.UUID, 0, len(runs))
 	for _, run := range runs {
@@ -496,14 +616,14 @@ func listCanvasRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, limit 
 	ctx, done := telemetry.Span(ctx, "runs.list")
 	defer done(&err)
 
-	return models.ListCanvasRunsInTransaction(db, canvasID, limit, beforeTime, filters)
+	return models.ListCanvasRuns(db, canvasID, limit, beforeTime, filters)
 }
 
 func countCanvasRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, filters models.CanvasRunFilters) (count int64, err error) {
 	ctx, done := telemetry.Span(ctx, "runs.count")
 	defer done(&err)
 
-	return models.CountCanvasRunsInTransaction(db, canvasID, filters)
+	return models.CountCanvasRuns(db, canvasID, filters)
 }
 
 func loadRootEventsForRunsSpan(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (events map[string]models.CanvasEvent, err error) {

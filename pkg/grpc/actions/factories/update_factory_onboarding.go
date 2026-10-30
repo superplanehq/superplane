@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
@@ -36,25 +37,64 @@ func UpdateFactoryOnboarding(
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 	setOnboardingVCSProvider(db, orgID, &patch)
+	patch, err = verifiedOnboardingDefaultBranch(ctx, deps, db, orgID, organizationID, factory, patch)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
 
 	if err := rejectVCSProviderChange(factory, patch); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 
+	config, err := factory.OnboardingConfigAfter(patch)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+	if config.AgentIntegrationID != "" && (patch.AgentIntegrationID != nil || patch.AgentHarness != nil || req.GetComplete()) {
+		integration, err := findReadyOnboardingIntegration(db, orgID, config.AgentIntegrationID)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+		provider := ""
+		if integration.AppName == models.CustomLLMAppName {
+			provider = models.UsageProviderCustom
+		}
+		if err := models.RequireOrganizationBYOKAccess(db, orgID, provider); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+	}
+
+	if req.GetComplete() && !wasComplete && billing.Enabled() {
+		if err := billing.AssertOrganizationPlanAllowsRuns(db, orgID); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+		if err := billing.AssertOrganizationPaymentMethod(db, orgID); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		}
+	}
+
 	if req.Complete != nil && *req.Complete {
-		config, configErr := factory.OnboardingConfigAfter(patch)
-		if configErr != nil {
-			return nil, factoryErrorToStatus(configErr, "failed to update factory onboarding")
-		}
-		if validationErr := validateFactoryOnboardingResources(db, orgID, factory, config); validationErr != nil {
-			return nil, factoryErrorToStatus(validationErr, "failed to update factory onboarding")
-		}
-		if !wasComplete {
-			if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, db, factory, patch, config); err != nil {
-				return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if err := validateFactoryOnboardingResources(ctx, tx, orgID, factory, config); err != nil {
+				return err
 			}
-		}
-		err = factory.CompleteOnboarding(db, patch)
+			if !wasComplete {
+				if err := synchronizeOnboardingSubscriptionApps(ctx, tx, deps, factory, config); err != nil {
+					return err
+				}
+			}
+			if config.CodexSubscription {
+				if err := validateSubscriptionCanvases(tx, factory); err != nil {
+					return err
+				}
+			}
+			if !wasComplete {
+				if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, tx, factory, patch, config); err != nil {
+					return err
+				}
+			}
+			return factory.CompleteOnboarding(tx, patch)
+		})
 	} else {
 		err = factory.UpdateOnboarding(db, patch)
 	}
@@ -151,11 +191,15 @@ func ensureOnboardingDiscussionHandler(
 }
 
 func validateFactoryOnboardingResources(
+	ctx context.Context,
 	db *gorm.DB,
 	organizationID uuid.UUID,
 	factory *models.Factory,
 	config models.FactoryOnboardingConfig,
 ) error {
+	if config.IssuesSource == models.FactoryOnboardingIssuesSourceVCS && config.EffectiveVCSProvider() != models.ProviderGitHub {
+		return invalidArgument("GitHub Issues requires a GitHub repository")
+	}
 	if config.VCSIntegrationID != "" {
 		integration, err := findReadyOnboardingIntegration(db, organizationID, config.VCSIntegrationID)
 		if err != nil {
@@ -166,7 +210,11 @@ func validateFactoryOnboardingResources(
 		}
 	}
 
-	if config.AgentIntegrationID != "" {
+	if config.CodexSubscription {
+		if err := validateCodexSubscriptionOnboarding(ctx, db, organizationID, factory, config); err != nil {
+			return err
+		}
+	} else if config.AgentIntegrationID != "" {
 		integration, err := findReadyOnboardingIntegration(db, organizationID, config.AgentIntegrationID)
 		if err != nil {
 			return err
@@ -323,8 +371,80 @@ func factoryOnboardingPatchFromRequest(req *pb.UpdateFactoryOnboardingRequest) (
 		}
 		patch.AgentHarness = &harness
 	}
+	if req.CodexSubscription != nil {
+		value := req.GetCodexSubscription()
+		patch.CodexSubscription = &value
+	}
 
 	return patch, nil
+}
+
+func validateCodexSubscriptionOnboarding(
+	ctx context.Context,
+	db *gorm.DB,
+	organizationID uuid.UUID,
+	factory *models.Factory,
+	config models.FactoryOnboardingConfig,
+) error {
+	if config.AgentHarness != models.FactoryOnboardingAgentHarnessCodex {
+		return invalidArgument("ChatGPT subscription uses Codex")
+	}
+	if config.AgentIntegrationID != "" {
+		return invalidArgument("ChatGPT subscription does not use an API key")
+	}
+	callerID, err := codexCallerID(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err := models.ActiveCodexMember(db, organizationID, callerID); err != nil {
+		return err
+	}
+	connection, err := models.FindFactoryCodexConnection(db, organizationID, factory.ID, callerID)
+	if err != nil {
+		return invalidArgument("Connect ChatGPT before you finish setup")
+	}
+	if connection.Status != models.CodexConnectionStatusReady || connection.Reserved() {
+		return invalidArgument("Wait until the ChatGPT sign-in runner has stopped")
+	}
+	return nil
+}
+
+func validateSubscriptionCanvases(db *gorm.DB, factory *models.Factory) error {
+	canvases, err := factory.ListCanvases(db)
+	if err != nil {
+		return err
+	}
+	for i := range canvases {
+		nodes, err := models.FindCanvasNodesInTransaction(db, canvases[i].ID)
+		if err != nil {
+			return err
+		}
+		for _, node := range nodes {
+			if err := validateSubscriptionCodexNode(node); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateSubscriptionCodexNode(node models.CanvasNode) error {
+	name := node.ComponentName()
+	switch name {
+	case "", "runnerClaudeCode", "runnerOpenRouter", models.SuperPlaneRunnerComponent:
+		if name == "" {
+			return nil
+		}
+		return invalidArgument("This workspace must use Codex with a ChatGPT subscription")
+	case "runnerCodex":
+		configuration := node.Configuration.Data()
+		credentials, _ := configuration["credentials"].(map[string]any)
+		source, _ := credentials["source"].(string)
+		if source != "subscription" {
+			return invalidArgument("This workspace must use Codex with a ChatGPT subscription")
+		}
+	}
+	return nil
 }
 
 func factoryOnboardingIssuesSourceFromProto(source pb.FactoryOnboarding_IssuesSource) (string, error) {

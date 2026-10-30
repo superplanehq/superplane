@@ -1,28 +1,48 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
-on_error() {
-  echo -e "\033[0;31m"
-  echo "License check failed"
-  echo -e "\033[0m"
-  echo "To add a specific license to the whitelist, run:"
-  echo "  bundle exec license_finder permitted_licenses add <LICENSE NAME> --decisions-file scripts/license_finder.yml"
-  echo ""
-  echo "To add a specific dependency to the whitelist, run:"
-  echo "  bundle exec license_finder approvals add <DEPENDENCY NAME> --who <YOUR NAME> --why <REASON> --decisions-file scripts/license_finder.yml"
-  echo ""
-  echo "Before adding a dependency to the whitelist, please make sure that the license is compatible with the project's license and that the dependency is not a security risk."
-  echo "Consult with the project's maintainers if you are unsure."
-  echo ""
-  exit 1
-}
+cd "$(dirname "$0")/.."
 
-bundle install
+# Pin the release and digest so local checks and CI use the same scanner.
+scanner_image="ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0"
+permitted_licenses=$(paste -sd, scripts/permitted-licenses.txt)
 
-echo "CHECKING LICENSES FOR BACKEND (Go modules)"
-bundle exec license_finder --project-path . --decisions-file scripts/license_finder.yml || on_error
+config_directory=$(mktemp -d)
+trap 'rm -rf "$config_directory"' EXIT
+cp osv-scanner.toml "$config_directory/osv-scanner.toml"
 
-echo "CHECKING LICENSES FOR FRONTEND (npm packages)"
-bundle exec license_finder --project-path web_src --decisions-file scripts/license_finder.yml || on_error
+# Restrict this command to licenses. Keep vulnerability exceptions out of the
+# shared config so future vulnerability scans can use it without this override.
+cat >> "$config_directory/osv-scanner.toml" <<'TOML'
 
+[[PackageOverrides]]
+vulnerability.ignore = true
+reason = "Vulnerability enforcement is outside this license check."
+TOML
+
+# Explicit lockfiles preserve the existing Go and frontend dependency scope.
+# Optional lockfile arguments support focused checks and integration fixtures.
+if [ "$#" -eq 0 ]; then
+  set -- go.mod web_src/package-lock.json
+fi
+lockfiles=()
+for lockfile in "$@"; do
+  lockfiles+=(--lockfile="/src/${lockfile#"$PWD"/}")
+done
+
+status=0
+echo "Checking dependency licenses only. Vulnerability findings are suppressed for this command."
+docker run --rm \
+  --mount "type=bind,source=$PWD,target=/src,readonly" \
+  --mount "type=bind,source=$config_directory,target=/config,readonly" \
+  --workdir /src \
+  "$scanner_image" scan source \
+  --config=/config/osv-scanner.toml \
+  --licenses="$permitted_licenses" \
+  "${lockfiles[@]}" || status=$?
+
+if [ "$status" -ne 0 ]; then
+  echo "License check failed (exit $status)." >&2
+  echo "Review license violations before changing scripts/permitted-licenses.txt or osv-scanner.toml." >&2
+fi
+exit "$status"

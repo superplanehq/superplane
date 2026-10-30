@@ -1,0 +1,12 @@
+Join {{.OrganizationName}} on SuperPlane
+
+{{.InviterName}} invited you to join {{.OrganizationName}} with the role {{.Role}}.
+
+Accept the invitation: {{.AcceptanceURL}}
+
+This invitation expires on {{.ExpiresAt}}.
+
+If you do not know this organization, you can ignore this email.
+
+Best regards,
+The SuperPlane Team

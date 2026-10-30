@@ -8,7 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
-// Execution modes accepted by the task broker / fleet manager (lowercase JSON).
+// Execution modes accepted by runners (lowercase JSON).
 const (
 	ExecutionModeHost   = "host"
 	ExecutionModeDocker = "docker"

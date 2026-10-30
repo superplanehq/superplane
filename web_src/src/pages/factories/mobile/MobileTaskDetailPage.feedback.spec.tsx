@@ -74,7 +74,7 @@ vi.mock("@/contexts/usePermissions", () => ({
 }));
 
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
-  useFactoryLineRunnerModels: () => ({ data: [], isLoading: false }),
+  useFactoryLineRunnerModels: () => ({ data: { models: [] }, isLoading: false }),
 }));
 
 vi.mock("@/hooks/useOrganizationData", () => ({

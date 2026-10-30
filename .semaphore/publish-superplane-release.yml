@@ -22,7 +22,7 @@ global_job_config:
   prologue:
     commands:
       - checkout
-      - test "$SEMAPHORE_GIT_BRANCH" = main
+      - bash release/verify-superplane-release-branch.sh "$SEMAPHORE_GIT_BRANCH"
       - test "$SEMAPHORE_PIPELINE_PROMOTION" = true
       - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
 
@@ -142,3 +142,18 @@ blocks:
                 superplane-single-host.tar.gz \
                 "superplane-${RELEASE_VERSION#v}.tgz" \
                 checksums.txt
+
+promotions:
+  - name: Finalize SuperPlane Release
+    pipeline_file: prepare-superplane-release.yml
+    deployment_target: release
+    parameters:
+      env_vars:
+        - name: RELEASE_CANDIDATE_VERSION
+          required: true
+          default_value: "${{parameters.RELEASE_VERSION}}"
+          description: Published SuperPlane release candidate
+        - name: RELEASE_VERSION
+          required: true
+          default_value: vX.Y.Z
+          description: Stable SuperPlane version

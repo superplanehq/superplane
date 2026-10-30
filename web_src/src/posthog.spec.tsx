@@ -39,7 +39,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+  usePermissions: () => ({ canAct: () => true, hasPermission: () => true, isLoading: false }),
 }));
 
 import { AccountProvider } from "@/contexts/AccountProvider";
@@ -146,8 +146,8 @@ describe("account identification", () => {
     });
   });
 
-  it("does not call identify when impersonation is active", async () => {
-    const fetchMock = stubFetch({ ...mockAccount, impersonation: { active: true } });
+  it("does not call identify when a support session is active", async () => {
+    const fetchMock = stubFetch({ ...mockAccount, support_session: { active: true } });
     render(
       <AccountProvider>
         <div />

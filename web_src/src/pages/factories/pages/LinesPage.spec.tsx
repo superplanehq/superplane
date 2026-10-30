@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -17,10 +17,10 @@ import {
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
-  FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
+import { dematerializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
 
 vi.mock("@monaco-editor/react", () => {
   function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
@@ -29,7 +29,6 @@ vi.mock("@monaco-editor/react", () => {
   return { default: MockMonacoEditor, Editor: MockMonacoEditor };
 });
 import {
-  factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
   factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
@@ -45,6 +44,7 @@ import {
   factorySentryIntakeSetupPath,
   firstFactoryLineId,
 } from "../lib/factoryPagePaths";
+import { factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT,
@@ -53,7 +53,6 @@ import {
   DRAFT_WORK_ORDER,
   factoryWithPlanning,
   GITHUB_ISSUES_INTAKE,
-  GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
@@ -464,13 +463,23 @@ describe("LinesPage board", () => {
   });
 
   it("sets a pastel colour on the backlog from circular swatches", async () => {
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({
+      id: REFUND_LINE_PLAN_ID,
+      columnColors: { backlog: "sky" },
+    });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
-    await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
+    await user.click(screen.getByTestId("lines-backlog-menu-color-sky"));
 
-    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
+    await waitFor(() =>
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
+        lineId: REFUND_LINE_PLAN_ID,
+        columnColors: { backlog: "sky" },
+      }),
+    );
+    expect(screen.getByTestId("lines-backlog-column")).toHaveClass("line-board-color-sky", "line-board-column-vivid");
   });
 
   it("shows a score on a draft card and hides it on other columns", () => {
@@ -704,8 +713,7 @@ describe("LinesPage board", () => {
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
   });
 
-  it("opens an existing phase automation on the split config screen", async () => {
-    enabledExperimentalFeatures.add(FEATURE_WORKSPACE_MCP);
+  it("opens supported Implement settings from the phase automation row", async () => {
     enabledExperimentalFeatures.add(FEATURE_WORKSPACE_SKILLS);
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
@@ -730,8 +738,8 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("column-automation-view-tab-general")).not.toBeInTheDocument();
     const dialog = screen.getByTestId("merge-confidence-config");
     expect(within(dialog).getByRole("heading", { name: "Implement" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
-    expect(within(dialog).getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("implement-settings-save")).toBeInTheDocument();
     expect(within(dialog).getByTestId("merge-confidence-config-tab-automation")).toHaveAttribute(
       "data-state",
       "active",
@@ -741,9 +749,9 @@ describe("LinesPage board", () => {
     expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Concurrency")).toHaveValue(5);
-    expect(within(dialog).getByText("MCP servers")).toBeInTheDocument();
-    expect(within(dialog).getByText("Skills")).toBeInTheDocument();
+    expect(within(dialog).getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(5);
+    expect(within(dialog).queryByText("MCP servers")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Skills")).not.toBeInTheDocument();
   });
 
   it("opens Planning settings from the Task analysis row", async () => {
@@ -1119,7 +1127,7 @@ describe("LinesPage board extras", () => {
     );
   });
 
-  it("opens the name dialog when Verify only has custom automation left", async () => {
+  it("opens custom Verify setup when only custom automation remains", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
@@ -1141,32 +1149,23 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
 
     expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
-    expect(screen.getByTestId("factory-app-name-input")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryCustomAutomationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
   });
 
-  it("creates a custom Verify automation and opens the editor", async () => {
+  it("opens custom Verify setup from the catalog", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-    createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "canvas-custom", name: "Destroy ephemeral env" });
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-verify-menu"));
     await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
-    await user.click(screen.getByTestId("add-column-automation-template-custom"));
-    await user.type(screen.getByTestId("factory-app-name-input"), "Destroy ephemeral env");
-    await user.click(screen.getByTestId("factory-app-create-button"));
+    await user.click(screen.getByTestId("add-column-automation-template-custom-verification"));
 
-    await waitFor(() => {
-      expect(createFactoryAutomationMutateAsync).toHaveBeenCalledWith({
-        name: "Destroy ephemeral env",
-        columnKey: "verify",
-      });
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/automations/canvas-custom`,
-      );
-    });
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryCustomAutomationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
   });
 
   it("opens the created scheduled intake in the board automation view", async () => {
@@ -1482,28 +1481,32 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).not.toBeInTheDocument();
   });
 
-  it("opens intake settings from the row and links to the factory canvas editor", async () => {
+  it("opens intake run history from the row and shares the selected tab", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByRole("button", { name: `Open ${GITHUB_ISSUES_INTAKE.name} settings` }));
-    await user.click(screen.getByRole("tab", { name: "Automation" }));
+    await user.click(screen.getByRole("tab", { name: "Runs" }));
 
-    expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
-      "href",
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, GITHUB_ISSUES_INTAKE_APP.id!, {
-        from: "lines",
-        lineId: REFUND_LINE_PLAN_ID,
-      }),
-    );
+    expect(screen.getByRole("table", { name: "Runs" })).toBeInTheDocument();
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
+    expect(location).toHaveTextContent("settings=runs");
+    expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
   });
 
   it("opens the settings of the intake whose row was used", async () => {
     useFactoryIntakes.mockReturnValue({
       data: [
         GITHUB_ISSUES_INTAKE,
-        { id: "intake-triage", canvasId: "app-triage", name: "Triage issues", source: "SOURCE_GITHUB_ISSUES" },
+        {
+          id: "intake-triage",
+          canvasId: "app-triage",
+          name: "Triage issues",
+          source: "SOURCE_GITHUB_ISSUES",
+          settings: { labels: ["triage"] },
+        },
       ],
     });
     const user = userEvent.setup();
@@ -1511,9 +1514,8 @@ describe("LinesPage board extras", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Triage issues settings" }));
 
-    expect(
-      within(screen.getByTestId("intake-source-settings")).getByRole("heading", { name: "Intake Triage issues" }),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("intakeId=intake-triage");
+    expect(within(screen.getByTestId("intake-source-settings")).getByText("triage")).toBeInTheDocument();
   });
 
   it("does not list intake runs under the GitHub issues row", () => {
@@ -1649,25 +1651,30 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByRole("menuitem", { name: "Edit Automation" })).not.toBeInTheDocument();
   });
 
-  it("saves the Implement agent when a choice changes", async () => {
+  it("saves supported Implement settings after the user confirms", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
-    const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
-    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
+    const dialog = await screen.findByTestId("merge-confidence-config");
+    const concurrency = within(dialog).getByRole("spinbutton", { name: "Maximum simultaneous runs" });
+    fireEvent.change(concurrency, { target: { value: "3" } });
     expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
-    expect(await screen.findByRole("heading", { name: "Implement From Task Description" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Add step" }));
+    expect(commitCanvasStagingMutateAsync).not.toHaveBeenCalled();
 
-    await waitFor(() => {
-      expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step");
+    await act(async () => {
+      fireEvent.click(within(dialog).getByTestId("implement-settings-save"));
     });
+
+    expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step");
     const saved = updateCanvasVersionMutateAsync.mock.calls.at(-1)?.[0] as { canvasYaml?: string };
-    expect(saved.canvasYaml).toContain("implementation-agent-no-issue");
-    expect(saved.canvasYaml?.match(/type: bash/g)).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
-  });
+    const savedAgent = dematerializeCanvasSpec(saved.canvasYaml ?? "")?.nodes?.find(
+      (node) => node.id === "implementation-agent-no-issue",
+    );
+    expect(savedAgent?.concurrency?.max).toBe(3);
+    expect(savedAgent?.configuration?.steps).toEqual(implementerCanvas.spec.nodes[1].configuration.steps);
+    expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument();
+  }, 15000);
 
   it("keeps Backlog Edit as the only edit action", async () => {
     const user = userEvent.setup();
@@ -2036,18 +2043,20 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     const first = renderLinesBoard();
 
-    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column")).toHaveClass("line-board-color-lime", "line-board-column-vivid");
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
     await user.hover(screen.getByTestId("lines-board-view-column-color"));
     fireEvent.click(await screen.findByTestId("lines-board-view-no-column-colors"));
 
-    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column")).not.toHaveClass("line-board-color-lime");
+    expect(screen.getByTestId("lines-backlog-column")).toHaveClass("bg-muted");
 
     first.unmount();
     renderLinesBoard();
 
-    expect(screen.getByTestId("lines-backlog-column").className).not.toContain("bg-lime-300");
+    expect(screen.getByTestId("lines-backlog-column")).not.toHaveClass("line-board-color-lime");
+    expect(screen.getByTestId("lines-backlog-column")).toHaveClass("bg-muted");
   });
 
   it("lets the header view menu show column colors as borders", async () => {
@@ -2059,8 +2068,8 @@ describe("LinesPage board editing", () => {
     fireEvent.click(await screen.findByTestId("lines-board-view-colored-borders"));
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(backlog.className).not.toContain("bg-lime-300");
-    expect(backlog.className).toContain("border-lime-400");
+    expect(backlog).toHaveClass("line-board-color-lime", "line-board-column-bordered", "bg-card");
+    expect(backlog).not.toHaveClass("line-board-column-vivid");
   });
 
   it("lets the header view menu show soft column colors", async () => {
@@ -2068,18 +2077,15 @@ describe("LinesPage board editing", () => {
     renderLinesBoard();
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(backlog.className).toContain("bg-lime-300");
-    expect(backlog.className).toContain("dark:bg-lime-800");
+    expect(backlog).toHaveClass("line-board-color-lime", "line-board-column-vivid");
 
     await user.click(screen.getByTestId("lines-board-view-menu"));
     await user.hover(screen.getByTestId("lines-board-view-column-color"));
     fireEvent.click(await screen.findByTestId("lines-board-view-dim-column-colors"));
 
     const softBacklog = screen.getByTestId("lines-backlog-column");
-    expect(softBacklog.className).toContain("bg-lime-100");
-    expect(softBacklog.className).toContain("dark:bg-lime-950/40");
-    expect(softBacklog.className).not.toContain("bg-lime-300");
-    expect(softBacklog.className).not.toContain("dark:bg-lime-800");
+    expect(softBacklog).toHaveClass("line-board-color-lime", "line-board-column-soft");
+    expect(softBacklog).not.toHaveClass("line-board-column-vivid");
   });
 
   it("lets the header view menu switch automation names to icons and persist the choice", async () => {

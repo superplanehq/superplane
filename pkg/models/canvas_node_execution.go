@@ -29,6 +29,10 @@ const (
 	// CanvasNodeExecutionFrozenComponentKey stores the component an execution
 	// started with when a later model-source switch replaces the runtime node.
 	CanvasNodeExecutionFrozenComponentKey = "frozenComponent"
+
+	// Records a task creation skipped by the duplicate guard. Keep this in
+	// metadata: emitting a creation output would start downstream components.
+	CanvasNodeExecutionExistingTaskIDKey = "existing_task_id"
 )
 
 var CanvasNodeExecutionActiveStates = []string{
@@ -108,6 +112,11 @@ func (e *CanvasNodeExecution) FrozenComponentName() string {
 	}
 	name, _ := e.Metadata.Data()[CanvasNodeExecutionFrozenComponentKey].(string)
 	return strings.TrimSpace(name)
+}
+
+func (e *CanvasNodeExecution) ExistingTaskID() string {
+	id, _ := e.Metadata.Data()[CanvasNodeExecutionExistingTaskIDKey].(string)
+	return id
 }
 
 func (e *CanvasNodeExecution) BeforeCreate(tx *gorm.DB) error {
@@ -750,6 +759,16 @@ func ListCanvasEventsForExecutionsInTransaction(tx *gorm.DB, executionIDs []uuid
 	}
 
 	return events, nil
+}
+
+func (e *CanvasNodeExecution) FindPendingRequest(tx *gorm.DB) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
+	err := tx.Where("workflow_id = ? AND execution_id = ? AND state = ?", e.WorkflowID, e.ID, NodeExecutionRequestStatePending).
+		Order("created_at ASC").First(&request).Error
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
 }
 
 func (e *CanvasNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {

@@ -1,5 +1,6 @@
 import type { AuthorizationPermission } from "@/api-client";
 import { useMe } from "@/hooks/useMe";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 import { useCallback, useEffect, useMemo } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { COMMAND_SHORTCUT } from "./constants";
@@ -12,7 +13,9 @@ export function usePalettePermissions(organizationId: string | null) {
 
   const permissionSet = useMemo(() => toPermissionSet(me?.permissions ?? []), [me?.permissions]);
 
-  const canAct = useCallback(
+  const inSupportSession = useIsSupportSession();
+
+  const hasPermission = useCallback(
     (resource: string, action: string) => {
       if (!organizationId) return false;
       if (isLoading) return false;
@@ -21,7 +24,15 @@ export function usePalettePermissions(organizationId: string | null) {
     [isLoading, organizationId, permissionSet],
   );
 
-  return { canAct, isLoading };
+  const canAct = useCallback(
+    (resource: string, action: string) => {
+      if (inSupportSession && action.toLowerCase() !== "read") return false;
+      return hasPermission(resource, action);
+    },
+    [hasPermission, inSupportSession],
+  );
+
+  return { canAct, hasPermission, isLoading };
 }
 
 export function useCommandPaletteShortcuts({

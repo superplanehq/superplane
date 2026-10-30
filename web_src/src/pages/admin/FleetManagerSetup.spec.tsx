@@ -1,10 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
-import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
-import { FLEET_MANAGER_DRAFT_KEY } from "@/lib/fleetManagerSetup";
+import { useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
+import { FLEET_MANAGER_DRAFT_KEY, type FleetManagerDraft } from "@/lib/fleetManagerSetup";
 import { FleetManagerSetup } from "./FleetManagerSetup";
 
 const { createToken } = vi.hoisted(() => ({ createToken: vi.fn() }));
@@ -76,11 +76,63 @@ function stubSetup(body: unknown = metadata) {
   );
 }
 
-function FleetWizard() {
+type PendingFleetCheck = {
+  resolve: (response: Response) => void;
+  signal: AbortSignal;
+};
+
+function holdFleetChecks() {
+  const pending: PendingFleetCheck[] = [];
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(metadata);
+    if (!url.endsWith("/admin/api/installation/fleets")) return new Response("", { status: 404 });
+
+    return new Promise<Response>((resolve, reject) => {
+      const signal = init?.signal;
+      if (!signal) {
+        reject(new Error("missing abort signal"));
+        return;
+      }
+      const abort = () => reject(new DOMException("The operation was aborted.", "AbortError"));
+      if (signal.aborted) {
+        abort();
+        return;
+      }
+      signal.addEventListener("abort", abort, { once: true });
+      pending.push({
+        signal,
+        resolve: (response) => {
+          signal.removeEventListener("abort", abort);
+          resolve(response);
+        },
+      });
+    });
+  });
+  return { fetchMock, pending };
+}
+
+const installedFleet = jsonResponse({
+  fleets: [{ id: "e1-large-amd64", runnerVersion: "v0.2.0", spec: fleetSpec }],
+});
+
+const savedInstallDraft: FleetManagerDraft = {
+  provider: "aws",
+  managerId: "terraform-cluster",
+  namespace: "superplane",
+  serviceAccountName: "superplane-fleet-manager",
+  superplaneUrl: "https://superplane.example.com",
+  runnerVersion: "v0.2.0",
+  selectedFleetIds: ["e1-large-amd64"],
+  fleetCapacities: { "e1-large-amd64": { warmCapacity: 1, maxCapacity: 10 } },
+  fields: { region: "us-east-1", imageAmd64: "ami-amd64" },
+};
+
+function WizardScreen({ step }: { step: "fleets" | "install" }) {
   const setup = useFleetManagerSetup(true, "org-1");
   return (
     <FleetManagerWizardScreen
-      step="fleets"
+      step={step}
       setup={setup}
       onNext={() => undefined}
       onFinish={() => undefined}
@@ -119,6 +171,65 @@ describe("FleetManagerSetup", () => {
     const command = await screen.findByTestId("fleet-manager-install-command");
     expect(command).toHaveTextContent("warmCapacity: 1");
     expect(command).toHaveTextContent("maxCapacity: 10");
+  });
+
+  it("restores the Kubernetes context into the install command", async () => {
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({ ...savedInstallDraft, kubeContext: "aws-prod" }),
+    );
+
+    render(<WizardScreen step="install" />);
+
+    expect(await screen.findByLabelText("Kubernetes context")).toHaveValue("aws-prod");
+    expect(screen.getByText(/Run this command in the same directory/)).toBeInTheDocument();
+    expect(screen.getByText(/helm upgrade --install fleet-manager/)).toHaveTextContent("--kube-context 'aws-prod'");
+  });
+
+  it("keeps the fleet check running while the Kubernetes context changes", async () => {
+    window.localStorage.setItem(FLEET_MANAGER_DRAFT_KEY, JSON.stringify({ ...savedInstallDraft, kubeContext: "" }));
+    const { fetchMock, pending } = holdFleetChecks();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<WizardScreen step="install" />);
+
+    expect(await screen.findByText("Checking Fleet Manager installation...")).toBeInTheDocument();
+    expect(pending).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Kubernetes context"), { target: { value: "aws-prod" } });
+    });
+
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.signal.aborted).toBe(false);
+    expect(screen.getByText(/helm upgrade --install fleet-manager/)).toHaveTextContent("--kube-context 'aws-prod'");
+
+    pending[0]?.resolve(installedFleet);
+    expect(await screen.findByRole("button", { name: "Finish installation" })).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Kubernetes context"), { target: { value: "aws-prod-2" } });
+    });
+
+    expect(screen.getByRole("button", { name: "Finish installation" })).toBeInTheDocument();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.signal.aborted).toBe(false);
+  });
+
+  it("starts a new fleet check when the fleet configuration changes", async () => {
+    const { fetchMock, pending } = holdFleetChecks();
+    vi.stubGlobal("fetch", fetchMock);
+    const draft: FleetManagerDraft = { ...savedInstallDraft, kubeContext: "aws-prod" };
+    const { rerender } = renderHook(
+      (props: { draft: FleetManagerDraft }) => useFleetManagerVerification(true, props.draft, metadata),
+      { initialProps: { draft } },
+    );
+    await waitFor(() => expect(pending).toHaveLength(1));
+
+    rerender({ draft: { ...draft, namespace: "runners" } });
+
+    await waitFor(() => expect(pending).toHaveLength(2));
+    expect(pending[0]?.signal.aborted).toBe(true);
+    expect(pending[1]?.signal.aborted).toBe(false);
   });
 
   it("keeps a saved warm 0 and max 1 capacity", async () => {
@@ -160,17 +271,17 @@ describe("FleetManagerSetup", () => {
     expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
   });
 
-  it("shows the single-VM runner command instead of the chart", async () => {
-    const user = userEvent.setup();
+  it("explains that single-host Fleet Manager is automatic", async () => {
     stubSetup({ ...metadata, installationType: "single-host" });
     render(<FleetManagerSetup />);
 
-    await user.click(await screen.findByRole("button", { name: "This VM" }));
+    expect(await screen.findByRole("heading", { name: "Local runners" })).toBeInTheDocument();
+    expect(screen.getByText(/manages Fleet Manager automatically/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Configure the default fleet" })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Generate install command" }));
-    expect(await screen.findByText("./enable-runners.sh 'one-time-personal-token'")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "This VM" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/enable-runners.sh/)).not.toBeInTheDocument();
     expect(screen.queryByText(/helm upgrade --install fleet-manager/)).not.toBeInTheDocument();
+    expect(createToken).not.toHaveBeenCalled();
   });
 
   it("switches the machine type list when the cloud changes", async () => {
@@ -220,7 +331,7 @@ describe("FleetManagerSetup", () => {
 
   it("keeps the wizard install action disabled when no runner version is available", async () => {
     stubSetup({ ...metadata, defaultRunnerVersion: "", runnerVersions: [] });
-    render(<FleetWizard />);
+    render(<WizardScreen step="fleets" />);
 
     expect(await screen.findByRole("button", { name: "Generate install command" })).toBeDisabled();
   });
@@ -365,11 +476,16 @@ describe("FleetManagerSetup", () => {
     expect(command).toHaveTextContent("ami: ami-amd64");
     expect(command).toHaveTextContent("runnerVersion: v0.2.0");
     expect(command).toHaveTextContent("cpuMillicores: 2000");
-    expect(command).toHaveTextContent("-f fleet-manager-values.yaml");
     expect(command).not.toHaveTextContent("kubectl create secret");
     expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("one-time-personal-token");
 
     expect(command).toHaveTextContent("cat > fleet-manager-values.yaml <<'EOF'");
+    expect(command).not.toHaveTextContent("helm upgrade --install fleet-manager");
+    fireEvent.change(screen.getByLabelText("Kubernetes context"), { target: { value: "aws-prod" } });
+    const helmCommand = await screen.findByText(/helm upgrade --install fleet-manager/);
+    expect(helmCommand).toHaveTextContent("--kube-context 'aws-prod'");
+    expect(helmCommand).toHaveTextContent("-f fleet-manager-values.yaml");
+    expect(helmCommand).not.toHaveTextContent("kubectl");
     fireEvent.click(screen.getByRole("button", { name: "Copy values command" }));
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining("cat > fleet-manager-values.yaml <<'EOF'")),
@@ -379,6 +495,7 @@ describe("FleetManagerSetup", () => {
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining("helm upgrade --install fleet-manager")),
     );
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("--kube-context 'aws-prod'"));
     expect(writeText.mock.calls.some(([text]) => String(text).includes("kubectl"))).toBe(false);
 
     fireEvent.change(screen.getByLabelText("Maximum capacity"), { target: { value: "3" } });

@@ -197,6 +197,17 @@ function disableCssAnimations() {
   const style = document.createElement("style");
   style.setAttribute("data-superplane-test-disable-animations", "");
   style.textContent =
-    "*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important;}";
+    "*,*::before,*::after{animation-name:none!important;animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important;}";
   document.head.appendChild(style);
+  const getComputedStyle = window.getComputedStyle.bind(window);
+  window.getComputedStyle = (element: Element, pseudoElt?: string | null) => {
+    const styles = getComputedStyle(element, pseudoElt);
+    return new Proxy(styles, {
+      get(target, property, receiver) {
+        if (property === "animationName") return "none";
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  };
 }

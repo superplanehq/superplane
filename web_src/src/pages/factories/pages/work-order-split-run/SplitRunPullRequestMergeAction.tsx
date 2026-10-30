@@ -8,6 +8,7 @@ import type {
 } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFactoryPullRequestMergeability, useMergeFactoryPullRequest } from "@/hooks/useFactoryPullRequestMerge";
@@ -165,17 +166,20 @@ export function SplitRunPullRequestMergeControls({
 
   const mergeControls = (
     <ButtonGroup>
-      <Button
+      <LoadingButton
         type="button"
         variant="outline"
         size={compact ? "sm" : "lg"}
         className={compact ? undefined : "h-11 px-5 text-[15px] font-semibold"}
         disabled={!canMerge || merging}
+        loading={merging}
+        loadingText={PULL_REQUEST_REVIEW_COPY.merging}
+        aria-busy={merging}
         onClick={() => mergeWith(method)}
         data-testid="split-run-merge-button"
       >
         {PULL_REQUEST_REVIEW_COPY.merge}
-      </Button>
+      </LoadingButton>
       <ButtonGroupSeparator />
       <MergeMethodMenu
         allowedMethods={allowedMethods}

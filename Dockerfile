@@ -1,6 +1,6 @@
 ARG UBUNTU_VERSION=22.04
 ARG GO_VERSION=1.26.10
-ARG PLAYWRIGHT_GO_VERSION=v0.6100.0
+ARG PLAYWRIGHT_GO_VERSION=v0.6201.1
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 
 # Optional CI module caches. `make image.build` replaces these with

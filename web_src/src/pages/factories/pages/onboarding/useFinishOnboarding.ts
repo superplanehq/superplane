@@ -1,8 +1,13 @@
+import { onboardingBillingError } from "./onboardingBilling";
+import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
+import { useBYOKAccess } from "@/hooks/useBYOKAccess";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
+import { resolveOnboardingAgent } from "./onboardingAgentReadiness";
 import type {
   FactoriesFactory,
   FactoriesFactoryIntakeSettings,
   FactoriesFactoryLine,
-  FactoryLineStep,
+  FactoriesFactoryLineStep as FactoryLineStep,
 } from "@/api-client";
 import { accountOrganizationsQueryKey } from "@/hooks/useAccountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -31,12 +36,37 @@ import {
   type InstallOnboardingApp,
   type ListFactoryApps,
   type ListFactoryIntakes,
+  type UpdateFactoryIntake,
   type UpdateOnboarding,
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
+
+export class MissingRepositoryBranchError extends Error {
+  constructor() {
+    super("Choose the repository default branch before you continue.");
+    this.name = "MissingRepositoryBranchError";
+  }
+}
+
+/** A rejected lookup is unknown. An empty lookup keeps a saved branch. */
+export async function onboardingDefaultBranch(args: { lookup: () => Promise<string>; saved: string }): Promise<string> {
+  const lookedUp = await args.lookup().catch(() => "");
+  const branch = lookedUp.trim() || args.saved.trim();
+  if (!branch) throw new MissingRepositoryBranchError();
+  return branch;
+}
+
+export function branchFromOnboardingUpdate(response: unknown): string {
+  if (!response || typeof response !== "object") return "";
+  const record = response as {
+    onboarding?: { defaultBranch?: string | null };
+    data?: { factory?: { onboarding?: { defaultBranch?: string | null } } };
+  };
+  return record.onboarding?.defaultBranch?.trim() || record.data?.factory?.onboarding?.defaultBranch?.trim() || "";
+}
 
 export function finishOnboardingError(args: {
   appRepository: string | null;
@@ -59,6 +89,8 @@ export function finishOnboardingError(args: {
   if (!args.appRepository || !args.backlogRepository) {
     return "Select the code repository and the backlog repository.";
   }
+  const intakeError = githubIntakeRepositoryError(args.issuesChoice, args.vcsHost);
+  if (intakeError) return intakeError;
   if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
     return "Connect Jira, then choose a project.";
   }
@@ -104,6 +136,7 @@ export async function afterWorkspaceProvisioned(args: {
   invalidateAccountOrganizations: () => void;
   navigate: ReturnType<typeof useNavigate>;
   skipInitialImport?: boolean;
+  bypassAnalysis?: boolean;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }): Promise<void> {
   let organizationId = args.organizationId;
@@ -122,7 +155,7 @@ export async function afterWorkspaceProvisioned(args: {
   args.invalidateAccountOrganizations();
   markWorkspaceGettingStarted(organizationId, args.factoryId);
   const destination = { organizationId, factoryKey: args.factoryKey, lineId: args.lineId };
-  if (args.onProvisioned && !args.skipInitialImport) {
+  if (args.onProvisioned && !args.skipInitialImport && !args.bypassAnalysis) {
     args.onProvisioned(destination);
     return;
   }
@@ -140,6 +173,7 @@ export async function provisionWorkspace(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  updateIntake: UpdateFactoryIntake;
   deleteIntake: DeleteFactoryIntake;
   listApps: ListFactoryApps;
   workspaceName: string;
@@ -148,6 +182,8 @@ export async function provisionWorkspace(args: {
   backlogRepository: string;
   issuesChoice: IssuesChoiceId | null;
   skipInitialImport?: boolean;
+  /** Start the intake with automatic intake off. */
+  paused?: boolean;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   vcs: { id: string; provider: VcsHostId };
   agentPlan: OnboardingAgentPlan;
@@ -156,6 +192,10 @@ export async function provisionWorkspace(args: {
   jira?: { integrationId: string; projectId: string; settings?: FactoriesFactoryIntakeSettings };
   linear?: { integrationId: string; scope: LinearIntakeScope };
 }): Promise<{ lineId: string }> {
+  const defaultBranch = await onboardingDefaultBranch({
+    lookup: () => args.resolveDefaultBranch(args.appRepository),
+    saved: args.factory?.onboarding?.defaultBranch ?? "",
+  });
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
       name: args.workspaceName,
@@ -163,19 +203,18 @@ export async function provisionWorkspace(args: {
       save: (name) => args.updateFactory({ name }),
     });
   }
+  const subscription = args.agentPlan.credentialsSource === "subscription";
   await args.updateOnboarding({
     vcsIntegrationId: args.vcs.id,
-    agentIntegrationId: args.agentIntegrationId ?? "",
+    agentIntegrationId: subscription ? "" : (args.agentIntegrationId ?? ""),
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
     issuesSource: apiIssuesSource(args.issuesChoice),
-    agentHarness: args.agentPlan.harness,
+    agentHarness: subscription ? "AGENT_HARNESS_CODEX" : args.agentPlan.harness,
+    codexSubscription: subscription,
   });
-  // Onboarding installs the Implement app with the real default branch (main,
-  // master, staging, ...) instead of hardcoding "main", so Create Branch and
-  // Create Pull Request target the branch GitHub actually treats as default.
-  const defaultBranch = (await args.resolveDefaultBranch(args.appRepository)) || "main";
-  await args.updateOnboarding({ defaultBranch });
+  const updated = await args.updateOnboarding({ defaultBranch });
+  const provisionBranch = branchFromOnboardingUpdate(updated) || defaultBranch;
   const { lineId, primaryAppId } = await provisionLine({
     factory: args.factory,
     savedLineId: args.factory?.onboarding?.provisionedLineId,
@@ -183,7 +222,7 @@ export async function provisionWorkspace(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
-    defaultBranch,
+    defaultBranch: provisionBranch,
     agentRewrite: args.agentRewrite,
     vcsProvider: args.vcs.provider,
     installFactory: args.installFactory,
@@ -195,7 +234,7 @@ export async function provisionWorkspace(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
-    defaultBranch,
+    defaultBranch: provisionBranch,
     agentRewrite: args.agentRewrite,
     vcsProvider: args.vcs.provider,
     installFactory: args.installFactory,
@@ -206,9 +245,11 @@ export async function provisionWorkspace(args: {
     vcsProvider: args.vcs.provider,
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
+    updateIntake: args.updateIntake,
     deleteIntake: args.deleteIntake,
     issuesChoice: args.issuesChoice,
     skipInitialImport: args.skipInitialImport,
+    paused: args.paused,
     jira: args.jira,
     linear: args.linear,
   });
@@ -273,6 +314,43 @@ function agentIntegrationIdForPlan(plan: OnboardingAgentPlan, selections: Integr
   return selections[plan.integrationName]?.id;
 }
 
+async function verifyOnboardingPlan(
+  access: ReturnType<typeof useBYOKAccess>,
+  usage: ReturnType<typeof useOrganizationWorkspaceUsage>,
+  savedPlan: OnboardingAgentPlan | undefined,
+) {
+  if (savedPlan?.credentialsSource === "subscription") return { plan: savedPlan, bypassAnalysis: false };
+  try {
+    const byokAllowed = await access.verify();
+    if (byokAllowed) return { plan: savedPlan, bypassAnalysis: false };
+    const hosted = await usage.refetch();
+    if (hosted.error || !hosted.data) throw new Error("SuperPlane could not load hosted models. Try again.");
+    const plan = resolveOnboardingAgent({
+      connected: new Set(),
+      hostedModels: { anthropic: [], openai: [], openrouter: [] },
+      defaultHostedProvider: hosted.data.defaultHostedProvider,
+      defaultHostedModel: hosted.data.defaultHostedModel,
+    });
+    if (!plan)
+      throw new Error(
+        "No hosted default model is available. Ask your administrator to configure a SuperPlane-hosted model.",
+      );
+    return { plan, bypassAnalysis: true };
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, "SuperPlane could not verify model access. Try again."));
+    return undefined;
+  }
+}
+
+async function verifyOnboardingBilling(billing: ReturnType<typeof useOrganizationBilling>): Promise<void> {
+  const currentBilling = await billing.refetch();
+  if (currentBilling.error || !currentBilling.data) {
+    throw new Error("SuperPlane could not verify billing. Try again.");
+  }
+  const error = onboardingBillingError(currentBilling.data);
+  if (error) throw new Error(error);
+}
+
 export function useFinishOnboarding(args: {
   organizationId: string;
   factoryId: string;
@@ -287,9 +365,11 @@ export function useFinishOnboarding(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  updateIntake: UpdateFactoryIntake;
   deleteIntake: DeleteFactoryIntake;
   listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
+  onMissingDefaultBranch?: () => void;
   takenNames: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
@@ -301,9 +381,16 @@ export function useFinishOnboarding(args: {
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
+  const billing = useOrganizationBilling(args.organizationId);
+  const access = useBYOKAccess(args.organizationId);
+  const usage = useOrganizationWorkspaceUsage(args.organizationId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // The first workspace in an organization always imports: that batch is
+  // what the onboarding analysis and the first tasks are built from.
   const skipInitialImport = !args.factory?.onboarding?.initial && args.setup.skipInitialImport;
+  // Only an explicit "off" pauses the intake.
+  const paused = args.setup.automaticIntake === false;
   // A caller that just changed the issues answer in the same click (the
   // ticket screen's Analyze action) passes it here instead of reading
   // `args.setup.issuesChoice`. That value comes from a render captured before
@@ -311,7 +398,10 @@ export function useFinishOnboarding(args: {
   // click, and provisioning would save that stale (often empty) answer over
   // the one `saveIssues` already stored.
   return async (issuesChoiceOverride?: IssuesChoiceId) => {
-    const appRepository = args.setup.selectedRepo;
+    const verified = await verifyOnboardingPlan(access, usage, args.plan);
+    if (!verified) return;
+    const { plan, bypassAnalysis } = verified;
+    const appRepository = args.setup.selectedRepo ?? "";
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
     const workspaceName = args.setup.workspaceName.trim();
     const issuesChoice = issuesChoiceOverride ?? args.setup.issuesChoice;
@@ -327,7 +417,7 @@ export function useFinishOnboarding(args: {
       vcsHost,
       remainingCreditCents: args.remainingCreditCents,
       hostedModelsLoading: args.hostedModelsLoading,
-      plan: args.plan,
+      plan,
       issuesChoice,
       jiraReady: Boolean(jira?.ready),
       jiraProjectId: args.jiraProjectId,
@@ -338,12 +428,13 @@ export function useFinishOnboarding(args: {
       showErrorToast(error);
       return;
     }
-    if (!appRepository || !backlogRepository || !vcs?.id || !args.plan) {
+    if (!plan || !vcs?.id) {
       return;
     }
 
     args.setSaving(true);
     try {
+      await verifyOnboardingBilling(billing);
       const selections = await selectionsWithVcsInstallation(args.organizationId, args.selections, vcsHost, vcs.id);
       const provisioned = await provisionWorkspace({
         ...args,
@@ -353,10 +444,11 @@ export function useFinishOnboarding(args: {
         backlogRepository,
         issuesChoice,
         skipInitialImport,
+        paused,
         vcs: { id: vcs.id, provider: vcsHost },
-        agentPlan: args.plan,
-        agentRewrite: agentRewriteFromPlan(args.plan, selections),
-        agentIntegrationId: agentIntegrationIdForPlan(args.plan, selections),
+        agentPlan: plan,
+        agentRewrite: agentRewriteFromPlan(plan, selections),
+        agentIntegrationId: agentIntegrationIdForPlan(plan, selections),
         jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId, args.jiraCompletion),
         linear: linearIntakeBinding(issuesChoice, linear?.id, args.linearScope),
       });
@@ -374,11 +466,21 @@ export function useFinishOnboarding(args: {
         navigate,
         onProvisioned: args.onProvisioned,
         skipInitialImport,
+        bypassAnalysis,
       });
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
+      reportFinishFailure(error, args.onMissingDefaultBranch);
     } finally {
       args.setSaving(false);
     }
   };
+}
+
+function reportFinishFailure(error: unknown, onMissing?: () => void) {
+  if (error instanceof MissingRepositoryBranchError) onMissing?.();
+  showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
+}
+
+function githubIntakeRepositoryError(choice: IssuesChoiceId | null | undefined, host: VcsHostId | null | undefined) {
+  return choice === "vcs" && host === "bitbucket" ? "GitHub Issues requires a GitHub repository." : null;
 }

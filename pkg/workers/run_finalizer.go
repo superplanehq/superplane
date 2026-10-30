@@ -474,7 +474,32 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		)
 	}
 
+	w.startAutomaticCustomAutomationsForRun(runID)
 	return nil
+}
+
+func (w *RunFinalizer) startAutomaticCustomAutomationsForRun(runID uuid.UUID) {
+	db := database.Conn()
+	execution, err := models.FindWorkOrderExecutionByRunID(db, runID)
+	if err != nil {
+		if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			w.logger.WithError(err).Warnf("custom automation: failed to load line step for run %s", runID)
+		}
+		return
+	}
+	factory, err := models.FindFactory(db, execution.OrganizationID, execution.FactoryID)
+	if err != nil {
+		w.logger.WithError(err).Warnf("custom automation: failed to load factory for run %s", runID)
+		return
+	}
+	order, err := factory.FindWorkOrder(db, execution.WorkOrderID)
+	if err != nil {
+		w.logger.WithError(err).Warnf("custom automation: failed to load work order for run %s", runID)
+		return
+	}
+	if err := factoryactions.StartAutomaticCustomAutomations(context.Background(), w.factoryIntakeDeps(), factory, order); err != nil {
+		w.logger.WithError(err).Warnf("custom automation: failed to start automatic automations for order %s", order.ID)
+	}
 }
 
 func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, error) {
@@ -693,6 +718,21 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultPassed)
 	}
 
+	// Do not return this refusal. MarkFinished already ran, and an error
+	// here rolls that write back and retries the same step forever.
+	// Finish the dispatch so the user can set the branch and start Implement.
+	blocked, err := factoryactions.ImplementStepBlockedByMissingBranch(tx, factory, workOrder, dispatch.Steps[nextIndex].AppID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if blocked {
+		if err := factoryactions.NoteMissingImplementBranch(tx, workOrder); err != nil {
+			return nil, nil, err
+		}
+		w.logger.WithField("work_order_id", workOrder.ID).Info("stopped the line before Implement because no default branch is saved")
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
+	}
+
 	result, err := dispatch.EnqueueOrStartStep(tx, workOrder, nextIndex)
 	if err != nil {
 		return nil, nil, err
@@ -702,6 +742,12 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		pendingRuns = append(pendingRuns, factoryLinePendingRun{
 			workflowID: result.Run.WorkflowID,
 			runID:      result.Run.ID,
+		})
+	}
+	if result.Run == nil && result.Execution != nil {
+		orderUpdates = append(orderUpdates, factoryWorkOrderUpdate{
+			factoryID: result.Execution.FactoryID,
+			orderID:   result.Execution.WorkOrderID,
 		})
 	}
 

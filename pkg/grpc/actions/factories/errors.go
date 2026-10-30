@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
@@ -27,12 +28,25 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return err
 	}
 
+	var busy *models.CodexConnectionBusyError
+	if errors.As(err, &busy) {
+		return grpcerrors.Conflict(err, busy.Error())
+	}
+
 	var datadogAPIErr *datadog.APIError
 	if errors.As(err, &datadogAPIErr) {
 		return grpcerrors.FailedPrecondition(err, datadogAPIErr.Error())
 	}
 
 	switch {
+	case errors.Is(err, billing.ErrPaymentMethodRequired):
+		return grpcerrors.FailedPrecondition(err, "Add a payment method before you complete workspace setup.")
+	case errors.Is(err, billing.ErrHostedSubscriptionRequired), errors.Is(err, billing.ErrHostedPaymentPastDue), errors.Is(err, billing.ErrHostedSubscriptionPaused):
+		return grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
+	case errors.Is(err, models.ErrSubscriptionModelUnavailable), errors.Is(err, models.ErrSubscriptionOwnerRequired), errors.Is(err, models.ErrSubscriptionOwnerInvalid), errors.Is(err, models.ErrSubscriptionOwnerBusy), errors.Is(err, models.ErrSubscriptionTaskAssociation):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrBYOKAccessDenied):
+		return grpcerrors.PermissionDenied(err, err.Error())
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory with the same name already exists")
 	case errors.Is(err, models.ErrFactoryNameRequired):
@@ -103,6 +117,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "factory line step entrypoint must use the onRun trigger")
 	case errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound):
+		return grpcerrors.NotFound(err, "artifact not found")
 	case errors.Is(err, models.ErrFactoryIntakeNotFound):
 		return grpcerrors.NotFound(err, "factory intake not found")
 	case errors.Is(err, models.ErrFactoryIntakeSourceInvalid):
@@ -125,6 +141,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "factory pull request not found")
 	case errors.Is(err, models.ErrFactoryPullRequestInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPullRequestActivityNotFound):
+		return grpcerrors.NotFound(err, "pull request activity not found")
+	case errors.Is(err, models.ErrFactoryPullRequestFixesNotPaused):
+		return grpcerrors.FailedPrecondition(err, "Automatic fixes are not paused for this pull request.")
 	case errors.Is(err, models.ErrFactoryPullRequestAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory pull request already exists")
 	case errors.Is(err, models.ErrFactoryPullRequestRunAlreadyLinked):
@@ -245,12 +265,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
-	case errors.Is(err, errWorkspaceMCPDisabled):
-		return grpcerrors.FailedPrecondition(err, "Workspace MCP is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
-	case errors.Is(err, errWorkspaceAgentDisabled):
-		return grpcerrors.FailedPrecondition(err, "SuperPlane Agent is not enabled for this organization.")
 	case errors.Is(err, errSuperPlaneMCPServerDisabled):
 		return grpcerrors.FailedPrecondition(err, "MCP Server is not enabled for this organization.")
 	case errors.Is(err, models.ErrMCPOAuthRefreshNotFound):
@@ -259,6 +275,18 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		return grpcerrors.NotFound(err, "resource not found")
+	case errors.Is(err, models.ErrCodexConnectionNotFound):
+		return grpcerrors.NotFound(err, "ChatGPT subscription connection not found")
+	case errors.Is(err, models.ErrCodexConnectionNotEligible):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionNotReady):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionStale):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionActive):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionUnavailable):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	default:
 		return grpcerrors.Internal(err, internalMessage)
 	}
@@ -271,9 +299,7 @@ var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server fi
 var errListMCPTools = errors.New("could not list MCP tools")
 var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
-var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
-var errWorkspaceAgentDisabled = errors.New("workspace agent is not enabled")
 var errSuperPlaneMCPServerDisabled = errors.New("superplane MCP server is not enabled")
 var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")
 var errCannotClosePullRequest = errors.New("could not close a previous pull request")

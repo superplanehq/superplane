@@ -68,7 +68,7 @@ export function OrganizationSettings() {
   const isIntegrationSetupRoute = Boolean(
     matchPath({ path: "/:organizationId/settings/integrations/:integrationName/setup", end: true }, location.pathname),
   );
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
 
@@ -226,7 +226,7 @@ export function OrganizationSettings() {
   const canAccessLink = (link: NavLink) => {
     if (!link.permission) return true;
     if (permissionsLoading) return true;
-    return canAct(link.permission.resource, link.permission.action);
+    return hasPermission(link.permission.resource, link.permission.action);
   };
 
   const sectionMeta: Record<
@@ -387,12 +387,7 @@ export function OrganizationSettings() {
       </Sidebar>
 
       <div className={cn("flex-1 overflow-auto bg-slate-100 [scrollbar-gutter:stable]", appDarkModeClasses.surface)}>
-        <div
-          className={cn(
-            "mx-auto w-full px-8 pb-8",
-            isIntegrationSetupRoute || currentSection === "members" ? "max-w-6xl" : "max-w-3xl",
-          )}
-        >
+        <div className={cn("mx-auto w-full px-8 pb-8", isIntegrationSetupRoute ? "max-w-6xl" : "max-w-3xl")}>
           <div className="pt-10 pb-8">
             <h1 className={cn("!text-2xl font-medium text-gray-900", appDarkModeClasses.textPrimary)}>
               {activeMeta.title}

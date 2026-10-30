@@ -110,7 +110,7 @@ export function RunInspectorNodeAccordion({
           </span>
         </NodeHeaderButton>
         <RunInspectorNodeActions section={section} actions={actions} currentUser={currentUser} />
-        <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
+        <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} readOnly={actions.readOnly} />
       </AccordionPrimitive.Header>
       {section.isQueued ? null : (
         <AccordionContent className="bg-slate-50 px-3 pb-3 pt-3 dark:bg-gray-950">
@@ -176,7 +176,7 @@ export function RunInspectorNodeActions({
   const hasActions =
     section.queueItem || section.actions.canStop || section.actions.canPushThrough || actionableApproval;
 
-  if (!hasActions) return null;
+  if (!hasActions || actions.readOnly) return null;
 
   return (
     <div
@@ -296,14 +296,16 @@ function NodeMetadata({
   section,
   onRerun,
   rerunPending,
+  readOnly,
 }: {
   section: RunInspectorNodeSection;
   onRerun: () => void;
   rerunPending: boolean;
+  readOnly: boolean;
 }) {
   return (
     <div className="ml-auto flex shrink-0 items-center gap-3 px-4 text-xs text-slate-500 dark:text-gray-400">
-      {section.isTrigger ? (
+      {section.isTrigger && !readOnly ? (
         <Button
           type="button"
           variant="outline"

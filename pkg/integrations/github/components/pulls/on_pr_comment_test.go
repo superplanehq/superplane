@@ -371,6 +371,11 @@ func TestOnPRCommentAddressAllBots(t *testing.T) {
 }
 
 func TestOnPRCommentCustomAppDoesNotTriggerItself(t *testing.T) {
+	t.Setenv("SUPERPLANE_GITHUB_APP_ID", "99")
+	t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane-cloud")
+	t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
+	t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "test-secret")
+
 	trigger := &OnPRComment{}
 	configuration := map[string]any{
 		"repository":     "test",
@@ -387,6 +392,9 @@ func TestOnPRCommentCustomAppDoesNotTriggerItself(t *testing.T) {
 	metadataIntegration := &contexts.IntegrationContext{
 		Metadata: common.Metadata{GitHubApp: common.GitHubAppMetadata{Slug: "hosted-superplane"}},
 	}
+	hostedIntegration := &contexts.IntegrationContext{
+		Metadata: common.Metadata{HostedApp: true},
+	}
 
 	cases := []struct {
 		name         string
@@ -398,6 +406,7 @@ func TestOnPRCommentCustomAppDoesNotTriggerItself(t *testing.T) {
 	}{
 		{name: "custom app property does not start a run", integration: propertyIntegration, userType: "Bot", login: "acme-superplane[bot]", want: 0},
 		{name: "hosted app metadata does not start a run", integration: metadataIntegration, userType: "Bot", login: "hosted-superplane[bot]", want: 0},
+		{name: "hosted app configuration does not start a run", integration: hostedIntegration, userType: "Bot", login: "superplane-cloud[bot]", want: 0},
 		{name: "other bot still starts a run", integration: propertyIntegration, userType: "Bot", login: "coderabbitai[bot]", want: 1},
 		{name: "human with the app slug still needs a mention", integration: propertyIntegration, userType: "User", login: "acme-superplane", want: 0},
 		{name: "webhook app slug does not start a run", userType: "Bot", login: "workspace-app[bot]", installation: "workspace-app", want: 0},

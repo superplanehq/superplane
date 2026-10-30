@@ -29,6 +29,9 @@ describe("AddColumnAutomationPicker", () => {
     expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toHaveTextContent(
       "Capture screenshots or a short video when a pull request changes the user interface.",
     );
+    expect(screen.getByTestId("add-column-automation-template-custom-verification")).toHaveTextContent(
+      "Custom automation",
+    );
   });
 
   it("reports the chosen entry and disables taken ones", async () => {

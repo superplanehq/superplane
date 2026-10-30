@@ -8,9 +8,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -18,6 +20,7 @@ import (
 
 func SelectFactoryVCSProviderRepository(
 	ctx context.Context,
+	deps IntakeDependencies,
 	organizationID string,
 	req *pb.SelectFactoryVCSProviderRepositoryRequest,
 ) (*pb.SelectFactoryVCSProviderRepositoryResponse, error) {
@@ -27,7 +30,7 @@ func SelectFactoryVCSProviderRepository(
 	}
 	provider := strings.ToLower(strings.TrimSpace(req.GetProvider()))
 	if provider == models.ProviderBitbucket {
-		return selectBitbucketFactoryRepository(ctx, orgID, organizationID, req)
+		return selectBitbucketFactoryRepository(ctx, deps, orgID, organizationID, req)
 	}
 	if provider != models.ProviderGitHub {
 		return nil, grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
@@ -44,6 +47,28 @@ func SelectFactoryVCSProviderRepository(
 	}
 
 	db := database.DB(ctx)
+	catalog, findErr := findGitHubCatalogRepository(ctx, db, organizationID, req.GetRepositoryId())
+	if errors.Is(findErr, gorm.ErrRecordNotFound) {
+		return nil, grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
+	}
+	if findErr != nil {
+		return nil, factoryErrorToStatus(findErr, "failed to select VCS repository")
+	}
+	var httpCtx core.HTTPContext
+	if deps.Registry != nil {
+		httpCtx = deps.Registry.HTTPContext()
+	}
+	liveBranch := defaultBranchFromCacheOrProvider(catalog.DefaultBranch, func() (string, error) {
+		return common.InstallationRepositoryDefaultBranch(
+			httpCtx,
+			app.ID,
+			app.PrivateKey,
+			catalog.InstallationID,
+			catalog.RepositoryID,
+			catalog.FullName,
+		)
+	})
+
 	var factory *models.Factory
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err = findFactory(tx, orgID, req.GetId())
@@ -80,14 +105,19 @@ func SelectFactoryVCSProviderRepository(
 		previousIntegrationID := factory.OnboardingConfigValue().VCSIntegrationID
 		integrationID := integration.ID.String()
 		repositoryID := repository.RepositoryID
+		backlogRepositoryID := &repositoryID
+		if config := factory.OnboardingConfigValue(); config.BacklogRepository != "" && config.BacklogRepository != config.AppRepository {
+			backlogRepositoryID = nil
+		}
+		branch := keepSavedDefaultBranch(factory.OnboardingConfigValue(), repository.FullName, liveBranch)
 		if updateErr := factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:    &integrationID,
 			VCSProvider:         &provider,
 			AppRepository:       &repository.FullName,
 			AppRepositoryID:     &repositoryID,
-			BacklogRepository:   &repository.FullName,
-			BacklogRepositoryID: &repositoryID,
-			DefaultBranch:       &repository.DefaultBranch,
+			BacklogRepository:   onboardingBacklogRepository(factory, repository.FullName),
+			BacklogRepositoryID: backlogRepositoryID,
+			DefaultBranch:       &branch,
 		}); updateErr != nil {
 			return updateErr
 		}
@@ -230,4 +260,13 @@ func rejectFactoryProviderSwitch(factory *models.Factory, provider string) error
 		return grpcerrors.InvalidArgument(nil, "version control provider cannot be changed")
 	}
 	return nil
+}
+
+// Keep an explicit backlog binding when the application repository changes.
+func onboardingBacklogRepository(factory *models.Factory, repository string) *string {
+	config := factory.OnboardingConfigValue()
+	if config.BacklogRepository != "" && config.BacklogRepository != config.AppRepository {
+		return nil
+	}
+	return &repository
 }

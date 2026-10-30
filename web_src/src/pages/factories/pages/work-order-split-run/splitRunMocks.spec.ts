@@ -811,7 +811,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes[0]?.text).toBe(
       "This automation did not finish. Fix the error, then run this step again.",
     );
-    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Debug");
+    expect(fixture.waitingNotes[0]?.cta?.label).toBe("View run details");
     expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(fixture.checks).toEqual([]);
@@ -911,8 +911,8 @@ describe("splitRunFixtureForWorkOrder", () => {
       },
       {
         failureReason: "hosted_subscription_required",
-        text: "This agent run is blocked. SuperPlane hosted runs need a Business plan.",
-        label: "Subscribe",
+        text: "This agent run is blocked. Agent runs need an active plan.",
+        label: "View billing",
       },
       {
         failureReason: "workspace_budget_empty",
@@ -1290,6 +1290,7 @@ describe("line board work-order examples", () => {
         {
           canvasId: "canvas-checks",
           pullRequestNumber: "6812",
+          pullRequest: { id: "pr-6812" },
           description: "Automatic fixes paused after 3 attempts",
           kind: "fixes-paused",
           run: {
@@ -1304,9 +1305,33 @@ describe("line board work-order examples", () => {
     });
     expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.note?.headline).toBe("Automatic fixes did not succeed");
-    expect(fixture.footer.note?.text).toContain("Review the pull request");
+    expect(fixture.footer.note?.text).toContain("Continue fixes or review the pull request");
     expect(fixture.footer.note?.cta?.label).toBe("Review PR #6812");
     expect(fixture.waitingNotes[0]?.headline).toBe("Automatic fixes did not succeed");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Continue fixes", "Reject", "Approve"]);
+    expect(fixture.footer.continueFixes).toEqual({ pullRequestId: "pr-6812", runId: "run-paused" });
+  });
+
+  it("offers Continue fixes only while automatic fixes are paused", () => {
+    const run = (kind: "fixes-paused" | "addressing", state: "STATE_FINISHED" | "STATE_STARTED") => ({
+      canvasId: "canvas-checks",
+      pullRequestNumber: "6812",
+      pullRequest: { id: "pr-6812" },
+      kind,
+      run: { id: "run-1", canvasId: "canvas-checks", state, createdAt: "2026-08-26T12:00:00Z" },
+    });
+    const paused = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [run("fixes-paused", "STATE_FINISHED")],
+    });
+    const waiting = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER);
+    const working = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [run("addressing", "STATE_STARTED")],
+    });
+
+    expect(paused.footer.actions.map((action) => action.kind)).toContain("continue-fixes");
+    expect(waiting.footer.actions.map((action) => action.kind)).not.toContain("continue-fixes");
+    expect(waiting.footer.continueFixes).toBeUndefined();
+    expect(working.footer.actions.map((action) => action.kind)).not.toContain("continue-fixes");
   });
 
   it("uses the written status note after automatic fixes pause", () => {

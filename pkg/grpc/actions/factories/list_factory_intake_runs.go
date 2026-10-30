@@ -60,7 +60,7 @@ func ListFactoryIntakeRuns(
 		before = &beforeTime
 	}
 
-	runs, err := models.ListCanvasRunsInTransaction(db, intake.CanvasID, limit, before, models.CanvasRunFilters{})
+	runs, err := models.ListCanvasRuns(db, intake.CanvasID, limit, before, models.CanvasRunFilters{})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}

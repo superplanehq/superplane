@@ -34,3 +34,12 @@ The board has several views to help you find what you're looking for:
   improvements to existing functionality
 - [**Dev Productivity**](https://github.com/orgs/superplanehq/projects/2/views/5): Improvements to our
   development tools and processes
+
+## Working on issues
+
+Wait until a maintainer assigns an issue to you before you start implementation.
+This avoids duplicate work and competing pull requests.
+
+Documentation and typo fixes do not need an assigned issue.
+
+See [Before you start](../../CONTRIBUTING.md#before-you-start).

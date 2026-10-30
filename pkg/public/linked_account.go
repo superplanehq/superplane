@@ -34,8 +34,8 @@ func (s *Server) disconnectLinkedAccount(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if hasActiveImpersonation(r) {
-		http.Error(w, "Linked accounts cannot change while impersonating", http.StatusForbidden)
+	if hasActiveSupportSession(r) {
+		http.Error(w, "Linked accounts cannot change in a read-only support session", http.StatusForbidden)
 		return
 	}
 

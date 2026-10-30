@@ -2,17 +2,15 @@ package runner
 
 import (
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 )
 
 // RewriteLoopbackTaskFileURLs points localhost file URLs at the origin a
-// local runner container can reach. A remote broker leaves every URL as
-// minted. A public host, including object storage, stays unchanged.
+// runner can reach. Public hosts, including object storage, stay unchanged.
 func RewriteLoopbackTaskFileURLs(text string, files []storedfiles.DispatchFile) (string, []storedfiles.DispatchFile) {
-	if !isLocalTaskBrokerURL(os.Getenv("TASK_BROKER_BASE_URL")) || len(files) == 0 {
+	if len(files) == 0 {
 		return text, files
 	}
 	rewritten := make([]storedfiles.DispatchFile, len(files))
@@ -37,7 +35,7 @@ func rewriteLoopbackTaskFileURL(raw string) string {
 	if !isLoopbackBaseURL(raw) {
 		return raw
 	}
-	base := localComposeSuperplaneBaseURL("")
+	base := RunnerSuperplaneBaseURL("")
 	if base == "" || isLoopbackBaseURL(base) {
 		return raw
 	}

@@ -44,6 +44,9 @@ export function ModelSourceBody({
   byokLoading,
   canUpdate,
   integrationsHref,
+  subscriptionModels,
+  subscriptionLoading,
+  subscriptionReconnectRequired,
   onChoose,
 }: {
   source: WorkspaceModelSource;
@@ -55,6 +58,9 @@ export function ModelSourceBody({
   byokLoading: boolean;
   canUpdate: boolean;
   integrationsHref: string;
+  subscriptionModels?: string[];
+  subscriptionLoading: boolean;
+  subscriptionReconnectRequired: boolean;
   onChoose: (target: LLMModelsSwitchTarget) => void;
 }) {
   const notice = switchedNotice ? (
@@ -63,6 +69,20 @@ export function ModelSourceBody({
     </p>
   ) : null;
   const hostedModels = <HostedModelAllowlist organizationId={organizationId} canUpdate={canUpdate} />;
+
+  if (subscriptionModels) {
+    return (
+      <div className="flex flex-col gap-5">
+        {notice}
+        <SubscriptionModelList
+          models={subscriptionModels}
+          isLoading={subscriptionLoading}
+          reconnectRequired={subscriptionReconnectRequired}
+        />
+        <div className="border-t border-border pt-4">{hostedModels}</div>
+      </div>
+    );
+  }
 
   if (source === "hosted") {
     return (
@@ -86,11 +106,44 @@ export function ModelSourceBody({
           canUpdate={canUpdate}
           integrationsHref={integrationsHref}
         />
-      ) : (
+      ) : providers.length > 0 ? (
         <NoProviderNotice integrationsHref={integrationsHref} />
-      )}
+      ) : null}
       <div className="border-t border-border pt-4">{hostedModels}</div>
       <ChangeModelSource current={currentProvider} providers={providers} onChoose={onChoose} disabled={!canUpdate} />
+    </div>
+  );
+}
+
+function SubscriptionModelList({
+  models,
+  isLoading,
+  reconnectRequired,
+}: {
+  models: string[];
+  isLoading: boolean;
+  reconnectRequired: boolean;
+}) {
+  if (reconnectRequired) return <StatusText>{COPY.subscriptionReconnect}</StatusText>;
+  if (isLoading) return <StatusText>{COPY.subscriptionLoading}</StatusText>;
+  if (models.length === 0) return <StatusText>{COPY.subscriptionEmptyCatalog}</StatusText>;
+
+  return (
+    <div className="space-y-3" data-testid="llm-models-codex-subscription">
+      <div>
+        <h3 className="text-[13px] font-medium text-foreground">{COPY.subscriptionTitle}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">{COPY.subscriptionHelper}</p>
+      </div>
+      <ModelAllowlistEditor
+        modelIds={models}
+        selected={models}
+        query=""
+        onQueryChange={() => undefined}
+        onToggle={() => undefined}
+        disabled
+        searchLabel="Search ChatGPT subscription models"
+        showCount
+      />
     </div>
   );
 }
@@ -104,6 +157,7 @@ function ProviderChoices({
   onChoose: (target: LLMModelsSwitchTarget) => void;
   disabled: boolean;
 }) {
+  if (providers.length === 0) return null;
   return (
     <div className="space-y-3 border-t border-border pt-4" data-testid="llm-models-provider-choices">
       <div>

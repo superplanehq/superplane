@@ -33,32 +33,38 @@ func ListFactoryLineRunnerModels(
 		return nil, factoryErrorToStatus(err, "failed to list line runner models")
 	}
 
-	ids, err := listLineRunnerModels(db, orgID, factory.ID, req.GetLineName())
+	ownerID, err := resolveModelCatalogOwner(ctx, db, factory, req.GetOrderId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to resolve model owner")
+	}
+	ids, usesHostedFunding, err := listLineRunnerModels(db, orgID, factory.ID, req.GetLineName(), ownerID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list line runner models")
 	}
 
 	return &pb.ListFactoryLineRunnerModelsResponse{
-		Models: serializeLineRunnerModels(ids),
+		Models:            serializeLineRunnerModels(ids),
+		UsesHostedFunding: usesHostedFunding,
 	}, nil
 }
 
-func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName string) ([]string, error) {
+func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName string, ownerIDs ...uuid.UUID) ([]string, bool, error) {
 	lineName = strings.TrimSpace(lineName)
 	if lineName == "" {
-		return nil, invalidArgument("line_name is required")
+		return nil, false, invalidArgument("line_name is required")
 	}
 
 	factory, err := models.FindFactory(tx, orgID, factoryID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	line, err := factory.FindLineByName(tx, lineName)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	seen := map[string]struct{}{}
+	usesHostedFunding := false
 	var out []string
 	for _, step := range line.Steps {
 		if step.AppID == uuid.Nil {
@@ -66,12 +72,15 @@ func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName stri
 		}
 		version, err := models.FindLiveCanvasVersionInTransaction(tx, step.AppID)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		for _, node := range []models.Node(version.Nodes) {
-			ids, err := lineRunnerModelsForNode(tx, orgID, factoryID, node)
+			if lineRunnerNodeUsesHostedFunding(node) {
+				usesHostedFunding = true
+			}
+			ids, err := lineRunnerModelsForNode(tx, orgID, factoryID, node, ownerIDs...)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
 			for _, id := range ids {
 				if _, dup := seen[id]; dup {
@@ -83,10 +92,30 @@ func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName stri
 		}
 	}
 	sort.Strings(out)
-	return out, nil
+	return out, usesHostedFunding, nil
 }
 
-func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node) ([]string, error) {
+// lineRunnerNodeUsesHostedFunding reports whether a runner node spends
+// SuperPlane-hosted funds. The SuperPlane runner is always hosted; the other
+// runners follow their credentials source.
+func lineRunnerNodeUsesHostedFunding(node models.Node) bool {
+	if node.ComponentName() == models.SuperPlaneRunnerComponent {
+		return true
+	}
+	if _, ok := runnerNodeProvider(node); !ok {
+		return false
+	}
+	return runnerFundingSource(node.Configuration) == models.UsageFundingSourceHosted
+}
+
+func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, ownerIDs ...uuid.UUID) ([]string, error) {
+	credentials, _ := node.Configuration["credentials"].(map[string]any)
+	if node.ComponentName() == runnerCodex && credentials["source"] == "subscription" {
+		if len(ownerIDs) != 1 {
+			return nil, nil
+		}
+		return models.FactoryCodexSubscriptionModels(tx, orgID, factoryID, ownerIDs[0])
+	}
 	if node.ComponentName() == models.SuperPlaneRunnerComponent {
 		return hostedSelectableLineRunnerModels(tx, orgID, factoryID, storedRunnerModel(node.Configuration))
 	}
@@ -105,10 +134,26 @@ func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node model
 	if err != nil {
 		return nil, err
 	}
-	if stored := storedRunnerModel(node.Configuration); stored != "" {
-		ids = append(ids, stored)
+	stored := storedRunnerModel(node.Configuration)
+	if stored != "" {
+		include, err := storedRunnerModelIsAvailable(tx, orgID, factoryID, node)
+		if err != nil {
+			return nil, err
+		}
+		if include {
+			ids = append(ids, stored)
+		}
 	}
 	return concreteLineRunnerModels(ids), nil
+}
+
+// storedRunnerModelIsAvailable applies the execution gate to stored BYOK
+// models. Hosted models stay available.
+func storedRunnerModelIsAvailable(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node) (bool, error) {
+	if runnerFundingSource(node.Configuration) == models.UsageFundingSourceHosted {
+		return true, nil
+	}
+	return models.RunnerAcceptsModel(tx, orgID, &factoryID, node.ComponentName(), node.Configuration, storedRunnerModel(node.Configuration))
 }
 
 func hostedSelectableLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, stored string) ([]string, error) {
@@ -172,7 +217,7 @@ func runnerFundingSource(configuration map[string]any) string {
 	credentials, _ := configuration["credentials"].(map[string]any)
 	source, _ := credentials["source"].(string)
 	switch strings.TrimSpace(source) {
-	case "secret", "integration":
+	case "secret", "integration", "subscription":
 		return models.UsageFundingSourceBYOK
 	default:
 		return models.UsageFundingSourceHosted

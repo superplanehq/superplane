@@ -137,9 +137,7 @@ function renderPopup(
   props: {
     onSave?: (next: typeof DEFAULT_GITHUB_INTAKE_SETTINGS) => void;
     onClose?: () => void;
-    editAutomationHref?: string;
     canvasId?: string;
-    runHrefFor?: (runId: string) => string;
     agent?: PlanningReviewAgentSlot;
     initialTab?: IntakeSettingsTab;
     page?: boolean;
@@ -182,9 +180,7 @@ function renderPopup(
               onSave={props.onSave ?? vi.fn()}
               deleteError={props.deleteError}
               onDelete={props.onDelete}
-              editAutomationHref={props.editAutomationHref}
               canvasId={props.canvasId}
-              runHrefFor={props.runHrefFor}
               agent={props.agent}
               onClose={props.onClose ?? vi.fn()}
               initialTab={props.initialTab}
@@ -208,34 +204,46 @@ describe("IntakeSourceSettingsPopup", () => {
 
     const dialog = screen.getByTestId("intake-source-settings");
     expect(dialog).toHaveAttribute("role", "dialog");
-    expect(screen.getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Create tasks from GitHub issues" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: /Listen for new issues/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: /Run on a schedule/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-confidence-value")).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Issue has one of these labels" })).not.toBeChecked();
-    const checkboxNames = screen.getAllByRole("checkbox").map((checkbox) => checkbox.getAttribute("aria-label"));
-    expect(checkboxNames).toEqual([
-      "A closed issue is re-opened",
-      "Issue has one of these labels",
-      "Author is a repository collaborator",
-    ]);
-    const filters = screen.getByRole("group", { name: "Filters" });
-    expect(within(filters).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeChecked();
-    expect(screen.queryByRole("checkbox", { name: "superplane" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-label-options")).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Create task when:" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Only issues with selected labels" })).not.toBeChecked();
+    const filters = screen.getByRole("group", { name: "Which issues to include" });
+    expect(within(filters).getByRole("checkbox", { name: "Only authors with repository access" })).toBeChecked();
+    expect(screen.queryByRole("combobox", { name: "Search or add a label" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Include reopened issues" })).toBeChecked();
     expect(
       screen.queryByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Automation"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
     expect(screen.queryByTestId("intake-settings-tab-agent")).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Runs" })).toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+  });
+
+  it("requires a label for selected-label intake and allows switching back to all issues", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    renderPopup({ onSave });
+
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByText("Select at least one label, or choose All issues.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "bug" }));
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Remove bug" }));
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+
+    await user.click(screen.getByRole("radio", { name: "All issues" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ filterByLabel: false, labels: [] }));
   });
 
   it("keeps the intake form and save action on a page without a dialog", async () => {
@@ -245,9 +253,9 @@ describe("IntakeSourceSettingsPopup", () => {
     renderPopup({ page: true, onSave, onClose });
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Intake GitHub issues" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Create tasks from GitHub issues" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
-    await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
+    await user.click(screen.getByRole("checkbox", { name: "Include reopened issues" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ reopenedIssues: false })));
@@ -263,7 +271,9 @@ describe("IntakeSourceSettingsPopup", () => {
   ] as const)("shows the %s picture left of the title", (sourceId, name, iconSrc) => {
     renderPopup({ sourceId });
 
-    const heading = screen.getByRole("heading", { name: `Intake ${name}` });
+    const heading = screen.getByRole("heading", {
+      name: sourceId === "github-issues" ? "Create tasks from GitHub issues" : `Intake ${name}`,
+    });
     const icon = screen.getByTestId("intake-source-settings-title-icon");
     expect(icon).toHaveAttribute("alt", "");
     expect(icon).toHaveAttribute("src", iconSrc);
@@ -274,16 +284,17 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup({ labelOptions: ["bug", "superplane", "needs design"] });
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
 
-    const options = within(screen.getByTestId("intake-label-options"));
-    expect(options.getAllByRole("checkbox").map((checkbox) => checkbox.getAttribute("aria-label"))).toEqual([
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
       "superplane",
       "bug",
       "needs design",
     ]);
-    await user.click(options.getByRole("checkbox", { name: "bug" }));
-    expect(options.queryByRole("checkbox", { name: "bug" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "bug" }));
+    expect(screen.queryByRole("option", { name: "bug" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove bug" })).toBeInTheDocument();
   });
 
@@ -291,83 +302,34 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup({ labelOptions: [] });
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
 
-    const options = within(screen.getByTestId("intake-label-options"));
-    expect(options.getAllByRole("checkbox").map((checkbox) => checkbox.getAttribute("aria-label"))).toEqual([
-      "superplane",
-    ]);
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["superplane"]);
   });
 
   it("keeps a label that the user types", async () => {
     const user = userEvent.setup();
     renderPopup();
 
-    expect(screen.queryByRole("textbox", { name: "Search or add a label" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Search or add a label" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
-    await user.type(screen.getByRole("textbox", { name: "Search or add a label" }), "needs-triage");
-    await user.click(screen.getByRole("button", { name: 'Add label "needs-triage"' }));
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+    await user.type(screen.getByRole("combobox", { name: "Search or add a label" }), "needs-triage");
+    await user.click(screen.getByRole("option", { name: 'Add label "needs-triage"' }));
 
     expect(screen.getByRole("button", { name: "Remove needs-triage" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Search or add a label" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Search or add a label" })).toHaveValue("");
   });
 
   it("adds a label when the user presses Enter", async () => {
     const user = userEvent.setup();
     renderPopup();
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
-    await user.type(screen.getByRole("textbox", { name: "Search or add a label" }), "needs-triage{Enter}");
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+    await user.type(screen.getByRole("combobox", { name: "Search or add a label" }), "needs-triage{ArrowDown}{Enter}");
 
     expect(screen.getByRole("button", { name: "Remove needs-triage" })).toBeInTheDocument();
-  });
-
-  it("shows the intake automation on the Automation tab", async () => {
-    const user = userEvent.setup();
-    renderPopup({ editAutomationHref: "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1" });
-
-    await user.click(screen.getByRole("tab", { name: "Automation" }));
-
-    const automation = screen.getByTestId("intake-source-automation");
-    expect(automation).toHaveAccessibleName("Automation");
-    expect(within(automation).getByTestId("rf__node-trigger")).toBeInTheDocument();
-    expect(within(automation).getAllByText("On Issue").length).toBeGreaterThan(0);
-    expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
-    expect(within(automation).getAllByText("Create Task").length).toBeGreaterThan(0);
-    const headerRow = screen.getByTestId("settings-automation-header-row");
-    expect(within(headerRow).getByRole("tab", { name: "General" })).toBeInTheDocument();
-    expect(within(headerRow).getByRole("tab", { name: "Automation" })).toBeInTheDocument();
-    expect(within(headerRow).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
-    const edit = within(automation).getByRole("link", { name: "Edit automation" });
-    expect(edit).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1");
-    expect(document.querySelector(".sp-canvas-editing")).toBeNull();
-    expect(within(automation).queryByRole("button", { name: /Add next component/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Accepted events go to Backlog" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
-  });
-
-  it("lists canvas runs beside the automation when a canvas id is given", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      canvasId: "app-github-issues-intake",
-      runHrefFor: (runId) => `/org-1/workspaces/RF/apps/app-github-issues-intake?run=${runId}`,
-    });
-
-    await user.click(screen.getByRole("tab", { name: "Automation" }));
-
-    const sidebar = within(screen.getByTestId("intake-source-automation")).getByTestId(
-      "factory-automation-runs-sidebar",
-    );
-    expect(within(sidebar).getByText("Runs")).toBeInTheDocument();
-    expect(within(sidebar).getByText("feat: Add console empty-state")).toBeInTheDocument();
-    expect(within(sidebar).getByRole("link", { name: "feat: Add console empty-state" })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/RF/apps/app-github-issues-intake?run=run-1",
-    );
   });
 
   it("puts Agent after General when the intake canvas has an agent", async () => {
@@ -376,7 +338,7 @@ describe("IntakeSourceSettingsPopup", () => {
       agent: { draft: PLANNING_REVIEW_DRAFT, organizationId: "org-1", onSave: vi.fn() },
     });
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Automation"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Runs"]);
 
     await user.click(screen.getByTestId("intake-settings-tab-agent"));
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
@@ -390,11 +352,13 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup({ onSave, onClose });
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
-    await user.click(screen.getByRole("checkbox", { name: "superplane" }));
-    await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "bug" }));
-    await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
-    await user.click(screen.getByRole("checkbox", { name: "Author is a repository collaborator" }));
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "superplane" }));
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "bug" }));
+    await user.click(screen.getByRole("checkbox", { name: "Include reopened issues" }));
+    await user.click(screen.getByRole("checkbox", { name: "Only authors with repository access" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     await waitFor(() =>

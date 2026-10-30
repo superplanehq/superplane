@@ -107,7 +107,18 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
+
 vi.mock("./AgentStep", () => ({ AgentStep: () => <div data-testid="agent-step" /> }));
+
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({
+    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
+  }),
+}));
 
 function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPageModel {
   const { result } = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
@@ -118,6 +129,14 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
+    codexSubscriptionOffered: false,
+    codexSubscriptionLoading: false,
+    codexConnection: undefined,
+    codexSubscriptionReady: false,
+    startCodexConnection: vi.fn(),
+    cancelCodexConnection: vi.fn(),
+    codexStarting: false,
+    codexCanceling: false,
     customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
@@ -130,6 +149,13 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
     bitbucketIntegrationId: "",
+    branchIntegrationId: "",
+    defaultBranchRequired: false,
+    chosenDefaultBranch: "",
+    setChosenDefaultBranch: vi.fn(),
+    requireDefaultBranch: vi.fn(),
+    clearDefaultBranchRequirement: vi.fn(),
+    saveChosenDefaultBranch: vi.fn().mockResolvedValue(true),
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
     saving: false,
@@ -528,3 +554,12 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(showErrorToast).toHaveBeenCalledWith("GitHub token expired");
   });
 });
+
+vi.mock("@/hooks/useOrganizationBilling", () => ({
+  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
+  useOrganizationBilling: () => ({
+    data: { billingEnabled: false, productFeatures: { byo_key: true } },
+    isSuccess: true,
+    refetch: async () => ({ data: { billingEnabled: false, productFeatures: { byo_key: true } } }),
+  }),
+}));

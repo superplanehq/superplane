@@ -105,7 +105,7 @@ function HistoryPreview({
 }
 
 const meta = {
-  title: "Factories/Pages/Automation run history",
+  title: "Factories/Components/Run history/Display states",
   decorators: [withFactoriesTheme],
   component: HistoryPreview,
   parameters: { layout: "fullscreen" },

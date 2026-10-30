@@ -12,7 +12,6 @@ Read more only when the task needs it:
   [.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md), and
   [.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
 - `pkg/models` or new database access: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
-- If changing Terraform, look at [release/terraform/AGENTS.md](release/terraform/AGENTS.md).
 - Local factory GitHub App: [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md)
 
 ## Read this first
@@ -68,9 +67,9 @@ approvals, and an operational UI.
 - `docs/` — Markdown documentation (see `docs/contributing/`).
 - `cmd/runner`, `cmd/fleetmanager`, `pkg/runners`, and `pkg/fleets` — the
   integrated runner and Fleet Manager. Local development uses this stack.
-- Legacy runner source and release automation live in
-  [superplanehq/runner](https://github.com/superplanehq/runner). App-side
-  legacy broker routing remains here during the hosted rollout.
+- Legacy runner source lives in
+  [superplanehq/runner](https://github.com/superplanehq/runner). The application
+  retains broker access only for historical logs.
 - `Makefile` — the entrypoint for all common tasks.
 - `.semaphore/` — CI pipelines. There is no `.github/workflows/` directory.
 
@@ -113,8 +112,8 @@ token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
 `make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
-runner API and Docker Fleet Manager. Set `TASK_BROKER_*` in `.env` only while
-testing legacy or remote broker routing (see `.env.example`).
+runner API and Docker Fleet Manager. Keep `TASK_BROKER_*` in `.env` only
+when historical execution logs remain on the legacy broker (see `.env.example`).
 
 The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
 `jq`, ffmpeg, ffprobe, whisper-cli, yt-dlp, and the Whisper tiny model. Factory
@@ -195,6 +194,29 @@ Further reading:
 - New components/triggers: [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
 - Component design & quality: [docs/contributing/component-design.md](docs/contributing/component-design.md)
 - UI component workflow: [web_src/AGENTS.md](web_src/AGENTS.md)
+
+## Deployment dependencies
+
+Before a change adds or activates a runtime dependency, trace which processes
+need its configuration. This includes removing feature flags or guards around
+existing code.
+
+- Identify the required service endpoints, environment variables, and Secret
+  keys for each affected API, worker, and runner process.
+- Check local Docker Compose, `release/superplane-helm-chart/helm`, the hosted
+  chart in [superplanehq/helm-chart](https://github.com/superplanehq/helm-chart),
+  and environment values and Secret references in
+  [superplanehq/launchpad](https://github.com/superplanehq/launchpad).
+  The two charts are separate. Configuration on API pods does not configure
+  workers. Tests that supply credentials do not verify deployment configuration.
+- Update each affected deployment source. If a required repository or live
+  configuration is unavailable, flag the missing change or verification.
+- In the PR Summary, name the affected processes, required configuration keys,
+  companion PRs, and rollout order. Explicitly flag deployment changes required
+  before the new code path is activated.
+
+Keep credential values out of code and PR text. Distinguish prepared changes
+from published charts and verified deployed configuration.
 
 ## Coding Style & Naming Conventions
 

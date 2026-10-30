@@ -7,13 +7,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
-
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/ee/billing/pricebook"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func Test__DescribeFactoryUsage(t *testing.T) {
@@ -89,4 +89,61 @@ func Test__DescribeFactoryUsage(t *testing.T) {
 	assert.Equal(t, computeMachineType, resp.ByMachineType[0].MachineType)
 	assert.Equal(t, computeSeconds, resp.ByMachineType[0].DurationSeconds)
 	assert.Equal(t, computeCostCents, resp.ByMachineType[0].CostCents)
+}
+
+func Test__DescribeFactoryUsageCreditGates(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	describe := func() *pb.DescribeFactoryUsageResponse {
+		resp, err := DescribeFactoryUsage(context.Background(), r.Organization.ID.String(), &pb.DescribeFactoryUsageRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		return resp
+	}
+
+	// An uncapped workspace follows the organization balance.
+	resp := describe()
+	assert.True(t, resp.HostedCreditAvailable)
+	assert.True(t, resp.FactoryHostedBudgetAvailable)
+	assert.Nil(t, resp.HostedSpendBudgetCents)
+
+	// A sub-cent organization remainder rounds down to zero cents, but the
+	// exact gate stays open, same as AssertHostedCreditAvailable.
+	before, err := billingmodels.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	_, err = billingmodels.AdjustOrganizationLLMCreditBalance(db, billingmodels.CreditBalanceAdjustment{
+		OrganizationID: r.Organization.ID,
+		Bucket:         billingmodels.CreditBalanceBucketTrial,
+		TargetMicros:   5000,
+		ExpectedMicros: before.WelcomeRemainingMicros,
+		Note:           "support",
+		ActorAccountID: &r.Account.ID,
+	})
+	require.NoError(t, err)
+
+	resp = describe()
+	assert.Zero(t, resp.RemainingCreditCents)
+	assert.True(t, resp.HostedCreditAvailable)
+	require.NoError(t, billingmodels.AssertHostedCreditAvailable(db, r.Organization.ID))
+
+	// A capped workspace reports its own gate. A zero cap is exhausted even
+	// though the organization still has credit.
+	budgetCents := int64(0)
+	require.NoError(t, factory.UpdateHostedSpendBudget(db, &budgetCents))
+
+	resp = describe()
+	require.NotNil(t, resp.HostedSpendBudgetCents)
+	assert.True(t, resp.HostedCreditAvailable)
+	assert.False(t, resp.FactoryHostedBudgetAvailable)
+	assert.ErrorIs(t, billingmodels.AssertFactoryHostedBudgetAvailable(db, factory), billingmodels.ErrFactoryHostedBudgetEmpty)
+
+	// Removing the cap opens the workspace gate again.
+	require.NoError(t, factory.UpdateHostedSpendBudget(db, nil))
+	resp = describe()
+	assert.True(t, resp.FactoryHostedBudgetAvailable)
 }

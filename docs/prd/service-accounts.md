@@ -249,4 +249,4 @@ The service accounts management UI should be accessible under **Organization Set
 - **Data model**: Unified `users` table with a `type` column (see Architecture Decision section above).
 - **Token model**: Single token per service account, reusing the existing `token_hash` column. Multi-token support is a future enhancement.
 - **Service account quotas**: 100 service accounts per organization.
-- **Impersonation**: Not supported. Service accounts cannot be impersonated through the UI.
+- **Support sessions**: Not supported. Installation admins cannot start a support session for a service account.

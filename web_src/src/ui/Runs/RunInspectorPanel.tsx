@@ -159,7 +159,7 @@ function RunInspectorPanelBody({
         stepCount={model.sections.length || run.executions?.length || 0}
         onAction={() => (stopping ? model.actions.stop() : model.actions.rerun())}
         actionPending={stopping ? model.actions.stopPending : model.actions.rerunPending}
-        actionDisabled={stopping ? model.actions.stopDisabled : !run.rootEvent?.id}
+        actionDisabled={model.actions.readOnly || (stopping ? model.actions.stopDisabled : !run.rootEvent?.id)}
       />
       <RunInspectorContent
         runErrors={model.runErrors}

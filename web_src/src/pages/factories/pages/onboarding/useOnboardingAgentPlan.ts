@@ -1,16 +1,12 @@
+import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
-import { hostedModelIds } from "@/lib/hostedLLMModels";
+import { hasHostedDefaultModel, hostedModelIds } from "@/lib/hostedLLMModels";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 
-import {
-  AGENT_PROVIDER_IDS,
-  hasHostedDefaultModel,
-  resolveOnboardingAgent,
-  type OnboardingAgentPlan,
-} from "./onboardingAgentReadiness";
+import { AGENT_PROVIDER_IDS, resolveOnboardingAgent, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import type { IntegrationId } from "./onboardingFixtures";
 
 type HostedAgentDefaults = {
@@ -38,7 +34,8 @@ export function useOnboardingAgentPlan(
       Boolean(defaultHosted.customProvider) && connected.has("customLlm"),
     ),
   };
-  const connectedForPlan = new Set(connected);
+  const access = useBYOKAccess(organizationId);
+  const connectedForPlan = access.allowed ? new Set(connected) : new Set<IntegrationId>();
   if (!defaultHosted.customProvider) connectedForPlan.delete("customLlm");
   const plan = resolveOnboardingAgent({
     connected: connectedForPlan,
@@ -50,7 +47,7 @@ export function useOnboardingAgentPlan(
     customModels: byokModelIds(queries.customLlm.data),
     defaultHostedProvider: defaultHosted.provider,
     defaultHostedModel: defaultHosted.model,
-    preferOwnKey: defaultHosted.preferOwnKey,
+    preferOwnKey: access.allowed && defaultHosted.preferOwnKey,
   });
   const providerId = plan?.providerId ?? AGENT_PROVIDER_IDS.find((id) => connectedForPlan.has(id));
   const query = plan?.credentialsSource !== "hosted" && providerId ? queries[providerId] : undefined;
@@ -138,6 +135,14 @@ export function agentRewriteFromPlan(
       component: "runnerSuperPlane",
       model: "",
       planningModel: "",
+    };
+  }
+  if (plan.credentialsSource === "subscription") {
+    return {
+      component: "runnerCodex",
+      model: "",
+      planningModel: "",
+      credentials: { source: "subscription" },
     };
   }
   const integrationName = plan.integrationName;

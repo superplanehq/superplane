@@ -13,6 +13,8 @@ export type PlanningSessionPayload = {
   canvasRunId?: string;
   waitState?: string;
   executionId?: string;
+  runnerState?: string;
+  blockedByParallelismLimit?: boolean;
   selectableModelKey?: string;
   kind?: "PLANNING_SESSION_KIND_TASK_CREATION" | "PLANNING_SESSION_KIND_WORK_ORDER_ANALYSIS";
   messages?: PlanningSessionMessagePayload[];
@@ -65,7 +67,7 @@ type PlanningSessionActivityItemPayload = {
 
 export type PlanningSessionSurveyPayload = {
   id?: string;
-  questions?: Array<{ prompt?: string; options?: string[] }>;
+  questions?: Array<{ prompt?: string; options?: string[]; recommendedOption?: string }>;
 };
 
 /**
@@ -154,6 +156,8 @@ export function createWithAgentViewFromSession(
   return {
     repository: session.repository ?? "",
     machineStatus: createWithAgentMachineStatus(session),
+    runnerState: session.runnerState,
+    blockedByParallelismLimit: session.blockedByParallelismLimit,
     turnEnded: session.state === "ended",
     canvasId: session.canvasId ?? "",
     canvasRunId: session.canvasRunId ?? "",
@@ -215,7 +219,9 @@ function planningSessionSurveyFromPayload(
     if (!prompt || !options.length) {
       return [];
     }
-    return [{ prompt, options }];
+    return [
+      { prompt, options, ...(question.recommendedOption ? { recommendedOption: question.recommendedOption } : {}) },
+    ];
   });
   if (!questions.length) {
     return undefined;
@@ -238,9 +244,15 @@ export function planningSessionIsWaiting(
 
 /** True when the agent is still running this session. */
 export function planningSessionIsWorking(
-  session: Pick<PlanningSessionPayload, "state" | "waitState"> | null | undefined,
+  session: Pick<PlanningSessionPayload, "state" | "waitState" | "runnerState"> | null | undefined,
 ): boolean {
-  return Boolean(session && session.state !== "ended" && session.waitState !== "pending");
+  return Boolean(
+    session &&
+      session.state !== "ended" &&
+      session.waitState !== "pending" &&
+      session.runnerState !== "queued" &&
+      session.runnerState !== "pending",
+  );
 }
 
 /**
@@ -288,7 +300,10 @@ function analysisStopStatus(analysisDelivered: boolean): CreateWithAgentView["ma
   return analysisDelivered ? "passed" : "failed";
 }
 
-export type PlanningSessionMachineInput = Pick<PlanningSessionPayload, "state" | "waitState" | "executionId">;
+export type PlanningSessionMachineInput = Pick<
+  PlanningSessionPayload,
+  "state" | "waitState" | "executionId" | "runnerState"
+>;
 
 /**
  * An ended session is a closed turn: the next user message starts a new run
@@ -297,6 +312,12 @@ export type PlanningSessionMachineInput = Pick<PlanningSessionPayload, "state" |
 function createWithAgentMachineStatus(session: PlanningSessionMachineInput): CreateWithAgentView["machineStatus"] {
   if (session.state === "ended") {
     return "waiting";
+  }
+  if (session.runnerState === "queued" || session.runnerState === "pending") {
+    return "queued";
+  }
+  if (session.runnerState === "reserved") {
+    return "starting";
   }
   if (!session.executionId) {
     return "starting";

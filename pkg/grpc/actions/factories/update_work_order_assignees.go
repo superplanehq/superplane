@@ -59,6 +59,11 @@ func UpdateWorkOrderAssignees(
 			return err
 		}
 
+		// Lock before reading owners, so an agent assignment that runs at the
+		// same time cannot add a second owner.
+		if err := models.LockFactoryWorkOrder(tx, orderID); err != nil {
+			return err
+		}
 		order, err := factory.FindWorkOrder(tx, orderID)
 		if err != nil {
 			return err

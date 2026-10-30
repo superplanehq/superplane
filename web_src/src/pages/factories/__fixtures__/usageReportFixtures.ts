@@ -9,6 +9,8 @@ export interface StorybookUsageReport {
   totalTokens: string;
   totalCostCents: string;
   totalDurationSeconds?: string;
+  defaultHostedProvider?: string;
+  defaultHostedModel?: string;
   periodDays: number;
   byModel: Array<{ provider: string; model: string; totalTokens: string; costCents: string }>;
   byMachineType?: Array<{ machineType: string; durationSeconds: string; costCents: string }>;
@@ -88,6 +90,12 @@ export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   welcomeCreditExpiresAt: ACTIVE_TRIAL_ENDS_AT,
 };
 
+export const HOSTED_DEFAULT_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  defaultHostedProvider: "openrouter",
+  defaultHostedModel: "openai/gpt-5",
+};
+
 /** Welcome grant spent. Remaining hosted credit is empty. Polar recovery is available. */
 export const SPENT_CREDIT_USAGE_REPORT: StorybookUsageReport = {
   ...DEFAULT_FACTORY_USAGE,
@@ -146,7 +154,11 @@ export const STORYBOOK_CUSTOM_CREDIT_PRODUCT = {
 };
 
 export const BUSINESS_ORGANIZATION_BILLING = {
+  productFeatures: { byo_key: true },
   plan: "business",
+  planName: "Business",
+  planCategory: "paid",
+  planPriceCents: "19900",
   planSource: "polar",
   polarSubscriptionStatus: "active",
   trialEndsAt: ACTIVE_TRIAL_ENDS_AT,
@@ -159,6 +171,26 @@ export const BUSINESS_ORGANIZATION_BILLING = {
   subscriptionCheckoutEnabled: true,
   creditPurchaseAllowed: true,
   hasBillingCustomer: true,
+};
+
+export const TEAM_ORGANIZATION_BILLING = {
+  ...BUSINESS_ORGANIZATION_BILLING,
+  plan: "team",
+  catalogKey: "team",
+  planName: "Team",
+  planCategory: "paid",
+  planPriceCents: "2900",
+  planPerSeat: true,
+  purchasedSeats: 10,
+  occupiedSeats: 9,
+  availableSeats: 1,
+  pendingInvitationSeats: 2,
+  invitableSeats: 0,
+  planMaximumSeats: 50,
+  purchasableSeats: 40,
+  expectedRenewalSeats: 9,
+  currentMonthlyTotalCents: "29000",
+  expectedRenewalCents: "26100",
 };
 
 export const ENDING_ORGANIZATION_BILLING = {
@@ -174,6 +206,8 @@ export const ADMIN_ORGANIZATION_BILLING = {
 
 export const EXPIRED_TRIAL_ORGANIZATION_BILLING = {
   plan: "trial",
+  planName: "Trial",
+  planCategory: "trial",
   planSource: "system",
   trialEndsAt: EXPIRED_TRIAL_ENDED_AT,
   remainingCreditCents: "0",
@@ -188,6 +222,8 @@ export const EXPIRED_TRIAL_ORGANIZATION_BILLING = {
 
 export const LAPSED_ORGANIZATION_BILLING = {
   plan: "none",
+  planName: "None",
+  planCategory: "none",
   planSource: "polar",
   polarSubscriptionStatus: "canceled",
   remainingCreditCents: "5000",
@@ -203,6 +239,8 @@ export const LAPSED_ORGANIZATION_BILLING = {
 
 export const RESTORED_TRIAL_ORGANIZATION_BILLING = {
   plan: "trial",
+  planName: "Trial",
+  planCategory: "trial",
   planSource: "polar",
   polarSubscriptionStatus: "canceled",
   trialEndsAt: ACTIVE_TRIAL_ENDS_AT,

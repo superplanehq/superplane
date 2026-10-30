@@ -36,6 +36,7 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 
+	installBillingHTTPTestRoutes(server, r)
 	server.RegisterWebSocketRoutes()
 	server.RegisterWebRoutes("")
 
@@ -203,6 +204,8 @@ func Test__ListAccountOrganizations(t *testing.T) {
 }
 
 func TestServer_ProviderConfiguration(t *testing.T) {
+	t.Setenv("BITBUCKET_CLIENT_ID", "")
+	t.Setenv("BITBUCKET_CLIENT_SECRET", "")
 	// Test with no providers configured
 	os.Unsetenv("GITHUB_CLIENT_ID")
 	os.Unsetenv("GITHUB_CLIENT_SECRET")

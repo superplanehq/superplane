@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
@@ -8,7 +8,11 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
-import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import {
+  DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_SENTRY_INTAKE_SETTINGS,
+  type IntakeSourceSettings,
+} from "./intakeSourceSettingsModel";
 
 vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ currentUserId: "alice" }) }));
 
@@ -19,7 +23,7 @@ function popup(
   labelOptions: string[],
   onSave: (next: IntakeSourceSettings) => void,
   organizationId?: string,
-  sourceId: "github-issues" | "dependabot-alerts" = "github-issues",
+  sourceId: "github-issues" | "dependabot-alerts" | "sentry-exceptions" = "github-issues",
 ) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -44,8 +48,9 @@ function popup(
 
 async function pickLabel(name: string) {
   const user = userEvent.setup();
-  await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
-  await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name }));
+  await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+  await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+  await user.click(screen.getByRole("option", { name }));
   return user;
 }
 
@@ -54,15 +59,36 @@ describe("IntakeSourceSettingsPopup draft", () => {
     render(popup(DEFAULT_GITHUB_INTAKE_SETTINGS, [], vi.fn(), "org-owner", "dependabot-alerts"));
     expect(screen.queryByRole("button", { name: "Default task owner" })).not.toBeInTheDocument();
   });
-  it("keeps the selected owner in the draft until Save", async () => {
-    queryClient.setQueryData(
-      ["organization", "users", "org-owner"],
-      [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+  it("keeps the selected Sentry owner in the draft until Save", async () => {
+    queryClient.setQueryData(["organization", "users", "org-owner"], {
+      users: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    });
+    const onSave = vi.fn();
+    render(
+      popup(
+        { ...DEFAULT_SENTRY_INTAKE_SETTINGS, sentryProjectIds: ["payments"] },
+        [],
+        onSave,
+        "org-owner",
+        "sentry-exceptions",
+      ),
     );
+    const user = userEvent.setup();
+    expect(screen.getByRole("tab", { name: "General" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Default task owner" }));
+    await user.click(await screen.findByRole("option", { name: "Alice" }));
+    expect(onSave).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ defaultOwnerId: "alice" })));
+  });
+  it("keeps the selected owner in the draft until Save", async () => {
+    queryClient.setQueryData(["organization", "users", "org-owner"], {
+      users: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    });
     const onSave = vi.fn();
     render(popup(DEFAULT_GITHUB_INTAKE_SETTINGS, [], onSave, "org-owner"));
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Default task owner" }));
+    await user.click(screen.getByRole("button", { name: "Task owner" }));
     await user.click(await screen.findByRole("option", { name: "Alice" }));
     expect(onSave).not.toHaveBeenCalled();
     await user.click(screen.getByTestId("intake-source-settings-save"));

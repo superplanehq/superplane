@@ -208,7 +208,7 @@ func TestDirectoryListsEveryRepositoryForAWorkspaceOwner(t *testing.T) {
 	assert.Equal(t, "acme", repositories[0].WorkspaceSlug)
 }
 
-func TestDirectoryFollowsPermissionPagesAndFallsBackToMain(t *testing.T) {
+func TestDirectoryFollowsPermissionPagesAndLeavesAnEmptyBranch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
@@ -239,7 +239,7 @@ func TestDirectoryFollowsPermissionPagesAndFallsBackToMain(t *testing.T) {
 	assert.Equal(t, "acme/api", repositories[0].FullName)
 	assert.Equal(t, "develop", repositories[0].DefaultBranch)
 	assert.Equal(t, "acme/web", repositories[1].FullName)
-	assert.Equal(t, "main", repositories[1].DefaultBranch)
+	assert.Empty(t, repositories[1].DefaultBranch)
 	assert.False(t, repositories[1].Private)
 }
 

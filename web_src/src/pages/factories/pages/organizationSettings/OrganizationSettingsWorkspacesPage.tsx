@@ -54,11 +54,11 @@ function WorkspacesBody({
   factories: FactoriesFactory[];
 }) {
   const { account } = useAccount();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { canAct, hasPermission, isLoading: permissionsLoading } = usePermissions();
   const deleteFactory = useDeleteFactory(organizationId);
   const [pendingDelete, setPendingDelete] = useState<FactoriesFactory | null>(null);
 
-  const canOpenSettings = canAct("factories", "update");
+  const canOpenSettings = hasPermission("factories", "update");
   const canDelete = canAct("factories", "delete");
 
   const handleDelete = async () => {

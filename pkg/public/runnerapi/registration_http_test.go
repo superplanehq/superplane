@@ -43,11 +43,11 @@ func TestRegisterRunnerConsumesGrantAndReturnsCredential(t *testing.T) {
 
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, nil)
 	require.NoError(t, err)
-	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS)
+	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS, nil)
 	require.NoError(t, err)
 
 	response := executeRegistrationRequest(t, server, token, runner.RunnerVersion,
-		map[string]string{"ec2_instance_id": "i-123"})
+		map[string]string{"ec2_instance_id": "i-123", "fleet_manager_id": "manager-a", "runner_provider": "aws"})
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 
 	var body registerRunnerResponse
@@ -61,6 +61,8 @@ func TestRegisterRunnerConsumesGrantAndReturnsCredential(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerStateIdle, reloaded.State)
 	assert.Equal(t, "i-123", reloaded.Tags.Data()["ec2_instance_id"])
+	assert.NotContains(t, reloaded.Tags.Data(), "fleet_manager_id")
+	assert.NotContains(t, reloaded.Tags.Data(), "runner_provider")
 	assert.Equal(t, "linux", reloaded.OS)
 	assert.Equal(t, "amd64", reloaded.Arch)
 	assert.Equal(t, "worker-a", reloaded.Hostname)
@@ -90,7 +92,7 @@ func TestRegisterRunnerRejectsVersionMismatchAndTerminatesRunner(t *testing.T) {
 	runner, registration, fleet := createRegistrationFixture(t)
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, nil)
 	require.NoError(t, err)
-	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS)
+	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS, nil)
 	require.NoError(t, err)
 
 	response := executeRegistrationRequest(t, server, token, "different-version")
@@ -112,7 +114,7 @@ func TestRegisterRunnerRejectsInvalidTagsBeforeConsumingGrant(t *testing.T) {
 	runner, registration, fleet := createRegistrationFixture(t)
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, nil)
 	require.NoError(t, err)
-	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS)
+	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS, nil)
 	require.NoError(t, err)
 
 	rejected := executeRegistrationRequest(t, server, token, runner.RunnerVersion,
@@ -136,7 +138,7 @@ func TestRegisterRunnerAcceptsLegacyRequestWithoutHostFields(t *testing.T) {
 	runner, registration, fleet := createRegistrationFixture(t)
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, nil)
 	require.NoError(t, err)
-	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS)
+	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS, nil)
 	require.NoError(t, err)
 
 	response := executeRegistrationPayload(t, server, token, registerRunnerRequest{

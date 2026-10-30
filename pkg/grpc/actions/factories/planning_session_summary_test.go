@@ -18,11 +18,11 @@ func TestSerializePlanningSessionSummary_KeepsBoardFields(t *testing.T) {
 		WaitState: models.PlanningWaitPending,
 		SurveyID:  &surveyID,
 		Survey: datatypes.NewJSONType(models.PlanningSessionSurvey{
-			Questions: []models.PlanningSessionSurveyQuestion{{Prompt: "Which API?", Options: []string{"REST"}}},
+			Questions: []models.PlanningSessionSurveyQuestion{{Prompt: "Which API?", Options: []string{"REST"}, RecommendedOption: "REST"}},
 		}),
 	}
 
-	summary := serializePlanningSessionSummary(session, "exec-1")
+	summary := serializePlanningSessionSummary(session, planningSessionRuntime{executionID: "exec-1"})
 	require.NotNil(t, summary)
 	assert.Equal(t, session.ID.String(), summary.Id)
 	assert.Equal(t, models.PlanningSessionStateRunning, summary.State)
@@ -32,6 +32,7 @@ func TestSerializePlanningSessionSummary_KeepsBoardFields(t *testing.T) {
 	require.Len(t, summary.Survey.Questions, 1)
 	assert.Equal(t, "Which API?", summary.Survey.Questions[0].Prompt)
 	assert.Equal(t, []string{"REST"}, summary.Survey.Questions[0].Options)
+	assert.Equal(t, "REST", summary.Survey.Questions[0].RecommendedOption)
 }
 
 func TestSerializePlanningSessionSummary_OmitsEmptySurvey(t *testing.T) {
@@ -40,7 +41,7 @@ func TestSerializePlanningSessionSummary_OmitsEmptySurvey(t *testing.T) {
 		State: models.PlanningSessionStateRunning,
 	}
 
-	summary := serializePlanningSessionSummary(session, "")
+	summary := serializePlanningSessionSummary(session, planningSessionRuntime{})
 	require.NotNil(t, summary)
 	assert.Nil(t, summary.Survey)
 	assert.Empty(t, summary.ExecutionId)

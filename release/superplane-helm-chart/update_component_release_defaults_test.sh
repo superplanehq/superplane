@@ -59,7 +59,7 @@ while [ "$#" -gt 0 ]; do
       printf '%s' "$2" >"${TMP_DIR}/max-time"
       shift 2
       ;;
-    --silent|--show-error)
+    --silent|--show-error|--head)
       shift
       ;;
     --)
@@ -80,7 +80,9 @@ if [ -z "${output}" ] || [ -z "${header_file}" ] || [ -z "${url}" ]; then
   exit 1
 fi
 
-printf '%s\n' "${authorization}" >"${CURL_AUTH_FLAG}"
+if [[ "${url}" != *fleet-manager-chart* ]]; then
+  printf '%s\n' "${authorization}" >"${CURL_AUTH_FLAG}"
+fi
 printf 'curl %s\n' "${url}" >>"${CURL_SEQUENCE}"
 
 if [[ "${url}" == *"/releases/latest"* ]]; then
@@ -100,6 +102,21 @@ write_response() {
   printf '%s' "${body}" >"${output}"
   printf '%s' "${status%% *}"
 }
+
+if [[ "${url}" == *"/token?scope=repository:superplanehq/fleet-manager-chart:pull"* ]]; then
+  write_response "200 OK" '{"token":"registry-token"}'
+  exit 0
+fi
+if [[ "${url}" == *"/v2/superplanehq/fleet-manager-chart/manifests/"* ]]; then
+  version="${url##*/}"
+  status_file="${TMP_DIR}/chart-status/${version}"
+  if [ -f "${status_file}" ]; then
+    write_response "$(cat "${status_file}")" ""
+  else
+    write_response "200 OK" ""
+  fi
+  exit 0
+fi
 
 page_one="$(cat "${TMP_DIR}/page-one.json" 2>/dev/null || true)"
 page_two="$(cat "${TMP_DIR}/page-two.json" 2>/dev/null || true)"
@@ -328,6 +345,34 @@ EOF
 assert_file "${TMP_DIR}/expected.yaml"
 
 write_saved_values
+mkdir -p "${TMP_DIR}/chart-status"
+printf '404 Not Found' >"${TMP_DIR}/chart-status/0.4.0"
+printf '%s\n' \
+  '[{"tag_name":"runner/v0.3.0","draft":false,"prerelease":false},{"tag_name":"fleet-manager/v0.4.0","draft":false,"prerelease":false},{"tag_name":"fleet-manager/v0.3.0","draft":false,"prerelease":false}]' \
+  >"${TMP_DIR}/page-one.json"
+export CURL_MODE=numeric
+run_updater
+cat >"${TMP_DIR}/expected.yaml" <<EOF
+other: keep
+
+${FALLBACK_COMMENT}
+componentReleases:
+  runnerVersion: v0.3.0
+  runnerVersions:
+    - v0.3.0
+  fleetManagerVersion: v0.3.0
+
+tail: keep
+EOF
+assert_file "${TMP_DIR}/expected.yaml"
+grep -q 'Fleet Manager default: v0.3.0' "${TMP_DIR}/stdout"
+if grep -q 'fleetManagerVersion: v0.4.0' "${TMP_DIR}/values.yaml"; then
+  echo "updater wrote a Fleet Manager release that has no chart" >&2
+  exit 1
+fi
+rm -rf "${TMP_DIR}/chart-status"
+
+write_saved_values
 cp "${TMP_DIR}/values.yaml" "${TMP_DIR}/values.before"
 export CURL_MODE=http-error
 run_updater
@@ -447,5 +492,62 @@ if grep -qx 'helm push' "${CURL_SEQUENCE}"; then
   exit 1
 fi
 test -f "${TMP_DIR}/chart-output/superplane-1.2.3.tgz"
+
+: >"${CURL_SEQUENCE}"
+export CURL_MODE=success
+export COMPONENT_RELEASES_ALREADY_RESOLVED=yes
+(
+  cd "${REPO_ROOT}"
+  bash "${BUILD_SCRIPT}" v1.2.3 "${TMP_DIR}/chart-output-reused" >"${TMP_DIR}/reuse-stdout" 2>"${TMP_DIR}/reuse-stderr"
+)
+unset COMPONENT_RELEASES_ALREADY_RESOLVED
+if grep -q '^curl ' "${CURL_SEQUENCE}"; then
+  echo "chart build looked up releases after the archive resolve" >&2
+  exit 1
+fi
+cmp -s "${VALUES_BACKUP}" "${VALUES_PATH}"
+test -f "${TMP_DIR}/chart-output-reused/superplane-1.2.3.tgz"
+
+cat >"${TMP_DIR}/candidate-values.yaml" <<'EOF'
+candidateOnly: keep
+
+componentReleases:
+  runnerVersion: v0.2.1
+  runnerVersions:
+    - v0.2.1
+  fleetManagerVersion: v0.1.5
+
+candidateTail: keep
+EOF
+cat >"${TMP_DIR}/stable-values.yaml" <<'EOF'
+stableOnly: keep
+
+componentReleases:
+  runnerVersion: v9.0.0
+  runnerVersions:
+    - v9.0.0
+  fleetManagerVersion: v9.0.0
+
+stableTail: keep
+EOF
+node "${UPDATER}" reuse \
+  "${TMP_DIR}/candidate-values.yaml" \
+  "${TMP_DIR}/stable-values.yaml"
+cat >"${TMP_DIR}/expected-reused-values.yaml" <<'EOF'
+stableOnly: keep
+
+componentReleases:
+  runnerVersion: v0.2.1
+  runnerVersions:
+    - v0.2.1
+  fleetManagerVersion: v0.1.5
+
+stableTail: keep
+EOF
+if ! cmp -s "${TMP_DIR}/expected-reused-values.yaml" "${TMP_DIR}/stable-values.yaml"; then
+  diff -u "${TMP_DIR}/expected-reused-values.yaml" "${TMP_DIR}/stable-values.yaml" >&2 || true
+  echo "candidate component release defaults were not reused" >&2
+  exit 1
+fi
 
 echo "Chart component release default tests passed."

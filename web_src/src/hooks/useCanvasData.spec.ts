@@ -146,6 +146,25 @@ describe("useInfiniteCanvasRuns", () => {
     });
   });
 
+  it("sends includeTask only when the run list asks for task labels", async () => {
+    const queryClient = createQueryClient();
+    canvasesListRuns.mockResolvedValue({
+      data: { runs: [], totalCount: 0, hasNextPage: false },
+    });
+
+    renderHook(() => useInfiniteCanvasRuns("canvas-1", { includeTask: true }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(canvasesListRuns).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: { limit: 25, includeTask: true },
+        }),
+      );
+    });
+  });
+
   it("does not poll for run updates", async () => {
     const queryClient = createQueryClient();
     canvasesListRuns.mockResolvedValueOnce({
@@ -194,6 +213,27 @@ describe("useDescribeRun", () => {
     expect(canvasesDescribeRun).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { canvasId: "canvas-1", runId: "run-42" },
+      }),
+    );
+  });
+
+  it("asks describe run for the task when requested", async () => {
+    const queryClient = createQueryClient();
+    canvasesDescribeRun.mockResolvedValueOnce({
+      data: { run: { id: "run-42", task: { id: "task-1", key: "SP-1", title: "Linked task" } } },
+    });
+
+    const { result } = renderHook(() => useDescribeRun("canvas-1", "run-42", true, true), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data?.run?.task?.key).toBe("SP-1");
+    });
+    expect(canvasesDescribeRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { canvasId: "canvas-1", runId: "run-42" },
+        query: { includeTask: true },
       }),
     );
   });

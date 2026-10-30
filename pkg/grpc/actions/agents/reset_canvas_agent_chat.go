@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 )
@@ -31,6 +32,9 @@ func ResetCanvasAgentChat(
 
 	session, err := svc.ResetSession(ctx, org, user, canvas)
 	if err != nil {
+		if errors.Is(err, billing.ErrPaymentMethodRequired) || errors.Is(err, billing.ErrHostedSubscriptionRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, err.Error())
+		}
 		if errors.Is(err, agents.ErrSessionForbidden) {
 			return nil, grpcerrors.PermissionDenied(nil, "agent chat is not allowed")
 		}

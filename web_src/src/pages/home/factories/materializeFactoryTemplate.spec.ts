@@ -63,7 +63,6 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/web",
       backlogRepository: "acme/web",
-      defaultBranch: "main",
     });
     expect(
       normalizeFactoryInstallParams({
@@ -75,7 +74,6 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
-      defaultBranch: "main",
     });
   });
 
@@ -87,9 +85,9 @@ describe("materializeFactoryTemplate", () => {
     ).toBe("base: staging");
   });
 
-  it("defaults defaultBranch to main when absent or blank", () => {
-    expect(normalizeFactoryInstallParams({ appRepository: "acme/app" }).defaultBranch).toBe("main");
-    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "" }).defaultBranch).toBe("main");
+  it("keeps a missing or blank default branch empty", () => {
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app" }).defaultBranch).toBeUndefined();
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "" }).defaultBranch).toBe("");
     expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "staging" }).defaultBranch).toBe(
       "staging",
     );
@@ -302,6 +300,35 @@ spec:
       expect(agent.configuration?.credentials).toBeUndefined();
       expect(agent.configuration?.model).toBeUndefined();
       expect(agent.configuration?.maxTurns).toBeUndefined();
+    }
+  });
+
+  it("materializes a ChatGPT subscription as Codex with no model", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("software-factory"),
+      canvasName: "My Factory",
+      canvasId: "canvas-123",
+      installParams: { repository: "acme/web" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerCodex",
+        model: "",
+        planningModel: "",
+        credentials: { source: "subscription" },
+      },
+    });
+
+    const doc = yaml.load(canvasYaml) as {
+      spec?: { nodes?: Array<{ component?: string; configuration?: Record<string, unknown> }> };
+    };
+    const agents = (doc.spec?.nodes ?? []).filter((node) => node.component === "runnerCodex");
+    expect(agents.length).toBeGreaterThan(0);
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
+    for (const agent of agents) {
+      expect(agent.configuration?.credentials).toEqual({ source: "subscription" });
+      expect(agent.configuration?.model).toBeUndefined();
     }
   });
 

@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collap
 import { ChevronRight } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 
-import { getWorkOrderRunHref } from "../../../lib/workOrderExecutions";
+import { splitRunPhaseRunHref } from "../splitRunPopupModel";
 import type { SplitRunPhase, SplitRunPhaseStatus } from "../splitRunMocks";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import type { AutomationStage } from "./automationsViewModel";
@@ -439,8 +439,8 @@ function runHrefFor(
   phase: SplitRunPhase | undefined,
   orderNumber: string | undefined,
 ): string | null {
-  if (!organizationId || !factoryKey) {
+  if (!phase) {
     return null;
   }
-  return getWorkOrderRunHref(organizationId, factoryKey, phase?.appId, phase?.runId, { orderNumber });
+  return splitRunPhaseRunHref({ organizationId, factoryKey, phase, orderNumber }) ?? null;
 }

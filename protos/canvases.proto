@@ -273,7 +273,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas runs";
-      description: "Returns a list of runs for a canvas";
+      description: "Returns a list of runs for a canvas. Set include_task to include the task id, key, and title.";
       tags: "CanvasRun";
     };
   }
@@ -284,7 +284,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe a run";
-      description: "Returns a description of a run";
+      description: "Returns a description of a run. Set include_task to include the task id, key, and title.";
       tags: "CanvasRun";
     };
   }
@@ -642,6 +642,12 @@ message CanvasNodeExecutionRef {
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   repeated CanvasRunRef runs = 9;
+  // Recorded output channels only; payloads remain on execution detail endpoints.
+  repeated string output_channels = 10;
+  // Historical component identity. Do not use the current canvas to interpret old runs.
+  string component_name = 11;
+  // Task identified by a recorded duplicate-task decision, not inferred from source identity.
+  string existing_task_id = 12;
 }
 
 //
@@ -724,6 +730,10 @@ message ListRunsRequest {
   google.protobuf.Timestamp before = 3;
   repeated CanvasRun.State states = 4;
   repeated CanvasRun.Result results = 5;
+  optional bool include_task = 6;
+  // Case-insensitive substring match on the root event's custom run title.
+  string search = 7;
+  repeated string trigger_ids = 8;
 }
 
 message ListRunsResponse {
@@ -736,6 +746,7 @@ message ListRunsResponse {
 message DescribeRunRequest {
   string canvas_id = 1;
   string run_id = 2;
+  optional bool include_task = 3;
 }
 
 message DescribeRunResponse {
@@ -816,6 +827,12 @@ message CanvasEvent {
   string run_id = 9;
 }
 
+message CanvasRunTask {
+  string id = 1;
+  string key = 2;
+  string title = 3;
+}
+
 message CanvasRun {
   enum State {
     STATE_UNKNOWN = 0;
@@ -852,6 +869,9 @@ message CanvasRun {
   int64 cost_cents = 17;
   // Models that recorded spend on this run tree.
   repeated string models = 18;
+  CanvasRunTask task = 19;
+  // Trigger node that starts this run, including before its root event exists.
+  string node_id = 20;
 }
 
 message CanvasRunRef {

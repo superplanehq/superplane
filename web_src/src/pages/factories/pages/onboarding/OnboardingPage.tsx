@@ -1,4 +1,7 @@
+import { useEffect } from "react";
+
 import { useConsumeIntegrationSetupReturnOnArrival } from "@/hooks/useConsumeIntegrationSetupReturnOnArrival";
+import { isPostHogEnabled, posthog } from "@/posthog";
 
 import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunSetup } from "./FirstRunSetup";
@@ -8,6 +11,27 @@ import { useOnboardingWorkspaceResolution } from "./useOnboardingWorkspaceResolu
 
 export function OnboardingPage() {
   const layout = useFactoriesLayout();
+
+  useEffect(() => {
+    if (!isPostHogEnabled()) return;
+
+    const startRecording = () => posthog.startSessionRecording({ sampling: true, linked_flag: true });
+    const stopRecording = () => posthog.stopSessionRecording();
+    const resumeRecording = (event: PageTransitionEvent) => {
+      if (event.persisted) startRecording();
+    };
+
+    startRecording();
+    window.addEventListener("pagehide", stopRecording);
+    window.addEventListener("pageshow", resumeRecording);
+
+    return () => {
+      window.removeEventListener("pagehide", stopRecording);
+      window.removeEventListener("pageshow", resumeRecording);
+      stopRecording();
+    };
+  }, []);
+
   return <WorkspaceOnboardingPage key={layout.factoryId} layout={layout} />;
 }
 

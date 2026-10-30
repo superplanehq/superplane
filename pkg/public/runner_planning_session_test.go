@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	sentrytest "github.com/superplanehq/superplane/test/support/sentry"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgconn"
+	amqp "github.com/rabbitmq/amqp091-go"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -319,7 +321,7 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hook := logtest.NewGlobal()
 			t.Cleanup(func() { hook.Reset() })
-			transport := bindTestSentryHub(t)
+			transport := sentrytest.BindHub(t)
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", nil)
 			req.Pattern = "/api/v1/runner/planning-sessions/clarity"
 			if tt.cancelRequest {
@@ -358,7 +360,7 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 				_, present := event.Tags[key]
 				assert.False(t, present, "tag %s should be omitted", key)
 			}
-			assert.Contains(t, capturedExceptionText(event), tt.wantMessage)
+			assert.Contains(t, sentrytest.ExceptionText(event), tt.wantMessage)
 		})
 	}
 }
@@ -371,7 +373,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("client disconnect returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		ctx, cancel := context.WithCancel(req.Context())
 		cancel()
@@ -393,7 +395,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("driver timeout on canceled request returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		ctx, cancel := context.WithCancel(req.Context())
 		cancel()
@@ -413,7 +415,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	})
 
 	t.Run("canceled error with live request stays 500", func(t *testing.T) {
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
@@ -429,7 +431,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("dropped database connection returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		rec := httptest.NewRecorder()
 		lookupReset := fmt.Errorf("lookup: %w", errors.New("pgproto3.writeError: write failed: write tcp 10.96.2.5:43492->10.32.160.2:5432: write: connection reset by peer"))
@@ -449,7 +451,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("wrapped postgres connection reset returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		rec := httptest.NewRecorder()
 		lookupReset := fmt.Errorf("pgproto3.writeError: write failed: %w", &net.OpError{
@@ -473,7 +475,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	t.Run("bad database connection returns pending", func(t *testing.T) {
 		hook := logtest.NewGlobal()
 		t.Cleanup(func() { hook.Reset() })
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		rec := httptest.NewRecorder()
 
@@ -490,7 +492,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	})
 
 	t.Run("blob connection reset stays 500", func(t *testing.T) {
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
@@ -509,7 +511,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	})
 
 	t.Run("deadlock with live request stays 500", func(t *testing.T) {
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
@@ -524,7 +526,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 	})
 
 	t.Run("generic lookup error with live request stays 500", func(t *testing.T) {
-		transport := bindTestSentryHub(t)
+		transport := sentrytest.BindHub(t)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
@@ -539,7 +541,7 @@ func TestWritePlanningWaitError(t *testing.T) {
 }
 
 func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	activityID := uuid.New()
 	path := "/api/v1/runner/planning-sessions/activities/" + activityID.String()
 	router := mux.NewRouter()
@@ -557,7 +559,7 @@ func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
 }
 
 func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	activityID := uuid.New()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), nil)
 	rec := httptest.NewRecorder()
@@ -570,7 +572,7 @@ func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
 
 func TestRunnerPlanningSessionSpecWithoutDraftReturnsLookupFailed(t *testing.T) {
 	r := support.Setup(t)
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	server, session, _, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	session.DraftWorkOrderID = nil
@@ -593,7 +595,7 @@ func TestRunnerPlanningSessionSpecWithoutDraftReturnsLookupFailed(t *testing.T) 
 	assert.Equal(t, session.ID.String(), event.Tags["planning_session_id"])
 	_, hasDraft := event.Tags["draft_work_order_id"]
 	assert.False(t, hasDraft)
-	assert.Contains(t, capturedExceptionText(event), models.ErrFactoryPlanningSessionNoDraft.Error())
+	assert.Contains(t, sentrytest.ExceptionText(event), models.ErrFactoryPlanningSessionNoDraft.Error())
 }
 
 func assertLegacyPlanningScoreRejected(t *testing.T, server *Server, token string, path string, score string) {
@@ -614,7 +616,7 @@ func TestRunnerPlanningSessionSurvey(t *testing.T) {
 	db := database.DB(t.Context())
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/surveys", bytes.NewReader([]byte(
-		`{"questions":[{"prompt":"What is the priority?","options":["High","Low"]}]}`,
+		`{"questions":[{"prompt":"What is the priority?","options":["High","Low"],"recommended_option":"High"}]}`,
 	)))
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
@@ -626,6 +628,7 @@ func TestRunnerPlanningSessionSurvey(t *testing.T) {
 	require.Len(t, reloaded.CurrentSurvey().Questions, 1)
 	assert.Equal(t, "What is the priority?", reloaded.CurrentSurvey().Questions[0].Prompt)
 	assert.Equal(t, []string{"High", "Low"}, reloaded.CurrentSurvey().Questions[0].Options)
+	assert.Equal(t, "High", reloaded.CurrentSurvey().Questions[0].RecommendedOption)
 }
 
 func TestRunnerPlanningSessionRecordsAgentMessage(t *testing.T) {
@@ -690,6 +693,82 @@ func TestRunnerPlanningSessionStoresActivityAndLinksAgentMessage(t *testing.T) {
 	require.Len(t, messages, 1)
 	require.NotNil(t, messages[0].ActivityID)
 	assert.Equal(t, activityID, *messages[0].ActivityID)
+}
+
+func TestRunnerPlanningSessionActivityPublishesBoardUpdate(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	require.NotNil(t, session.DraftWorkOrderID)
+	activityID := uuid.New()
+	startedAt := time.Now().UnixMilli()
+
+	type boardUpdate struct {
+		factoryID string
+		orderID   string
+		reason    string
+	}
+	published := []boardUpdate{}
+	restore := messages.SetFactoryWorkOrderUpdatedPublisherForTest(func(factoryID, orderID, reason string) error {
+		published = append(published, boardUpdate{factoryID: factoryID, orderID: orderID, reason: reason})
+		return nil
+	})
+	defer restore()
+
+	body := fmt.Sprintf(`{
+		"schema_version":2,
+		"activity_id":%q,
+		"provider":"claude",
+		"turn":1,
+		"sequence":1,
+		"status":"running",
+		"started_at":%d,
+		"items":[{"type":"tool","id":"tool-1","kind":"bash","input":"go test ./pkg/models","status":"running"}]
+	}`, activityID.String(), startedAt)
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), bytes.NewReader([]byte(body)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	require.Len(t, published, 1)
+	assert.Equal(t, session.FactoryID.String(), published[0].factoryID)
+	assert.Equal(t, session.DraftWorkOrderID.String(), published[0].orderID)
+	assert.Equal(t, factoryevents.EventTypeOrderUpdated, published[0].reason)
+
+	repeat := fmt.Sprintf(`{
+		"schema_version":2,
+		"activity_id":%q,
+		"provider":"claude",
+		"turn":1,
+		"sequence":1,
+		"status":"running",
+		"started_at":%d,
+		"items":[{"type":"tool","id":"tool-1","kind":"bash","input":"go test ./pkg/models","status":"running"}]
+	}`, activityID.String(), startedAt)
+	req = httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), bytes.NewReader([]byte(repeat)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Len(t, published, 1)
+
+	newer := fmt.Sprintf(`{
+		"schema_version":2,
+		"activity_id":%q,
+		"provider":"claude",
+		"turn":1,
+		"sequence":2,
+		"status":"running",
+		"started_at":%d,
+		"items":[{"type":"tool","id":"tool-1","kind":"bash","input":"go test ./pkg/public","status":"running"}]
+	}`, activityID.String(), startedAt)
+	req = httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), bytes.NewReader([]byte(newer)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Len(t, published, 2)
+	assert.Equal(t, session.DraftWorkOrderID.String(), published[1].orderID)
 }
 
 func TestRunnerPlanningSessionIgnoresStaleActivitySnapshot(t *testing.T) {
@@ -777,6 +856,8 @@ func TestRunnerPlanningSessionRejectsTaskCreationKind(t *testing.T) {
 		{name: "confidence", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/confidence", body: `{"score":4,"summary":"Clear"}`},
 		{name: "survey", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/surveys", body: `{"questions":[{"prompt":"Priority?","options":["High","Low"]}]}`},
 		{name: "agent message", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/agent-messages", body: `{"text":"Ready."}`},
+		{name: "suggest owners", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/suggest-owners", body: `{"paths":["pkg"]}`},
+		{name: "owner", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/owner", body: `{"user":"octocat","reason":"Owns the code."}`},
 		{name: "activity", method: http.MethodPut, path: "/api/v1/runner/planning-sessions/activities/" + uuid.New().String(), body: `{}`},
 	}
 	for _, request := range requests {
@@ -822,6 +903,8 @@ func TestRunnerPlanningSessionRejectsRunMismatch(t *testing.T) {
 	}{
 		{path: "/api/v1/runner/planning-sessions/specs", body: `{"body":"# Retry refunds"}`},
 		{path: "/api/v1/runner/planning-sessions/agent-messages", body: `{"text":"Ready."}`},
+		{path: "/api/v1/runner/planning-sessions/suggest-owners", body: `{"paths":["pkg"]}`},
+		{path: "/api/v1/runner/planning-sessions/owner", body: `{"user":"octocat","reason":"Owns the code."}`},
 	}
 	for _, request := range requests {
 		req := httptest.NewRequest(http.MethodPost, request.path, bytes.NewBufferString(request.body))
@@ -1264,42 +1347,100 @@ func TestBeginPlanningWaitAndNotify_SkipsFollowUpWaitWithoutQuestion(t *testing.
 }
 
 func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
-	r := support.Setup(t)
-	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
-	db := database.DB(t.Context())
-	line := mustAutoStartLine(t, r, factoryModel, true)
-	mustEnableAutoStart(t, db, factoryModel, line.ID)
-	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
-	require.NoError(t, err)
-	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
-		Scores: &models.PlanningReviewScores{
-			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
-			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
-			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
-		},
-		Spec: "# Retry refunds\n\nStop double charges.\n",
-	}))
+	for _, tc := range []struct {
+		name       string
+		ownerCount int
+	}{
+		{name: "single backlog owner", ownerCount: 1},
+		{name: "multiple backlog owners", ownerCount: 2},
+		{name: "unassigned", ownerCount: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+			db := database.DB(t.Context())
+			line := mustAutoStartLine(t, r, factoryModel, true)
+			mustEnableAutoStart(t, db, factoryModel, line.ID)
+			order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+			require.NoError(t, err)
+			require.NotNil(t, order.CreatedByID)
+			owners := make([]uuid.UUID, 0, tc.ownerCount)
+			for range tc.ownerCount {
+				owner := support.CreateUser(t, r, r.Organization.ID)
+				owners = append(owners, owner.ID)
+			}
+			require.NoError(t, order.ReplaceAssignees(db, owners))
+			require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+				Scores: &models.PlanningReviewScores{
+					Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
+					Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
+					Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+				},
+				Spec: "# Retry refunds\n\nStop double charges.\n",
+			}))
 
-	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+			amqpURL, err := config.RabbitMQURL()
+			require.NoError(t, err)
+			connection, err := amqp.Dial(amqpURL)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = connection.Close() })
+			channel, err := connection.Channel()
+			require.NoError(t, err)
+			require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+			queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+			require.NoError(t, err)
+			require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderNotificationRoutingKey, messages.CanvasExchange, false, nil))
+			require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
-	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
-	assert.Nil(t, reloaded.AutoStartLineID)
-	active, err := reloaded.FindActiveLineDispatch(db)
-	require.NoError(t, err)
-	assert.Equal(t, line.ID, active.LineID)
-	assert.Empty(t, active.Model)
-	assert.Empty(t, active.ThinkingLevel)
-	updatedSession, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.PlanningSessionStateEnded, updatedSession.State)
+			reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+			assert.Nil(t, reloaded.AutoStartLineID)
+			assert.ElementsMatch(t, owners, reloaded.AssigneeIDs())
+			assert.Equal(t, order.CreatedByID, reloaded.CreatedByID)
+			events, err := reloaded.ListEvents(db, 0, nil)
+			require.NoError(t, err)
+			var statusUpdates []factoryevents.WorkOrderStatusUpdated
+			for _, event := range events {
+				assert.NotEqual(t, factoryevents.EventTypeOrderAssigneesUpdated, event.Type)
+				if event.Type != factoryevents.EventTypeOrderStatusUpdated {
+					continue
+				}
+				var update factoryevents.WorkOrderStatusUpdated
+				require.NoError(t, json.Unmarshal(event.Data, &update))
+				if update.FromState == models.FactoryWorkOrderStateDraft && update.ToState == models.FactoryWorkOrderStateOpen {
+					statusUpdates = append(statusUpdates, update)
+				}
+			}
+			require.Len(t, statusUpdates, 1)
+			assert.Nil(t, statusUpdates[0].User)
+			delivery, ok, err := channel.Get(queue.Name, true)
+			require.NoError(t, err)
+			require.True(t, ok, "auto-start publishes a status notification")
+			var notification messages.FactoryWorkOrderNotificationMessage
+			require.NoError(t, json.Unmarshal(delivery.Body, &notification))
+			assert.Equal(t, order.ID.String(), notification.OrderID)
+			assert.Equal(t, factoryevents.EventTypeOrderStatusUpdated, notification.EventType)
+			assert.Equal(t, models.FactoryWorkOrderStateDraft, notification.FromState)
+			assert.Equal(t, models.FactoryWorkOrderStateOpen, notification.ToState)
+			assert.Empty(t, notification.ActorUserID)
 
-	err = beginPlanningWaitAndNotify(db, session)
-	require.Error(t, err)
-	activeAgain, err := reloaded.FindActiveLineDispatch(db)
-	require.NoError(t, err)
-	assert.Equal(t, active.ID, activeAgain.ID)
+			active, err := reloaded.FindActiveLineDispatch(db)
+			require.NoError(t, err)
+			assert.Equal(t, line.ID, active.LineID)
+			assert.Empty(t, active.Model)
+			assert.Empty(t, active.ThinkingLevel)
+			updatedSession, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.PlanningSessionStateEnded, updatedSession.State)
+
+			err = beginPlanningWaitAndNotify(db, session)
+			require.Error(t, err)
+			activeAgain, err := reloaded.FindActiveLineDispatch(db)
+			require.NoError(t, err)
+			assert.Equal(t, active.ID, activeAgain.ID)
+		})
+	}
 }
 
 func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {
@@ -1508,31 +1649,6 @@ func requireResolvedMessageWait(t *testing.T, db *gorm.DB, session *models.Facto
 	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
 }
 
-func bindTestSentryHub(t *testing.T) *memorySentryTransport {
-	t.Helper()
-	transport := &memorySentryTransport{}
-	client, err := sentry.NewClient(sentry.ClientOptions{
-		Dsn:       "https://public@localhost/1",
-		Transport: transport,
-	})
-	require.NoError(t, err)
-	hub := sentry.CurrentHub()
-	previous := hub.Client()
-	hub.BindClient(client)
-	t.Cleanup(func() {
-		hub.BindClient(previous)
-	})
-	return transport
-}
-
-func capturedExceptionText(event *sentry.Event) string {
-	var values []string
-	for _, exception := range event.Exception {
-		values = append(values, exception.Value)
-	}
-	return strings.Join(values, "\n")
-}
-
 func requireCapturedException(t *testing.T, events []*sentry.Event) *sentry.Event {
 	t.Helper()
 	for _, event := range events {
@@ -1542,30 +1658,6 @@ func requireCapturedException(t *testing.T, events []*sentry.Event) *sentry.Even
 	}
 	require.Fail(t, "expected a captured exception", "events=%d", len(events))
 	return nil
-}
-
-type memorySentryTransport struct {
-	mu     sync.Mutex
-	events []*sentry.Event
-}
-
-func (t *memorySentryTransport) Configure(sentry.ClientOptions) {}
-
-func (t *memorySentryTransport) Flush(time.Duration) bool { return true }
-
-func (t *memorySentryTransport) SendEvent(event *sentry.Event) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	clone := *event
-	t.events = append(t.events, &clone)
-}
-
-func (t *memorySentryTransport) Events() []*sentry.Event {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	out := make([]*sentry.Event, len(t.events))
-	copy(out, t.events)
-	return out
 }
 
 type errAfterFirstCheckContext struct {

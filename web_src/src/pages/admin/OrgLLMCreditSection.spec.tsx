@@ -1,19 +1,29 @@
+import {
+  credit,
+  catalog,
+  grants,
+  billingPlan,
+  jsonResponse,
+  mockOrgCreditFetch,
+} from "./OrgLLMCreditSection.test-support";
+import {
+  ADMIN_POLAR_MANAGED_PLAN_COPY,
+  ADMIN_LOCAL_PLAN_COPY,
+  ADMIN_PLAN_UNKNOWN_COPY,
+  ADMIN_TRIAL_ENDS_LABEL,
+  ADMIN_TRIAL_ENDS_HELP,
+  ADMIN_TRIAL_ENDS_ERROR,
+} from "./OrgBillingPlanField";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import {
   ADMIN_CREDIT_HISTORY_ERROR_COPY,
-  ADMIN_LOCAL_PLAN_COPY,
   ADMIN_NO_ACTIVE_TRIAL_COPY,
-  ADMIN_PLAN_UNKNOWN_COPY,
-  ADMIN_POLAR_MANAGED_PLAN_COPY,
-  ADMIN_TRIAL_ENDS_ERROR,
-  ADMIN_TRIAL_ENDS_HELP,
-  ADMIN_TRIAL_ENDS_LABEL,
   OrgLLMCreditSection,
 } from "./OrgLLMCreditSection";
-import { CREDIT_BALANCE_CHANGED_COPY, prefilledTrialEndDate, type OrganizationLLMCredit } from "./useOrgLLMCredit";
+import { CREDIT_BALANCE_CHANGED_COPY, prefilledTrialEndDate } from "./useOrgLLMCredit";
 import { showErrorToast } from "@/lib/toast";
 
 vi.mock("@/lib/toast", () => ({
@@ -27,116 +37,11 @@ vi.mock("@/hooks/useBillingProductEnabled", () => ({
   useBillingProductEnabled: () => billingProductEnabled,
 }));
 
-const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-const credit: OrganizationLLMCredit = {
-  remaining_credit_cents: 9500,
-  grant_total_cents: 10000,
-  superplane_grant_cents: 7000,
-  purchased_credit_cents: 3000,
-  hosted_billed_cents: 500,
-  welcome_remaining_cents: 4500,
-  included_remaining_cents: 0,
-  purchased_remaining_cents: 3000,
-  admin_remaining_cents: 2000,
-  welcome_credit_expires_at: trialEnd,
-  markup_bps: 2000,
-  markup_override_bps: null,
-  warning: false,
-};
-
-const catalog = [
-  { key: "trial", name: "Trial", category: "trial", require_payment_method: false },
-  { key: "business_legacy", name: "Business", category: "paid", require_payment_method: true },
-  { key: "business_manual", name: "Business Manual", category: "paid", require_payment_method: false },
-  { key: "pay_as_you_go", name: "Pay-as-you-go", category: "paid", require_payment_method: true },
-  { key: "none", name: "None", category: "none", require_payment_method: false },
-];
-
-const grants = [
-  {
-    id: "grant-2",
-    kind: "trial_adjustment",
-    amountCents: "-500",
-    note: "Support correction",
-    actorName: "Ada",
-    createdAt: new Date().toISOString(),
-  },
-  { id: "grant-1", kind: "welcome", amountCents: "5000", note: "", createdAt: new Date().toISOString() },
-];
-
 function futureUtcDate(daysAhead: number): string {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysAhead))
     .toISOString()
     .slice(0, 10);
-}
-
-function billingPlan(
-  polarManaged: boolean,
-  trialEndsAt: string | null = null,
-  plan = polarManaged ? "business" : "trial",
-  catalogCategory?: string,
-) {
-  return {
-    plan,
-    catalog_key: plan === "business" ? (polarManaged ? "business_legacy" : "business_manual") : plan,
-    catalog_category: catalogCategory ?? (plan === "trial" ? "trial" : plan === "none" ? "none" : "paid"),
-    plan_source: polarManaged ? "polar" : plan === "business" ? "admin" : "system",
-    polar_subscription_status: polarManaged ? "active" : "",
-    polar_managed: polarManaged,
-    trial_ends_at: trialEndsAt,
-    current_period_end: null,
-  };
-}
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
-
-function mockOrgCreditFetch(
-  options: {
-    polarManaged?: boolean;
-    planStatus?: number;
-    plan?: ReturnType<typeof billingPlan>;
-    creditData?: typeof credit;
-    onPutBalance?: (body: unknown) => Response;
-    onGetGrants?: () => Response;
-    catalogStatus?: number;
-  } = {},
-) {
-  const {
-    catalogStatus = 200,
-    onPutBalance = () => jsonResponse(options.creditData ?? credit),
-    onGetGrants = () => jsonResponse({ grants }),
-  } = options;
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    if (url.endsWith("/feature-definitions")) return jsonResponse([]);
-    if (url.endsWith("/features")) return jsonResponse({ grants: [], effective: { features: {} } });
-    if (url.endsWith("/llm-credit/balances") && init?.method === "PUT") {
-      const body = JSON.parse(String(init.body));
-      return onPutBalance(body);
-    }
-    if (url.endsWith("/llm-credit/grants")) {
-      return onGetGrants();
-    }
-    if (url.endsWith("/llm-credit")) {
-      return jsonResponse(options.creditData ?? credit);
-    }
-    if (url.endsWith("/billing-plans")) {
-      return jsonResponse(catalog, catalogStatus);
-    }
-    if (url.includes("/billing-plan")) {
-      if (options.planStatus) {
-        return new Response("failed", { status: options.planStatus });
-      }
-      return jsonResponse(options.plan ?? billingPlan(options.polarManaged ?? false));
-    }
-    return new Response("not found", { status: 404 });
-  });
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
 }
 
 afterEach(() => {
@@ -392,7 +297,7 @@ describe("OrgLLMCreditSection balances", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
 
     const history = screen.getByTestId("admin-org-credit-history");
-    expect(await within(history).findByText("Trial adjustment")).toBeInTheDocument();
+    expect(await within(history).findByText("Signup credit adjustment")).toBeInTheDocument();
     expect(within(history).getByText("-$5.00")).toBeInTheDocument();
     expect(within(history).getByText("Support correction · Adjusted by Ada")).toBeInTheDocument();
   });
@@ -548,8 +453,9 @@ describe("OrgLLMCreditSection balances", () => {
     expect(screen.queryByText("No credit grants yet.")).not.toBeInTheDocument();
 
     grantsFailed = false;
-    await user.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("Trial adjustment")).toBeInTheDocument();
-    expect(screen.queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
+    const history = screen.getByTestId("admin-org-credit-history");
+    await user.click(within(history).getByRole("button", { name: "Try again" }));
+    expect(await within(history).findByText("Signup credit adjustment")).toBeInTheDocument();
+    expect(within(history).queryByText(ADMIN_CREDIT_HISTORY_ERROR_COPY)).not.toBeInTheDocument();
   });
 });

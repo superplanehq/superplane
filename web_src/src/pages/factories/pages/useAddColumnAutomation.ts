@@ -24,6 +24,7 @@ import {
   factoryRiskScoreSetupPath,
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
+import { factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
 
 export function useAddColumnAutomation(args: {
   organizationId: string;
@@ -58,6 +59,10 @@ export function useAddColumnAutomation(args: {
   const openPicker = (key: ColumnKey) => {
     const nextCatalog = catalogForColumn(key, catalogOptions);
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
+    if (key === "verify" && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
+      navigate(factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId));
+      return;
+    }
     setColumn(key);
     setNaming(onlyCustomCatalogRemains(nextCatalog, nextTaken));
   };
@@ -66,8 +71,8 @@ export function useAddColumnAutomation(args: {
     if (!column) {
       return;
     }
-    if (entry.kind === "pr-discussion" || entry.kind === "pr-checks") {
-      openPRFeedbackSetup(entry.id, args, navigate, closePicker);
+    if (entry.kind === "pr-discussion" || entry.kind === "pr-checks" || entry.kind === "custom-verification") {
+      openFocusedVerifySetup(entry, args, navigate, closePicker);
       return;
     }
     if (entry.kind === "pr-closure") {
@@ -133,25 +138,37 @@ export function useAddColumnAutomation(args: {
   };
 }
 
-function openPRFeedbackSetup(
-  catalogId: string,
+function openFocusedVerifySetup(
+  entry: ColumnAutomationCatalogEntry,
   args: { organizationId: string; factoryKey: string; lineId?: string },
   navigate: (path: string) => void,
   close: () => void,
 ) {
-  const sourceId = catalogId === "checks" ? "checks" : "discussion";
-  const href = args.lineId
-    ? factoryPRFeedbackSetupPath(
-        args.organizationId,
-        args.factoryKey,
-        args.lineId,
-        prFeedbackSetupKindFromSourceId(sourceId),
-      )
-    : undefined;
+  const sourceId = entry.id === "checks" ? "checks" : "discussion";
+  const href = args.lineId ? focusedVerifySetupPath(entry, args, sourceId) : undefined;
   close();
   if (href) {
     navigate(href);
   }
+}
+
+function focusedVerifySetupPath(
+  entry: ColumnAutomationCatalogEntry,
+  args: { organizationId: string; factoryKey: string; lineId?: string },
+  sourceId: "checks" | "discussion",
+): string | undefined {
+  if (!args.lineId) {
+    return undefined;
+  }
+  if (entry.kind === "custom-verification") {
+    return factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId);
+  }
+  return factoryPRFeedbackSetupPath(
+    args.organizationId,
+    args.factoryKey,
+    args.lineId,
+    prFeedbackSetupKindFromSourceId(sourceId),
+  );
 }
 
 async function installationName(organizationId: string, integrationId: string): Promise<string> {

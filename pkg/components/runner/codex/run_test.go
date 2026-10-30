@@ -19,6 +19,60 @@ func TestThinkingArgsMapsReasoningEffort(t *testing.T) {
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="low"`}, thinkingArgsFromScript(t, "low"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="medium"`}, thinkingArgsFromScript(t, "medium"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="high"`}, thinkingArgsFromScript(t, "HIGH"))
+	assert.Equal(t, []string{"-c", `model_reasoning_effort="minimal"`}, thinkingArgsFromScript(t, "minimal"))
+	assert.Equal(t, []string{"-c", `model_reasoning_effort="xhigh"`}, thinkingArgsFromScript(t, "xhigh"))
+}
+
+func TestCodexRunReadsModelFromRolloutAndMapsUsage(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	resultPath := filepath.Join(taskDir, "result.json")
+	codexHome := filepath.Join(taskDir, "codex-home")
+	require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), []byte(`module.exports = {
+  subscriptionEnabled: () => true,
+  subscriptionChildEnv: (env) => env,
+  reportUsage: async () => { throw new Error("Usage upload unavailable"); },
+};`), 0o600))
+	fakeCodex := filepath.Join(taskDir, "codex")
+	require.NoError(t, os.WriteFile(fakeCodex, []byte(`#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+const id = "thread-123";
+const dir = path.join(process.env.CODEX_HOME, "sessions", "2026", "10", "19");
+fs.mkdirSync(dir, { recursive: true });
+fs.writeFileSync(path.join(dir, "rollout-test-" + id + ".jsonl"), [
+  JSON.stringify({ type: "turn_context", payload: { model: "gpt-5.4", effort: "xhigh" } }),
+  "{invalid"
+].join("\n"));
+process.stdout.write(JSON.stringify({ type: "thread.started", thread_id: id }) + "\n");
+process.stdout.write(JSON.stringify({ type: "turn.completed", usage: { input_tokens: 10, output_tokens: 4, cache_read_input_tokens: 3, cache_write_input_tokens: 2, reasoning_output_tokens: 1 } }) + "\n");
+`), 0o700))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+		"OPENAI_API_KEY=sk-test-openai-key",
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+resultPath,
+		"CODEX_HOME="+codexHome,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Contains(t, string(out), "Usage upload unavailable")
+
+	var result map[string]any
+	content, err := os.ReadFile(resultPath)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(content, &result))
+	assert.Equal(t, "gpt-5.4", result["model"])
+	assert.Equal(t, "xhigh", result["thinkingLevel"])
+	usage := result["usage"].(map[string]any)
+	assert.Equal(t, float64(2), usage["cache_creation_input_tokens"])
+	assert.Equal(t, float64(1), usage["reasoning_tokens"])
 }
 
 func thinkingArgsFromScript(t *testing.T, thinking string) []string {
@@ -47,18 +101,74 @@ func TestCodexExecArgsUsesDangerousBypassOutsidePlanning(t *testing.T) {
 	assert.Contains(t, args, "gpt-5")
 	assert.NotContains(t, args, "--sandbox")
 	assert.NotContains(t, args, "read-only")
-	assert.NotContains(t, strings.Join(args, " "), "mcp_servers")
+	joined := strings.Join(args, " ")
+	assert.NotContains(t, joined, "mcp_servers")
+	assert.NotContains(t, joined, "openai_base_url")
+}
+
+func TestCodexExecArgsAddsOpenAIBaseURLOverride(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{
+		"OPENAI_BASE_URL": "https://proxy.example/v1",
+	}, "gpt-5", "/task/planning_session_mcp.js")
+
+	assert.Contains(t, strings.Join(args, " "), `openai_base_url="https://proxy.example/v1"`)
+}
+
+func TestCodexExecEnvCopiesOpenAIAPIKey(t *testing.T) {
+	env := codexExecEnvFromScript(t, map[string]string{
+		"OPENAI_API_KEY": "sk-from-openai",
+		"OTHER":          "keep-me",
+	})
+	assert.Equal(t, "sk-from-openai", env["CODEX_API_KEY"])
+	assert.Equal(t, "sk-from-openai", env["OPENAI_API_KEY"])
+	assert.Equal(t, "keep-me", env["OTHER"])
+}
+
+func TestCodexExecEnvKeepsExplicitCodexAPIKey(t *testing.T) {
+	env := codexExecEnvFromScript(t, map[string]string{
+		"CODEX_API_KEY":  "sk-codex",
+		"OPENAI_API_KEY": "sk-openai",
+	})
+	assert.Equal(t, "sk-codex", env["CODEX_API_KEY"])
+	assert.Equal(t, "sk-openai", env["OPENAI_API_KEY"])
+}
+
+func TestCodexExecEnvRejectsMissingAPIKey(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `require(process.argv[1]).codexExecEnv({OPENAI_API_KEY:"  "})`, script)
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(out), "Codex API key is missing")
 }
 
 func TestCodexExecArgsAddsMergeConfidenceMCP(t *testing.T) {
 	args := codexExecArgsFromScript(t, map[string]string{
-		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
+		"SUPERPLANE_BASE_URL":               "http://superplane.test",
+		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "merge-confidence-secret",
 	}, "gpt-5", "/task/merge_confidence_mcp.js")
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
 	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/merge_confidence_mcp.js"]`)
+	assertForwardsMCPEnvVars(t, args, "SUPERPLANE_BASE_URL", "SUPERPLANE_MERGE_CONFIDENCE_TOKEN")
+	assert.NotContains(t, joined, "merge-confidence-secret")
+	assert.NotContains(t, joined, "approval_mode")
+}
+
+func assertForwardsMCPEnvVars(t *testing.T, args []string, names ...string) {
+	t.Helper()
+	var envVars string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "mcp_servers.superplane.env_vars=") {
+			envVars = arg
+		}
+	}
+	require.NotEmpty(t, envVars, "missing mcp_servers.superplane.env_vars override")
+	for _, name := range names {
+		assert.Contains(t, envVars, fmt.Sprintf("%q", name))
+	}
 }
 
 func TestCodexSuperplaneMCPScriptUsesMergeConfidence(t *testing.T) {
@@ -79,21 +189,73 @@ func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
 	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/task_artifact_mcp.js"]`)
+	assertForwardsMCPEnvVars(t, args, "SUPERPLANE_BASE_URL", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ARTIFACT_TOKEN")
+	assert.NotContains(t, joined, "artifact-token")
+	assert.NotContains(t, joined, "approval_mode")
+}
+
+func TestCodexExecArgsAddsGlobalMCPWithApprovedTools(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"task run": {"SUPERPLANE_RUNNER_TOKEN": "runner-token-secret"},
+		"planning": {
+			"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+			"SUPERPLANE_RUNNER_TOKEN":          "runner-token-secret",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			args := codexExecArgsFromScript(t, env, "gpt-5", "/task/planning_session_mcp.js")
+			joined := strings.Join(args, " ")
+
+			assert.Contains(t, args, `mcp_servers.superplane_global.command="node"`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.args=["/task/superplane_mcp/server.js"]`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR"]`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.tools.suggest_owners.approval_mode="approve"`)
+			assert.Contains(t, args, `mcp_servers.superplane_global.tools.assign_owner.approval_mode="approve"`)
+			assert.NotContains(t, joined, "mcp_servers.superplane.tools.suggest_owners")
+			assert.NotContains(t, joined, "runner-token-secret")
+		})
+	}
 }
 
 func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
-	args := codexExecArgsFromScript(t, map[string]string{
-		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
-		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
-	}, "gpt-5", "/task/planning_session_mcp.js")
+	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
+	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))
+	for _, session := range []string{"", "thread-1"} {
+		t.Run("session="+session, func(t *testing.T) {
+			args := codexExecArgsFromScriptWithSession(t, map[string]string{
+				"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+				"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+				"SUPERPLANE_WORKSPACE_MCP_CONFIG":  configPath,
+				"SUPERPLANE_RUN_TOKEN":             "run-token-secret",
+			}, "gpt-5", "/task/planning_session_mcp.js", session)
 
-	assert.NotContains(t, args, "--dangerously-bypass-approvals-and-sandbox")
-	joined := strings.Join(args, " ")
-	assert.Contains(t, joined, `sandbox_mode="read-only"`)
-	assert.Contains(t, joined, `approval_policy="never"`)
-	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
-	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/planning_session_mcp.js"]`)
-	assert.Contains(t, joined, "developer_instructions")
+			assert.NotContains(t, args, "--dangerously-bypass-approvals-and-sandbox")
+			joined := strings.Join(args, " ")
+			assert.Contains(t, joined, `sandbox_mode="read-only"`)
+			assert.Contains(t, joined, `approval_policy="never"`)
+			assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
+			assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/planning_session_mcp.js"]`)
+			assert.Contains(t, joined, "developer_instructions")
+			assert.Contains(t, args, `mcp_servers.superplane.tools.propose_update.approval_mode="approve"`)
+			assert.Contains(t, args, `mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"`)
+			assert.Contains(t, args, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
+			assert.NotContains(t, joined, "superplane_global")
+			assertForwardsMCPEnvVars(t, args,
+				"SUPERPLANE_BASE_URL",
+				"SUPERPLANE_RUN_TOKEN",
+				"SUPERPLANE_ARTIFACT_TOKEN",
+				"SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
+				"SUPERPLANE_ACTIVITY_ID",
+				"SUPERPLANE_TASK_DIR",
+				"SUPERPLANE_ANALYSIS_SPEC_FILE",
+				"SUPERPLANE_ANALYSIS_SCORE_FILE",
+			)
+			assert.NotContains(t, joined, "run-token-secret")
+			assert.Equal(t, 2, strings.Count(joined, "approval_mode="))
+			assert.NotContains(t, joined, "default_tools_approval_mode")
+		})
+	}
 }
 
 func TestCodexExecArgsMergesWorkspaceMCP(t *testing.T) {
@@ -184,7 +346,7 @@ func TestCodexSessionIDFromThreadEvent(t *testing.T) {
 	assert.Equal(t, "thread-123", string(out))
 }
 
-func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
+func TestCodexAnalysisRunPreservesFailedResultWhenMessageUploadFails(t *testing.T) {
 	taskDir := t.TempDir()
 	prompt := filepath.Join(taskDir, "prompt.txt")
 	result := filepath.Join(taskDir, "result.json")
@@ -193,7 +355,10 @@ func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(taskDir, "planning_session_mcp.js"),
-		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);`),
+		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => {
+  fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);
+  throw new Error("Planning message upload failed");
+};`),
 		0o600,
 	))
 	fakeCodex := filepath.Join(taskDir, "codex")
@@ -213,15 +378,215 @@ func TestCodexAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
 		"RECORDED_AGENT_MESSAGE="+recorded,
+		"OPENAI_API_KEY=sk-test-openai-key",
 	)
 	output, err := cmd.CombinedOutput()
 	require.Error(t, err, string(output))
+	assert.Contains(t, string(output), "Planning message upload failed")
 
 	message, err := os.ReadFile(recorded)
 	require.NoError(t, err)
 	assert.Equal(t, "I found useful context before the tool failed.", string(message))
-	_, err = os.Stat(result)
+	content, err := os.ReadFile(result)
 	require.NoError(t, err)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(content, &payload))
+	assert.Equal(t, string(message), payload["result"])
+	assert.Equal(t, true, payload["is_error"])
+	assert.Equal(t, "Codex failed with exit code 1.", payload["error"])
+	assert.NotNil(t, payload["usage"])
+}
+
+func TestCodexRunReportsProviderFailures(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		events   string
+		stderr   string
+		exitCode int
+		message  string
+	}{
+		{
+			name: "failed turn",
+			events: `{"type":"item.completed","item":{"id":"reply","type":"agent_message","text":"I started the task."}}
+{"type":"turn.failed","error":{"message":"The model is not available with your ChatGPT subscription."}}`,
+			exitCode: 1,
+			message:  "The model is not available with your ChatGPT subscription.",
+		},
+		{
+			name:     "stream error",
+			events:   `{"type":"error","message":"Your ChatGPT usage limit has been reached."}`,
+			exitCode: 1,
+			message:  "Your ChatGPT usage limit has been reached.",
+		},
+		{
+			name:    "failed event with zero exit code",
+			events:  `{"type":"turn.failed","error":{"message":"Your ChatGPT session has expired."}}`,
+			message: "Your ChatGPT session has expired.",
+		},
+		{
+			name:     "stderr failure",
+			stderr:   "Failed to refresh your ChatGPT credentials.",
+			exitCode: 1,
+			message:  "Failed to refresh your ChatGPT credentials.",
+		},
+		{
+			name:     "failure with only startup diagnostics",
+			stderr:   "Reading additional input from stdin...",
+			exitCode: 2,
+			message:  "Codex failed with exit code 2.",
+		},
+		{
+			name:     "empty failure",
+			exitCode: 1,
+			message:  "Codex failed with exit code 1.",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			taskDir := t.TempDir()
+			prompt := filepath.Join(taskDir, "prompt.txt")
+			resultPath := filepath.Join(taskDir, "result.json")
+			require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "planning_session_mcp.js"), []byte(`module.exports.recordAgentMessage = async () => {};`), 0o600))
+			events := strings.ReplaceAll(test.events, test.message, test.message+" subscription-secret-value api-secret-value")
+			stderr := strings.ReplaceAll(test.stderr, test.message, test.message+" subscription-secret-value api-secret-value")
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(fmt.Sprintf(`#!/usr/bin/env node
+process.stdout.write(%q + "\n");
+process.stderr.write(%q + "\n");
+process.exitCode = %d;
+`, events, stderr, test.exitCode)), 0o700))
+			// Use the real activity module and subscription redactor to check every
+			// persisted failure surface, including a credential read from auth.json.
+			subscription, err := os.ReadFile("codex_subscription.js")
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), subscription, 0o600))
+			require.NoError(t, os.Mkdir(filepath.Join(taskDir, "codex-home"), 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex-home", "auth.json"), []byte(`{"tokens":{"access_token":"subscription-secret-value"}}`), 0o600))
+			script, err := filepath.Abs("run.js")
+			require.NoError(t, err)
+			cmd := exec.Command("node", script, prompt)
+			cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+				"PATH="+taskDir+":"+os.Getenv("PATH"),
+				"SUPERPLANE_TASK_DIR="+taskDir,
+				"SUPERPLANE_RESULT_FILE="+resultPath,
+				"CODEX_HOME="+filepath.Join(taskDir, "codex-home"),
+				"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+				"SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis",
+				"OPENAI_API_KEY=api-secret-value",
+			)
+			output, err := cmd.CombinedOutput()
+			require.Error(t, err, string(output))
+			assert.Contains(t, string(output), test.message)
+			content, err := os.ReadFile(resultPath)
+			require.NoError(t, err)
+			var result map[string]any
+			require.NoError(t, json.Unmarshal(content, &result))
+			assert.Equal(t, true, result["is_error"])
+			assert.Contains(t, result["error"], test.message)
+			assert.NotContains(t, string(output)+string(content), "subscription-secret-value")
+			assert.NotContains(t, string(output)+string(content), "api-secret-value")
+			if test.name == "failed turn" {
+				assert.Equal(t, "I started the task.", result["result"])
+			}
+			var noticeFound bool
+			for _, record := range activityRecords(t, string(output)) {
+				if record["type"] == "activity_notice" && record["code"] == "codex_error" {
+					noticeFound = true
+					assert.Contains(t, record["message"], test.message)
+				}
+			}
+			assert.True(t, noticeFound, "failure should be visible in task activity")
+		})
+	}
+}
+
+func TestCodexRunSelectsAuthenticationForCodexChild(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		subscription bool
+		suppliedKeys bool
+	}{
+		{name: "API key", suppliedKeys: true},
+		{name: "subscription without API keys", subscription: true},
+		{name: "subscription removes API keys", subscription: true, suppliedKeys: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			taskDir := t.TempDir()
+			prompt := filepath.Join(taskDir, "prompt.txt")
+			result := filepath.Join(taskDir, "result.json")
+			received := filepath.Join(taskDir, "received-environment.json")
+			require.NoError(t, os.WriteFile(prompt, []byte("hello"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(`#!/usr/bin/env node
+const fs = require("fs");
+fs.writeFileSync(process.env.RECEIVED_ENVIRONMENT, JSON.stringify(process.env));
+process.stdout.write('{"type":"thread.started","thread_id":"thread-1"}\n{"type":"item.completed","item":{"id":"reply-1","type":"agent_message","text":"ok"}}\n');
+`), 0o700))
+			script, err := filepath.Abs("run.js")
+			require.NoError(t, err)
+			cmd := exec.Command("node", script, prompt)
+			cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+				"PATH="+taskDir+":"+os.Getenv("PATH"),
+				"SUPERPLANE_TASK_DIR="+taskDir,
+				"SUPERPLANE_RESULT_FILE="+result,
+				"RECEIVED_ENVIRONMENT="+received,
+			)
+			if test.suppliedKeys {
+				cmd.Env = append(cmd.Env, "OPENAI_API_KEY=sk-from-openai", "OPENAI_BASE_URL=https://api.example.com")
+				if test.subscription {
+					cmd.Env = append(cmd.Env, "CODEX_API_KEY=sk-codex")
+				}
+			}
+			if test.subscription {
+				require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), []byte(subscriptionScript), 0o600))
+				cmd.Env = append(cmd.Env, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=subscription-token")
+			}
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, string(output))
+			encoded, err := os.ReadFile(received)
+			require.NoError(t, err)
+			var got map[string]string
+			require.NoError(t, json.Unmarshal(encoded, &got))
+			if test.subscription {
+				assert.Empty(t, got["CODEX_API_KEY"])
+				assert.Empty(t, got["OPENAI_API_KEY"])
+				assert.Empty(t, got["OPENAI_BASE_URL"])
+				assert.Equal(t, filepath.Join(taskDir, "codex-home"), got["CODEX_HOME"])
+				return
+			}
+			assert.Equal(t, "sk-from-openai", got["CODEX_API_KEY"])
+			assert.Equal(t, "sk-from-openai", got["OPENAI_API_KEY"])
+		})
+	}
+}
+
+func TestCodexRunRejectsMissingAPIKeyBeforeSpawn(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	result := filepath.Join(taskDir, "result.json")
+	spawned := filepath.Join(taskDir, "spawned")
+	require.NoError(t, os.WriteFile(prompt, []byte("hello"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(taskDir, "codex"),
+		[]byte("#!/bin/sh\ntouch \"$SPAWNED\"\n"),
+		0o700,
+	))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+result,
+		"SPAWNED="+spawned,
+	)
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err, string(output))
+	assert.Contains(t, string(output), "Codex API key is missing")
+	_, statErr := os.Stat(spawned)
+	assert.Error(t, statErr)
 }
 
 func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
@@ -299,6 +664,7 @@ func TestFormatCodexJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"reasoning-1","type":"reasoning","text":%q}}`, token),
 		fmt.Sprintf(`{"type":"item.started","item":{"id":"item-1","type":"command_execution","command":%q}}`, "git clone https://x-access-token:"+token+"@github.com/acme/app.git"),
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"item-1","type":"command_execution","command":"true","aggregated_output":%q,"exit_code":0}}`, imageResult),
+		fmt.Sprintf(`{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_update","status":"failed","error":{"message":%q}}}`, token),
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"answer-1","type":"agent_message","text":%q}}`, token),
 	})
 
@@ -322,6 +688,72 @@ func TestFormatCodexJsonLinesPairsAnonymousItemIDs(t *testing.T) {
 	assert.Equal(t, "tool_end", records[1]["type"])
 	assert.Equal(t, "passed", records[1]["status"])
 	assert.Equal(t, 1, strings.Count(output, `"type":"tool_start"`))
+}
+
+func TestCodexFormatterReportsPlanningToolFailures(t *testing.T) {
+	for _, status := range []string{"failed", "cancelled", "declined", "completed"} {
+		for _, withActivity := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/activity=%t", status, withActivity), func(t *testing.T) {
+				item := map[string]any{
+					"id": "publish-1", "type": "mcp_tool_call", "server": "superplane",
+					"tool": "propose_update", "status": status,
+				}
+				failed := status != "completed"
+				if failed {
+					item["error"] = map[string]any{"message": "MCP tool approval was cancelled"}
+				}
+				event, err := json.Marshal(map[string]any{"type": "item.completed", "item": item})
+				require.NoError(t, err)
+				format := runCodexFormatter
+				if withActivity {
+					format = runCodexFormatterWithActivity
+				}
+				output := format(t, []string{string(event)})
+				records := liveLogRecords(t, output)
+				require.Len(t, records, 2)
+				assert.Contains(t, records[0]["text"], "propose_update")
+				expectedStatus := "passed"
+				if failed {
+					expectedStatus = "failed"
+					assert.Contains(t, output, "MCP tool approval was cancelled")
+				}
+				assert.Equal(t, expectedStatus, records[1]["status"])
+				if !withActivity {
+					return
+				}
+				var ended bool
+				var errorOutput bool
+				for _, record := range activityRecords(t, output) {
+					if record["type"] == "activity_tool_end" {
+						ended = true
+						activityStatus := expectedStatus
+						if status == "cancelled" {
+							activityStatus = "cancelled"
+						}
+						assert.Equal(t, activityStatus, record["status"])
+					}
+					if record["channel"] == "tool_output" && record["output_stream"] == "stderr" {
+						errorOutput = true
+					}
+				}
+				assert.True(t, ended)
+				assert.Equal(t, failed, errorOutput)
+			})
+		}
+	}
+}
+
+func TestCodexFormatterShowsFailedMCPToolResultText(t *testing.T) {
+	event := `{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_update","status":"failed","error":null,"result":{"content":[{"type":"text","text":"SUPERPLANE_BASE_URL is required"}],"structured_content":null}}}`
+	output := runCodexFormatterWithActivity(t, []string{event})
+
+	var errorOutput string
+	for _, record := range activityRecords(t, output) {
+		if record["channel"] == "tool_output" && record["output_stream"] == "stderr" {
+			errorOutput, _ = record["text"].(string)
+		}
+	}
+	assert.Equal(t, "SUPERPLANE_BASE_URL is required", errorOutput)
 }
 
 func TestFormatTurnResultWritesClaudeStyleDoneLine(t *testing.T) {
@@ -421,6 +853,37 @@ func codexExecArgsFromScriptWithPrompt(
 	var args []string
 	require.NoError(t, json.Unmarshal(out, &args))
 	return args
+}
+
+func codexExecEnvFromScript(t *testing.T, env map[string]string) map[string]string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { codexExecEnv } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexExecEnv(JSON.parse(process.argv[2]))));`,
+		script,
+		string(payload),
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var childEnv map[string]string
+	require.NoError(t, json.Unmarshal(out, &childEnv))
+	return childEnv
+}
+
+func withoutCodexAPIKeys(env []string) []string {
+	filtered := make([]string, 0, len(env))
+	for _, entry := range env {
+		if strings.HasPrefix(entry, "OPENAI_API_KEY=") || strings.HasPrefix(entry, "CODEX_API_KEY=") {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
 }
 
 func planningEnabledFromScript(t *testing.T, env map[string]string) bool {

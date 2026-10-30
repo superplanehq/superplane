@@ -44,21 +44,21 @@ func ValidateAgentCredentials(credentials AgentCredentials, integrationRequired 
 	}
 }
 
-func InjectSecretAPIKey(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, envName string, secret configuration.SecretKeyRef) ([]BrokerEnvironmentVariable, error) {
+func InjectSecretAPIKey(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, envName string, secret configuration.SecretKeyRef) ([]TaskEnvironmentVariable, error) {
 	apiKey, err := ctx.Secrets.GetKey(secret.Secret, secret.Key)
 	if err != nil {
 		return nil, fmt.Errorf("resolve API key: %w", err)
 	}
-	return append(environment, BrokerEnvironmentVariable{Name: envName, Value: string(apiKey)}), nil
+	return append(environment, TaskEnvironmentVariable{Name: envName, Value: string(apiKey)}), nil
 }
 
-func InjectIntegrationKeys(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, integration configuration.IntegrationRef) ([]BrokerEnvironmentVariable, error) {
+func InjectIntegrationKeys(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, integration configuration.IntegrationRef) ([]TaskEnvironmentVariable, error) {
 	secrets, err := ctx.Secrets.GetIntegrationSecrets(integration.Name)
 	if err != nil {
 		return nil, fmt.Errorf("resolve integration: %w", err)
 	}
 	for name, value := range secrets.Values {
-		environment = append(environment, BrokerEnvironmentVariable{Name: name, Value: string(value)})
+		environment = append(environment, TaskEnvironmentVariable{Name: name, Value: string(value)})
 	}
 	return environment, nil
 }
@@ -89,21 +89,21 @@ func PrepareHostedRun(ctx core.ExecutionContext, provider, model string) (core.H
 	return access, nil
 }
 
-func InjectHostedAPIKey(environment []BrokerEnvironmentVariable, envName, apiKey string, extra ...BrokerEnvironmentVariable) []BrokerEnvironmentVariable {
-	environment = append(environment, BrokerEnvironmentVariable{Name: envName, Value: apiKey})
+func InjectHostedAPIKey(environment []TaskEnvironmentVariable, envName, apiKey string, extra ...TaskEnvironmentVariable) []TaskEnvironmentVariable {
+	environment = append(environment, TaskEnvironmentVariable{Name: envName, Value: apiKey})
 	return append(environment, extra...)
 }
 
-func InjectHostedCredentials(environment []BrokerEnvironmentVariable, apiKeyEnv, apiKey, baseURLEnv, baseURL string) []BrokerEnvironmentVariable {
+func InjectHostedCredentials(environment []TaskEnvironmentVariable, apiKeyEnv, apiKey, baseURLEnv, baseURL string) []TaskEnvironmentVariable {
 	environment = dropEnvironmentNames(environment, apiKeyEnv, baseURLEnv)
-	extra := []BrokerEnvironmentVariable{}
+	extra := []TaskEnvironmentVariable{}
 	if trimmed := strings.TrimSpace(baseURL); trimmed != "" {
-		extra = append(extra, BrokerEnvironmentVariable{Name: baseURLEnv, Value: strings.TrimRight(trimmed, "/")})
+		extra = append(extra, TaskEnvironmentVariable{Name: baseURLEnv, Value: strings.TrimRight(trimmed, "/")})
 	}
 	return InjectHostedAPIKey(environment, apiKeyEnv, apiKey, extra...)
 }
 
-func dropEnvironmentNames(environment []BrokerEnvironmentVariable, names ...string) []BrokerEnvironmentVariable {
+func dropEnvironmentNames(environment []TaskEnvironmentVariable, names ...string) []TaskEnvironmentVariable {
 	deny := make(map[string]struct{}, len(names))
 	for _, name := range names {
 		if trimmed := strings.TrimSpace(name); trimmed != "" {
@@ -114,7 +114,7 @@ func dropEnvironmentNames(environment []BrokerEnvironmentVariable, names ...stri
 		return environment
 	}
 
-	kept := make([]BrokerEnvironmentVariable, 0, len(environment))
+	kept := make([]TaskEnvironmentVariable, 0, len(environment))
 	for _, variable := range environment {
 		if _, drop := deny[variable.Name]; drop {
 			continue

@@ -433,6 +433,10 @@ export function githubIntakeLabelsForApi(settings: IntakeSourceSettings): string
   return [];
 }
 
+export function intakeSourceSupportsDefaultOwner(sourceId: string | undefined): boolean {
+  return sourceId === "github-issues" || sourceId === "sentry-exceptions";
+}
+
 export function intakeSettingsToApi(
   settings: IntakeSourceSettings,
   sourceId?: LineIntakeSourceId,
@@ -440,7 +444,7 @@ export function intakeSettingsToApi(
   const labels =
     sourceId === "github-issues" ? githubIntakeLabelsForApi(settings) : settings.filterByLabel ? settings.labels : [];
   return {
-    ...(sourceId === "github-issues" ? { defaultOwnerId: settings.defaultOwnerId } : {}),
+    ...(intakeSourceSupportsDefaultOwner(sourceId) ? { defaultOwnerId: settings.defaultOwnerId } : {}),
     confidencePct: settings.confidencePct,
     labels,
     labelFilterMode: settings.labelFilterMode === "exclude" ? "LABEL_FILTER_MODE_EXCLUDE" : "LABEL_FILTER_MODE_INCLUDE",
@@ -492,4 +496,8 @@ function assignmentFromApi(assignment: FactoriesFactoryIntakeSettings["assignmen
     return "unassigned";
   }
   return "any";
+}
+
+export function intakeSourceSettingsTitle(sourceId: string, name: string): string {
+  return sourceId === "github-issues" ? "Create tasks from GitHub issues" : `Intake ${name}`;
 }
