@@ -21,9 +21,9 @@ vi.mock("./useOrganizationId", () => ({
   useOrganizationId: useOrganizationIdMock,
 }));
 
-import { integrationKeys, resolveGithubDefaultBranch, useAvailableIntegrations } from "./useIntegrations";
+import { integrationKeys, resolveRepositoryDefaultBranch, useAvailableIntegrations } from "./useIntegrations";
 
-describe("resolveGithubDefaultBranch", () => {
+describe("resolveRepositoryDefaultBranch", () => {
   beforeEach(() => {
     organizationsListIntegrationResources.mockReset();
   });
@@ -33,7 +33,7 @@ describe("resolveGithubDefaultBranch", () => {
       data: { resources: [{ type: "default_branch", name: "staging", id: "staging" }] },
     });
 
-    const branch = await resolveGithubDefaultBranch("org-1", "int-1", "acme/app");
+    const branch = await resolveRepositoryDefaultBranch("org-1", "int-1", "acme/app");
 
     expect(branch).toBe("staging");
     expect(organizationsListIntegrationResources).toHaveBeenCalledWith(
@@ -44,26 +44,39 @@ describe("resolveGithubDefaultBranch", () => {
     );
   });
 
-  it("falls back to main when the integration id is missing", async () => {
-    const branch = await resolveGithubDefaultBranch("org-1", "", "acme/app");
+  it("returns an empty branch when the organization id is missing", async () => {
+    const branch = await resolveRepositoryDefaultBranch("", "int-1", "acme/app");
 
-    expect(branch).toBe("main");
+    expect(branch).toBe("");
     expect(organizationsListIntegrationResources).not.toHaveBeenCalled();
   });
 
-  it("falls back to main when the repository is missing", async () => {
-    const branch = await resolveGithubDefaultBranch("org-1", "int-1", "");
+  it("returns an empty branch when the integration id is missing", async () => {
+    const branch = await resolveRepositoryDefaultBranch("org-1", "", "acme/app");
 
-    expect(branch).toBe("main");
+    expect(branch).toBe("");
     expect(organizationsListIntegrationResources).not.toHaveBeenCalled();
   });
 
-  it("falls back to main when the response has no resources", async () => {
+  it("returns an empty branch when the repository is missing", async () => {
+    const branch = await resolveRepositoryDefaultBranch("org-1", "int-1", "");
+
+    expect(branch).toBe("");
+    expect(organizationsListIntegrationResources).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty branch when the response has no resources", async () => {
     organizationsListIntegrationResources.mockResolvedValue({ data: { resources: [] } });
 
-    const branch = await resolveGithubDefaultBranch("org-1", "int-1", "acme/app");
+    const branch = await resolveRepositoryDefaultBranch("org-1", "int-1", "acme/app");
 
-    expect(branch).toBe("main");
+    expect(branch).toBe("");
+  });
+
+  it("rejects when the branch request fails", async () => {
+    organizationsListIntegrationResources.mockRejectedValue(new Error("github unavailable"));
+
+    await expect(resolveRepositoryDefaultBranch("org-1", "int-1", "acme/app")).rejects.toThrow("github unavailable");
   });
 });
 

@@ -264,12 +264,39 @@ func TestWorkspaceCheckoutScriptAnchorsToTaskDirFromSubdirectory(t *testing.T) {
 	assert.NoDirExists(t, filepath.Join(nested, "repo"))
 }
 
-func TestWorkspaceCheckoutScriptFailsOnMissingBranch(t *testing.T) {
-	main := initBareRepo(t, "develop")
+func TestWorkspaceCheckoutScriptFallsBackWhenBranchIsMissing(t *testing.T) {
+	remote := initBareRepo(t, "develop")
 	dir := t.TempDir()
-	_, err := runCheckoutScript(t, dir, "file://"+main, "main", "")
+	output, err := runCheckoutScript(t, dir, "file://"+remote, "main", "")
+	require.NoError(t, err, output)
+	assert.Contains(t, output, `The workspace default branch "main" does not exist`)
+	assert.Contains(t, output, `Checking out "develop"`)
+	assert.Equal(t, "develop", runGitQuiet(t, "", filepath.Join(dir, "repo"), "rev-parse", "--abbrev-ref", "HEAD"))
+}
+
+func TestWorkspaceCheckoutScriptCommitSetupRejectsMissingBranch(t *testing.T) {
+	remote := initBareRepo(t, "master")
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "main", checkoutScriptOptions{
+		commitSetup: "1",
+		extraEnv:    []string{"REPO=acme/app"},
+	})
 	require.Error(t, err)
+	assert.Contains(t, output, `The workspace default branch "main" does not exist in acme/app`)
+	assert.Contains(t, output, `The repository's default branch is "master"`)
+	assert.Contains(t, output, "Workspace settings → Repository")
 	assert.NoDirExists(t, filepath.Join(dir, "repo", ".git"))
+}
+
+func TestWorkspaceCheckoutScriptUsesRemoteDefaultWhenBaseIsEmpty(t *testing.T) {
+	remote := initBareRepo(t, "master")
+	dir := t.TempDir()
+	output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "", checkoutScriptOptions{commitSetup: "1"})
+	require.NoError(t, err, output)
+	assert.Equal(t, "master", runGitQuiet(t, "", filepath.Join(dir, "repo"), "rev-parse", "--abbrev-ref", "HEAD"))
+	heads := runGitQuiet(t, "", "", "ls-remote", "--heads", "file://"+remote)
+	assert.Contains(t, heads, "refs/heads/master")
+	assert.NotContains(t, heads, "refs/heads/main")
 }
 
 func TestWorkspaceCheckoutScriptSkipsUnsafeContextDirectory(t *testing.T) {

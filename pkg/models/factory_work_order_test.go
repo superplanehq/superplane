@@ -17,6 +17,156 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestFactory_RetargetUnfinishedWorkOrderBranches(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "retarget-branch")
+	_, _, otherFactory := setupFactoryWithUser(t, "retarget-other")
+	tx := database.DB(t.Context())
+
+	emptyDraft := createOrderWithBranch(t, tx, factoryModel, userID, "Empty draft", nil)
+	previousDraft := createOrderWithBranch(t, tx, factoryModel, userID, "Previous draft", branchPtr("main"))
+	otherOpen := createOrderWithBranch(t, tx, factoryModel, userID, "Other open", branchPtr("release"))
+	_, err := otherOpen.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	closed := createOrderWithBranch(t, tx, factoryModel, userID, "Closed", branchPtr("main"))
+	_, err = closed.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	_, err = closed.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateClosed,
+		Result:  FactoryWorkOrderResultCompleted,
+		Actor:   &userID,
+	})
+	require.NoError(t, err)
+	otherFactoryOrder := createOrderWithBranch(t, tx, otherFactory, userID, "Other factory", branchPtr("main"))
+
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "", "", "main", "main", ""))
+	assertOrderBranch(t, tx, previousDraft.ID, "main")
+
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "", "acme/api", "main", "master", ProviderGitHub))
+
+	assertOrderCheckout(t, tx, emptyDraft.ID, "acme/api", "master", ProviderGitHub)
+	assertOrderCheckout(t, tx, previousDraft.ID, "acme/api", "master", ProviderGitHub)
+	assertOrderCheckout(t, tx, otherOpen.ID, "", "release", "")
+	assertOrderBranch(t, tx, closed.ID, "main")
+	assertOrderBranch(t, tx, otherFactoryOrder.ID, "main")
+
+	blank := createOrderWithBranch(t, tx, factoryModel, userID, "Blank open", branchPtr(""))
+	_, err = blank.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	kept := createOrderWithBranch(t, tx, factoryModel, userID, "Kept draft", branchPtr("develop"))
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(tx, "", "acme/api", "", "trunk", ProviderGitHub))
+	assertOrderCheckout(t, tx, blank.ID, "acme/api", "trunk", ProviderGitHub)
+	assertOrderBranch(t, tx, kept.ID, "develop")
+	assertOrderBranch(t, tx, otherOpen.ID, "release")
+
+	followed := createOrderWithBranch(t, tx, factoryModel, userID, "Followed draft", branchPtr("main"))
+	setOrderRepository(t, tx, followed, "acme/old", ProviderGitHub)
+	separate := createOrderWithBranch(t, tx, factoryModel, userID, "Separate draft", branchPtr("main"))
+	setOrderRepository(t, tx, separate, "acme/other", ProviderGitHub)
+	custom := createOrderWithBranch(t, tx, factoryModel, userID, "Custom branch", branchPtr("release"))
+	setOrderRepository(t, tx, custom, "acme/old", ProviderGitHub)
+	running := createOrderWithBranch(t, tx, factoryModel, userID, "Running open", branchPtr("main"))
+	setOrderRepository(t, tx, running, "acme/old", ProviderGitHub)
+	_, err = running.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	finished := createOrderWithBranch(t, tx, factoryModel, userID, "Finished open", branchPtr("main"))
+	setOrderRepository(t, tx, finished, "acme/old", ProviderGitHub)
+	_, err = finished.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen, Actor: &userID})
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(tx, "retarget-ship", nil)
+	require.NoError(t, err)
+	insertOrderLineDispatch(t, tx, line, running, FactoryWorkOrderLineDispatchStateActive)
+	insertOrderLineDispatch(t, tx, line, finished, FactoryWorkOrderLineDispatchStateFinished)
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(
+		tx, "acme/old", "acme/new", "main", "develop", ProviderBitbucket,
+	))
+	assertOrderCheckout(t, tx, followed.ID, "acme/new", "develop", ProviderBitbucket)
+	assertOrderCheckout(t, tx, separate.ID, "acme/other", "main", ProviderGitHub)
+	assertOrderCheckout(t, tx, custom.ID, "acme/old", "release", ProviderGitHub)
+	assertOrderCheckout(t, tx, running.ID, "acme/old", "main", ProviderGitHub)
+	assertOrderCheckout(t, tx, finished.ID, "acme/new", "develop", ProviderBitbucket)
+
+	sameBranch := createOrderWithBranch(t, tx, factoryModel, userID, "Same branch other repository", branchPtr("main"))
+	setOrderRepository(t, tx, sameBranch, "acme/a", ProviderGitHub)
+	emptyOnPrevious := createOrderWithBranch(t, tx, factoryModel, userID, "Empty branch other repository", branchPtr(""))
+	setOrderRepository(t, tx, emptyOnPrevious, "acme/a", ProviderGitHub)
+	customOnPrevious := createOrderWithBranch(t, tx, factoryModel, userID, "Custom branch other repository", branchPtr("release"))
+	setOrderRepository(t, tx, customOnPrevious, "acme/a", ProviderGitHub)
+	require.NoError(t, factoryModel.RetargetUnfinishedWorkOrderBranches(
+		tx, "acme/a", "acme/b", "main", "main", ProviderGitHub,
+	))
+	assertOrderCheckout(t, tx, sameBranch.ID, "acme/b", "main", ProviderGitHub)
+	assertOrderCheckout(t, tx, emptyOnPrevious.ID, "acme/b", "main", ProviderGitHub)
+	assertOrderCheckout(t, tx, customOnPrevious.ID, "acme/a", "release", ProviderGitHub)
+}
+
+func createOrderWithBranch(t *testing.T, tx *gorm.DB, factoryModel *Factory, userID uuid.UUID, title string, branch *string) *FactoryWorkOrder {
+	t.Helper()
+	order, err := factoryModel.CreateWorkOrder(tx, title, "", &userID, nil, nil)
+	require.NoError(t, err)
+	if branch != nil {
+		require.NoError(t, tx.Model(order).Update("default_branch", *branch).Error)
+	}
+	return order
+}
+
+func branchPtr(value string) *string {
+	return &value
+}
+
+func insertOrderLineDispatch(t *testing.T, tx *gorm.DB, line *FactoryLine, order *FactoryWorkOrder, state string) {
+	t.Helper()
+	now := time.Now()
+	dispatch := &FactoryWorkOrderLineDispatch{
+		ID:             uuid.New(),
+		OrganizationID: order.OrganizationID,
+		FactoryID:      order.FactoryID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		LineName:       line.Name,
+		Steps:          datatypes.JSONSlice[FactoryLineStep]{},
+		State:          state,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	require.NoError(t, tx.Create(dispatch).Error)
+}
+
+func setOrderRepository(t *testing.T, tx *gorm.DB, order *FactoryWorkOrder, repository, provider string) {
+	t.Helper()
+	require.NoError(t, tx.Model(order).Updates(map[string]any{
+		"repository":   repository,
+		"vcs_provider": provider,
+	}).Error)
+}
+
+func assertOrderBranch(t *testing.T, tx *gorm.DB, id uuid.UUID, want string) {
+	t.Helper()
+	var order FactoryWorkOrder
+	require.NoError(t, tx.First(&order, "id = ?", id).Error)
+	assertOptionalString(t, order.DefaultBranch, want)
+}
+
+func assertOrderCheckout(t *testing.T, tx *gorm.DB, id uuid.UUID, repository, branch, provider string) {
+	t.Helper()
+	var order FactoryWorkOrder
+	require.NoError(t, tx.First(&order, "id = ?", id).Error)
+	assertOptionalString(t, order.Repository, repository)
+	assertOptionalString(t, order.DefaultBranch, branch)
+	assertOptionalString(t, order.VCSProvider, provider)
+}
+
+func assertOptionalString(t *testing.T, got *string, want string) {
+	t.Helper()
+	if want == "" {
+		assert.True(t, got == nil || *got == "")
+		return
+	}
+	require.NotNil(t, got)
+	assert.Equal(t, want, *got)
+}
+
 func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

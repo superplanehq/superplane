@@ -606,6 +606,91 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 		"a passed step with a next step in the snapshot leaves the traversal active")
 }
 
+func Test__RunFinalizer__ExecuteNextFactoryLineStep__StopsImplementWhenNoBranchIsSaved(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	refine, refineEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "refine", "start-refine")
+	implement, implementEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start-impl")
+	require.NoError(t, implement.StampFactoryAppTemplate(database.Conn(), implementEntry, "line-implementation", 1))
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+	steps := []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: refine.ID, Entrypoint: refineEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: implementEntry},
+	}
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Needs a branch", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+	var firstResult *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var startErr error
+		_, firstResult, startErr = line.Dispatch(tx, order)
+		return startErr
+	}))
+	finishPassedRun(t, firstResult.Run)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	var pending []factoryLinePendingRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
+		return advanceErr
+	}))
+	assert.Empty(t, pending)
+
+	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, firstExecution.Status)
+	assert.Equal(t, models.CanvasRunResultPassed, firstExecution.Result)
+	stopped, err := models.FindWorkOrderLineDispatch(database.Conn(), firstExecution.LineDispatchID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, stopped.State)
+	assert.Equal(t, models.CanvasRunResultCancelled, stopped.Result)
+	stoppedOrder, err := factory.FindWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+	notes, err := stoppedOrder.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 1)
+	assert.Equal(t, "Set the default branch", notes[0].Headline)
+	assert.Equal(t, "Set the default branch in Workspace settings → Repository before you start Implement.", notes[0].Body)
+
+	branch := "develop"
+	require.NoError(t, factory.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{DefaultBranch: &branch}))
+	nextOrder, err := factory.CreateWorkOrder(database.Conn(), "Has a branch", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, nextOrder)
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var startErr error
+		_, firstResult, startErr = line.Dispatch(tx, nextOrder)
+		return startErr
+	}))
+	finishPassedRun(t, firstResult.Run)
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
+		return advanceErr
+	}))
+	require.Len(t, pending, 1)
+	assert.Equal(t, implement.ID, pending[0].workflowID)
+}
+
+func finishPassedRun(t *testing.T, run *models.CanvasRun) {
+	t.Helper()
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+}
+
 // Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnLastStepPass
 // covers acceptance criterion 2: a traversal whose steps all pass finishes
 // as passed.
