@@ -140,10 +140,13 @@ test("withAnalysisContinuation prepends prior spec on the first prompt", () => {
   );
 });
 
-test("analysis protocol allows the owner tools only on request", () => {
+test("analysis protocol assigns an owner on the first plan turn", () => {
   const pack = analysisProtocol();
   assert.match(pack, /propose_update, inspect_attachment, suggest_owners, and assign_owner/);
-  assert.match(pack, /only when the task or your instructions ask for a reviewer or an owner/);
+  assert.match(pack, /set an owner when the task has none/);
+  assert.match(pack, /Never replace an existing owner/);
+  assert.match(pack, /only_if_unassigned/);
+  assert.match(pack, /Owner rules in your instructions take precedence/);
 });
 
 test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () => {
