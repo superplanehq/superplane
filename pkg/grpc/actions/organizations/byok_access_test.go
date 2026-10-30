@@ -9,12 +9,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -41,8 +43,13 @@ func TestBYOKAccess(t *testing.T) {
 	_, err = billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
 	for _, provider := range []string{models.UsageProviderAnthropic, models.UsageProviderOpenAI, models.UsageProviderOpenRouter, models.UsageProviderCustom} {
-		_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{"test-model"})
+		_, err := support.SaveProviderModelCatalog(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{"test-model"})
 		require.NoError(t, err)
+	}
+	for _, app := range []string{"claude", "openai", "openrouter", models.CustomLLMAppName} {
+		r.Registry.Integrations[app] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{ListResources: func(string, core.ListResourcesContext) ([]core.IntegrationResource, error) {
+			return []core.IntegrationResource{{ID: "test-model"}}, nil
+		}})
 	}
 	for _, tc := range []struct {
 		name                                                      string
@@ -105,12 +112,6 @@ func TestBYOKAccess(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, !tc.billing || !tc.gated || tc.included || tc.grant, billing.ProductFeatures["byo_key"])
 			_, err = ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{Provider: tc.provider})
-			if tc.allowed {
-				require.NoError(t, err)
-			} else {
-				require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
-			}
-			_, err = UpdateBYOKLLMModels(context.Background(), r.Organization.ID.String(), &pb.UpdateBYOKLLMModelsRequest{Provider: tc.provider, AllowedModels: []string{"test-model"}})
 			if tc.allowed {
 				require.NoError(t, err)
 			} else {

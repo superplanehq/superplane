@@ -36,7 +36,7 @@ func TestRunnerAdmissionRejectsQueuedModelRemovedFromWorkspace(t *testing.T) {
 			funding := models.UsageFundingSourceBYOK
 			if scenario.source == "integration" {
 				require.NoError(t, models.EnableExperimentalFeature(connection.OrganizationID, features.FeatureOrganizationBYOK))
-				_, err := models.UpsertOrganizationBYOKModelAllowlist(db, connection.OrganizationID, models.UsageProviderOpenAI, []string{"permitted-model", "excluded-model"})
+				_, err := support.SaveProviderModelCatalog(db, connection.OrganizationID, models.UsageProviderOpenAI, []string{"permitted-model", "excluded-model"})
 				require.NoError(t, err)
 			}
 			if scenario.source == "hosted" {

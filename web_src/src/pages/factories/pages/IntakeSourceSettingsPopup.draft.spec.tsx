@@ -73,9 +73,9 @@ async function pickLabel(name: string) {
 }
 
 describe("IntakeSourceSettingsPopup draft", () => {
-  it("does not offer a default owner for other intake sources", () => {
+  it("offers an optional default owner for Dependabot", () => {
     render(popup(DEFAULT_GITHUB_INTAKE_SETTINGS, [], vi.fn(), "org-owner", "dependabot-alerts"));
-    expect(screen.queryByRole("button", { name: "Default task owner" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Default task owner" })).toHaveTextContent("No owner");
   });
   it("keeps the selected Sentry owner in the draft until Save", async () => {
     ownerMode.subscription = true;

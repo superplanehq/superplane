@@ -86,6 +86,12 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		return nil, grpcerrors.FailedPrecondition(nil, "failed to list integration resources")
 	}
 
+	if resourceType == "model" && models.IsBYOKIntegration(instance.AppName) {
+		if err := models.StoreIntegrationModelCatalog(database.DB(ctx), instance.ID, providerCatalogModels(resources)); err != nil {
+			return nil, grpcerrors.Internal(err, "failed to save model catalog")
+		}
+	}
+
 	return &pb.ListIntegrationResourcesResponse{
 		Resources: serializeIntegrationResources(resources),
 	}, nil

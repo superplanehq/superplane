@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganizationUsers: () => ({ data: [], isLoading: false, isError: false }),
+}));
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useCreateFactoryIntake: () => ({ mutateAsync: mocks.createIntake, isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: mocks.updateIntake, isPending: false }),

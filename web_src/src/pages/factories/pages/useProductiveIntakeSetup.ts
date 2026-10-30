@@ -67,7 +67,7 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
     try {
       const ownerSettings = owner.settings();
       await createIntake.mutateAsync({
-        ...(owner.required ? { settings: ownerSettings } : {}),
+        ...(Object.keys(ownerSettings).length ? { settings: ownerSettings } : {}),
         source: "SOURCE_PRODUCTIVE_TASKS",
         integrationId,
         resourceId: projectId,

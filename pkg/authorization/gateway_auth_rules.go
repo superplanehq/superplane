@@ -1087,16 +1087,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "PUT", Pattern: "/api/v1/organizations/{id}/byok-models"}: {
-			Resource:   "org",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "PUT", Pattern: "/api/v1/organizations/{id}/hosted-models"}: {
-			Resource:   "org",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
-		},
 		// Self-scoped: members update their own notification settings.
 		{Method: "PUT", Pattern: "/api/v1/me/notification-settings"}: {
 			Resource:                     "notifications",

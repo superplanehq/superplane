@@ -36,6 +36,32 @@ The workspace model policy lists the combined catalogs of eligible connected
 members. Each task can use only its actual owner's subscription and the models
 that its workspace permits. Members never borrow another member's credentials.
 
+Workspace policies control model selection. Hosted models come from the enabled
+installation catalog. API-key model pickers use the connected provider catalog.
+Organization model restrictions no longer apply. Installation controls and
+billing permissions still apply.
+
+Provider catalog requests save model IDs, display names, and observation time
+for each integration. A failed request preserves the last successful snapshot.
+Missing snapshots mean unknown availability. Successful empty responses mean the
+provider returned no models. Pickers reuse saved snapshots. Provider catalog
+requests refresh them, so outages do not delay pickers that have saved data.
+Catalog availability does not authorize execution.
+
+Existing API-key automations keep their configured models and provider defaults
+when workspace policy is absent or inherited. Explicit workspace selections
+restrict the final model. An explicitly empty selection blocks model execution.
+Aliases and restricted defaults resolve before execution snapshots are saved.
+Queued tasks are checked again without changing their snapshots. Command-only
+steps skip model checks. Worker admission makes no provider HTTP requests.
+
+All supported external and scheduled intakes show the default owner control.
+Outside subscription mode, owners are optional and users can select **No owner**.
+Switching away from subscriptions preserves existing owners. New intakes start
+without an owner, even when the workspace retains a subscription default.
+Missing-owner recovery notices apply only to subscription workspaces. PagerDuty
+keeps direct creation outside subscription mode; its owner is editable in settings.
+
 Personal APIs use `/api/v1/me/codex-connection` for describe, start/refresh,
 cancel, and disconnect. Existing factory endpoints adapt to the same connection.
 Closing setup ends its continuation. Only **Cancel sign-in** cancels the shared
@@ -56,10 +82,11 @@ connections and users.
 
 Deploy the API and worker changes together in a drained migration window:
 
-1. Stop new Codex admissions and sign-in attempts on all API and worker processes.
+1. Stop new runner admissions on all API and worker processes. Stop Codex sign-in attempts.
 2. Let runs finish. Confirm deletion of login and catalog-refresh runner VMs.
 3. Verify that `factory_codex_leases` is empty. The migration aborts atomically if any lease remains.
-4. Apply `20261030121001_organization-codex-connections`.
+4. Apply `20261030121001_organization-codex-connections` and
+   `20261030143043_provider-model-catalogs`.
 5. Start the matching API and worker versions together, then resume admissions.
 
 The migration preserves the sole usable ready connection for each member and
