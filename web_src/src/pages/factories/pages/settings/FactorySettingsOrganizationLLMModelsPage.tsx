@@ -1,4 +1,3 @@
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
@@ -34,35 +33,27 @@ export function FactorySettingsOrganizationLLMModelsPage() {
 
 function WorkspaceModelSettings({ settings }: { settings: ReturnType<typeof useWorkspaceModelSettings> }) {
   return (
-    <Tabs
-      value={settings.source}
-      onValueChange={settings.chooseSource}
-      activationMode="manual"
-      className="gap-4"
-      data-testid="factory-settings-llm-models"
-    >
+    <div className="flex flex-col gap-4" data-testid="factory-settings-llm-models">
       <WorkspaceModelSourceSelector settings={settings} />
-      <TabsContent value={settings.source}>
-        <FactorySettingsCard data-testid="llm-models-list">
-          {settings.switcher.switchedNotice ? (
-            <p role="status" className="mb-4 text-xs text-muted-foreground">
-              {settings.switcher.switchedNotice}
-            </p>
-          ) : null}
-          <ModelSourceBody
-            {...settings}
-            canUpdate={
-              settings.canUpdate &&
-              !settings.switcher.saving &&
-              (settings.source !== "subscription" || settings.subscription.offered)
-            }
-            onChangeDefaultOwner={() => settings.switcher.setSubscriptionDialog("warn")}
-            onChooseProvider={(target) => {
-              if (target !== settings.currentProvider) settings.switcher.setDialog({ target, step: "warn" });
-            }}
-          />
-        </FactorySettingsCard>
-      </TabsContent>
-    </Tabs>
+      <FactorySettingsCard data-testid="llm-models-list">
+        {settings.switcher.switchedNotice ? (
+          <p role="status" className="mb-4 text-xs text-muted-foreground">
+            {settings.switcher.switchedNotice}
+          </p>
+        ) : null}
+        <ModelSourceBody
+          {...settings}
+          canUpdate={
+            settings.canUpdate &&
+            !settings.switcher.saving &&
+            (settings.source !== "subscription" || settings.subscription.offered)
+          }
+          onChangeDefaultOwner={() => settings.switcher.setSubscriptionDialog("warn")}
+          onChooseProvider={(target) => {
+            if (target !== settings.currentProvider) settings.switcher.setDialog({ target, step: "warn" });
+          }}
+        />
+      </FactorySettingsCard>
+    </div>
   );
 }

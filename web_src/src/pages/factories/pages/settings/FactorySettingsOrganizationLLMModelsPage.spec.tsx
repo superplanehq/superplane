@@ -169,21 +169,21 @@ describe("workspace LLM model settings", () => {
   it("shows only the saved source and keeps it selected while a switch is canceled", async () => {
     connectedProviders.add("openai");
     renderPage("AGENT_HARNESS_SUPERPLANE");
-    expect(screen.getByRole("tab", { name: "SuperPlane" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("status", { name: "SuperPlane is active" })).toBeInTheDocument();
     expect(screen.queryByRole("searchbox", { name: "Search OpenAI models" })).not.toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Your API key" }));
-    expect(screen.getByRole("tab", { name: "SuperPlane", hidden: true })).toHaveAttribute("aria-selected", "true");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Switch to Your API key" }));
+    expect(screen.getByRole("status", { name: "SuperPlane is active", hidden: true })).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Keep SuperPlane" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(switchSource).not.toHaveBeenCalled();
   });
 
-  it("moves source focus with arrow keys and activates only with Enter", async () => {
+  it("tabs between explicit source actions and opens confirmation with Enter", async () => {
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    screen.getByRole("tab", { name: "SuperPlane" }).focus();
-    await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: "Your API key" })).toHaveFocus();
+    screen.getByRole("button", { name: "Switch to Your API key" }).focus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Switch to ChatGPT subscriptions" })).toHaveFocus();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await user.keyboard("{Enter}");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -297,7 +297,7 @@ describe("workspace LLM model settings", () => {
     canUpdate = false;
     renderPage("AGENT_HARNESS_SUPERPLANE");
     expect(screen.getByRole("button", { name: "Save models" })).toBeDisabled();
-    expect(screen.getByRole("tab", { name: "Your API key" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Switch to Your API key" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: /sonnet 4-6/ })).toBeDisabled();
   });
 

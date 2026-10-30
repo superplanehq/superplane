@@ -19,7 +19,7 @@ export function subscriptionModelSourceSwitchCases({
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     renderPage("AGENT_HARNESS_SUPERPLANE", false, client);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "ChatGPT subscriptions" }));
+    await user.click(await screen.findByRole("button", { name: "Switch to ChatGPT subscriptions" }));
     expect(screen.getByRole("button", { name: "Switch to Codex" })).toBeDisabled();
     await user.click(await screen.findByRole("button", { name: "Connect Codex" }));
     await user.click(await screen.findByRole("button", { name: "Connect ChatGPT" }));
@@ -34,6 +34,7 @@ export function subscriptionModelSourceSwitchCases({
     expect(switchSource).not.toHaveBeenCalled();
     await user.click(confirm);
     expect(switchSource).toHaveBeenCalledWith({ source: "subscription", defaultOwnerId: "me", apiKey: undefined });
+    expect(await screen.findByRole("status", { name: "ChatGPT subscriptions is active" })).toBeInTheDocument();
   });
 
   it("lets a disconnected admin select another connected member and retry a failed switch", async () => {
@@ -41,7 +42,7 @@ export function subscriptionModelSourceSwitchCases({
     switchSource.mockRejectedValueOnce(new Error("The intake configuration changed."));
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "ChatGPT subscriptions" }));
+    await user.click(await screen.findByRole("button", { name: "Switch to ChatGPT subscriptions" }));
     await user.click(screen.getByRole("combobox", { name: "Default task owner (required)" }));
     await user.click(await screen.findByRole("option", { name: "Other member" }));
     await user.click(screen.getByRole("button", { name: "Switch to Codex" }));
@@ -55,10 +56,10 @@ export function subscriptionModelSourceSwitchCases({
   it("does not switch after owner selection is canceled", async () => {
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "ChatGPT subscriptions" }));
+    await user.click(await screen.findByRole("button", { name: "Switch to ChatGPT subscriptions" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
     expect(switchSource).not.toHaveBeenCalled();
-    expect(screen.getByRole("tab", { name: "SuperPlane" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("status", { name: "SuperPlane is active" })).toBeInTheDocument();
   });
 
   it("warns about replacing intake owners and changes the default owner while Codex stays active", async () => {
@@ -77,7 +78,7 @@ export function subscriptionModelSourceSwitchCases({
   it("warns about replacing intake owners before the first switch to Codex", async () => {
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "ChatGPT subscriptions" }));
+    await user.click(await screen.findByRole("button", { name: "Switch to ChatGPT subscriptions" }));
     expect(await screen.findByText(/replaces the default task owner of every intake/)).toBeInTheDocument();
   });
 
@@ -85,8 +86,9 @@ export function subscriptionModelSourceSwitchCases({
     setConnection({ status: "ready", eligible: true, availableModels: ["gpt-5.4"] });
     renderPage("AGENT_HARNESS_CODEX", true);
     const user = userEvent.setup();
-    await user.click(screen.getByRole("tab", { name: "SuperPlane" }));
+    await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
     await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
     expect(switchSource).toHaveBeenCalledWith({ source: "hosted", apiKey: undefined });
+    expect(await screen.findByRole("status", { name: "SuperPlane is active" })).toBeInTheDocument();
   });
 }
