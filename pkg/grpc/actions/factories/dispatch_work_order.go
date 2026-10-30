@@ -219,6 +219,11 @@ func dispatchWorkOrderOnLineTx(
 	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
 		return nil, err
 	}
+	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
+		if err := order.ClearStatusNote(tx, missingImplementBranchNoteKey); err != nil {
+			return nil, err
+		}
+	}
 
 	fromState := order.State
 	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
@@ -299,7 +304,25 @@ func requireSavedBranchForImplementation(
 	if err != nil || !blocked {
 		return err
 	}
-	return invalidArgument("Set the default branch in Workspace settings → Repository before you start Implement.")
+	return invalidArgument(missingImplementBranchMessage)
+}
+
+const (
+	missingImplementBranchNoteKey = "missing-implement-branch"
+	missingImplementBranchMessage = "Set the default branch in Workspace settings → Repository before you start Implement."
+)
+
+// NoteMissingImplementBranch tells the task why the line stopped.
+func NoteMissingImplementBranch(tx *gorm.DB, order *models.FactoryWorkOrder) error {
+	if order == nil {
+		return nil
+	}
+	_, err := order.SetStatusNote(tx, models.FactoryWorkOrderStatusNoteParams{
+		Key:      missingImplementBranchNoteKey,
+		Headline: "Set the default branch",
+		Body:     missingImplementBranchMessage,
+	})
+	return err
 }
 
 // ImplementStepBlockedByMissingBranch reports whether this app is Implement

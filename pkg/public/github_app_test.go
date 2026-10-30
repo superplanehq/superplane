@@ -487,7 +487,7 @@ func TestApplyGitHubCatalogWebhookRefreshesDefaultBranch(t *testing.T) {
 	assert.True(t, stored.Private)
 
 	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.PushEvent{
-		Created: gh.Ptr(false),
+		Created: gh.Ptr(true),
 		Ref:     gh.Ptr("refs/heads/master"),
 		Repo: &gh.PushEventRepository{
 			ID:            gh.Ptr(repositoryID),
@@ -496,10 +496,11 @@ func TestApplyGitHubCatalogWebhookRefreshesDefaultBranch(t *testing.T) {
 			DefaultBranch: gh.Ptr("develop"),
 		},
 	}, installationID))
-	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.PushEvent{
-		Created: gh.Ptr(true),
-		Ref:     gh.Ptr("refs/tags/v1"),
-		Repo: &gh.PushEventRepository{
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.CreateEvent{
+		Ref:          gh.Ptr("v1"),
+		RefType:      gh.Ptr("tag"),
+		MasterBranch: gh.Ptr("develop"),
+		Repo: &gh.Repository{
 			ID:            gh.Ptr(repositoryID),
 			FullName:      gh.Ptr("acme/service"),
 			Private:       gh.Ptr(true),
@@ -509,10 +510,10 @@ func TestApplyGitHubCatalogWebhookRefreshesDefaultBranch(t *testing.T) {
 	stored = requireCatalogRepository(t, db, repositoryID)
 	assert.Equal(t, "master", stored.DefaultBranch)
 
-	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.PushEvent{
-		Created: gh.Ptr(true),
-		Ref:     gh.Ptr("refs/heads/master"),
-		Repo: &gh.PushEventRepository{
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.CreateEvent{
+		Ref:     gh.Ptr("develop"),
+		RefType: gh.Ptr("branch"),
+		Repo: &gh.Repository{
 			ID:            gh.Ptr(repositoryID),
 			FullName:      gh.Ptr("acme/service"),
 			Private:       gh.Ptr(true),
@@ -521,6 +522,19 @@ func TestApplyGitHubCatalogWebhookRefreshesDefaultBranch(t *testing.T) {
 	}, installationID))
 	stored = requireCatalogRepository(t, db, repositoryID)
 	assert.Equal(t, "develop", stored.DefaultBranch)
+
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.CreateEvent{
+		Ref:          gh.Ptr("trunk"),
+		RefType:      gh.Ptr("branch"),
+		MasterBranch: gh.Ptr("trunk"),
+		Repo: &gh.Repository{
+			ID:       gh.Ptr(repositoryID),
+			FullName: gh.Ptr("acme/service"),
+			Private:  gh.Ptr(true),
+		},
+	}, installationID))
+	stored = requireCatalogRepository(t, db, repositoryID)
+	assert.Equal(t, "trunk", stored.DefaultBranch)
 
 	const missingID = int64(42)
 	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.RepositoryEvent{

@@ -726,6 +726,9 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, nil, err
 	}
 	if blocked {
+		if err := factoryactions.NoteMissingImplementBranch(tx, workOrder); err != nil {
+			return nil, nil, err
+		}
 		w.logger.WithField("work_order_id", workOrder.ID).Info("stopped the line before Implement because no default branch is saved")
 		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
 	}

@@ -737,6 +737,59 @@ func TestUpdateFactoryOnboardingRejectsADifferentBranchWhenLookupFails(t *testin
 	assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
 }
 
+func TestUpdateFactoryOnboardingUsesTheProviderDefaultWhenTheRepositoryChanges(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		provider string
+		resolver repositoryBranchResolver
+	}{
+		{
+			name:     "bitbucket",
+			provider: models.ProviderBitbucket,
+			resolver: repositoryBranchResolver{bitbucketDefault: func(repository string) (string, error) {
+				if repository == "acme/web" {
+					return "develop", nil
+				}
+				return "main", nil
+			}},
+		},
+		{
+			name:     "github",
+			provider: models.ProviderGitHub,
+			resolver: repositoryBranchResolver{gitHubDefault: func(repository string) (string, error) {
+				if repository == "acme/web" {
+					return "develop", nil
+				}
+				return "main", nil
+			}},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			repository := "acme/api"
+			saved := "main"
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+				AppRepository: &repository,
+				VCSProvider:   &test.provider,
+				DefaultBranch: &saved,
+			}))
+
+			nextRepository := "acme/web"
+			ctx := withRepositoryBranchResolver(onboardingContext(r), test.resolver)
+			response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+				Id:            factory.ID.String(),
+				AppRepository: &nextRepository,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, "acme/web", response.Factory.Onboarding.AppRepository)
+			assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
+		})
+	}
+}
+
 func TestUpdateFactoryOnboardingClearsTheBranchWhenTheRepositoryChanges(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

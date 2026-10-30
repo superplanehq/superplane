@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
@@ -313,6 +314,50 @@ func TestReplaceLegacyCheckoutBaseToken(t *testing.T) {
 	assert.Equal(t, "Keep the main branch name in this prompt.", nodes[0].Configuration["steps"].([]any)[1].(map[string]any)["prompt"])
 	assert.Contains(t, nodes[1].Configuration["command"], "${BASE:-main}")
 	assert.False(t, replaceLegacyCheckoutBaseToken(nodes, map[string]bool{implementationAgentNodeID: true}))
+}
+
+func TestReplaceWorkspaceCheckoutTargetKeepsRepositoryAndBranchTogether(t *testing.T) {
+	previousURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/api")
+	nextURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/web")
+	nodes := []models.Node{
+		{
+			ID: "scheduled-agent",
+			Configuration: map[string]any{
+				"environment": []any{
+					map[string]any{"name": "REPO", "value": "acme/api"},
+					map[string]any{"name": "SOURCE_REPO", "value": "acme/api"},
+					map[string]any{"name": "REPO_URL", "value": previousURL},
+					map[string]any{"name": "BASE", "value": "main"},
+				},
+				"repository": "acme/api",
+				"command":    "git clone https://github.com/acme/api.git",
+			},
+		},
+		{
+			ID: "other-repo",
+			Configuration: map[string]any{
+				"repository": "acme/other",
+				"environment": []any{
+					map[string]any{"name": "BASE", "value": "release"},
+				},
+			},
+		},
+	}
+
+	assert.True(t, replaceWorkspaceCheckoutTarget(nodes, models.ProviderGitHub, "acme/api", "acme/web", "main", "develop"))
+	environment := nodes[0].Configuration["environment"].([]any)
+	assert.Equal(t, "acme/web", environment[0].(map[string]any)["value"])
+	assert.Equal(t, "acme/web", environment[1].(map[string]any)["value"])
+	assert.Equal(t, nextURL, environment[2].(map[string]any)["value"])
+	assert.Equal(t, "develop", environment[3].(map[string]any)["value"])
+	assert.Equal(t, "acme/web", nodes[0].Configuration["repository"])
+	assert.Equal(t, "git clone https://github.com/acme/api.git", nodes[0].Configuration["command"])
+	assert.Equal(t, "acme/other", nodes[1].Configuration["repository"])
+	assert.Equal(t, "release", nodes[1].Configuration["environment"].([]any)[0].(map[string]any)["value"])
+
+	assert.True(t, replaceWorkspaceCheckoutTarget(nodes, models.ProviderGitHub, "acme/web", "acme/web", "develop", "trunk"))
+	assert.Equal(t, nextURL, nodes[0].Configuration["environment"].([]any)[2].(map[string]any)["value"])
+	assert.Equal(t, "trunk", nodes[0].Configuration["environment"].([]any)[3].(map[string]any)["value"])
 }
 
 func TestReplaceTriggerRepository(t *testing.T) {

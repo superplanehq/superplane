@@ -302,9 +302,16 @@ func verifiedOnboardingDefaultBranch(
 	repositoryChanged := patch.AppRepository != nil && !sameRepository(current.AppRepository, *patch.AppRepository)
 	if patch.DefaultBranch == nil || strings.TrimSpace(*patch.DefaultBranch) == "" {
 		// A new repository must not keep the previous repository's branch.
+		// Use the provider default when it is available. Leave the branch
+		// empty when that lookup fails so the user can choose one.
 		if repositoryChanged {
-			empty := ""
-			patch.DefaultBranch = &empty
+			branch := onboardingProviderDefaultBranch(ctx, deps, db, orgID, organizationID, factory, patch)
+			if branch == "" {
+				empty := ""
+				patch.DefaultBranch = &empty
+				return patch, nil
+			}
+			patch.DefaultBranch = &branch
 			return patch, nil
 		}
 		patch.DefaultBranch = nil
@@ -333,6 +340,47 @@ func verifiedOnboardingDefaultBranch(
 	}
 	patch.DefaultBranch = &chosen
 	return patch, nil
+}
+
+// onboardingProviderDefaultBranch reads the default branch the provider
+// reports for the repository in the patch. A failed lookup returns "".
+func onboardingProviderDefaultBranch(
+	ctx context.Context,
+	deps IntakeDependencies,
+	db *gorm.DB,
+	orgID uuid.UUID,
+	organizationID string,
+	factory *models.Factory,
+	patch models.FactoryOnboardingPatch,
+) string {
+	if factory == nil {
+		return ""
+	}
+	merged, err := factory.OnboardingConfigAfter(patch)
+	if err != nil {
+		return ""
+	}
+	repository := strings.TrimSpace(merged.AppRepository)
+	if repository == "" {
+		return ""
+	}
+	integration, err := readyOnboardingVCSIntegration(db, orgID, merged.VCSIntegrationID)
+	if err != nil {
+		return ""
+	}
+	if merged.EffectiveVCSProvider() == models.ProviderBitbucket {
+		branch, lookupErr := bitbucketRepositoryDefaultBranch(ctx, db, deps, integration, repository)
+		if lookupErr != nil {
+			return ""
+		}
+		return strings.TrimSpace(branch)
+	}
+	installationID, repositoryID := githubInstallationForRepository(ctx, db, organizationID, integration, repository)
+	branch, lookupErr := gitHubRepositoryDefaultBranch(ctx, deps, integration, repository, installationID, repositoryID)
+	if lookupErr != nil {
+		return ""
+	}
+	return strings.TrimSpace(branch)
 }
 
 func onboardingBranchVerification(

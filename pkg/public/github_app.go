@@ -285,9 +285,28 @@ func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) 
 }
 
 func applyGitHubCatalogWebhook(tx *gorm.DB, event any, installationID int64) error {
+	if !githubCatalogWebhookWrites(event) {
+		return nil
+	}
 	return tx.Transaction(func(tx *gorm.DB) error {
 		return applyGitHubCatalogWebhookInTransaction(tx, event, installationID)
 	})
+}
+
+// githubCatalogWebhookWrites reports whether this event can change the catalog.
+// Ignored event types return before a database transaction starts.
+func githubCatalogWebhookWrites(event any) bool {
+	switch event := event.(type) {
+	case *gh.InstallationEvent, *gh.InstallationRepositoriesEvent, *gh.MemberEvent:
+		return true
+	case *gh.RepositoryEvent:
+		action := event.GetAction()
+		return action == "edited" || action == "renamed"
+	case *gh.CreateEvent:
+		return event.GetRefType() == "branch"
+	default:
+		return false
+	}
 }
 
 func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installationID int64) error {
@@ -383,22 +402,26 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 		}
 		return refreshGitHubCatalogDefaultBranch(tx, installationID, repo.GetID(), repo.GetFullName(), repo.Private, repo.GetDefaultBranch())
 
-	case *gh.PushEvent:
-		if !event.GetCreated() || !strings.HasPrefix(event.GetRef(), "refs/heads/") {
+	case *gh.CreateEvent:
+		if event.GetRefType() != "branch" {
 			return nil
 		}
 		repo := event.GetRepo()
 		if repo == nil {
 			return nil
 		}
-		return refreshGitHubCatalogDefaultBranch(tx, installationID, repo.GetID(), repo.GetFullName(), repo.Private, repo.GetDefaultBranch())
+		defaultBranch := strings.TrimSpace(repo.GetDefaultBranch())
+		if defaultBranch == "" {
+			defaultBranch = strings.TrimSpace(event.GetMasterBranch())
+		}
+		return refreshGitHubCatalogDefaultBranch(tx, installationID, repo.GetID(), repo.GetFullName(), repo.Private, defaultBranch)
 	}
 
 	return nil
 }
 
 // refreshGitHubCatalogDefaultBranch stores the branch GitHub reports after
-// an edit, a rename, or the first push. A missing catalog row is reconciled
+// an edit, a rename, or a new branch. A missing catalog row is reconciled
 // later instead of inserting a partial repository.
 func refreshGitHubCatalogDefaultBranch(
 	tx *gorm.DB,

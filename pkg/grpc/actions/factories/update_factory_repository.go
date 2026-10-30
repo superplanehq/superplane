@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
@@ -367,14 +368,14 @@ func reconcileFactoryRepository(
 				managedRunnerNodeIDs["capture-visual-evidence"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
 			case scheduledIntakeTemplateID:
-				changed = replaceLiteralCheckoutBase(nodes, previousDefaultBranch, nextBranch) || changed
+				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch) || changed
 			}
 			if template.id == "line-implementation" {
 				changed = replaceLegacyCheckoutBaseToken(nodes, managedRunnerNodeIDs) || changed
 			}
 		}
 		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID {
-			changed = replaceLiteralCheckoutBase(nodes, previousDefaultBranch, nextBranch) || changed
+			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch) || changed
 		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
 			graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{
@@ -650,6 +651,22 @@ func replaceConfigurationValues(value any, replacements []configurationReplaceme
 	default:
 		return value, false
 	}
+}
+
+// replaceWorkspaceCheckoutTarget keeps a baked checkout on the workspace
+// repository and branch together. A repository change rewrites the repository
+// slug and its clone URL. A branch change rewrites only BASE.
+func replaceWorkspaceCheckoutTarget(nodes []models.Node, provider, previousRepository, nextRepository, previousBranch, nextBranch string) bool {
+	changed := replaceLiteralCheckoutBase(nodes, previousBranch, nextBranch)
+	previousRepository = strings.TrimSpace(previousRepository)
+	nextRepository = strings.TrimSpace(nextRepository)
+	if previousRepository == "" || nextRepository == "" || sameRepository(previousRepository, nextRepository) {
+		return changed
+	}
+	return replaceNodeConfigurationValues(nodes, []configurationReplacement{
+		{from: previousRepository, to: nextRepository},
+		{from: runner.WorkspaceContextRepoURL(provider, previousRepository), to: runner.WorkspaceContextRepoURL(provider, nextRepository)},
+	}) || changed
 }
 
 // replaceLiteralCheckoutBase rewrites a BASE value that is exactly the previous

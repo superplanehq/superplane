@@ -652,6 +652,13 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__StopsImplementWhenNoBranchI
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, stopped.State)
 	assert.Equal(t, models.CanvasRunResultCancelled, stopped.Result)
+	stoppedOrder, err := factory.FindWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+	notes, err := stoppedOrder.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 1)
+	assert.Equal(t, "Set the default branch", notes[0].Headline)
+	assert.Equal(t, "Set the default branch in Workspace settings → Repository before you start Implement.", notes[0].Body)
 
 	branch := "develop"
 	require.NoError(t, factory.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{DefaultBranch: &branch}))

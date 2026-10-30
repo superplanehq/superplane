@@ -853,6 +853,31 @@ func Test__DispatchWorkOrder__RequiresASavedBranchBeforeImplement(t *testing.T) 
 	})
 	require.NoError(t, err)
 	require.Len(t, response.Order.LineDispatches, 1)
+
+	openOrder, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	_, err = openOrder.SetStatusNote(db, models.FactoryWorkOrderStatusNoteParams{
+		Key:      missingImplementBranchNoteKey,
+		Headline: "Set the default branch",
+		Body:     missingImplementBranchMessage,
+	})
+	require.NoError(t, err)
+	active, err := openOrder.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return active.Finish(tx, models.CanvasRunResultCancelled)
+	}))
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+	openOrder, err = factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	notes, err := openOrder.StatusNotes()
+	require.NoError(t, err)
+	assert.Empty(t, notes)
 }
 
 func Test__DispatchWorkOrder__RequiresASavedBranchBeforeALaterImplementStep(t *testing.T) {
