@@ -42,6 +42,8 @@ bash -n \
   release/verify_component_release_source_test.sh \
   release/verify-public-assets.sh \
   release/runner/build.sh \
+  release/runner/packer/aws/scripts/install.sh \
+  release/runner/packer/gce/scripts/install.sh \
   release/runner/upload.sh \
   release/fleet-manager/build.sh \
   release/fleet-manager/build-release.sh \
