@@ -16,14 +16,28 @@ PG_CLIENT_VERSION="17.11-1.pgdg22.04+2"
 
 echo "Installing PostgreSQL Client ${PG_CLIENT_VERSION}"
 
-apt-get update -y
-apt-get install --no-install-recommends -y ca-certificates curl gnupg
+# Retry apt steps. Transient mirror or network errors otherwise fail the image build.
+apt_retry() {
+  attempt=1
+  while [ "$attempt" -lt 5 ]; do
+    if "$@"; then
+      return 0
+    fi
+    echo "Retrying after failure (attempt ${attempt}): $*"
+    attempt=$((attempt + 1))
+    sleep 5
+  done
+  "$@"
+}
+
+apt_retry apt-get update -y
+apt_retry apt-get install --no-install-recommends -y ca-certificates curl gnupg
 
 . /etc/os-release
 echo "deb http://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-connrefused -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
 
-apt-get update -y
-apt-get install --no-install-recommends -y "postgresql-client-17=${PG_CLIENT_VERSION}"
+apt_retry apt-get update -y
+apt_retry apt-get install --no-install-recommends -y "postgresql-client-17=${PG_CLIENT_VERSION}"
 apt-get clean
 rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*

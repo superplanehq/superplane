@@ -16,6 +16,79 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSubscriptionScriptSavesSetupFailuresWithoutSecrets(t *testing.T) {
+	const runnerToken = "subscription-runner-token-value"
+	tests := []struct {
+		name       string
+		command    string
+		status     int
+		bundle     map[string]any
+		brokenHome bool
+		wantError  string
+	}{
+		{
+			name:      "restore request rejected",
+			command:   "restore",
+			status:    http.StatusForbidden,
+			wantError: "ChatGPT subscription request failed (403)",
+		},
+		{
+			name:      "refresh credentials missing",
+			command:   "refresh",
+			status:    http.StatusOK,
+			wantError: "ChatGPT subscription credentials are missing",
+		},
+		{
+			name:       "restore filesystem error contains token",
+			command:    "restore",
+			status:     http.StatusOK,
+			bundle:     map[string]any{"access_token": "access-token-value"},
+			brokenHome: true,
+			wantError:  "[REDACTED]",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/api/v1/runner/codex-subscription/credentials", r.URL.Path)
+				w.WriteHeader(tt.status)
+				_ = json.NewEncoder(w).Encode(map[string]any{"bundle": tt.bundle})
+			}))
+			t.Cleanup(server.Close)
+			taskDir := t.TempDir()
+			resultFile := filepath.Join(taskDir, "result.json")
+			codexHome := filepath.Join(taskDir, "codex-home")
+			if tt.brokenHome {
+				codexHome = filepath.Join(taskDir, runnerToken)
+				require.NoError(t, os.WriteFile(codexHome, nil, 0o600))
+			}
+			_, callerFile, _, ok := runtime.Caller(0)
+			require.True(t, ok)
+			cmd := exec.Command("node", filepath.Join(filepath.Dir(callerFile), "codex_subscription.js"), tt.command)
+			cmd.Env = append(os.Environ(),
+				"SUPERPLANE_TASK_DIR="+taskDir,
+				"SUPERPLANE_RESULT_FILE="+resultFile,
+				"CODEX_HOME="+codexHome,
+				"SUPERPLANE_BASE_URL="+server.URL,
+				"SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN="+runnerToken,
+			)
+			out, err := cmd.CombinedOutput()
+			require.Error(t, err)
+			contents, err := os.ReadFile(resultFile)
+			require.NoError(t, err, "setup failures must be saved for the task: %s", out)
+			var result map[string]any
+			require.NoError(t, json.Unmarshal(contents, &result))
+			assert.Equal(t, "result", result["type"])
+			assert.Equal(t, true, result["is_error"])
+			assert.Contains(t, result["error"], "ChatGPT subscription "+tt.command+" failed")
+			assert.Contains(t, result["error"], tt.wantError)
+			assert.Contains(t, string(out), tt.wantError)
+			assert.NotContains(t, string(out), runnerToken)
+			assert.NotContains(t, string(contents), runnerToken)
+		})
+	}
+}
+
 func TestSubscriptionScriptReportsUsageWithoutAuthBundle(t *testing.T) {
 	var body map[string]any
 	var unavailable atomic.Bool

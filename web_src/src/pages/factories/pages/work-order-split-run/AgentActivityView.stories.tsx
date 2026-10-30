@@ -167,6 +167,26 @@ export const Failed: Story = {
   },
 };
 
+export const CodexSubscriptionError: Story = {
+  args: {
+    activity: {
+      id: "activity-codex-error",
+      provider: "codex",
+      status: "failed",
+      sequence: 4,
+      truncated: false,
+      items: [
+        {
+          type: "notice",
+          id: "codex-error",
+          code: "codex_error",
+          text: "Your ChatGPT session has expired. Sign in again to continue.",
+        },
+      ],
+    },
+  },
+};
+
 export const EditedFiles: Story = {
   args: {
     activity: {
