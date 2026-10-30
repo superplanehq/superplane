@@ -24,6 +24,8 @@ function SentryIntakePreview() {
     <QueryClientProvider client={client}>
       <ComponentStoryShell className="h-screen bg-background">
         <IntakeSourceSettingsPopup
+          canEdit
+          accessLoading={false}
           sourceId="sentry-exceptions"
           organizationId={factoryHistoryStoryOrganization}
           factoryId={factoryHistoryStoryFactory}

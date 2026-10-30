@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
+import { Toaster } from "sonner";
 import { vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -16,6 +17,7 @@ import {
   useEventExecutions,
   useInfiniteCanvasRuns,
   useIntegrationResources,
+  permissions,
   useTriggers,
 } from "./intakeSettingsHostSpecMocks";
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
@@ -160,6 +162,9 @@ export function connectedJiraIntake(overrides: Partial<ConfiguredLineIntakeSourc
 }
 
 export function resetHostMocks() {
+  permissions.canUpdate = true;
+  permissions.canReadIntegrations = true;
+  permissions.isLoading = false;
   resetIntakeSettingsHostMocks({
     useCanvas,
     useTriggers,
@@ -174,7 +179,7 @@ export function resetHostMocks() {
   });
 }
 
-export { deleteIntake, updateIntake, useCanvas, useInfiniteCanvasRuns };
+export { deleteIntake, permissions, updateIntake, useCanvas, useInfiniteCanvasRuns };
 
 export function resetIntakeSettingsHostMocks(mocks: {
   useCanvas: ReturnType<typeof vi.fn>;
@@ -326,6 +331,7 @@ export function renderHost(
               initialTab={props.initialTab}
               onClose={props.onClose ?? vi.fn()}
             />
+            <Toaster />
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>

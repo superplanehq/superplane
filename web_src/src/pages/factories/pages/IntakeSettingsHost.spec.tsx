@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import {
   connectedJiraIntake,
   GITHUB_INTAKE,
+  permissions,
   DATADOG_INTAKE,
   DEPENDABOT_INTAKE,
   DEPENDABOT_INTAKE_CANVAS,
@@ -45,6 +46,57 @@ describe("IntakeSettingsHost", () => {
     expect(within(dialog).getByTestId("intake-source-settings-automatic-intake")).toBeChecked();
     expect(within(dialog).getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
     expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument();
+  });
+
+  it("shows saved settings without edit actions when the user cannot update the workspace", async () => {
+    permissions.canUpdate = false;
+    updateIntake.mockClear();
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        ...GITHUB_INTAKE,
+        settings: { ...GITHUB_INTAKE.settings, filterByLabel: true, labels: ["superplane"] },
+      },
+      repository: "operately/operately",
+      vcsIntegrationId: "github-1",
+    });
+
+    expect(
+      screen.getByText("You do not have permission to change intake settings. Ask an organization admin for access."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Include reopened issues" })).toBeDisabled();
+    expect(screen.getByTestId("intake-source-settings-automatic-intake")).toBeDisabled();
+    const labelPicker = screen.getByRole("combobox", { name: "Search or add a label" });
+    await user.click(labelPicker.parentElement!);
+    expect(screen.queryByRole("option", { name: "bug" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove superplane" })).toBeDisabled();
+    expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-delete")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Runs" }));
+    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("data-state", "active");
+    expect(updateIntake).not.toHaveBeenCalled();
+  });
+
+  it("explains a 404 if a save loses access while the settings are open", async () => {
+    updateIntake.mockRejectedValueOnce(Object.assign(new Error("Not found"), { status: 404 }));
+    renderHost();
+
+    await userEvent.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This intake could not be found or you do not have access. Refresh the page or ask an organization admin.",
+    );
+    expect(screen.queryByText("Intake settings saved.")).not.toBeInTheDocument();
+  });
+
+  it("confirms a successful save after closing the settings", async () => {
+    const onClose = vi.fn();
+    renderHost({ onClose });
+
+    await userEvent.click(screen.getByTestId("intake-source-settings-save"));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Intake settings saved.")).toBeInTheDocument();
   });
 
   it("pauses and resumes GitHub intake without saving or losing filter edits", async () => {
