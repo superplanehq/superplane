@@ -23,14 +23,6 @@ type mergeConfidenceCheckRequest struct {
 	Summary string  `json:"summary"`
 }
 
-func (s *Server) handleRunnerMergeConfidenceCheck(w http.ResponseWriter, r *http.Request) {
-	scope, ok := s.authenticateMergeConfidenceRunner(w, r)
-	if !ok {
-		return
-	}
-	s.reportRunnerMergeConfidenceCheck(w, r, scope)
-}
-
 func (s *Server) reportRunnerMergeConfidenceCheck(w http.ResponseWriter, r *http.Request, scope *runneraction.MergeConfidenceScope) {
 	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
 	var req mergeConfidenceCheckRequest
@@ -63,20 +55,6 @@ func (s *Server) reportRunnerMergeConfidenceCheck(w http.ResponseWriter, r *http
 		log.WithError(err).Warn("failed to publish merge confidence check")
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "reported"})
-}
-
-func (s *Server) authenticateMergeConfidenceRunner(w http.ResponseWriter, r *http.Request) (*runneraction.MergeConfidenceScope, bool) {
-	token := bearerToken(r.Header.Get("Authorization"))
-	if token == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return nil, false
-	}
-	scope, err := runneraction.ParseMergeConfidenceToken(s.jwt, token)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return nil, false
-	}
-	return scope, true
 }
 
 func writeMergeConfidenceLookupError(w http.ResponseWriter, err error) {

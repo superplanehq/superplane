@@ -2,7 +2,6 @@ package runner_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -10,7 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -41,40 +39,12 @@ func TestMergeConfidenceChecksFromSteps(t *testing.T) {
 	assert.Nil(t, labels)
 }
 
-func TestMergeConfidenceTokenRoundTrip(t *testing.T) {
-	signer := jwt.NewSigner("merge-secret")
-	scope := runner.MergeConfidenceScope{
-		OrganizationID:  uuid.New(),
-		FactoryID:       uuid.New(),
-		WorkOrderID:     uuid.New(),
-		CanvasRunID:     uuid.New(),
-		NodeExecutionID: uuid.New(),
-		EnabledChecks:   []string{"risk", "security"},
-	}
-	token, err := runner.MintMergeConfidenceToken(signer, scope, time.Hour)
-	require.NoError(t, err)
-
-	got, err := runner.ParseMergeConfidenceToken(signer, token)
-	require.NoError(t, err)
-	assert.Equal(t, scope, *got)
-}
-
-func TestParseMergeConfidenceTokenRejectsPlanningPurpose(t *testing.T) {
-	signer := jwt.NewSigner("merge-secret")
-	token, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-		"purpose": runner.PlanningSessionTokenPurpose,
-	})
-	require.NoError(t, err)
-
-	_, err = runner.ParseMergeConfidenceToken(signer, token)
-	assert.ErrorContains(t, err, "purpose")
-}
-
 func TestAttachMergeConfidenceEnvLeavesOtherRunsAlone(t *testing.T) {
 	environment := []runner.TaskEnvironmentVariable{{Name: "REPO", Value: "acme/app"}}
-	got, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{}, environment, nil, 60)
+	got, scope, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{}, environment, nil)
 	require.NoError(t, err)
 	assert.Equal(t, environment, got)
+	assert.Nil(t, scope)
 }
 
 func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
@@ -86,13 +56,12 @@ func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
 	orderID := uuid.New()
 	runID := uuid.New()
 	executionID := uuid.New()
-	t.Setenv("JWT_SECRET", "merge-secret")
 	t.Setenv("RUNNER_API_BASE_URL", "https://app.example")
 	t.Setenv("WEBHOOKS_BASE_URL", "https://app.example")
 	t.Setenv("BASE_URL", "https://app.example")
 
 	prompt := "Enabled checks: risk, security.\n"
-	environment, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{
+	environment, scope, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{
 		ID:             executionID,
 		RunID:          runID,
 		WorkflowID:     canvas.ID.String(),
@@ -100,18 +69,17 @@ func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
 	}, []runner.TaskEnvironmentVariable{
 		{Name: "REPO", Value: "acme/app"},
 		{Name: runner.EnvSuperplaneMergeConfidenceOrderID, Value: orderID.String()},
+		{Name: "SUPERPLANE_MERGE_CONFIDENCE_TOKEN", Value: "stale-token"},
 	}, []runner.AgentStep{{
 		Name:   "Review",
 		Type:   runner.AgentStepPrompt,
 		Prompt: &prompt,
-	}}, 60)
+	}})
 	require.NoError(t, err)
 
 	assert.False(t, environmentHas(environment, runner.EnvSuperplaneMergeConfidenceOrderID))
-	token, ok := environmentLookup(environment, runner.EnvSuperplaneMergeConfidenceToken)
-	require.True(t, ok)
-	scope, err := runner.ParseMergeConfidenceToken(jwt.NewSigner("merge-secret"), token)
-	require.NoError(t, err)
+	assert.False(t, environmentHas(environment, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN"))
+	require.NotNil(t, scope)
 	assert.Equal(t, orderID, scope.WorkOrderID)
 	assert.Equal(t, factoryModel.ID, scope.FactoryID)
 	assert.Equal(t, r.Organization.ID, scope.OrganizationID)
@@ -126,18 +94,18 @@ func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
 func TestAttachMergeConfidenceEnvRequiresFactoryCanvas(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	t.Setenv("JWT_SECRET", "merge-secret")
 	t.Setenv("RUNNER_API_BASE_URL", "https://app.example")
 	t.Setenv("WEBHOOKS_BASE_URL", "https://app.example")
 
-	_, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{
+	_, scope, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{
 		ID:             uuid.New(),
 		RunID:          uuid.New(),
 		WorkflowID:     canvas.ID.String(),
 		OrganizationID: r.Organization.ID.String(),
 	}, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplaneMergeConfidenceOrderID, Value: uuid.NewString()},
-	}, nil, 60)
+	}, nil)
+	assert.Nil(t, scope)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "factory canvas")
 }
