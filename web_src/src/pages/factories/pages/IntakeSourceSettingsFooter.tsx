@@ -26,6 +26,7 @@ import type { LineIntakeSourceId } from "./lineIntakeModel";
 type IntakeSourceSettingsFooterProps = {
   sourceId: LineIntakeSourceId;
   draft: IntakeSourceSettings;
+  canEdit?: boolean;
   getDraft: () => IntakeSourceSettings;
   savePending?: boolean;
   saveError?: string;
@@ -39,6 +40,7 @@ type IntakeSourceSettingsFooterProps = {
 export function IntakeSourceSettingsFooter({
   sourceId,
   draft,
+  canEdit = true,
   savePending,
   saveError,
   deletePending,
@@ -48,16 +50,28 @@ export function IntakeSourceSettingsFooter({
   onSave,
   onClose,
 }: IntakeSourceSettingsFooterProps) {
-  const deleteControls = intakeSupportsDelete(sourceId);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  if (!canEdit) {
+    return (
+      <footer className="flex shrink-0 justify-end border-t border-border px-5 py-3">
+        <Button type="button" variant="outline" onClick={onClose}>
+          Close
+        </Button>
+      </footer>
+    );
+  }
+
+  const deleteControls = intakeSupportsDelete(sourceId);
   const linearProjectsMissing = sourceId === "linear-issues" && draft.linearProjectIds.length === 0;
   const sentryProjectsMissing = sourceId === "sentry-exceptions" && draft.sentryProjectIds.length === 0;
   const projectsMissing = linearProjectsMissing || sentryProjectsMissing;
-  const footerError =
-    saveError ??
-    (deleteOpen ? undefined : deleteError) ??
-    (linearProjectsMissing ? LINEAR_INTAKE_SETUP_COPY.projectsRequired : undefined) ??
-    (sentryProjectsMissing ? SENTRY_INTAKE_SETUP_COPY.projectsRequired : undefined);
+  const footerError = intakeFooterError(
+    saveError,
+    deleteError,
+    deleteOpen,
+    linearProjectsMissing,
+    sentryProjectsMissing,
+  );
 
   return (
     <>
@@ -103,6 +117,21 @@ export function IntakeSourceSettingsFooter({
         />
       ) : null}
     </>
+  );
+}
+
+function intakeFooterError(
+  saveError: string | undefined,
+  deleteError: string | undefined,
+  deleteOpen: boolean,
+  linearProjectsMissing: boolean,
+  sentryProjectsMissing: boolean,
+): string | undefined {
+  return (
+    saveError ??
+    (deleteOpen ? undefined : deleteError) ??
+    (linearProjectsMissing ? LINEAR_INTAKE_SETUP_COPY.projectsRequired : undefined) ??
+    (sentryProjectsMissing ? SENTRY_INTAKE_SETUP_COPY.projectsRequired : undefined)
   );
 }
 
