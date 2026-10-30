@@ -6,14 +6,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
+CHECKOUT_DIR="${WORK_DIR}/checkout"
 
 # Run the real generator and Syft in a small checkout, without local dependencies.
-mkdir -p "${WORK_DIR}/release" "${WORK_DIR}/web_src" "${WORK_DIR}/tmp/bin"
-cp "${SCRIPT_DIR}/generate-sbom.sh" "${WORK_DIR}/release/"
+mkdir -p "${CHECKOUT_DIR}/release" "${CHECKOUT_DIR}/web_src" "${CHECKOUT_DIR}/tmp/bin"
+cp "${SCRIPT_DIR}/generate-sbom.sh" "${CHECKOUT_DIR}/release/"
 if [ -x "${REPO_ROOT}/tmp/bin/syft" ]; then
-  ln -s "${REPO_ROOT}/tmp/bin/syft" "${WORK_DIR}/tmp/bin/syft"
+  ln -s "${REPO_ROOT}/tmp/bin/syft" "${CHECKOUT_DIR}/tmp/bin/syft"
 fi
-cd "${WORK_DIR}"
+cd "${CHECKOUT_DIR}"
 
 cat >go.mod <<'EOF'
 module example.com/application
@@ -58,6 +59,9 @@ require example.com/unrelated-dependency v1.9.9
 EOF
 done
 
+# Exercise symlinked workspaces explicitly, including on Linux CI.
+ln -s "${CHECKOUT_DIR}" "${WORK_DIR}/linked-checkout"
+cd "${WORK_DIR}/linked-checkout"
 bash release/generate-sbom.sh v1.0.0
 node - "${WORK_DIR}/clean.json" build/superplane-single-host-tarball-v1.0.0/superplane-sbom.json <<'EOF'
 const assert = require("node:assert/strict");
