@@ -13,7 +13,7 @@ import (
 
 func Test__ResolveBYOKRunnerModel__StandaloneKeepsConfiguredModel(t *testing.T) {
 	r := support.Setup(t)
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	configuration := map[string]any{
