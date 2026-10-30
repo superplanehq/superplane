@@ -620,6 +620,37 @@ image.build:
 	  --build-arg FRONTEND_PREBUILT=$(FRONTEND_PREBUILT) \
 	  --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
+# CI builds in the app container so Go can use its mounted caches directly.
+# Select arm64 explicitly when validating this path on an ARM development host.
+IMAGE_PLATFORM?=linux/amd64
+IMAGE_BUILD_DIR?=tmp/image-artifacts
+
+.PHONY: image.ci.up image.prepare image.package test.image
+image.ci.up:
+	@mkdir -p $(GO_CACHE_DIRS) tmp
+	$(COMPOSE) --progress plain up -d --no-deps --wait --build --pull always app
+
+image.prepare:
+	$(MAKE) pb.gen
+	mkdir -p "$(IMAGE_BUILD_DIR)"
+	$(COMPOSE) exec -T app bash /app/scripts/with-host-owned-output "$(IMAGE_BUILD_DIR)" bash -lec '\
+	  test "$$(go env GOOS)/$$(go env GOARCH)" = "$(IMAGE_PLATFORM)" || { \
+	    echo "Build container must match IMAGE_PLATFORM=$(IMAGE_PLATFORM)" >&2; exit 1; \
+	  }; \
+	  go build -o "$(IMAGE_BUILD_DIR)/app/build/superplane" cmd/server/main.go; \
+	  mkdir -p "$(IMAGE_BUILD_DIR)/usr/bin"; \
+	  cp /usr/bin/createdb /usr/bin/migrate "$(IMAGE_BUILD_DIR)/usr/bin/"'
+	$(COMPOSE) exec -T app bash -lc 'cd web_src && NODE_OPTIONS=--max-old-space-size=4096 npx tsc -b'
+
+image.package:
+	docker build -f Dockerfile --target runner --platform $(IMAGE_PLATFORM) \
+	  --build-arg ARTIFACTS_STAGE=prebuilt \
+	  --progress plain -t $(IMAGE):$(IMAGE_TAG) "$(IMAGE_BUILD_DIR)"
+
+test.image:
+	bash scripts/build_image_test.sh
+	$(COMPOSE) exec -T app bash /app/scripts/build_image_ownership_test.sh
+
 image.auth:
 	@test -n "$$GHCR_PUSH_TOKEN" || (echo "GHCR_PUSH_TOKEN is empty" >&2; exit 1)
 	@printf "%s" "$$GHCR_PUSH_TOKEN" | docker login ghcr.io -u superplanehq --password-stdin
