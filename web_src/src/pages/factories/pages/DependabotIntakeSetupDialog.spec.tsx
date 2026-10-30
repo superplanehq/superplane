@@ -162,7 +162,7 @@ describe("DependabotIntakeSetupDialog", () => {
     expect(mocks.createIntake).toHaveBeenCalledTimes(1);
     expect(mocks.updateIntake).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "Change filters" }));
+    await user.click(screen.getByTestId("first-run-back"));
     await user.click(screen.getByRole("checkbox", { name: "Low" }));
     await openPicker(user);
     await user.click(screen.getByRole("checkbox", { name: /astro/ }));
