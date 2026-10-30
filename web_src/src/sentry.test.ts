@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
 
 import {
   IGNORED_CONSOLE_MESSAGES,
@@ -335,6 +335,79 @@ describe("captureConsole unknown-touch warnings", () => {
       expect(captured).toEqual(["Something actually broke"]);
     } finally {
       await client?.close(0);
+    }
+  });
+});
+
+describe("captureConsole MetaMask browser-extension noise", () => {
+  it("drops only the reported warning and its breadcrumb through production initialization", async () => {
+    const warning = 'ObjectMultiplex - orphaned data for stream "metamask-multichain-provider"';
+    const retainedWarnings = [
+      "Application warning",
+      'ObjectMultiplex - orphaned data for stream "application-provider"',
+      `Application: ${warning}`,
+      `${warning} (application context)`,
+    ];
+    const captured: Sentry.Event[] = [];
+    const sentryWindow = window as Window & { SUPERPLANE_SENTRY_DSN?: string };
+    const previousDsn = sentryWindow.SUPERPLANE_SENTRY_DSN;
+    const init = Sentry.init;
+    // Use the production callbacks and integrations with an in-memory transport.
+    const initSpy = spyOn(Sentry, "init").mockImplementation((options: Parameters<typeof Sentry.init>[0]) =>
+      init({
+        ...options,
+        autoSessionTracking: false,
+        sendClientReports: false,
+        transport: () => ({
+          send(envelope) {
+            for (const [header, payload] of envelope[1]) {
+              if (header.type === "event") {
+                captured.push(payload as Sentry.Event);
+              }
+            }
+            return Promise.resolve({ statusCode: 200 });
+          },
+          flush: () => Promise.resolve(true),
+        }),
+      }),
+    );
+
+    Sentry.getCurrentScope().clear();
+    sentryWindow.SUPERPLANE_SENTRY_DSN = "https://public@o0.ingest.sentry.io/0";
+
+    try {
+      // Reload the telemetry owner so its global initialization runs with the test DSN.
+      const modulePath = "./sentry.ts?metamask-console-regression";
+      await import(modulePath);
+
+      console.warn(warning);
+      for (const message of retainedWarnings) {
+        console.warn(message);
+      }
+      console.error("Application error");
+
+      expect(await Sentry.flush(2000)).toBe(true);
+
+      expect(captured.map((event) => ({ message: event.message, level: event.level }))).toEqual([
+        ...retainedWarnings.map((message) => ({ message, level: "warning" })),
+        { message: "Application error", level: "error" },
+      ]);
+
+      const applicationError = captured.find((event) => event.message === "Application error");
+      const consoleBreadcrumbs = applicationError?.breadcrumbs
+        ?.filter((breadcrumb) => breadcrumb.category === "console")
+        .map((breadcrumb) => breadcrumb.message);
+      expect(consoleBreadcrumbs).not.toContain(warning);
+      expect(consoleBreadcrumbs).toEqual(expect.arrayContaining(retainedWarnings));
+    } finally {
+      await Sentry.getClient()?.close(0);
+      Sentry.getCurrentScope().clear();
+      initSpy.mockRestore();
+      if (previousDsn === undefined) {
+        delete sentryWindow.SUPERPLANE_SENTRY_DSN;
+      } else {
+        sentryWindow.SUPERPLANE_SENTRY_DSN = previousDsn;
+      }
     }
   });
 });
