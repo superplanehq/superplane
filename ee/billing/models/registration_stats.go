@@ -29,30 +29,44 @@ type RegisteredOrganization struct {
 	AvailableCreditCents int64     `json:"available_credit_cents"`
 }
 
+type RegistrationStatsFilter struct {
+	Start           time.Time
+	End             time.Time
+	Offset          int
+	ExcludeInternal bool
+}
+
 // DescribeRegistrationStats groups active organizations by registration time.
 // Credit totals are lifetime values for that cohort, independent of pagination.
 // They need every organization in the cohort, so only the first page (offset 0)
 // calculates them, and report zero totals when no organization matches. Later
 // pages load credit for their own rows only.
-func DescribeRegistrationStats(tx *gorm.DB, start, end time.Time, offset int) (RegistrationStats, error) {
+func DescribeRegistrationStats(tx *gorm.DB, filter RegistrationStatsFilter) (RegistrationStats, error) {
 	report := RegistrationStats{Items: []RegisteredOrganization{}}
 	cohort := func() *gorm.DB {
-		return tx.Model(&coremodels.Organization{}).Where("organizations.created_at >= ? AND organizations.created_at < ?", start, end)
+		query := tx.Model(&coremodels.Organization{}).Where("organizations.created_at >= ? AND organizations.created_at < ?", filter.Start, filter.End)
+		if filter.ExcludeInternal {
+			internalOwners := tx.Model(&coremodels.User{}).Select("1").
+				Where("users.organization_id = organizations.id AND is_owner = ? AND type = ?", true, coremodels.UserTypeHuman).
+				Where("email ILIKE ?", "%@superplane.com")
+			query = query.Where("NOT EXISTS (?)", internalOwners)
+		}
+		return query
 	}
 	var ids []uuid.UUID
 	if err := cohort().Order("created_at DESC, id DESC").Pluck("id", &ids).Error; err != nil {
 		return report, err
 	}
 	report.Total = int64(len(ids))
-	if offset == 0 {
+	if filter.Offset == 0 {
 		if err := addTrialCreditTotals(tx, &report, ids); err != nil {
 			return report, err
 		}
 	}
-	if offset >= len(ids) {
+	if filter.Offset >= len(ids) {
 		return report, nil
 	}
-	pageIDs := ids[offset:min(offset+RegistrationStatsPageSize, len(ids))]
+	pageIDs := ids[filter.Offset:min(filter.Offset+RegistrationStatsPageSize, len(ids))]
 	credits, err := hostedCreditSpendByOrganization(tx, pageIDs)
 	if err != nil {
 		return report, err

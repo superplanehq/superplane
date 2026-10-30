@@ -29,10 +29,21 @@ func (s *Server) adminRegistrationStats(w http.ResponseWriter, r *http.Request) 
 		}
 		offset = parsed
 	}
+	excludeInternal := false
+	if raw := query.Get("exclude_internal"); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			http.Error(w, "Invalid internal organization filter", http.StatusBadRequest)
+			return
+		}
+		excludeInternal = parsed
+	}
 	var report billingmodels.RegistrationStats
 	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		var err error
-		report, err = billingmodels.DescribeRegistrationStats(tx, start, end, offset)
+		report, err = billingmodels.DescribeRegistrationStats(tx, billingmodels.RegistrationStatsFilter{
+			Start: start, End: end, Offset: offset, ExcludeInternal: excludeInternal,
+		})
 		return err
 	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {

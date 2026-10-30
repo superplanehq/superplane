@@ -25,7 +25,7 @@ const report: RegistrationReport = {
       plan: "Trial",
       available_credit_cents: 700,
     },
-    { id: "6", name: "Tandem", owner_email: "owner@tandem.example", plan: "Business", available_credit_cents: 4500 },
+    { id: "6", name: "Tandem", owner_email: "test@superplane.com", plan: "Business", available_credit_cents: 4500 },
   ],
 };
 
@@ -45,8 +45,20 @@ const meta = {
     msw: {
       handlers: [
         http.get("/admin/api/stats", ({ request }) => {
-          const offset = Number(new URL(request.url).searchParams.get("offset") ?? 0);
-          return HttpResponse.json({ ...report, items: report.items.slice(offset, offset + 5) });
+          const params = new URL(request.url).searchParams;
+          const offset = Number(params.get("offset") ?? 0);
+          const excludeInternal = params.get("exclude_internal") === "true";
+          const items = excludeInternal ? report.items.slice(0, 5) : report.items;
+          return HttpResponse.json({
+            total: items.length,
+            ...(offset
+              ? {}
+              : {
+                  trial_granted_cents: excludeInternal ? 5000 : report.trial_granted_cents,
+                  trial_spent_cents: excludeInternal ? 2000 : report.trial_spent_cents,
+                }),
+            items: items.slice(offset, offset + 5),
+          });
         }),
       ],
     },
