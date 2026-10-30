@@ -70,14 +70,13 @@ function WorkspaceModelSettings({ settings }: { settings: ReturnType<typeof useW
         />
       </FactorySettingsCard>
       {settings.source === "subscription" ? (
-        <FactorySettingsCard>
-          <WorkspaceCodexMembers
-            organizationId={settings.organizationId}
-            factoryId={settings.factoryId}
-            canUpdate={settings.canUpdate && !settings.switcher.saving && settings.subscription.offered}
-            onChangeDefaultOwner={() => settings.switcher.openDialog("subscription")}
-          />
-        </FactorySettingsCard>
+        <WorkspaceCodexMembers
+          organizationId={settings.organizationId}
+          factoryId={settings.factoryId}
+          canUpdate={settings.canUpdate && !settings.switcher.saving && settings.subscription.offered}
+          defaultOwnerId={settings.factory.onboarding?.codexDefaultOwnerId}
+          onChangeDefaultOwner={(ownerId) => settings.switcher.openDialog("subscription", ownerId)}
+        />
       ) : null}
     </div>
   );
