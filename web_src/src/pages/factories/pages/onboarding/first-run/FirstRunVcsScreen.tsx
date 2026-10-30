@@ -2,7 +2,10 @@ import { useAccount } from "@/contexts/useAccount";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { FEATURE_GITHUB_ENTERPRISE } from "@/lib/license";
 
+import { RepositoryBranchPromptLoader } from "../RepositoryBranchPromptLoader";
+import type { RepositoryBranchPrompt } from "../repositoryBranchPrompt";
 import type { FirstRunSetupFlow, OnboardingPageModel } from "../useFirstRunSetupFlow";
+import { selectWorkspaceRepository } from "../workspaceRepositorySelection";
 import { FirstRunBitbucketChooseScreen } from "./FirstRunBitbucketChooseScreen";
 import { FirstRunBitbucketForgeScreen } from "./FirstRunBitbucketForgeScreen";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
@@ -29,11 +32,13 @@ function BitbucketChooseHost({
   flow,
   model,
   chrome,
+  branchPrompt,
 }: {
   organizationId: string;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
   chrome: FirstRunChrome;
+  branchPrompt?: RepositoryBranchPrompt;
 }) {
   const connected = model.setup.connected.has("bitbucket");
   const resources = useIntegrationResources(organizationId, model.bitbucketIntegrationId, "repository", undefined, {
@@ -72,9 +77,10 @@ function BitbucketChooseHost({
         onGrantAccess={() => void flow.grantBitbucketAccess()}
         installUrl={flow.bitbucketInstallUrl}
         onCopyInstallLink={() => flow.copyBitbucketInstallLink()}
-        onSelectRepository={model.setup.selectRepo}
+        onSelectRepository={(repository) => selectWorkspaceRepository(model, repository)}
         onClearRepository={model.setup.clearRepository}
         onContinue={() => void flow.continueFromRepository()}
+        branchPrompt={branchPrompt}
         onSelectIdentity={(providerUserId) => void flow.selectBitbucketIdentity(providerUserId)}
         onConnectAnotherAccount={() => window.location.assign(flow.bitbucketConnectHref)}
       />
@@ -91,25 +97,44 @@ function BitbucketChooseHost({
       chrome={chrome}
       sphere={sphere}
       onConnect={flow.connectBitbucket}
-      onSelectRepository={model.setup.selectRepo}
+      onSelectRepository={(repository) => selectWorkspaceRepository(model, repository)}
       onContinue={() => void flow.continueFromRepository()}
+      branchPrompt={branchPrompt}
     />
   );
 }
 
-export function FirstRunVcsScreen({
-  screen,
-  organizationId,
-  flow,
-  model,
-  chrome,
-}: {
+type FirstRunVcsScreenProps = {
   screen: "host" | "connect" | "ghe-host" | "choose";
   organizationId: string;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
   chrome: FirstRunChrome;
-}) {
+};
+
+export function FirstRunVcsScreen(props: FirstRunVcsScreenProps) {
+  const model = props.model;
+  if (!model.defaultBranchRequired) return <FirstRunVcsChoices {...props} />;
+  return (
+    <RepositoryBranchPromptLoader
+      organizationId={props.organizationId}
+      integrationId={model.branchIntegrationId}
+      repository={model.setup.selectedRepo}
+      branch={model.chosenDefaultBranch}
+      onChange={model.setChosenDefaultBranch}
+      render={(branchPrompt) => <FirstRunVcsChoices {...props} branchPrompt={branchPrompt} />}
+    />
+  );
+}
+
+function FirstRunVcsChoices({
+  screen,
+  organizationId,
+  flow,
+  model,
+  chrome,
+  branchPrompt,
+}: FirstRunVcsScreenProps & { branchPrompt?: RepositoryBranchPrompt }) {
   const { account } = useAccount();
   const githubEnterpriseLicensed = Boolean(account?.license?.features?.includes(FEATURE_GITHUB_ENTERPRISE));
   const setup = model.setup;
@@ -164,11 +189,27 @@ export function FirstRunVcsScreen({
   }
 
   if (flow.vcsHost === "bitbucket") {
-    return <BitbucketChooseHost organizationId={organizationId} flow={flow} model={model} chrome={chrome} />;
+    return (
+      <BitbucketChooseHost
+        organizationId={organizationId}
+        flow={flow}
+        model={model}
+        chrome={chrome}
+        branchPrompt={branchPrompt}
+      />
+    );
   }
 
   if (flow.githubEnterprise) {
-    return <GitHubEnterpriseChooseHost organizationId={organizationId} flow={flow} model={model} chrome={chrome} />;
+    return (
+      <GitHubEnterpriseChooseHost
+        organizationId={organizationId}
+        flow={flow}
+        model={model}
+        chrome={chrome}
+        branchPrompt={branchPrompt}
+      />
+    );
   }
 
   return (
@@ -187,7 +228,8 @@ export function FirstRunVcsScreen({
       appConfigured={flow.appConfigured}
       chrome={chrome}
       sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
-      onSelectRepository={setup.selectRepo}
+      onSelectRepository={(repository) => selectWorkspaceRepository(model, repository)}
+      branchPrompt={branchPrompt}
       onClearRepository={setup.clearRepository}
       onSelectGitHubIdentity={(userId) => void flow.selectGitHubIdentity(userId)}
       onConnectAnotherGitHubAccount={() => void flow.connectGitHub()}

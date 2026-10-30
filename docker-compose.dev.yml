@@ -39,6 +39,7 @@ services:
       RUNNER_ACTIVE_LOG_FS_PATH: "/var/lib/superplane/active-runner-logs"
       START_RUNNER_LOG_COMPACTOR: "yes"
       START_RUNNER_CLEANUP_WORKER: "yes"
+      START_RUNNER_TASK_SCHEDULER: "yes"
       START_CONSUMERS: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
       START_WEB_SERVER: "yes"

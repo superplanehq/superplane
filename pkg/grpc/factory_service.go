@@ -68,7 +68,7 @@ func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.Up
 
 func (s *FactoryService) SelectFactoryVCSProviderRepository(ctx context.Context, req *pb.SelectFactoryVCSProviderRepositoryRequest) (*pb.SelectFactoryVCSProviderRepositoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.SelectFactoryVCSProviderRepository(ctx, organizationID, req)
+	return actions.SelectFactoryVCSProviderRepository(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) SwitchFactoryModelSource(ctx context.Context, req *pb.SwitchFactoryModelSourceRequest) (*pb.SwitchFactoryModelSourceResponse, error) {
@@ -289,6 +289,14 @@ func (s *FactoryService) UpdateWorkOrderAssignees(
 	return actions.UpdateWorkOrderAssignees(ctx, organizationID, req)
 }
 
+func (s *FactoryService) SuggestTaskOwners(
+	ctx context.Context,
+	req *pb.SuggestTaskOwnersRequest,
+) (*pb.SuggestTaskOwnersResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SuggestTaskOwners(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) UpdateWorkOrder(
 	ctx context.Context,
 	req *pb.UpdateWorkOrderRequest,
@@ -330,6 +338,11 @@ func (s *FactoryService) ListWorkOrderArtifacts(ctx context.Context, req *pb.Lis
 func (s *FactoryService) CreateWorkOrderArtifact(ctx context.Context, req *pb.CreateWorkOrderArtifactRequest) (*pb.CreateWorkOrderArtifactResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateWorkOrderArtifact(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RemoveWorkOrderArtifact(ctx context.Context, req *pb.RemoveWorkOrderArtifactRequest) (*pb.RemoveWorkOrderArtifactResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RemoveWorkOrderArtifact(ctx, organizationID, req)
 }
 
 func (s *FactoryService) DescribeFactoryVelocity(ctx context.Context, req *pb.DescribeFactoryVelocityRequest) (*pb.DescribeFactoryVelocityResponse, error) {

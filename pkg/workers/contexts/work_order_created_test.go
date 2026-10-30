@@ -113,6 +113,7 @@ func TestWorkOrderCreatedPayloadUsesFactoryProviderWithoutDefaultBranch(t *testi
 	workOrder, ok := workOrderCreatedPayload(db, order)["workOrder"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "https://bitbucket.org/acme/widgets.git", workOrder["repository_url"])
+	assert.Equal(t, "", workOrder["default_branch"])
 }
 
 func TestWorkOrderCreatedPayloadKeepsRepositoryHost(t *testing.T) {

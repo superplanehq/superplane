@@ -1,10 +1,5 @@
 #!/usr/bin/env node
 "use strict";
-const {
-  ownerTools,
-  suggestOwners,
-  assignOwner,
-} = require("./task_owner_tools");
 
 /**
  * Stdio MCP server for merge confidence.
@@ -135,23 +130,18 @@ async function handleRequest(message) {
     return;
   }
   if (method === "tools/list") {
-    sendResult(id, { tools: [...TOOLS, ...ownerTools()] });
+    sendResult(id, { tools: TOOLS });
     return;
   }
   if (method === "tools/call") {
     const name = params && params.name;
     const args = (params && params.arguments) || {};
     try {
-      if (![...TOOLS, ...ownerTools()].some((tool) => tool.name === name)) {
+      if (!TOOLS.some((tool) => tool.name === name)) {
         sendError(id, -32601, `Unknown tool: ${name}`);
         return;
       }
-      const result =
-        name === "suggest_owners"
-          ? await suggestOwners(args)
-          : name === "assign_owner"
-            ? await assignOwner(args)
-            : await reportMergeCheck(args);
+      const result = await reportMergeCheck(args);
       sendResult(id, {
         content: [{ type: "text", text: JSON.stringify(result) }],
         structuredContent: result,

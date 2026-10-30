@@ -7,6 +7,7 @@ import {
   persistGitHubEnterpriseRepository,
   readOnboardingGithubEnterprise,
   resolvedOnboardingGithubEnterprise,
+  vcsOnboardingIntegrationIds,
   writeOnboardingGithubEnterprise,
 } from "./onboardingGithubEnterprise";
 
@@ -114,6 +115,20 @@ describe("githubOnboardingIntegrationId", () => {
   });
 });
 
+describe("vcsOnboardingIntegrationIds", () => {
+  it("uses the Enterprise integration for default-branch lookup", () => {
+    expect(
+      vcsOnboardingIntegrationIds({
+        githubSelectionId: "int-github-com",
+        githubId: "int-github-com",
+        vcsHost: "github",
+        vcsIntegrationId: "int-ghe",
+        rememberedIntegrationId: "int-ghe",
+      }).branchIntegrationId,
+    ).toBe("int-ghe");
+  });
+});
+
 describe("bindGitHubEnterpriseOnboarding", () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -156,7 +171,7 @@ describe("githubEnterpriseOnboardingActions", () => {
 
   it("saves the repository against the session Enterprise integration", async () => {
     writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
-    const updateOnboarding = vi.fn().mockResolvedValue(undefined);
+    const updateOnboarding = vi.fn().mockResolvedValue({ onboarding: { defaultBranch: "main" } });
     const selectVcsHost = vi.fn();
     const selectRepo = vi.fn();
     const runSave = vi.fn(async (_setSaving: (saving: boolean) => void, action: () => Promise<unknown>) => {
@@ -178,7 +193,7 @@ describe("githubEnterpriseOnboardingActions", () => {
       runSave,
     });
 
-    await actions.selectGitHubEnterpriseRepository("acme/app");
+    await expect(actions.selectGitHubEnterpriseRepository("acme/app")).resolves.toBe(true);
 
     expect(updateOnboarding).toHaveBeenCalledWith({
       vcsIntegrationId: "int-ghe",
@@ -186,6 +201,31 @@ describe("githubEnterpriseOnboardingActions", () => {
       backlogRepository: "acme/app",
     });
     expect(selectRepo).toHaveBeenCalledWith("acme/app");
+  });
+
+  it("asks for a branch when GitHub Enterprise does not report a default", async () => {
+    writeOnboardingGithubEnterprise("factory-1", true, "acme.ghe.com", "int-ghe");
+    const updateOnboarding = vi.fn().mockResolvedValue({ onboarding: { defaultBranch: "" } });
+    const runSave = vi.fn(async (_setSaving: (saving: boolean) => void, action: () => Promise<unknown>) => {
+      await action();
+      return true;
+    });
+
+    const actions = githubEnterpriseOnboardingActions({
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      githubIntegrationId: "int-github-com",
+      setSaving: vi.fn(),
+      updateOnboarding,
+      rememberPreferredInstance: vi.fn(),
+      refetchConnections: vi.fn().mockResolvedValue(undefined),
+      setSelections: vi.fn(),
+      selectVcsHost: vi.fn(),
+      selectRepo: vi.fn(),
+      runSave,
+    });
+
+    await expect(actions.selectGitHubEnterpriseRepository("acme/app")).resolves.toBe("needs-branch");
   });
 
   it("saves the created integration on the workspace", async () => {

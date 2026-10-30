@@ -133,7 +133,7 @@ componentReleases:
   runnerVersion: v0.2.1
   runnerVersions:
     - v0.2.1
-  fleetManagerVersion: v0.1.5
+  fleetManagerVersion: v0.1.7
 
 sentry:
   secretName: ""

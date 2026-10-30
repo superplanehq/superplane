@@ -2,8 +2,10 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { Loader2 } from "lucide-react";
 
+import { RepositoryDefaultBranchPicker, RepositoryPicker } from "../onboardingSteps";
+import { repositoryBranchChosen, type RepositoryBranchPrompt } from "../repositoryBranchPrompt";
 import type { FirstRunSetupFlow, OnboardingPageModel } from "../useFirstRunSetupFlow";
-import { RepositoryPicker } from "../onboardingSteps";
+import { selectWorkspaceRepository } from "../workspaceRepositorySelection";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
@@ -18,11 +20,13 @@ export function GitHubEnterpriseChooseHost({
   flow,
   model,
   chrome,
+  branchPrompt,
 }: {
   organizationId: string;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
   chrome?: FirstRunChrome;
+  branchPrompt?: RepositoryBranchPrompt;
 }) {
   const integrationId = flow.githubEnterpriseIntegrationId || model.githubIntegrationId;
   const resources = useIntegrationResources(organizationId, integrationId, "repository", undefined, {
@@ -38,8 +42,9 @@ export function GitHubEnterpriseChooseHost({
       saving={flow.blockingAction === "saving-repository"}
       chrome={chrome}
       sphere={repositorySphereFor(model.setup.selectedRepo)}
-      onSelectRepository={model.setup.selectRepo}
+      onSelectRepository={(repository) => selectWorkspaceRepository(model, repository)}
       onContinue={() => void flow.continueFromRepository()}
+      branchPrompt={branchPrompt}
     />
   );
 }
@@ -54,6 +59,7 @@ export function FirstRunGitHubEnterpriseChooseScreen({
   sphere,
   onSelectRepository,
   onContinue,
+  branchPrompt,
 }: {
   repositories: string[];
   selectedRepository: string | null;
@@ -64,6 +70,7 @@ export function FirstRunGitHubEnterpriseChooseScreen({
   sphere?: FirstRunSphereProps;
   onSelectRepository: (repository: string) => void;
   onContinue: () => void;
+  branchPrompt?: RepositoryBranchPrompt;
 }) {
   const busy = loading || saving;
   const selectedInList = Boolean(selectedRepository && repositories.includes(selectedRepository));
@@ -89,11 +96,12 @@ export function FirstRunGitHubEnterpriseChooseScreen({
           disabled={busy}
           onSelectRepository={onSelectRepository}
         />
+        {branchPrompt ? <RepositoryDefaultBranchPicker prompt={branchPrompt} /> : null}
         <div className="space-y-2">
           <LoadingButton
             type="button"
             className="w-full"
-            disabled={!selectedInList || busy}
+            disabled={!selectedInList || busy || !repositoryBranchChosen(branchPrompt)}
             loading={saving}
             loadingText={chooseCopy.saving}
             onClick={onContinue}

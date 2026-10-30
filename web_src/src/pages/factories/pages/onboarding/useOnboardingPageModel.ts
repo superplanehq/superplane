@@ -12,9 +12,8 @@ import {
   useDeleteFactoryIntake,
   useUpdateFactoryIntake,
 } from "@/hooks/useFactoryIntakeData";
-import { resolveGithubDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { resolveRepositoryDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
-import { getApiErrorMessage } from "@/lib/errors";
 import { githubHostFromIntegration } from "@/lib/githubHost";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { showErrorToast } from "@/lib/toast";
@@ -26,6 +25,14 @@ import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
+import {
+  runSave,
+  saveBitbucketForgeRepository,
+  saveBitbucketRepository,
+  saveCatalogRepository,
+  useDefaultBranchGate,
+  type OnboardingRepositorySelection,
+} from "./selectOnboardingRepository";
 import {
   AGENT_PROVIDER_IDS,
   CODEX_SUBSCRIPTION_PLAN,
@@ -40,8 +47,11 @@ import { useOnboardingAgentPageState } from "./useOnboardingAgentPageState";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
-import { readOnboardingGithubEnterprise, vcsOnboardingIntegrationIds } from "./onboardingGithubEnterprise";
-import { vcsOnboardingRepositorySaves } from "./onboardingVcsRepositorySaves";
+import {
+  githubEnterpriseOnboardingActions,
+  readOnboardingGithubEnterprise,
+  vcsOnboardingIntegrationIds,
+} from "./onboardingGithubEnterprise";
 import {
   apiIssuesSource,
   initialWizardStep,
@@ -92,19 +102,6 @@ function useRestoreIntegrationReadiness(setup: OnboardingSetupApi, selections: I
     if (!selections.claude?.ready) return;
     setAgent("claude-code");
   }, [selections.claude?.ready, setAgent]);
-}
-
-async function runSave(setSaving: (saving: boolean) => void, action: () => Promise<unknown>): Promise<boolean> {
-  setSaving(true);
-  try {
-    await action();
-    return true;
-  } catch (error) {
-    showErrorToast(getApiErrorMessage(error, "Failed to save workspace setup"));
-    return false;
-  } finally {
-    setSaving(false);
-  }
 }
 
 function useSectionSaves(args: {
@@ -207,6 +204,7 @@ type OnboardingGithubSavesAndFinishArgs = {
   mutations: ReturnType<typeof useOnboardingMutations>;
   setSaving: (saving: boolean) => void;
   setProvisionedDestination: (destination: OnboardingDestination | null) => void;
+  onMissingDefaultBranch?: () => void;
   agent: ReturnType<typeof useOnboardingAgentContext>;
 };
 
@@ -255,7 +253,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     deleteIntake: deleteIntake.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
-      resolveGithubDefaultBranch(args.organizationId, branchIntegrationId, repository),
+      resolveRepositoryDefaultBranch(args.organizationId, branchIntegrationId, repository),
     remainingCreditCents: args.agent.remainingCreditCents,
     hostedModelsLoading: args.agent.hostedModelsLoading,
     plan: args.agent.plan,
@@ -263,6 +261,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     jiraProjectId: jira.jiraProjectId,
     jiraCompletion: jira.jiraCompletion,
     linearProjectIds: linear.linearProjectIds,
+    onMissingDefaultBranch: args.onMissingDefaultBranch,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;
@@ -270,21 +269,43 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     onProvisioned: args.setProvisionedDestination,
   });
   const finishSetup = useFinishSetupAction({ ...args, finish });
+  const repositorySelection: OnboardingRepositorySelection = {
+    organizationId: args.organizationId,
+    setSaving: args.setSaving,
+    selectGitHubRepository: (repositoryId) => args.mutations.selectGitHubRepository.mutateAsync(repositoryId),
+    selectBitbucketForgeRepository: (input) => args.mutations.selectBitbucketForgeRepository.mutateAsync(input),
+    updateOnboarding: (input) => updateOnboarding.mutateAsync(input),
+    bitbucketIntegrationId,
+    rememberPreferredInstance: args.connect.rememberPreferredInstance,
+    refetchConnections: () => args.connect.refetchConnections(),
+    setSelections: args.integrations.setSelections,
+    selectVcsHost: args.setup.selectVcsHost,
+    selectRepo: args.setup.selectRepo,
+  };
+  const selectCatalogRepository = (repository: { repositoryId?: string; fullName?: string }) =>
+    saveCatalogRepository(repositorySelection, repository);
+  // The backend reads the provider from the integration, so the workspace
+  // becomes a Bitbucket workspace when this save completes.
+  const selectBitbucketForgeRepository = (fullName: string) =>
+    saveBitbucketForgeRepository(repositorySelection, fullName);
+  const selectBitbucketRepository = (fullName: string) => saveBitbucketRepository(repositorySelection, fullName);
+
   return {
     githubIntegrationId,
     bitbucketIntegrationId,
+    branchIntegrationId,
     saves,
     githubOwner,
     finishSetup,
-    ...vcsOnboardingRepositorySaves({
+    selectCatalogRepository,
+    selectBitbucketForgeRepository,
+    selectBitbucketRepository,
+    ...githubEnterpriseOnboardingActions({
       organizationId: args.organizationId,
       factoryId: args.factoryId,
       githubIntegrationId,
-      bitbucketIntegrationId,
       setSaving: args.setSaving,
       updateOnboarding: updateOnboarding.mutateAsync,
-      selectGitHubRepository: args.mutations.selectGitHubRepository.mutateAsync,
-      selectBitbucketForgeRepository: args.mutations.selectBitbucketForgeRepository.mutateAsync,
       rememberPreferredInstance: args.connect.rememberPreferredInstance,
       refetchConnections: args.connect.refetchConnections,
       setSelections: args.integrations.setSelections,
@@ -337,6 +358,7 @@ function wiredVcsFields(
     githubIntegrationId,
     githubHost,
     bitbucketIntegrationId: wired.bitbucketIntegrationId,
+    branchIntegrationId: wired.branchIntegrationId,
   };
 }
 
@@ -409,6 +431,7 @@ export function useOnboardingPageModel(args: {
   const [saving, setSaving] = useState(false);
   const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
   const mutations = useOnboardingMutations(args.organizationId, args.factoryId);
+  const branchGate = useDefaultBranchGate(setSaving, mutations.updateOnboarding.mutateAsync);
   const wired = useOnboardingGithubSavesAndFinish({
     ...args,
     reresolveWorkspace: args.reresolveWorkspace ?? null,
@@ -421,6 +444,7 @@ export function useOnboardingPageModel(args: {
     mutations,
     setSaving,
     setProvisionedDestination,
+    onMissingDefaultBranch: branchGate.onMissingDefaultBranch,
     agent: finishAgent,
   });
 
@@ -454,6 +478,7 @@ export function useOnboardingPageModel(args: {
     setOpenSection,
     requestConnect,
     ...wiredVcsFields(wired, connectedIntegrations),
+    ...branchGate.model,
     integrationDialogs: createElement(OnboardingConnectDialogs, {
       connectDialogs: connect.dialogs,
       customProviderOpen: customProviderDialogOpen,

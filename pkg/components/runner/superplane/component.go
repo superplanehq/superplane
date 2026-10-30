@@ -154,7 +154,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	environment = runner.AttachTaskOwnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
@@ -173,6 +173,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	environment, files = runner.AttachFactoryCommitIdentity(ctx, environment, files)
 	files = runner.AppendTaskArtifactMCP(environment, files)
 	files = runner.AppendMergeConfidenceMCP(environment, files)
+	files = runner.AppendGlobalMCP(environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {
 		access, err = mintOpenRouterRunnerKey(ctx, access, spec.ExecutionTimeoutSeconds)

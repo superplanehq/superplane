@@ -182,6 +182,8 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
+	assert.True(t, Exists(FeatureFactoryStepActions))
+	assert.False(t, IsReleased(FeatureFactoryStepActions))
 	assert.False(t, Exists("mobile_factory_board"))
 	assert.False(t, Exists("factory_risk_score"))
 	assert.False(t, Exists("factory_visual_evidence"))

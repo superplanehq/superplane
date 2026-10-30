@@ -391,23 +391,85 @@ if ! command -v git >/dev/null 2>&1; then
   echo "git not found on PATH; required for checkout" >&2
   exit 1
 fi
-branch="${BASE:-main}"
+requested_branch="${BASE:-}"
+branch="$requested_branch"
+# Pull request checkouts stay read-only even when the task also sets
+# CHECKOUT_COMMIT_SETUP. Only the default-branch path below opts in.
+checkout_mode=readonly
+
+repository_label() {
+  if [ -n "${REPO:-}" ]; then
+    printf '%s\n' "${REPO}"
+    return
+  fi
+  printf '%s\n' "${REPO_URL}"
+}
+
+remote_head_branch() {
+  symref="$(git ls-remote --symref "${REPO_URL}" HEAD 2>/dev/null || true)"
+  printf '%s\n' "$symref" | awk '$1 == "ref:" && index($2, "refs/heads/") == 1 { sub(/^refs\/heads\//, "", $2); print $2; exit }'
+}
+
+read_checked_out_branch() {
+  name="$(git -C repo rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  if [ -n "$name" ] && [ "$name" != "HEAD" ]; then
+    printf '%s\n' "$name"
+    return 0
+  fi
+  # An empty clone has no commit, so rev-parse reports HEAD. The branch
+  # name is still stored in .git/HEAD.
+  if [ -f repo/.git/HEAD ]; then
+    name="$(sed -n 's#^ref: refs/heads/##p' repo/.git/HEAD)"
+    if [ -n "$name" ]; then
+      printf '%s\n' "$name"
+      return 0
+    fi
+  fi
+  name="$(git -C repo symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+  printf '%s\n' "${name#origin/}"
+}
+
+clone_remote_default() {
+  git clone --depth 1 "${REPO_URL}" repo
+  branch="$(read_checked_out_branch)"
+}
 
 clone_default_branch() {
   if [ -d repo/.git ]; then
     echo "repo/ already checked out, reusing."
+    if [ -z "$branch" ]; then
+      branch="$(read_checked_out_branch)"
+    fi
     return 0
   fi
   rm -rf repo
   heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
-  if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then
-    git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo
-  elif [ -z "$heads" ]; then
+  if [ -n "$requested_branch" ] && printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${requested_branch}"; then
+    git clone --depth 1 --branch "${requested_branch}" "${REPO_URL}" repo
+    branch="$requested_branch"
+    return 0
+  fi
+  if [ -z "$heads" ]; then
     git clone "${REPO_URL}" repo
-  else
-    echo "Remote branch ${branch} not found. The repository has other branches." >&2
+    if [ -z "$branch" ]; then
+      branch="$(read_checked_out_branch)"
+    fi
+    return 0
+  fi
+  label="$(repository_label)"
+  remote_default="$(remote_head_branch)"
+  if [ -n "$requested_branch" ] && [ "$checkout_mode" = "commit" ]; then
+    if [ -n "$remote_default" ]; then
+      echo "The workspace default branch \"${requested_branch}\" does not exist in ${label}. The repository's default branch is \"${remote_default}\". Update it in Workspace settings → Repository." >&2
+    else
+      echo "The workspace default branch \"${requested_branch}\" does not exist in ${label}. Update it in Workspace settings → Repository." >&2
+    fi
     exit 1
   fi
+  if [ -n "$requested_branch" ]; then
+    echo "Warning: The workspace default branch \"${requested_branch}\" does not exist in ${label}. Checking out \"${remote_default}\"." >&2
+  fi
+  clone_remote_default
 }
 
 revision_matches() {
@@ -429,9 +491,10 @@ checkout_github_revision() {
     echo "Checked out $(git rev-parse HEAD). Expected ${PR_REVISION}." >&2
     exit 1
   fi
-  if [ -n "${REPO:-}" ] && [ -n "${BASE:-}" ]; then
+  compare_base="${branch:-${BASE:-}}"
+  if [ -n "${REPO:-}" ] && [ -n "${compare_base}" ]; then
     revision="$(git rev-parse HEAD)"
-    base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
+    base_ref="$(printf '%s' "${compare_base}" | sed 's#/#%2F#g')"
     gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
   fi
   cd "$_sp_root" || exit 1
@@ -566,6 +629,9 @@ elif [ -n "${PR_NUMBER:-}" ] && [ -z "${PR_REVISION:-}" ]; then
 elif [ -n "${PR_REVISION:-}" ]; then
   checkout_github_revision
 else
+  if [ "${` + WorkspaceCheckoutCommitSetupEnv + `:-0}" = "1" ]; then
+    checkout_mode=commit
+  fi
   clone_default_branch
 ` + workspaceCheckoutCommitSetup() + `
 fi
@@ -630,6 +696,10 @@ git config --global user.email "` + FactoryAgentEmail + `"
 git config --global user.name "` + FactoryAgentName + `"
 _sp_cwd="$(pwd)"
 cd repo || exit 1
+if [ -z "${branch}" ]; then
+  echo "Could not determine the repository default branch. Set it in Workspace settings → Repository." >&2
+  exit 1
+fi
 ` + FactoryRepoCommitSetup() + `
 use_existing_branch() {
   echo "Another run created ${branch}. Using that branch." >&2

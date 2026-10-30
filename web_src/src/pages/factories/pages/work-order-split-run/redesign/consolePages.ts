@@ -13,7 +13,7 @@ import { isRunnerComponent } from "../streamNotesFromLiveLog";
 import type { AutomationStage } from "./automationsViewModel";
 
 /** The expanded card's fixed pages, in tab order. */
-export type ConsolePageId = "agent" | "artifacts" | "checks";
+export type ConsolePageId = "agent" | "artifacts" | "checks" | "actions";
 
 export type StageArtifact = AutomationStage["outputs"]["artifacts"][number];
 
@@ -27,6 +27,8 @@ export function consolePages(
   stage: AutomationStage,
   phase?: SplitRunPhase,
   runs: AutomationStage[] = [stage],
+  actionCount = 0,
+  actionsFailed = false,
 ): ConsolePageId[] {
   const pages: ConsolePageId[] = [];
   if (runs.some((run) => hasAgentLog(run, run.id === stage.id ? phase : undefined))) {
@@ -37,6 +39,9 @@ export function consolePages(
   }
   if (stage.checks.length > 0) {
     pages.push("checks");
+  }
+  if (actionCount > 0 || actionsFailed) {
+    pages.push("actions");
   }
   return pages;
 }

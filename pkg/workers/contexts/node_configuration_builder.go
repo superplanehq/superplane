@@ -1352,10 +1352,6 @@ func resolveOrderRepository(order *models.FactoryWorkOrder, config models.Factor
 	// with current workspace settings when a legacy row contains only one.
 	repository = config.AppRepository
 	defaultBranch = config.DefaultBranch
-	if defaultBranch == "" {
-		defaultBranch = "main"
-	}
-
 	return repository, defaultBranch, false
 }
 

@@ -43,6 +43,7 @@ import {
   type GitHubInstallScope,
 } from "./githubInstallReturn";
 import { githubConnectReturnPath } from "./onboardingGitHubConnect";
+import { continueFromRepositoryAction, saveSelectedRepository } from "./firstRunRepositoryActions";
 import { useFirstRunBlockingAction, type FirstRunBlocking } from "./useFirstRunBlockingAction";
 import { useFirstRunBitbucket } from "./useFirstRunBitbucket";
 import {
@@ -140,6 +141,7 @@ function useFirstRunNavigation(
   const githubPending = connection.onboarding.isPending;
   if (FINAL_SCREENS.has(screen) && !model.setup.selectedRepo) screen = "host";
   if (FINAL_SCREENS.has(screen) && !intakePrerequisitesSatisfied(model)) screen = "tickets";
+  if (model.defaultBranchRequired && (screen === "tickets" || FINAL_SCREENS.has(screen))) screen = "choose";
   useEffect(() => {
     if (githubPending && !initialFirstRunScreen(searchParams)) return;
     const step = urlStepFor(screen);
@@ -199,29 +201,6 @@ function intakePrerequisitesSatisfied(model: OnboardingPageModel) {
   return selectedIssuesChoice(model) != null;
 }
 
-function saveSelectedRepository(args: {
-  model: OnboardingPageModel;
-  connection: GitHubConnectionState;
-  forgeConfigured: boolean;
-  githubEnterprise: boolean;
-}): Promise<boolean> {
-  const selectedRepo = args.model.setup.selectedRepo;
-  if (!selectedRepo) return Promise.resolve(false);
-  if (args.model.setup.vcsHost === "bitbucket") {
-    args.model.setup.commitRepoStep();
-    if (args.forgeConfigured) return args.model.selectBitbucketForgeRepository(selectedRepo);
-    return args.model.selectBitbucketRepository(selectedRepo);
-  }
-  if (args.githubEnterprise) {
-    args.model.setup.commitRepoStep();
-    return args.model.selectGitHubEnterpriseRepository(selectedRepo);
-  }
-  const repository = args.connection.repositories.find((candidate) => candidate.fullName === selectedRepo);
-  if (!repository) return Promise.resolve(false);
-  args.model.setup.commitRepoStep();
-  return args.model.selectCatalogRepository(repository);
-}
-
 function continueFromTicketSource(args: {
   model: OnboardingPageModel;
   afterTickets: () => Promise<void>;
@@ -263,12 +242,12 @@ function useFirstRunCommands(args: FirstRunCommandsArgs) {
   const location = useLocation();
   const saveRepository = () =>
     saveSelectedRepository({ model, connection, forgeConfigured, githubEnterprise: args.githubEnterprise });
-  const continueFromRepository = () =>
-    blocking.run("saving-repository", async () => {
-      if (await saveRepository()) {
-        navigation.goToScreen("tickets");
-      }
-    });
+  const continueFromRepository = continueFromRepositoryAction({
+    model,
+    blocking,
+    navigation,
+    saveRepository,
+  });
   const chooseVcsHost = (host: FirstRunHostChoice) =>
     chooseFirstRunVcsHost({
       host,

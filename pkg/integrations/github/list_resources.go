@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
@@ -98,9 +99,8 @@ func toIntegrationResources(repositories []*github.Repository) []core.Integratio
 }
 
 // listDefaultBranchResource resolves the default branch of a single
-// repository, identified by ctx.Parameters["repository"]. It is used by
-// onboarding to write the real default branch (main, master, staging, ...)
-// into generated automations instead of hardcoding "main".
+// repository, identified by ctx.Parameters["repository"]. Onboarding saves
+// that name. An empty result means GitHub did not report a default branch.
 func (g *GitHub) listDefaultBranchResource(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	repository := ctx.Parameters["repository"]
 	if repository == "" {
@@ -120,13 +120,15 @@ func (g *GitHub) listDefaultBranchResource(ctx core.ListResourcesContext) ([]cor
 	return toDefaultBranchResources(repo), nil
 }
 
-// toDefaultBranchResources returns the resolved default branch as a single
-// IntegrationResource, falling back to "main" when GitHub reports no default
-// branch (this can happen for empty repositories).
+// toDefaultBranchResources returns the default branch GitHub reported.
+// An empty name returns no resource, including for an empty repository.
 func toDefaultBranchResources(repo *github.Repository) []core.IntegrationResource {
-	branch := repo.GetDefaultBranch()
+	if repo == nil {
+		return []core.IntegrationResource{}
+	}
+	branch := strings.TrimSpace(repo.GetDefaultBranch())
 	if branch == "" {
-		branch = "main"
+		return []core.IntegrationResource{}
 	}
 
 	return []core.IntegrationResource{

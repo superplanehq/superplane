@@ -755,6 +755,34 @@ test("Fleet Manager releases record image and chart digests", async () => {
   assert.match(payload.body, /Fleet Manager chart digest: `sha256:e{64}`/);
 });
 
+test("Fleet Manager releases require image and chart digests", async () => {
+  const common = {
+    apiURL: "http://127.0.0.1:1",
+    repository: "superplanehq/superplane",
+    token: "test-token",
+    releaseID: "44",
+    component: "fleet-manager",
+    version: "v1.2.3",
+    sha: "c".repeat(40),
+    releaseNotes: "## Fleet Manager changes\n\n- Publish the chart.",
+  };
+
+  await assert.rejects(
+    publishGitHubRelease({
+      ...common,
+      imageDigest: `sha256:${"d".repeat(64)}`,
+    }),
+    /fleet-manager releases require a chart digest/,
+  );
+  await assert.rejects(
+    publishGitHubRelease({
+      ...common,
+      chartDigest: `sha256:${"e".repeat(64)}`,
+    }),
+    /fleet-manager releases require an image digest/,
+  );
+});
+
 test("SuperPlane releases record image and chart digests", async () => {
   let payload;
   const server = http.createServer((request, response) => {

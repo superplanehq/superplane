@@ -67,30 +67,6 @@ import (
 
 var _ = registryimports.Loaded
 
-var agentProviderOverride = struct {
-	sync.Mutex
-	provider agents.Provider
-}{}
-
-func SetAgentProviderForTests(provider agents.Provider) func() {
-	agentProviderOverride.Lock()
-	previous := agentProviderOverride.provider
-	agentProviderOverride.provider = provider
-	agentProviderOverride.Unlock()
-
-	return func() {
-		agentProviderOverride.Lock()
-		agentProviderOverride.provider = previous
-		agentProviderOverride.Unlock()
-	}
-}
-
-func getAgentProviderOverride() agents.Provider {
-	agentProviderOverride.Lock()
-	defer agentProviderOverride.Unlock()
-	return agentProviderOverride.provider
-}
-
 var licenseServiceOverride = struct {
 	sync.Mutex
 	service *licensing.Service
@@ -118,11 +94,6 @@ func getLicenseServiceOverride() *licensing.Service {
 }
 
 func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
-	if provider := getAgentProviderOverride(); provider != nil {
-		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
-		return provider, agents.NewService(provider, authService)
-	}
-
 	cfg := config.LoadAnthropicAgentConfig()
 	if !cfg.Enabled() {
 		log.Info("Anthropic managed agents disabled: missing ANTHROPIC_* env vars")
@@ -226,6 +197,11 @@ func startWorkers(
 			time.Minute,
 		)
 		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_RUNNER_TASK_SCHEDULER") == "yes" {
+		log.Println("Starting Runner Task Scheduler")
+		go workers.NewRunnerTaskScheduler(time.Second).Start(context.Background())
 	}
 
 	if os.Getenv("START_RUNNER_CLEANUP_WORKER") == "yes" {

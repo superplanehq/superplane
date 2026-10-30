@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/v84/github"
@@ -163,18 +164,29 @@ func Test__ListReviewBotResourcesFromClient(t *testing.T) {
 }
 
 type fakeGitHubStatusCheckAPI struct {
-	openPulls   []*github.PullRequest
-	closedPulls []*github.PullRequest
-	openErr     error
-	closedErr   error
-	states      []string
+	openPulls          []*github.PullRequest
+	closedPulls        []*github.PullRequest
+	openErr            error
+	closedErr          error
+	states             []string
+	defaultBranch      *string
+	protectionBranches []string
+	checkRuns          map[string]*github.ListCheckRunsResults
 }
 
 func (f *fakeGitHubStatusCheckAPI) FindRepository(string) (*github.Repository, error) {
-	return &github.Repository{DefaultBranch: github.Ptr("main")}, nil
+	if f.defaultBranch != nil && strings.TrimSpace(*f.defaultBranch) == "" {
+		return &github.Repository{}, nil
+	}
+	branch := "main"
+	if f.defaultBranch != nil {
+		branch = *f.defaultBranch
+	}
+	return &github.Repository{DefaultBranch: github.Ptr(branch)}, nil
 }
 
-func (f *fakeGitHubStatusCheckAPI) GetBranchProtection(context.Context, string, string) (*github.Protection, error) {
+func (f *fakeGitHubStatusCheckAPI) GetBranchProtection(_ context.Context, _, branch string) (*github.Protection, error) {
+	f.protectionBranches = append(f.protectionBranches, branch)
 	return nil, errors.New("unused")
 }
 
@@ -196,7 +208,12 @@ func (f *fakeGitHubStatusCheckAPI) ListPullRequests(_ context.Context, _ string,
 	return f.closedPulls, &github.Response{}, nil
 }
 
-func (f *fakeGitHubStatusCheckAPI) ListCheckRunsForRef(context.Context, string, string, *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
+func (f *fakeGitHubStatusCheckAPI) ListCheckRunsForRef(_ context.Context, _, ref string, _ *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
+	if f.checkRuns != nil {
+		if result, ok := f.checkRuns[ref]; ok {
+			return result, &github.Response{}, nil
+		}
+	}
 	return nil, &github.Response{}, errors.New("unused")
 }
 
@@ -252,5 +269,26 @@ func Test__ListStatusCheckResourcesFromClient(t *testing.T) {
 		resources, err := listStatusCheckResourcesFromClient(context.Background(), api, "acme/app")
 		assert.EqualError(t, err, "open pulls unavailable")
 		assert.Empty(t, resources)
+	})
+
+	t.Run("skips branch protection when the repository has no default branch", func(t *testing.T) {
+		t.Parallel()
+		empty := ""
+		api := &fakeGitHubStatusCheckAPI{
+			defaultBranch: &empty,
+			openPulls: []*github.PullRequest{
+				{Head: &github.PullRequestBranch{SHA: github.Ptr("pr-head")}},
+			},
+			checkRuns: map[string]*github.ListCheckRunsResults{
+				"pr-head": {CheckRuns: []*github.CheckRun{{Name: github.Ptr("lint")}}},
+			},
+		}
+
+		resources, err := listStatusCheckResourcesFromClient(context.Background(), api, "acme/app")
+		require.NoError(t, err)
+		assert.Empty(t, api.protectionBranches)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: "status_check", Name: "lint", ID: "lint"},
+		}, resources)
 	})
 }

@@ -216,9 +216,6 @@ func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (st
 	if repository == "" {
 		return "", "", ""
 	}
-	if defaultBranch == "" {
-		defaultBranch = "main"
-	}
 	provider := config.EffectiveVCSProvider()
 	if repositoryFromOrder {
 		provider = orderRepositoryProvider(order)

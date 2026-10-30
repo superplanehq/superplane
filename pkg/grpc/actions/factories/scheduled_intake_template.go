@@ -1,16 +1,17 @@
 package factories
 
 import (
-	"github.com/superplanehq/superplane/pkg/triggers/schedule"
 	"math"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/triggers/schedule"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
@@ -114,8 +115,24 @@ func githubHostForFactory(db *gorm.DB, factory *models.Factory) string {
 	if factory == nil {
 		return ""
 	}
-	host, err := githubcommon.HostFromFactoryOnboarding(db, factory.OrganizationID, factory.OnboardingConfigValue())
-	if err != nil || host.IsDotCom() {
+	return githubHostForVCSIntegration(db, factory.OrganizationID, factory.OnboardingConfigValue().VCSIntegrationID)
+}
+
+func githubHostForVCSIntegration(db *gorm.DB, organizationID uuid.UUID, integrationID string) string {
+	id := strings.TrimSpace(integrationID)
+	if id == "" || db == nil {
+		return ""
+	}
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return ""
+	}
+	integration, err := models.FindIntegrationInTransaction(db, organizationID, parsed)
+	if err != nil {
+		return ""
+	}
+	host := githubcommon.HostFromModel(integration)
+	if host.IsDotCom() {
 		return ""
 	}
 	return host.WebHostname()

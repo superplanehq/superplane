@@ -336,9 +336,6 @@ func normalizeFactoryInstallParams(params map[string]string) map[string]string {
 	if normalized == nil {
 		normalized = map[string]string{}
 	}
-	if strings.TrimSpace(normalized["defaultBranch"]) == "" {
-		normalized["defaultBranch"] = "main"
-	}
 	if strings.TrimSpace(normalized["riskRules"]) == "" {
 		normalized["riskRules"] = defaultRiskScoreRules
 	}

@@ -43,6 +43,30 @@ import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
+export class MissingRepositoryBranchError extends Error {
+  constructor() {
+    super("Choose the repository default branch before you continue.");
+    this.name = "MissingRepositoryBranchError";
+  }
+}
+
+/** A rejected lookup is unknown. An empty lookup keeps a saved branch. */
+export async function onboardingDefaultBranch(args: { lookup: () => Promise<string>; saved: string }): Promise<string> {
+  const lookedUp = await args.lookup().catch(() => "");
+  const branch = lookedUp.trim() || args.saved.trim();
+  if (!branch) throw new MissingRepositoryBranchError();
+  return branch;
+}
+
+export function branchFromOnboardingUpdate(response: unknown): string {
+  if (!response || typeof response !== "object") return "";
+  const record = response as {
+    onboarding?: { defaultBranch?: string | null };
+    data?: { factory?: { onboarding?: { defaultBranch?: string | null } } };
+  };
+  return record.onboarding?.defaultBranch?.trim() || record.data?.factory?.onboarding?.defaultBranch?.trim() || "";
+}
+
 export function finishOnboardingError(args: {
   appRepository: string | null;
   backlogRepository: string | null;
@@ -167,6 +191,10 @@ export async function provisionWorkspace(args: {
   jira?: { integrationId: string; projectId: string; settings?: FactoriesFactoryIntakeSettings };
   linear?: { integrationId: string; projectIds: string[] };
 }): Promise<{ lineId: string }> {
+  const defaultBranch = await onboardingDefaultBranch({
+    lookup: () => args.resolveDefaultBranch(args.appRepository),
+    saved: args.factory?.onboarding?.defaultBranch ?? "",
+  });
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
       name: args.workspaceName,
@@ -184,11 +212,8 @@ export async function provisionWorkspace(args: {
     agentHarness: subscription ? "AGENT_HARNESS_CODEX" : args.agentPlan.harness,
     codexSubscription: subscription,
   });
-  // Onboarding installs the Implement app with the real default branch (main,
-  // master, staging, ...) instead of hardcoding "main", so Create Branch and
-  // Create Pull Request target the branch GitHub actually treats as default.
-  const defaultBranch = (await args.resolveDefaultBranch(args.appRepository)) || "main";
-  await args.updateOnboarding({ defaultBranch });
+  const updated = await args.updateOnboarding({ defaultBranch });
+  const provisionBranch = branchFromOnboardingUpdate(updated) || defaultBranch;
   const { lineId, primaryAppId } = await provisionLine({
     factory: args.factory,
     savedLineId: args.factory?.onboarding?.provisionedLineId,
@@ -196,7 +221,7 @@ export async function provisionWorkspace(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
-    defaultBranch,
+    defaultBranch: provisionBranch,
     agentRewrite: args.agentRewrite,
     vcsProvider: args.vcs.provider,
     installFactory: args.installFactory,
@@ -208,7 +233,7 @@ export async function provisionWorkspace(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
-    defaultBranch,
+    defaultBranch: provisionBranch,
     agentRewrite: args.agentRewrite,
     vcsProvider: args.vcs.provider,
     installFactory: args.installFactory,
@@ -343,6 +368,7 @@ export function useFinishOnboarding(args: {
   deleteIntake: DeleteFactoryIntake;
   listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
+  onMissingDefaultBranch?: () => void;
   takenNames: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
@@ -442,11 +468,16 @@ export function useFinishOnboarding(args: {
         bypassAnalysis,
       });
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
+      reportFinishFailure(error, args.onMissingDefaultBranch);
     } finally {
       args.setSaving(false);
     }
   };
+}
+
+function reportFinishFailure(error: unknown, onMissing?: () => void) {
+  if (error instanceof MissingRepositoryBranchError) onMissing?.();
+  showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
 }
 
 function githubIntakeRepositoryError(choice: IssuesChoiceId | null | undefined, host: VcsHostId | null | undefined) {

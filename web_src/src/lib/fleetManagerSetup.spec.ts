@@ -233,16 +233,18 @@ describe("validateFleetManagerConfiguration", () => {
 it("generates a bounded Helm installation command with the complete values", () => {
   const values = "installationAdminToken: personal-token\n";
   const fileCommand = fleetManagerValuesFileCommand(values);
-  const helmCommand = fleetManagerHelmCommand(metadata, "superplane");
-  const install = fleetManagerInstallCommand(metadata, "superplane", values);
+  const helmCommand = fleetManagerHelmCommand(metadata, "superplane", "aws-prod");
+  const install = fleetManagerInstallCommand(metadata, "superplane", values, "aws-prod");
 
   expect(fileCommand).toBe("cat > fleet-manager-values.yaml <<'EOF'\ninstallationAdminToken: personal-token\nEOF\n");
   expect(helmCommand).toContain("helm upgrade --install fleet-manager");
   expect(helmCommand).toContain("--version 0.1.0");
+  expect(helmCommand).toContain("--kube-context 'aws-prod'");
   expect(helmCommand).toContain("--timeout 10m");
   expect(helmCommand).toContain("-f fleet-manager-values.yaml");
   expect(helmCommand).not.toContain("kubectl");
   expect(helmCommand).not.toContain("create secret");
+  expect(fleetManagerHelmCommand(metadata, "superplane", "o'reilly")).toContain("--kube-context 'o'\\''reilly'");
   expect(install).toBe(`${fileCommand}\n${helmCommand}\n`);
   expect(install).not.toContain("--values -");
 });
@@ -256,7 +258,7 @@ it("keeps a custom machine type and resets a type from another cloud", () => {
 });
 
 it("uses a custom namespace in generated commands", () => {
-  const install = fleetManagerInstallCommand(metadata, "runners", "manager:\n  id: test\n");
+  const install = fleetManagerInstallCommand(metadata, "runners", "manager:\n  id: test\n", "aws-prod");
 
   expect(install).toContain("--namespace runners");
 });
@@ -493,6 +495,7 @@ it("uses a browser key that stores only the non-secret draft", () => {
     selectedFleetIds: ["e1-large-amd64"],
     fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
     fields: { region: "us-east-1" },
+    kubeContext: "aws-prod",
   };
 
   saveFleetManagerDraft(draft);
@@ -524,5 +527,6 @@ it("migrates global capacities and removes unknown values from a stored draft", 
 
   const draft = loadFleetManagerDraft();
   expect(draft).not.toHaveProperty("plaintextToken");
+  expect(draft?.kubeContext).toBe("");
   expect(draft?.fleetCapacities).toEqual({ "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } });
 });

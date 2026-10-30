@@ -167,7 +167,7 @@ export function WorkOrderCard({
     isDraft && planningSession?.state !== "ended" && planningSession?.waitState !== "pending"
       ? planningSession?.runnerState
       : undefined;
-  const planningQueued = runnerState === "queued";
+  const planningQueued = runnerState === "queued" || runnerState === "pending";
   const { showAgentQuestion, agentWorking } = draftCardActionFlags(
     isDraft,
     isAnalyzing && !planningQueued,
@@ -216,9 +216,10 @@ export function WorkOrderCard({
           onAssigneesSave={onAssigneesSave}
         />
 
-        {!showAgentQuestion && (runnerState === "queued" || runnerState === "running") ? (
-          <WorkOrderCardPlanningStatus state={runnerState} queueReason={planningSession?.queueReason} />
-        ) : null}
+        <WorkOrderCardPlanningStatus
+          state={showAgentQuestion ? undefined : runnerState}
+          blockedByParallelismLimit={planningSession?.blockedByParallelismLimit}
+        />
         <WorkOrderCardStatusRow
           entryId={entry.id}
           reasons={attentionReasons}
@@ -307,9 +308,18 @@ function WorkOrderCardOpenControl({
   return <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${title}`} />;
 }
 
-function WorkOrderCardPlanningStatus({ state, queueReason }: { state: "queued" | "running"; queueReason?: string }) {
-  const queued = state === "queued";
-  const atParallelismLimit = queued && queueReason === "parallelism_limit";
+function WorkOrderCardPlanningStatus({
+  state,
+  blockedByParallelismLimit,
+}: {
+  state?: string;
+  blockedByParallelismLimit?: boolean;
+}) {
+  if (state !== "pending" && state !== "queued" && state !== "running") {
+    return null;
+  }
+  const queued = state === "queued" || state === "pending";
+  const atParallelismLimit = state === "pending" && blockedByParallelismLimit;
   const Icon = queued ? Clock : Bot;
 
   return (
@@ -331,7 +341,9 @@ function WorkOrderCardPlanningStatus({ state, queueReason }: { state: "queued" |
           <p>
             {atParallelismLimit
               ? "Starts automatically when a slot is free."
-              : "Starts automatically when a runner is available."}
+              : state === "pending"
+                ? "Waiting for scheduling."
+                : "Starts automatically when a runner is available."}
           </p>
         </div>
       ) : null}

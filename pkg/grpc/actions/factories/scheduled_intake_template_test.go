@@ -124,6 +124,25 @@ func TestScheduledIntakeUsesGitHubEnterpriseHost(t *testing.T) {
 	t.Fatal("scheduled-agent node not found")
 }
 
+func TestScheduledIntakeLeavesBaseEmptyWhenWorkspaceBranchIsEmpty(t *testing.T) {
+	result, err := materializeFactoryTemplate(scheduledIntakeTemplateID, models.ProviderGitHub, factoryTemplateInput{
+		installParams: map[string]string{"appRepository": "acme/app", "defaultBranch": ""},
+	})
+	require.NoError(t, err)
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	require.NoError(t, configureScheduledIntake(canvas, models.ProviderGitHub, map[string]string{
+		"appRepository": "acme/app",
+		"defaultBranch": "",
+	}))
+
+	agent := findYAMLNode(t, canvas, "scheduled-agent")
+	env := agent.Configuration["environment"].([]any)
+	require.GreaterOrEqual(t, len(env), 2)
+	require.Equal(t, "BASE", env[1].(map[string]any)["name"])
+	require.Equal(t, "", env[1].(map[string]any)["value"])
+}
+
 func TestScheduledIntakeProposalResult(t *testing.T) {
 	result, err := materializeFactoryTemplate(scheduledIntakeTemplateID, models.ProviderGitHub, factoryTemplateInput{installParams: map[string]string{"appRepository": "acme/app"}})
 	require.NoError(t, err)

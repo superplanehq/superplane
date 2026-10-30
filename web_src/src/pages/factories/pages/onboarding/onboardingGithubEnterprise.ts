@@ -112,14 +112,15 @@ export function vcsOnboardingIntegrationIds(args: {
   rememberedIntegrationId?: string;
 }) {
   const bitbucketIntegrationId = args.bitbucketReady ? (args.bitbucketId ?? "") : "";
-  const branchIntegrationId = args.vcsHost === "bitbucket" ? (args.bitbucketId ?? "") : (args.githubId ?? "");
+  const githubIntegrationId = githubOnboardingIntegrationId({
+    selectionId: args.githubSelectionId,
+    vcsProvider: args.vcsProvider,
+    vcsIntegrationId: args.vcsIntegrationId,
+    rememberedIntegrationId: args.rememberedIntegrationId,
+  });
+  const branchIntegrationId = args.vcsHost === "bitbucket" ? (args.bitbucketId ?? "") : githubIntegrationId;
   return {
-    githubIntegrationId: githubOnboardingIntegrationId({
-      selectionId: args.githubSelectionId,
-      vcsProvider: args.vcsProvider,
-      vcsIntegrationId: args.vcsIntegrationId,
-      rememberedIntegrationId: args.rememberedIntegrationId,
-    }),
+    githubIntegrationId,
     bitbucketIntegrationId,
     branchIntegrationId,
   };
@@ -151,14 +152,15 @@ export async function persistGitHubEnterpriseRepository(args: {
   updateOnboarding: UpdateOnboarding;
   selectVcsHost: (host: VcsHostId) => void;
   selectRepo: (repository: string) => void;
-}): Promise<void> {
-  await args.updateOnboarding({
+}): Promise<string> {
+  const factory = (await args.updateOnboarding({
     vcsIntegrationId: args.githubIntegrationId,
     appRepository: args.fullName,
     backlogRepository: args.fullName,
-  });
+  })) as { onboarding?: { defaultBranch?: string | null } | null };
   args.selectVcsHost("github");
   args.selectRepo(args.fullName);
+  return factory?.onboarding?.defaultBranch?.trim() ?? "";
 }
 
 export async function bindGitHubEnterpriseOnboarding(args: {
@@ -199,19 +201,22 @@ export function githubEnterpriseOnboardingActions(args: {
   runSave: (setSaving: (saving: boolean) => void, action: () => Promise<unknown>) => Promise<boolean>;
 }) {
   return {
-    selectGitHubEnterpriseRepository: (fullName: string) => {
+    selectGitHubEnterpriseRepository: async (fullName: string) => {
       const githubIntegrationId =
         readOnboardingGithubEnterprise(args.factoryId).integrationId.trim() || args.githubIntegrationId;
-      if (!githubIntegrationId || !fullName) return Promise.resolve(false);
-      return args.runSave(args.setSaving, () =>
-        persistGitHubEnterpriseRepository({
+      if (!githubIntegrationId || !fullName) return false;
+      let branch = "";
+      const saved = await args.runSave(args.setSaving, async () => {
+        branch = await persistGitHubEnterpriseRepository({
           fullName,
           githubIntegrationId,
           updateOnboarding: args.updateOnboarding,
           selectVcsHost: args.selectVcsHost,
           selectRepo: args.selectRepo,
-        }),
-      );
+        });
+      });
+      if (!saved) return false;
+      return branch ? true : "needs-branch";
     },
     bindGitHubEnterpriseIntegration: (integrationId: string) =>
       bindGitHubEnterpriseOnboarding({
