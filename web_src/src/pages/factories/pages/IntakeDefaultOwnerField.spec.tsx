@@ -67,24 +67,29 @@ describe("IntakeDefaultOwnerField", () => {
     fireEvent.click(await screen.findByRole("option", { name: "No owner" }));
     expect(onChange).toHaveBeenLastCalledWith("");
   });
-  it("connects Codex from the empty owner picker and selects the signed-in member", async () => {
-    eligibleMembers = [{ userId: "bob", eligible: false }];
-    const onChange = vi.fn();
-    try {
-      render(
-        <IntakeDefaultOwnerField organizationId="org" factoryId="factory" value="" required onChange={onChange} />,
-      );
-      fireEvent.click(screen.getByRole("button", { name: "Connect Codex" }));
-      fireEvent.click(await screen.findByRole("button", { name: "Finish Codex sign-in" }));
-      await waitFor(() => expect(onChange).toHaveBeenCalledWith("alice"));
-      await waitFor(() =>
-        expect(screen.queryByRole("button", { name: "Finish Codex sign-in" })).not.toBeInTheDocument(),
-      );
-    } finally {
-      eligibleMembers = [
-        { userId: "alice", eligible: true },
-        { userId: "bob", eligible: false },
-      ];
-    }
-  });
+  it.each([{ members: [] }, { members: [{ userId: "bob", eligible: false }] }])(
+    "disables the empty owner picker and connects the signed-in member (%j)",
+    async ({ members }) => {
+      eligibleMembers = members;
+      const onChange = vi.fn();
+      try {
+        render(
+          <IntakeDefaultOwnerField organizationId="org" factoryId="factory" value="" required onChange={onChange} />,
+        );
+        expect(screen.getByRole("combobox", { name: /Default task owner/ })).toBeDisabled();
+        expect(screen.getByText("No members have ChatGPT connected.")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Connect Codex" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Finish Codex sign-in" }));
+        await waitFor(() => expect(onChange).toHaveBeenCalledWith("alice"));
+        await waitFor(() =>
+          expect(screen.queryByRole("button", { name: "Finish Codex sign-in" })).not.toBeInTheDocument(),
+        );
+      } finally {
+        eligibleMembers = [
+          { userId: "alice", eligible: true },
+          { userId: "bob", eligible: false },
+        ];
+      }
+    },
+  );
 });
