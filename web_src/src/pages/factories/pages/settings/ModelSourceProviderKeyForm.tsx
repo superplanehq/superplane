@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -24,10 +24,6 @@ export function ProviderKeyStep({
         onSaveKey(apiKey.trim());
       }}
     >
-      <DialogHeader>
-        <DialogTitle>Your {providerName} key</DialogTitle>
-        <DialogDescription>SuperPlane stores this key for agents in this workspace.</DialogDescription>
-      </DialogHeader>
       <div className="space-y-2">
         <Label htmlFor="llm-models-switch-api-key">{providerName} API key</Label>
         <Input
