@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"regexp"
 	"slices"
 	"strings"
@@ -36,12 +37,19 @@ type TaskOwnerCandidate struct {
 	OpenTasks    int
 }
 
+// ErrTaskOwnerAlreadyAssigned reports that an assignment asked to keep the
+// current owners and the task already has one.
+var ErrTaskOwnerAlreadyAssigned = errors.New("task already has an owner")
+
 // TaskOwnerAssignment is the owner choice of an automated assignment.
+// OnlyIfUnassigned keeps the current owners when the task already has one.
+// The check runs inside the task lock.
 type TaskOwnerAssignment struct {
-	UserID uuid.UUID
-	Source string
-	Reason string
-	Run    *factory.RunRef
+	UserID           uuid.UUID
+	Source           string
+	Reason           string
+	Run              *factory.RunRef
+	OnlyIfUnassigned bool
 }
 
 type taskOwnerCandidateScan struct {
@@ -185,6 +193,9 @@ func (o *FactoryWorkOrder) AssignOwner(tx *gorm.DB, assignment TaskOwnerAssignme
 		owners, err := o.ListAssignees(tx)
 		if err != nil {
 			return err
+		}
+		if assignment.OnlyIfUnassigned && len(owners) > 0 {
+			return ErrTaskOwnerAlreadyAssigned
 		}
 		o.Assignees = owners
 		reason := NormalizeTaskOwnerReason(assignment.Reason)

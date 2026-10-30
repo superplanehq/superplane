@@ -3,6 +3,7 @@ package public
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -23,8 +24,9 @@ type suggestOwnersRequest struct {
 }
 
 type assignOwnerRequest struct {
-	User   string `json:"user"`
-	Reason string `json:"reason"`
+	User             string `json:"user"`
+	Reason           string `json:"reason"`
+	OnlyIfUnassigned bool   `json:"only_if_unassigned"`
 }
 
 // taskOwnerTarget is the authorized task and the members who can own it.
@@ -132,14 +134,29 @@ func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request,
 	}
 
 	assignment := models.TaskOwnerAssignment{
-		UserID: owner.UserID,
-		Source: models.TaskOwnerSourceAgent,
-		Reason: reason,
+		UserID:           owner.UserID,
+		Source:           models.TaskOwnerSourceAgent,
+		Reason:           reason,
+		OnlyIfUnassigned: req.OnlyIfUnassigned,
 	}
 	if target.canvasRunID != uuid.Nil {
 		assignment.Run = &factoryevents.RunRef{ID: target.canvasRunID}
 	}
 	err := assignTaskOwner(database.DB(r.Context()), target.order, assignment)
+	if errors.Is(err, models.ErrTaskOwnerAlreadyAssigned) {
+		owners, listErr := target.order.ListAssignees(database.DB(r.Context()))
+		if listErr != nil {
+			log.WithError(listErr).Error("task owner assignment failed")
+			http.Error(w, "Task owner assignment failed", http.StatusInternalServerError)
+			return
+		}
+		target.order.Assignees = owners
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status": "kept",
+			"owners": currentTaskOwners(target),
+		})
+		return
+	}
 	if err != nil {
 		if target.session != nil {
 			writeRunnerPlanningError(w, r, target.session, err)

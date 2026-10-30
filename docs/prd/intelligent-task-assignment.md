@@ -76,7 +76,7 @@ sequenceDiagram
 A planning session sets one owner on the first plan turn when the task has no owner. It does not replace an existing owner. The agent picks a member in this order:
 
 1. For a GitHub, Linear, or Jira issue, the issue assignee. If the issue has no assignee, or the assignee is not a member, the issue author. The agent reads the issue with the tools it has. If it cannot read the issue, it uses the next step.
-2. For every other task, and when step 1 finds no member, the CODEOWNERS entry for the files the change will touch. A user or email entry must match a member. Team entries do not match. If no entry matches, the agent uses the member who most recently changed those files.
+2. For every other task, and when step 1 finds no member, the CODEOWNERS entry for the files the change will touch. A user or email entry must match a member. Team entries do not match. If no entry matches, the agent uses the first code owner from suggest_owners. That list ranks members by recent commits. Newer commits weigh more than older commits.
 3. The member who owns the fewest open tasks.
 
 Owner rules in Additional instructions take precedence over these steps. Other task agents still use the owner tools only when the task or the instructions ask for an owner.
@@ -125,6 +125,11 @@ Input: `user` (a `user_id` or a GitHub login from `suggest_owners`) and
 The tool replaces all current assignees with the selected person, including
 owners that a person set manually. A successful call leaves exactly one owner.
 Replacement is the default and does not require a force option.
+
+`only_if_unassigned` keeps the current owners when the task already has one.
+The check runs inside the task lock. The response status is `kept`, and the
+call does not change the task. A planning session sets this field, so an owner
+added while the agent researches stays in place.
 
 Successful calls return `status: assigned` and `owner`, the selected member.
 The timeline records the assigned and unassigned users, the agent source, and

@@ -22,6 +22,7 @@ async function assignOwner(input, client) {
   const reason = String((input && input.reason) || "").trim();
   const body = { user };
   if (reason) body.reason = reason;
+  if (input && input.only_if_unassigned === true) body.only_if_unassigned = true;
   return client.request("PUT", "/api/v1/runner/task/owner", body);
 }
 
@@ -62,6 +63,11 @@ const ASSIGN_OWNER = {
           type: "string",
           description:
             "Optional. One sentence that SuperPlane shows on the task, for example: You changed pkg/payments/charge.go 3 times in the last 30 days.",
+        },
+        only_if_unassigned: {
+          type: "boolean",
+          description:
+            "Optional. When true, keep the current owners if the task already has one. The result status is kept. Use this for the default planning assignment.",
         },
       },
       required: ["user"],

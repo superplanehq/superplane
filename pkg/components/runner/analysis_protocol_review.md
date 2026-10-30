@@ -64,7 +64,7 @@ Pick one member from the suggest_owners members list. Match a person to a member
 2. For every other task, such as Sentry or Dependabot, find the intent of the change and the files it will touch. Read CODEOWNERS in .github/, the repository root, or docs/. The last matching pattern applies. Use a user or email entry that matches a member. Skip team entries. If no entry matches a member, call suggest_owners with those paths and use the first code owner.
 3. If no step finds a member, use the first member in the members list. That member owns the fewest open tasks.
 
-Call assign_owner once. Give a one-sentence reason that names the step you used. If an owner tool fails, continue the plan. Do not mention the owner in chat unless the user asks. Owner rules in your instructions take precedence over these steps.
+Call assign_owner once, with only_if_unassigned set. Give a one-sentence reason that names the step you used. If the result status is kept, an owner was added while you researched. Do not assign again. If an owner tool fails, continue the plan. Do not mention the owner in chat unless the user asks. Owner rules in your instructions take precedence over these steps.
 
 ## Images
 
