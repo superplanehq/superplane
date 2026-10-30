@@ -74,6 +74,16 @@ After the first setup, run `make dev.up` when the stack is not running, then
 `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you
 need a fresh `npm install`, codegen, or migrations.
 
+The local development stack disables billing enforcement by default when
+`SUPERPLANE_BILLING_ENABLED` is missing or empty. With a ready provider
+integration and a valid model, workspace setup and agent runs do not require
+a SuperPlane subscription. Usage recording stays active.
+
+To test billing locally, set `SUPERPLANE_BILLING_ENABLED=yes` in `.env`.
+Run `make dev.up`, then run `make dev.server` to apply changed container
+environment values. SuperPlane Cloud and CI retain the billing-enabled
+runtime default.
+
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
 After owner setup, create the required installation fleets through the admin
