@@ -458,7 +458,6 @@ func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level stri
 	return nil
 }
 
-
 // dispatchThinkingOverridesLevel reports whether a Start thinking value sets
 // a level. Empty keeps the agent level and default uses the runner default.
 func dispatchThinkingOverridesLevel(thinking string) bool {
