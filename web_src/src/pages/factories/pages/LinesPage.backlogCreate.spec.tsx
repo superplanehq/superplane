@@ -13,7 +13,6 @@ import {
   type FactoryAutomation,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { CodexActionProvider } from "../codex/CodexActionProvider";
@@ -79,7 +78,6 @@ const enabledExperimentalFeatures = new Set<string>();
 let codexConnection: FactoriesFactoryCodexConnection;
 
 function renderSubscriptionBoard() {
-  enabledExperimentalFeatures.add(FEATURE_CODEX_SUBSCRIPTIONS);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const openCreateWorkOrder = vi.fn();
   render(

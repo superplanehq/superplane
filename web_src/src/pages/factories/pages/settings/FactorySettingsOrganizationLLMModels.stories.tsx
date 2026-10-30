@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { FactoriesFactoryCodexConnection } from "@/api-client";
 import { PermissionsContext } from "@/contexts/permissionsContextState";
 import { usePermissions } from "@/contexts/usePermissions";
-import { FEATURE_CODEX_SUBSCRIPTIONS, FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -24,7 +24,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 const modelsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`;
-const features = [FEATURE_ORGANIZATION_BYOK, FEATURE_CODEX_SUBSCRIPTIONS];
+const features = [FEATURE_ORGANIZATION_BYOK];
 const OPENROUTER_CANDIDATES = [
   "anthropic/claude-sonnet-4-6",
   "anthropic/claude-opus-4-6",

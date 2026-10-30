@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -658,7 +657,6 @@ func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing
 	r, factory := resetTestFactory(t)
 	db := database.DB(t.Context())
 	enableHostedSuperPlaneAgent(t, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	otherOwner := support.CreateUser(t, r, r.Organization.ID)
 	otherConnection, err := models.CreateCodexConnection(db, r.Organization.ID, otherOwner.ID, time.Now())
 	require.NoError(t, err)

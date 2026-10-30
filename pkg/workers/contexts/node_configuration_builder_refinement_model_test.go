@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -38,7 +37,6 @@ func TestBuildRefinementModel(t *testing.T) {
 			require.NoError(t, err)
 			t.Cleanup(func() { db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{}) })
 			if tc.source == "subscription" {
-				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 				connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 				require.NoError(t, err)
 				require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: tc.override}, {Model: tc.stored}}, time.Now()))
