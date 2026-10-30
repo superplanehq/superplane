@@ -372,11 +372,7 @@ func ReserveFactoryCodexConnection(
 ) (*FactoryCodexConnection, error) {
 	var connection *FactoryCodexConnection
 	err := tx.Transaction(func(tx *gorm.DB) error {
-		order, err := FindSubscriptionWorkOrderForRun(tx, organizationID, factoryID, runID)
-		if err != nil {
-			return err
-		}
-		ownerID, err := order.RequireSubscriptionOwner(tx, true)
+		ownerID, err := RequireSubscriptionRunOwner(tx, organizationID, factoryID, runID)
 		if err != nil {
 			return err
 		}

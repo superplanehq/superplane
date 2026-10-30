@@ -113,7 +113,16 @@ it("keeps an ineligible selected owner visible and permits clearing", () => {
   expect(onChange).toHaveBeenCalledWith([]);
 });
 
+it("permits a disconnected current user to select ownership while keeping other members unavailable", () => {
+  permissionsState.currentUserId = "alice";
+  const { onChange } = renderPicker({ eligibility: { subscription: true, ownershipChangeAllowed: true, members: [] } });
+  expect(screen.getByRole("option", { name: /Bob Brown/ })).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(screen.getByRole("option", { name: /Alice Anderson/ }));
+  expect(onChange).toHaveBeenCalledWith(["alice"]);
+});
+
 it("blocks both clearing and assignment while the task stops", () => {
+  permissionsState.currentUserId = "alice";
   const { onChange } = renderPicker({
     selectedIds: ["alice"],
     eligibility: {
@@ -123,6 +132,7 @@ it("blocks both clearing and assignment while the task stops", () => {
     },
   });
   fireEvent.click(screen.getByRole("option", { name: "No owner" }));
+  fireEvent.click(screen.getByRole("option", { name: /Alice Anderson/ }));
   expect(onChange).not.toHaveBeenCalled();
   expect(screen.getByText("Wait for this task to stop.")).toBeInTheDocument();
 });

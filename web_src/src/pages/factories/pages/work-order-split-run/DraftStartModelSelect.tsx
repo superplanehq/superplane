@@ -1,4 +1,3 @@
-import { useFactoryTaskIdentity } from "../../factoryTaskContext";
 import { Bot, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,6 @@ const START_THINKING_LEVELS = [
 export function DraftStartModelSelect({
   organizationId,
   factoryId,
-  orderId,
   lineName,
   model,
   thinkingLevel,
@@ -62,8 +60,7 @@ export function DraftStartModelSelect({
   disabled?: boolean;
   appearance?: Appearance;
 }) {
-  const task = useFactoryTaskIdentity();
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId ?? task.orderId);
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true);
   const selectedName =
     model === DRAFT_START_MODEL_AUTO
       ? "Auto"

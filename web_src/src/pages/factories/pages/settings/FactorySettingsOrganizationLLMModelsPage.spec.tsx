@@ -1,3 +1,4 @@
+import { subscriptionModelSourceSwitchCases } from "./organizationLLMModels.subscription.spec.cases";
 import { QueryClient } from "@tanstack/react-query";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -146,7 +147,7 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
       { key: "hosted::anthropic::claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6", provider: "anthropic" },
     ];
     selectedHostedModels = [...hostedModels];
-    codexConnection = undefined;
+    codexConnection = { status: "disconnected", eligible: true };
     vi.mocked(factoriesDescribeFactoryCodexConnection)
       .mockReset()
       .mockImplementation(async () => ({ data: { connection: codexConnection } }) as never);
@@ -249,7 +250,7 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(subscription).toHaveTextContent("All models available to this ChatGPT subscription are enabled.");
     expect(within(subscription).getByRole("checkbox", { name: "gpt-5.4" })).toBeChecked();
     expect(within(subscription).getByRole("checkbox", { name: "gpt-5.3-codex" })).toBeChecked();
-    expect(screen.queryByTestId("llm-models-change-source")).not.toBeInTheDocument();
+    expect(screen.getByTestId("llm-models-change-source")).toBeInTheDocument();
   });
 
   it.each(["reconnect_required", "disconnected"])(
@@ -259,11 +260,11 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
       codexConnection = { status, availableModels: ["gpt-5.4"] };
       renderPage("AGENT_HARNESS_CODEX", true);
       expect(
-        await screen.findByText("Connect ChatGPT again in workspace setup to load subscription models."),
+        await screen.findByText("Connect your Codex account again to load subscription models."),
       ).toBeInTheDocument();
       expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("ChatGPT");
       expect(screen.queryByTestId("llm-models-provider-openai")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("llm-models-change-source")).not.toBeInTheDocument();
+      expect(screen.getByTestId("llm-models-change-source")).toBeInTheDocument();
     },
   );
 
@@ -277,8 +278,15 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
       renderPage("AGENT_HARNESS_SUPERPLANE", false, client);
     });
     expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("SuperPlane");
-    expect(factoriesDescribeFactoryCodexConnection).not.toHaveBeenCalled();
+    expect(factoriesDescribeFactoryCodexConnection).toHaveBeenCalledTimes(1);
     expect(factoriesStartFactoryCodexConnection).not.toHaveBeenCalled();
+  });
+
+  subscriptionModelSourceSwitchCases({
+    setConnection: (connection) => {
+      codexConnection = connection;
+    },
+    switchSource,
   });
 
   it("saves hosted selectable keys and disables Save when the selection is unchanged", async () => {

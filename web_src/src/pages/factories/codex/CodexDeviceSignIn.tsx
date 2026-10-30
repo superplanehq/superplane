@@ -4,8 +4,8 @@ import { CopyButton } from "@/ui/CopyButton";
 import type { FactoriesFactoryCodexConnection } from "@/api-client";
 import { useEffect, useState } from "react";
 
-import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
-import { FIRST_RUN_COPY } from "./firstRunCopy";
+import { ConnectOptionRow, IntegrationChoiceIcon } from "../pages/onboarding/onboardingSteps";
+import { CODEX_CONNECTION_COPY } from "./codexConnectionCopy";
 
 type CodexPhase = "device" | "pending" | "finishing" | "ready" | "start";
 
@@ -28,7 +28,7 @@ function DeviceSignIn({
   canceling: boolean;
   onCancel: () => void;
 }) {
-  const copy = FIRST_RUN_COPY.agent;
+  const copy = CODEX_CONNECTION_COPY;
   return (
     <div className="mt-3 space-y-2 text-[13px]" data-testid="first-run-codex-device">
       <p>{copy.subscriptionDevice}</p>
@@ -67,7 +67,7 @@ function WaitingSignIn({
   canceling: boolean;
   onCancel: () => void;
 }) {
-  const copy = FIRST_RUN_COPY.agent;
+  const copy = CODEX_CONNECTION_COPY;
   return (
     <div className="mt-3 space-y-2 text-[13px]" role="status">
       {phase === "pending" ? <p>{copy.subscriptionPending}</p> : <FinishingSignIn connection={connection} />}
@@ -81,7 +81,7 @@ function WaitingSignIn({
 }
 
 function signInCleanupMessage(status?: string): string {
-  const copy = FIRST_RUN_COPY.agent;
+  const copy = CODEX_CONNECTION_COPY;
   if (status === "canceling") return copy.subscriptionCanceling;
   if (status === "finishing" || status === "ready") return copy.subscriptionFinishing;
   return copy.subscriptionStopping;
@@ -89,7 +89,7 @@ function signInCleanupMessage(status?: string): string {
 
 function FinishingSignIn({ connection }: { connection?: FactoriesFactoryCodexConnection }) {
   const [delayed, setDelayed] = useState(false);
-  const copy = FIRST_RUN_COPY.agent;
+  const copy = CODEX_CONNECTION_COPY;
   useEffect(() => {
     setDelayed(false);
     const timer = setTimeout(() => setDelayed(true), 60000);
@@ -105,7 +105,7 @@ function FinishingSignIn({ connection }: { connection?: FactoriesFactoryCodexCon
 }
 
 function ReadySignIn({ connection }: { connection?: FactoriesFactoryCodexConnection }) {
-  const copy = FIRST_RUN_COPY.agent;
+  const copy = CODEX_CONNECTION_COPY;
   const label = connection?.accountLabel;
   return (
     <p className="mt-3 text-[13px]" role="status">
@@ -114,7 +114,7 @@ function ReadySignIn({ connection }: { connection?: FactoriesFactoryCodexConnect
   );
 }
 
-export function FirstRunCodexSubscription({
+export function CodexDeviceSignIn({
   selected,
   disabled,
   connection,
@@ -133,7 +133,7 @@ export function FirstRunCodexSubscription({
   onStart: () => void;
   onCancel: () => void;
 }) {
-  const copy = FIRST_RUN_COPY.agent;
+  const copy = CODEX_CONNECTION_COPY;
   const phase = codexPhase(connection);
   return (
     <fieldset disabled={disabled} className="m-0 min-w-0 border-0 p-0" data-testid="first-run-codex-subscription">

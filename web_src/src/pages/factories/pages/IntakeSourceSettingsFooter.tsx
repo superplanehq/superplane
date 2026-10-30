@@ -1,3 +1,4 @@
+import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -118,6 +119,8 @@ function IntakeSaveButtons({
   IntakeSourceSettingsFooterProps,
   "sourceId" | "draft" | "savePending" | "deletePending" | "getDraft" | "onSave" | "onClose"
 > & { projectsMissing: boolean }) {
+  const layout = useOptionalFactoriesLayout();
+  const ownerMissing = layout?.factory?.onboarding?.codexSubscription === true && !draft.defaultOwnerId;
   const labelsMissing = sourceId === "github-issues" && draft.filterByLabel && draft.labels.length === 0;
   return (
     <div className="ml-auto flex shrink-0 items-center gap-3">
@@ -128,7 +131,7 @@ function IntakeSaveButtons({
       ) : null}
       <Button
         type="button"
-        disabled={savePending || projectsMissing || labelsMissing}
+        disabled={savePending || projectsMissing || labelsMissing || ownerMissing}
         onClick={async () => {
           try {
             await onSave(normalizeIntakeSourceSettings(getDraft(), sourceId));
