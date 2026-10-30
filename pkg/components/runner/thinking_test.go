@@ -18,19 +18,43 @@ func TestNormalizeThinkingLevel(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, got)
 
-	_, err = NormalizeThinkingLevel("xhigh")
+	_, err = NormalizeThinkingLevel("ultra")
 	require.Error(t, err)
 }
 
-func TestNormalizeCodexThinkingLevel(t *testing.T) {
+func TestNormalizeThinkingLevelPerCLI(t *testing.T) {
 	t.Parallel()
 
-	for _, level := range []string{"minimal", "low", "medium", "high", "xhigh"} {
+	for _, level := range []string{"low", "medium", "high", "xhigh", "max"} {
+		got, err := NormalizeClaudeCodeThinkingLevel(level)
+		require.NoError(t, err)
+		assert.Equal(t, level, got)
+	}
+	_, err := NormalizeClaudeCodeThinkingLevel("minimal")
+	require.Error(t, err)
+
+	for _, level := range []string{"none", "minimal", "low", "medium", "high", "xhigh"} {
 		got, err := NormalizeCodexThinkingLevel(level)
 		require.NoError(t, err)
 		assert.Equal(t, level, got)
 	}
-	_, err := NormalizeCodexThinkingLevel("max")
+	_, err = NormalizeCodexThinkingLevel("max")
+	require.Error(t, err)
+
+	got, err := NormalizeOpenCodeThinkingLevel("max")
+	require.NoError(t, err)
+	assert.Equal(t, ThinkingLevelMax, got)
+}
+
+func TestNormalizeDispatchThinkingLevel(t *testing.T) {
+	t.Parallel()
+
+	for _, level := range []string{"", "default", "none", "minimal", "low", "medium", "high", "xhigh", "max"} {
+		got, err := NormalizeDispatchThinkingLevel(level)
+		require.NoError(t, err)
+		assert.Equal(t, level, got)
+	}
+	_, err := NormalizeDispatchThinkingLevel("ultra")
 	require.Error(t, err)
 }
 
