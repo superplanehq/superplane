@@ -367,6 +367,7 @@ function IntakeGeneralTab({
               onSettingsChange={onDraftChange}
               labelOptions={labelOptions}
               labelOptionsLoading={labelOptionsLoading}
+              disabled={!canEdit}
             />
             <JiraIntakeFilterFields
               sourceId={sourceId}

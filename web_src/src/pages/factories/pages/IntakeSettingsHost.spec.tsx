@@ -52,13 +52,24 @@ describe("IntakeSettingsHost", () => {
     permissions.canUpdate = false;
     updateIntake.mockClear();
     const user = userEvent.setup();
-    renderHost({ repository: "operately/operately", vcsIntegrationId: "github-1" });
+    renderHost({
+      intake: {
+        ...GITHUB_INTAKE,
+        settings: { ...GITHUB_INTAKE.settings, filterByLabel: true, labels: ["superplane"] },
+      },
+      repository: "operately/operately",
+      vcsIntegrationId: "github-1",
+    });
 
     expect(
       screen.getByText("You do not have permission to change intake settings. Ask an organization admin for access."),
     ).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Include reopened issues" })).toBeDisabled();
     expect(screen.getByTestId("intake-source-settings-automatic-intake")).toBeDisabled();
+    const labelPicker = screen.getByRole("combobox", { name: "Search or add a label" });
+    await user.click(labelPicker.parentElement!);
+    expect(screen.queryByRole("option", { name: "bug" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove superplane" })).toBeDisabled();
     expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-settings-delete")).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Runs" }));
