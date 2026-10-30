@@ -1,11 +1,13 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { Button } from "@/components/ui/button";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { ModelSourceBody } from "./llmModelSourceBody";
 import { ORGANIZATION_LLM_MODELS_COPY as COPY } from "./organizationLLMModelsCopy";
 import { useWorkspaceModelSettings } from "./useWorkspaceModelSettings";
-import { WorkspaceModelSourceSelector } from "./WorkspaceModelSourceSelector";
-import { ModelSourceSwitchDialogs } from "./workspaceModelSourceSwitch";
+import { workspaceModelSourceLabel } from "./workspaceModelSource";
+import { WorkspaceModelSourceDialog } from "./workspaceModelSourceSwitch";
+import { WorkspaceCodexMembers } from "./WorkspaceCodexMembers";
 
 export function FactorySettingsOrganizationLLMModelsPage() {
   const settings = useWorkspaceModelSettings();
@@ -21,20 +23,37 @@ export function FactorySettingsOrganizationLLMModelsPage() {
             : "You do not have permission to view workspace models."}
         </p>
       )}
-      <ModelSourceSwitchDialogs
-        {...settings}
-        providers={settings.providers.filter(
-          (provider) => settings.canCreateIntegration || settings.connected.includes(provider),
-        )}
-      />
+      <WorkspaceModelSourceDialog settings={settings} />
     </FactorySettingsPageFrame>
   );
 }
 
 function WorkspaceModelSettings({ settings }: { settings: ReturnType<typeof useWorkspaceModelSettings> }) {
+  const sourceLabel = workspaceModelSourceLabel(settings.source);
   return (
     <div className="flex flex-col gap-4" data-testid="factory-settings-llm-models">
-      <WorkspaceModelSourceSelector settings={settings} />
+      <FactorySettingsCard>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <p className="text-xs text-muted-foreground">Model source</p>
+            <p role="status" aria-label={`${sourceLabel} is active`} className="text-sm font-medium">
+              {sourceLabel}
+            </p>
+          </div>
+          <Button
+            ref={settings.changeSourceButtonRef}
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            aria-label="Change model source"
+            disabled={!settings.canUpdate || settings.switcher.saving}
+            onClick={() => settings.switcher.openDialog()}
+          >
+            Change
+          </Button>
+        </div>
+      </FactorySettingsCard>
       <FactorySettingsCard data-testid="llm-models-list">
         {settings.switcher.switchedNotice ? (
           <p role="status" className="mb-4 text-xs text-muted-foreground">
@@ -48,12 +67,18 @@ function WorkspaceModelSettings({ settings }: { settings: ReturnType<typeof useW
             !settings.switcher.saving &&
             (settings.source !== "subscription" || settings.subscription.offered)
           }
-          onChangeDefaultOwner={() => settings.switcher.setSubscriptionDialog("warn")}
-          onChooseProvider={(target) => {
-            if (target !== settings.currentProvider) settings.switcher.setDialog({ target, step: "warn" });
-          }}
         />
       </FactorySettingsCard>
+      {settings.source === "subscription" ? (
+        <FactorySettingsCard>
+          <WorkspaceCodexMembers
+            organizationId={settings.organizationId}
+            factoryId={settings.factoryId}
+            canUpdate={settings.canUpdate && !settings.switcher.saving && settings.subscription.offered}
+            onChangeDefaultOwner={() => settings.switcher.openDialog("subscription")}
+          />
+        </FactorySettingsCard>
+      ) : null}
     </div>
   );
 }

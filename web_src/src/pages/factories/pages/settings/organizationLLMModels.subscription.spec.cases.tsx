@@ -1,11 +1,20 @@
 import { QueryClient } from "@tanstack/react-query";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it, type vi } from "bun:test";
-import type { FactoriesFactoryCodexConnection } from "@/api-client";
+import { expect, it, vi } from "bun:test";
+import {
+  factoriesListFactoryOwnerEligibility,
+  meCancelCodexConnection,
+  type FactoriesFactoryCodexConnection,
+} from "@/api-client";
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
 import { factoryCodexConnectionKey } from "../onboarding/useFactoryCodexConnection";
 import { renderPage } from "./organizationLLMModels.spec.render";
+
+function expectSingleDialog(name: string) {
+  expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
+  expect(screen.getByRole("dialog", { name })).toBeInTheDocument();
+}
 
 export function subscriptionModelSourceSwitchCases({
   setConnection,
@@ -16,23 +25,39 @@ export function subscriptionModelSourceSwitchCases({
 }) {
   it("returns from sign-in to owner selection and requires explicit confirmation", async () => {
     setConnection({ status: "disconnected", eligible: true });
+    let connected = false;
+    vi.mocked(factoriesListFactoryOwnerEligibility).mockImplementation(
+      async () =>
+        ({
+          data: {
+            subscription: true,
+            ownershipChangeAllowed: true,
+            members: [{ userId: "me", eligible: connected }],
+          },
+        }) as never,
+    );
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     renderPage("AGENT_HARNESS_SUPERPLANE", false, client);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Switch to ChatGPT subscriptions" }));
+    await user.click(await screen.findByRole("button", { name: "Change model source" }));
+    await user.click(screen.getByRole("button", { name: "Select ChatGPT subscriptions" }));
+    expectSingleDialog("Switch to Codex");
     expect(screen.getByRole("button", { name: "Switch to Codex" })).toBeDisabled();
+    await waitFor(() => expect(screen.queryAllByRole("combobox").length).toBe(0));
     await user.click(await screen.findByRole("button", { name: "Connect Codex" }));
+    expectSingleDialog("Connect Codex");
     await user.click(await screen.findByRole("button", { name: "Connect ChatGPT" }));
-    expect(switchSource).not.toHaveBeenCalled();
     const connection = { status: "ready", eligible: true, availableModels: ["gpt-5.4"] };
+    connected = true;
     setConnection(connection);
     await act(async () =>
       client.setQueryData(factoryCodexConnectionKey("org-1", REFUND_FACTORY.id ?? "factory-1", "me"), connection),
     );
-    const confirm = await screen.findByRole("button", { name: "Switch to Codex" });
-    await waitFor(() => expect(confirm).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Switch to Codex" })).toBeEnabled());
+    expectSingleDialog("Switch to Codex");
+    expect(screen.getByRole("combobox", { name: "Default task owner (required)" })).toBeEnabled();
     expect(switchSource).not.toHaveBeenCalled();
-    await user.click(confirm);
+    await user.click(screen.getByRole("button", { name: "Switch to Codex" }));
     expect(switchSource).toHaveBeenCalledWith({ source: "subscription", defaultOwnerId: "me", apiKey: undefined });
     expect(await screen.findByRole("status", { name: "ChatGPT subscriptions is active" })).toBeInTheDocument();
   });
@@ -42,7 +67,8 @@ export function subscriptionModelSourceSwitchCases({
     switchSource.mockRejectedValueOnce(new Error("The intake configuration changed."));
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Switch to ChatGPT subscriptions" }));
+    await user.click(await screen.findByRole("button", { name: "Change model source" }));
+    await user.click(screen.getByRole("button", { name: "Select ChatGPT subscriptions" }));
     await user.click(screen.getByRole("combobox", { name: "Default task owner (required)" }));
     await user.click(await screen.findByRole("option", { name: "Other member" }));
     await user.click(screen.getByRole("button", { name: "Switch to Codex" }));
@@ -53,10 +79,26 @@ export function subscriptionModelSourceSwitchCases({
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("does not switch after owner selection is canceled", async () => {
+  it("cancels pending sign-in and returns to owner selection without switching", async () => {
+    setConnection({ status: "pending", eligible: true, reservationHeld: true });
+    vi.mocked(meCancelCodexConnection).mockImplementationOnce(async () => {
+      const connection = { status: "disconnected", eligible: true };
+      setConnection(connection);
+      return { data: { connection } } as never;
+    });
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Switch to ChatGPT subscriptions" }));
+    await user.click(await screen.findByRole("button", { name: "Change model source" }));
+    await user.click(screen.getByRole("button", { name: "Select ChatGPT subscriptions" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Codex" }));
+    await screen.findByText("Wait for the ChatGPT sign-in code.");
+    expectSingleDialog("Connect Codex");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(meCancelCodexConnection).toHaveBeenCalledTimes(1);
+    await screen.findByRole("dialog", { name: "Switch to Codex" });
+    expectSingleDialog("Switch to Codex");
+    expect(switchSource).not.toHaveBeenCalled();
+    expect(screen.getByRole("status", { name: "SuperPlane is active", hidden: true })).toBeInTheDocument();
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
     expect(switchSource).not.toHaveBeenCalled();
     expect(screen.getByRole("status", { name: "SuperPlane is active" })).toBeInTheDocument();
@@ -68,7 +110,7 @@ export function subscriptionModelSourceSwitchCases({
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Change default task owner" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/replaces the default task owner of every intake/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Replaces every default owner, including scheduled intakes/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("combobox", { name: "Default task owner (required)" }));
     await user.click(await screen.findByRole("option", { name: "Other member" }));
     await user.click(within(dialog).getByRole("button", { name: "Save default owner" }));
@@ -78,15 +120,17 @@ export function subscriptionModelSourceSwitchCases({
   it("warns about replacing intake owners before the first switch to Codex", async () => {
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Switch to ChatGPT subscriptions" }));
-    expect(await screen.findByText(/replaces the default task owner of every intake/)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Change model source" }));
+    await user.click(screen.getByRole("button", { name: "Select ChatGPT subscriptions" }));
+    expect(await screen.findByText(/Replaces every default owner, including scheduled intakes/)).toBeInTheDocument();
   });
 
   it("switches a subscription workspace back to hosted models", async () => {
     setConnection({ status: "ready", eligible: true, availableModels: ["gpt-5.4"] });
     renderPage("AGENT_HARNESS_CODEX", true);
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
+    await user.click(screen.getByRole("button", { name: "Change model source" }));
+    await user.click(screen.getByRole("button", { name: "Select SuperPlane" }));
     await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
     expect(switchSource).toHaveBeenCalledWith({ source: "hosted", apiKey: undefined });
     expect(await screen.findByRole("status", { name: "SuperPlane is active" })).toBeInTheDocument();
