@@ -1,3 +1,4 @@
+import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import { Button } from "@/components/ui/button";
 
 import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
@@ -52,6 +53,7 @@ export function GitHubIntakeSetupDialog(props: GitHubIntakeSetupDialogProps) {
             {setup.error}
           </p>
         ) : null}
+        <IntakeSetupDefaultOwner owner={setup.owner} disabled={setup.createIntake.isPending} />
         <SetupFooter setup={setup} onCreated={props.onCreated} />
       </div>
     </FirstRunShell>

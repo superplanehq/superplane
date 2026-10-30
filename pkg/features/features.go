@@ -39,12 +39,12 @@ const FeatureFactoryScheduledIntake = "factory_scheduled_intake"
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
 
-// FeatureOrganizationBYOK gates the organization LLM Models settings page
+// FeatureOrganizationBYOK gates the organization Models settings page
 // until the BYOK UX is ready for general use.
 const FeatureOrganizationBYOK = "organization_byok"
 
 // FeatureOrganizationBYOKCustomProvider gates a custom model provider on the
-// organization LLM Models page. It requires FeatureOrganizationBYOK as well.
+// organization Models page. It requires FeatureOrganizationBYOK as well.
 const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
 
 // FeatureFactoryCustomAutomations gates custom automations on Verify, Done,
@@ -85,11 +85,11 @@ var registry = []Feature{
 	{ID: FeatureFactoryScheduledIntake, Label: "Scheduled Intake", Description: "Propose backlog tasks on a schedule"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
-	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
+	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add custom automations to board columns"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
-	{ID: FeatureCodexSubscriptions, Label: "ChatGPT Subscription", Description: "Sign in to ChatGPT once and reuse that subscription on factory Codex runs"},
+	{ID: FeatureCodexSubscriptions, Label: "ChatGPT Subscription", Description: "Use your ChatGPT subscription for factory Codex runs"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 	{ID: FeatureFactoryStepActions, Label: "Step actions", Description: "Show agent action reasons on the step card"},

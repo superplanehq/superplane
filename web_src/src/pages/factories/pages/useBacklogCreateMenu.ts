@@ -1,3 +1,4 @@
+import { isCodexActionCancelled } from "@/pages/factories/codex/codexActionContext";
 import type { FactoriesFactoryIntakeItem, FactoriesWorkOrder } from "@/api-client";
 import { useCreateWorkOrder } from "@/hooks/useFactoryData";
 import {
@@ -110,6 +111,7 @@ export function useBacklogCreateMenu(
         onImported?.(order.id, order);
       }
     } catch (error) {
+      if (isCodexActionCancelled(error)) return;
       showErrorToast(getApiErrorMessage(error, "SuperPlane could not create the task."));
     }
   };

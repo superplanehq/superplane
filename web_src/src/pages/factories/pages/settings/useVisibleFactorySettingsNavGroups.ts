@@ -14,7 +14,7 @@ import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
 const WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID = "workspace-superplane-mcp-server";
 
 /**
- * Drops nav items whose experimental features are off, and skips any group
+ * Drops nav items whose experimental features are absent, and skips any group
  * left with no items. The source groups stay static so other consumers
  * (e.g. route lookups) keep seeing the full, approved list.
  */
@@ -43,7 +43,7 @@ function visibleFactorySettingsNavGroups(
 
 /**
  * Settings nav groups the current user can open: permission-gated items are
- * removed, then items behind experimental features that are off.
+ * removed, then items with unavailable experimental features.
  */
 export function useVisibleFactorySettingsNavGroups(organizationId: string): FactorySettingsNavGroup[] {
   const settingsNavGroups = useFactorySettingsNavGroups();

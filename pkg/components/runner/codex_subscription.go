@@ -39,7 +39,7 @@ func MintCodexSubscriptionToken(signer *jwt.Signer, scope CodexSubscriptionScope
 	if ttl <= 0 {
 		ttl = time.Duration(DefaultExecutionTimeoutSeconds) * time.Second
 	}
-	if scope.OrganizationID == uuid.Nil || scope.FactoryID == uuid.Nil || scope.ConnectionID == uuid.Nil || scope.TaskID == uuid.Nil || scope.Generation < 1 {
+	if scope.OrganizationID == uuid.Nil || scope.ConnectionID == uuid.Nil || scope.TaskID == uuid.Nil || scope.Generation < 1 {
 		return "", fmt.Errorf("chatgpt subscription scope is incomplete")
 	}
 	return signer.GenerateWithClaims(ttl, map[string]string{
@@ -69,7 +69,8 @@ func ParseCodexSubscriptionToken(signer *jwt.Signer, token string) (*CodexSubscr
 	if err != nil {
 		return nil, err
 	}
-	scope.FactoryID, err = parsePlanningClaimUUID(claims, "factory_id")
+	factory, _ := claims["factory_id"].(string)
+	scope.FactoryID, err = uuid.Parse(factory)
 	if err != nil {
 		return nil, err
 	}

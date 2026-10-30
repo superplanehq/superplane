@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { SuperplaneUsersUser } from "@/api-client";
@@ -113,7 +114,67 @@ it("keeps an ineligible selected owner visible and permits clearing", () => {
   expect(onChange).toHaveBeenCalledWith([]);
 });
 
+it.each(["hover", "focus"] as const)(
+  "keeps other disconnected members disabled and explains why on %s",
+  async (interaction) => {
+    const user = userEvent.setup();
+    const reason = "Connect a ChatGPT subscription in this workspace.";
+    permissionsState.currentUserId = "alice";
+    const { onChange } = renderPicker({
+      eligibility: {
+        subscription: true,
+        ownershipChangeAllowed: true,
+        members: [
+          { userId: "alice", eligible: false, reason },
+          { userId: "bob", eligible: true },
+          { userId: "carol", eligible: false, reason },
+        ],
+      },
+    });
+
+    const otherMember = screen.getByRole("option", { name: "Carol Clark" });
+    expect(otherMember).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(otherMember);
+    expect(onChange).not.toHaveBeenCalled();
+
+    if (interaction === "hover") {
+      await user.hover(otherMember);
+    } else {
+      await user.tab();
+      expect(otherMember).toHaveFocus();
+    }
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("must connect a ChatGPT subscription");
+    if (interaction === "focus") {
+      await user.keyboard("{Enter}");
+      expect(onChange).not.toHaveBeenCalled();
+    }
+    fireEvent.click(screen.getByRole("option", { name: "Bob Brown" }));
+    expect(onChange).toHaveBeenCalledWith(["bob"]);
+  },
+);
+
+it("lets a disconnected signed-in user select themselves so the connect flow can start", () => {
+  const reason = "Connect a ChatGPT subscription in this workspace.";
+  permissionsState.currentUserId = "alice";
+  const { onChange } = renderPicker({
+    eligibility: {
+      subscription: true,
+      ownershipChangeAllowed: true,
+      members: [{ userId: "alice", eligible: false, reason }],
+    },
+  });
+
+  const currentUser = screen.getByRole("option", { name: /Alice Anderson/ });
+  expect(currentUser).not.toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByText(reason)).toBeInTheDocument();
+  fireEvent.click(currentUser);
+
+  expect(onChange).toHaveBeenCalledWith(["alice"]);
+});
+
 it("blocks both clearing and assignment while the task stops", () => {
+  permissionsState.currentUserId = "alice";
   const { onChange } = renderPicker({
     selectedIds: ["alice"],
     eligibility: {
@@ -123,6 +184,7 @@ it("blocks both clearing and assignment while the task stops", () => {
     },
   });
   fireEvent.click(screen.getByRole("option", { name: "No owner" }));
+  fireEvent.click(screen.getByRole("option", { name: /Alice Anderson/ }));
   expect(onChange).not.toHaveBeenCalled();
   expect(screen.getByText("Wait for this task to stop.")).toBeInTheDocument();
 });
