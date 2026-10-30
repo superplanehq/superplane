@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -427,6 +428,7 @@ func serializeCodexConnection(
 	view.AccountLabel = connection.AccountLabel
 	view.ReservationHeld = connection.Reserved()
 	view.AvailableModels = models.CompactModelIDs(codexModelIDs(connection.AvailableModels))
+	view.AvailableModelOptions = serializeCodexModelOptions(connection.AvailableModels)
 	if connection.LoginLease != nil {
 		view.ActiveTaskId = connection.LoginLease.TaskID.String()
 	}
@@ -435,6 +437,30 @@ func serializeCodexConnection(
 		view.VerificationCode = connection.VerificationCode
 	}
 	return view
+}
+
+// serializeCodexModelOptions lists each subscription model once, with the
+// thinking levels from the Codex model catalog.
+func serializeCodexModelOptions(available []models.CodexModel) []*pb.FactoryLLMModel {
+	thinkingLevels := codexSubscriptionThinkingLevels(available)
+	ids := models.CompactModelIDs(codexModelIDs(available))
+	out := make([]*pb.FactoryLLMModel, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, &pb.FactoryLLMModel{
+			Id:             id,
+			Name:           id,
+			ThinkingLevels: thinkingLevels(id),
+			IsDefault:      codexModelIsDefault(available, id),
+		})
+	}
+	return out
+}
+
+// codexModelIsDefault reports whether the Codex catalog marks the model as its default.
+func codexModelIsDefault(available []models.CodexModel, id string) bool {
+	return slices.ContainsFunc(available, func(model models.CodexModel) bool {
+		return model.IsDefault && strings.TrimSpace(model.Model) == strings.TrimSpace(id)
+	})
 }
 
 func codexModelIDs(available []models.CodexModel) []string {

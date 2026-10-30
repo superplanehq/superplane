@@ -18,6 +18,7 @@ const DEFAULT_WAIT_CAP_MS = 3_600_000;
 const MODEL_CATALOG_REFRESH_TIMEOUT_MS = 30_000;
 const MODEL_CATALOG_REFRESH_MAX_BUFFER = 32 * 1024 * 1024;
 const SESSION_FILE = "opencode_session";
+const OPENROUTER_EFFORT_VARIANT = "superplane_effort";
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
@@ -419,14 +420,23 @@ function writeSessionID(taskDir, sessionID) {
   fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
 }
 
-function thinkingArgs(thinking) {
+function normalizedThinkingLevel(thinking) {
   const level = String(thinking || "")
     .trim()
     .toLowerCase();
-  if (level === "low" || level === "medium" || level === "high") {
-    return ["--variant", level];
+  if (["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(level)) {
+    return level;
   }
-  return [];
+  return "";
+}
+
+function thinkingArgs(thinking, env = process.env) {
+  const level = normalizedThinkingLevel(thinking);
+  if (!level) {
+    return [];
+  }
+  const variant = customLLMFromEnv(env) ? level : OPENROUTER_EFFORT_VARIANT;
+  return ["--variant", variant];
 }
 
 function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking, env }) {
@@ -435,7 +445,7 @@ function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking, env }) {
   if (prefixed) {
     args.push("-m", prefixed);
   }
-  args.push(...thinkingArgs(thinking));
+  args.push(...thinkingArgs(thinking, env));
   if (cwd) {
     args.push("--dir", cwd);
   }
@@ -451,6 +461,7 @@ function buildOpenCodeConfig({
   env = process.env,
   planning = false,
   models = [],
+  thinking = "",
 } = {}) {
   const config = {
     $schema: "https://opencode.ai/config.json",
@@ -493,6 +504,7 @@ function buildOpenCodeConfig({
       options.baseURL = baseURL;
     }
     const modelEntries = {};
+    const effort = normalizedThinkingLevel(thinking);
     for (const id of modelIds) {
       modelEntries[id] = {
         attachment: true,
@@ -506,6 +518,12 @@ function buildOpenCodeConfig({
           },
         },
       };
+      if (effort) {
+        // A separate variant avoids merging catalog token budgets into the effort.
+        modelEntries[id].variants = {
+          [OPENROUTER_EFFORT_VARIANT]: { reasoning: { effort } },
+        };
+      }
     }
     if (Object.keys(options).length > 0 || Object.keys(modelEntries).length > 0) {
       config.provider = { openrouter: {} };
@@ -550,12 +568,13 @@ function buildOpenCodeConfig({
   return config;
 }
 
-function writeOpenCodeConfig(taskDir, env, models) {
+function writeOpenCodeConfig(taskDir, { env, models, thinking }) {
   const config = buildOpenCodeConfig({
     taskDir,
     env,
     planning: planningEnabled(env),
     models,
+    thinking,
   });
   fs.writeFileSync(
     path.join(taskDir, "opencode.json"),
@@ -780,7 +799,11 @@ async function runPrompt(promptFile, model, helpers = {}) {
       `Model catalog refresh unavailable. Continuing with OpenCode configuration for ${currentModel}.`,
     );
   }
-  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
+  writeOpenCodeConfig(sp, {
+    env,
+    models: currentModel ? [currentModel] : [],
+    thinking,
+  });
 
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};
