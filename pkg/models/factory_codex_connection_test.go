@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -104,6 +105,12 @@ func TestCodexConnectionAllowsParallelRunLeases(t *testing.T) {
 		assert.Equal(t, models.CodexLeasePurposeRun, lease.Purpose)
 		assert.NotEmpty(t, lease.SecretHash)
 	}
+
+	runID := support.CreateCodexOwnedRun(t, db, connection)
+	require.NoError(t, models.DisableExperimentalFeature(connection.OrganizationID, features.FeatureFactories))
+	_, err = models.ReserveFactoryCodexConnection(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), runID, uuid.New(), now, crypto.NewNoOpEncryptor())
+	require.ErrorIs(t, err, models.ErrCodexConnectionUnavailable)
+	assert.Len(t, codexLeases(t, db, connection.ID), 3, "disabled factories must not admit another run")
 }
 
 func TestCodexConnectionIsSharedAcrossOrganizationWorkspaces(t *testing.T) {
