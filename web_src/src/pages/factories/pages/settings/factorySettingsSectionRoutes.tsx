@@ -34,6 +34,7 @@ import {
   AccountLinkedAccountsRedirect,
   LegacyFactorySettingsRedirect,
   OrganizationUsageRedirect,
+  OrganizationModelsRedirect,
   WorkspaceAgentMcpConnectionRedirect,
   WorkspaceAgentSettingsRedirect,
   WorkspaceAgentSkillRedirect,
@@ -199,13 +200,18 @@ export const factorySettingsSectionRoutes = [
     }
   />,
   <Route
-    key="factory-settings-organization-models"
-    path="organization/models"
+    key="factory-settings-workspace-models"
+    path="workspace/models"
     element={
-      <RequirePermission resource="org" action="read">
+      <RequirePermission resource="factories" action="read">
         <FactoryOrganizationLLMModelsPage />
       </RequirePermission>
     }
+  />,
+  <Route
+    key="factory-settings-organization-models"
+    path="organization/models"
+    element={<OrganizationModelsRedirect />}
   />,
   <Route
     key="factory-settings-organization-integration-setup"

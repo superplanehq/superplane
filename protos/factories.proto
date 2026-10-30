@@ -1123,7 +1123,7 @@ message UpdateFactoryOnboardingResponse {
 
 message SwitchFactoryModelSourceRequest {
   string id = 1;
-  // hosted, anthropic, openai, openrouter, or custom.
+  // hosted, subscription, anthropic, openai, openrouter, or custom.
   string source = 2;
   // Provider API key. Required when this organization has no ready integration for the source.
   string api_key = 3;
@@ -2996,6 +2996,7 @@ message ListFactoryLLMModelsResponse {
   repeated FactoryLLMModel parent = 1;
   repeated FactoryLLMModel selected = 2;
   bool inherit_parent = 3;
+  repeated FactoryLLMModel configured_models = 4;
 }
 
 message UpdateFactoryLLMModelsRequest {
@@ -3003,6 +3004,7 @@ message UpdateFactoryLLMModelsRequest {
   string provider = 2;
   string funding_source = 3;
   repeated string allowed_models = 4;
+  optional bool inherit_parent = 5;
 }
 
 message UpdateFactoryLLMModelsResponse {

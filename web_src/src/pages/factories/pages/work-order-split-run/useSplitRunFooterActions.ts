@@ -1,3 +1,4 @@
+import { isCodexActionCancelled } from "@/pages/factories/codex/codexActionContext";
 import { canvasesCancelRun, type FactoriesWorkOrderResult } from "@/api-client";
 import { useContinueFactoryPullRequestFixes } from "@/hooks/useFactoryPullRequestFixes";
 import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
@@ -110,6 +111,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
         showSuccessToast(copy.success);
         return true;
       } catch (error) {
+        if (isCodexActionCancelled(error)) return;
         showErrorToast(getApiErrorMessage(error, copy.error));
         return false;
       }
@@ -135,6 +137,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
         await continueFixes.mutateAsync(target);
         showSuccessToast("Automatic fixes started again.");
       } catch (error) {
+        if (isCodexActionCancelled(error)) return;
         showErrorToast(getApiErrorMessage(error, "Failed to continue fixes"));
       }
     },
@@ -175,6 +178,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
           },
         });
       } catch (error) {
+        if (isCodexActionCancelled(error)) return;
         showErrorToast(getApiErrorMessage(error, stopErrorFallback(choice, footer)));
       }
     },
@@ -190,6 +194,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
         await stopSplitRunAutomation(run, (next) => cancelRun.mutateAsync(next));
         showSuccessToast("Automation stopped.");
       } catch (error) {
+        if (isCodexActionCancelled(error)) return;
         showErrorToast(getApiErrorMessage(error, "Failed to stop the run"));
       }
     },

@@ -1,3 +1,4 @@
+import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import {
   useAvailableIntegrations,
@@ -24,6 +25,7 @@ export function useDatadogIntakeSetup(organizationId: string, factoryId: string)
     useDatadogConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const owner = useIntakeOwnerDraft(organizationId, factoryId);
   const servicesQuery = useIntegrationResources(organizationId, integrationId, "service", undefined, {
     enabled: Boolean(integrationId),
   });
@@ -65,7 +67,9 @@ export function useDatadogIntakeSetup(organizationId: string, factoryId: string)
     if (!integrationId || !resourceId) return false;
     setError(undefined);
     try {
+      const ownerSettings = owner.settings();
       await createIntake.mutateAsync({
+        ...(owner.required ? { settings: ownerSettings } : {}),
         source: "SOURCE_DATADOG",
         integrationId,
         resourceId,
@@ -79,6 +83,7 @@ export function useDatadogIntakeSetup(organizationId: string, factoryId: string)
   };
 
   return {
+    owner,
     step,
     setStep,
     integrationId,

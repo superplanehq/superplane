@@ -650,8 +650,10 @@ CREATE TABLE public.factory_llm_model_allowlists (
     funding_source text NOT NULL,
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text]))),
-    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text])))
+    inherit_parent boolean,
+    CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text, 'subscription'::text]))),
+    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text]))),
+    CONSTRAINT factory_llm_model_allowlists_subscription_provider CHECK (((funding_source <> 'subscription'::text) OR (provider = 'openai'::text)))
 );
 
 
@@ -6540,7 +6542,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261029180446	f
+20261030113233	f
 \.
 
 
