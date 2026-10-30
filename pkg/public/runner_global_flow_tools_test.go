@@ -141,6 +141,13 @@ func TestRunnerGlobalArtifactUpload(t *testing.T) {
 	require.Len(t, artifacts, 1)
 	assert.Equal(t, models.FactoryWorkOrderArtifactTypeFile, artifacts[0].Type)
 
+	links := runnerTokenFrom(runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
+		{Name: runner.EnvSuperplaneArtifactToken, Value: "artifact-token"},
+		{Name: runner.EnvSuperplanePublishLinks, Value: "yes"},
+	}, 60))
+	rec = postRunnerArtifactFile(t, server, links, png)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
 	withoutEvidence := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	rec = postRunnerArtifactFile(t, server, withoutEvidence, png)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
@@ -169,8 +176,14 @@ func TestRunnerGlobalArtifactLink(t *testing.T) {
 	require.NotNil(t, artifacts[0].Key)
 	assert.Equal(t, order.ID.String()+":staging", *artifacts[0].Key)
 
+	markdown := `{"body":"# Note","title":"Note","key":"note"}`
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/markdown", markdown)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
 	withoutLinks := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	rec = runnerRequest(t, server, http.MethodPost, withoutLinks, "/api/v1/runner/task/links", body)
+	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	rec = runnerRequest(t, server, http.MethodPost, withoutLinks, "/api/v1/runner/task/markdown", markdown)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 }
 

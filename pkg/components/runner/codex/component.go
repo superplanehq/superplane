@@ -166,7 +166,6 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 		task.Files = runner.AppendPlanningSessionMCPFiles(task.Files)
 	}
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
-	task.Files = runner.AppendMergeConfidenceMCP(environment, task.Files)
 	task.Files = runner.AppendGlobalMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)

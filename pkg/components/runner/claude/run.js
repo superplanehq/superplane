@@ -101,13 +101,6 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 // changes while drafting a task.
 const PLANNING_READONLY_TOOLS = "Read,Bash";
 
-function analysisAllowedTools() {
-  return [
-    "mcp__superplane__propose_update",
-    "mcp__superplane__inspect_attachment",
-  ];
-}
-
 // The global runner MCP server lists only the tools that the run token
 // allows, and the backend checks the scope on every call.
 const GLOBAL_MCP_SERVER = "superplane_global";
@@ -119,11 +112,6 @@ function globalMCPEnabled(env = process.env) {
 function globalAllowedTools(env = process.env) {
   return globalMCPEnabled(env) ? [`mcp__${GLOBAL_MCP_SERVER}`] : [];
 }
-const ARTIFACT_ALLOWED_TOOLS = [
-  "mcp__superplane__inspect_screenshot",
-  "mcp__superplane__upload_artifact",
-  "mcp__superplane__report_visual_evidence_unavailable",
-];
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
@@ -142,41 +130,8 @@ function allowedClaudeTools(env = process.env) {
     (name) => `mcp__${name}`,
   );
   const globalAllow = globalAllowedTools(env);
-  if (!legacyMCPEnabled(env)) {
-    const baseTools = planningMCPEnabled(env) ? PLANNING_READONLY_TOOLS : BASE_ALLOWED_TOOLS;
-    return [baseTools, ...globalAllow, ...workspaceAllow].join(",");
-  }
-  if (planningMCPEnabled(env)) {
-    return [
-      PLANNING_READONLY_TOOLS,
-      "mcp__superplane",
-      ...globalAllow,
-      ...workspaceAllow,
-      ...analysisAllowedTools(env),
-    ].join(",");
-  }
-  if (mergeConfidenceMCPEnabled(env)) {
-    return [
-      BASE_ALLOWED_TOOLS,
-      "mcp__superplane",
-      ...globalAllow,
-      ...workspaceAllow,
-      "mcp__superplane__report_merge_check",
-    ].join(",");
-  }
-  if (taskToolsEnabled(env)) {
-    const tools = [BASE_ALLOWED_TOOLS, "mcp__superplane", ...globalAllow, ...workspaceAllow];
-    if (artifactMCPEnabled(env)) tools.push(...ARTIFACT_ALLOWED_TOOLS);
-    if (publishLinksEnabled(env)) tools.push("mcp__superplane__publish_link");
-    return tools.join(",");
-  }
-  return [BASE_ALLOWED_TOOLS, ...globalAllow, ...workspaceAllow].join(",");
-}
-
-// The global server serves the flow tools when the run has a runner token.
-// Runs without that token keep the per-flow superplane server.
-function legacyMCPEnabled(env = process.env) {
-  return mcpToolsEnabled(env) && !globalMCPEnabled(env);
+  const baseTools = planningMCPEnabled(env) ? PLANNING_READONLY_TOOLS : BASE_ALLOWED_TOOLS;
+  return [baseTools, ...globalAllow, ...workspaceAllow].join(",");
 }
 
 function disallowedClaudeTools(env = process.env) {
@@ -208,14 +163,6 @@ function claudePermissionMode(env = process.env) {
   return "acceptEdits";
 }
 
-function mcpToolsEnabled(env = process.env) {
-  return (
-    planningMCPEnabled(env) ||
-    taskToolsEnabled(env) ||
-    mergeConfidenceMCPEnabled(env)
-  );
-}
-
 function planningMCPEnabled(env = process.env) {
   return (
     planningAnalysisEnabled(env) &&
@@ -234,24 +181,6 @@ function publishLinksEnabled(env = process.env) {
 
 function artifactMCPEnabled(env = process.env) {
   return visualEvidenceEnabled(env);
-}
-
-function taskToolsEnabled(env = process.env) {
-  return artifactMCPEnabled(env) || publishLinksEnabled(env);
-}
-
-function mergeConfidenceMCPEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
-}
-
-function artifactMCPPath(taskDir, env = process.env) {
-  if (planningMCPEnabled(env)) {
-    return path.join(taskDir, "planning_session_mcp.js");
-  }
-  if (mergeConfidenceMCPEnabled(env)) {
-    return path.join(taskDir, "merge_confidence_mcp.js");
-  }
-  return path.join(taskDir, "task_artifact_mcp.js");
 }
 
 function configureArtifactOutput(taskDir, env = process.env) {
@@ -309,19 +238,13 @@ function workspaceMCPServers(env = process.env) {
   }
 }
 
-function writeClaudeMCPConfig(taskDir, env = process.env, includeSuperplane = false) {
+function writeClaudeMCPConfig(taskDir, env = process.env) {
   const mcpServers = {};
   for (const [name, server] of Object.entries(workspaceMCPServers(env))) {
     mcpServers[name] = {
       type: server.type,
       url: server.url,
       headers: server.headers,
-    };
-  }
-  if (includeSuperplane) {
-    mcpServers.superplane = {
-      command: "node",
-      args: [artifactMCPPath(taskDir, env)],
     };
   }
   if (globalMCPEnabled(env)) {
@@ -442,7 +365,7 @@ async function runPrompt(promptFile, model, thinking) {
     claudeArgs[claudeArgs.length - 1] =
       SYSTEM_PROMPT + planningSystemPrompt();
   }
-  const mcpConfigPath = writeClaudeMCPConfig(sp, process.env, legacyMCPEnabled());
+  const mcpConfigPath = writeClaudeMCPConfig(sp);
   if (mcpConfigPath) {
     claudeArgs.push("--mcp-config", mcpConfigPath);
   }
@@ -515,7 +438,7 @@ async function runPrompt(promptFile, model, thinking) {
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planningMCPEnabled()) {
     const result = JSON.parse(resultJSON);
-    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+    await require(path.join(sp, "agent_message.js")).recordAgentMessage(
       result.result,
     );
   }

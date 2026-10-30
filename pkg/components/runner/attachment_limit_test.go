@@ -41,7 +41,6 @@ func TestPlanningFilesShipOneAttachmentLimit(t *testing.T) {
 	}
 	assert.Equal(t, 1, copies)
 	assert.Contains(t, FollowUpLoopFile().Content, `require("./attachment_limit")`)
-	assert.Contains(t, PlanningSessionMCPScript(), `require("./attachment_limit")`)
 }
 
 func attachmentLimitMiB(t *testing.T, source, pattern string) int64 {

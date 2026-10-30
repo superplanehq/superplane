@@ -150,34 +150,8 @@ func TestCodexExecArgsAddsMergeConfidenceMCP(t *testing.T) {
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
-	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
-	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/merge_confidence_mcp.js"]`)
-	assertForwardsMCPEnvVars(t, args, "SUPERPLANE_BASE_URL", "SUPERPLANE_MERGE_CONFIDENCE_TOKEN")
+	assert.NotContains(t, joined, "mcp_servers.superplane")
 	assert.NotContains(t, joined, "merge-confidence-secret")
-	assert.NotContains(t, joined, "approval_mode")
-}
-
-func assertForwardsMCPEnvVars(t *testing.T, args []string, names ...string) {
-	t.Helper()
-	var envVars string
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "mcp_servers.superplane.env_vars=") {
-			envVars = arg
-		}
-	}
-	require.NotEmpty(t, envVars, "missing mcp_servers.superplane.env_vars override")
-	for _, name := range names {
-		assert.Contains(t, envVars, fmt.Sprintf("%q", name))
-	}
-}
-
-func TestCodexSuperplaneMCPScriptUsesMergeConfidence(t *testing.T) {
-	script, err := filepath.Abs("run.js")
-	require.NoError(t, err)
-	cmd := exec.Command("node", "-e", `const { superplaneMCPScript } = require(process.argv[1]); process.stdout.write(superplaneMCPScript("/task", { SUPERPLANE_MERGE_CONFIDENCE_TOKEN: "token" }));`, script)
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, string(out))
-	assert.Equal(t, "/task/merge_confidence_mcp.js", string(out))
 }
 
 func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
@@ -187,11 +161,8 @@ func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
-	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
-	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/task_artifact_mcp.js"]`)
-	assertForwardsMCPEnvVars(t, args, "SUPERPLANE_BASE_URL", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ARTIFACT_TOKEN")
+	assert.NotContains(t, joined, "mcp_servers.superplane")
 	assert.NotContains(t, joined, "artifact-token")
-	assert.NotContains(t, joined, "approval_mode")
 }
 
 func TestCodexExecArgsStartsOnlyTheGlobalMCPWithARunnerToken(t *testing.T) {
@@ -242,26 +213,13 @@ func TestCodexExecArgsBypassesSandboxForAnalysis(t *testing.T) {
 			joined := strings.Join(args, " ")
 			assert.NotContains(t, joined, "sandbox_mode=")
 			assert.NotContains(t, joined, "approval_policy=")
-			assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
-			assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/planning_session_mcp.js"]`)
+			assert.NotContains(t, joined, "mcp_servers.superplane.")
 			assert.Contains(t, joined, "developer_instructions")
 			assert.Contains(t, joined, "Do not edit or write repository files.")
-			assert.Contains(t, args, `mcp_servers.superplane.tools.propose_update.approval_mode="approve"`)
-			assert.Contains(t, args, `mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"`)
 			assert.Contains(t, args, `mcp_servers.docs.url="https://mcp.example.com/mcp"`)
 			assert.NotContains(t, joined, "superplane_global")
-			assertForwardsMCPEnvVars(t, args,
-				"SUPERPLANE_BASE_URL",
-				"SUPERPLANE_RUN_TOKEN",
-				"SUPERPLANE_ARTIFACT_TOKEN",
-				"SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
-				"SUPERPLANE_ACTIVITY_ID",
-				"SUPERPLANE_TASK_DIR",
-				"SUPERPLANE_ANALYSIS_SPEC_FILE",
-				"SUPERPLANE_ANALYSIS_SCORE_FILE",
-			)
 			assert.NotContains(t, joined, "run-token-secret")
-			assert.Equal(t, 2, strings.Count(joined, "approval_mode="))
+			assert.NotContains(t, joined, "approval_mode=")
 			assert.NotContains(t, joined, "default_tools_approval_mode")
 		})
 	}
@@ -363,7 +321,7 @@ func TestCodexAnalysisRunPreservesFailedResultWhenMessageUploadFails(t *testing.
 	require.NoError(t, os.WriteFile(prompt, []byte("Analyze the task."), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(taskDir, "planning_session_mcp.js"),
+		filepath.Join(taskDir, "agent_message.js"),
 		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => {
   fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);
   throw new Error("Planning message upload failed");
@@ -456,7 +414,7 @@ func TestCodexRunReportsProviderFailures(t *testing.T) {
 			resultPath := filepath.Join(taskDir, "result.json")
 			require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
 			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
-			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "planning_session_mcp.js"), []byte(`module.exports.recordAgentMessage = async () => {};`), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "agent_message.js"), []byte(`module.exports.recordAgentMessage = async () => {};`), 0o600))
 			events := strings.ReplaceAll(test.events, test.message, test.message+" subscription-secret-value api-secret-value")
 			stderr := strings.ReplaceAll(test.stderr, test.message, test.message+" subscription-secret-value api-secret-value")
 			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(fmt.Sprintf(`#!/usr/bin/env node

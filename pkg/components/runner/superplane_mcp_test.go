@@ -10,7 +10,7 @@ import (
 )
 
 func TestGlobalMCPNodeTests(t *testing.T) {
-	command := exec.Command("node", "--test", "server_test.js", "owner_test.js", "tasks_test.js", "artifacts_test.js", "flow_tools_test.js", "stdio_test.js")
+	command := exec.Command("node", "--test", "server_test.js", "owner_test.js", "tasks_test.js", "artifacts_test.js", "flow_tools_test.js", "agent_message_test.js", "stdio_test.js")
 	command.Dir = "superplane_mcp"
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -30,8 +30,9 @@ func TestAppendGlobalMCP(t *testing.T) {
 		paths := map[string]bool{}
 		for _, file := range files {
 			assert.False(t, strings.HasSuffix(file.Path, "_test.js"), file.Path)
-			assert.False(t, strings.HasPrefix(file.Path, "task_cli"), file.Path)
-			assert.NotEqual(t, "bin/superplane", file.Path)
+			if strings.HasPrefix(file.Path, "superplane_mcp/") {
+				assert.NotContains(t, file.Path, "task_cli")
+			}
 			paths[file.Path] = true
 		}
 		for _, path := range []string{
@@ -43,9 +44,14 @@ func TestAppendGlobalMCP(t *testing.T) {
 			"superplane_mcp/modules/evidence.js",
 			"superplane_mcp/modules/links.js",
 			"superplane_mcp/modules/merge.js",
+			"task_cli.js",
+			"bin/superplane",
 		} {
 			require.True(t, paths[path], path)
 		}
+		command := files[len(files)-1]
+		assert.Equal(t, "bin/superplane", command.Path)
+		assert.Equal(t, "0755", command.Mode)
 		assert.Len(t, AppendGlobalMCP(env, files), len(files))
 	})
 }

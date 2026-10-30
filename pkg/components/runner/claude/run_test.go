@@ -71,9 +71,9 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 
 	assert.Contains(t, tools, "Read")
 	assert.Contains(t, tools, "Bash")
-	assert.Contains(t, tools, "mcp__superplane")
-	assert.Contains(t, tools, "mcp__superplane__propose_update")
-	assert.Contains(t, tools, "mcp__superplane__inspect_attachment")
+	assert.NotContains(t, tools, "mcp__superplane")
+	assert.NotContains(t, tools, "mcp__superplane__propose_update")
+	assert.NotContains(t, tools, "mcp__superplane__inspect_attachment")
 	assert.NotContains(t, tools, "mcp__superplane__suggest_owners")
 	assert.NotContains(t, tools, "mcp__superplane__assign_owner")
 	assert.NotContains(t, tools, "mcp__superplane_global")
@@ -82,7 +82,6 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
 	assert.NotContains(t, tools, "mcp__superplane__survey")
 	assert.NotContains(t, tools, "mcp__superplane__create_task")
-	assert.Contains(t, tools, "mcp__superplane__inspect_attachment")
 	assert.NotContains(t, tools, "mcp__superplane__propose_draft")
 	assert.NotContains(t, tools, "Edit")
 	assert.NotContains(t, tools, "Write")
@@ -112,10 +111,8 @@ func TestClaudeStartsOnlyTheGlobalMCPServerWithARunnerToken(t *testing.T) {
 func TestClaudeStartsTheLegacyMCPServerWithoutARunnerToken(t *testing.T) {
 	run := runClaudeWithFakeCLI(t, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN=merge-token")
 
-	assert.Equal(t, "Bash,Read,Edit,Write,mcp__superplane,mcp__superplane__report_merge_check", run.allowedTools)
-	assert.Equal(t, map[string]any{
-		"superplane": map[string]any{"command": "node", "args": []any{filepath.Join(run.taskDir, "merge_confidence_mcp.js")}},
-	}, run.mcpServers)
+	assert.Equal(t, "Bash,Read,Edit,Write", run.allowedTools)
+	assert.Nil(t, run.mcpServers)
 }
 
 type claudeRun struct {
@@ -133,7 +130,7 @@ func runClaudeWithFakeCLI(t *testing.T, env ...string) claudeRun {
 	require.NoError(t, os.WriteFile(prompt, []byte("Do the task."), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(taskDir, "planning_session_mcp.js"),
+		filepath.Join(taskDir, "agent_message.js"),
 		[]byte(`module.exports.recordAgentMessage = async () => {};`),
 		0o600,
 	))
@@ -168,7 +165,9 @@ func runClaudeWithFakeCLI(t *testing.T, env ...string) claudeRun {
 		}
 	}
 	content, err := os.ReadFile(configCopy)
-	require.NoError(t, err)
+	if err != nil {
+		return run
+	}
 	var config map[string]any
 	require.NoError(t, json.Unmarshal(content, &config))
 	run.mcpServers, _ = config["mcpServers"].(map[string]any)
@@ -182,7 +181,7 @@ func TestAllowedClaudeToolsUsesProposeUpdateWithoutReviewEnv(t *testing.T) {
 		"SUPERPLANE_RUN_TOKEN":             "token",
 		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
 	})
-	assert.Contains(t, tools, "mcp__superplane__propose_update")
+	assert.NotContains(t, tools, "mcp__superplane__propose_update")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
 }
 
@@ -195,7 +194,7 @@ func TestAllowedClaudeToolsIgnoresLegacyScoreEnv(t *testing.T) {
 		"SUPERPLANE_RUN_TOKEN":             "token",
 		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
 	})
-	assert.Contains(t, tools, "mcp__superplane__propose_update")
+	assert.NotContains(t, tools, "mcp__superplane__propose_update")
 	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
 	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
 }
@@ -208,8 +207,8 @@ func TestAllowedClaudeToolsAllowsMergeConfidenceReport(t *testing.T) {
 
 	assert.Contains(t, tools, "Bash")
 	assert.Contains(t, tools, "Read")
-	assert.Contains(t, tools, "mcp__superplane")
-	assert.Contains(t, tools, "mcp__superplane__report_merge_check")
+	assert.NotContains(t, tools, "mcp__superplane")
+	assert.NotContains(t, tools, "mcp__superplane__report_merge_check")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
 	assert.NotContains(t, tools, "mcp__superplane__upload_artifact")
 }
@@ -223,7 +222,7 @@ func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
 		"SUPERPLANE_WORKSPACE_MCP_CONFIG":  configPath,
 	})
 	assert.Contains(t, tools, "mcp__docs")
-	assert.Contains(t, tools, "mcp__superplane")
+	assert.NotContains(t, tools, "mcp__superplane")
 }
 
 func TestDisallowedClaudeToolsIncludesWorkspaceMCPTools(t *testing.T) {
@@ -245,7 +244,7 @@ func TestAllowedClaudeToolsReadsWorkspaceMCPFromTaskDir(t *testing.T) {
 		"SUPERPLANE_WORKSPACE_MCP_CONFIG":  "/task/workspace_mcp.json",
 	})
 	assert.Contains(t, tools, "mcp__deepwiki")
-	assert.Contains(t, tools, "mcp__superplane")
+	assert.NotContains(t, tools, "mcp__superplane")
 }
 
 func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
@@ -306,8 +305,8 @@ func TestAllowedClaudeToolsAddsPublishLinkWithoutScreenshotTools(t *testing.T) {
 		"SUPERPLANE_PUBLISH_LINKS":  "yes",
 	})
 
-	assert.Contains(t, tools, "Bash,Read,Edit,Write")
-	assert.Contains(t, tools, "mcp__superplane__publish_link")
+	assert.Equal(t, "Bash,Read,Edit,Write", tools)
+	assert.NotContains(t, tools, "mcp__superplane__publish_link")
 	assert.NotContains(t, tools, "mcp__superplane__upload_artifact")
 	assert.NotContains(t, tools, "mcp__superplane__inspect_screenshot")
 }
@@ -317,10 +316,10 @@ func TestAllowedClaudeToolsAddsArtifactToolsOutsidePlanning(t *testing.T) {
 		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
 	})
 
-	assert.Contains(t, tools, "Bash,Read,Edit,Write")
-	assert.Contains(t, tools, "mcp__superplane__inspect_screenshot")
-	assert.Contains(t, tools, "mcp__superplane__upload_artifact")
-	assert.Contains(t, tools, "mcp__superplane__report_visual_evidence_unavailable")
+	assert.Equal(t, "Bash,Read,Edit,Write", tools)
+	assert.NotContains(t, tools, "mcp__superplane__inspect_screenshot")
+	assert.NotContains(t, tools, "mcp__superplane__upload_artifact")
+	assert.NotContains(t, tools, "mcp__superplane__report_visual_evidence_unavailable")
 	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
 }
 
@@ -427,7 +426,7 @@ func TestClaudeAnalysisRunRecordsTheAgentMessage(t *testing.T) {
 	require.NoError(t, os.WriteFile(prompt, []byte("Analyze the task."), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(taskDir, "planning_session_mcp.js"),
+		filepath.Join(taskDir, "agent_message.js"),
 		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);`),
 		0o600,
 	))
@@ -467,7 +466,7 @@ func TestClaudeAnalysisRunRecordsAgentMessageFromFailedTurn(t *testing.T) {
 	require.NoError(t, os.WriteFile(prompt, []byte("Analyze the task."), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(taskDir, "planning_session_mcp.js"),
+		filepath.Join(taskDir, "agent_message.js"),
 		[]byte(`const fs = require("fs"); module.exports.recordAgentMessage = async (text) => fs.writeFileSync(process.env.RECORDED_AGENT_MESSAGE, text);`),
 		0o600,
 	))

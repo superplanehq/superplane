@@ -171,7 +171,6 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	commands = runner.ApplyFactoryCheckout(files, commands, spec.Steps)
 	environment, files = runner.AttachFactoryCommitIdentity(ctx, environment, files)
 	files = runner.AppendTaskArtifactMCP(environment, files)
-	files = runner.AppendMergeConfidenceMCP(environment, files)
 	files = runner.AppendGlobalMCP(environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {

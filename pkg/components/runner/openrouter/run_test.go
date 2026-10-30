@@ -144,12 +144,8 @@ func TestBuildOpenCodeConfigWritesBaseURLAndAnalysisMCP(t *testing.T) {
 	assert.Equal(t, "deny", permission["question"])
 	assert.Equal(t, "allow", permission["*"])
 	mcp, _ := config["mcp"].(map[string]any)
-	superplane, _ := mcp["superplane"].(map[string]any)
-	assert.Equal(t, "local", superplane["type"])
-	command, _ := superplane["command"].([]any)
-	require.Equal(t, 2, len(command))
-	assert.Equal(t, "node", command[0])
-	assert.Equal(t, "/task/planning_session_mcp.js", command[1])
+	_, hasSuperplane := mcp["superplane"]
+	assert.False(t, hasSuperplane)
 	assert.NotNil(t, config["instructions"])
 }
 
@@ -243,11 +239,8 @@ func TestBuildOpenCodeConfigAddsMergeConfidenceMCP(t *testing.T) {
 		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
 	})
 	mcp, _ := config["mcp"].(map[string]any)
-	superplane, _ := mcp["superplane"].(map[string]any)
-	command, _ := superplane["command"].([]any)
-
-	assert.Equal(t, []any{"node", "/task/merge_confidence_mcp.js"}, command)
-	assert.Equal(t, true, superplane["enabled"])
+	_, hasSuperplane := mcp["superplane"]
+	assert.False(t, hasSuperplane)
 }
 
 func TestBuildOpenCodeConfigStartsOnlyTheGlobalMCPWithARunnerToken(t *testing.T) {
@@ -279,11 +272,8 @@ func TestBuildOpenCodeConfigAddsArtifactMCPOutsidePlanning(t *testing.T) {
 		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
 	})
 	mcp, _ := config["mcp"].(map[string]any)
-	superplane, _ := mcp["superplane"].(map[string]any)
-	command, _ := superplane["command"].([]any)
-
-	assert.Equal(t, []any{"node", "/task/task_artifact_mcp.js"}, command)
-	assert.Equal(t, true, superplane["enabled"])
+	_, hasSuperplane := mcp["superplane"]
+	assert.False(t, hasSuperplane)
 }
 
 func TestBuildOpenCodeConfigAllowsFallbacksForSelectedModel(t *testing.T) {

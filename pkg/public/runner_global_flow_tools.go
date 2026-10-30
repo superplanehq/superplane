@@ -37,7 +37,7 @@ func (s *Server) handleRunnerGlobalMergeCheck(w http.ResponseWriter, r *http.Req
 }
 
 func (s *Server) handleRunnerGlobalArtifactUpload(w http.ResponseWriter, r *http.Request) {
-	scope, ok := s.authenticateRunner(w, r, runneraction.ScopeEvidenceWrite)
+	scope, ok := s.authenticateRunnerAny(w, r, runneraction.ScopeEvidenceWrite, runneraction.ScopeLinksWrite)
 	if !ok {
 		return
 	}
@@ -60,6 +60,19 @@ func (s *Server) handleRunnerGlobalArtifactLink(w http.ResponseWriter, r *http.R
 		return
 	}
 	s.attachRunnerArtifactLink(w, r, artifact)
+}
+
+func (s *Server) handleRunnerGlobalArtifactMarkdown(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticateRunner(w, r, runneraction.ScopeLinksWrite)
+	if !ok {
+		return
+	}
+	artifact, ok := scope.ArtifactUploadScope()
+	if !ok {
+		writeRunnerFlowMismatch(w)
+		return
+	}
+	s.attachRunnerArtifactMarkdown(w, r, artifact)
 }
 
 func writeRunnerFlowMismatch(w http.ResponseWriter) {
