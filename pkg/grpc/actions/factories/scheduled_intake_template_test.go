@@ -88,7 +88,6 @@ func TestScheduledIntakeCreation(t *testing.T) {
 		})
 	}
 	t.Run("subscription requires a connected default before publishing", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 		subscription := true
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
 		_, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -32,7 +31,6 @@ var (
 	ErrCodexConnectionNotReady    = newSubscriptionAdmissionError("connect ChatGPT before this task can run")
 	ErrCodexConnectionStale       = newSubscriptionAdmissionError("the ChatGPT sign-in update is out of date")
 	ErrCodexConnectionActive      = errors.New("stop the running tasks before you disconnect ChatGPT")
-	ErrCodexConnectionUnavailable = newSubscriptionAdmissionError("ChatGPT subscription is not available for this organization")
 )
 
 // CodexConnectionBusyError names the task that holds the subscription.
@@ -154,9 +152,6 @@ func FindFactoryCodexConnectionByID(tx *gorm.DB, id uuid.UUID) (*FactoryCodexCon
 
 // LockScopedFactoryCodexConnection locks the exact connection in a signed scope.
 func LockScopedFactoryCodexConnection(tx *gorm.DB, organizationID, connectionID uuid.UUID) (*FactoryCodexConnection, error) {
-	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
-		return nil, err
-	}
 	snapshot, err := FindFactoryCodexConnectionByID(tx, connectionID)
 	if err != nil {
 		return nil, err
@@ -737,23 +732,9 @@ func (c *FactoryCodexConnection) MarkReconnectRequired(tx *gorm.DB, now time.Tim
 	return nil
 }
 
-func requireCodexSubscriptionEligible(tx *gorm.DB, organizationID uuid.UUID) error {
-	organization, err := FindOrganizationByIDInTransaction(tx, organizationID.String())
-	if err != nil {
-		return err
-	}
-	if !organization.HasExperimentalFeature(features.FeatureCodexSubscriptions) {
-		return ErrCodexConnectionUnavailable
-	}
-	return nil
-}
-
 // ActiveCodexMember locks membership before connection mutation. Removal uses
 // the same order, so it cannot race sign-in or subscription admission.
 func ActiveCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, error) {
-	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
-		return nil, err
-	}
 	return activeHumanCodexMember(tx, organizationID, userID)
 }
 
@@ -910,9 +891,6 @@ func activeHumanCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*Use
 // ListEligibleCodexConnections supplies the combined workspace policy catalog.
 // Task admission still checks the actual owner's connection and native catalog.
 func ListEligibleCodexConnections(tx *gorm.DB, organizationID uuid.UUID) ([]FactoryCodexConnection, error) {
-	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
-		return nil, err
-	}
 	var connections []FactoryCodexConnection
 	err := tx.Model(&FactoryCodexConnection{}).Select("factory_codex_connections.*").
 		Joins("JOIN users ON users.id = factory_codex_connections.owner_user_id AND users.organization_id = factory_codex_connections.organization_id").

@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -715,7 +714,6 @@ func TestSubscriptionHandOffWaitsForAssignmentAndExplicitStart(t *testing.T) {
 			column := scenario.column
 			r := support.Setup(t)
 			db := database.DB(t.Context())
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 			f := seedHandOffFactory(t, r, db)
 			subscription := true
 			require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
@@ -800,7 +798,6 @@ func seedPendingVerifyHandOff(t *testing.T) (context.Context, *support.ResourceR
 	t.Helper()
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	f := seedHandOffFactory(t, r, db)
 	subscription := true
 	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
@@ -884,7 +881,6 @@ func TestIsHandOffPullRequestGoneRecognizesBitbucketNotFound(t *testing.T) {
 func TestSubscriptionHandOffRejectsInvalidPullRequestURLBeforeSaving(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
 	githubFactory := seedHandOffFactory(t, r, db)
 	bitbucketFactory := seedBitbucketHandOffFactory(t, r, db)
