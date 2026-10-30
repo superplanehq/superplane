@@ -2,6 +2,7 @@ package runners
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
+func TestCreateRunnerForPendingTaskRollsBackAndCanRetryAfterScheduling(t *testing.T) {
 	resource := support.Setup(t)
 	t.Setenv(billingmodels.BillingEnabledEnv, "true")
 	db := database.DB(t.Context())
@@ -30,6 +31,7 @@ func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
 	otherFleet := createTestFleetWithSlug(t, "other-capacity-fleet")
 	firstTask := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
 	secondTask := createTestTask(t, resource.Organization.ID, otherFleet.ID, []byte("encrypted"))
+	require.NoError(t, db.Model(secondTask).Update("state", models.RunnerTaskStatePending).Error)
 	service := newTestRunnerService()
 	firstRequest := &pb.CreateRunnerRequest{
 		FleetId: fleet.Slug, TaskId: stringPointer(firstTask.ID.String()),
@@ -42,7 +44,7 @@ func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
 		IdempotencyKey: "denied-slot", Ephemeral: true,
 	}
 	_, err = service.CreateRunner(t.Context(), secondRequest)
-	require.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 
 	var runners, registrations int64
 	require.NoError(t, db.Model(&models.Runner{}).Count(&runners).Error)
@@ -51,7 +53,7 @@ func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
 	assert.Equal(t, int64(1), registrations)
 	queued, err := models.FindRunnerTask(db, secondTask.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.RunnerTaskStateQueued, queued.State)
+	assert.Equal(t, models.RunnerTaskStatePending, queued.State)
 	assert.Nil(t, queued.RunnerID)
 
 	// Retries reuse an existing slot, and generic provisioning uses no slot.
@@ -64,7 +66,31 @@ func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
 	runner, err := models.FindRunner(db, uuid.MustParse(first.Runner.Id))
 	require.NoError(t, err)
 	require.NoError(t, runner.Terminate(db, models.RunnerTerminationProvisioningFailed))
+	// Returning a reservation to queued retains its slot. Cancel it before scheduling another task.
+	storedFirst, err := models.FindRunnerTask(db, firstTask.ID)
+	require.NoError(t, err)
+	require.NoError(t, storedFirst.RequestCancel(db, time.Now()))
+	_, err = models.ScheduleOrganizationRunnerTasks(db, resource.Organization.ID, 100)
+	require.NoError(t, err)
 	admitted, err := service.CreateRunner(t.Context(), secondRequest)
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerStatePending, admitted.Runner.State)
+}
+
+func TestFleetCapacityCountsOnlyTasksWithOrganizationSlots(t *testing.T) {
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+	for range 3 {
+		task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
+		require.NoError(t, db.Model(task).Update("state", models.RunnerTaskStatePending).Error)
+	}
+	ready := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
+	capacity, err := loadFleetCapacity(t.Context(), fleet)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), capacity.RunnableTasks)
+	require.NoError(t, ready.RequestCancel(db, time.Now()))
+	capacity, err = loadFleetCapacity(t.Context(), fleet)
+	require.NoError(t, err)
+	assert.Zero(t, capacity.RunnableTasks)
 }

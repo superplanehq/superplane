@@ -563,8 +563,6 @@ func (s *Service) createRunner(
 		return nil, nil, grpcerrors.NotFound(err, "fleet not found")
 	case errors.Is(err, models.ErrRunnerTaskNotFound):
 		return nil, nil, grpcerrors.NotFound(err, "task not found")
-	case errors.Is(err, models.ErrOrganizationRunnerCapacity):
-		return nil, nil, grpcerrors.ResourceExhausted(err, "Organization parallel runner limit reached.")
 	case errors.Is(err, models.ErrCodexConnectionStale),
 		errors.Is(err, models.ErrCodexConnectionNotEligible),
 		errors.Is(err, models.ErrCodexConnectionNotReady),
@@ -744,6 +742,7 @@ func validateRunnerStates(states []string) error {
 
 func validateTaskStates(states []string) error {
 	valid := []string{
+		models.RunnerTaskStatePending,
 		models.RunnerTaskStateQueued,
 		models.RunnerTaskStateReserved,
 		models.RunnerTaskStateRunning,

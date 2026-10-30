@@ -120,7 +120,7 @@ func TestFactoryWorkOrder_AssignOwner(t *testing.T) {
 		require.NoError(t, err)
 		eventsBefore, err := order.ListEvents(db, 0, nil)
 		require.NoError(t, err)
-		assigned, err = order.AssignOwner(db, TaskOwnerAssignment{UserID: userID, Source: TaskOwnerSourceAgent, Reason: "Same owner."})
+		assigned, err = order.AssignOwner(db, TaskOwnerAssignment{UserID: userID, Source: TaskOwnerSourceAgent})
 		require.NoError(t, err)
 		assert.False(t, assigned)
 		after, err := factoryModel.FindWorkOrder(db, order.ID)
@@ -129,6 +129,25 @@ func TestFactoryWorkOrder_AssignOwner(t *testing.T) {
 		eventsAfter, err := order.ListEvents(db, 0, nil)
 		require.NoError(t, err)
 		assert.Equal(t, eventsBefore, eventsAfter)
+
+		runID := uuid.New()
+		assigned, err = order.AssignOwner(db, TaskOwnerAssignment{
+			UserID: userID,
+			Source: TaskOwnerSourceAgent,
+			Reason: "Same owner.",
+			Run:    &factory.RunRef{ID: runID},
+		})
+		require.NoError(t, err)
+		assert.True(t, assigned)
+		after, err = factoryModel.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, before.UpdatedAt, after.UpdatedAt)
+		assert.Equal(t, []uuid.UUID{userID}, after.AssigneeIDs())
+		payload = latestAssigneesUpdated(t, order)
+		assert.Equal(t, "Same owner.", payload.Reason)
+		assert.Equal(t, []factory.UserRef{{ID: userID}}, payload.Assigned)
+		require.NotNil(t, payload.Run)
+		assert.Equal(t, runID, payload.Run.ID)
 	})
 
 	t.Run("rolls assignment and history back with the transaction", func(t *testing.T) {

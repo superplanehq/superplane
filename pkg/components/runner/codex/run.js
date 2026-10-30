@@ -25,9 +25,15 @@ const SUPERPLANE_MCP_ENV_VARS = [
   "SUPERPLANE_ANALYSIS_SCORE_FILE",
   "SUPERPLANE_ARTIFACT_TOKEN",
   "SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
-  "SUPERPLANE_OWNER_TOKEN",
   "SUPERPLANE_VISUAL_EVIDENCE",
   "SUPERPLANE_PUBLISH_LINKS",
+];
+
+const GLOBAL_MCP_SERVER = "superplane_global";
+const GLOBAL_MCP_ENV_VARS = [
+  "SUPERPLANE_BASE_URL",
+  "SUPERPLANE_RUNNER_TOKEN",
+  "SUPERPLANE_TASK_DIR",
 ];
 
 function loadActivityStreamModule() {
@@ -212,16 +218,13 @@ function codexExecArgs(
     );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
-    if (
-      artifactEnabled(env) ||
-      mergeConfidenceEnabled(env) ||
-      envFlag(env, "SUPERPLANE_OWNER_TOKEN")
-    ) {
+    if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
       args.push(...mcpConfigOverrides(mcpScriptPath, env));
     } else {
       args.push(...workspaceMCPConfigOverrides(env));
     }
   }
+  args.push(...globalMCPConfigOverrides(path.dirname(String(mcpScriptPath || "")), env));
   if (model) {
     args.push("-m", model);
   }
@@ -276,14 +279,6 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
     "-c",
     `mcp_servers.superplane.env_vars=${tomlStringArray(SUPERPLANE_MCP_ENV_VARS)}`,
-    ...(envFlag(env, "SUPERPLANE_OWNER_TOKEN")
-      ? [
-          "-c",
-          'mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.assign_owner.approval_mode="approve"',
-        ]
-      : []),
     // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
     // answer that prompt, so approve only these planning tools, not shell writes.
     ...(planningEnabled(env)
@@ -292,13 +287,45 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
           'mcp_servers.superplane.tools.propose_update.approval_mode="approve"',
           "-c",
           'mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.assign_owner.approval_mode="approve"',
         ]
       : []),
     ...workspaceMCPConfigOverrides(env),
+  ];
+}
+
+function loadGlobalMCPRegistry(taskDir) {
+  const candidates = [
+    path.join(taskDir, "superplane_mcp", "registry.js"),
+    path.join(__dirname, "..", "superplane_mcp", "registry.js"),
+  ];
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return null;
+}
+
+// The global server lists only the tools that the run token allows. Approve
+// every known global tool: Codex exec cannot answer an approval prompt, and the
+// backend rejects a call outside the token scope.
+function globalMCPConfigOverrides(taskDir, env = process.env) {
+  if (!envFlag(env, "SUPERPLANE_RUNNER_TOKEN")) {
+    return [];
+  }
+  const registry = loadGlobalMCPRegistry(taskDir);
+  const toolNames = registry ? registry.allTools().map((tool) => tool.definition.name) : [];
+  return [
+    "-c",
+    `mcp_servers.${GLOBAL_MCP_SERVER}.command=${tomlString("node")}`,
+    "-c",
+    `mcp_servers.${GLOBAL_MCP_SERVER}.args=${tomlStringArray([path.join(taskDir, "superplane_mcp", "server.js")])}`,
+    "-c",
+    `mcp_servers.${GLOBAL_MCP_SERVER}.env_vars=${tomlStringArray(GLOBAL_MCP_ENV_VARS)}`,
+    ...toolNames.flatMap((name) => [
+      "-c",
+      `mcp_servers.${GLOBAL_MCP_SERVER}.tools.${tomlKey(name)}.approval_mode="approve"`,
+    ]),
   ];
 }
 
@@ -340,7 +367,7 @@ function workspaceMCPConfigOverrides(env = process.env) {
   for (const server of workspaceMCPServers(env)) {
     const name = String((server && server.name) || "").trim();
     const url = String((server && server.url) || "").trim();
-    if (!name || name === "superplane" || !url) {
+    if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER || !url) {
       continue;
     }
     const serverKey = tomlKey(name);

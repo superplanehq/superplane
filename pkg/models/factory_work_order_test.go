@@ -884,6 +884,61 @@ func TestFactoryWorkOrder_DeleteArtifacts(t *testing.T) {
 	assert.Equal(t, userID, payload.User.ID)
 }
 
+func TestFactoryWorkOrder_PaddedArtifactTitleStillMatches(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "padded-title")
+	db := database.Conn()
+	order, err := factoryModel.CreateWorkOrder(db, "Padded title", "", &userID, nil, nil)
+	require.NoError(t, err)
+	stored, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+		Type: FactoryWorkOrderArtifactTypeLink,
+		Data: map[string]any{
+			"url":   "https://preview.example.com/notes",
+			"title": "\tNotes\n",
+		},
+		CreatedBy: &userID,
+	})
+	require.NoError(t, err)
+	_, err = order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+		Type: FactoryWorkOrderArtifactTypeLink,
+		Data: map[string]any{
+			"url":   "https://preview.example.com/other",
+			"title": "Other",
+		},
+		CreatedBy: &userID,
+	})
+	require.NoError(t, err)
+
+	removed, err := order.RemoveArtifact(db, "", "Notes", &userID)
+	require.NoError(t, err)
+	assert.Equal(t, stored.ID, removed.ID)
+	remaining, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.Len(t, remaining, 1)
+	assert.Equal(t, "Other", mustArtifactData(t, &remaining[0])["title"])
+
+	padded, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+		Type: FactoryWorkOrderArtifactTypeLink,
+		Data: map[string]any{
+			"url":   "https://preview.example.com/notes",
+			"title": "\tNotes\n",
+		},
+		CreatedBy: &userID,
+	})
+	require.NoError(t, err)
+	replaced, created, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+		Type: FactoryWorkOrderArtifactTypeLink,
+		Data: map[string]any{
+			"url":   "https://preview.example.com/notes-2",
+			"title": "Notes",
+		},
+	})
+	require.NoError(t, err)
+	assert.False(t, created)
+	assert.Equal(t, padded.ID, replaced.ID)
+}
+
 func TestFactoryWorkOrder_CreateArtifact_Key(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

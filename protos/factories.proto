@@ -592,6 +592,18 @@ service Factories {
     };
   }
 
+  rpc SuggestTaskOwners(SuggestTaskOwnersRequest) returns (SuggestTaskOwnersResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/suggest-owners"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Suggest owners for a task";
+      description: "Lists members who can own a task and ranks code owners for the given paths";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateWorkOrder(UpdateWorkOrderRequest) returns (UpdateWorkOrderResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{factory_id}/orders/{order_id}"
@@ -683,6 +695,18 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create work order artifact";
       description: "Attaches a typed artifact to a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc RemoveWorkOrderArtifact(RemoveWorkOrderArtifactRequest) returns (RemoveWorkOrderArtifactResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts/remove"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove one work order artifact";
+      description: "Removes one artifact from a work order by key or title";
       tags: "Factory";
     };
   }
@@ -2369,6 +2393,41 @@ message UpdateWorkOrderAssigneesResponse {
   WorkOrder order = 1;
 }
 
+message SuggestTaskOwnersRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  repeated string paths = 3;
+}
+
+message SuggestTaskOwnersResponse {
+  repeated string paths = 1;
+  repeated TaskOwnerMember current_owners = 2;
+  repeated TaskCodeOwner code_owners = 3;
+  repeated TaskOwnerMember members = 4;
+  string history_note = 5;
+}
+
+message TaskOwnerMember {
+  string user_id = 1;
+  string name = 2;
+  string email = 3;
+  string github_login = 4;
+  repeated string roles = 5;
+  int32 open_tasks = 6;
+}
+
+message TaskCodeOwner {
+  string user_id = 1;
+  string name = 2;
+  string github_login = 3;
+  repeated string roles = 4;
+  int32 commits = 5;
+  google.protobuf.Timestamp last_commit_at = 6;
+  repeated string paths = 7;
+  int32 open_tasks = 8;
+  double score = 9;
+}
+
 message UpdateWorkOrderRequest {
   string factory_id = 1;
   string order_id = 2;
@@ -2499,6 +2558,18 @@ message CreateWorkOrderArtifactRequest {
 
 message CreateWorkOrderArtifactResponse {
   WorkOrderArtifact artifact = 1;
+}
+
+message RemoveWorkOrderArtifactRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string key = 3;
+  string title = 4;
+}
+
+message RemoveWorkOrderArtifactResponse {
+  string id = 1;
+  string title = 2;
 }
 
 message WorkOrderArtifact {
@@ -3195,8 +3266,8 @@ message PlanningSessionSummary {
   PlanningSessionSurvey survey = 5;
   // Integrated runner task state, independent of the agent node state.
   string runner_state = 6;
-  // "parallelism_limit" while a queued task waits for organization capacity.
-  string queue_reason = 7;
+  // True when the organization parallelism limit blocks a pending task.
+  bool blocked_by_parallelism_limit = 7;
 }
 
 message PlanningSession {
@@ -3217,8 +3288,8 @@ message PlanningSession {
   repeated PlanningSessionActivity activities = 15;
   // Integrated runner task state, independent of the agent node state.
   string runner_state = 16;
-  // "parallelism_limit" while a queued task waits for organization capacity.
-  string queue_reason = 17;
+  // True when the organization parallelism limit blocks a pending task.
+  bool blocked_by_parallelism_limit = 17;
 }
 
 enum PlanningSessionKind {

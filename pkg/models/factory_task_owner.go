@@ -41,6 +41,7 @@ type TaskOwnerAssignment struct {
 	UserID uuid.UUID
 	Source string
 	Reason string
+	Run    *factory.RunRef
 }
 
 type taskOwnerCandidateScan struct {
@@ -171,7 +172,9 @@ ORDER BY u.id, l.active DESC, l.linked_at DESC
 `
 
 // AssignOwner makes the selected person the only owner, replacing current
-// assignees. It reports whether ownership changed. The same sole owner is a no-op.
+// assignees. It reports whether it recorded an event. The same sole owner
+// with an empty reason records nothing. A reason on that owner still records
+// the sentence and the calling run, without changing the owner list.
 func (o *FactoryWorkOrder) AssignOwner(tx *gorm.DB, assignment TaskOwnerAssignment) (bool, error) {
 	changed := false
 	err := tx.Transaction(func(tx *gorm.DB) error {
@@ -184,20 +187,27 @@ func (o *FactoryWorkOrder) AssignOwner(tx *gorm.DB, assignment TaskOwnerAssignme
 			return err
 		}
 		o.Assignees = owners
-		if len(owners) == 1 && owners[0].UserID == assignment.UserID {
+		reason := NormalizeTaskOwnerReason(assignment.Reason)
+		sameOwner := len(owners) == 1 && owners[0].UserID == assignment.UserID
+		if sameOwner && reason == "" {
 			return nil
 		}
-		assigned, unassigned := assigneeDiff(o.AssigneeIDs(), []uuid.UUID{assignment.UserID})
 
-		if err := o.ReplaceAssignees(tx, []uuid.UUID{assignment.UserID}); err != nil {
-			return err
+		var assigned, unassigned []factory.UserRef
+		if sameOwner {
+			assigned = []factory.UserRef{{ID: assignment.UserID}}
+		} else {
+			assigned, unassigned = assigneeDiff(o.AssigneeIDs(), []uuid.UUID{assignment.UserID})
+			if err := o.ReplaceAssignees(tx, []uuid.UUID{assignment.UserID}); err != nil {
+				return err
+			}
+			now := time.Now()
+			if err := tx.Model(o).Omit(clause.Associations).Update("updated_at", now).Error; err != nil {
+				return err
+			}
+			o.UpdatedAt = now
+			o.Assignees = []FactoryWorkOrderAssignee{{WorkOrderID: o.ID, UserID: assignment.UserID}}
 		}
-		now := time.Now()
-		if err := tx.Model(o).Omit(clause.Associations).Update("updated_at", now).Error; err != nil {
-			return err
-		}
-		o.UpdatedAt = now
-		o.Assignees = []FactoryWorkOrderAssignee{{WorkOrderID: o.ID, UserID: assignment.UserID}}
 
 		changed = true
 		return o.recordEvent(tx, factory.EventTypeOrderAssigneesUpdated, factory.WorkOrderAssigneesUpdated{
@@ -205,7 +215,8 @@ func (o *FactoryWorkOrder) AssignOwner(tx *gorm.DB, assignment TaskOwnerAssignme
 			Assigned:   assigned,
 			Unassigned: unassigned,
 			Source:     assignment.Source,
-			Reason:     NormalizeTaskOwnerReason(assignment.Reason),
+			Reason:     reason,
+			Run:        assignment.Run,
 		})
 	})
 	return changed && err == nil, err
