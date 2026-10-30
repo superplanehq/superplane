@@ -39,6 +39,7 @@ services:
       RUNNER_ACTIVE_LOG_FS_PATH: "/var/lib/superplane/active-runner-logs"
       START_RUNNER_LOG_COMPACTOR: "yes"
       START_RUNNER_CLEANUP_WORKER: "yes"
+      START_RUNNER_TASK_SCHEDULER: "yes"
       START_CONSUMERS: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
       START_WEB_SERVER: "yes"
@@ -67,6 +68,7 @@ services:
       START_FACTORY_CLEANUP_WORKER: "yes"
       START_FACTORY_VELOCITY_SYNC_WORKER: "yes"
       START_PRICE_BOOK_SYNC_WORKER: "yes"
+      START_SEAT_RENEWAL_SYNC_WORKER: "yes"
       START_PLANNING_SESSION_CLEANUP_WORKER: "yes"
       START_EVENT_RETENTION_WORKER: "yes"
       WEB_BASE_PATH: ""
@@ -80,12 +82,9 @@ services:
       SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID: ${SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID:-}
       SIGNUP_WAITLIST_HUBSPOT_FORM_ID: ${SIGNUP_WAITLIST_HUBSPOT_FORM_ID:-}
       SIGNUP_WAITLIST_HUBSPOT_REGION: ${SIGNUP_WAITLIST_HUBSPOT_REGION:-}
-      ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       # Fixed test key for local development only. Set ENCRYPTION_MASTER_KEYS
       # in .env to test rotation with another key.
       ENCRYPTION_MASTER_KEYS: ${ENCRYPTION_MASTER_KEYS:-env://dev-v1:MTIzNDU2Nzg5MGFiY2RlZmdoaWprbG1ub3BxcnN0dXY=}
-      ENCRYPTION_LEGACY_FORMAT: ${ENCRYPTION_LEGACY_FORMAT:-plaintext}
-      ENCRYPTION_WRITE_FORMAT: ${ENCRYPTION_WRITE_FORMAT:-versioned}
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
       OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
@@ -137,6 +136,10 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
+      INVITATION_ORG_HOURLY_LIMIT: ${INVITATION_ORG_HOURLY_LIMIT:-}
+      INVITATION_RECIPIENT_DAILY_LIMIT: ${INVITATION_RECIPIENT_DAILY_LIMIT:-}
+      INVITATION_SHARED_RECIPIENT_DAILY_LIMIT: ${INVITATION_SHARED_RECIPIENT_DAILY_LIMIT:-}
+      PENDING_INVITATION_LIMIT: ${PENDING_INVITATION_LIMIT:-}
       DISCORD_FEEDBACK_WEBHOOK_URL: ${DISCORD_FEEDBACK_WEBHOOK_URL:-}
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-yes}
       ENABLE_PASSWORD_LOGIN: "yes"
@@ -152,6 +155,7 @@ services:
       SUPERPLANE_VERSION: ${SUPERPLANE_VERSION:-}
       POLAR_ACCESS_TOKEN: ${POLAR_ACCESS_TOKEN:-}
       POLAR_BUSINESS_PRODUCT_ID: ${POLAR_BUSINESS_PRODUCT_ID:-}
+      POLAR_DASHBOARD_ORGANIZATION_SLUG: ${POLAR_DASHBOARD_ORGANIZATION_SLUG:-}
       POLAR_ENVIRONMENT: ${POLAR_ENVIRONMENT:-sandbox}
       POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
       POLAR_API_VERSION: ${POLAR_API_VERSION:-}
@@ -248,8 +252,15 @@ services:
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 3s
-      timeout: 3s
-      retries: 5
+      # The ping starts a full Erlang CLI each time. On loaded CI runners
+      # it can take longer than 3s, which counts as a failed check.
+      timeout: 10s
+      # Allow time for RabbitMQ to boot on loaded CI runners. Without a
+      # start period, a slow boot marks the container unhealthy and fails
+      # every dependent service. Allow enough failed checks to survive
+      # slow pings during long setup steps.
+      start_period: 30s
+      retries: 20
 
   # Build-only service. Fleet Manager starts ephemeral containers from this
   # image when a task is queued.

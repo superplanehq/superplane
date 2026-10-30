@@ -63,7 +63,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to start authorization", http.StatusInternalServerError)
 			return
 		}
-		s.writeConsentPage(w, r, account, consentClientName(client), consent, "", http.StatusOK)
+		s.writeConsentPage(w, r, account, consentClientName(client), consent, "", "", http.StatusOK)
 		return
 	}
 
@@ -81,14 +81,25 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, oauthErr.Description, oauthErr.Status)
 		return
 	}
-	userID, orgID, factoryID, err := mcpserver.ResolveConsentWorkspace(r.Context(), account, r.FormValue("factory_id"))
+	organizationID := strings.TrimSpace(r.FormValue("organization_id"))
+	workspacesFor := strings.TrimSpace(r.FormValue("workspaces_for"))
+	if workspacesFor == "" || workspacesFor != organizationID {
+		token, mintErr := mcpserver.MintConsentToken(s.jwt, *consent)
+		if mintErr != nil {
+			http.Error(w, "failed to start authorization", http.StatusInternalServerError)
+			return
+		}
+		s.writeConsentPage(w, r, account, consentClientName(client), token, organizationID, "", http.StatusOK)
+		return
+	}
+	userID, orgID, factoryIDs, err := mcpserver.ResolveConsentWorkspaces(r.Context(), account, organizationID, r.PostForm["factory_id"])
 	if err != nil {
 		token, mintErr := mcpserver.MintConsentToken(s.jwt, *consent)
 		if mintErr != nil {
 			http.Error(w, "failed to start authorization", http.StatusInternalServerError)
 			return
 		}
-		s.writeConsentPage(w, r, account, consentClientName(client), token, "Choose a workspace this account can use.", http.StatusBadRequest)
+		s.writeConsentPage(w, r, account, consentClientName(client), token, organizationID, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -100,7 +111,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 		CodeChallengeMethod: consent.CodeChallengeMethod,
 		Resource:            consent.Resource,
 		ResponseType:        consent.ResponseType,
-	}, userID, orgID, factoryID)
+	}, userID, orgID, factoryIDs)
 	if err != nil {
 		http.Error(w, "failed to create authorization code", http.StatusInternalServerError)
 		return
@@ -124,15 +135,15 @@ func (s *Server) writeConsentPage(
 	w http.ResponseWriter,
 	r *http.Request,
 	account *models.Account,
-	clientName, consent, errMessage string,
+	clientName, consent, organizationID, errMessage string,
 	status int,
 ) {
-	workspaces, err := mcpserver.ListConsentWorkspaces(r.Context(), account)
+	view, err := mcpserver.BuildConsentView(r.Context(), account, organizationID, errMessage)
 	if err != nil {
 		http.Error(w, "failed to load workspaces", http.StatusInternalServerError)
 		return
 	}
-	page, err := mcpserver.RenderConsentPage(clientName, consent, errMessage, workspaces)
+	page, err := mcpserver.RenderConsentPage(clientName, consent, view)
 	if err != nil {
 		http.Error(w, "failed to render authorization page", http.StatusInternalServerError)
 		return
@@ -192,12 +203,13 @@ func (s *Server) handleMCPToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	access, err := mcpserver.MintAccessToken(s.jwt, mcpserver.AccessClaims{
-		UserID:    issue.UserID,
-		OrgID:     issue.OrgID,
-		FactoryID: issue.FactoryID,
-		ClientID:  issue.ClientID,
-		Resource:  issue.Resource,
-		Scopes:    issue.Scopes,
+		UserID:     issue.UserID,
+		OrgID:      issue.OrgID,
+		FactoryID:  issue.FactoryID,
+		FactoryIDs: issue.FactoryIDs,
+		ClientID:   issue.ClientID,
+		Resource:   issue.Resource,
+		Scopes:     issue.Scopes,
 	}, mcpserver.AccessTokenTTL)
 	if err != nil {
 		writeOAuthError(w, &mcpserver.OAuthError{Code: "server_error", Description: "failed to mint access token", Status: http.StatusInternalServerError})
@@ -281,6 +293,7 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 			Encryptor:   s.encryptor,
 			AuthService: s.authService,
 		},
+		BaseURL: s.BaseURL,
 	}
 	response := mcpserver.HandleJSONRPC(r.Context(), runtime, claims, message)
 	if response == nil {

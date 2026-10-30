@@ -11,7 +11,7 @@ import AdminSearchHeader from "./AdminSearchHeader";
 import ConfirmAdminDialog from "./ConfirmAdminDialog";
 import { ConfirmBlockDialog } from "./ConfirmBlockDialog";
 import { SortableHeader, type SortDirection } from "./SortableHeader";
-import { startImpersonation, toggleAdmin, toggleBlock } from "./useAccountActions";
+import { startSupportSession, toggleAdmin, toggleBlock } from "./useAccountActions";
 
 interface AdminAccount {
   id: string;
@@ -86,11 +86,11 @@ function AccountsTable({
               toggling={togglingAccountId === acc.id}
               onPromoteDemote={() => onPromoteDemote(acc)}
               onBlockUnblock={() => onBlockUnblock(acc)}
-              impersonateButton={
-                <Button variant="outline" size="sm" onClick={() => startImpersonation(acc.id)}>
+              supportSessionButton={
+                <Button variant="outline" size="sm" onClick={() => startSupportSession(acc.id)}>
                   <span className="flex items-center gap-1">
                     <Eye size={14} />
-                    Impersonate
+                    Start support session
                   </span>
                 </Button>
               }

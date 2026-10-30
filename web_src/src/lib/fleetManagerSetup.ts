@@ -51,6 +51,7 @@ export type FleetManagerDraft = {
   fleetCapacities: Record<string, FleetCapacity>;
   fields: FleetManagerProviderFields;
   fieldsByProvider?: Partial<Record<FleetManagerProvider, FleetManagerProviderFields>>;
+  kubeContext?: string;
 };
 
 export type InstalledFleet = {
@@ -277,9 +278,7 @@ function quoteReleaseBaseUrl(values: string): string {
 
 export function validateFleetInfrastructure(input: FleetInfrastructureInput): string[] {
   const errors: string[] = [];
-  if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(input.managerId)) {
-    errors.push("Enter a valid Fleet Manager ID.");
-  }
+  if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(input.managerId)) errors.push("Enter a valid Fleet Manager ID.");
   if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(input.namespace)) {
     errors.push("Enter a valid Kubernetes namespace.");
   }
@@ -355,25 +354,22 @@ export function fleetManagerValuesFileCommand(values: string): string {
   return `cat > ${FLEET_MANAGER_VALUES_FILE} <<'EOF'\n${values.trimEnd()}\nEOF\n`;
 }
 
-const DOCKER_VM_FLEET_IDS = ["e1-large-amd64", "e1-large-arm64"];
-
-export function fleetManagerDockerCommand(token: string): string {
-  return `./enable-runners.sh '${token.replace(/'/g, `'\\''`)}'`;
+function quotedShellArgument(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
-export function fleetsMatchDockerVm(installed: InstalledFleet[], runnerVersion: string): boolean {
-  return installed.some((fleet) =>
-    Boolean(fleet.id && DOCKER_VM_FLEET_IDS.includes(fleet.id) && fleet.runnerVersion === runnerVersion),
-  );
-}
-
-export function fleetManagerHelmCommand(metadata: FleetManagerSetupMetadata, namespace: string): string {
+export function fleetManagerHelmCommand(
+  metadata: FleetManagerSetupMetadata,
+  namespace: string,
+  kubeContext: string,
+): string {
   return [
     "helm upgrade --install fleet-manager",
     metadata.chartRepository,
     `--version ${metadata.defaultChartVersion}`,
     `--namespace ${namespace}`,
     "--create-namespace",
+    `--kube-context ${quotedShellArgument(kubeContext)}`,
     "--wait",
     "--timeout 10m",
     `-f ${FLEET_MANAGER_VALUES_FILE}`,
@@ -384,8 +380,9 @@ export function fleetManagerInstallCommand(
   metadata: FleetManagerSetupMetadata,
   namespace: string,
   values: string,
+  kubeContext: string,
 ): string {
-  return `${fleetManagerValuesFileCommand(values)}\n${fleetManagerHelmCommand(metadata, namespace)}\n`;
+  return `${fleetManagerValuesFileCommand(values)}\n${fleetManagerHelmCommand(metadata, namespace, kubeContext)}\n`;
 }
 
 export function normalizeInfrastructureFields(fields: Record<string, string | string[]>): FleetManagerProviderFields {
@@ -491,6 +488,7 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       Object.entries(draft.fields).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
     );
     const fleetCapacities = storedFleetCapacities(draft);
+    const kubeContext = typeof draft.kubeContext === "string" ? draft.kubeContext.replace(/[\r\n]/g, "") : "";
     const fieldsByProvider = {
       ...storedFieldsByProvider(draft.fieldsByProvider),
       [draft.provider]: fields,
@@ -506,6 +504,7 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       fleetCapacities,
       fields,
       fieldsByProvider,
+      kubeContext,
     };
   } catch {
     return null;

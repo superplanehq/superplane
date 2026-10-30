@@ -74,7 +74,7 @@ variable "opencode_version" {
 variable "codex_version" {
   type        = string
   description = "Codex version installed in the AMIs."
-  default     = "0.144.5"
+  default     = "0.163.0"
 }
 
 variable "playwright_version" {

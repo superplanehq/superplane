@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	agentservice "github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"gorm.io/gorm"
@@ -42,6 +44,9 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "agent chat not found")
+		}
+		if errors.Is(err, billing.ErrPaymentMethodRequired) || errors.Is(err, billing.ErrHostedSubscriptionRequired) {
+			return nil, grpcerrors.FailedPrecondition(err, err.Error())
 		}
 		if errors.Is(err, agentservice.ErrSessionBusy) {
 			return nil, grpcerrors.FailedPrecondition(nil, "agent is still processing the previous turn")

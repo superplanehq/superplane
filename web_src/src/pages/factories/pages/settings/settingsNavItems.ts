@@ -23,6 +23,7 @@ export type FactorySettingsSection =
   | "profile"
   | "security"
   | "notifications"
+  | "codex-usage"
   | "repository"
   | "superplane-mcp-server"
   | "mcp"
@@ -120,6 +121,14 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "selected workspaces",
         ],
       },
+      {
+        id: "account-codex-usage",
+        label: "Codex usage",
+        Icon: BarChart3,
+        scope: "account",
+        section: "codex-usage",
+        keywords: ["chatgpt", "subscription", "quota", "remaining", "limits"],
+      },
     ],
   },
   {
@@ -213,19 +222,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         scope: "organization",
         section: "members",
         permission: { resource: "members", action: "read" },
-        keywords: [
-          "invite",
-          "invite link",
-          "copy link",
-          "people",
-          "team",
-          "role",
-          "email",
-          "name",
-          "remove",
-          "owner",
-          "admin",
-        ],
+        keywords: ["invite", "copy link", "people", "team", "role", "email", "name", "remove", "owner", "admin"],
       },
       {
         id: "organization-integrations",

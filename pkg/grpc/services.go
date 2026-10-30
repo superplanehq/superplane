@@ -30,6 +30,7 @@ import (
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/services"
 )
 
 type Services struct {
@@ -53,17 +54,17 @@ type Services struct {
 }
 
 type ServicesConfig struct {
-	BaseURL                     string
-	WebhooksBaseURL             string
-	RunnerAPIBaseURL            string
-	Encryptor                   crypto.Encryptor
-	EncryptionStore             *encryption.Store
-	EncryptionMigrationsEnabled bool
-	AuthService                 authorization.Authorization
-	Registry                    *registry.Registry
-	OIDCProvider                oidc.Provider
-	AgentService                agentsActions.AgentsService
-	JWTSigner                   *jwt.Signer
+	EmailService     services.EmailService
+	BaseURL          string
+	WebhooksBaseURL  string
+	RunnerAPIBaseURL string
+	Encryptor        crypto.Encryptor
+	EncryptionStore  *encryption.Store
+	AuthService      authorization.Authorization
+	Registry         *registry.Registry
+	OIDCProvider     oidc.Provider
+	AgentService     agentsActions.AgentsService
+	JWTSigner        *jwt.Signer
 
 	// Entitlements defaults to Community mode. Enterprise defaults to a
 	// registry whose Community implementations refuse every operation.
@@ -86,6 +87,11 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		featureRegistry = enterprise.NewRegistry()
 	}
 
+	billingImplementation, err := enterprise.Get[enterprise.BillingOperations](featureRegistry, enterprise.Billing)
+	if err != nil {
+		return nil, err
+	}
+
 	groups, err := NewGroupsService(cfg.AuthService, featureRegistry)
 	if err != nil {
 		return nil, err
@@ -95,23 +101,22 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		return nil, err
 	}
 
+	organizationService := NewOrganizationService(cfg.AuthService, cfg.Registry, cfg.OIDCProvider, cfg.BaseURL, cfg.WebhooksBaseURL, billingImplementation)
+	organizationService.invitations.Entitlements = entitlements
+	if cfg.EmailService != nil {
+		organizationService.invitations.EmailService = cfg.EmailService
+	}
 	return &Services{
-		Users:  NewUsersService(cfg.AuthService),
-		Groups: groups,
-		Roles:  roles,
-		Organizations: NewOrganizationService(
-			cfg.AuthService,
-			cfg.Registry,
-			cfg.OIDCProvider,
-			cfg.BaseURL,
-			cfg.WebhooksBaseURL,
-		),
-		Integrations: NewIntegrationService(cfg.Encryptor, cfg.Registry),
-		Secrets:      NewSecretService(cfg.Encryptor, cfg.AuthService),
-		Me:           NewMeService(cfg.AuthService),
-		Actions:      NewActionService(cfg.Registry),
-		Triggers:     NewTriggerService(cfg.Registry),
-		Widgets:      NewWidgetService(cfg.Registry),
+		Users:         NewUsersService(cfg.AuthService),
+		Groups:        groups,
+		Roles:         roles,
+		Organizations: organizationService,
+		Integrations:  NewIntegrationService(cfg.Encryptor, cfg.Registry),
+		Secrets:       NewSecretService(cfg.Encryptor, cfg.AuthService),
+		Me:            NewMeService(cfg.AuthService),
+		Actions:       NewActionService(cfg.Registry),
+		Triggers:      NewTriggerService(cfg.Registry),
+		Widgets:       NewWidgetService(cfg.Registry),
 		Canvases: NewCanvasService(
 			cfg.AuthService,
 			cfg.Registry,
@@ -133,6 +138,6 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 				cfg.RunnerAPIBaseURL,
 			),
 		),
-		AdminKeys: NewAdminKeysService(cfg.EncryptionStore, cfg.EncryptionMigrationsEnabled),
+		AdminKeys: NewAdminKeysService(cfg.EncryptionStore),
 	}, nil
 }

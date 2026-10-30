@@ -7,12 +7,13 @@ import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestMergeabili
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
+const mergePending = { current: false };
 const mergeMutate = vi.fn();
 const experimentalFeatureHas = { current: (_id: string) => true };
 
 vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
-  useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
+  useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: mergePending.current }),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -67,6 +68,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   mergeMutate.mockReset();
+  mergePending.current = false;
   experimentalFeatureHas.current = () => true;
   mergeability.current = {
     canMerge: true,
@@ -153,7 +155,11 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
   it("keeps the standard note for a link that is not a pull request", () => {
     renderNote({
-      note: { headline: "Implement did not pass", text: "Fix the error.", cta: { label: "Debug", href: "/runs/1" } },
+      note: {
+        headline: "Implement did not pass",
+        text: "Fix the error.",
+        cta: { label: "View run details", href: "/runs/1" },
+      },
       tone: "failed",
     });
 
@@ -233,8 +239,19 @@ describe("SplitRunAttentionNote for a pull request", () => {
   it("enables merge when mergeability is true", () => {
     renderNote({ pullRequests: [GITHUB_PR] });
 
-    expect(screen.getByTestId("split-run-merge-button")).toBeEnabled();
+    const button = screen.getByTestId("split-run-merge-button");
+    expect(button).toBeEnabled();
+    expect(button).toHaveAccessibleName("Merge");
     expect(screen.queryByTestId("split-run-merge-reason")).not.toBeInTheDocument();
+  });
+
+  it("shows Merging and blocks another merge while the request is pending", () => {
+    mergePending.current = true;
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    const button = screen.getByTestId("split-run-merge-button");
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleName("Merging");
   });
 
   it("disables merge and shows the reason on hover when automation is running", async () => {

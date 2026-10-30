@@ -9,7 +9,7 @@ function storageKey(factoryId: string): string {
 }
 
 function isModelSource(value: string | null): value is OnboardingAgentCredentialChoice {
-  return value === "own-key" || value === "hosted";
+  return value === "own-key" || value === "hosted" || value === "subscription";
 }
 
 export function readOnboardingModelSource(factoryId: string): OnboardingAgentCredentialChoice | null {

@@ -153,3 +153,45 @@ func TestCheckRequiredExperimentalFeatures(t *testing.T) {
 		assert.Equal(t, codes.PermissionDenied, status.Code(err))
 	})
 }
+
+func TestModelSourceRouteAllowsHostedRecoveryWithoutBYOK(t *testing.T) {
+	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
+	org, err := models.CreateOrganization("hosted-recovery-"+uuid.NewString()[:8], "")
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+	request := httptestRequest(t, map[string]string{"x-user-id": uuid.NewString(), "x-organization-id": org.ID.String()})
+	_, err = NewGatewayAuthorizer(allowingPermissionChecker{}).AuthorizeHTTP(t.Context(), request,
+		HTTPRoute{Method: "POST", Pattern: "/api/v1/factories/{id}/model-source"}, map[string]string{"id": uuid.NewString()})
+	require.NoError(t, err)
+}
+
+func TestTeamBillingMutationsRequireBillingPermission(t *testing.T) {
+	for _, pattern := range []string{
+		"/api/v1/organizations/{id}/billing/select-plan",
+		"/api/v1/organizations/{id}/billing/seats/preview",
+		"/api/v1/organizations/{id}/billing/seats/purchase",
+		"/api/v1/organizations/{id}/billing/payment-method-session",
+	} {
+		t.Run(pattern, func(t *testing.T) {
+			t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
+			org, err := models.CreateOrganization("checkout-auth-"+uuid.NewString()[:8], "")
+			require.NoError(t, err)
+			route := HTTPRoute{Method: "POST", Pattern: pattern}
+			for _, tc := range []struct {
+				name       string
+				permission bool
+				want       codes.Code
+			}{
+				{"read permission only", false, codes.NotFound},
+				{"billing manager", true, codes.OK},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					request := httptestRequest(t, map[string]string{"x-user-id": uuid.NewString(), "x-organization-id": org.ID.String()})
+					checker := actionPermissionChecker{"org:read": true, "org:update": tc.permission}
+					_, err := NewGatewayAuthorizer(checker).AuthorizeHTTP(t.Context(), request, route, map[string]string{"id": org.ID.String()})
+					require.Equal(t, tc.want, status.Code(err))
+				})
+			}
+		})
+	}
+}

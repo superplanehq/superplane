@@ -137,7 +137,9 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		ProvisionedLineId:       config.ProvisionedLineID,
 		Initial:                 factory.IsInitialOnboarding(),
 		VcsProvider:             config.VCSProvider,
+		CodexSubscription:       config.CodexSubscription,
 	}
+
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
 	}
@@ -521,6 +523,8 @@ func serializeWorkOrder(
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
 		AutoStartLineId:      serializeOptionalID(order.AutoStartLineID),
 		McpClient:            serializeWorkOrderMCPClient(order),
+		RefinementModel:      refinementModelValue(order),
+		PendingHandoff:       serializePendingHandOff(order),
 	}, nil
 }
 
@@ -560,6 +564,8 @@ func serializeWorkOrderSummary(
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		McpClient:            serializeWorkOrderMCPClient(order),
+		RefinementModel:      refinementModelValue(order),
+		PendingHandoff:       serializePendingHandOff(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
 	}, nil
 }
@@ -987,4 +993,19 @@ func loadedMemberDeleted(user *models.User) bool {
 
 func loadedMemberFormer(user *models.User) bool {
 	return user != nil && user.DeletedAt.Valid && !loadedMemberDeleted(user)
+}
+
+func refinementModelValue(order *models.FactoryWorkOrder) string {
+	if order.RefinementModel == nil {
+		return ""
+	}
+	return *order.RefinementModel
+}
+
+func serializePendingHandOff(order *models.FactoryWorkOrder) *pb.PendingHandOff {
+	if order.PendingHandOff == nil {
+		return nil
+	}
+	pending := order.PendingHandOff.Data()
+	return &pb.PendingHandOff{LineId: pending.LineID.String(), Column: pending.Column, PullRequestUrl: pending.PullRequestURL}
 }

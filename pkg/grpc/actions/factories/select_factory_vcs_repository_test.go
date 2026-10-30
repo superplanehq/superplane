@@ -40,7 +40,7 @@ func TestSelectFactoryVCSProviderRepositoryWithoutAccountConnection(t *testing.T
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	response, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+	response, err := SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 		Id:           factory.ID.String(),
 		Provider:     models.ProviderGitHub,
 		RepositoryId: repositoryID,
@@ -50,7 +50,7 @@ func TestSelectFactoryVCSProviderRepositoryWithoutAccountConnection(t *testing.T
 	assert.Equal(t, repositoryID, response.Factory.Onboarding.AppRepositoryId)
 
 	outsider := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-	_, err = SelectFactoryVCSProviderRepository(outsider, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+	_, err = SelectFactoryVCSProviderRepository(outsider, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 		Id:           factory.ID.String(),
 		Provider:     models.ProviderGitHub,
 		RepositoryId: repositoryID,
@@ -85,7 +85,7 @@ func TestSelectFactoryVCSProviderRepositoryFromPublicAppRequiresLinkedAccount(t 
 	require.NoError(t, err)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	_, err = SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+	_, err = SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 		Id:           factory.ID.String(),
 		Provider:     models.ProviderGitHub,
 		RepositoryId: 404,
@@ -97,13 +97,16 @@ func TestSelectFactoryVCSProviderRepositoryFromPublicAppRequiresLinkedAccount(t 
 
 func saveInstallationGitHubApp(t *testing.T) {
 	t.Helper()
+	encryptor := crypto.NewNoOpEncryptor()
+	crypto.SetProcessEncryptor(encryptor)
+	t.Cleanup(func() { crypto.SetProcessEncryptor(nil) })
 	t.Setenv(config.EnvGitHubAppID, "")
 	t.Setenv(config.EnvGitHubAppSlug, "")
 	t.Setenv(config.EnvGitHubAppPrivateKey, "")
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
 	t.Setenv("GITHUB_CLIENT_ID", "")
 	t.Setenv("GITHUB_CLIENT_SECRET", "")
-	require.NoError(t, githubapp.Save(t.Context(), database.Conn(), crypto.NewNoOpEncryptor(), config.GitHubHostedAppConfig{
+	require.NoError(t, githubapp.Save(t.Context(), database.Conn(), encryptor, config.GitHubHostedAppConfig{
 		ID:            12345,
 		Slug:          "superplane-test",
 		PrivateKey:    "test-private-key",
@@ -171,13 +174,13 @@ func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 		second, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		firstResponse, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		firstResponse, err := SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 			Id:           first.ID.String(),
 			Provider:     models.ProviderGitHub,
 			RepositoryId: repositoryID,
 		})
 		require.NoError(t, err)
-		secondResponse, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		secondResponse, err := SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 			Id:           second.ID.String(),
 			Provider:     models.ProviderGitHub,
 			RepositoryId: repositoryID,
@@ -203,7 +206,7 @@ func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 		require.Len(t, granted, 1)
 		assert.Equal(t, repositoryID, granted[0].RepositoryID)
 
-		_, err = SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		_, err = SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 			Id:           first.ID.String(),
 			Provider:     models.ProviderGitHub,
 			RepositoryId: secondRepositoryID,
@@ -213,7 +216,7 @@ func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, granted, 2)
 
-		_, err = SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		_, err = SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 			Id:           second.ID.String(),
 			Provider:     models.ProviderGitHub,
 			RepositoryId: secondRepositoryID,
@@ -229,7 +232,7 @@ func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		_, err = SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		_, err = SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 			Id:           factory.ID.String(),
 			Provider:     models.ProviderGitHub,
 			RepositoryId: 999,

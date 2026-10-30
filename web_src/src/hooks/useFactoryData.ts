@@ -8,6 +8,7 @@ import {
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
+  factoriesResumeHandOffWorkOrder,
   factoriesCreateFactoryAutomation,
   factoriesPreviewFactorySchedule,
   factoriesDeleteFactoryAutomation,
@@ -34,7 +35,8 @@ import type {
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
   FactoryAutomation,
-  FactoryLineStep,
+  FactoriesFactoryLineStep,
+  OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
@@ -60,12 +62,21 @@ import {
   uniqueWorkOrdersById,
   WORK_ORDER_LIST_PAGE_SIZE,
   workOrdersPageFromResponse,
+  type WorkOrdersPage,
   type WorkOrdersPageCursor,
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
 import { integrationKeys } from "./useIntegrations";
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { organizationBillingQueryKey } from "./useOrganizationBilling";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 export const factoryQueryKeys = {
@@ -585,7 +596,13 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { title: string; description: string; assigneeIds?: string[]; model?: string }) => {
+    mutationFn: async (input: {
+      title: string;
+      description: string;
+      assigneeIds?: string[];
+      unassigned?: boolean;
+      model?: string;
+    }) => {
       const response = await factoriesCreateWorkOrder(
         withOrganizationHeader({
           organizationId,
@@ -594,6 +611,7 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
             title: input.title,
             description: input.description,
             assigneeIds: input.assigneeIds,
+            ...(input.unassigned ? { unassigned: true } : {}),
             ...(input.model ? { model: input.model } : {}),
           },
         }),
@@ -605,10 +623,13 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     },
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      // A Backlog run starts only when Planning is on. Show Analyzing until
-      // that run arrives. Missing factory data defaults to Planning on.
       const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
-      if (factoryPlanningEnabled(factory)) {
+      const billing = queryClient.getQueryData<OrganizationsDescribeOrganizationBillingResponse>(
+        organizationBillingQueryKey(organizationId),
+      );
+      // Predict analysis only when the server permits runs. Otherwise wait
+      // for a real run, including when billing has not loaded yet.
+      if (factoryPlanningEnabled(factory) && billing?.hostedExecutionAllowed === true) {
         markBacklogAnalysisPending(order.id);
       }
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
@@ -625,7 +646,7 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { orderId: string; title?: string; description?: string }) => {
+    mutationFn: async (input: { orderId: string; title?: string; description?: string; refinementModel?: string }) => {
       const response = await factoriesUpdateWorkOrder(
         withOrganizationHeader({
           organizationId,
@@ -633,6 +654,7 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
           body: {
             title: input.title,
             description: input.description,
+            refinementModel: input.refinementModel,
           },
         }),
       );
@@ -676,6 +698,11 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
       return response.data.order;
     },
     onSuccess: (order, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "owner-eligibility"] });
+      void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "line-runner-models"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["organizations", organizationId, "selectable-llm-models", factoryId],
+      });
       // Assignee saves bump updated_at on the server, so a ListWorkOrders
       // refetch would resort the backlog and jump the card. Patch in place
       // instead and keep the column order the user was looking at.
@@ -700,6 +727,20 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       model?: string;
       thinkingLevel?: string;
     }) => {
+      const current =
+        queryClient.getQueryData<FactoriesWorkOrder>(workOrderDetailKey(organizationId, factoryId, input.orderId)) ??
+        cachedWorkOrderFromLists(queryClient, organizationId, factoryId, input.orderId);
+      if (current?.pendingHandoff) {
+        const response = await factoriesResumeHandOffWorkOrder(
+          withOrganizationHeader({
+            organizationId,
+            path: { factoryId, orderId: input.orderId },
+            body: { model: input.model, thinkingLevel: input.thinkingLevel },
+          }),
+        );
+        if (!response.data?.order) throw new Error("Could not start the pending handoff.");
+        return response.data.order;
+      }
       const response = await factoriesDispatchWorkOrder(
         withOrganizationHeader({
           organizationId,
@@ -730,6 +771,7 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       await queryClient.cancelQueries({ queryKey: pagePrefix });
 
       const previousOrders = queryClient.getQueryData<FactoriesWorkOrder[]>(ordersKey);
+      const previousOrderPages = queryClient.getQueriesData<InfiniteData<WorkOrdersPage>>({ queryKey: pagePrefix });
       const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
       const line = factory?.lines?.find((candidate) => candidate.name === variables.lineName);
       const current = cachedWorkOrderFromLists(queryClient, organizationId, factoryId, variables.orderId);
@@ -748,11 +790,14 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
         );
       }
 
-      return { previousOrders };
+      return { previousOrders, previousOrderPages };
     },
     onError: (_error, _variables, context) => {
       if (context?.previousOrders) {
         queryClient.setQueryData(workOrdersKey(organizationId, factoryId), context.previousOrders);
+      }
+      for (const [queryKey, pages] of context?.previousOrderPages ?? []) {
+        queryClient.setQueryData(queryKey, pages);
       }
       void queryClient.invalidateQueries({ queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId) });
     },
@@ -992,7 +1037,7 @@ export function useCreateFactoryLine(organizationId: string, factoryId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name: string; steps: FactoryLineStep[] }) => {
+    mutationFn: async (input: { name: string; steps: FactoriesFactoryLineStep[] }) => {
       const response = await factoriesCreateFactoryLine(
         withOrganizationHeader({
           organizationId,
@@ -1021,7 +1066,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
     mutationFn: async (input: {
       lineId: string;
       name?: string;
-      steps?: FactoryLineStep[];
+      steps?: FactoriesFactoryLineStep[];
       columnColors?: Record<string, string>;
     }) => {
       const response = await factoriesUpdateFactoryLine(
@@ -1055,7 +1100,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
   });
 }
 
-export type { FactoryAutomation, FactoriesFactoryLine, FactoryLineStep };
+export type { FactoryAutomation, FactoriesFactoryLine, FactoriesFactoryLineStep as FactoryLineStep };
 
 export function useFactorySchedulePreview(
   organizationId: string,

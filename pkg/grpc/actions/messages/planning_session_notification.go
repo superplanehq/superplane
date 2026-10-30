@@ -22,6 +22,14 @@ func SetWorkOrderNotificationPublisherForTest(fn func(FactoryWorkOrderNotificati
 	return func() { publishWorkOrderNotification = previous }
 }
 
+var publishFactoryWorkOrderUpdated = PublishFactoryWorkOrderUpdated
+
+func SetFactoryWorkOrderUpdatedPublisherForTest(fn func(factoryID, orderID, reason string) error) func() {
+	previous := publishFactoryWorkOrderUpdated
+	publishFactoryWorkOrderUpdated = fn
+	return func() { publishFactoryWorkOrderUpdated = previous }
+}
+
 // PublishPlanningBoardStatus tells open lines boards to reload the work
 // order list. The list carries the working flag and the question flag.
 func PublishPlanningBoardStatus(session *models.FactoryPlanningSession) {
@@ -32,8 +40,52 @@ func PublishPlanningBoardStatus(session *models.FactoryPlanningSession) {
 	if len(session.CurrentSurvey().Questions) > 0 {
 		reason = factory.EventTypeOrderAgentQuestion
 	}
-	if err := PublishFactoryWorkOrderUpdated(session.FactoryID.String(), session.DraftWorkOrderID.String(), reason); err != nil {
+	if err := publishFactoryWorkOrderUpdated(session.FactoryID.String(), session.DraftWorkOrderID.String(), reason); err != nil {
 		log.WithError(err).Warnf("Failed to publish planning board status for session %s", session.ID)
+	}
+}
+
+// PublishPlanningBoardStatusForRun refreshes planning state after committed
+// runner task changes, including the first queued task and its admission.
+func PublishPlanningBoardStatusForRun(tx *gorm.DB, runID uuid.UUID) {
+	if runID == uuid.Nil {
+		return
+	}
+	session, err := models.FindPlanningSessionByRun(tx, runID)
+	if errors.Is(err, models.ErrFactoryPlanningSessionNotFound) {
+		return
+	}
+	if err != nil {
+		log.WithError(err).Warnf("Failed to find planning session for run %s", runID)
+		return
+	}
+	PublishPlanningBoardStatus(session)
+}
+
+// PublishPlanningBoardStatusForTask refreshes only the planning task that changed.
+// Starting an existing reservation does not change organization capacity.
+func PublishPlanningBoardStatusForTask(tx *gorm.DB, task *models.RunnerTask) {
+	execution, err := task.FindExecution(tx)
+	if err == nil {
+		PublishPlanningBoardStatusForRun(tx, execution.RunID)
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.WithError(err).Warnf("Failed to find execution for runner task %s", task.ID)
+	}
+}
+
+// PublishPlanningRunnerStatus refreshes a task after reservation or capacity
+// release, and sends one list refresh per factory with queued planning tasks.
+func PublishPlanningRunnerStatus(tx *gorm.DB, task *models.RunnerTask) {
+	PublishPlanningBoardStatusForTask(tx, task)
+	factoryIDs, err := models.ListQueuedRunnerPlanningFactoryIDs(tx, task.OrganizationID)
+	if err != nil {
+		log.WithError(err).Warnf("Failed to find queued planning factories for organization %s", task.OrganizationID)
+		return
+	}
+	for _, factoryID := range factoryIDs {
+		if err := publishFactoryWorkOrderUpdated(factoryID.String(), "", "runner_capacity"); err != nil {
+			log.WithError(err).Warnf("Failed to publish runner capacity status for factory %s", factoryID)
+		}
 	}
 }
 

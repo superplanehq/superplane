@@ -6,6 +6,7 @@ import { CopyButton } from "@/ui/CopyButton";
 import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import { RunIdCopy, RunStatusLabel } from "./RunIdentity";
 import { RunTimestamp } from "./RunTimestamp";
+import { IntakeRunHeading } from "./IntakeRunHeading";
 import { Skeleton } from "@/ui/skeleton";
 import type { AutomationRun, RunLogs, RunActivity } from "./types";
 
@@ -48,16 +49,21 @@ export function AutomationRunDetails({
   onRetryLogs,
   renderLogs,
   tasksLoading,
+  selectedActivityId,
+  onSelectActivity,
 }: {
   run: AutomationRun;
   onBack: () => void;
   onRetryLogs: (activityId: string) => void;
   renderLogs?: (activity: RunActivity) => ReactNode;
   tasksLoading?: boolean;
+  selectedActivityId?: string | null;
+  onSelectActivity?: (id: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string>();
+  const activityId = onSelectActivity ? selectedActivityId : selectedId;
   const selected =
-    run.activities.find((activity) => activity.id === selectedId) ??
+    run.activities.find((activity) => activity.id === activityId) ??
     run.activities.find(
       (activity) => activity.status === "Failed" || activity.status === "Running" || activity.status === "Pending",
     ) ??
@@ -68,7 +74,7 @@ export function AutomationRunDetails({
         <ArrowLeft className="size-4" />
         Run history
       </Button>
-      <RunDetailsHeader run={run} tasksLoading={tasksLoading} />
+      {run.intake ? <IntakeRunHeading run={run} /> : <RunDetailsHeader run={run} tasksLoading={tasksLoading} />}
       <dl className="flex flex-wrap gap-x-16 gap-y-4 border-y border-border py-5 text-sm">
         {[
           ["Started", formatRunTime(run.startedAt)],
@@ -96,7 +102,10 @@ export function AutomationRunDetails({
                 key={activity.id}
                 variant="ghost"
                 aria-pressed={selected?.id === activity.id}
-                onClick={() => setSelectedId(activity.id)}
+                onClick={() => {
+                  setSelectedId(activity.id);
+                  onSelectActivity?.(activity.id);
+                }}
                 className={`h-auto w-full rounded-md flex-col items-start gap-2 whitespace-normal px-3 py-4 text-left ${selected?.id === activity.id ? "bg-muted" : ""}`}
               >
                 <span>{activity.name}</span>
@@ -121,45 +130,77 @@ export function AutomationRunDetails({
                 {selected.error}
               </p>
             )}
-            <Tabs key={selected.id} defaultValue="logs">
-              <TabsList>
-                <TabsTrigger value="logs">Logs</TabsTrigger>
-                <TabsTrigger value="outputs">Outputs</TabsTrigger>
-                {selected.additionalInstructions ? <TabsTrigger value="instructions">Instructions</TabsTrigger> : null}
-              </TabsList>
-              <TabsContent value="logs" className="pt-5">
-                {renderLogs ? (
-                  renderLogs(selected)
-                ) : (
-                  <RunLogContent logs={selected.logs} onRetry={() => onRetryLogs(selected.id)} />
-                )}
-              </TabsContent>
-              {selected.additionalInstructions ? (
-                <TabsContent value="instructions" className="space-y-3 pt-5">
-                  <p className="text-xs text-muted-foreground">Additional instructions used for this activity.</p>
-                  <pre className="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-5 font-sans text-sm leading-6">
-                    {selected.additionalInstructions}
-                  </pre>
-                </TabsContent>
-              ) : null}
-              <TabsContent value="outputs" className="pt-5">
-                {selected.outputs ? (
-                  <pre className="overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-5 text-xs leading-6">
-                    {JSON.stringify(selected.outputs, null, 2)}
-                  </pre>
-                ) : (
-                  <p className="p-12 text-center text-sm text-muted-foreground">
-                    No outputs were recorded for this activity.
-                  </p>
-                )}
-              </TabsContent>
-            </Tabs>
+            <RunActivityTabs activity={selected} renderLogs={renderLogs} onRetryLogs={onRetryLogs} />
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No activity was recorded for this run.</p>
         )}
       </div>
     </section>
+  );
+}
+
+function RunActivityTabs({
+  activity,
+  renderLogs,
+  onRetryLogs,
+}: {
+  activity: RunActivity;
+  renderLogs?: (activity: RunActivity) => ReactNode;
+  onRetryLogs: (activityId: string) => void;
+}) {
+  // Late execution metadata can identify a runner and change the default tab.
+  return (
+    <Tabs
+      key={`${activity.id}:${Boolean(activity.logs)}`}
+      defaultValue={activity.logs ? (activity.defaultTab ?? "logs") : "outputs"}
+    >
+      <RunActivityTabList activity={activity} />
+      {activity.logs ? (
+        <TabsContent value="logs" className="pt-5">
+          {renderLogs ? (
+            renderLogs(activity)
+          ) : (
+            <RunLogContent logs={activity.logs} onRetry={() => onRetryLogs(activity.id)} />
+          )}
+        </TabsContent>
+      ) : null}
+      {activity.additionalInstructions ? (
+        <TabsContent value="instructions" className="space-y-3 pt-5">
+          <p className="text-xs text-muted-foreground">Additional instructions used for this activity.</p>
+          <pre className="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-5 font-sans text-sm leading-6">
+            {activity.additionalInstructions}
+          </pre>
+        </TabsContent>
+      ) : null}
+      <TabsContent value="outputs" className="pt-5">
+        {activity.outputs ? (
+          <pre className="overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-5 text-xs leading-6">
+            {JSON.stringify(activity.outputs, null, 2)}
+          </pre>
+        ) : (
+          <p className="p-12 text-center text-sm text-muted-foreground">No outputs were recorded for this activity.</p>
+        )}
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function RunActivityTabList({ activity }: { activity: RunActivity }) {
+  const tabs = activity.logs
+    ? activity.defaultTab === "outputs"
+      ? ["outputs", "logs"]
+      : ["logs", "outputs"]
+    : ["outputs"];
+  return (
+    <TabsList>
+      {tabs.map((tab) => (
+        <TabsTrigger key={tab} value={tab}>
+          {tab === "logs" ? "Logs" : (activity.outputsLabel ?? "Outputs")}
+        </TabsTrigger>
+      ))}
+      {activity.additionalInstructions ? <TabsTrigger value="instructions">Instructions</TabsTrigger> : null}
+    </TabsList>
   );
 }
 

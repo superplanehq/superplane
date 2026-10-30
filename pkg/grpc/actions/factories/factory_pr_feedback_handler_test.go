@@ -70,6 +70,8 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, liveVersion.Nodes, 15)
 		assert.Len(t, liveVersion.Edges, 12)
+		assertLivePRFeedbackOmitsCommitIdentity(t, liveVersion.Nodes,
+			prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID)
 		for _, node := range liveVersion.Nodes {
 			assert.NotEqual(t, "noop", node.ComponentName())
 		}
@@ -232,6 +234,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		assert.Len(t, liveVersion.Nodes, 9)
+		assertLivePRFeedbackOmitsCommitIdentity(t, liveVersion.Nodes, prFeedbackRunnerNodeID)
 		var foundWait bool
 		for _, node := range liveVersion.Nodes {
 			if node.ID == prFeedbackWaitChecksNodeID {
@@ -368,6 +371,30 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 		assert.Error(t, err)
 	})
+}
+
+func assertLivePRFeedbackOmitsCommitIdentity(t *testing.T, nodes []models.Node, nodeIDs ...string) {
+	t.Helper()
+
+	for _, nodeID := range nodeIDs {
+		var found bool
+		for _, node := range nodes {
+			if node.ID != nodeID {
+				continue
+			}
+			found = true
+			steps, ok := node.Configuration["steps"].([]any)
+			require.True(t, ok, "runner %s has no steps", nodeID)
+			for _, item := range steps {
+				step, ok := item.(map[string]any)
+				require.True(t, ok)
+				name, _ := step["name"].(string)
+				assert.NotEqual(t, "Set Up Git User", name)
+				assert.NotEqual(t, "Set Up DCO Signing", name)
+			}
+		}
+		assert.Truef(t, found, "missing runner %s", nodeID)
+	}
 }
 
 func assertLivePRFeedbackAcknowledge(

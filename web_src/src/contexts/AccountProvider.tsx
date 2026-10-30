@@ -3,6 +3,7 @@ import { posthog } from "@/posthog";
 import { consumePendingSignupAnalyticsPreference, hasConfirmedSignupAnalyticsPreference } from "@/lib/signupAnalytics";
 import { getUtmEventProperties } from "@/lib/utmAttribution";
 import { trackGoogleSignup } from "@/lib/googleTagManager";
+import { setSupportSessionActive } from "@/lib/supportSession";
 
 import { AccountContext, type AccountContextType } from "./accountContextState";
 
@@ -30,15 +31,18 @@ export function AccountProvider({ children }: AccountProviderProps) {
 
     if (response.status !== 200) {
       if (!keepAccountOnError || response.status === 401) {
+        setSupportSessionActive(false);
         setAccount(null);
       }
       return;
     }
 
     const accountData = await response.json();
+    const inSupportSession = accountData.support_session?.active === true;
+    setSupportSessionActive(inSupportSession);
     setAccount(accountData);
 
-    if (!identify || accountData.impersonation?.active) {
+    if (!identify || inSupportSession) {
       return;
     }
 

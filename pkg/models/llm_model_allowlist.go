@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -213,6 +212,11 @@ func UpsertFactoryLLMModelAllowlist(tx *gorm.DB, orgID, factoryID uuid.UUID, pro
 	if err != nil {
 		return nil, err
 	}
+	if source == UsageFundingSourceBYOK {
+		if err := RequireOrganizationBYOKAccess(tx, orgID, normalized); err != nil {
+			return nil, err
+		}
+	}
 	if err := assertFactoryModelsInParent(tx, orgID, normalized, source, normalizedModels); err != nil {
 		return nil, err
 	}
@@ -278,10 +282,11 @@ func ResolveSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	if subset == nil || !hasAllowedModel(subset.AllowedModels) {
-		return parent, nil
+	resolved := parent
+	if subset != nil && hasAllowedModel(subset.AllowedModels) {
+		resolved = IntersectModelIDs(parent, subset.AllowedModels)
 	}
-	return IntersectModelIDs(parent, subset.AllowedModels), nil
+	return resolved, nil
 }
 
 func ModelIsSelectable(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provider, fundingSource, model string) (bool, error) {
@@ -293,13 +298,8 @@ func ModelIsSelectable(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provi
 }
 
 func parentSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, provider, fundingSource string) ([]string, error) {
-	if provider == UsageProviderCustom {
-		enabled, err := OrganizationHasExperimentalFeatures(
-			tx,
-			orgID,
-			features.FeatureOrganizationBYOK,
-			features.FeatureOrganizationBYOKCustomProvider,
-		)
+	if fundingSource == UsageFundingSourceBYOK {
+		enabled, err := OrganizationBYOKAccess(tx, orgID, provider)
 		if err != nil {
 			return nil, err
 		}

@@ -1,4 +1,9 @@
-import { newestClaudeModelInFamily, pickHostedModel, pickNewestModelMatching } from "@/lib/hostedLLMModels";
+import {
+  hasHostedDefaultModel,
+  newestClaudeModelInFamily,
+  pickHostedModel,
+  pickNewestModelMatching,
+} from "@/lib/hostedLLMModels";
 import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 
 import type { IntegrationId } from "./onboardingFixtures";
@@ -14,7 +19,7 @@ export type OnboardingAgentHarness = "AGENT_HARNESS_CLAUDE_CODE" | "AGENT_HARNES
 export type OnboardingAgentPlan = {
   providerId?: AgentProviderId;
   component: "runnerClaudeCode" | "runnerCodex" | "runnerOpenRouter" | "runnerSuperPlane";
-  credentialsSource: "integration" | "hosted";
+  credentialsSource: "integration" | "hosted" | "subscription";
   integrationName?: AgentProviderId;
   harness: OnboardingAgentHarness;
   model: string;
@@ -135,13 +140,6 @@ function connectedProviderPlan(args: {
   return undefined;
 }
 
-/** True when the installation sets a default SuperPlane-hosted model. */
-export function hasHostedDefaultModel(args: { defaultHostedProvider?: string; defaultHostedModel?: string }): boolean {
-  const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
-  const defaultModel = args.defaultHostedModel?.trim() ?? "";
-  return Boolean(defaultProvider && defaultModel);
-}
-
 function hostedSuperPlanePlan(args: {
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
@@ -166,34 +164,15 @@ export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boole
   return plan?.component === "runnerSuperPlane";
 }
 
-export type OnboardingAgentCredentialChoice = "own-key" | "hosted";
+export type OnboardingAgentCredentialChoice = "own-key" | "hosted" | "subscription";
 
-/**
- * Where the agent screen goes in the wizard:
- * - `show`: after the ticket screen, to connect a provider key.
- * - `first`: before the ticket screen, to choose a model source.
- * - `skip`: nowhere. Hosted models run the agent.
- * - `pending`: not known until the bring-your-own-key flag loads.
- */
-export type OnboardingAgentGate = "show" | "first" | "skip" | "pending";
-
-/**
- * Hosted models skip the agent screen. Only an organization with the
- * bring-your-own-key flag chooses its own provider key or SuperPlane-hosted
- * models, before it chooses the backlog. The gate waits until the flag has
- * loaded, so setup does not finish on the hosted path first.
- */
-export function onboardingAgentGate(args: {
-  hostedModelsAvailable: boolean;
-  hostedModelsAvailableLoading: boolean;
-  bringYourOwnKey: boolean;
-  bringYourOwnKeyLoading: boolean;
-}): OnboardingAgentGate {
-  if (args.hostedModelsAvailableLoading || args.bringYourOwnKeyLoading) return "pending";
-  if (!args.hostedModelsAvailable) return "show";
-  if (args.bringYourOwnKey) return "first";
-  return "skip";
-}
+export const CODEX_SUBSCRIPTION_PLAN: OnboardingAgentPlan = {
+  component: "runnerCodex",
+  credentialsSource: "subscription",
+  harness: "AGENT_HARNESS_CODEX",
+  model: "",
+  planningModel: "",
+};
 
 /**
  * A model source choice must be made before setup finishes. Own-key setup
@@ -205,7 +184,9 @@ export function agentFinishReady(args: {
   providerConnected: boolean;
   agentReady: boolean;
   hostedAgentReady: boolean;
+  subscriptionReady?: boolean;
 }): boolean {
+  if (args.credentialChoice === "subscription") return args.subscriptionReady === true;
   if (args.modelSourceChoice && !args.credentialChoice) return false;
   if (args.credentialChoice === "own-key") return args.providerConnected;
   return args.agentReady || args.hostedAgentReady;
@@ -216,7 +197,7 @@ export function firstWorkOrderAgentError(args: {
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
 }): string | null {
-  if (args.plan?.component === "runnerSuperPlane") return null;
+  if (args.plan?.credentialsSource === "subscription" || args.plan?.component === "runnerSuperPlane") return null;
   if (args.hostedModelsLoading) {
     return "Hosted models are still loading. Try again.";
   }
@@ -227,15 +208,15 @@ export function firstWorkOrderAgentError(args: {
   return "Ask an installation admin to set a SuperPlane agent model.";
 }
 
-export function shouldShowHostedCreditGrant(grantTotalCents: number): boolean {
-  return grantTotalCents > 0;
+export function shouldShowHostedCreditGrant(grantTotalCents: number, billingEnabled: boolean): boolean {
+  return billingEnabled && grantTotalCents > 0;
 }
 
 export function hostedCreditGrantCopy(remainingCreditCents: number): string {
   if (remainingCreditCents > 0) {
-    return `This organization has ${formatUsdCents(remainingCreditCents)} of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.`;
+    return `This organization has ${formatUsdCents(remainingCreditCents)} of trial usage for machines and managed models. Contact an installation admin to keep hosted runs after the trial.`;
   }
-  return "Trial credit is used up. Subscribe to Business or connect a provider to continue.";
+  return "Trial credit is used up. Contact an installation admin or connect a provider to continue.";
 }
 
 function planForConnectedProvider(

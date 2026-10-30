@@ -1,0 +1,367 @@
+package models
+
+import (
+	"sort"
+	"time"
+)
+
+type hostedCreditSpend struct {
+	TrialGrantedMicros       int64
+	TrialSpentMicros         int64
+	RemainingMicros          int64
+	IncludedRemainingMicros  int64
+	PurchasedRemainingMicros int64
+	WelcomeRemainingMicros   int64
+	AdminRemainingMicros     int64
+	SuperPlaneGrantMicros    int64
+	PurchasedCreditMicros    int64
+	WelcomeCreditExpiresAt   *time.Time
+}
+
+// creditBucket is the credit type a grant pays into. Its value is the spend
+// order: hosted runs spend lower buckets first.
+type creditBucket int
+
+const (
+	creditBucketWelcome creditBucket = iota
+	creditBucketIncluded
+	creditBucketPurchased
+	creditBucketAdmin
+	creditBucketOther
+)
+
+func grantCreditBucket(kind string) creditBucket {
+	switch kind {
+	case LLMCreditGrantKindWelcome, LLMCreditGrantKindTrialAdjustment:
+		return creditBucketWelcome
+	case LLMCreditGrantKindIncluded, LLMCreditGrantKindIncludedAdjustment:
+		return creditBucketIncluded
+	case LLMCreditGrantKindTopup, LLMCreditGrantKindTopupRefund, LLMCreditGrantKindTopupAdjustment:
+		return creditBucketPurchased
+	case LLMCreditGrantKindAdmin, LLMCreditGrantKindAdminAdjustment:
+		return creditBucketAdmin
+	default:
+		return creditBucketOther
+	}
+}
+
+func isPurchasedGrantKind(kind string) bool {
+	return grantCreditBucket(kind) == creditBucketPurchased
+}
+
+func isCreditAdjustmentKind(kind string) bool {
+	switch kind {
+	case LLMCreditGrantKindIncludedAdjustment, LLMCreditGrantKindTrialAdjustment, LLMCreditGrantKindTopupAdjustment, LLMCreditGrantKindAdminAdjustment:
+		return true
+	default:
+		return false
+	}
+}
+
+func grantSpendPriority(kind string) int {
+	return int(grantCreditBucket(kind))
+}
+
+func allocateHostedCreditSpend(
+	grants []OrganizationLLMCreditGrant,
+	billedMicros int64,
+	billedAtOrBefore map[int64]int64,
+	now time.Time,
+) hostedCreditSpend {
+	var welcomeExpiresAt *time.Time
+	var superplane, purchased, trialGranted int64
+	for _, grant := range grants {
+		if grant.Kind == LLMCreditGrantKindWelcome {
+			welcomeExpiresAt = grant.ExpiresAt
+		}
+		if grantCreditBucket(grant.Kind) == creditBucketWelcome && grant.AmountMicros > 0 {
+			trialGranted += grant.AmountMicros
+		}
+		switch grantCreditBucket(grant.Kind) {
+		case creditBucketWelcome, creditBucketIncluded, creditBucketAdmin:
+			superplane += grant.AmountMicros
+		case creditBucketPurchased:
+			purchased += grant.AmountMicros
+		}
+	}
+
+	expired, live := splitCreditGrantsForSpend(grants, now)
+	consumedExpired := consumedExpiredGrantSpend(expired, billedAtOrBefore)
+
+	spend := billedMicros - consumedExpired.TotalMicros
+	if spend < 0 {
+		spend = 0
+	}
+
+	var includedRemaining, purchasedRemaining, adminRemaining, welcomeRemaining int64
+	for _, grant := range live {
+		left := grant.AmountMicros
+		if left > 0 {
+			take := left
+			if take > spend {
+				take = spend
+			}
+			left -= take
+			spend -= take
+		}
+		switch grantCreditBucket(grant.Kind) {
+		case creditBucketWelcome:
+			welcomeRemaining += left
+		case creditBucketIncluded:
+			includedRemaining += left
+		case creditBucketPurchased:
+			purchasedRemaining += left
+		case creditBucketAdmin:
+			adminRemaining += left
+		}
+	}
+	if includedRemaining < 0 {
+		includedRemaining = 0
+	}
+	if purchasedRemaining < 0 {
+		purchasedRemaining = 0
+	}
+	if adminRemaining < 0 {
+		adminRemaining = 0
+	}
+	if welcomeRemaining < 0 {
+		welcomeRemaining = 0
+	}
+
+	return hostedCreditSpend{
+		TrialGrantedMicros:       trialGranted,
+		TrialSpentMicros:         lifetimeTrialSpentMicros(grants, billedMicros, billedAtOrBefore, now),
+		RemainingMicros:          welcomeRemaining + includedRemaining + purchasedRemaining + adminRemaining,
+		IncludedRemainingMicros:  includedRemaining,
+		PurchasedRemainingMicros: purchasedRemaining,
+		WelcomeRemainingMicros:   welcomeRemaining,
+		AdminRemainingMicros:     adminRemaining,
+		SuperPlaneGrantMicros:    superplane,
+		PurchasedCreditMicros:    purchased,
+		WelcomeCreditExpiresAt:   welcomeExpiresAt,
+	}
+}
+
+func splitCreditGrantsForSpend(grants []OrganizationLLMCreditGrant, now time.Time) (expired, live []OrganizationLLMCreditGrant) {
+	for _, grant := range applyNegativeCreditAdjustments(grants) {
+		if grant.IsExpired(now) {
+			expired = append(expired, grant)
+			continue
+		}
+		live = append(live, grant)
+	}
+	sort.SliceStable(expired, func(i, j int) bool {
+		return grantExpiresBefore(expired[i], expired[j])
+	})
+	sortGrantsBySpendOrder(live)
+	return expired, live
+}
+
+// lifetimeTrialSpentMicros returns how much usage the trial (welcome) grants
+// paid for. It replays usage in the periods between grant creation and expiry
+// times. Each period is spent, in spend order, by the grants that existed and
+// were live during it. Usage that a trial grant paid for therefore stays trial
+// spend after other grants expire, and a later grant does not take over past
+// usage. A grant whose creation time has no billed amount in billedAtOrBefore
+// counts as existing from the start.
+func lifetimeTrialSpentMicros(grants []OrganizationLLMCreditGrant, billedMicros int64, billedAtOrBefore map[int64]int64, now time.Time) int64 {
+	capacity := applyNegativeCreditAdjustments(grants)
+	sortGrantsBySpendOrder(capacity)
+	boundaries := trialSpendBoundaries(capacity, billedAtOrBefore, now)
+
+	var trialSpent, billedBefore int64
+	var periodStart time.Time
+	spendPeriod := func(billedUntil int64, live func(OrganizationLLMCreditGrant) bool) {
+		spend := billedUntil - billedBefore
+		if spend <= 0 {
+			return
+		}
+		billedBefore = billedUntil
+		for i := range capacity {
+			grant := &capacity[i]
+			if grant.AmountMicros <= 0 {
+				continue
+			}
+			if !existedAt(*grant, periodStart, billedAtOrBefore) || !live(*grant) {
+				continue
+			}
+			take := min(grant.AmountMicros, spend)
+			grant.AmountMicros -= take
+			spend -= take
+			if grantCreditBucket(grant.Kind) == creditBucketWelcome {
+				trialSpent += take
+			}
+			if spend == 0 {
+				return
+			}
+		}
+	}
+	for _, boundary := range boundaries {
+		spendPeriod(billedAtOrBefore[boundary.UTC().UnixNano()], func(grant OrganizationLLMCreditGrant) bool {
+			return grant.ExpiresAt == nil || !grant.ExpiresAt.Before(boundary)
+		})
+		periodStart = boundary
+	}
+	spendPeriod(billedMicros, func(grant OrganizationLLMCreditGrant) bool {
+		return !grant.IsExpired(now)
+	})
+	return trialSpent
+}
+
+// trialSpendBoundaries returns the sorted, unique expiry times of expired
+// grants and the creation times that have a billed amount.
+func trialSpendBoundaries(grants []OrganizationLLMCreditGrant, billedAtOrBefore map[int64]int64, now time.Time) []time.Time {
+	boundaries := make([]time.Time, 0, len(billedAtOrBefore))
+	seen := map[int64]struct{}{}
+	add := func(at time.Time) {
+		key := at.UTC().UnixNano()
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		boundaries = append(boundaries, at)
+	}
+	for _, grant := range grants {
+		if grant.ExpiresAt != nil && grant.IsExpired(now) {
+			add(*grant.ExpiresAt)
+		}
+		if _, ok := billedAtOrBefore[grant.CreatedAt.UTC().UnixNano()]; ok {
+			add(grant.CreatedAt)
+		}
+	}
+	sort.Slice(boundaries, func(i, j int) bool { return boundaries[i].Before(boundaries[j]) })
+	return boundaries
+}
+
+// existedAt reports whether the grant existed when a period starting at
+// periodStart began. Usage at the creation time itself is older than the grant.
+func existedAt(grant OrganizationLLMCreditGrant, periodStart time.Time, billedAtOrBefore map[int64]int64) bool {
+	if _, ok := billedAtOrBefore[grant.CreatedAt.UTC().UnixNano()]; !ok {
+		return true
+	}
+	return !grant.CreatedAt.After(periodStart)
+}
+
+type expiredCreditSpend struct{ TotalMicros int64 }
+
+func consumedExpiredGrantSpend(expired []OrganizationLLMCreditGrant, billedAtOrBefore map[int64]int64) expiredCreditSpend {
+	consumed := expiredCreditSpend{}
+	for _, grant := range expired {
+		if grant.AmountMicros <= 0 || grant.ExpiresAt == nil {
+			continue
+		}
+		billed := billedAtOrBefore[grant.ExpiresAt.UTC().UnixNano()]
+		available := billed - consumed.TotalMicros
+		if available < 0 {
+			available = 0
+		}
+		take := grant.AmountMicros
+		if take > available {
+			take = available
+		}
+		consumed.TotalMicros += take
+	}
+	return consumed
+}
+
+func liveHostedSpendMicros(grants []OrganizationLLMCreditGrant, billedMicros int64, billedAtOrBefore map[int64]int64, now time.Time) int64 {
+	expired, _ := splitCreditGrantsForSpend(grants, now)
+	spend := billedMicros - consumedExpiredGrantSpend(expired, billedAtOrBefore).TotalMicros
+	if spend < 0 {
+		return 0
+	}
+	return spend
+}
+
+func liveWelcomeCapacityMicros(grants []OrganizationLLMCreditGrant, now time.Time) int64 {
+	_, live := splitCreditGrantsForSpend(grants, now)
+	var capacity int64
+	for _, grant := range live {
+		if grantCreditBucket(grant.Kind) != creditBucketWelcome || grant.AmountMicros <= 0 {
+			continue
+		}
+		capacity += grant.AmountMicros
+	}
+	return capacity
+}
+
+// applyNegativeCreditAdjustments returns a copy of grants without negative
+// adjustment rows. Each negative adjustment lowers the amount of the same-type
+// grants that were live when the admin made it, starting with the grant that
+// hosted runs spend last. A lower amount, not a negative spend line, lets spend
+// move on to the next credit type when the lowered type runs out.
+func applyNegativeCreditAdjustments(grants []OrganizationLLMCreditGrant) []OrganizationLLMCreditGrant {
+	var reductions []OrganizationLLMCreditGrant
+	capacity := make([]OrganizationLLMCreditGrant, 0, len(grants))
+	for _, grant := range grants {
+		if isCreditAdjustmentKind(grant.Kind) && grant.AmountMicros < 0 {
+			reductions = append(reductions, grant)
+			continue
+		}
+		capacity = append(capacity, grant)
+	}
+
+	sort.SliceStable(reductions, func(i, j int) bool {
+		return reductions[i].CreatedAt.Before(reductions[j].CreatedAt)
+	})
+	for _, reduction := range reductions {
+		reduceGrantCapacity(capacity, reduction)
+	}
+	return capacity
+}
+
+func reduceGrantCapacity(grants []OrganizationLLMCreditGrant, reduction OrganizationLLMCreditGrant) {
+	bucket := grantCreditBucket(reduction.Kind)
+	candidates := make([]int, 0)
+	for i, grant := range grants {
+		if grantCreditBucket(grant.Kind) != bucket || grant.AmountMicros <= 0 {
+			continue
+		}
+		if grant.CreatedAt.After(reduction.CreatedAt) || grant.IsExpired(reduction.CreatedAt) {
+			continue
+		}
+		candidates = append(candidates, i)
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return grantExpiresBefore(grants[candidates[j]], grants[candidates[i]])
+	})
+
+	left := -reduction.AmountMicros
+	for _, index := range candidates {
+		if left <= 0 {
+			return
+		}
+		take := grants[index].AmountMicros
+		if take > left {
+			take = left
+		}
+		grants[index].AmountMicros -= take
+		left -= take
+	}
+}
+
+func sortGrantsBySpendOrder(grants []OrganizationLLMCreditGrant) {
+	sort.SliceStable(grants, func(i, j int) bool {
+		pi, pj := grantSpendPriority(grants[i].Kind), grantSpendPriority(grants[j].Kind)
+		if pi != pj {
+			return pi < pj
+		}
+		return grantExpiresBefore(grants[i], grants[j])
+	})
+}
+
+func grantExpiresBefore(a, b OrganizationLLMCreditGrant) bool {
+	if a.ExpiresAt == nil && b.ExpiresAt == nil {
+		return a.CreatedAt.Before(b.CreatedAt)
+	}
+	if a.ExpiresAt == nil {
+		return false
+	}
+	if b.ExpiresAt == nil {
+		return true
+	}
+	if a.ExpiresAt.Equal(*b.ExpiresAt) {
+		return a.CreatedAt.Before(b.CreatedAt)
+	}
+	return a.ExpiresAt.Before(*b.ExpiresAt)
+}

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { INLINE_SKILL, UI_UX_PRO_MAX_SKILL } from "../../__fixtures__/agentResourceFixtures";
 
 const DISABLED_SKILL = {
@@ -28,7 +28,7 @@ vi.mock("@monaco-editor/react", () => ({
 
 const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 const skillsEditorPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills`;
-const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+const agentPageFeatures = [FEATURE_WORKSPACE_SKILLS];
 
 describe("FactorySettingsSkillsPage", () => {
   beforeAll(() => {

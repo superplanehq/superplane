@@ -6,6 +6,7 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
+import { MERGE_CONFIDENCE_CHECKS } from "./mergeConfidenceChecks";
 
 function confidenceGraph(): IntakeAutomationGraph {
   const { nodes, edges } = prepareData({
@@ -56,6 +57,16 @@ function confidenceGraph(): IntakeAutomationGraph {
         name: "Assess Merge Confidence",
         type: "TYPE_ACTION",
         component: "runnerClaudeCode",
+        configuration: {
+          model: "sonnet",
+          executionTimeoutSeconds: 3600,
+          steps: MERGE_CONFIDENCE_CHECKS.map((id) => ({
+            name: id,
+            type: "prompt",
+            prompt: `Merge check: ${id}.\nReview this score.`,
+          })),
+        },
+        concurrency: { max: 5, key: "{{ $.data.pull_request.number }}" },
       },
     ],
   };
@@ -85,4 +96,14 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Automation: Story = {};
+export const Configuration: Story = {};
+
+export const Saving: Story = { args: { onSaveNode: () => new Promise<void>(() => undefined) } };
+
+export const SaveError: Story = {
+  args: {
+    onSaveNode: () => {
+      throw new Error("Save failed");
+    },
+  },
+};

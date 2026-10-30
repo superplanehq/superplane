@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"gorm.io/gorm"
 )
 
@@ -15,12 +16,18 @@ const SuperPlaneRunnerComponent = "runnerSuperPlane"
 const hostedLLMModelKeySeparator = "::"
 
 const (
-	SuperPlaneRunnerNoCreditMessage        = "This organization has no hosted credit."
-	SuperPlaneRunnerSubscribeMessage       = "Contact an installation admin to keep SuperPlane-hosted runs."
-	SuperPlaneRunnerNoFactoryBudgetMessage = "This workspace has no remaining hosted credit."
-	SuperPlaneRunnerNoModelMessage         = "The instance has no SuperPlane agent model."
-	SuperPlaneRunnerModelNotAllowedMessage = "This workspace does not allow the SuperPlane agent model."
+	SuperPlaneRunnerNoCreditMessage           = "This organization has no hosted credit."
+	SuperPlaneRunnerSubscribeMessage          = "Subscribe to a plan to run agents."
+	SuperPlaneRunnerPaymentPastDueMessage     = "The renewal payment failed. Update the payment method to run agents."
+	SuperPlaneRunnerSubscriptionPausedMessage = "The subscription is paused. Resume the subscription in Billing to run agents."
+	SuperPlaneRunnerNoFactoryBudgetMessage    = "This workspace has no remaining hosted credit."
+	SuperPlaneRunnerNoModelMessage            = "The instance has no SuperPlane agent model."
+	SuperPlaneRunnerModelNotAllowedMessage    = "This workspace does not allow the SuperPlane agent model."
 )
+
+// legacySuperPlaneRunnerSubscribeMessage is the text older versions stored on
+// nodes. Readiness checks still clear it when the organization can run agents.
+const legacySuperPlaneRunnerSubscribeMessage = "Contact an installation admin to keep SuperPlane-hosted runs."
 
 var hostedProviderRunnerComponents = []string{
 	"runnerClaudeCode",
@@ -171,14 +178,20 @@ func SuperPlaneRunnerReadinessError(tx *gorm.DB, orgID uuid.UUID, factoryID *uui
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
 
-	if err := AssertHostedRunAllowed(tx, orgID, factoryID); err != nil {
-		if errors.Is(err, ErrHostedSubscriptionRequired) {
-			return ErrHostedSubscriptionRequired
+	if err := billing.AssertHostedRunAllowed(tx, orgID, factoryID); err != nil {
+		if errors.Is(err, billing.ErrHostedPaymentPastDue) {
+			return billing.ErrHostedPaymentPastDue
 		}
-		if errors.Is(err, ErrHostedCreditEmpty) {
+		if errors.Is(err, billing.ErrHostedSubscriptionPaused) {
+			return billing.ErrHostedSubscriptionPaused
+		}
+		if errors.Is(err, billing.ErrHostedSubscriptionRequired) {
+			return billing.ErrHostedSubscriptionRequired
+		}
+		if errors.Is(err, billing.ErrHostedCreditEmpty) {
 			return ErrSuperPlaneRunnerNoCredit
 		}
-		if errors.Is(err, ErrFactoryHostedBudgetEmpty) {
+		if errors.Is(err, billing.ErrFactoryHostedBudgetEmpty) {
 			return ErrSuperPlaneRunnerNoFactoryBudget
 		}
 		return err
@@ -301,11 +314,15 @@ func AnnotateSuperPlaneRunnerNodes(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid
 
 func SuperPlaneRunnerReadinessMessage(err error) string {
 	switch {
-	case errors.Is(err, ErrHostedSubscriptionRequired):
+	case errors.Is(err, billing.ErrHostedPaymentPastDue):
+		return SuperPlaneRunnerPaymentPastDueMessage
+	case errors.Is(err, billing.ErrHostedSubscriptionPaused):
+		return SuperPlaneRunnerSubscriptionPausedMessage
+	case errors.Is(err, billing.ErrHostedSubscriptionRequired):
 		return SuperPlaneRunnerSubscribeMessage
-	case errors.Is(err, ErrSuperPlaneRunnerNoCredit), errors.Is(err, ErrHostedCreditEmpty):
+	case errors.Is(err, ErrSuperPlaneRunnerNoCredit), errors.Is(err, billing.ErrHostedCreditEmpty):
 		return SuperPlaneRunnerNoCreditMessage
-	case errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget), errors.Is(err, ErrFactoryHostedBudgetEmpty):
+	case errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget), errors.Is(err, billing.ErrFactoryHostedBudgetEmpty):
 		return SuperPlaneRunnerNoFactoryBudgetMessage
 	case errors.Is(err, ErrSuperPlaneRunnerNoModel):
 		return SuperPlaneRunnerNoModelMessage
@@ -317,10 +334,10 @@ func SuperPlaneRunnerReadinessMessage(err error) string {
 }
 
 func isSuperPlaneReadinessError(err error) bool {
-	return errors.Is(err, ErrHostedSubscriptionRequired) ||
+	return errors.Is(err, billing.ErrHostedSubscriptionRequired) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoCredit) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget) ||
-		errors.Is(err, ErrFactoryHostedBudgetEmpty) ||
+		errors.Is(err, billing.ErrFactoryHostedBudgetEmpty) ||
 		errors.Is(err, ErrSuperPlaneRunnerNoModel) ||
 		errors.Is(err, ErrSuperPlaneRunnerModelNotAllowed)
 }
@@ -328,6 +345,9 @@ func isSuperPlaneReadinessError(err error) bool {
 func isSuperPlaneReadinessMessage(message string) bool {
 	switch strings.TrimSpace(message) {
 	case SuperPlaneRunnerSubscribeMessage,
+		SuperPlaneRunnerPaymentPastDueMessage,
+		SuperPlaneRunnerSubscriptionPausedMessage,
+		legacySuperPlaneRunnerSubscribeMessage,
 		SuperPlaneRunnerNoCreditMessage,
 		SuperPlaneRunnerNoFactoryBudgetMessage,
 		SuperPlaneRunnerNoModelMessage,
@@ -340,6 +360,12 @@ func isSuperPlaneReadinessMessage(message string) bool {
 
 func isHostedProviderRunnerComponent(name string) bool {
 	return slices.Contains(hostedProviderRunnerComponents, name)
+}
+
+// IsAgentRunnerComponent reports whether the component runs an agent. These
+// are the SuperPlane runner and the Claude Code, Codex, and OpenRouter runners.
+func IsAgentRunnerComponent(name string) bool {
+	return name == SuperPlaneRunnerComponent || isHostedProviderRunnerComponent(name)
 }
 
 func hostedProviderForRunnerComponent(name string) string {

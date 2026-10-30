@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -39,7 +40,7 @@ func (s *Service) ProviderName() string { return s.provider.Name() }
 // EnsureSession returns the user's single chat session for the given canvas,
 // provisioning it on the upstream provider on first call.
 func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
-	if err := s.checkAgentPermission(ctx, userID.String(), organizationID.String()); err != nil {
+	if err := s.checkAgentAccess(ctx, userID, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -56,7 +57,7 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 // ResetSession replaces the user's canvas session with a fresh one, used by the
 // `/clear` UX to give the user a new chat with no rewind.
 func (s *Service) ResetSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
-	if err := s.checkAgentPermission(ctx, userID.String(), organizationID.String()); err != nil {
+	if err := s.checkAgentAccess(ctx, userID, organizationID); err != nil {
 		return nil, err
 	}
 	if err := s.ensureCanvasSessionNotStreaming(organizationID, userID, canvasID); err != nil {
@@ -194,6 +195,12 @@ func (s *Service) GetSession(organizationID, userID, sessionID uuid.UUID) (*mode
 	return models.FindAgentSessionForUser(organizationID, userID, sessionID)
 }
 
+// FindCanvasSession returns the user's chat session for the given canvas
+// without provisioning or refreshing it. It returns nil when none exists.
+func (s *Service) FindCanvasSession(organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
+	return findCanvasSession(database.Conn(), organizationID, userID, canvasID)
+}
+
 func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error) {
 	if beforeID == uuid.Nil {
 		return models.ListAgentSessionMessagesPage(sessionID, nil, limit)
@@ -279,6 +286,9 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
+	if err := assertAgentRunsAllowed(ctx, organizationID); err != nil {
+		return err
+	}
 	if session.Status == models.AgentSessionStatusStreaming {
 		return s.handleBusySession(sessionID, organizationID, userID)
 	}
@@ -354,6 +364,10 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 
 	session, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := assertAgentRunsAllowed(ctx, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -692,15 +706,15 @@ func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) err
 	return fmt.Errorf("enqueue stream: %w", err)
 }
 
-// checkAgentPermission enforces the org-level baseline. Per-canvas access is
+// checkAgentAccess enforces organization permissions and payment requirements. Per-canvas access is
 // gated by the gRPC handler's models.FindCanvas(orgID, canvasID).
-func (s *Service) checkAgentPermission(ctx context.Context, userID, organizationID string) error {
+func (s *Service) checkAgentAccess(ctx context.Context, userID, organizationID uuid.UUID) error {
 	checks := []struct{ resource, action string }{
 		{"agents", "create"},
 		{"canvases", "read"},
 	}
 	for _, c := range checks {
-		allowed, err := s.auth.CheckOrganizationPermission(ctx, userID, organizationID, c.resource, c.action)
+		allowed, err := s.auth.CheckOrganizationPermission(ctx, userID.String(), organizationID.String(), c.resource, c.action)
 		if err != nil {
 			return fmt.Errorf("resolve %s:%s permission: %w", c.resource, c.action, err)
 		}
@@ -708,7 +722,17 @@ func (s *Service) checkAgentPermission(ctx context.Context, userID, organization
 			return ErrSessionForbidden
 		}
 	}
-	return nil
+	return assertAgentRunsAllowed(ctx, organizationID)
+}
+
+// assertAgentRunsAllowed checks the billing requirements for agent sessions:
+// a payment method when the plan needs one, and a plan that can run agents.
+func assertAgentRunsAllowed(ctx context.Context, organizationID uuid.UUID) error {
+	db := database.DB(ctx)
+	if err := billing.AssertOrganizationPaymentMethod(db, organizationID); err != nil {
+		return err
+	}
+	return billing.AssertOrganizationPlanAllowsRuns(db, organizationID)
 }
 
 func findCanvasSession(tx *gorm.DB, orgID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {

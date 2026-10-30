@@ -641,7 +641,7 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		settings = defaultLinearIntakeSettings()
 	}
 	settings.ConfidencePct = graph.ConfidencePct
-	if source == models.FactoryIntakeSourceGitHubIssues {
+	if intakeSourceSupportsDefaultOwner(source) {
 		if create := findIntakeNode(spec.Nodes, graph.CreateNodeID); create != nil {
 			settings.DefaultOwnerID, _ = create.Configuration["defaultOwnerId"].(string)
 		}
@@ -792,7 +792,7 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		ReopenedIssues:       proto.Bool(settings.ReopenedIssues),
 		SuperplaneLabelAdded: proto.Bool(settings.SuperplaneLabelAdded),
 	}
-	if source == models.FactoryIntakeSourceGitHubIssues {
+	if intakeSourceSupportsDefaultOwner(source) {
 		serialized.DefaultOwnerId = proto.String(settings.DefaultOwnerID)
 	}
 	if source == models.FactoryIntakeSourceJiraIssues {

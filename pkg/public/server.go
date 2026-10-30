@@ -26,8 +26,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
@@ -37,17 +40,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
-	"github.com/superplanehq/superplane/pkg/productanalytics"
-	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
-	"go.opentelemetry.io/otel/attribute"
-	nooptrace "go.opentelemetry.io/otel/trace/noop"
-
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
@@ -67,9 +62,15 @@ import (
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/otel/attribute"
+	nooptrace "go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/gorm"
@@ -94,6 +95,8 @@ type Server struct {
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
 	adminRouter           *mux.Router
+	publicRouter          *mux.Router
+	billingHTTPRegistrar  billing.HTTPRegistrar
 	BasePath              string
 	BaseURL               string
 	WebhooksBaseURL       string
@@ -101,6 +104,7 @@ type Server struct {
 	authHandler           *authentication.Handler
 	isDev                 bool
 	licenseService        *licensing.Service
+	codexTokenRefresh     func(context.Context, string) (runner.CodexTokenSet, error)
 }
 
 // SetLicenseService connects the installation license. Without it, the server
@@ -431,6 +435,10 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/credentials", s.handleRunnerCodexSubscriptionCredentials).Methods("GET")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/checkpoint", s.handleRunnerCodexSubscriptionCheckpoint).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/progress", s.handleRunnerCodexSubscriptionProgress).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/refresh", s.handleRunnerCodexSubscriptionRefresh).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/updates", s.handleRunnerPlanningUpdate).Methods("POST")
@@ -438,9 +446,22 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/agent-messages", s.handleRunnerPlanningAgentMessage).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/suggest-owners", s.handleRunnerPlanningSuggestOwners).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/owner", s.handleRunnerPlanningAssignOwner).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", s.handleRunnerPlanningActivity).Methods("PUT")
 	s.Router.HandleFunc("/api/v1/runner/merge-confidence/checks", s.handleRunnerMergeConfidenceCheck).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tasks/suggest-owners", s.handleRunnerTaskSuggestOwners).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tasks/owner", s.handleRunnerTaskAssignOwner).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/tools", s.handleRunnerTools).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerListTasks).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerCreateTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/close", s.handleRunnerCloseTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/artifacts", s.handleRunnerRemoveArtifact).Methods(http.MethodDelete)
+	s.Router.HandleFunc("/api/v1/runner/task/suggest-owners", s.handleRunnerGlobalSuggestOwners).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/owner", s.handleRunnerGlobalAssignOwner).Methods(http.MethodPut)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/artifacts/links", s.handleRunnerArtifactLink).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/artifacts/markdown", s.handleRunnerArtifactMarkdown).Methods(http.MethodPost)
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
@@ -491,6 +512,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
+	s.Router.PathPrefix("/api/v1/invitations").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
@@ -507,7 +529,9 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 func headersMatcher(key string) (string, bool) {
 	switch key {
-	case "X-User-Id", "X-Organization-Id", "X-Account-Id":
+	case "Grpc-Metadata-X-User-Id", "Grpc-Metadata-X-Organization-Id", "Grpc-Metadata-X-Account-Id", "Grpc-Metadata-X-Token-Scopes", "Grpc-Metadata-X-Support-Session":
+		return "", false
+	case "X-User-Id", "X-Organization-Id", "X-Account-Id", "X-Support-Session":
 		return key, true
 	case "X-Token-Scopes":
 		return key, true
@@ -536,6 +560,11 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		// to not allow them to be spoofed by the client.
 		//
 		r2.Header.Del("x-Token-Scopes")
+
+		r2.Header.Del("x-Support-Session")
+		if middleware.IsSupportSessionActive(r) {
+			r2.Header.Set("x-Support-Session", "true")
+		}
 
 		scopedClaims, ok := middleware.GetScopedTokenClaimsFromContext(r.Context())
 		if ok {
@@ -569,13 +598,17 @@ func apiKeyCanvasScopes(canvasIDs []string) []string {
 
 func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := middleware.CloneGatewayRequest(r)
+		if middleware.IsFleetManagerRequest(r.Context()) {
+			middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
+			return
+		}
 		account, ok := middleware.GetAccountFromContext(r.Context())
 		if !ok {
 			http.Error(w, "Account not found in context", http.StatusUnauthorized)
 			return
 		}
 
-		r2 := middleware.CloneGatewayRequest(r)
 		r2.Header.Set("x-account-id", account.ID.String())
 		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
@@ -737,7 +770,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/setup-owner/status", s.setupOwnerStatus).Methods("GET")
-	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/public/organizations/{org}/workspaces/{key}/lines/{lineId}/board", s.handlePublicFactoryBoard).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/public/artifacts/{public_id}/{filename}", s.handlePublicArtifactDownload).Methods(http.MethodGet, http.MethodHead)
@@ -815,9 +847,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
-	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt))
+	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt, singleHostFleetManagerToken()))
 	adminRoute.Use(middleware.RequireInstallationAdmin())
-	adminRoute.HandleFunc("/billing-plans", s.adminListBillingPlans).Methods("GET")
 	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}", s.adminGetOrganization).Methods("GET")
@@ -843,44 +874,24 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminUpdateInstallationLLMSettings).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}", s.adminUpdateHostedLLMProvider).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}/models", s.adminListHostedLLMProviderModels).Methods("POST")
-	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit", s.adminGetOrganizationLLMCredit).Methods("GET")
-	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminAddOrganizationLLMCredit).Methods("POST")
-	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminListOrganizationCreditGrants).Methods("GET")
-	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/balances", s.adminSetOrganizationCreditBalance).Methods("PUT")
-	adminRoute.HandleFunc("/organizations/{orgId}/llm-settings", s.adminUpdateOrganizationLLMMarkup).Methods("PATCH")
-	adminRoute.HandleFunc("/billing-plans", s.adminSaveBillingPlan).Methods("POST")
-	adminRoute.HandleFunc("/billing-plans/{planId}", s.adminSaveBillingPlan).Methods("PUT")
-	adminRoute.HandleFunc("/billing-plans/{planId}", s.adminDeleteBillingPlan).Methods("DELETE")
-	adminRoute.HandleFunc("/feature-definitions/{featureKey}/organizations", s.adminListFeatureOrganizations).Methods("GET")
-	adminRoute.HandleFunc("/feature-definitions", s.adminListFeatureDefinitions).Methods("GET")
-	adminRoute.HandleFunc("/feature-definitions", s.adminSaveFeatureDefinition).Methods("POST")
-	adminRoute.HandleFunc("/feature-definitions/{featureKey}", s.adminSaveFeatureDefinition).Methods("PUT")
-	adminRoute.HandleFunc("/organizations/{orgId}/features", s.adminOrganizationFeatures).Methods("GET", "PUT")
-	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
-	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
-	adminRoute.HandleFunc("/organizations/{orgId}/spending-report", s.adminGetOrganizationSpendingReport).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/velocity", s.adminGetOrganizationVelocity).Methods("GET")
-	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
-	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
-	adminRoute.HandleFunc("/polar/webhooks/endpoints", s.adminListPolarWebhookEndpoints).Methods("GET")
 	adminRoute.HandleFunc("/sentry/webhooks", s.adminListSentryWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/datadog/webhooks", s.adminListDatadogWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/linear/webhooks", s.adminListLinearWebhooks).Methods("GET")
-	adminRoute.HandleFunc("/polar/webhooks/{eventId}/redeliver", s.adminRedeliverPolarWebhook).Methods("POST")
-	adminRoute.HandleFunc("/price-books", s.adminGetPriceBooks).Methods("GET")
-	adminRoute.HandleFunc("/price-books", s.adminSavePriceBooks).Methods("PUT")
-	adminRoute.HandleFunc("/price-books", s.adminDeletePriceBook).Methods("DELETE")
-	adminRoute.HandleFunc("/price-books/sync", s.adminSyncPriceBooks).Methods("POST")
-	adminRoute.HandleFunc("/price-books/current", s.adminActivatePriceBook).Methods("PUT")
-	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
-	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
-	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
+	adminRoute.HandleFunc("/support-session/start", s.startSupportSession).Methods("POST")
+	adminRoute.HandleFunc("/support-session/end", s.endSupportSession).Methods("POST")
+	adminRoute.HandleFunc("/support-session/status", s.supportSessionStatus).Methods("GET")
 	adminRoute.HandleFunc("/accounts/{accountId}/promote", s.promoteAdmin).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/block", s.blockAccount).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/unblock", s.unblockAccount).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}", s.adminDeleteAccount).Methods("DELETE")
 	s.adminRouter = adminRoute
+	s.publicRouter = publicRoute
+	if s.billingHTTPRegistrar != nil {
+		s.billingHTTPRegistrar.RegisterPublic(publicRoute)
+		s.billingHTTPRegistrar.RegisterAdmin(adminRoute)
+	}
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
@@ -888,6 +899,13 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	}
 
 	s.Router = r
+}
+
+func singleHostFleetManagerToken() string {
+	if os.Getenv("SUPERPLANE_INSTALLATION_TYPE") != "single-host" {
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv("FLEET_MANAGER_API_TOKEN"))
 }
 
 type oidcDiscoveryResponse struct {
@@ -1174,16 +1192,6 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if models.BillingEnabled() {
-		err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
-		if err != nil {
-			tx.Rollback()
-			log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
-			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-			return
-		}
-	}
-
 	err = tx.Commit().Error
 	if err != nil {
 		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
@@ -1192,7 +1200,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
-	recordOrganizationCreated(organization, account.ID, "workspace_switcher")
+	recordOrganizationCreated(organization, account, "workspace_switcher")
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
@@ -1276,7 +1284,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
 	}
-	recordOrganizationCreated(organization, account.ID, "initial_onboarding")
+	recordOrganizationCreated(organization, account, "initial_onboarding")
 
 	writeInitialWorkspaceResponse(w, organization, workspace)
 }
@@ -1354,23 +1362,35 @@ func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.O
 	})
 }
 
-func recordOrganizationCreated(organization *models.Organization, accountID uuid.UUID, creationPath string) {
+func recordOrganizationCreated(organization *models.Organization, account *models.Account, creationPath string) {
 	organizationID := organization.ID.String()
+	properties := productanalytics.Properties{"creation_path": creationPath}
+	identity := productanalytics.Properties{}
+	for key, value := range map[string]string{"email": account.Email, "name": account.Name} {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		properties[key] = value
+		identity[key] = value
+	}
+	if len(identity) > 0 {
+		properties["$set"] = identity
+	}
 	productanalytics.Capture(productanalytics.Event{
 		Name:           productanalytics.EventOrganizationCreated,
 		EventID:        productanalytics.StableEventID(productanalytics.EventOrganizationCreated, organizationID),
-		DistinctID:     accountID.String(),
+		DistinctID:     account.ID.String(),
 		OrganizationID: organizationID,
 		ActorType:      productanalytics.ActorUser,
 		Source:         productanalytics.SourceUI,
-		Properties:     productanalytics.Properties{"creation_path": creationPath},
+		Properties:     properties,
 	})
 	productanalytics.IdentifyOrganizationGroup(productanalytics.OrganizationGroupIdentity{
 		ID:        organizationID,
 		Name:      organization.Name,
 		Slug:      organization.Slug,
 		CreatedAt: organization.CreatedAt,
-		AccountID: accountID.String(),
+		AccountID: account.ID.String(),
 	})
 }
 
@@ -1482,11 +1502,6 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
 	}
-	if models.BillingEnabled() {
-		if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
-			return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
-		}
-	}
 
 	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")
 	if err != nil {
@@ -1498,7 +1513,7 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	return organization, workspace, nil
 }
 
-type AccountImpersonation struct {
+type AccountSupportSession struct {
 	Active   bool   `json:"active"`
 	UserName string `json:"user_name,omitempty"`
 }
@@ -1535,7 +1550,7 @@ type AccountResponse struct {
 	Providers                    []AccountProviderResponse            `json:"providers"`
 	LinkedAccounts               []AccountLinkedAccountResponse       `json:"linked_accounts"`
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
-	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
+	SupportSession               *AccountSupportSession               `json:"support_session,omitempty"`
 	License                      AccountLicense                       `json:"license"`
 	BillingEnabled               bool                                 `json:"billing_enabled"`
 }
@@ -1652,11 +1667,11 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
 		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
-		BillingEnabled:               models.BillingEnabled(),
+		BillingEnabled:               billing.Enabled(),
 	}
 
-	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
-		accountResponse.Impersonation = &AccountImpersonation{
+	if info, ok := middleware.GetSupportSessionFromContext(r.Context()); ok && info.Active {
+		accountResponse.SupportSession = &AccountSupportSession{
 			Active:   true,
 			UserName: info.UserName,
 		}

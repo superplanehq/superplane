@@ -137,7 +137,7 @@ async function handleRequest(message) {
     const name = params && params.name;
     const args = (params && params.arguments) || {};
     try {
-      if (name !== "report_merge_check") {
+      if (!TOOLS.some((tool) => tool.name === name)) {
         sendError(id, -32601, `Unknown tool: ${name}`);
         return;
       }

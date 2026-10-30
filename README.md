@@ -1,7 +1,7 @@
 <p align="center">
-<a href="https://superplane.com/">
-  <img src="./docs/images/background_image.png" alt="SuperPlane factory board with Backlog, Implement, Verify, and Done columns" width="100%">
-</a>
+  <a href="https://superplane.com/">
+    <img src="./docs/images/background_image.png" alt="SuperPlane factory board with Backlog, Implement, Verify, and Done columns" width="100%">
+  </a>
 </p>
 
 <p align="center">
@@ -12,11 +12,11 @@
 </p>
 
 <p align="center">
+  <a href="https://app.superplane.com/">Try SuperPlane</a> ·
   <a href="https://superplane.com/">Website</a> ·
   <a href="https://docs.superplane.com/">Docs</a> ·
-  <a href="https://discord.superplane.com/">Discord</a> ·
-  <a href="https://superplane.com/blog/">Blog</a> ·
-  <a href="https://luma.com/superplane">Event</a>
+  <a href="https://docs.superplane.com/self-hosting/overview/">Self-host</a> ·
+  <a href="https://discord.superplane.com/">Discord</a>
 </p>
 
 ## About
@@ -39,43 +39,53 @@ SuperPlane is built on an Apache 2.0 open source engine. Choose your models,
 run in the cloud or on-prem and build the factory around your stack and cost
 constraints.
 
-## How the factory works
+## How it works
 
-![SuperPlane work order with a GitHub issue summary and agent controls](./docs/images/board_image.png)
+### Turn backlog issues into work agents can deliver
 
-A SuperPlane Factory turns incoming work into a durable operational record.
-A work order enters through the backlog, moves through one or more automation
-lines and produces pull requests, notes, branches and other reviewable
-artifacts.
+<p align="center">
+  <img src="./docs/images/backlog-refinement-framed.png" alt="Task refinement showing a plan and readiness assessment" width="100%">
+</p>
 
-| Resource | What it does |
-| --- | --- |
-| **Factory** | Holds work orders, automation lines and the policies for a team. |
-| **Work order** | Records one delegated task from intake through its final outcome. |
-| **Line** | Defines the ordered stages that process a work order. |
-| **Automation** | Runs an agent, calls a tool, waits for an event or requires approval through a Canvas-backed app. |
-| **Run** | Tracks durable execution, inputs, outputs, retries and cost for one automation step. |
+Reliable automation starts with a clear task. SuperPlane analyzes the issue,
+helps refine the plan, and identifies decisions that need your input before
+implementation begins.
 
-Every step stays visible. SuperPlane preserves the event history, execution
-state and artifacts across retries so a failed run can resume without custom
-glue or lost context.
+### Bring verified changes to human review
 
-## Built around your stack
+<p align="center">
+  <img src="./docs/images/pull-request-verification-framed.png" alt="Pull request verification showing check fixes and merge confidence" width="100%">
+</p>
 
-SuperPlane coordinates the systems where engineering work already happens.
-Each integration provides event triggers and actions that you can compose on a
-Canvas.
+SuperPlane checks the agent's work and sends failures back for correction.
+An agent review assesses merge confidence and highlights remaining concerns,
+so your team can make the final decision with evidence.
 
-| Area | Examples |
-| --- | --- |
-| **AI and coding agents** | Claude, Cursor, OpenAI, OpenRouter and Perplexity |
-| **Source control and CI** | GitHub, GitLab, Bitbucket, Semaphore, CircleCI and Harness |
-| **Cloud and delivery** | AWS, Google Cloud, Azure, Cloudflare, Docker Hub and Render |
-| **Observability** | Datadog, Grafana, Honeycomb, New Relic, Prometheus and Sentry |
-| **Incidents and service management** | PagerDuty, Rootly, FireHydrant, incident.io, Jira and ServiceNow |
-| **Communication** | Slack, Discord, Microsoft Teams, Telegram, SendGrid and SMTP |
+The plan and the pull request review are two parts of that workflow. SuperPlane
+can also wait for an event from your tools, call an agent, or ask a person for
+approval.
 
-[Explore every integration →](https://docs.superplane.com/components/)
+## Getting started
+
+### SuperPlane Cloud
+
+1. [Sign up](https://app.superplane.com/) and create a workspace.
+2. Connect a GitHub repository.
+3. Choose a small bug, a test fix, or a documentation update for the first run.
+
+SuperPlane imports the issues and assesses which tasks are suitable for an agent.
+
+- Follow the [quickstart](https://docs.superplane.com/get-started/quickstart/) for setup.
+- Read the [product overview](https://docs.superplane.com/get-started/overview/) to learn how SuperPlane coordinates agents and verification.
+
+### Self-host
+
+Install SuperPlane on your own infrastructure.
+
+- Use Docker Compose on one Linux VM.
+- Use Kubernetes on AWS, Azure, or Google Cloud.
+
+See the [self-hosting guide](https://docs.superplane.com/self-hosting/overview/).
 
 ## Contributing
 
@@ -83,8 +93,7 @@ We welcome focused pull requests, bug reports and product ideas.
 
 1. Read the [contributing guide](./CONTRIBUTING.md).
 2. Review the [issue tracking process](./docs/contributing/issue-tracking.md).
-3. Find an [open issue](https://github.com/superplanehq/superplane/issues) or an
-   [open bounty](https://superplane.com/bounties/).
+3. Find an [open issue](https://github.com/superplanehq/superplane/issues).
 4. Join the [Discord community](https://discord.superplane.com) to discuss an
    approach with maintainers.
 

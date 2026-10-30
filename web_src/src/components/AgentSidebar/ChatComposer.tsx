@@ -12,7 +12,9 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { useFlushAgentComposerSend } from "./useFlushAgentComposerSend";
 import { useSkillSlashCandidates } from "@/hooks/useSkillSlashCandidates";
+import { useIsSupportSession } from "@/hooks/useSupportSession";
 import type { SkillSlashCandidate } from "@/lib/skillSlash";
+import { SUPPORT_SESSION_READ_ONLY_MESSAGE } from "@/lib/supportSession";
 
 type ChatComposerProps = {
   canvasId: string;
@@ -48,6 +50,17 @@ export function ChatComposer({
   runs,
 }: ChatComposerProps) {
   const c = useComposerController({ canvasId, organizationId, factoryId, onSend, sendPending, nodes, runs });
+  const inSupportSession = useIsSupportSession();
+
+  if (inSupportSession) {
+    return (
+      <footer className="px-3 pb-3 pt-2">
+        <p className="mx-auto w-full max-w-[800px] rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500 outline outline-1 outline-slate-950/10 dark:bg-gray-800 dark:text-gray-400 dark:outline-gray-700">
+          {SUPPORT_SESSION_READ_ONLY_MESSAGE}
+        </p>
+      </footer>
+    );
+  }
 
   return (
     <footer className="px-3 pb-3 pt-2">

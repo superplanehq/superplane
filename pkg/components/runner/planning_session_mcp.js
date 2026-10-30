@@ -58,14 +58,19 @@ async function requestJSON(method, path, body) {
 
 function surveyQuestions(input) {
   const raw = input && Array.isArray(input.questions) ? input.questions : [];
-  return raw.map((question) => ({
-    prompt: String((question && question.prompt) || "").trim(),
-    options: Array.isArray(question && question.options)
-      ? question.options
-          .map((option) => String(option || "").trim())
-          .filter(Boolean)
-      : [],
-  }));
+  return raw
+    .map((question) => ({
+      prompt: String((question && question.prompt) || "").trim(),
+      options: Array.isArray(question && question.options)
+        ? question.options
+            .map((option) => String(option || "").trim())
+            .filter(Boolean)
+        : [],
+      ...(question && question.recommended_option
+        ? { recommended_option: String(question.recommended_option) }
+        : {}),
+    }))
+    .filter((question) => question.prompt);
 }
 
 async function proposeSurvey(input) {
@@ -141,8 +146,9 @@ async function proposeUpdate(input) {
   if (spec) {
     body.spec = spec;
   }
-  if (input && input.survey) {
-    body.survey = { questions: surveyQuestions(input.survey) };
+  const questions = surveyQuestions(input && input.survey);
+  if (questions.length > 0) {
+    body.survey = { questions };
   }
   if (!body.scores && !body.spec && !body.survey) {
     throw new Error("scores, spec, or survey is required");
@@ -397,16 +403,22 @@ const UPDATE_TOOL = {
         properties: {
           questions: {
             type: "array",
+            minItems: 1,
             items: {
               type: "object",
               properties: {
                 prompt: { type: "string" },
                 options: { type: "array", items: { type: "string" } },
+                recommended_option: {
+                  type: "string",
+                  description: "Exact text of the recommended option. Omit when context is not enough.",
+                },
               },
               required: ["prompt", "options"],
             },
           },
         },
+        required: ["questions"],
       },
     },
   },
@@ -635,7 +647,10 @@ if (require.main === module) {
 }
 
 function planningTools() {
-  return [UPDATE_TOOL, TOOLS.find((tool) => tool.name === "inspect_attachment")];
+  return [
+    UPDATE_TOOL,
+    TOOLS.find((tool) => tool.name === "inspect_attachment"),
+  ];
 }
 
 module.exports = {

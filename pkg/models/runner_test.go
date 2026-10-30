@@ -224,6 +224,7 @@ func TestRunnerTaskReservationAndRunnerTermination(t *testing.T) {
 
 	require.NoError(t, db.Model(runner).Update("state", models.RunnerStateIdle).Error)
 	runner.State = models.RunnerStateIdle
+	require.Error(t, runner.MarkProviderDeleted(db, time.Now()))
 	require.NoError(t, runner.Terminate(db, models.RunnerTerminationRequested))
 	assert.Equal(t, models.RunnerStateTerminated, runner.State)
 	require.NotNil(t, runner.TerminatedAt)
@@ -234,6 +235,14 @@ func TestRunnerTaskReservationAndRunnerTermination(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, persisted.CreationIdempotencyKey)
 	assert.Nil(t, persisted.CreationRequestHash)
+
+	deletedAt := time.Now()
+	require.NoError(t, runner.MarkProviderDeleted(db, deletedAt))
+	require.NoError(t, runner.MarkProviderDeleted(db, deletedAt.Add(time.Minute)))
+	persisted, err = models.FindRunner(db, runner.ID)
+	require.NoError(t, err)
+	require.NotNil(t, persisted.ProviderDeletedAt)
+	assert.WithinDuration(t, deletedAt, *persisted.ProviderDeletedAt, time.Millisecond)
 
 	reloadedTask, err := models.FindRunnerTask(db, task.ID)
 	require.NoError(t, err)

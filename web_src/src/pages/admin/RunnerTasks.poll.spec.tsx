@@ -45,8 +45,6 @@ const runners = (id: string, hasNextPage = false) =>
 
 const tasks = () => json({ tasks: [], totalCount: "0", hasNextPage: false });
 
-const broker = () => json({ configured: false, tasks: [] });
-
 const renderPage = () => render(<RunnerTasks />, { wrapper: MemoryRouter });
 
 const hold = (pending: Array<{ url: URL; resolve: (response: Response) => void }>, url: URL) =>
@@ -64,9 +62,6 @@ describe("RunnerTasks fleet polling", () => {
         const url = new URL(String(input), "http://localhost");
         if (url.pathname === "/admin/api/installation/fleets") {
           return fleetList("e1-large-amd64");
-        }
-        if (url.pathname === "/admin/api/runner/tasks") {
-          return broker();
         }
         if (url.pathname.includes("/fleets/e1-large-amd64/")) {
           return hold(pending, url);
@@ -117,9 +112,6 @@ describe("RunnerTasks fleet polling", () => {
             listReleases.push(resolve);
           });
         }
-        if (url.pathname === "/admin/api/runner/tasks") {
-          return broker();
-        }
         if (url.pathname.endsWith("/runners")) {
           return runners("recovered-runner");
         }
@@ -160,9 +152,6 @@ describe("RunnerTasks fleet polling", () => {
         const url = new URL(String(input), "http://localhost");
         if (url.pathname === "/admin/api/installation/fleets") {
           return fleetList("stalled-fleet");
-        }
-        if (url.pathname === "/admin/api/runner/tasks") {
-          return broker();
         }
         if (url.pathname.endsWith("/capacity")) {
           return new Promise<Response>((resolve) => {

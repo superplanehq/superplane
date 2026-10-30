@@ -2,6 +2,10 @@ package factories
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -9,21 +13,25 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	_ "github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-
-	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
 func Test__UpdateFactoryOnboarding(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 
 	t.Run("new factory is incomplete in create response", func(t *testing.T) {
@@ -119,27 +127,10 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		assert.Equal(t, firstCompletedAt.UnixMicro(), response.Factory.Onboarding.CompletedAt.AsTime().UnixMicro())
 	})
 
-	t.Run("complete without agent integration succeeds when hosted credit remains", func(t *testing.T) {
-		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
-		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
-		appID, lineID := createOnboardingResources(t, r, factory)
-
-		req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
-		req.AgentIntegrationId = nil
-		complete := true
-		req.Complete = &complete
-
-		upsertHostedOnboardingProvider(t, db)
-		response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
-		require.NoError(t, err)
-		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
-		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
-	})
-
 	t.Run("complete without agent integration succeeds when hosted credit is empty", func(t *testing.T) {
 		emptyOrg := support.CreateOrganization(t, r, r.User)
-		require.NoError(t, db.Where("organization_id = ?", emptyOrg.ID).Delete(&models.OrganizationLLMCreditGrant{}).Error)
+		support.AssignOpenSystemTrial(t, emptyOrg.ID)
+		require.NoError(t, db.Where("organization_id = ?", emptyOrg.ID).Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
 
 		factory, err := models.CreateFactory(db, emptyOrg.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
@@ -292,6 +283,8 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 
 func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 
 	for _, provider := range []string{"github", models.ProviderBitbucket} {
@@ -302,6 +295,10 @@ func TestUpdateFactoryOnboardingCreatesDiscussionHandler(t *testing.T) {
 			agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
 			appID, lineID := createOnboardingResources(t, r, factory)
 			req := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
+			if provider == models.ProviderBitbucket {
+				source := pb.FactoryOnboarding_ISSUES_SOURCE_SKIP
+				req.IssuesSource = &source
+			}
 			complete := true
 			req.Complete = &complete
 
@@ -561,7 +558,15 @@ func createReadyOnboardingIntegration(t *testing.T, organizationID uuid.UUID, ap
 
 func upsertHostedOnboardingProvider(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+	settings, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.Background()).Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+			"default_hosted_provider": settings.DefaultHostedProvider,
+			"default_hosted_model":    settings.DefaultHostedModel,
+		}).Error)
+	})
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider:      models.UsageProviderAnthropic,
 		Enabled:       true,
 		APIKey:        []byte("test-hosted-key"),
@@ -570,13 +575,10 @@ func upsertHostedOnboardingProvider(t *testing.T, db *gorm.DB) {
 	require.NoError(t, err)
 	provider := models.UsageProviderAnthropic
 	model := "sonnet"
-	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
-		DefaultHostedProvider: &provider,
-		DefaultHostedModel:    &model,
-	})
+	hostedSettings := *settings
+	hostedSettings.DefaultHostedProvider = &provider
+	hostedSettings.DefaultHostedModel = &model
+	_, err = models.UpdateInstallationLLMSettings(db, hostedSettings)
 	require.NoError(t, err)
 }
 
@@ -591,4 +593,397 @@ func clearHostedLLMProviders(t *testing.T, db *gorm.DB) {
 			require.NoError(t, upsertErr)
 		}
 	})
+}
+
+func TestFactoryOnboardingRejectsBYOKAfterRevocation(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), AgentIntegrationId: &integrationID})
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+	// Store an old preference directly to represent a previously allowed setup.
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AgentIntegrationID: &integrationID}))
+	complete := true
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), Complete: &complete})
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+}
+
+func TestOnboardingRequiresBillingBeforeCompletion(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(billing.BillingEnabledEnv, "yes")
+	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	appID, lineID := createOnboardingResources(t, r, factory)
+	req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
+	req.AgentIntegrationId = nil
+	complete := true
+	req.Complete = &complete
+
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err), "welcome credit must not bypass plan selection")
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	require.False(t, reloaded.IsOnboardingComplete())
+
+	plan := billingmodels.BillingPlan{Key: "onboarding_" + uuid.NewString()[:8], Name: "Card required", Category: "paid", Visibility: "private", CreditFrequency: "none", CreditExpiration: "never"}
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	_, err = billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
+	require.NoError(t, err)
+	plan.RequirePaymentMethod = true
+	require.NoError(t, billingmodels.SaveBillingPlan(db, &plan))
+	hasCard := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		require.Equal(t, "/customers/external/"+r.Organization.ID.String()+"/payment-methods", request.URL.Path)
+		if !hasCard {
+			_, _ = w.Write([]byte(`{"items":[],"pagination":{"max_page":1}}`))
+			return
+		}
+		_, _ = fmt.Fprintf(w, `{"items":[{"id":"card","type":"card","method_metadata":{"exp_month":1,"exp_year":%d}}],"pagination":{"max_page":1}}`, time.Now().Year()+1)
+	}))
+	defer server.Close()
+	t.Setenv("POLAR_ACCESS_TOKEN", "test")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err), "an active plan must not bypass its card requirement")
+	reloaded, err = models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	require.False(t, reloaded.IsOnboardingComplete())
+	hasCard = true
+	response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+	require.NoError(t, err)
+	require.NotNil(t, response.Factory.Onboarding.CompletedAt)
+}
+
+func TestUpdateFactoryOnboardingReplacesAMissingDefaultBranch(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	saved := "develop"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		DefaultBranch: &saved,
+	}))
+
+	missing := "main"
+	issues := pb.FactoryOnboarding_ISSUES_SOURCE_SKIP
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		gitHubBranches: func(string) ([]string, error) { return []string{"master"}, nil },
+		gitHubDefault:  func(string) (string, error) { return "master", nil },
+	})
+	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &missing,
+		IssuesSource:  &issues,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "master", response.Factory.Onboarding.DefaultBranch)
+	assert.Equal(t, pb.FactoryOnboarding_ISSUES_SOURCE_SKIP, response.Factory.Onboarding.IssuesSource)
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "master", reloaded.OnboardingConfigValue().DefaultBranch)
+}
+
+func TestUpdateFactoryOnboardingRejectsADifferentBranchWhenLookupFails(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	saved := "develop"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		DefaultBranch: &saved,
+	}))
+
+	missing := "main"
+	issues := pb.FactoryOnboarding_ISSUES_SOURCE_SKIP
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		gitHubBranches: func(string) ([]string, error) { return nil, errors.New("github unavailable") },
+	})
+	_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &missing,
+		IssuesSource:  &issues,
+	})
+	require.ErrorContains(t, err, "could not verify the default branch")
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "develop", reloaded.OnboardingConfigValue().DefaultBranch)
+	assert.Empty(t, reloaded.OnboardingConfigValue().IssuesSource)
+
+	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &saved,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
+
+	blank := " "
+	response, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &blank,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
+}
+
+func TestUpdateFactoryOnboardingUsesTheProviderDefaultWhenTheRepositoryChanges(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		provider string
+		resolver repositoryBranchResolver
+	}{
+		{
+			name:     "bitbucket",
+			provider: models.ProviderBitbucket,
+			resolver: repositoryBranchResolver{bitbucketDefault: func(repository string) (string, error) {
+				if repository == "acme/web" {
+					return "develop", nil
+				}
+				return "main", nil
+			}},
+		},
+		{
+			name:     "github",
+			provider: models.ProviderGitHub,
+			resolver: repositoryBranchResolver{gitHubDefault: func(repository string) (string, error) {
+				if repository == "acme/web" {
+					return "develop", nil
+				}
+				return "main", nil
+			}},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			repository := "acme/api"
+			saved := "main"
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+				AppRepository: &repository,
+				VCSProvider:   &test.provider,
+				DefaultBranch: &saved,
+			}))
+
+			nextRepository := "acme/web"
+			ctx := withRepositoryBranchResolver(onboardingContext(r), test.resolver)
+			response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+				Id:            factory.ID.String(),
+				AppRepository: &nextRepository,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, "acme/web", response.Factory.Onboarding.AppRepository)
+			assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
+		})
+	}
+}
+
+func TestUpdateFactoryOnboardingClearsTheBranchWhenTheRepositoryChanges(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	saved := "main"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		VCSProvider:   &provider,
+		DefaultBranch: &saved,
+	}))
+
+	nextRepository := "acme/web"
+	response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		AppRepository: &nextRepository,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acme/web", response.Factory.Onboarding.AppRepository)
+	assert.Empty(t, response.Factory.Onboarding.DefaultBranch)
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Empty(t, reloaded.OnboardingConfigValue().DefaultBranch)
+	assert.Equal(t, "acme/web", reloaded.OnboardingConfigValue().AppRepository)
+}
+
+func TestUpdateFactoryOnboardingRejectsAnUnknownBranchWhenNothingIsSaved(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository}))
+
+	missing := "main"
+	issues := pb.FactoryOnboarding_ISSUES_SOURCE_SKIP
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		gitHubBranches: func(string) ([]string, error) { return nil, errors.New("github unavailable") },
+	})
+	_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &missing,
+		IssuesSource:  &issues,
+	})
+	require.ErrorContains(t, err, "could not verify the default branch")
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Empty(t, reloaded.OnboardingConfigValue().DefaultBranch)
+	assert.Empty(t, reloaded.OnboardingConfigValue().IssuesSource)
+}
+
+func TestUpdateFactoryOnboardingUsesTheBitbucketDefaultWhenMainIsMissing(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	provider := models.ProviderBitbucket
+	saved := "develop"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		VCSProvider:   &provider,
+		DefaultBranch: &saved,
+	}))
+
+	missing := "main"
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		gitHubDefault: func(string) (string, error) { return "wrong", nil },
+		bitbucketHead: func(_, branch string) (string, error) {
+			if branch == "main" {
+				return "", nil
+			}
+			return "abc", nil
+		},
+		bitbucketDefault: func(string) (string, error) { return "master", nil },
+	})
+	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &missing,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "master", response.Factory.Onboarding.DefaultBranch)
+}
+
+func TestUpdateFactoryOnboardingRejectsASavedBranchFromAnotherRepository(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	saved := "develop"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		DefaultBranch: &saved,
+	}))
+
+	nextRepository := "acme/web"
+	requested := "main"
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		gitHubBranches: func(string) ([]string, error) { return nil, errors.New("github unavailable") },
+	})
+	_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		AppRepository: &nextRepository,
+		DefaultBranch: &requested,
+	})
+	require.ErrorContains(t, err, "could not verify the default branch")
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "acme/api", reloaded.OnboardingConfigValue().AppRepository)
+	assert.Equal(t, "develop", reloaded.OnboardingConfigValue().DefaultBranch)
+}
+
+func TestUpdateFactoryOnboardingAcceptsAnInitialBranchForAnEmptyRepository(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository}))
+
+	requested := "develop"
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		gitHubBranches: func(string) ([]string, error) { return nil, nil },
+		gitHubDefault:  func(string) (string, error) { return "main", nil },
+	})
+	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &requested,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "develop", reloaded.OnboardingConfigValue().DefaultBranch)
+}
+
+func TestUpdateFactoryOnboardingAcceptsAnInitialBitbucketBranchWhenTheRepositoryIsEmpty(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		VCSProvider:   &provider,
+	}))
+
+	requested := "develop"
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		bitbucketHead:        func(string, string) (string, error) { return "", nil },
+		bitbucketDefault:     func(string) (string, error) { return "", nil },
+		bitbucketHasBranches: func(string) (bool, error) { return false, nil },
+	})
+	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &requested,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "develop", response.Factory.Onboarding.DefaultBranch)
+}
+
+func TestUpdateFactoryOnboardingRejectsAMissingBitbucketBranchWhenOtherBranchesExist(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/api"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+		VCSProvider:   &provider,
+	}))
+
+	requested := "develop"
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		bitbucketHead:        func(string, string) (string, error) { return "", nil },
+		bitbucketDefault:     func(string) (string, error) { return "", nil },
+		bitbucketHasBranches: func(string) (bool, error) { return true, nil },
+	})
+	_, err = UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:            factory.ID.String(),
+		DefaultBranch: &requested,
+	})
+	require.ErrorContains(t, err, "default branch is required")
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Empty(t, reloaded.OnboardingConfigValue().DefaultBranch)
 }

@@ -28,8 +28,12 @@ mkdir -p "${OUTPUT_DIR}"
 echo "* Updating Helm dependencies"
 helm dependency update "${CHART_DIR}"
 
-echo "* Resolving component release defaults"
-node release/superplane-helm-chart/update-component-release-defaults.js
+if [ "${COMPONENT_RELEASES_ALREADY_RESOLVED:-}" = "yes" ]; then
+  echo "* Using component release defaults resolved for this release"
+else
+  echo "* Resolving component release defaults"
+  node release/superplane-helm-chart/update-component-release-defaults.js
+fi
 
 # Package the chart with the specified version
 helm package "${CHART_DIR}" \

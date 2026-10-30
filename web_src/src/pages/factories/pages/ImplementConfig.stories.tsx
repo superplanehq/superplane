@@ -4,7 +4,6 @@ import { http, HttpResponse } from "msw";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import type { IntegrationsCapabilityDefinition, SuperplaneComponentsNode } from "@/api-client";
-import { FEATURE_FACTORY_RUN_HISTORY } from "@/lib/experimentalFeatures";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 import { storybookSelectableLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
@@ -18,7 +17,7 @@ import { PLANNING_REVIEW_RUNNER_FIELDS } from "./planningReviewRunnerFields";
 const organizationId = "implement-config-org";
 const factoryId = "implement-config-workspace";
 const canvasId = "implement-config";
-const features = [FEATURE_FACTORY_RUN_HISTORY];
+const features: string[] = [];
 const action = {
   name: "runnerSuperPlane",
   label: "Run SuperPlane Agent",
@@ -216,18 +215,7 @@ export const InvalidDuration: Story = {
     await expect(canvas.getByTestId("implement-settings-save")).toBeDisabled();
   },
 };
-export const FeatureDisabled: Story = {
-  parameters: {
-    msw: {
-      handlers: [
-        http.get(`/api/v1/organizations/${organizationId}`, () =>
-          organizationResponse(features.filter((id) => id !== FEATURE_FACTORY_RUN_HISTORY)),
-        ),
-        ...handlers,
-      ],
-    },
-  },
-};
+
 export const WithInstructions: Story = {
   args: {
     additionalInstructions:

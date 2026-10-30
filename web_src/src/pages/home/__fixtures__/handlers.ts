@@ -108,7 +108,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       pattern: re("/api/v1/organizations/[^/]+/selectable-llm-models"),
       resolve: () => ({ json: { models: storybookSelectableLlmModels() } }),
     },
-    { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
       resolve: () => ({
@@ -170,16 +169,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               id: "organization_byok_custom_provider",
               label: "Organization BYOK Custom Provider",
               description: "Add a custom model provider with a URL, token, and API type",
-            },
-            {
-              id: "workspace_agent",
-              label: "SuperPlane Agent",
-              description: "Show the SuperPlane Agent page",
-            },
-            {
-              id: "workspace_mcp",
-              label: "Workspace MCP",
-              description: "Add MCP servers for workspace agents",
             },
             {
               id: "workspace_skills",

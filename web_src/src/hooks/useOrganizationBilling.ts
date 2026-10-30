@@ -1,12 +1,12 @@
 import { useCallback } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
   organizationsCancelOrganizationSubscription,
-  organizationsCreateBusinessCheckout,
   organizationsDescribeOrganizationBilling,
   organizationsResumeOrganizationSubscription,
   organizationsSyncOrganizationBilling,
+  type OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -16,14 +16,44 @@ export function organizationBillingQueryKey(organizationId: string) {
   return ["organizations", organizationId, "billing"] as const;
 }
 
-export async function syncOrganizationBilling(organizationId: string) {
-  await organizationsSyncOrganizationBilling(
-    withOrganizationHeader({
-      organizationId,
-      path: { id: organizationId },
-      body: {},
-    }),
-  );
+const billingSynchronizations = new WeakMap<
+  QueryClient,
+  Map<string, Promise<OrganizationsDescribeOrganizationBillingResponse>>
+>();
+
+export function syncOrganizationBilling(organizationId: string, queryClient: QueryClient) {
+  let synchronizations = billingSynchronizations.get(queryClient);
+  if (!synchronizations) {
+    synchronizations = new Map();
+    billingSynchronizations.set(queryClient, synchronizations);
+  }
+  const pending = synchronizations.get(organizationId);
+  if (pending) return pending;
+
+  const synchronize = async () => {
+    const response = await organizationsSyncOrganizationBilling(
+      withOrganizationHeader({
+        organizationId,
+        path: { id: organizationId },
+        body: {},
+      }),
+    );
+    if (!response.data) throw new Error("SuperPlane could not synchronize billing. Try again.");
+    queryClient.setQueryData(organizationBillingQueryKey(organizationId), response.data);
+    await invalidateOrganizationModelAccess(queryClient, organizationId);
+    return response.data;
+  };
+  const synchronization = synchronize().finally(() => synchronizations.delete(organizationId));
+  synchronizations.set(organizationId, synchronization);
+  return synchronization;
+}
+
+export function invalidateOrganizationModelAccess(queryClient: QueryClient, organizationId: string) {
+  return queryClient.invalidateQueries({
+    predicate: (query) =>
+      query.queryKey[1] === organizationId &&
+      ((query.queryKey[0] === "organizations" && query.queryKey[2] !== "billing") || query.queryKey[0] === "factories"),
+  });
 }
 
 export function useOrganizationBilling(organizationId: string | undefined) {
@@ -40,25 +70,6 @@ export function useOrganizationBilling(organizationId: string | undefined) {
     },
     enabled: Boolean(organizationId),
     staleTime: 30 * 1000,
-  });
-}
-
-export function useCreateBusinessCheckout(organizationId: string) {
-  return useMutation({
-    mutationFn: async () => {
-      const response = await organizationsCreateBusinessCheckout(
-        withOrganizationHeader({
-          organizationId,
-          path: { id: organizationId },
-          body: {},
-        }),
-      );
-      const checkoutUrl = response.data?.checkoutUrl;
-      if (!checkoutUrl) {
-        throw new Error("Checkout is not available");
-      }
-      return checkoutUrl;
-    },
   });
 }
 
@@ -108,7 +119,7 @@ export function useOrganizationSubscriptionActions(organizationId: string) {
     try {
       await cancelSubscription.mutateAsync();
     } catch (cancelError) {
-      showErrorToast(getApiErrorMessage(cancelError, "Unable to cancel Business."));
+      showErrorToast(getApiErrorMessage(cancelError, "Unable to cancel subscription."));
       throw cancelError;
     }
   }, [cancelSubscription]);
@@ -117,7 +128,7 @@ export function useOrganizationSubscriptionActions(organizationId: string) {
     try {
       await resumeSubscription.mutateAsync();
     } catch (keepError) {
-      showErrorToast(getApiErrorMessage(keepError, "Unable to keep Business."));
+      showErrorToast(getApiErrorMessage(keepError, "Unable to keep subscription."));
       throw keepError;
     }
   }, [resumeSubscription]);

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -15,6 +16,7 @@ import (
 
 func selectBitbucketFactoryRepository(
 	ctx context.Context,
+	deps IntakeDependencies,
 	orgID uuid.UUID,
 	organizationID string,
 	req *pb.SelectFactoryVCSProviderRepositoryRequest,
@@ -39,6 +41,13 @@ func selectBitbucketFactoryRepository(
 	if match == nil {
 		return nil, grpcerrors.PermissionDenied(nil, "VCS repository is not accessible")
 	}
+	var httpCtx core.HTTPContext
+	if deps.Registry != nil {
+		httpCtx = deps.Registry.HTTPContext()
+	}
+	branch := defaultBranchFromCacheOrProvider(match.DefaultBranch, func() (string, error) {
+		return bitbucketLiveDefaultBranch(httpCtx, match.InstallationID, match.FullName)
+	})
 
 	var factory *models.Factory
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -61,17 +70,21 @@ func selectBitbucketFactoryRepository(
 		integrationID := integration.ID.String()
 		provider := models.ProviderBitbucket
 		repositoryID := int64(0)
+		backlogRepositoryID := &repositoryID
+		if config := factory.OnboardingConfigValue(); config.BacklogRepository != "" && config.BacklogRepository != config.AppRepository {
+			backlogRepositoryID = nil
+		}
 		fullName := match.FullName
 		externalID := match.UUID
-		branch := match.DefaultBranch
+		branch = keepSavedDefaultBranch(factory.OnboardingConfigValue(), fullName, branch)
 		return factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:        &integrationID,
 			VCSProvider:             &provider,
 			AppRepository:           &fullName,
 			AppRepositoryID:         &repositoryID,
 			AppRepositoryExternalID: &externalID,
-			BacklogRepository:       &fullName,
-			BacklogRepositoryID:     &repositoryID,
+			BacklogRepository:       onboardingBacklogRepository(factory, fullName),
+			BacklogRepositoryID:     backlogRepositoryID,
 			DefaultBranch:           &branch,
 		})
 	})

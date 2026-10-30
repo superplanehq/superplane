@@ -19,10 +19,12 @@ import (
 )
 
 const (
-	ArtifactUploadTokenPurpose = "runner_artifact_upload"
-	EnvSuperplaneArtifactToken = "SUPERPLANE_ARTIFACT_TOKEN"
-	EnvPlaywrightMCPBrowser    = "PLAYWRIGHT_MCP_BROWSER"
-	artifactTokenGracePeriod   = 30 * time.Minute
+	ArtifactUploadTokenPurpose  = "runner_artifact_upload"
+	EnvSuperplaneArtifactToken  = "SUPERPLANE_ARTIFACT_TOKEN"
+	EnvSuperplaneVisualEvidence = "SUPERPLANE_VISUAL_EVIDENCE"
+	EnvSuperplanePublishLinks   = "SUPERPLANE_PUBLISH_LINKS"
+	EnvPlaywrightMCPBrowser     = "PLAYWRIGHT_MCP_BROWSER"
+	artifactTokenGracePeriod    = 30 * time.Minute
 )
 
 type ArtifactUploadScope struct {
@@ -43,11 +45,13 @@ type ArtifactRunContext struct {
 	WorkOrderID    uuid.UUID
 	CanvasID       uuid.UUID
 	LineExecution  *models.FactoryWorkOrderExecution
+	PublishLinks   bool
 }
 
 // ResolveArtifactRunContext accepts factory line runs, registered PR
-// discussion runs, and Verify visual evidence runs. Other factory canvases
-// do not receive artifact access.
+// discussion runs, Verify visual evidence runs, and custom automation runs.
+// Other factory canvases do not receive artifact access. Custom automation
+// runs set PublishLinks so a Bash or prompt step can attach a link.
 func ResolveArtifactRunContext(tx *gorm.DB, runID uuid.UUID) (*ArtifactRunContext, error) {
 	execution, err := models.FindWorkOrderExecutionForRun(tx, runID)
 	if err == nil {
@@ -79,7 +83,7 @@ func ResolveArtifactRunContext(tx *gorm.DB, runID uuid.UUID) (*ArtifactRunContex
 		return nil, err
 	}
 	if handler == nil {
-		return resolveVisualEvidenceArtifactRun(tx, run)
+		return resolveFactoryColumnArtifactRun(tx, run)
 	}
 	if handler.Source != models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
 		return nil, ErrArtifactRunScopeNotFound
@@ -109,6 +113,122 @@ func ResolveArtifactRunContext(tx *gorm.DB, runID uuid.UUID) (*ArtifactRunContex
 		WorkOrderID:    pullRequest.WorkOrderID,
 		CanvasID:       run.WorkflowID,
 	}, nil
+}
+
+func resolveFactoryColumnArtifactRun(tx *gorm.DB, run *models.CanvasRun) (*ArtifactRunContext, error) {
+	runContext, err := resolveVisualEvidenceArtifactRun(tx, run)
+	if err == nil || !errors.Is(err, ErrArtifactRunScopeNotFound) {
+		return runContext, err
+	}
+	return resolveCustomAutomationArtifactRun(tx, run)
+}
+
+func resolveCustomAutomationArtifactRun(tx *gorm.DB, run *models.CanvasRun) (*ArtifactRunContext, error) {
+	matches, err := models.CanvasHasFactoryAppTemplate(tx, run.WorkflowID, models.FactoryAppTemplateCustomAutomationID)
+	if err != nil {
+		return nil, err
+	}
+	if !matches {
+		return nil, ErrArtifactRunScopeNotFound
+	}
+
+	canvas, err := models.FindUnscopedCanvasInTransaction(tx, run.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	if canvas.FactoryID == nil {
+		return nil, ErrArtifactRunScopeNotFound
+	}
+
+	rootEvent, err := models.FindRootEventForRun(tx, run.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrArtifactRunScopeNotFound
+		}
+		return nil, err
+	}
+
+	factoryModel, err := models.FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+	workOrderID, err := customAutomationWorkOrderID(tx, factoryModel, rootEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ArtifactRunContext{
+		OrganizationID: canvas.OrganizationID,
+		FactoryID:      *canvas.FactoryID,
+		WorkOrderID:    workOrderID,
+		CanvasID:       run.WorkflowID,
+		PublishLinks:   true,
+	}, nil
+}
+
+func customAutomationWorkOrderID(tx *gorm.DB, factoryModel *models.Factory, event *models.CanvasEvent) (uuid.UUID, error) {
+	if event == nil {
+		return uuid.Nil, ErrArtifactRunScopeNotFound
+	}
+	payload, ok := objectMap(models.RootEventSourcePayload(event.Data.Data()))
+	if !ok {
+		return uuid.Nil, ErrArtifactRunScopeNotFound
+	}
+	if workOrder, ok := objectMap(payload["workOrder"]); ok {
+		if id, err := uuid.Parse(strings.TrimSpace(fmt.Sprint(workOrder["id"]))); err == nil && id != uuid.Nil {
+			order, findErr := factoryModel.FindWorkOrder(tx, id)
+			if findErr != nil {
+				if errors.Is(findErr, models.ErrFactoryWorkOrderNotFound) {
+					return uuid.Nil, ErrArtifactRunScopeNotFound
+				}
+				return uuid.Nil, findErr
+			}
+			return order.ID, nil
+		}
+	}
+
+	lookup, ok := customAutomationPullRequestLookup(payload)
+	if !ok {
+		return uuid.Nil, ErrArtifactRunScopeNotFound
+	}
+	pullRequest, err := factoryModel.FindPullRequest(tx, lookup)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestNotFound) || errors.Is(err, models.ErrFactoryPullRequestLookupIncomplete) {
+			return uuid.Nil, ErrArtifactRunScopeNotFound
+		}
+		return uuid.Nil, err
+	}
+	return pullRequest.WorkOrderID, nil
+}
+
+func customAutomationPullRequestLookup(payload map[string]any) (models.FactoryPullRequestLookup, bool) {
+	repository, _ := objectMap(payload["repository"])
+	fullName, _ := repository["full_name"].(string)
+	fullName = strings.TrimSpace(fullName)
+	if fullName == "" {
+		return models.FactoryPullRequestLookup{}, false
+	}
+	if pullRequest, ok := objectMap(payload["pull_request"]); ok {
+		number, ok := positiveInt64(pullRequest["number"])
+		if ok {
+			return models.FactoryPullRequestLookup{
+				Provider:   models.FactoryPullRequestProviderGitHub,
+				Repository: fullName,
+				Number:     number,
+			}, true
+		}
+	}
+	if pullRequest, ok := objectMap(payload["pullrequest"]); ok {
+		number, ok := positiveInt64(pullRequest["id"])
+		if ok {
+			return models.FactoryPullRequestLookup{
+				Provider:   models.FactoryPullRequestProviderBitbucket,
+				Repository: fullName,
+				Number:     number,
+			}, true
+		}
+	}
+	return models.FactoryPullRequestLookup{}, false
 }
 
 func resolveVisualEvidenceArtifactRun(tx *gorm.DB, run *models.CanvasRun) (*ArtifactRunContext, error) {
@@ -268,18 +388,29 @@ func ParseArtifactUploadToken(signer *jwt.Signer, token string) (*ArtifactUpload
 	return scope, nil
 }
 
-func HasArtifactUploadToken(environment []BrokerEnvironmentVariable) bool {
-	for _, item := range environment {
-		if item.Name == EnvSuperplaneArtifactToken && strings.TrimSpace(item.Value) != "" {
-			return true
-		}
-	}
-	return false
+func HasArtifactUploadToken(environment []TaskEnvironmentVariable) bool {
+	value, ok := environmentValue(environment, EnvSuperplaneArtifactToken)
+	return ok && value != ""
 }
 
-func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, timeoutSeconds int, enabled bool) []BrokerEnvironmentVariable {
-	environment = removeArtifactUploadToken(environment)
-	if !enabled || HasPlanningSessionToken(environment) || ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
+func HasVisualEvidence(environment []TaskEnvironmentVariable) bool {
+	value, ok := environmentValue(environment, EnvSuperplaneVisualEvidence)
+	return ok && value != ""
+}
+
+func HasPublishLinks(environment []TaskEnvironmentVariable) bool {
+	value, ok := environmentValue(environment, EnvSuperplanePublishLinks)
+	return ok && value != ""
+}
+
+func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int, enabled bool) []TaskEnvironmentVariable {
+	environment = removeArtifactCapabilityEnv(environment)
+	if HasPlanningSessionToken(environment) || ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
+		return environment
+	}
+	// A run id without a canvas is not a custom automation. Skip the lookup so
+	// callers that only disable visual evidence stay free of a database call.
+	if !enabled && strings.TrimSpace(ctx.WorkflowID) == "" {
 		return environment
 	}
 	db := database.DB(context.Background())
@@ -288,6 +419,9 @@ func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvi
 		if !errors.Is(err, ErrArtifactRunScopeNotFound) && ctx.Logger != nil {
 			ctx.Logger.WithError(err).Warn("skip artifact upload token: failed to resolve work order")
 		}
+		return environment
+	}
+	if !enabled && !runContext.PublishLinks {
 		return environment
 	}
 	canvasID, err := uuid.Parse(ctx.WorkflowID)
@@ -324,19 +458,24 @@ func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []BrokerEnvi
 		}
 		return environment
 	}
-	return append(environment,
-		BrokerEnvironmentVariable{Name: EnvSuperplaneBaseURL, Value: strings.TrimRight(baseURL, "/")},
-		BrokerEnvironmentVariable{Name: EnvSuperplaneArtifactToken, Value: token},
-		BrokerEnvironmentVariable{Name: EnvPlaywrightMCPBrowser, Value: "chromium"},
+	environment = append(environment,
+		TaskEnvironmentVariable{Name: EnvSuperplaneBaseURL, Value: strings.TrimRight(baseURL, "/")},
+		TaskEnvironmentVariable{Name: EnvSuperplaneArtifactToken, Value: token},
 	)
+	if enabled {
+		environment = append(environment,
+			TaskEnvironmentVariable{Name: EnvSuperplaneVisualEvidence, Value: "yes"},
+			TaskEnvironmentVariable{Name: EnvPlaywrightMCPBrowser, Value: "chromium"},
+		)
+	}
+	if runContext.PublishLinks {
+		environment = append(environment, TaskEnvironmentVariable{Name: EnvSuperplanePublishLinks, Value: "yes"})
+	}
+	return environment
 }
 
-func removeArtifactUploadToken(environment []BrokerEnvironmentVariable) []BrokerEnvironmentVariable {
-	filtered := make([]BrokerEnvironmentVariable, 0, len(environment))
-	for _, item := range environment {
-		if item.Name != EnvSuperplaneArtifactToken {
-			filtered = append(filtered, item)
-		}
-	}
-	return filtered
+func removeArtifactCapabilityEnv(environment []TaskEnvironmentVariable) []TaskEnvironmentVariable {
+	environment = withoutEnvironmentName(environment, EnvSuperplaneArtifactToken)
+	environment = withoutEnvironmentName(environment, EnvSuperplaneVisualEvidence)
+	return withoutEnvironmentName(environment, EnvSuperplanePublishLinks)
 }

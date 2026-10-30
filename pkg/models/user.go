@@ -86,7 +86,17 @@ func (u *User) SoftDelete(tx *gorm.DB, now time.Time, tombstoneEmail string) err
 		updates["email"] = tombstoneEmail
 	}
 
-	return tx.Unscoped().Model(u).Updates(updates).Error
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Model(u).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		if err := u.RevokeCodexConnections(tx, now); err != nil {
+			return err
+		}
+
+		return tx.Where("user_id = ?", u.ID).Delete(&UserAPIToken{}).Error
+	})
 }
 
 func (u *User) Restore() error {
@@ -509,11 +519,7 @@ func CountActiveUsersByOrganizationIDs(orgIDs []string) (map[string]int64, error
 	return counts, nil
 }
 
-func CountActiveHumanUsersByOrganization(orgID string) (int64, error) {
-	return CountActiveHumanUsersByOrganizationInTransaction(database.Conn(), orgID)
-}
-
-func CountActiveHumanUsersByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64, error) {
+func CountActiveHumanUsersByOrganization(tx *gorm.DB, orgID string) (int64, error) {
 	var count int64
 	err := tx.
 		Model(&User{}).
@@ -593,6 +599,20 @@ func ListOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
 	err := tx.
 		Where("organization_id = ?", orgID).
 		Where("is_owner = ?", true).
+		Where("type = ?", UserTypeHuman).
+		Order("id").
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func ListHumanUsersInOrganization(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
+	var users []User
+	err := tx.
+		Where("organization_id = ?", orgID).
 		Where("type = ?", UserTypeHuman).
 		Order("id").
 		Find(&users).

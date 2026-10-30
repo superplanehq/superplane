@@ -61,25 +61,14 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryCustomAutomations, f.ID)
 		assert.Equal(t, "Custom Automations", f.Label)
-		assert.Equal(t, "Add a blank custom automation to a board column", f.Description)
+		assert.Equal(t, "Add custom automations to board columns", f.Description)
 		assert.Nil(t, f.Released)
 	})
 
-	t.Run("known id returns workspace agent feature", func(t *testing.T) {
-		f, ok := Get(FeatureWorkspaceAgent)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureWorkspaceAgent, f.ID)
-		assert.Equal(t, "SuperPlane Agent", f.Label)
-		assert.Equal(t, "Show the SuperPlane Agent page", f.Description)
-		assert.Nil(t, f.Released)
-	})
-
-	t.Run("known id returns workspace MCP feature", func(t *testing.T) {
-		f, ok := Get(FeatureWorkspaceMCP)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureWorkspaceMCP, f.ID)
-		assert.Equal(t, "Workspace MCP", f.Label)
-		assert.Equal(t, "Add MCP servers for workspace agents", f.Description)
+	t.Run("retired workspace agent flag is absent", func(t *testing.T) {
+		feature, ok := Get("workspace_agent")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
 	})
 
 	t.Run("known id returns workspace skills feature", func(t *testing.T) {
@@ -137,6 +126,12 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, Feature{}, feature)
 	})
 
+	t.Run("retired workspace MCP flag is absent", func(t *testing.T) {
+		feature, ok := Get("workspace_mcp")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
+
 	t.Run("retired dependabot intake flag is absent", func(t *testing.T) {
 		feature, ok := Get("factory_dependabot_intake")
 		assert.False(t, ok)
@@ -177,16 +172,18 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
-	assert.True(t, Exists(FeatureWorkspaceAgent))
-	assert.True(t, Exists(FeatureWorkspaceMCP))
+	assert.False(t, Exists("workspace_agent"))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
+	assert.True(t, Exists(FeatureFactoryStepActions))
+	assert.False(t, IsReleased(FeatureFactoryStepActions))
 	assert.False(t, Exists("mobile_factory_board"))
 	assert.False(t, Exists("factory_risk_score"))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("factory_task_console"))
 	assert.False(t, Exists("factory_sentry_intake"))
+	assert.False(t, Exists("workspace_mcp"))
 	assert.False(t, Exists("factory_dependabot_intake"))
 	assert.False(t, Exists("factory_jira_intake"))
 	assert.False(t, Exists("factory_linear_intake"))
@@ -235,10 +232,4 @@ func Test__IsReleased(t *testing.T) {
 		registry = []Feature{{ID: "explicit-false", Label: "X", Released: &v}}
 		assert.False(t, IsReleased("explicit-false"))
 	})
-}
-
-func TestFactoryRunHistoryRequiresOrganizationOptIn(t *testing.T) {
-	_, exists := Get("factory_run_history")
-	assert.True(t, exists, "administrators must be able to enable the rollout flag")
-	assert.False(t, IsReleased("factory_run_history"), "the new view must not be enabled for all organizations")
 }

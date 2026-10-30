@@ -87,6 +87,9 @@ func CreateFactoryIntake(
 		(source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceDependabotAlerts) {
 		return nil, factoryErrorToStatus(invalidArgument("this intake source is not supported for Bitbucket workspaces"), "failed to create factory intake")
 	}
+	if req.GetPaused() && !intakeSourceSupportsPause(source) {
+		return nil, factoryErrorToStatus(invalidArgument("pause is not supported for this intake"), "failed to create factory intake")
+	}
 
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
@@ -120,6 +123,18 @@ func CreateFactoryIntake(
 	}
 	if err := validateIntakeDefaultOwner(db, orgID, source, "", req.GetSettings()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+	if source == models.FactoryIntakeSourceGitHubIssues && factory.OnboardingConfigValue().CodexSubscription && (req.GetSettings() == nil || req.GetSettings().DefaultOwnerId == nil) {
+		callerID, err := codexCallerID(ctx)
+		if err == nil {
+			owners, ownerErr := factory.DefaultSubscriptionAssignees(db, &callerID)
+			if ownerErr != nil {
+				return nil, factoryErrorToStatus(ownerErr, "failed to choose intake owner")
+			}
+			if len(owners) == 1 {
+				settings.DefaultOwnerID = owners[0].String()
+			}
+		}
 	}
 	settings = parseIntakeSettings(settings, req.GetSettings())
 	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {
@@ -166,6 +181,14 @@ func CreateFactoryIntake(
 		// linger as an unexplained factory app. Retire it.
 		discardIntakeCanvas(db, orgID, canvasID)
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	// Pause before the first batch lands, so a live item that arrives during
+	// the initial import is ignored like every later one.
+	if req.GetPaused() {
+		if err := intake.SetPaused(db, true); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to create factory intake")
+		}
 	}
 
 	// An intake works without a first batch, so a source that cannot be read

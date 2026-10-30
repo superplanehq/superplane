@@ -1,11 +1,23 @@
-import SuperplaneLogo from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
 import { Sidebar, SidebarBody, SidebarSection } from "@/components/Sidebar/sidebar";
 import { Text } from "@/components/Text/text";
 import { useAccount } from "@/contexts/useAccount";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, BookOpen, Building, KeyRound, Network, Shield, Terminal, Users, Webhook } from "lucide-react";
+import {
+  ArrowLeft,
+  ChartNoAxesCombined,
+  BookOpen,
+  Building,
+  CreditCard,
+  KeyRound,
+  Network,
+  Shield,
+  Terminal,
+  Users,
+  Webhook,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, Navigate, NavLink, Outlet } from "react-router";
 
@@ -18,11 +30,13 @@ type AdminPageLink = {
 
 const adminPageLinks: AdminPageLink[] = [
   { label: "Organizations", to: "/admin", icon: Building, end: true },
+  { label: "Statistics", to: "/admin/stats", icon: ChartNoAxesCombined },
   { label: "Accounts", to: "/admin/accounts", icon: Users },
   { label: "Settings", to: "/admin/settings", icon: Network },
   { label: "Encryption", to: "/admin/encryption", icon: KeyRound },
   { label: "License", to: "/admin/license", icon: KeyRound },
   { label: "Billing plans", to: "/admin/billing-plans", icon: BookOpen },
+  { label: "Credits", to: "/admin/credits", icon: CreditCard },
   { label: "Features", to: "/admin/features", icon: BookOpen },
   { label: "Price Books", to: "/admin/price-books", icon: BookOpen },
   { label: "Fleets", to: "/admin/runner-tasks", icon: Terminal },
@@ -75,7 +89,11 @@ function AdminLayout() {
         <div className="flex h-12 items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center">
-              <img src={SuperplaneLogo} alt="SuperPlane" className="h-7 w-7 dark:brightness-0 dark:invert" />
+              <img
+                src={superplaneMark}
+                alt="SuperPlane"
+                className="h-7 w-7 object-contain dark:brightness-0 dark:invert"
+              />
             </Link>
 
             <div className="h-5 w-px bg-slate-200 dark:bg-gray-700" />

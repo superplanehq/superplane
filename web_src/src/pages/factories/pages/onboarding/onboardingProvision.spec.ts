@@ -247,7 +247,7 @@ describe("provisionGithubIntake", () => {
     const listIntakes = vi.fn().mockResolvedValue([]);
     const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" } as FactoriesFactoryIntake);
 
-    const intake = await provisionGithubIntake({ listIntakes, createIntake });
+    const intake = await provisionGithubIntake({ listIntakes, createIntake, updateIntake: vi.fn() });
 
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
     expect(intake.id).toBe("intake-1");
@@ -257,17 +257,36 @@ describe("provisionGithubIntake", () => {
     const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: GITHUB_INTAKE_SOURCE }]);
     const createIntake = vi.fn();
 
-    const intake = await provisionGithubIntake({ listIntakes, createIntake });
+    const intake = await provisionGithubIntake({ listIntakes, createIntake, updateIntake: vi.fn() });
 
     expect(createIntake).not.toHaveBeenCalled();
     expect(intake.id).toBe("intake-1");
+  });
+
+  it("pauses a reused GitHub intake when automatic intake was turned off before the retry", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: GITHUB_INTAKE_SOURCE, paused: false }]);
+    const updateIntake = vi.fn().mockResolvedValue({ id: "intake-1", paused: true } as FactoriesFactoryIntake);
+
+    const intake = await provisionGithubIntake({ listIntakes, createIntake: vi.fn(), updateIntake, paused: true });
+
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-1", paused: true });
+    expect(intake.paused).toBe(true);
+  });
+
+  it("resumes a reused GitHub intake when automatic intake was turned on before the retry", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: GITHUB_INTAKE_SOURCE, paused: true }]);
+    const updateIntake = vi.fn().mockResolvedValue({ id: "intake-1", paused: false } as FactoriesFactoryIntake);
+
+    await provisionGithubIntake({ listIntakes, createIntake: vi.fn(), updateIntake });
+
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-1", paused: false });
   });
 
   it("creates the GitHub intake next to an intake of another source", async () => {
     const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: "SOURCE_SENTRY_EXCEPTIONS" }]);
     const createIntake = vi.fn().mockResolvedValue({ id: "intake-2" } as FactoriesFactoryIntake);
 
-    const intake = await provisionGithubIntake({ listIntakes, createIntake });
+    const intake = await provisionGithubIntake({ listIntakes, createIntake, updateIntake: vi.fn() });
 
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
     expect(intake.id).toBe("intake-2");
@@ -283,6 +302,7 @@ describe("provisionJiraIntake", () => {
     const intake = await provisionJiraIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       integrationId: "jira-1",
       resourceId: "PAY",
@@ -305,6 +325,7 @@ describe("provisionJiraIntake", () => {
     await provisionJiraIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       integrationId: "jira-1",
       resourceId: "PAY",
@@ -327,6 +348,7 @@ describe("provisionJiraIntake", () => {
     const intake = await provisionJiraIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       integrationId: "jira-1",
       resourceId: "PAY",
@@ -335,6 +357,24 @@ describe("provisionJiraIntake", () => {
     expect(createIntake).not.toHaveBeenCalled();
     expect(deleteIntake).not.toHaveBeenCalled();
     expect(intake.id).toBe("intake-1");
+  });
+
+  it("applies the current automatic intake choice to a reused Jira intake", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ ...boundJiraIntake("intake-1", "jira-1", "PAY"), paused: false }]);
+    const updateIntake = vi.fn().mockResolvedValue({ id: "intake-1", paused: true } as FactoriesFactoryIntake);
+
+    const intake = await provisionJiraIntake({
+      listIntakes,
+      createIntake: vi.fn(),
+      updateIntake,
+      deleteIntake: vi.fn(),
+      paused: true,
+      integrationId: "jira-1",
+      resourceId: "PAY",
+    });
+
+    expect(updateIntake).toHaveBeenCalledWith({ intakeId: "intake-1", paused: true });
+    expect(intake.paused).toBe(true);
   });
 
   it("reuses a Jira intake created earlier in this session when the project is unchanged", async () => {
@@ -349,6 +389,7 @@ describe("provisionJiraIntake", () => {
     await provisionJiraIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       integrationId: "jira-1",
       resourceId: "PAY",
@@ -356,6 +397,7 @@ describe("provisionJiraIntake", () => {
     const intake = await provisionJiraIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       integrationId: "jira-1",
       resourceId: "PAY",
@@ -374,6 +416,7 @@ describe("provisionJiraIntake", () => {
     const intake = await provisionJiraIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       integrationId: "jira-1",
       resourceId: "CORE",
@@ -398,6 +441,7 @@ describe("provisionOnboardingIntake", () => {
     const intake = await provisionOnboardingIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       issuesChoice: "vcs",
     });
@@ -415,6 +459,7 @@ describe("provisionOnboardingIntake", () => {
     const intake = await provisionOnboardingIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       issuesChoice: "jira",
       jira: { integrationId: "jira-1", projectId: "PAY" },
@@ -436,6 +481,7 @@ describe("provisionOnboardingIntake", () => {
     await provisionOnboardingIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       issuesChoice: "jira",
       jira: { integrationId: "jira-1", projectId: "PAY" },
@@ -457,6 +503,7 @@ describe("provisionOnboardingIntake", () => {
     const intake = await provisionOnboardingIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       issuesChoice: "linear",
       linear: { integrationId: "linear-1", scope: { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" } },
@@ -567,6 +614,7 @@ describe("provisionOnboardingIntake", () => {
     await provisionOnboardingIntake({
       listIntakes,
       createIntake,
+      updateIntake: vi.fn(),
       deleteIntake,
       issuesChoice: "vcs",
     });

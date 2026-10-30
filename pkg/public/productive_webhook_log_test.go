@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	sentrytest "github.com/superplanehq/superplane/test/support/sentry"
 	"net/http"
 	"slices"
 	"strings"
@@ -144,7 +145,7 @@ func Test__HandleWebhook_ProductiveServerErrorReusesOrganizationLookup(t *testin
 		}).
 		Error)
 
-	transport := bindTestSentryHub(t)
+	transport := sentrytest.BindHub(t)
 	lookups := 0
 	db := database.Conn()
 	callbackName := "test:productive-organization-lookup"

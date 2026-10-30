@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func AcceptInviteLink(ctx context.Context, authService authorization.Authorization, accountID string, token string) (*structpb.Struct, error) {
+func AcceptInviteLink(ctx context.Context, _ authorization.Authorization, accountID string, token string) (*structpb.Struct, error) {
 	if token == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "invite link token is required")
 	}
@@ -36,43 +36,24 @@ func AcceptInviteLink(ctx context.Context, authService authorization.Authorizati
 		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
 
-	statusValue := "joined"
-	tx := database.DB(ctx).Begin()
-	user, err := models.FindMaybeDeletedUserByEmailInTransaction(tx, org.ID.String(), account.Email)
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := models.LockOrganization(tx, org.ID); err != nil {
+			return err
+		}
+		_, err := models.FindActiveHumanUserByAccountAndOrganization(tx, org.ID, account.ID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return grpcerrors.FailedPrecondition(nil, "This organization uses email invitations. Ask an organization admin for an invitation.")
+		}
+		return err
+	})
 	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			tx.Rollback()
-			return nil, grpcerrors.Internal(err, "failed to accept invite")
+		if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+			return nil, err
 		}
-
-		user, err = models.CreateUserInTransaction(tx, org.ID, account.ID, account.Email, account.Name)
-		if err != nil {
-			tx.Rollback()
-			return nil, grpcerrors.Internal(err, "failed to accept invite")
-		}
-	} else if !user.DeletedAt.Valid {
-		tx.Rollback()
-		statusValue = "already_member"
-		return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
-	} else {
-		err = user.RestoreInTransaction(tx)
-		if err != nil {
-			tx.Rollback()
-			return nil, grpcerrors.Internal(err, "failed to accept invite")
-		}
-	}
-
-	err = authService.AssignRole(user.ID.String(), models.RoleOrgOperator, org.ID.String(), models.DomainTypeOrganization)
-	if err != nil {
-		tx.Rollback()
 		return nil, grpcerrors.Internal(err, "failed to accept invite")
 	}
 
-	if err := tx.Commit().Error; err != nil {
-		return nil, grpcerrors.Internal(err, "failed to accept invite")
-	}
-
-	return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
+	return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, "already_member")
 }
 
 func inviteLinkAcceptResponse(organizationID, organizationSlug, organizationName, statusValue string) (*structpb.Struct, error) {

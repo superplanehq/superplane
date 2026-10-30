@@ -41,15 +41,22 @@ function allBotsDraft(): PRFeedbackDraftSettings {
   };
 }
 
-function renderSettings(onSave = vi.fn()) {
+function chooseBotsDraft(): PRFeedbackDraftSettings {
+  return {
+    ...allBotsDraft(),
+    addressAllBots: false,
+    allowedBots: ["coderabbitai"],
+  };
+}
+
+function renderSettings(onSave = vi.fn(), settings: PRFeedbackDraftSettings = allBotsDraft()) {
   render(
     <MemoryRouter>
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <PRFeedbackSettingsPopup
           organizationId="org-1"
           githubIntegrationId="gh-1"
-          settings={allBotsDraft()}
-          healthy
+          settings={settings}
           onSave={onSave}
           onClose={vi.fn()}
           fixed={false}
@@ -76,12 +83,29 @@ describe("PR feedback all-bot comments", () => {
     const user = userEvent.setup();
     const { onSave } = renderSettings();
 
-    expect(screen.getByRole("radio", { name: "All bots" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /^All bots/ })).toBeChecked();
 
     await user.click(screen.getByRole("radio", { name: "Ignore bots" }));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ addressAllBots: false, allowedBots: [] }));
+  });
+
+  it("shows all bots unchecked for a selected bot list and saves that choice", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderSettings(vi.fn(), chooseBotsDraft());
+
+    const allBots = screen.getByRole("radio", { name: /^All bots/ });
+    expect(allBots).not.toBeChecked();
+    expect(
+      screen.getByText("Every bot comment starts pull request feedback, including bots that appear later."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Choose bots" })).toBeChecked();
+
+    await user.click(allBots);
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ addressAllBots: true, allowedBots: [] }));
   });
 
   it("clears the all-bots choice when a selected bot list is saved", async () => {

@@ -75,7 +75,7 @@ function BacklogPreview({ source, detail = false }: { source: BacklogStorySource
 }
 
 const meta = {
-  title: "Factories/Pages/Automation run history/Backlog",
+  title: "Factories/Components/Run history/Integration scenarios/Backlog",
   component: BacklogPreview,
   decorators: [withFactoriesTheme],
   parameters: { layout: "fullscreen" },
@@ -118,8 +118,4 @@ export const Planning: Story = {
 export const RunPermalink: Story = {
   args: { source: "planning", detail: true },
   parameters: { msw: { handlers: factoryHistoryHandlers("planning") } },
-};
-export const FeatureDisabled: Story = {
-  args: { source: "github-issues" },
-  parameters: { msw: { handlers: factoryHistoryHandlers("github-issues", false) } },
 };

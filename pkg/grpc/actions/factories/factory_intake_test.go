@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -52,6 +53,29 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		return response.GetIntake()
 	}
+
+	t.Run("subscription intake defaults only a new intake to its eligible creator", func(t *testing.T) {
+		db := database.DB(t.Context())
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+		f := newFactory(t)
+		subscription := true
+		require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+		// Existing empty defaults must stay empty when a connection is added.
+		existing := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		assert.Empty(t, existing.Settings.GetDefaultOwnerId())
+		connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
+		require.NoError(t, err)
+		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+		implicit := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		assert.Equal(t, r.User.String(), implicit.Settings.GetDefaultOwnerId())
+		// The published graph carries the owner before initial events can run.
+		assert.Equal(t, r.User.String(), liveIntakeNode(t, r.Organization.ID, implicit, "create-work-order").Configuration["defaultOwnerId"])
+		cleared := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
+		assert.Empty(t, cleared.Settings.GetDefaultOwnerId())
+		updated, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: existing.Id, Settings: &pb.FactoryIntake_Settings{Labels: []string{"urgent"}}})
+		require.NoError(t, err)
+		assert.Empty(t, updated.Intake.Settings.GetDefaultOwnerId())
+	})
 
 	t.Run("default owner survives API saves and explicit clearing", func(t *testing.T) {
 		f := newFactory(t)
@@ -144,6 +168,112 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		}
 		_, err = CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{FactoryId: f.ID.String(), Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
 		require.Error(t, err)
+	})
+
+	t.Run("Sentry default owner survives API saves and explicit clearing", func(t *testing.T) {
+		f := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		intake := create(t, f, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			Settings: &pb.FactoryIntake_Settings{
+				DefaultOwnerId:   proto.String(r.User.String()),
+				SentryProjectIds: []string{"payments"},
+				SentryLevels:     []string{"error"},
+				SentryNewIssues:  proto.Bool(false),
+			},
+		})
+		require.Equal(t, r.User.String(), intake.GetSettings().GetDefaultOwnerId())
+		update := func(settings *pb.FactoryIntake_Settings) *pb.FactoryIntake {
+			t.Helper()
+			response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: intake.Id, Settings: settings})
+			require.NoError(t, err)
+			return response.Intake
+		}
+		request := &pb.FactoryIntake_Settings{}
+		require.NoError(t, protojson.Unmarshal([]byte(`{"defaultOwnerId":""}`), request))
+		cleared := update(request)
+		assert.Empty(t, cleared.Settings.GetDefaultOwnerId())
+		assert.Equal(t, intake.Settings.GetSentryLevels(), cleared.Settings.GetSentryLevels())
+		assert.Equal(t, intake.Settings.GetSentryNewIssues(), cleared.Settings.GetSentryNewIssues())
+		assert.Equal(t, intake.Settings.GetSentryProjectIds(), cleared.Settings.GetSentryProjectIds())
+		selected := update(&pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(r.User.String())})
+		omitted := proto.Clone(selected.Settings).(*pb.FactoryIntake_Settings)
+		omitted.DefaultOwnerId = nil
+		require.Equal(t, r.User.String(), update(omitted).Settings.GetDefaultOwnerId())
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: f.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.Intakes, 1)
+		assert.Equal(t, r.User.String(), listed.Intakes[0].Settings.GetDefaultOwnerId())
+	})
+
+	t.Run("Sentry unchanged unavailable owner does not block other settings", func(t *testing.T) {
+		f := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		account, err := models.CreateAccount(support.RandomName("left"), support.RandomName("left")+"@example.com")
+		require.NoError(t, err)
+		member, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
+		require.NoError(t, err)
+		intake := create(t, f, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			Settings: &pb.FactoryIntake_Settings{
+				DefaultOwnerId:   proto.String(member.ID.String()),
+				SentryProjectIds: []string{"payments"},
+				SentryLevels:     []string{"error"},
+			},
+		})
+		require.NoError(t, database.DB(t.Context()).Delete(member).Error)
+
+		next := proto.Clone(intake.GetSettings()).(*pb.FactoryIntake_Settings)
+		next.SentryLevels = []string{"fatal"}
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: f.ID.String(), IntakeId: intake.GetId(), Settings: next,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, member.ID.String(), response.GetIntake().GetSettings().GetDefaultOwnerId())
+		assert.Equal(t, []string{"fatal"}, response.GetIntake().GetSettings().GetSentryLevels())
+
+		changed := proto.Clone(next).(*pb.FactoryIntake_Settings)
+		changed.DefaultOwnerId = proto.String(uuid.NewString())
+		_, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: f.ID.String(), IntakeId: intake.GetId(), Settings: changed,
+		})
+		require.Error(t, err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("Sentry rejects invalid default owners on create and update", func(t *testing.T) {
+		f := newFactory(t)
+		intake := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+		otherOrg, err := models.CreateOrganization(support.RandomName("other-org"), "")
+		require.NoError(t, err)
+		account, err := models.CreateAccount(support.RandomName("foreign"), support.RandomName("foreign")+"@example.com")
+		require.NoError(t, err)
+		foreign, err := models.CreateUser(otherOrg.ID, account.ID, account.Email, account.Name)
+		require.NoError(t, err)
+		deletedAccount, err := models.CreateAccount(support.RandomName("deleted"), support.RandomName("deleted")+"@example.com")
+		require.NoError(t, err)
+		deleted, err := models.CreateUser(r.Organization.ID, deletedAccount.ID, deletedAccount.Email, deletedAccount.Name)
+		require.NoError(t, err)
+		require.NoError(t, database.DB(t.Context()).Delete(deleted).Error)
+		key, err := models.CreateAPIKey(database.DB(t.Context()), r.Organization.ID, support.RandomName("key"), nil, r.User, nil, nil)
+		require.NoError(t, err)
+		for _, owner := range []string{"invalid", uuid.NewString(), foreign.ID.String(), deleted.ID.String(), key.ID.String()} {
+			settings := &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(owner)}
+			_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{FactoryId: f.ID.String(), Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS, Settings: settings})
+			require.Error(t, err)
+			code, _, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.InvalidArgument, code)
+			_, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: intake.Id, Settings: settings})
+			require.Error(t, err)
+			code, _, ok = grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.InvalidArgument, code)
+		}
 	})
 
 	t.Run("creating an intake builds a live canvas that can run", func(t *testing.T) {
@@ -513,6 +643,41 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NotNil(t, trigger.IntegrationID)
 		assert.Equal(t, integrationID, *trigger.IntegrationID)
 		assert.Equal(t, "ENG", trigger.Configuration["project"])
+	})
+
+	t.Run("a paused Jira intake starts with automatic intake off and keeps its first batch", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyJiraIntakeIntegration(t, r.Organization.ID, "ENG")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_JIRA_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "ENG",
+			Paused:        true,
+		})
+
+		assert.True(t, intake.GetPaused())
+		assert.NotEqual(t, pb.FactoryIntake_INITIAL_IMPORT_STATUS_SKIPPED, intake.GetInitialImportStatus())
+
+		listed, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.GetIntakes(), 1)
+		assert.True(t, listed.GetIntakes()[0].GetPaused())
+	})
+
+	t.Run("a paused start is rejected for a source that cannot pause", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "datadog")
+
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			Source:        pb.FactoryIntake_SOURCE_DATADOG,
+			IntegrationId: integrationID,
+			ResourceId:    "checkout",
+			Paused:        true,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
 	t.Run("a Jira intake stores the completion column on the trigger", func(t *testing.T) {
@@ -1110,6 +1275,33 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			SourceID: intakeFilterNodeID,
 			TargetID: intakeCreateNodeID,
 		})
+
+		// Re-enabling a deleted gate makes the publisher assign new node IDs.
+		for _, enabled := range []bool{true, true, false} {
+			response, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+				FactoryId: factory.ID.String(),
+				IntakeId:  intake.GetId(),
+				Settings:  &pb.FactoryIntake_Settings{AuthorsWithAccess: enabled},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, enabled, response.GetIntake().GetSettings().GetAuthorsWithAccess())
+
+			canvas, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			liveVersion, err = models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+			require.NoError(t, err)
+			permissionCount := 0
+			for _, node := range liveVersion.Nodes {
+				if node.ComponentName() == intakeAuthorPermissionComponent {
+					permissionCount++
+				}
+			}
+			if enabled {
+				assert.Equal(t, 1, permissionCount)
+				continue
+			}
+			assert.Zero(t, permissionCount)
+		}
 	})
 
 	t.Run("the authors filter stays off by default", func(t *testing.T) {

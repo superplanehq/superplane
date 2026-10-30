@@ -61,15 +61,30 @@ func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
 				assert.Equal(t, "1", revListCount(t, remote, "develop"))
 			})
 
-			t.Run("missing named branch fails", func(t *testing.T) {
+			t.Run("missing named branch", func(t *testing.T) {
 				remote := bareRepository(t)
 				commitRemoteBranch(t, remote, "develop")
+				setRemoteHead(t, remote, "develop")
 				result := runCloneScript(t, script.script, fileURL(remote), "main", script.name == "implementation")
 
-				require.Error(t, result.err)
-				assert.Contains(t, result.stderr, "Remote branch main not found. The repository has other branches.")
-				assert.Empty(t, cloneInvocation(result.gitArgs))
-				assert.NoDirExists(t, filepath.Join(result.dir, "repo"))
+				if script.name == "implementation" {
+					require.Error(t, result.err)
+					assert.Contains(t, result.stderr, `The workspace default branch "main" does not exist`)
+					assert.Contains(t, result.stderr, `The repository's default branch is "develop"`)
+					assert.Contains(t, result.stderr, "Workspace settings → Repository")
+					assert.Empty(t, cloneInvocation(result.gitArgs))
+					assert.NoDirExists(t, filepath.Join(result.dir, "repo"))
+					return
+				}
+
+				require.NoError(t, result.err, result.stderr)
+				assert.Contains(t, result.stderr, "Warning:")
+				assert.Contains(t, result.stderr, `Checking out "develop"`)
+				cloneLine := cloneInvocation(result.gitArgs)
+				assert.Contains(t, cloneLine, "--depth 1")
+				assert.NotContains(t, cloneLine, "--branch")
+				head := gitOutput(t, filepath.Join(result.dir, "repo"), "rev-parse", "--abbrev-ref", "HEAD")
+				assert.Equal(t, "develop", strings.TrimSpace(head))
 			})
 		})
 	}
@@ -133,15 +148,31 @@ func TestEmptyRepositoryCreatesNamedBaseBranch(t *testing.T) {
 	assert.Equal(t, "1", revListCount(t, repo, "origin/develop..HEAD"))
 }
 
-func TestCloneRepositoryUsesMainWhenBranchIsEmpty(t *testing.T) {
+func TestCloneRepositoryUsesRemoteDefaultWhenBranchIsEmpty(t *testing.T) {
 	remote := bareRepository(t)
-	commitRemoteBranch(t, remote, "main")
+	commitRemoteBranch(t, remote, "master")
+	setRemoteHead(t, remote, "master")
 	result := runCloneScript(t, "checkout", fileURL(remote), "", false)
 
 	require.NoError(t, result.err, result.stderr)
 	cloneLine := cloneInvocation(result.gitArgs)
 	assert.Contains(t, cloneLine, "--depth 1")
-	assert.Contains(t, cloneLine, "--branch main")
+	assert.NotContains(t, cloneLine, "--branch")
+	head := gitOutput(t, filepath.Join(result.dir, "repo"), "rev-parse", "--abbrev-ref", "HEAD")
+	assert.Equal(t, "master", strings.TrimSpace(head))
+}
+
+func TestEmptyRepositoryCommitSetupUsesAdvertisedHeadWhenBaseIsEmpty(t *testing.T) {
+	remote := bareRepository(t)
+	setRemoteHead(t, remote, "master")
+	result := runCloneScript(t, "checkout", fileURL(remote), "", true)
+
+	require.NoError(t, result.err, result.stderr)
+	heads := gitOutput(t, remote, "ls-remote", "--heads", fileURL(remote))
+	assert.Contains(t, heads, "refs/heads/master")
+	assert.NotContains(t, heads, "refs/heads/main")
+	repo := filepath.Join(result.dir, "repo")
+	assert.Equal(t, "master", strings.TrimSpace(gitOutput(t, repo, "rev-parse", "--abbrev-ref", "HEAD")))
 }
 
 type cloneScriptResult struct {
@@ -245,6 +276,11 @@ func bareRepository(t *testing.T) string {
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	runGit(t, t.TempDir(), "init", "--bare", remote)
 	return remote
+}
+
+func setRemoteHead(t *testing.T, remote, branch string) {
+	t.Helper()
+	runGit(t, t.TempDir(), "--git-dir="+remote, "symbolic-ref", "HEAD", "refs/heads/"+branch)
 }
 
 func commitRemoteBranch(t *testing.T, remote, branch string) {

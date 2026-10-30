@@ -1,0 +1,86 @@
+name: Discord issue notifications
+
+on:
+  issues:
+    types: [opened, closed]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send issue notification to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_ISSUES_WEBHOOK }}
+          ACTION: ${{ github.event.action }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ACTOR: ${{ github.event.sender.login }}
+          CREATED_AT: ${{ github.event.issue.created_at }}
+          CLOSED_AT: ${{ github.event.issue.closed_at }}
+        run: |
+          SAFE_TITLE=$(python3 - <<'PY'
+          import os
+
+          title = os.environ["ISSUE_TITLE"]
+
+          # Keep the notification to one line.
+          title = title.replace("\r", " ").replace("\n", " ")
+
+          # Escape characters that can break out of a Markdown link label.
+          # Backslash must be escaped first.
+          title = title.replace("\\", "\\\\")
+          title = title.replace("[", "\\[")
+          title = title.replace("]", "\\]")
+
+          print(title)
+          PY
+          )
+
+          if [ "$ACTION" = "opened" ]; then
+            MESSAGE="🎫 [#${ISSUE_NUMBER} ${SAFE_TITLE}](${ISSUE_URL}) — ${ACTOR}"
+          else
+            DURATION=$(python3 - <<'PY'
+          import os
+          from datetime import datetime
+
+          created = datetime.fromisoformat(
+              os.environ["CREATED_AT"].replace("Z", "+00:00")
+          )
+          closed = datetime.fromisoformat(
+              os.environ["CLOSED_AT"].replace("Z", "+00:00")
+          )
+
+          total_minutes = int((closed - created).total_seconds() // 60)
+          days, remainder = divmod(total_minutes, 1440)
+          hours, minutes = divmod(remainder, 60)
+
+          if days:
+              print(f"{days}d {hours}h")
+          elif hours:
+              print(f"{hours}h {minutes}m")
+          else:
+              print(f"{minutes}m")
+          PY
+          )
+
+            MESSAGE="✅ [#${ISSUE_NUMBER} ${SAFE_TITLE}](${ISSUE_URL}) — ${ACTOR} — ${DURATION}"
+          fi
+
+          jq -n \
+            --arg content "$MESSAGE" \
+            '{
+              content: $content,
+              flags: 4,
+              allowed_mentions: {
+                parse: []
+              }
+            }' \
+          | curl \
+              --fail \
+              --silent \
+              --show-error \
+              -H "Content-Type: application/json" \
+              -d @- \
+              "$DISCORD_WEBHOOK"

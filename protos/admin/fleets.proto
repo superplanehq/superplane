@@ -70,6 +70,13 @@ service Runners {
       delete: "/admin/api/installation/fleets/{fleet_id}/runners/{runner_id}"
     };
   }
+
+  rpc MarkRunnerProviderDeleted(MarkRunnerProviderDeletedRequest) returns (MarkRunnerProviderDeletedResponse) {
+    option (google.api.http) = {
+      post: "/admin/api/installation/fleets/{fleet_id}/runners/{runner_id}:provider-deleted"
+      body: "*"
+    };
+  }
 }
 
 message Fleet {
@@ -107,6 +114,8 @@ message Runner {
   string arch = 14;
   string hostname = 15;
   string ip = 16;
+  // Set after Fleet Manager deletes the provider VM. A terminated row is not enough.
+  optional google.protobuf.Timestamp provider_deleted_at = 17;
 }
 
 message Task {
@@ -190,6 +199,9 @@ message CreateRunnerRequest {
   optional string task_id = 2;
   string idempotency_key = 3;
   bool ephemeral = 4;
+  // Record ownership before provisioning, including runners that never register.
+  string fleet_manager_id = 5;
+  string provider = 6;
 }
 
 message CreateRunnerResponse {
@@ -225,8 +237,23 @@ message DescribeRunnerResponse {
 message DeleteRunnerRequest {
   string fleet_id = 1;
   string runner_id = 2;
+  // When nonempty, delete only if the current state is in this list.
+  // A mismatch returns a conflict without changing the runner or task.
+  repeated string states = 3;
 }
 
 message DeleteRunnerResponse {
+  Runner runner = 1;
+}
+
+message MarkRunnerProviderDeletedRequest {
+  string fleet_id = 1;
+  string runner_id = 2;
+  // Must match the ownership recorded when the runner was created.
+  string fleet_manager_id = 3;
+  string provider = 4;
+}
+
+message MarkRunnerProviderDeletedResponse {
   Runner runner = 1;
 }

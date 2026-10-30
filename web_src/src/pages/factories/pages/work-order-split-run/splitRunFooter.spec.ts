@@ -28,7 +28,7 @@ const FAILED_NOTE = {
   key: "implement-failed",
   headline: "Implement did not pass",
   text: "Backend tests failed on the reconciliation worker.",
-  cta: { label: "Debug", icon: "bug" as const },
+  cta: { label: "View run details", icon: "bug" as const },
   source: { name: "Implementation" },
 };
 
@@ -193,6 +193,18 @@ describe("buildSplitRunFooter", () => {
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
 
+  it("puts Continue fixes before Reject and Approve while fixes are paused", () => {
+    const footer = buildSplitRunFooter({
+      kind: "waiting",
+      note: PR_NOTE,
+      continueFixes: { pullRequestId: "pr-1", runId: "run-paused" },
+    });
+
+    expect(footer.continueFixes).toEqual({ pullRequestId: "pr-1", runId: "run-paused" });
+    expect(footer.actions.map((action) => action.label)).toEqual(["Continue fixes", "Reject", "Approve"]);
+    expect(footer.actions.map((action) => action.emphasis)).toEqual(["primary", "quiet", "quiet"]);
+  });
+
   it("omits the decision strip when a waiting order has no run note", () => {
     expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
       kind: "waiting",
@@ -236,7 +248,7 @@ describe("buildSplitRunFooter", () => {
 
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
-    expect(footer.note?.cta?.label).toBe("Debug");
+    expect(footer.note?.cta?.label).toBe("View run details");
     expect(footer.sentence).toBe("This task failed.");
     expect(footer.actions).toEqual([REJECT, RERUN]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
@@ -318,8 +330,10 @@ describe("buildSplitRunFooter", () => {
       href: "/org/workspaces/acme/settings/organization/billing",
     });
     expect(creditBillingHrefForNote(note, undefined).cta).toBeUndefined();
-    expect(creditBillingHrefForNote({ ...note, cta: { label: "Debug", icon: "bug" } }, undefined).cta).toEqual({
-      label: "Debug",
+    expect(
+      creditBillingHrefForNote({ ...note, cta: { label: "View run details", icon: "bug" } }, undefined).cta,
+    ).toEqual({
+      label: "View run details",
       icon: "bug",
     });
   });

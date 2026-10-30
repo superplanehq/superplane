@@ -18,14 +18,6 @@ import {
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import { DEFAULT_PLANNING_SETTINGS } from "./planningSettingsModel";
 
-let historyEnabled = true;
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (feature: string) => historyEnabled && feature === "factory_run_history",
-    isLoading: false,
-    organizationReady: true,
-  }),
-}));
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => ({ data: [], isLoading: false }),
 }));
@@ -34,13 +26,13 @@ vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: () => 
 describe("Backlog intake run history", () => {
   beforeEach(() => {
     resetHostMocks();
-    historyEnabled = true;
   });
 
   it.each([
     [GITHUB_INTAKE, GITHUB_INTAKE_CANVAS],
     [SENTRY_INTAKE, SENTRY_INTAKE_CANVAS],
     [DEPENDABOT_INTAKE, DEPENDABOT_INTAKE_CANVAS],
+    [JIRA_INTAKE, GITHUB_INTAKE_CANVAS],
   ] as const)("replaces the canvas with shared history for $0.source.id", async (intake, canvas) => {
     useCanvas.mockReturnValue({ data: canvas, isPending: false, isError: false, refetch: vi.fn() });
     const user = userEvent.setup();
@@ -56,30 +48,12 @@ describe("Backlog intake run history", () => {
     expect(screen.getByTestId("intake-source-settings-save")).toBeInTheDocument();
   });
 
-  it("keeps the legacy canvas when the flag is off", async () => {
-    historyEnabled = false;
-    const user = userEvent.setup();
-    renderHost();
-    await user.click(screen.getByRole("tab", { name: "Automation" }));
-    expect(screen.getByTestId("intake-source-automation")).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
-  });
-
   it("shows the repository watched by Dependabot instead of the workspace default", () => {
     useCanvas.mockReturnValue({ data: DEPENDABOT_INTAKE_CANVAS, isPending: false, isError: false, refetch: vi.fn() });
     renderHost({ intake: DEPENDABOT_INTAKE, repository: "superplanehq/another-repository" });
 
     expect(screen.getByText("superplanehq/superplane")).toBeInTheDocument();
     expect(screen.queryByText("superplanehq/another-repository")).not.toBeInTheDocument();
-  });
-
-  it("keeps other intake sources on their existing view", async () => {
-    const user = userEvent.setup();
-    renderHost({ intake: JIRA_INTAKE });
-    expect(screen.getByRole("tab", { name: "Automation" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("intake-settings-tab-automation"));
-    expect(screen.getByTestId("intake-source-automation")).toBeInTheDocument();
   });
 
   it("shares Planning history and run selection through browser navigation", async () => {
@@ -100,7 +74,7 @@ describe("Backlog intake run history", () => {
     expect(screen.queryByTestId("planning-automation")).not.toBeInTheDocument();
   });
 
-  it("opens old Planning automation links as history when enabled", () => {
+  it("opens old Planning automation links as history", () => {
     renderPlanning("/?planningSettings=automation");
     expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("table")).toBeInTheDocument();

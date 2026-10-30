@@ -7,7 +7,7 @@ image_version           = "1.0.0"
 architecture            = "amd64"
 vm_size                 = "Standard_D2ds_v4"
 # Private gallery with image definition TrustedLaunch. This is the default.
-# The AKS development gallery in release/terraform/aks uses this value.
+# For custom images, the Azure installer creates a private gallery.
 trusted_launch          = true
 # Community gallery or direct shared gallery. The image definition must be
 # TrustedLaunchSupported. The build VM is then Standard Gen2.

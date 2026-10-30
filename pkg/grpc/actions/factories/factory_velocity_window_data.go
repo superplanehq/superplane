@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -155,7 +156,7 @@ func applyVelocityLedgerSpend(db *gorm.DB, factory *models.Factory, previous, cu
 	bounds = append(bounds, current[len(current)-1].end)
 
 	factoryID := factory.ID
-	days, err := models.SummarizeUsageByLocalDay(db, models.UsageReportFilter{
+	days, err := billing.SummarizeUsageByLocalDay(db, billing.UsageReportFilter{
 		OrganizationID: factory.OrganizationID,
 		FactoryID:      &factoryID,
 		Since:          bounds[0],

@@ -9,16 +9,25 @@ Fleet Manager selects the gallery image for each fleet. VM custom data
 downloads the configured runner release, verifies its checksum, and runs the
 release `install.sh`.
 
-Create the gallery and image definitions with the AKS Terraform stack in
-[release/terraform/aks](../../../terraform/aks) before you build.
+The normal Azure installation uses published runner images from the community
+gallery. It does not run Packer. The
+[Azure Terraform installer](https://github.com/superplanehq/terraform/tree/v0.1.0/azure)
+also creates an empty private gallery in the installation's subscription,
+although the normal install does not use it.
+
+For a custom image, apply the installer, build the image with Packer in that
+private gallery, set `runner_image_amd64` or `runner_image_arm64` to the new
+image version ID in `terraform.tfvars`, and apply Terraform again. The second
+apply updates the Helm-provided fleet setup defaults. If Fleet Manager is
+already installed, update its fleet image configuration separately.
 
 ## Trusted Launch
 
 `trusted_launch` defaults to true. Both templates use this variable. The
 build VM then uses Trusted Launch.
 Use true for a private gallery whose image definition is `TrustedLaunch`.
-The AKS Terraform stack creates that private gallery. Keep the default
-for the development path in `release/terraform/aks`.
+The Azure Terraform installer creates that private gallery. Keep the default
+when publishing a custom image there.
 
 Set `trusted_launch` to false for a community gallery or a direct shared
 gallery. The image definition must be `TrustedLaunchSupported`. Azure

@@ -15,6 +15,7 @@ export const CREATE_WITH_AGENT_COPY = {
   sendAnswer: "Send answer",
   sendAnswers: "Send answers",
   skipSurvey: "Skip",
+  recommendedOption: "Recommended",
   previousQuestion: "Previous",
   nextQuestion: "Next",
   otherAnswer: "Or write your own answer",

@@ -1,14 +1,14 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { resolveGithubDefaultBranch, showErrorToast, integrationResources } = vi.hoisted(() => ({
-  resolveGithubDefaultBranch: vi.fn(),
+const { resolveRepositoryDefaultBranch, showErrorToast, integrationResources } = vi.hoisted(() => ({
+  resolveRepositoryDefaultBranch: vi.fn(),
   showErrorToast: vi.fn(),
   integrationResources: vi.fn(() => ({ data: [{ name: "main" }, { name: "develop" }] })),
 }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
-  resolveGithubDefaultBranch,
+  resolveRepositoryDefaultBranch,
   useIntegrationResources: () => integrationResources(),
 }));
 
@@ -30,7 +30,7 @@ type CatalogRepository = {
 
 describe("useFactoryRepositoryDraft", () => {
   beforeEach(() => {
-    resolveGithubDefaultBranch.mockReset();
+    resolveRepositoryDefaultBranch.mockReset();
     showErrorToast.mockReset();
     integrationResources.mockReset();
     integrationResources.mockReturnValue({ data: [{ name: "main" }, { name: "develop" }] });
@@ -59,7 +59,7 @@ describe("useFactoryRepositoryDraft", () => {
 
   it("keeps the latest repository branch when an older lookup finishes last", async () => {
     const lookups = new Map<string, Deferred<string>>();
-    resolveGithubDefaultBranch.mockImplementation(
+    resolveRepositoryDefaultBranch.mockImplementation(
       (_organizationId: string, _integrationId: string, repository: string) => {
         const pending = deferred<string>();
         lookups.set(repository, pending);
@@ -82,6 +82,49 @@ describe("useFactoryRepositoryDraft", () => {
     });
     expect(result.current.branch).toBe("develop");
     expect(result.current.isSaving).toBe(false);
+  });
+
+  it("uses the live default branch before the catalog value", async () => {
+    resolveRepositoryDefaultBranch.mockResolvedValue("master");
+    const { result } = renderHook(() =>
+      useFactoryRepositoryDraft(
+        draftArgs({
+          savedBranch: "",
+          catalogRepositories: [{ fullName: "acme/api", defaultBranch: "main" }],
+        }),
+      ),
+    );
+
+    await waitFor(() => expect(result.current.branch).toBe("master"));
+  });
+
+  it("uses the catalog default branch when the live lookup fails", async () => {
+    resolveRepositoryDefaultBranch.mockRejectedValue(new Error("network down"));
+    const { result } = renderHook(() =>
+      useFactoryRepositoryDraft(
+        draftArgs({
+          savedBranch: "",
+          catalogRepositories: [{ fullName: "acme/api", defaultBranch: "main" }],
+        }),
+      ),
+    );
+
+    await waitFor(() => expect(result.current.branch).toBe("main"));
+    expect(showErrorToast).not.toHaveBeenCalled();
+  });
+
+  it("is ready to save when the saved branch is empty and the host reports one", async () => {
+    const { result } = renderHook(() =>
+      useFactoryRepositoryDraft(
+        draftArgs({
+          savedBranch: "",
+          catalogRepositories: [{ fullName: "acme/api", defaultBranch: "master" }],
+        }),
+      ),
+    );
+
+    await waitFor(() => expect(result.current.branch).toBe("master"));
+    expect(result.current.isDirty).toBe(true);
   });
 
   it("keeps an edited branch when repository choices refresh", () => {
@@ -117,7 +160,7 @@ describe("useFactoryRepositoryDraft", () => {
   });
 
   it("clears the previous branch when the selected repository lookup fails", async () => {
-    resolveGithubDefaultBranch.mockRejectedValue(new Error("network down"));
+    resolveRepositoryDefaultBranch.mockRejectedValue(new Error("network down"));
     const { result } = renderHook(() => useFactoryRepositoryDraft(draftArgs({ savedBranch: "main" })));
 
     act(() => result.current.selectRepository("acme/web"));
@@ -128,7 +171,7 @@ describe("useFactoryRepositoryDraft", () => {
   });
 
   it("shows an error when the saved default branch cannot be loaded", async () => {
-    resolveGithubDefaultBranch.mockRejectedValue(new Error("network down"));
+    resolveRepositoryDefaultBranch.mockRejectedValue(new Error("network down"));
     const { result } = renderHook(() => useFactoryRepositoryDraft(draftArgs({ savedBranch: "" })));
 
     await waitFor(() => expect(showErrorToast).toHaveBeenCalledWith("network down"));
@@ -138,7 +181,7 @@ describe("useFactoryRepositoryDraft", () => {
 
   it("clears branch loading when saved settings replace a pending lookup", async () => {
     const lookups = new Map<string, Deferred<string>>();
-    resolveGithubDefaultBranch.mockImplementation(
+    resolveRepositoryDefaultBranch.mockImplementation(
       (_organizationId: string, _integrationId: string, repository: string) => {
         const pending = deferred<string>();
         lookups.set(repository, pending);
@@ -167,7 +210,7 @@ describe("useFactoryRepositoryDraft", () => {
 
   it("ignores a failed lookup after the user selects another repository", async () => {
     const lookups = new Map<string, Deferred<string>>();
-    resolveGithubDefaultBranch.mockImplementation(
+    resolveRepositoryDefaultBranch.mockImplementation(
       (_organizationId: string, _integrationId: string, repository: string) => {
         const pending = deferred<string>();
         lookups.set(repository, pending);

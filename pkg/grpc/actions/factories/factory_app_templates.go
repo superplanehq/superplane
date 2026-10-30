@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -195,6 +194,12 @@ func factoryTemplateAgentFromIntake(agent *intakeAgent) *factoryTemplateAgent {
 			credentialSource: "hosted",
 		}
 	}
+	if source, _ := agent.Credentials["source"].(string); source == runner.CredentialsSourceSubscription {
+		return &factoryTemplateAgent{
+			component:        "runnerCodex",
+			credentialSource: runner.CredentialsSourceSubscription,
+		}
+	}
 
 	integration, _ := agent.Credentials["integration"].(map[string]any)
 	name, _ := integration["name"].(string)
@@ -331,9 +336,6 @@ func normalizeFactoryInstallParams(params map[string]string) map[string]string {
 	if normalized == nil {
 		normalized = map[string]string{}
 	}
-	if strings.TrimSpace(normalized["defaultBranch"]) == "" {
-		normalized["defaultBranch"] = "main"
-	}
 	if strings.TrimSpace(normalized["riskRules"]) == "" {
 		normalized["riskRules"] = defaultRiskScoreRules
 	}
@@ -433,6 +435,22 @@ func applyFactoryVisualEvidence(node *yaml.Node, includeVisualEvidence *bool) {
 
 func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 	if agent == nil {
+		return
+	}
+	if agent.credentialSource == runner.CredentialsSourceSubscription {
+		switch node.Component {
+		case "runnerClaudeCode", models.SuperPlaneRunnerComponent, "runnerCodex", "runnerOpenRouter":
+		default:
+			return
+		}
+		if node.Configuration == nil {
+			node.Configuration = map[string]any{}
+		}
+		node.Component = "runnerCodex"
+		node.Configuration["credentials"] = map[string]any{"source": runner.CredentialsSourceSubscription}
+		delete(node.Configuration, "model")
+		delete(node.Configuration, "maxTurns")
+		delete(node.Configuration, "llmProvider")
 		return
 	}
 	if node.Component != "runnerClaudeCode" && node.Component != models.SuperPlaneRunnerComponent {
@@ -971,16 +989,8 @@ func materializePRFeedbackDefaults(
 		VCSProvider:            factoryVCSProviderOrDefault(factory),
 		AgentSettings:          prFeedbackAgentSettingsFromGraph(graph, spec, savedSettings),
 		TriggerSettings:        prFeedbackTriggerSettingsFromGraph(graph, savedSettings),
+		OmitCommitIdentity:     true,
 	}
-	omitIdentity := false
-	if factory.OrganizationID != uuid.Nil {
-		var err error
-		omitIdentity, err = models.HasExperimentalFeature(factory.OrganizationID, features.FeatureWorkspaceAgent)
-		if err != nil {
-			return nil, err
-		}
-	}
-	request.OmitCommitIdentity = omitIdentity
 
 	templateID := prFeedbackDiscussionTemplateID
 	triggerID := prFeedbackCommentTriggerNodeID

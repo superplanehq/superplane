@@ -19,11 +19,7 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
-		_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
-			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
-			MarkupBPS:           models.DefaultMarkupBPS,
-			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
-		})
+		_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{})
 		require.NoError(t, err)
 	})
 
@@ -203,11 +199,7 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
-			MarkupBPS:           models.DefaultMarkupBPS,
-			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
-		})
+		_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{})
 		require.NoError(t, err)
 
 		agent := resolveIntakeAgent(db, factory)
@@ -331,6 +323,20 @@ func Test__IntakeAgentModel(t *testing.T) {
 		agent := &intakeAgent{Component: "runnerBash"}
 		assert.Empty(t, agent.model())
 	})
+
+	t.Run("a ChatGPT subscription keeps the model unset", func(t *testing.T) {
+		agent := &intakeAgent{
+			Component:   "runnerCodex",
+			Credentials: map[string]any{"source": runner.CredentialsSourceSubscription},
+			Model:       "gpt-5",
+		}
+		assert.Empty(t, agent.model())
+		template := factoryTemplateAgentFromIntake(agent)
+		require.NotNil(t, template)
+		assert.Equal(t, "runnerCodex", template.component)
+		assert.Equal(t, runner.CredentialsSourceSubscription, template.credentialSource)
+		assert.Empty(t, template.model)
+	})
 }
 
 func enableHostedSuperPlaneAgent(t *testing.T, db *gorm.DB) {
@@ -347,9 +353,6 @@ func enableHostedSuperPlaneAgent(t *testing.T, db *gorm.DB) {
 	provider := models.UsageProviderAnthropic
 	model := "claude-sonnet-4-6"
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
-		MarkupBPS:             models.DefaultMarkupBPS,
-		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
 		DefaultHostedProvider: &provider,
 		DefaultHostedModel:    &model,
 	})

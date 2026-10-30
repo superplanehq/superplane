@@ -4,12 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
-
-	"golang.org/x/sync/semaphore"
-	"google.golang.org/protobuf/proto"
-	"gorm.io/gorm"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -17,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -30,6 +28,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 var ErrRecordLocked = errors.New("record locked")
@@ -306,6 +307,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 
 	runCancellations := &RunCancellationNotifier{}
 
+	var processedRunID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -333,7 +335,6 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 			metricReason = executorReasonLocked
 			return ErrRecordLocked
 		}
-
 		node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
@@ -342,6 +343,9 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
+		if models.IsAgentRunnerComponent(metricComponent) {
+			processedRunID = execution.RunID
+		}
 		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
@@ -363,6 +367,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	contexts.ApplyFileBindCleanups(pendingFileBindCleanups, nil)
+	messages.PublishPlanningBoardStatusForRun(database.DB(context.Background()), processedRunID)
 	for _, event := range pendingProductAnalytics {
 		productanalytics.Capture(event)
 	}
@@ -477,6 +482,7 @@ func (w *NodeExecutor) executeActionNode(
 		WithRootEvent(&execution.RootEventID).
 		WithIncomingEventID(&execution.EventID).
 		WithInput(map[string]any{inputEvent.NodeID: input})
+	builder = builder.WithRunID(execution.RunID)
 	if execution.PreviousExecutionID != nil {
 		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
 	}
@@ -522,7 +528,8 @@ func (w *NodeExecutor) executeActionNode(
 			w.encryptor,
 			workflow.OrganizationID,
 		),
-		Logger: logger,
+		CodexSubscription: contexts.NewCodexSubscriptionContext(tx, workflow, execution.RunID, w.encryptor),
+		Logger:            logger,
 	}
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
@@ -541,7 +548,47 @@ func (w *NodeExecutor) executeActionNode(
 	}
 
 	ctx.Logger = logger
+	if err := billing.AssertOrganizationPaymentMethod(tx, workflow.OrganizationID); err != nil {
+		// Only a confirmed missing card fails the node. Temporary verification
+		// errors roll back the transaction, so the pending execution is retried.
+		if !errors.Is(err, billing.ErrPaymentMethodRequired) {
+			return err
+		}
+		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+	}
+	// Every agent run needs an active paid plan or an open trial. Credit and
+	// BYOK keys do not replace the plan. Database failures leave the execution
+	// pending for the worker retry.
+	if models.IsAgentRunnerComponent(componentName) {
+		if err := billing.AssertOrganizationPlanAllowsRuns(tx, workflow.OrganizationID); err != nil {
+			if !errors.Is(err, billing.ErrHostedSubscriptionRequired) {
+				return err
+			}
+			return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+		}
+	}
+	// Recheck saved BYOK configurations immediately before a new runner action.
+	// Database failures leave the execution pending for the worker retry.
+	if slices.Contains([]string{"runnerClaudeCode", "runnerCodex", "runnerOpenRouter"}, componentName) {
+		configuration := execution.Configuration.Data()
+		credentials, _ := configuration["credentials"].(map[string]any)
+		source, _ := credentials["source"].(string)
+		if source == "integration" || source == "secret" {
+			provider, _ := configuration["llmProvider"].(string)
+			if err := models.RequireOrganizationBYOKAccess(tx, workflow.OrganizationID, provider); err != nil {
+				if !errors.Is(err, models.ErrBYOKAccessDenied) {
+					return err
+				}
+				return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+			}
+		}
+	}
 	if err := action.Execute(ctx); err != nil {
+		var busy *models.CodexConnectionBusyError
+		if errors.As(err, &busy) {
+			// Keep the execution pending while ChatGPT sign-in holds the subscription.
+			return err
+		}
 		logger = withFactoryOrder(logger, tx, execution.RunID)
 		logger = withRejectedHostedCredit(logger, workflow.OrganizationID, err)
 		logger.Errorf("failed to execute action: %v", err)
@@ -567,11 +614,11 @@ func withFactoryOrder(logger *log.Entry, tx *gorm.DB, runID uuid.UUID) *log.Entr
 // withRejectedHostedCredit adds the credit buckets that made the hosted
 // check fail. The next log line can then be compared with the billing page.
 func withRejectedHostedCredit(logger *log.Entry, orgID uuid.UUID, err error) *log.Entry {
-	if logger == nil || !errors.Is(err, models.ErrHostedCreditEmpty) || orgID == uuid.Nil {
+	if logger == nil || !errors.Is(err, billing.ErrHostedCreditEmpty) || orgID == uuid.Nil {
 		return logger
 	}
 
-	summary, describeErr := models.DescribeOrganizationLLMCredit(database.Conn(), orgID)
+	summary, describeErr := billing.DescribeCredit(database.Conn(), orgID)
 	if describeErr != nil {
 		return logger.WithField("hosted_credit_lookup_error", describeErr.Error())
 	}

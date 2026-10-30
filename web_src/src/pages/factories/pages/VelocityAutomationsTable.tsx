@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { Link } from "@/components/Link/link";
 import { cn } from "@/lib/utils";
 
 import { formatDurationHours } from "../lib/factoryVelocityFlow";
-import { automationDetailPath } from "../lib/factoryPagePaths";
 import type { VelocityAutomation } from "../lib/factoryVelocityReport";
 import { velocityCardClassName } from "./velocityCards";
 import { VelocitySortableHeader, type VelocitySortDirection } from "./VelocitySortableHeader";
@@ -85,17 +83,10 @@ const DEFAULT_SORT_DIRECTION: VelocitySortDirection = "desc";
  */
 export function VelocityAutomationsTable({
   automations,
-  organizationId,
-  factoryKey,
   periodLabel,
-  linkNames = true,
 }: {
   automations: VelocityAutomation[];
-  organizationId: string;
-  factoryKey: string;
   periodLabel: string;
-  /** Installation Admin shows the canvas name as text, with no link into the workspace. */
-  linkNames?: boolean;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>(DEFAULT_SORT_KEY);
   const [sortDirection, setSortDirection] = useState<VelocitySortDirection>(DEFAULT_SORT_DIRECTION);
@@ -149,16 +140,7 @@ export function VelocityAutomationsTable({
             {sorted.map((automation) => (
               <tr key={automation.id} className="border-b border-border/60 last:border-b-0">
                 <td className="py-3 pr-6">
-                  {linkNames ? (
-                    <Link
-                      href={automationDetailPath(organizationId, factoryKey, automation.id)}
-                      className="text-foreground underline-offset-4 hover:!underline"
-                    >
-                      {automation.name}
-                    </Link>
-                  ) : (
-                    <span className="text-foreground">{automation.name}</span>
-                  )}
+                  <span className="text-foreground">{automation.name}</span>
                 </td>
                 {COLUMNS.map((column) => (
                   <td

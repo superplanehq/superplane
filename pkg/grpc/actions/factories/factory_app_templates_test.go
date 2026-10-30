@@ -17,6 +17,30 @@ import (
 	goyaml "gopkg.in/yaml.v3"
 )
 
+func TestRewriteFactoryAgentUsesSubscriptionWithoutModel(t *testing.T) {
+	node := &yaml.Node{
+		Component: "runnerClaudeCode",
+		Configuration: map[string]any{
+			"model":       "claude-sonnet-4-6",
+			"maxTurns":    4,
+			"credentials": map[string]any{"source": "integration"},
+		},
+	}
+	rewriteFactoryAgent(node, &factoryTemplateAgent{
+		component:        "runnerCodex",
+		model:            "gpt-5",
+		credentialSource: runner.CredentialsSourceSubscription,
+	})
+
+	assert.Equal(t, "runnerCodex", node.Component)
+	credentials := node.Configuration["credentials"].(map[string]any)
+	assert.Equal(t, runner.CredentialsSourceSubscription, credentials["source"])
+	_, hasModel := node.Configuration["model"]
+	assert.False(t, hasModel)
+	_, hasTurns := node.Configuration["maxTurns"]
+	assert.False(t, hasTurns)
+}
+
 func TestMaterializeFactoryTemplate(t *testing.T) {
 	result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
 		appID:   "app-1",
@@ -163,6 +187,8 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
 	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+	maxRuns := 5
+	assert.Equal(t, &yaml.ConcurrencySpec{Max: &maxRuns}, agent.Concurrency)
 	assert.NotContains(t, agent.Configuration, "credentials")
 	assert.NotContains(t, agent.Configuration, "model")
 	prompt := agentPrompt(t, agent)
@@ -229,6 +255,8 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, entrypoint.Integration)
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
+	maxRuns := 5
+	assert.Equal(t, &yaml.ConcurrencySpec{Max: &maxRuns}, agent.Concurrency)
 	prompt := agentPrompt(t, agent)
 	assert.Contains(t, prompt, "Merge check: risk.")
 	assert.Contains(t, prompt, "Description: {{ root().data.pull_request.description }}")
@@ -552,6 +580,50 @@ func TestCanvasAgentIncludesVisualEvidenceIgnoresUnrelatedRunners(t *testing.T) 
 	)
 	require.NotNil(t, input.includeVisualEvidence)
 	assert.False(t, *input.includeVisualEvidence)
+}
+
+func TestMaterializePRFeedbackDefaultsOmitsCommitIdentity(t *testing.T) {
+	cases := []struct {
+		name    string
+		source  string
+		build   func(prFeedbackBuildRequest) *yaml.Canvas
+		runners []string
+	}{
+		{
+			name:    "discussion",
+			source:  models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+			build:   buildDiscussionPRFeedbackCanvas,
+			runners: []string{prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID},
+		},
+		{
+			name:    "checks",
+			source:  models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
+			build:   buildChecksPRFeedbackCanvas,
+			runners: []string{prFeedbackRunnerNodeID},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			current := testCase.build(prFeedbackBuildRequest{Repository: "acme/app"})
+			result, err := materializePRFeedbackDefaults(
+				nil,
+				&models.Factory{OrganizationID: uuid.New()},
+				&models.Canvas{ID: uuid.New(), Name: "PR feedback"},
+				&models.CanvasVersion{Nodes: current.Nodes(), Edges: current.Edges()},
+				&models.FactoryPRFeedbackHandler{Source: testCase.source},
+				nil,
+			)
+			require.NoError(t, err)
+
+			defaults, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+			require.NoError(t, err)
+			for _, nodeID := range testCase.runners {
+				runner := findYAMLNode(t, defaults, nodeID)
+				assert.False(t, runnerHasStep(t, *runner, "Set Up Git User"))
+				assert.False(t, runnerHasStep(t, *runner, "Set Up DCO Signing"))
+			}
+		})
+	}
 }
 
 func TestMaterializePRFeedbackDefaultsRemovesSeparateEvidenceComment(t *testing.T) {

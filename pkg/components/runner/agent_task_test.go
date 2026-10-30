@@ -95,6 +95,33 @@ func TestAppendVisualEvidenceProtocolAddsProtocolToFirstPromptOnly(t *testing.T)
 	assert.Equal(t, 1, strings.Count(*twice[1].Prompt, "## Visual evidence protocol"))
 }
 
+func TestAppendPublishLinkProtocolAddsCommandToFirstPromptOnly(t *testing.T) {
+	t.Parallel()
+
+	firstPrompt := "deploy this pull request"
+	secondPrompt := "confirm the deploy"
+	command := "git status"
+	steps := []AgentStep{
+		{Name: "Prepare", Type: AgentStepBash, Command: &command},
+		{Name: "Deploy", Type: AgentStepPrompt, Prompt: &firstPrompt},
+		{Name: "Confirm", Type: AgentStepPrompt, Prompt: &secondPrompt},
+	}
+
+	got := AppendPublishLinkProtocol(steps, true)
+
+	require.Len(t, got, len(steps))
+	assert.Equal(t, firstPrompt, *steps[1].Prompt, "the original prompt must not change")
+	assert.Contains(t, *got[1].Prompt, firstPrompt)
+	assert.Contains(t, *got[1].Prompt, "superplane task artifact add-link")
+	assert.Contains(t, *got[1].Prompt, "superplane task artifact add-markdown")
+	assert.Contains(t, *got[1].Prompt, "superplane task artifact add-file")
+	assert.Contains(t, *got[1].Prompt, "publish_link")
+	assert.Equal(t, secondPrompt, *got[2].Prompt)
+	assert.Equal(t, command, *got[0].Command)
+	twice := AppendPublishLinkProtocol(got, true)
+	assert.Equal(t, 1, strings.Count(*twice[1].Prompt, "## Task link"))
+}
+
 func TestAppendVisualEvidenceProtocolDoesNothingWhenDisabled(t *testing.T) {
 	t.Parallel()
 
@@ -104,12 +131,12 @@ func TestAppendVisualEvidenceProtocolDoesNothingWhenDisabled(t *testing.T) {
 	assert.Equal(t, steps, AppendVisualEvidenceProtocol(steps, false))
 }
 
-func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
+func TestBuildAgentTaskAppliesStepWorkingDirectory(t *testing.T) {
 	t.Parallel()
 
 	prompt := "implement the change"
 	command := "git push"
-	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, files := BuildAgentTask(AgentTaskInput{
 		PrepareName:   "Prepare",
 		PrepareScript: NodePrepareScript("", "", ""),
 		RunScriptName: "run.js",
@@ -152,12 +179,12 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	assert.Equal(t, ActivityStreamScript, requireBrokerFile(t, files, "activity_stream.js").Content)
 }
 
-func TestBuildAgentBrokerTaskPreviewKeepsFullMultilineBody(t *testing.T) {
+func TestBuildAgentTaskPreviewKeepsFullMultilineBody(t *testing.T) {
 	t.Parallel()
 
 	prompt := "\nFirst line.\nSecond line.\n"
 	command := "set -e\necho one\necho two"
-	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, _ := BuildAgentTask(AgentTaskInput{
 		PrepareName:   "Prepare",
 		PrepareScript: NodePrepareScript("", "", ""),
 		RunScriptName: "run.js",
@@ -177,12 +204,12 @@ func TestBuildAgentBrokerTaskPreviewKeepsFullMultilineBody(t *testing.T) {
 	assert.Equal(t, "First line.\nSecond line.", commands[2].Preview)
 }
 
-func TestBuildAgentBrokerTaskAppliesNodeWorkingDirectoryWhenStepEmpty(t *testing.T) {
+func TestBuildAgentTaskAppliesNodeWorkingDirectoryWhenStepEmpty(t *testing.T) {
 	t.Parallel()
 
 	prompt := "implement the change"
 	command := "git push"
-	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, _ := BuildAgentTask(AgentTaskInput{
 		PrepareName:      "Prepare",
 		PrepareScript:    NodePrepareScript("", "", "repo"),
 		RunScriptName:    "run.js",
@@ -225,11 +252,11 @@ func TestApplyIntegrationUsagePrependsUsage(t *testing.T) {
 	assert.Equal(t, "Use gh.\n\nuser prompt", ApplyIntegrationUsage("user prompt", "Use gh."))
 }
 
-func TestBuildAgentBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
+func TestBuildAgentTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
 	t.Parallel()
 
 	prompt := "implement the change"
-	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, files := BuildAgentTask(AgentTaskInput{
 		PrepareName:   "Prepare",
 		PrepareScript: NodePrepareScript("", "", ""),
 		RunScriptName: "run.js",
@@ -272,7 +299,7 @@ func assertAgentStepMergesUsage(t *testing.T, command, inner string) {
 	assert.Contains(t, command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 }
 
-func requireBrokerFile(t *testing.T, files []BrokerTaskFile, path string) BrokerTaskFile {
+func requireBrokerFile(t *testing.T, files []TaskFile, path string) TaskFile {
 	t.Helper()
 	for _, file := range files {
 		if file.Path == path {
@@ -280,14 +307,14 @@ func requireBrokerFile(t *testing.T, files []BrokerTaskFile, path string) Broker
 		}
 	}
 	t.Fatalf("missing task file %q", path)
-	return BrokerTaskFile{}
+	return TaskFile{}
 }
 
-func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
+func TestBuildAgentTaskFetchesSignedAttachments(t *testing.T) {
 	t.Parallel()
 
 	prompt := "See ![bug](https://app.example/api/v1/public/files/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa?expires=1&sig=abc&sp_file=1)"
-	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, files := BuildAgentTask(AgentTaskInput{
 		PrepareName:   "Prepare",
 		PrepareScript: NodePrepareScript("", "", ""),
 		RunScriptName: "run.js",
@@ -315,11 +342,11 @@ func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
 	assert.Equal(t, "Implement", commands[3].Name)
 }
 
-func TestBuildAgentBrokerTaskProcessesVideoAttachments(t *testing.T) {
+func TestBuildAgentTaskProcessesVideoAttachments(t *testing.T) {
 	t.Parallel()
 
 	prompt := "See the clip"
-	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, files := BuildAgentTask(AgentTaskInput{
 		PrepareName:   "Prepare",
 		PrepareScript: NodePrepareScript("", "", ""),
 		RunScriptName: "run.js",
@@ -350,7 +377,7 @@ func TestBuildAgentBrokerTaskProcessesVideoAttachments(t *testing.T) {
 	assert.Equal(t, "Implement", commands[3].Name)
 }
 
-func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
+func TestBuildAgentTaskMintsFileRefsInPromptFiles(t *testing.T) {
 	t.Parallel()
 
 	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -364,7 +391,7 @@ func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, files := BuildAgentTask(AgentTaskInput{
 		PrepareName:     "Prepare",
 		PrepareScript:   NodePrepareScript("", "", ""),
 		RunScriptName:   "run.js",
@@ -400,7 +427,7 @@ func TestBuildAgentBrokerTaskMintsFileRefsInPromptFiles(t *testing.T) {
 	assert.NotContains(t, commands[3].Preview, "sp_file=1")
 }
 
-func TestBuildAgentBrokerTaskRewritesPlanningImagePaths(t *testing.T) {
+func TestBuildAgentTaskRewritesPlanningImagePaths(t *testing.T) {
 	t.Parallel()
 
 	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -414,7 +441,7 @@ func TestBuildAgentBrokerTaskRewritesPlanningImagePaths(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	_, files := BuildAgentTask(AgentTaskInput{
 		PrepareName:     "Prepare",
 		PrepareScript:   NodePrepareScript("", "", ""),
 		RunScriptName:   "run.js",
@@ -442,14 +469,14 @@ func TestBuildAgentBrokerTaskRewritesPlanningImagePaths(t *testing.T) {
 	assert.NotContains(t, prompt, "sp-file://")
 }
 
-func TestBuildAgentBrokerTaskPreviewOmitsDispatchOnlyImaginedLimit(t *testing.T) {
+func TestBuildAgentTaskPreviewOmitsDispatchOnlyImaginedLimit(t *testing.T) {
 	t.Parallel()
 
 	original := "Stop after 20 minutes. Token budget is 10000."
 	steps := []AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &original}}
 	dispatched := appendImaginedLimitPrompt(steps)
 
-	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+	commands, files := BuildAgentTask(AgentTaskInput{
 		PrepareName:     "Prepare",
 		PrepareScript:   NodePrepareScript("", "", ""),
 		RunScriptName:   "run.js",

@@ -1,3 +1,5 @@
+import { TaskRefinementModelSelect } from "../TaskRefinementModelSelect";
+import { FactoryTaskScope } from "../FactoryTaskScope";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -104,19 +106,22 @@ export function MobileTaskDetailPage() {
     );
   }
   return (
-    <LoadedMobileTask
-      key={order.id}
-      order={order}
-      orderId={order.id}
-      lineId={boardLineId}
-      lineName={factory?.lines?.find((line) => line.id === boardLineId)?.name}
-      onBack={backToBoard}
-      backDisabled={!boardLineId}
-    />
+    <FactoryTaskScope factoryId={factoryId} orderId={order.id}>
+      <LoadedMobileTask
+        key={order.id}
+        order={order}
+        orderId={order.id}
+        lineId={boardLineId}
+        lineName={factory?.lines?.find((line) => line.id === boardLineId)?.name}
+        onBack={backToBoard}
+        backDisabled={!boardLineId}
+      />
+    </FactoryTaskScope>
   );
 }
 
 type MobileTaskModel = {
+  orderId: string;
   fixture: SplitRunFixture;
   artifacts: FactoriesWorkOrderArtifact[];
   artifactsLoading: boolean;
@@ -127,6 +132,7 @@ type MobileTaskModel = {
   dispatchDraft?: (model?: string, thinkingLevel?: string) => Promise<void>;
   onArchive: ReturnType<typeof footerMutationHandlers>["onArchive"];
   onReject: ReturnType<typeof footerMutationHandlers>["onReject"];
+  onContinueFixes: ReturnType<typeof footerMutationHandlers>["onContinueFixes"];
   onStop: ReturnType<typeof footerMutationHandlers>["onStop"];
   startBusy: boolean;
   actionBusy: boolean;
@@ -199,6 +205,7 @@ function useMobileTaskModel(
     : undefined;
 
   return {
+    orderId,
     fixture,
     artifacts,
     artifactsLoading,
@@ -209,6 +216,7 @@ function useMobileTaskModel(
     dispatchDraft,
     onArchive: mutations.onArchive,
     onReject: mutations.onReject,
+    onContinueFixes: mutations.onContinueFixes,
     onStop: mutations.onStop,
     startBusy: cardActions.dispatchingOrderIds.has(orderId),
     actionBusy: footerActions.busy,
@@ -353,6 +361,7 @@ function useMobileDraftStart(model: MobileTaskModel, startLineKey: string) {
   );
   const modelSelect = showsPhoneDraftModelSelect(model.planningEnabled, fixture.footer) ? (
     <MobileDraftStartModelSelect
+      orderId={model.orderId}
       organizationId={organizationId}
       factoryId={factoryId}
       lineName={model.lineName}
@@ -463,6 +472,7 @@ function MobileTaskHeader({
       <h1 className="text-[20px] leading-snug font-semibold tracking-[-0.02em] text-foreground break-words">
         {fixture.title}
       </h1>
+      <TaskRefinementModelSelect organizationId={organizationId} canEdit={ownerEdits.canEdit} />
       <OwnerTimeCostRow
         fixture={{ ...fixture, owner: ownerEdits.owner }}
         className="mt-0"

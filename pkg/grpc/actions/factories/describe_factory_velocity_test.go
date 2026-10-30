@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -1099,14 +1100,14 @@ func TestDescribeFactoryVelocity_CostsMatchTheWorkspaceLedger(t *testing.T) {
 
 	currentStart, currentEnd := velocityBoundsFromPoints(resp.Points)
 	factoryID := factoryModel.ID
-	model, _, err := models.SummarizeUsage(db, models.UsageReportFilter{
+	model, _, err := billingmodels.SummarizeUsage(db, billingmodels.UsageReportFilter{
 		OrganizationID: factoryModel.OrganizationID,
 		FactoryID:      &factoryID,
 		Since:          currentStart,
 		Until:          currentEnd,
 	})
 	require.NoError(t, err)
-	compute, _, err := models.SummarizeComputeUsage(db, models.UsageReportFilter{
+	compute, _, err := billingmodels.SummarizeComputeUsage(db, billingmodels.UsageReportFilter{
 		OrganizationID: factoryModel.OrganizationID,
 		FactoryID:      &factoryID,
 		Since:          currentStart,
@@ -1136,14 +1137,14 @@ func TestDescribeFactoryVelocity_CostsMatchTheWorkspaceLedger(t *testing.T) {
 	assert.Equal(t, int64(1), quiet.CostCents, "spend on a day with no merge still counts")
 
 	previousStart := currentStart.AddDate(0, 0, -period)
-	previousModel, _, err := models.SummarizeUsage(db, models.UsageReportFilter{
+	previousModel, _, err := billingmodels.SummarizeUsage(db, billingmodels.UsageReportFilter{
 		OrganizationID: factoryModel.OrganizationID,
 		FactoryID:      &factoryID,
 		Since:          previousStart,
 		Until:          currentStart,
 	})
 	require.NoError(t, err)
-	previousCompute, _, err := models.SummarizeComputeUsage(db, models.UsageReportFilter{
+	previousCompute, _, err := billingmodels.SummarizeComputeUsage(db, billingmodels.UsageReportFilter{
 		OrganizationID: factoryModel.OrganizationID,
 		FactoryID:      &factoryID,
 		Since:          previousStart,
