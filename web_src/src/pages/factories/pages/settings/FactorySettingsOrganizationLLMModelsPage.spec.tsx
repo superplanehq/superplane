@@ -169,24 +169,40 @@ describe("workspace LLM model settings", () => {
   it("shows only the saved source and keeps it selected while a switch is canceled", async () => {
     connectedProviders.add("openai");
     renderPage("AGENT_HARNESS_SUPERPLANE");
-    expect(screen.getByRole("tab", { name: "SuperPlane" })).toHaveAttribute("aria-selected", "true");
+    const user = userEvent.setup();
+    expect(screen.getByRole("status", { name: "SuperPlane is active" })).toBeInTheDocument();
     expect(screen.queryByRole("searchbox", { name: "Search OpenAI models" })).not.toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Your API key" }));
-    expect(screen.getByRole("tab", { name: "SuperPlane", hidden: true })).toHaveAttribute("aria-selected", "true");
-    await userEvent.setup().click(screen.getByRole("button", { name: "Keep SuperPlane" }));
+    expect(screen.getAllByRole("button", { name: "Change model source" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Select Your API key" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Change model source" }));
+    expect(screen.getByRole("dialog", { name: "Change model source" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Current source" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Select Your API key" }));
+    expect(screen.getByRole("status", { name: "SuperPlane is active", hidden: true })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back to sources" }));
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
+    expect(screen.getByRole("dialog", { name: "Change model source" })).toBeInTheDocument();
+    expect(switchSource).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Select Your API key" }));
+    await user.click(screen.getByRole("button", { name: "Keep SuperPlane" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change model source" })).toHaveFocus();
     expect(switchSource).not.toHaveBeenCalled();
   });
 
-  it("moves source focus with arrow keys and activates only with Enter", async () => {
+  it("opens source choices and confirmation with the keyboard", async () => {
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    screen.getByRole("tab", { name: "SuperPlane" }).focus();
-    await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: "Your API key" })).toHaveFocus();
+    screen.getByRole("button", { name: "Change model source" }).focus();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Change model source" })).toBeInTheDocument();
+    screen.getByRole("button", { name: "Select Your API key" }).focus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Select ChatGPT subscriptions" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "Switch to Codex" })).toBeInTheDocument();
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
   });
 
   it("saves an explicit empty workspace selection without enabling inheritance", async () => {
@@ -234,6 +250,25 @@ describe("workspace LLM model settings", () => {
       allowedModels: ["gpt-5"],
       inheritParent: false,
     });
+  });
+
+  it("connects another API key provider through the same source dialog", async () => {
+    connectedProviders.add("openai");
+    renderPage("AGENT_HARNESS_CODEX");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Change model source" }));
+    await user.click(screen.getByRole("button", { name: "Change provider" }));
+    await user.click(screen.getByRole("combobox", { name: "New API key provider" }));
+    await user.click(screen.getByRole("option", { name: "Claude" }));
+    await user.click(screen.getByRole("button", { name: "Switch to Claude" }));
+    expect(screen.getByRole("dialog", { name: "Your Claude key" })).toBeInTheDocument();
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
+    expect(switchSource).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText("Claude API key"), "provider-key");
+    await user.click(screen.getByRole("button", { name: "Save and switch" }));
+    expect(switchSource).toHaveBeenCalledWith({ source: "anthropic", apiKey: "provider-key" });
+    expect(await screen.findByRole("status", { name: "Your API key is active" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("preserves unavailable subscription IDs until they are removed", async () => {
@@ -297,7 +332,7 @@ describe("workspace LLM model settings", () => {
     canUpdate = false;
     renderPage("AGENT_HARNESS_SUPERPLANE");
     expect(screen.getByRole("button", { name: "Save models" })).toBeDisabled();
-    expect(screen.getByRole("tab", { name: "Your API key" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Change model source" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: /sonnet 4-6/ })).toBeDisabled();
   });
 
@@ -306,7 +341,8 @@ describe("workspace LLM model settings", () => {
     renderPage("AGENT_HARNESS_CODEX", true);
     expect(await screen.findByText("Other member")).toBeInTheDocument();
     expect(screen.getByText("other@example.com")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "5-hour window remaining" })).toHaveAttribute("aria-valuenow", "75");
+    expect(screen.getByText("5-hour window")).toBeInTheDocument();
+    expect(screen.getByText("75% remaining")).toBeInTheDocument();
     expect(screen.queryByText("personal@example.com")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /(?:Connect|Reconnect|Disconnect) ChatGPT|Refresh usage/ }),
