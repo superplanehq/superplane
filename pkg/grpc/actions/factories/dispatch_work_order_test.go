@@ -431,6 +431,39 @@ func Test__DispatchWorkOrder__RerunStepKeepsEarlierExecutions(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp.Order.LineDispatches[0].StepExecutions), 2)
 }
 
+func Test__DispatchWorkOrder__KeepsSavedOwnersOfOpenTaskOutsideSubscriptionWorkspaces(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	creator := support.CreateUser(t, r, r.Organization.ID)
+	owner := support.CreateUser(t, r, r.Organization.ID)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &creator.ID, []uuid.UUID{creator.ID, owner.ID}, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []uuid.UUID{creator.ID, owner.ID}, reloaded.AssigneeIDs())
+}
+
 func Test__DispatchWorkOrder__ReturnsOwnerNameAfterStart(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

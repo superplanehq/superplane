@@ -48,8 +48,11 @@ func updateInteractiveWorkOrderAssignees(tx *gorm.DB, factory *models.Factory, o
 	return err
 }
 
+// assignWorkOrderStarter makes the caller the only owner of the task. Only
+// subscription workspaces need this, because the caller's Codex connection
+// runs the task. Other workspaces keep the saved owners.
 func assignWorkOrderStarter(tx *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder, actor *uuid.UUID) error {
-	if actor == nil {
+	if actor == nil || !factory.OnboardingConfigValue().CodexSubscription {
 		return nil
 	}
 	owners, err := order.ListAssignees(tx)
