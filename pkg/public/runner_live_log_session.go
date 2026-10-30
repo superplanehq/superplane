@@ -29,6 +29,7 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		"read",
 	)
 	if err != nil {
+		middleware.SetServerError(r.Context(), err, runnerLiveLogDiagnosticTags(r, "authorization"))
 		http.Error(w, "Authorization check failed", http.StatusInternalServerError)
 		return
 	}
@@ -51,18 +52,18 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 
 	access, err := runneraction.ResolveLiveLogAccess(user.OrganizationID, canvasID, executionID)
 	if err != nil {
-		writeRunnerLiveLogSessionError(w, r, err)
+		writeRunnerLiveLogSessionError(w, r, err, runnerLiveLogDiagnosticTags(r, "access_lookup"))
 		return
 	}
 	pricing, err := runneraction.ResolveHostedUsagePricing(database.DB(r.Context()), user.OrganizationID, access.ComponentName, access.Configuration)
 	if err != nil {
-		writeRunnerLiveLogSessionError(w, r, err)
+		writeRunnerLiveLogSessionError(w, r, err, runnerLiveLogDiagnosticTags(r, "pricing_lookup"))
 		return
 	}
 	if access.TaskBackend == core.RunnerTaskBackendIntegrated {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		err := json.NewEncoder(w).Encode(map[string]any{
 			"backend":        "integrated",
 			"hosted_pricing": pricing,
 			"stream_url": "/api/v1/canvases/" +
@@ -71,11 +72,15 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 				executionID.String() +
 				"/runner-logs",
 		})
+		if err != nil {
+			middleware.SetServerError(r.Context(), err, runnerLiveLogDiagnosticTags(r, "response_encoding"))
+		}
 		return
 	}
 
 	session, err := runneraction.NewLiveLogSession(access.BrokerTaskID, time.Now())
 	if err != nil {
+		middleware.SetServerError(r.Context(), err, runnerLiveLogDiagnosticTags(r, "session_creation"))
 		if errors.Is(err, runneraction.ErrLiveLogNotConfigured) {
 			http.Error(w, "Live logs are not configured on this installation", http.StatusServiceUnavailable)
 			return
@@ -94,11 +99,25 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		"expires_at":     session.ExpiresAt,
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
+		middleware.SetServerError(r.Context(), err, runnerLiveLogDiagnosticTags(r, "response_encoding"))
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
 
-func writeRunnerLiveLogSessionError(w http.ResponseWriter, r *http.Request, err error) {
+func runnerLiveLogDiagnosticTags(r *http.Request, operation string) map[string]string {
+	tags := map[string]string{"operation": operation}
+	if user, ok := middleware.GetUserFromContext(r.Context()); ok {
+		tags["organization_id"] = user.OrganizationID.String()
+	}
+	for _, key := range []string{"canvas_id", "execution_id"} {
+		if id, err := uuid.Parse(strings.TrimSpace(mux.Vars(r)[key])); err == nil {
+			tags[key] = id.String()
+		}
+	}
+	return tags
+}
+
+func writeRunnerLiveLogSessionError(w http.ResponseWriter, r *http.Request, err error, tags map[string]string) {
 	switch {
 	case errors.Is(err, runneraction.ErrLiveLogCanvasNotFound):
 		http.Error(w, "Canvas not found", http.StatusNotFound)
@@ -116,7 +135,7 @@ func writeRunnerLiveLogSessionError(w http.ResponseWriter, r *http.Request, err 
 			http.StatusNotFound,
 		)
 	default:
-		middleware.SetServerError(r.Context(), err, nil)
+		middleware.SetServerError(r.Context(), err, tags)
 		http.Error(w, "Lookup failed", http.StatusInternalServerError)
 	}
 }

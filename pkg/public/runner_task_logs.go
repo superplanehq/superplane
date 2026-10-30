@@ -57,7 +57,7 @@ func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	access, err := runneraction.ResolveLiveLogAccess(user.OrganizationID, canvasID, executionID)
 	if err != nil {
-		writeRunnerLiveLogSessionError(w, r, err)
+		writeRunnerLiveLogSessionError(w, r, err, runnerLiveLogDiagnosticTags(r, "access_lookup"))
 		return
 	}
 	if access.TaskBackend != core.RunnerTaskBackendIntegrated {
