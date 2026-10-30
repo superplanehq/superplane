@@ -65,6 +65,7 @@ blocks:
         - name: Checks
           commands:
             - make test.release
+            - make test.image
             - make check.db.structure
             - make check.db.migrations
             - make check.components.docs
@@ -174,7 +175,7 @@ blocks:
         commands:
           - "cache restore go-mod-$(checksum go.sum),go-mod"
           - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
-          - make dev.up
+          - make image.ci.up
           - make dev.setup.npm
       jobs:
         - name: Build image
