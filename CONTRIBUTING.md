@@ -75,6 +75,17 @@ After the first setup, run `make dev.up` when the stack is not running, then
 `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you
 need a fresh `npm install`, codegen, or migrations.
 
+Billing stays enabled in local development. With `APP_ENV=development`,
+owner setup gives the Demo organization a manual Business plan and $1,000
+in development credit. This uses local billing records and does not create
+a Polar subscription. Other organizations keep normal billing defaults.
+The seed runs only when owner setup creates Demo. It does not reset balances
+when you restart the server or run `make dev.setup` again.
+
+To disable billing enforcement, set `SUPERPLANE_BILLING_ENABLED=no` in `.env`.
+Run `make dev.up`, then run `make dev.server` to apply changed container
+environment values.
+
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
 After owner setup, create the required installation fleets through the admin
