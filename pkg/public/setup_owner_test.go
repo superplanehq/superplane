@@ -19,6 +19,7 @@ import (
 )
 
 func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
 	middleware.ResetOwnerSetupStateForTests()
 
 	r := support.Setup(t)
@@ -329,4 +330,74 @@ func TestSetupOwnerSkipsWelcomeCreditWhenBillingDisabled(t *testing.T) {
 	status := getSetupOwnerStatus(t, server, authCookie)
 	assert.Equal(t, setupOwnerStatusInProgress, status["status"])
 	assert.Equal(t, models.OwnerSetupStepLicense, status["step"])
+}
+
+func TestSetupOwnerSeedsDemoBillingOnlyInDevelopment(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		appEnv  string
+		billing string
+		seeded  bool
+	}{
+		{name: "development", appEnv: "development", billing: "yes", seeded: true},
+		{name: "production", appEnv: "production", billing: "yes"},
+		{name: "test", appEnv: "test", billing: "yes"},
+		{name: "unset environment", billing: "yes"},
+		{name: "billing disabled", appEnv: "development", billing: "no"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("APP_ENV", tc.appEnv)
+			t.Setenv(billingmodels.BillingEnabledEnv, tc.billing)
+			server := setupOwnerTestServer(t)
+			submitOwnerForm(t, server)
+
+			db := database.DB(t.Context())
+			organization, err := models.FindOrganizationByName("Demo")
+			require.NoError(t, err)
+			credit, err := billingmodels.DescribeOrganizationLLMCredit(db, organization.ID)
+			require.NoError(t, err)
+			plan, err := billingmodels.FindOrganizationBillingPlan(db, organization.ID)
+			require.NoError(t, err)
+			if !tc.seeded {
+				assert.Zero(t, credit.GrantMicros)
+				if tc.billing == "no" {
+					assert.Nil(t, plan)
+					return
+				}
+				require.NotNil(t, plan)
+				assert.Equal(t, billingmodels.BillingPlanNone, plan.Plan)
+				return
+			}
+
+			require.NotNil(t, plan)
+			assert.Equal(t, billingmodels.BillingPlanBusiness, plan.Plan)
+			assert.Equal(t, billingmodels.BillingPlanSourceAdmin, plan.PlanSource)
+			assert.True(t, plan.IsActiveBusiness())
+			assert.Nil(t, plan.PolarSubscriptionID)
+			assert.False(t, plan.Catalog.RequirePaymentMethod)
+			assert.Equal(t, int64(1_000_000_000), credit.RemainingMicros)
+			require.NoError(t, billingmodels.AssertHostedRunAllowed(db, organization.ID, nil))
+			retryBody, err := json.Marshal(SetupOwnerRequest{
+				Email: "owner@example.com", FirstName: "Owner", LastName: "User", Password: "Password1",
+			})
+			require.NoError(t, err)
+			retry := execRequest(server, requestParams{
+				method: http.MethodPost, path: "/api/v1/setup-owner", body: retryBody, contentType: "application/json",
+			})
+			assert.Equal(t, http.StatusConflict, retry.Code)
+			credit, err = billingmodels.DescribeOrganizationLLMCredit(db, organization.ID)
+			require.NoError(t, err)
+			assert.Equal(t, int64(1_000_000_000), credit.RemainingMicros)
+
+			other, err := models.CreateOrganization("Another organization", "")
+			require.NoError(t, err)
+			otherCredit, err := billingmodels.DescribeOrganizationLLMCredit(db, other.ID)
+			require.NoError(t, err)
+			assert.Zero(t, otherCredit.GrantMicros)
+			otherPlan, err := billingmodels.FindOrganizationBillingPlan(db, other.ID)
+			require.NoError(t, err)
+			require.NotNil(t, otherPlan)
+			assert.Equal(t, billingmodels.BillingPlanNone, otherPlan.Plan)
+		})
+	}
 }
