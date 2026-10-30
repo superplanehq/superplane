@@ -37,18 +37,6 @@ export function CodexQuotaWindow({ window, label }: { window: FactoriesCodexUsag
           {expired ? "Update needed" : remaining === undefined ? "Usage unavailable" : `${remaining}% remaining`}
         </span>
       </div>
-      {!expired && remaining !== undefined ? (
-        <div
-          role="progressbar"
-          aria-label={`${windowLabel} remaining`}
-          aria-valuenow={remaining}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          className="h-2 overflow-hidden rounded-full bg-muted"
-        >
-          <div className="h-full bg-primary" style={{ width: `${remaining}%` }} />
-        </div>
-      ) : null}
       {window.resetsAt ? (
         <p className="text-[12px] text-muted-foreground">
           {expired ? "Reset time passed" : "Resets"}: {new Date(window.resetsAt).toLocaleString()}
