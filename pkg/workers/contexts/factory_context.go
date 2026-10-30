@@ -1172,6 +1172,26 @@ func (c *FactoryContext) VCSProvider() (string, error) {
 	return factory.OnboardingConfigValue().VCSProvider, nil
 }
 
+// GitHubHost returns the hostname of the workspace GitHub integration.
+// Empty means github.com, or that the workspace does not use GitHub.
+func (c *FactoryContext) GitHubHost() (string, error) {
+	if c.canvas == nil || c.canvas.FactoryID == nil {
+		return "", nil
+	}
+	factory, err := c.currentFactory()
+	if err != nil {
+		return "", err
+	}
+	host, err := githubcommon.HostFromFactoryOnboarding(c.tx, c.canvas.OrganizationID, factory.OnboardingConfigValue())
+	if err != nil {
+		return "", err
+	}
+	if host.IsDotCom() {
+		return "", nil
+	}
+	return host.WebHostname(), nil
+}
+
 func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {

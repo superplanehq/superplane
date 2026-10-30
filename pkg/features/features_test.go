@@ -161,6 +161,12 @@ func Test__Get(t *testing.T) {
 		assert.False(t, ok)
 		assert.Equal(t, Feature{}, feature)
 	})
+
+	t.Run("retired GitHub Enterprise Cloud flag is absent", func(t *testing.T) {
+		feature, ok := Get("github_enterprise")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
 }
 
 func Test__Exists(t *testing.T) {
@@ -188,6 +194,7 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists("factory_jira_intake"))
 	assert.False(t, Exists("factory_linear_intake"))
 	assert.False(t, Exists("factory_bitbucket"))
+	assert.False(t, Exists("github_enterprise"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

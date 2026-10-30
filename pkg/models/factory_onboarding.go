@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	gitHubDotComWebURL = "https://github.com"
+
 	FactoryOnboardingIssuesSourceVCS    = "vcs"
 	FactoryOnboardingIssuesSourceLinear = "linear"
 	FactoryOnboardingIssuesSourceJira   = "jira"
@@ -130,12 +132,16 @@ func VCSProviderForIntegrationApp(appName string) (string, bool) {
 
 // VCSRepositoryCloneURL returns the HTTPS clone URL for an owner/name
 // repository on the provider. An empty provider means GitHub.
-func VCSRepositoryCloneURL(provider, repository string) string {
+func VCSRepositoryCloneURL(provider, repository, serverURL string) string {
 	repository = strings.TrimSuffix(strings.TrimSpace(repository), ".git")
 	if provider == ProviderBitbucket {
 		return "https://bitbucket.org/" + repository + ".git"
 	}
-	return "https://github.com/" + repository + ".git"
+	base := strings.TrimSuffix(strings.TrimSpace(serverURL), "/")
+	if base == "" {
+		base = gitHubDotComWebURL
+	}
+	return base + "/" + repository + ".git"
 }
 
 // FactoryVCSCapabilities is the set of factory automations a Git host can run.

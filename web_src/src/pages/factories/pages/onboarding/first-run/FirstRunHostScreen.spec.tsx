@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
 
 import { IntegrationChoiceIcon } from "../onboardingSteps";
+import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHostScreen } from "./FirstRunHostScreen";
 import { FirstRunModelSourceChoice } from "./FirstRunModelSourceChoice";
 import { FirstRunShell } from "./FirstRunShell";
@@ -25,6 +26,27 @@ function expectColoredMark(image: HTMLImageElement) {
 }
 
 describe("FirstRunHostScreen", () => {
+  it("enables GitHub Enterprise Cloud when the license grants it", () => {
+    render(<FirstRunHostScreen selectedHost={null} githubEnterpriseLicensed onChooseHost={vi.fn()} />);
+
+    const option = screen.getByTestId("first-run-host-github-enterprise");
+    expect(option).toHaveTextContent("GitHub Enterprise Cloud");
+    expect(option.querySelector("[data-testid='connect-option-badge']")).toBeNull();
+    expect(within(option).getByRole("button")).toBeEnabled();
+  });
+
+  it("shows GitHub Enterprise Cloud disabled with an Enterprise badge when the license lacks it", () => {
+    render(<FirstRunHostScreen selectedHost={null} onChooseHost={vi.fn()} />);
+
+    const option = screen.getByTestId("first-run-host-github-enterprise");
+    expect(option).toHaveTextContent("GitHub Enterprise Cloud");
+    expect(option).toHaveTextContent(FIRST_RUN_COPY.host.githubEnterpriseRequiresLicense);
+    expect(within(option).getByTestId("connect-option-badge")).toHaveTextContent(
+      FIRST_RUN_COPY.host.githubEnterpriseBadge,
+    );
+    expect(within(option).getByRole("button")).toBeDisabled();
+  });
+
   it("shows a light GitHub mark on the dark host card without a dark ancestor", () => {
     render(<FirstRunHostScreen selectedHost={null} onChooseHost={vi.fn()} />);
 

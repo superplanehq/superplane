@@ -289,6 +289,8 @@ func reconcileFactoryRepository(
 	}
 	config := factory.OnboardingConfigValue()
 	nextBranch := strings.TrimSpace(config.DefaultBranch)
+	previousGitHubHost := githubHostForVCSIntegration(tx, factory.OrganizationID, previousVCSIntegrationID)
+	nextGitHubHost := githubHostForVCSIntegration(tx, factory.OrganizationID, vcsIntegrationID)
 	if retargetTasks {
 		if err := factory.RetargetUnfinishedWorkOrderBranches(
 			tx,
@@ -368,14 +370,14 @@ func reconcileFactoryRepository(
 				managedRunnerNodeIDs["capture-visual-evidence"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
 			case scheduledIntakeTemplateID:
-				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch) || changed
+				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 			}
 			if template.id == "line-implementation" {
 				changed = replaceLegacyCheckoutBaseToken(nodes, managedRunnerNodeIDs) || changed
 			}
 		}
 		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID {
-			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch) || changed
+			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
 			graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{
@@ -656,7 +658,7 @@ func replaceConfigurationValues(value any, replacements []configurationReplaceme
 // replaceWorkspaceCheckoutTarget keeps a baked checkout on the workspace
 // repository and branch together. A repository change rewrites the repository
 // slug and its clone URL. A branch change rewrites only BASE.
-func replaceWorkspaceCheckoutTarget(nodes []models.Node, provider, previousRepository, nextRepository, previousBranch, nextBranch string) bool {
+func replaceWorkspaceCheckoutTarget(nodes []models.Node, provider, previousRepository, nextRepository, previousBranch, nextBranch, previousGitHubHost, nextGitHubHost string) bool {
 	changed := replaceLiteralCheckoutBase(nodes, previousBranch, nextBranch)
 	previousRepository = strings.TrimSpace(previousRepository)
 	nextRepository = strings.TrimSpace(nextRepository)
@@ -665,7 +667,7 @@ func replaceWorkspaceCheckoutTarget(nodes []models.Node, provider, previousRepos
 	}
 	return replaceNodeConfigurationValues(nodes, []configurationReplacement{
 		{from: previousRepository, to: nextRepository},
-		{from: runner.WorkspaceContextRepoURL(provider, previousRepository), to: runner.WorkspaceContextRepoURL(provider, nextRepository)},
+		{from: runner.WorkspaceContextRepoURL(provider, previousRepository, previousGitHubHost), to: runner.WorkspaceContextRepoURL(provider, nextRepository, nextGitHubHost)},
 	}) || changed
 }
 

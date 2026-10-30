@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/runner"
@@ -665,6 +666,42 @@ func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
 	assert.Equal(t, "context/superplanehq/suss", contextFile.Repositories[0].Directory)
 	assert.Contains(t, paths["prompts/implement.txt"], "Setup commands")
 	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss (../context/superplanehq/suss)")
+}
+
+func TestAttachWorkspaceAgentResourcesUsesEnterpriseContextHost(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{"host": "acme.ghe.com"})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	vcsID := integration.ID.String()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/extra",
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+
+	paths := map[string]string{}
+	for _, file := range files {
+		paths[file.Path] = file.Content
+	}
+	require.Contains(t, paths, runner.WorkspaceContextConfigPath)
+	var contextFile struct {
+		Repositories []struct {
+			URL string `json:"url"`
+		} `json:"repositories"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(paths[runner.WorkspaceContextConfigPath]), &contextFile))
+	require.Len(t, contextFile.Repositories, 1)
+	assert.Equal(t, "https://acme.ghe.com/acme/extra.git", contextFile.Repositories[0].URL)
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testing.T) {

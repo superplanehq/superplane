@@ -1,15 +1,17 @@
 package factories
 
 import (
-	"github.com/superplanehq/superplane/pkg/triggers/schedule"
 	"math"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/triggers/schedule"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
@@ -57,6 +59,7 @@ func scheduledIntakeCanvas(db *gorm.DB, factory *models.Factory, name string, pa
 			"appRepository": config.AppRepository, "defaultBranch": config.DefaultBranch,
 			"hour": params["hour"], "minute": params["minute"], "timezone": params["timezone"], "prompt": params["prompt"],
 			"type": params["type"], "cronExpression": params["cronExpression"],
+			"githubHost": githubHostForFactory(db, factory),
 		},
 		integrations: map[string]factoryTemplateIntegration{provider: {name: resolveVCSInstallationName(db, factory)}},
 		agent:        factoryTemplateAgentFromIntake(agent),
@@ -77,10 +80,7 @@ func configureScheduledIntake(canvas *yaml.Canvas, provider string, params map[s
 	if repository == "" {
 		return invalidArgument("repository is required for scheduled intake")
 	}
-	host := "github.com"
-	if provider == models.ProviderBitbucket {
-		host = "bitbucket.org"
-	}
+	repoURL := scheduledIntakeRepoURL(provider, repository, params["githubHost"])
 	prompt := strings.TrimSpace(params["prompt"])
 	if prompt == "" {
 		prompt = scheduledIntakeDefaultPrompt
@@ -100,7 +100,7 @@ func configureScheduledIntake(canvas *yaml.Canvas, provider string, params map[s
 		}
 		node.Configuration["environmentFrom"] = []any{map[string]any{"source": "integration", "integration": map[string]any{"name": provider}}}
 		node.Configuration["environment"] = []any{
-			map[string]any{"name": "REPO_URL", "value": "https://" + host + "/" + repository + ".git", "valueSource": "literal"},
+			map[string]any{"name": "REPO_URL", "value": repoURL, "valueSource": "literal"},
 			map[string]any{"name": "BASE", "value": params["defaultBranch"], "valueSource": "literal"},
 		}
 		steps := node.Configuration["steps"].([]any)
@@ -109,6 +109,44 @@ func configureScheduledIntake(canvas *yaml.Canvas, provider string, params map[s
 		steps[1].(map[string]any)["prompt"] = prompt + scheduledIntakeOutputInstructions
 	}
 	return nil
+}
+
+func githubHostForFactory(db *gorm.DB, factory *models.Factory) string {
+	if factory == nil {
+		return ""
+	}
+	return githubHostForVCSIntegration(db, factory.OrganizationID, factory.OnboardingConfigValue().VCSIntegrationID)
+}
+
+func githubHostForVCSIntegration(db *gorm.DB, organizationID uuid.UUID, integrationID string) string {
+	id := strings.TrimSpace(integrationID)
+	if id == "" || db == nil {
+		return ""
+	}
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return ""
+	}
+	integration, err := models.FindIntegrationInTransaction(db, organizationID, parsed)
+	if err != nil {
+		return ""
+	}
+	host := githubcommon.HostFromModel(integration)
+	if host.IsDotCom() {
+		return ""
+	}
+	return host.WebHostname()
+}
+
+func scheduledIntakeRepoURL(provider, repository, githubHost string) string {
+	if provider == models.ProviderBitbucket {
+		return "https://bitbucket.org/" + repository + ".git"
+	}
+	host, err := githubcommon.ParseHost(githubHost)
+	if err != nil {
+		host = githubcommon.DotCom()
+	}
+	return host.CloneURL(repository)
 }
 
 func scheduledIntakeNumber(params map[string]string, key string, fallback, maximum int) (int, error) {

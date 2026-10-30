@@ -65,7 +65,7 @@ export function sphereFor(
   if (screen === "welcome") {
     return sphere(0.14, copy.captionSetup, { ...WELCOME_ART, pill: awaitingPill() });
   }
-  if (screen === "host" || screen === "connect") {
+  if (screen === "host" || screen === "connect" || screen === "ghe-host") {
     return sphere(0.24, copy.captionConnect, { ...CONNECT_ART, pill: awaitingPill() });
   }
   if (screen === "choose") {

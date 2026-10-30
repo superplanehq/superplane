@@ -1,28 +1,31 @@
 import { Button } from "@/components/ui/button";
+import { githubRepoWebUrl } from "@/lib/githubHost";
 
 const FALLBACK_MESSAGE = "GitHub did not create the webhook. SuperPlane cannot receive new issues. Try again.";
 
-function githubRepositoryWebhooksUrl(repository: string | undefined): string | undefined {
-  const name = repository?.trim() ?? "";
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(name)) {
+function githubRepositoryWebhooksUrl(repository: string | undefined, host?: string | null): string | undefined {
+  const repoUrl = githubRepoWebUrl(repository?.trim() ?? "", host);
+  if (!repoUrl) {
     return undefined;
   }
-  return `https://github.com/${name}/settings/hooks`;
+  return `${repoUrl}/settings/hooks`;
 }
 
 /** Tells the user why new GitHub issues do not become tasks, and how to try again. */
 export function IntakeWebhookFailureNotice({
   message,
   repository,
+  host,
   retrying = false,
   onRetry,
 }: {
   message?: string;
   repository?: string;
+  host?: string | null;
   retrying?: boolean;
   onRetry: () => void;
 }) {
-  const webhooksUrl = githubRepositoryWebhooksUrl(repository);
+  const webhooksUrl = githubRepositoryWebhooksUrl(repository, host);
 
   return (
     <section className="px-3 pb-3" data-testid="intake-webhook-failure">

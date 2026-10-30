@@ -101,12 +101,14 @@ spec:
               value: {{ .Values.blobStorage.credentialsFile | quote }}
             - name: RUNNER_ACTIVE_LOG_FS_PATH
               value: {{ .Values.runner.activeLogs.path | quote }}
+            {{- include "superplane.githubEnterpriseEnv" . | nindent 12 }}
           volumeMounts:
             - name: oidc-keys
               mountPath: /app/oidc-keys
               readOnly: true
             - name: runner-active-logs
               mountPath: {{ .Values.runner.activeLogs.path }}
+            {{- include "superplane.githubEnterpriseVolumeMount" . | nindent 12 }}
           {{- include "superplane.appContainerSecurityContext" (dict "securityContext" .Values.securityContext "indent" 10) }}
           {{- with .Values.workers.resources }}
           resources:
@@ -119,4 +121,5 @@ spec:
         - name: runner-active-logs
           persistentVolumeClaim:
             claimName: {{ include "runner.activeLogs.claimName" . }}
+        {{- include "superplane.githubEnterpriseVolume" . | nindent 8 }}
 {{- end }}

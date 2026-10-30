@@ -94,9 +94,11 @@ export function consoleArtifactKind(artifact: StageArtifact): ConsoleArtifactKin
   return "file";
 }
 
-export function artifactOpenHref(artifact: StageArtifact): string | undefined {
+export function artifactOpenHref(artifact: StageArtifact, host?: string | null): string | undefined {
   const data = toArtifactDataRecord(artifact.data);
-  return extractArtifactUrl(data) ?? (consoleArtifactKind(artifact) === "branch" ? branchTreeUrl(data) : undefined);
+  return (
+    extractArtifactUrl(data) ?? (consoleArtifactKind(artifact) === "branch" ? branchTreeUrl(data, host) : undefined)
+  );
 }
 
 export function isExpandableArtifact(kind: ConsoleArtifactKind): boolean {
