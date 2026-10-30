@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -502,8 +503,8 @@ func MarkCodexConnectionUncertain(tx *gorm.DB, taskID uuid.UUID, now time.Time) 
 }
 
 // ReleaseCodexReservationForTask releases the lease for one runner task.
-// A run lease ends when the task is terminal. A login lease also waits until
-// its VM is confirmed deleted.
+// A run lease ends when the task is terminal. A login lease requires confirmed
+// local setup cleanup or provider deletion.
 func ReleaseCodexReservationForTask(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
 	lease, err := FindCodexLeaseByTask(tx, taskID)
 	if err != nil || lease == nil {
@@ -597,6 +598,9 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 	if !lease.Login() && lease.RevokedAt == nil {
 		return deleteCodexLease(tx, &lease)
 	}
+	if codexSetupCompleted(&connection, &lease, task) {
+		return connection.finishLoginLease(tx, &lease, CodexConnectionStatusReady, now)
+	}
 	if task.RunnerID != nil {
 		runner, runnerErr := FindRunner(tx, *task.RunnerID)
 		if runnerErr != nil && !errors.Is(runnerErr, ErrRunnerNotFound) {
@@ -613,6 +617,24 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 		return deleteCodexLease(tx, &lease)
 	}
 	return connection.finishLoginLease(tx, &lease, codexLoginLeaseOutcome(&connection, &lease, task), now)
+}
+
+func codexSetupCompleted(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) bool {
+	if !lease.Login() || lease.RevokedAt != nil || connection.RevocationPendingAt != nil ||
+		task.State != RunnerTaskStateSucceeded || task.CancelRequestedAt != nil {
+		return false
+	}
+	if !slices.Contains([]string{CodexConnectionStatusPending, CodexConnectionStatusFinishing, CodexConnectionStatusReady}, connection.Status) ||
+		connection.FinalCheckpointVersion <= lease.StartedVersion ||
+		connection.FinalCheckpointVersion != connection.CredentialVersion || len(connection.BundleCiphertext) == 0 {
+		return false
+	}
+	var result map[string]any
+	if json.Unmarshal(task.Result, &result) != nil {
+		return false
+	}
+	cleaned, ok := result["codexSubscriptionSetupCleaned"].(bool)
+	return ok && cleaned
 }
 
 func codexLoginLeaseOutcome(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) string {

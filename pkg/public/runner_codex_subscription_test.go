@@ -25,6 +25,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/datatypes"
 )
 
 func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
@@ -47,6 +48,7 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 		body, err := json.Marshal(map[string]any{
 			"bundle": map[string]any{"access_token": "access-token", "refresh_token": "refresh-token", "id_token": "id-token"},
 			"usage":  usage,
+			"final":  true,
 		})
 		require.NoError(t, err)
 		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/checkpoint", bytes.NewReader(body))
@@ -96,6 +98,23 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 	staleToken, err := runneraction.MintCodexSubscriptionToken(signer, scope, time.Hour)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusConflict, checkpoint(staleToken, valid).Code)
+	// A completed setup scope cannot write again while provider deletion waits.
+	fleet := models.RunnerFleet{ID: uuid.New(), Slug: support.RandomName("fleet"), ScopeType: models.RunnerFleetScopeInstallation, Enabled: true, RunnerVersion: "test"}
+	require.NoError(t, fleet.Create(db))
+	runner := &models.Runner{ID: uuid.New(), FleetID: fleet.ID, State: models.RunnerStateTerminated, TerminatedAt: &now, RunnerVersion: "test"}
+	require.NoError(t, db.Create(runner).Error)
+	task := &models.RunnerTask{ID: taskID, OrganizationID: r.Organization.ID, FleetID: fleet.ID, RunnerID: &runner.ID,
+		Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateSucceeded, QueuedAt: now, FinishedAt: &now,
+		PayloadCiphertext: []byte("payload"), Result: datatypes.JSON(`{"codexSubscriptionSetupCleaned":true}`)}
+	require.NoError(t, db.Create(task).Error)
+	require.NoError(t, models.ReleaseCodexReservationForTask(db, taskID, now))
+	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+	require.Equal(t, models.CodexConnectionStatusReady, connection.Status)
+	originalBundle, originalVersion := append([]byte(nil), connection.BundleCiphertext...), connection.CredentialVersion
+	assert.Equal(t, http.StatusConflict, checkpoint(token, valid).Code)
+	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+	assert.Equal(t, originalBundle, connection.BundleCiphertext)
+	assert.Equal(t, originalVersion, connection.CredentialVersion)
 }
 
 func TestCodexRunCheckpointDoesNotReplaceTheRefreshToken(t *testing.T) {
