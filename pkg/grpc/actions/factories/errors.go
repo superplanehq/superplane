@@ -236,7 +236,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	case errors.Is(err, models.ErrSelectableLLMModelIncomplete):
 		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
 	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
-		return grpcerrors.FailedPrecondition(err, "This workspace does not allow the selected model.")
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, ghdependabot.ErrAlertsDisabled):
 		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsDisabledMessage)
 	case errors.Is(err, ghdependabot.ErrAlertsUnreadable):

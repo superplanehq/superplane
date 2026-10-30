@@ -670,7 +670,22 @@ func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing
 	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "native-allowed"}, {Model: "native-excluded"}}, time.Now()))
+	inherit := false
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, datatypes.JSONSlice[string]{"native-allowed"}, &inherit)
+	require.NoError(t, err)
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceHosted, nil, &inherit)
+	require.NoError(t, err)
 	require.NoError(t, resetTestOrganization(t, r))
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	policy, err := ListFactoryLLMModels(ctx, r.Organization.ID.String(), &pb.ListFactoryLLMModelsRequest{FactoryId: factory.ID.String(), Provider: models.UsageProviderOpenAI, FundingSource: models.UsageFundingSourceSubscription})
+	require.NoError(t, err)
+	assert.False(t, policy.InheritParent)
+	assert.Equal(t, []string{"native-allowed"}, codexLineModelIDs(policy.Selected))
+	hostedPolicy, err := ListFactoryLLMModels(ctx, r.Organization.ID.String(), &pb.ListFactoryLLMModelsRequest{FactoryId: factory.ID.String(), Provider: models.UsageProviderOpenAI, FundingSource: models.UsageFundingSourceHosted})
+	require.NoError(t, err)
+	assert.False(t, hostedPolicy.InheritParent)
+	assert.Empty(t, hostedPolicy.Selected)
 	for _, canvas := range []*models.Canvas{scheduled, planner} {
 		for _, node := range resetTestLiveVersion(t, canvas).Nodes {
 			if !isFactoryAgentHarness(node.ComponentName()) {

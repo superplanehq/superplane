@@ -224,6 +224,7 @@ export function IntakeSetupDefaultOwner({ owner, disabled }: { owner: IntakeOwne
 
 function OptionalOwnerSelect({
   organizationId,
+  factoryId,
   value,
   onChange,
   disabled,
@@ -231,6 +232,7 @@ function OptionalOwnerSelect({
   helpId,
 }: {
   organizationId: string;
+  factoryId?: string;
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
@@ -244,6 +246,7 @@ function OptionalOwnerSelect({
     <>
       <WorkOrderAssigneesPopover
         organizationId={organizationId}
+        factoryId={factoryId}
         selectedIds={value ? [value] : []}
         align="start"
         disabled={disabled}
@@ -252,7 +255,7 @@ function OptionalOwnerSelect({
         <Button
           type="button"
           variant="outline"
-          className="justify-start"
+          className="w-72 max-w-full justify-start"
           aria-labelledby={labelId}
           aria-describedby={helpId}
           disabled={disabled}

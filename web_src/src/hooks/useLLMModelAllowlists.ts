@@ -16,11 +16,12 @@ import {
 } from "@/api-client";
 import { getResponseErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { usePermissions } from "@/contexts/usePermissions";
 
 import { useBYOKAccess } from "./useBYOKAccess";
 
 import { factoryQueryKeys } from "./useFactoryData";
-import { hostedLLMModelsQueryKey } from "./useHostedLLMModels";
+import { invalidateWorkspaceModelQueries } from "./workspaceModelQueries";
 
 const BYOK_PROVIDERS = ["anthropic", "openai", "openrouter"] as const;
 
@@ -226,8 +227,10 @@ export function factoryLLMModelsQueryKey(
   factoryId: string,
   provider: string,
   fundingSource: string,
+  memberId = "",
 ) {
-  return [...factoryQueryKeys.detail(organizationId, factoryId), "llm-models", provider, fundingSource] as const;
+  const key = [...factoryQueryKeys.detail(organizationId, factoryId), "llm-models", provider, fundingSource] as const;
+  return fundingSource === "subscription" ? ([...key, memberId] as const) : key;
 }
 
 export function useFactoryLLMModels(
@@ -237,8 +240,15 @@ export function useFactoryLLMModels(
   fundingSource: string | undefined,
   enabled: boolean,
 ) {
+  const { currentUserId } = usePermissions();
   return useQuery({
-    queryKey: factoryLLMModelsQueryKey(organizationId ?? "", factoryId ?? "", provider ?? "", fundingSource ?? ""),
+    queryKey: factoryLLMModelsQueryKey(
+      organizationId ?? "",
+      factoryId ?? "",
+      provider ?? "",
+      fundingSource ?? "",
+      currentUserId,
+    ),
     queryFn: async () => {
       const response = await factoriesListFactoryLlmModels(
         withOrganizationHeader({
@@ -257,7 +267,12 @@ export function useFactoryLLMModels(
 export function useUpdateFactoryLLMModels(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { provider: string; fundingSource: string; allowedModels: string[] }) => {
+    mutationFn: async (input: {
+      provider: string;
+      fundingSource: string;
+      allowedModels: string[];
+      inheritParent?: boolean;
+    }) => {
       const response = await factoriesUpdateFactoryLlmModels(
         withOrganizationHeader({
           organizationId,
@@ -266,25 +281,13 @@ export function useUpdateFactoryLLMModels(organizationId: string, factoryId: str
             provider: input.provider,
             fundingSource: input.fundingSource,
             allowedModels: input.allowedModels,
+            inheritParent: input.inheritParent,
           },
         }),
       );
       return response.data ?? {};
     },
-    onSuccess: (_data, input) => {
-      void queryClient.invalidateQueries({
-        queryKey: factoryLLMModelsQueryKey(organizationId, factoryId, input.provider, input.fundingSource),
-      });
-      if (input.fundingSource === "hosted") {
-        void queryClient.invalidateQueries({
-          queryKey: hostedLLMModelsQueryKey(organizationId, input.provider, factoryId),
-        });
-        return;
-      }
-      void queryClient.invalidateQueries({
-        queryKey: byokLLMModelsQueryKey(organizationId, input.provider, factoryId),
-      });
-    },
+    onSuccess: () => invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId),
   });
 }
 
@@ -312,12 +315,10 @@ export function useSwitchFactoryModelSource(organizationId: string, factoryId: s
       return response.json();
     },
     onSuccess: () => {
+      void invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId);
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "intakes"] });
-      void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "owner-eligibility"] });
-      void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "line-runner-models"] });
       void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "byok-models"] });
-      void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "selectable-llm-models"] });
     },
   });
 }

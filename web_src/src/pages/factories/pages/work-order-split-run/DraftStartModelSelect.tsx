@@ -43,6 +43,7 @@ const START_THINKING_LEVELS = [
 export function DraftStartModelSelect({
   organizationId,
   factoryId,
+  orderId,
   lineName,
   model,
   thinkingLevel,
@@ -60,11 +61,12 @@ export function DraftStartModelSelect({
   disabled?: boolean;
   appearance?: Appearance;
 }) {
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true);
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId);
   const selectedName =
     model === DRAFT_START_MODEL_AUTO
       ? "Auto"
-      : (models.data?.models ?? []).find((item) => item.id === model)?.name || model;
+      : (models.data?.models ?? []).find((item) => item.id === model)?.name ||
+        (models.isLoading ? model : `${model} (unavailable)`);
   const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
   const showName = appearance !== "icon";
 

@@ -10,6 +10,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { showErrorToast } from "@/lib/toast";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { invalidateWorkspaceModelQueries } from "@/hooks/workspaceModelQueries";
 
 export function factoryCodexConnectionKey(organizationId: string, factoryId: string, memberId = "") {
   return ["factory-codex-connection", organizationId, factoryId, memberId] as const;
@@ -21,6 +22,7 @@ export function codexSubscriptionReady(connection: FactoriesFactoryCodexConnecti
 
 function invalidateSubscriptionCatalogs(queryClient: QueryClient, organizationId: string, factoryId: string) {
   return Promise.all([
+    invalidateWorkspaceModelQueries(queryClient, organizationId, factoryId),
     queryClient.invalidateQueries({
       queryKey: ["factories", organizationId, factoryId, "owner-eligibility"],
       refetchType: "all",
@@ -142,12 +144,12 @@ export function useFactoryCodexConnection(
       return;
     }
     const availableModels = query.data.availableModels ?? [];
+    const catalog = JSON.stringify(availableModels);
+    if (invalidatedCatalog.current !== catalog) {
+      invalidatedCatalog.current = catalog;
+      void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
+    }
     if (availableModels.length > 0) {
-      const catalog = availableModels.join("\n");
-      if (invalidatedCatalog.current !== catalog) {
-        invalidatedCatalog.current = catalog;
-        void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
-      }
       return;
     }
     if (!canRefreshCatalog) return;

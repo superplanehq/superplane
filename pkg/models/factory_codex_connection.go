@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -396,19 +397,17 @@ func ReserveFactoryCodexConnection(
 		if login != nil {
 			return &CodexConnectionBusyError{TaskID: login.TaskID}
 		}
+		if len(selectedModels) == 0 {
+			selectedModels = []string{""}
+		}
 		for _, selected := range selectedModels {
-			model := strings.TrimSpace(selected)
-			if model == "" {
-				continue
+			resolved, err := locked.resolvePermittedModel(tx, selected)
+			if err != nil {
+				return err
 			}
-			available := false
-			for _, candidate := range locked.AvailableModels {
-				if candidate.Model == model {
-					available = true
-					break
-				}
-			}
-			if !available {
+			// The model is fixed in the execution snapshot. A blank model must
+			// not delegate a restricted choice to the native default.
+			if strings.TrimSpace(selected) == "" && resolved != "" {
 				return ErrSubscriptionModelUnavailable
 			}
 		}
@@ -817,6 +816,16 @@ func (c *FactoryCodexConnection) StoreUsage(tx *gorm.DB, limits []CodexUsageLimi
 }
 
 func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID) ([]string, error) {
+	available, err := FactoryCodexAvailableSubscriptionModels(tx, organizationID, factoryID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	return ApplyFactoryLLMModelPolicy(tx, factoryID, UsageProviderOpenAI, UsageFundingSourceSubscription, available)
+}
+
+// FactoryCodexAvailableSubscriptionModels returns the owner's native catalog
+// before the workspace policy is applied.
+func FactoryCodexAvailableSubscriptionModels(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID) ([]string, error) {
 	connection, err := FindFactoryCodexConnection(tx, organizationID, factoryID, ownerID)
 	if errors.Is(err, ErrCodexConnectionNotFound) {
 		return nil, nil
@@ -832,6 +841,51 @@ func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID, owne
 		models = append(models, model.Model)
 	}
 	return CompactModelIDs(models), nil
+}
+
+// ResolveFactoryCodexSubscriptionModel preserves the native default while
+// inheriting. Restricted workspaces always dispatch a permitted native ID.
+func ResolveFactoryCodexSubscriptionModel(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID, requested string) (string, error) {
+	connection, err := FindFactoryCodexConnection(tx, organizationID, factoryID, ownerID)
+	if err != nil {
+		return "", err
+	}
+	return connection.resolvePermittedModel(tx, requested)
+}
+
+func (c *FactoryCodexConnection) resolvePermittedModel(tx *gorm.DB, requested string) (string, error) {
+	model := strings.TrimSpace(requested)
+	policy, err := FindFactoryLLMModelAllowlist(tx, c.FactoryID, UsageProviderOpenAI, UsageFundingSourceSubscription)
+	if err != nil {
+		return "", err
+	}
+	if model == "" && policy.InheritsParent() {
+		return "", nil
+	}
+	available := make([]string, 0, len(c.AvailableModels))
+	for _, candidate := range c.AvailableModels {
+		available = append(available, candidate.Model)
+	}
+	permitted, err := ApplyFactoryLLMModelPolicy(tx, c.FactoryID, UsageProviderOpenAI, UsageFundingSourceSubscription, CompactModelIDs(available))
+	if err != nil {
+		return "", err
+	}
+	if model != "" {
+		if !slices.Contains(permitted, model) {
+			return "", ErrSubscriptionModelUnavailable
+		}
+		return model, nil
+	}
+	if len(permitted) == 0 {
+		return "", fmt.Errorf("No ChatGPT models are enabled for this task owner. Update Workspace Models: %w", ErrSubscriptionModelUnavailable)
+	}
+	for _, candidate := range c.AvailableModels {
+		if candidate.IsDefault && slices.Contains(permitted, candidate.Model) {
+			return candidate.Model, nil
+		}
+	}
+	slices.Sort(permitted)
+	return permitted[0], nil
 }
 
 func activeHumanCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, error) {

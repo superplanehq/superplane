@@ -532,6 +532,11 @@ func switchFactoryModelSource(
 		integrationName = integration.InstallationName
 		integrationID = integration.ID.String()
 		ids, err := organizations.ListConnectedBYOKModelIDs(tx, reg, integration)
+		if err == nil {
+			if err := models.CreateOrganizationBYOKModelAllowlistIfAbsent(tx, factory.OrganizationID, source, datatypes.JSONSlice[string](ids)); err != nil {
+				return nil, "", err
+			}
+		}
 		if strings.TrimSpace(source) == modelSourceCustom {
 			if err != nil {
 				return nil, "", err
@@ -548,6 +553,12 @@ func switchFactoryModelSource(
 	rewrite, err := workspaceAgentRewriteFor(source, integrationName, modelIDs)
 	if err != nil {
 		return nil, "", err
+	}
+	if integration != nil {
+		rewrite, err = applyWorkspaceModelPolicyToRewrite(tx, factory, rewrite, modelIDs)
+		if err != nil {
+			return nil, "", err
+		}
 	}
 
 	patch := models.FactoryOnboardingPatch{AgentHarness: &rewrite.Harness, CodexSubscription: &subscription}
@@ -580,6 +591,42 @@ func switchFactoryModelSource(
 		}
 	}
 	return changed, integrationID, nil
+}
+
+func applyWorkspaceModelPolicyToRewrite(tx *gorm.DB, factory *models.Factory, rewrite workspaceAgentRewrite, catalog []string) (workspaceAgentRewrite, error) {
+	policy, err := models.FindFactoryLLMModelAllowlist(tx, factory.ID, rewrite.Provider, models.UsageFundingSourceBYOK)
+	if err != nil {
+		return workspaceAgentRewrite{}, err
+	}
+	parentSaved, err := models.OrganizationBYOKModelAllowlistExists(tx, factory.OrganizationID, rewrite.Provider)
+	if err != nil {
+		return workspaceAgentRewrite{}, err
+	}
+	if policy.InheritsParent() && !parentSaved {
+		return rewrite, nil
+	}
+	permitted, err := models.ResolveSelectableLLMModels(tx, factory.OrganizationID, &factory.ID, rewrite.Provider, models.UsageFundingSourceBYOK)
+	if err != nil {
+		return workspaceAgentRewrite{}, err
+	}
+	// A nil catalog means the provider list was temporarily unavailable. Saved
+	// policy still applies; a successful empty response permits no models.
+	if catalog != nil {
+		permitted = models.IntersectModelIDs(permitted, catalog)
+	}
+	slices.Sort(permitted)
+	if len(permitted) == 0 {
+		rewrite.Model = ""
+		rewrite.PlanningModel = ""
+		return rewrite, nil
+	}
+	if !slices.Contains(permitted, rewrite.Model) {
+		rewrite.Model = permitted[0]
+	}
+	if !slices.Contains(permitted, rewrite.PlanningModel) {
+		rewrite.PlanningModel = rewrite.Model
+	}
+	return rewrite, nil
 }
 
 // providerModelListUsesDefaults reports a temporary catalog failure.

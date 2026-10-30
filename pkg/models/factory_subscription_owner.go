@@ -282,15 +282,12 @@ func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasI
 			model = strings.TrimSpace(model)
 		}
 		// Expressions resolve later. Dispatch checks the resolved value.
-		if model == "" || strings.Contains(model, "{{") {
+		if strings.Contains(model, "{{") {
 			continue
 		}
-		allowed, err := RunnerAcceptsModel(tx, o.OrganizationID, &o.FactoryID, node.ComponentName(), node.Configuration, model, ownerID)
+		_, err := ResolveFactoryCodexSubscriptionModel(tx, o.OrganizationID, o.FactoryID, ownerID, model)
 		if err != nil {
 			return err
-		}
-		if !allowed {
-			return ErrSubscriptionModelUnavailable
 		}
 	}
 	return nil

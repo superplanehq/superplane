@@ -214,14 +214,11 @@ func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
 		return ErrSubscriptionOwnerInvalid
 	}
 	model, _ := execution.Configuration.Data()["model"].(string)
-	if model == "" {
-		return nil
-	}
-	allowed, err := RunnerAcceptsModel(tx, connection.OrganizationID, &connection.FactoryID, "runnerCodex", map[string]any{"credentials": map[string]any{"source": "subscription"}}, model, ownerID)
+	resolved, err := connection.resolvePermittedModel(tx, model)
 	if err != nil {
 		return err
 	}
-	if !allowed {
+	if strings.TrimSpace(model) == "" && resolved != "" {
 		return ErrSubscriptionModelUnavailable
 	}
 	return nil

@@ -1,121 +1,205 @@
+import { userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
+import type { FactoriesFactoryCodexConnection } from "@/api-client";
+import { PermissionsContext } from "@/contexts/permissionsContextState";
+import { usePermissions } from "@/contexts/usePermissions";
+import { FEATURE_CODEX_SUBSCRIPTIONS, FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  PRIMARY_FACTORY_KEY,
+  REFUND_FACTORY,
+  type FactoriesFixture,
+} from "../../__fixtures__/factoryPageResponses";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
+import { FactorySettingsOrganizationLLMModelsPage } from "./FactorySettingsOrganizationLLMModelsPage";
 
 const meta = {
-  title: "Factories/Pages/Settings/LLM Models",
+  title: "Factories/Pages/Settings/Models",
   component: FactorySettingsLayout,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof FactorySettingsLayout>;
-
 export default meta;
-
 type Story = StoryObj<typeof meta>;
-
-const modelsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`;
-
+const modelsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`;
+const features = [FEATURE_ORGANIZATION_BYOK, FEATURE_CODEX_SUBSCRIPTIONS];
 const OPENROUTER_CANDIDATES = [
   "anthropic/claude-sonnet-4-6",
   "anthropic/claude-opus-4-6",
-  "anthropic/claude-haiku-4-5",
   "openai/gpt-5",
-  "openai/gpt-4.1",
   "google/gemini-2.5-pro",
-  "google/gemini-2.5-flash",
   "moonshotai/kimi-k2.6",
   "deepseek/deepseek-chat",
   "qwen/qwen3-coder",
   "meta-llama/llama-4-maverick",
-  "mistralai/mistral-large",
 ];
 
-export const NoProviders: Story = {
-  name: "No providers",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={modelsPath}
-      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
-      factoriesFixture={{
-        ...defaultFactoriesFixture,
-        byokConnectedProviders: [],
-      }}
-    />
-  ),
-};
+function fixture(
+  source: "hosted" | "byok" | "subscription",
+  overrides: Partial<FactoriesFixture> = {},
+): FactoriesFixture {
+  return {
+    ...defaultFactoriesFixture,
+    factories: defaultFactoriesFixture.factories.map((factory) => ({
+      ...factory,
+      onboarding: {
+        ...factory.onboarding,
+        agentHarness:
+          source === "hosted"
+            ? "AGENT_HARNESS_SUPERPLANE"
+            : source === "subscription"
+              ? "AGENT_HARNESS_CODEX"
+              : "AGENT_HARNESS_CLAUDE_CODE",
+        codexSubscription: source === "subscription",
+        agentIntegrationId: source === "byok" ? "int-openrouter" : undefined,
+      },
+    })),
+    byokConnectedProviders: source === "byok" ? ["openrouter"] : [],
+    byokCandidatesByProvider: { openrouter: OPENROUTER_CANDIDATES },
+    codexConnection: {
+      id: "personal-connection",
+      status: "ready",
+      eligible: true,
+      accountLabel: "ada@example.com",
+      availableModels: ["gpt-5.4", "gpt-5.3-codex"],
+    },
+    ...overrides,
+  };
+}
+function policy(source: string, provider: string, ids: string[]) {
+  return { [`${REFUND_FACTORY.id}:${source}:${provider}`]: { inheritParent: false, configuredModels: ids } };
+}
+const renderFixture = (state: FactoriesFixture) => (
+  <FactoriesHarness pathSuffix={modelsPath} experimentalFeatures={features} factoriesFixture={state} />
+);
 
+export const NoProviders: Story = { render: () => renderFixture(fixture("byok", { byokConnectedProviders: [] })) };
 export const HostedSelection: Story = {
-  name: "SuperPlane organization selection",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={modelsPath}
-      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
-      factoriesFixture={{
-        ...defaultFactoriesFixture,
-        factories: defaultFactoriesFixture.factories.map((factory) => ({
-          ...factory,
-          onboarding: { ...factory.onboarding, agentHarness: "AGENT_HARNESS_SUPERPLANE" },
-        })),
-        byokConnectedProviders: [],
-      }}
-    />
-  ),
+  name: "SuperPlane workspace selection",
+  render: () =>
+    renderFixture(fixture("hosted", { workspaceModelPolicies: policy("hosted", "anthropic", ["claude-sonnet-4-6"]) })),
 };
-
 export const EmptyHostedSelection: Story = {
   name: "No SuperPlane models selected",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={modelsPath}
-      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
-      factoriesFixture={{
-        ...defaultFactoriesFixture,
-        factories: defaultFactoriesFixture.factories.map((factory) => ({
-          ...factory,
-          onboarding: { ...factory.onboarding, agentHarness: "AGENT_HARNESS_SUPERPLANE" },
-        })),
-        byokConnectedProviders: [],
-        hostedSelectedKeys: [],
-      }}
-    />
-  ),
+  render: () =>
+    renderFixture(
+      fixture("hosted", {
+        workspaceModelPolicies: {
+          ...policy("hosted", "anthropic", []),
+          ...policy("hosted", "openai", []),
+          ...policy("hosted", "openrouter", []),
+        },
+      }),
+    ),
 };
-
 export const OpenRouterOnly: Story = {
   name: "OpenRouter connected",
+  render: () =>
+    renderFixture(
+      fixture("byok", { workspaceModelPolicies: policy("byok", "openrouter", ["anthropic/claude-sonnet-4-6"]) }),
+    ),
+};
+export const AllConnected: Story = {
+  name: "Provider switching",
+  render: () => renderFixture(fixture("byok", { byokConnectedProviders: ["anthropic", "openai", "openrouter"] })),
+};
+export const Subscription: Story = {
+  render: () =>
+    renderFixture(fixture("subscription", { workspaceModelPolicies: policy("subscription", "openai", ["gpt-5.4"]) })),
+};
+export const UnavailableSubscriptionModels: Story = {
+  render: () =>
+    renderFixture(
+      fixture("subscription", {
+        workspaceModelPolicies: policy("subscription", "openai", [
+          "gpt-5.4",
+          "gpt-native-model-with-a-long-identifier-unavailable-to-the-current-editor",
+        ]),
+      }),
+    ),
+};
+export const ReconnectSubscription: Story = {
+  render: () =>
+    renderFixture(
+      fixture("subscription", {
+        codexConnection: { eligible: true, status: "reconnect_required", accountLabel: "ada@example.com" },
+      }),
+    ),
+};
+export const SubscriptionSignIn: Story = {
+  render: () =>
+    renderFixture(
+      fixture("subscription", {
+        codexConnection: {
+          eligible: true,
+          status: "pending",
+          verificationUrl: "https://auth.openai.com/codex/device",
+          verificationCode: "ABCD-1234",
+        },
+      }),
+    ),
+};
+export const CatalogError: Story = {
+  render: () =>
+    renderFixture(fixture("hosted", { workspaceModelPolicyError: "The model catalog is unavailable. Try again." })),
+};
+function ReadOnlyModels() {
+  const permissions = usePermissions();
+  return (
+    <PermissionsContext.Provider
+      value={{
+        ...permissions,
+        canAct: (resource, action) => action === "read" && permissions.canAct(resource, action),
+      }}
+    >
+      <FactorySettingsOrganizationLLMModelsPage />
+    </PermissionsContext.Provider>
+  );
+}
+export const ReadOnly: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={modelsPath}
-      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
-      factoriesFixture={{
-        ...defaultFactoriesFixture,
-        byokConnectedProviders: ["openrouter"],
-        byokCandidatesByProvider: {
-          openrouter: OPENROUTER_CANDIDATES,
-        },
-        byokSelectedByProvider: {
-          openrouter: ["anthropic/claude-sonnet-4-6"],
-        },
-      }}
+      experimentalFeatures={features}
+      factoriesFixture={fixture("hosted")}
+      pageOverrides={{ llmModels: ReadOnlyModels }}
     />
   ),
 };
+export const EmptySubscriptionCatalog: Story = {
+  render: () =>
+    renderFixture(
+      fixture("subscription", {
+        codexConnection: { eligible: true, status: "disconnected" } satisfies FactoriesFactoryCodexConnection,
+      }),
+    ),
+};
 
-export const AllConnected: Story = {
-  name: "All providers connected",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={modelsPath}
-      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
-      factoriesFixture={{
-        ...defaultFactoriesFixture,
-        byokCandidatesByProvider: {
-          openrouter: OPENROUTER_CANDIDATES,
-        },
-      }}
-    />
-  ),
+export const Loading: Story = {
+  render: () => renderFixture(fixture("hosted", { workspaceModelPolicyDelayMs: { GET: 30000 } })),
+};
+export const PendingSave: Story = {
+  render: () =>
+    renderFixture(
+      fixture("byok", {
+        workspaceModelPolicies: policy("byok", "openrouter", ["anthropic/claude-sonnet-4-6"]),
+        workspaceModelPolicyDelayMs: { PUT: 8000 },
+      }),
+    ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Select all" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Save models" }));
+  },
+};
+export const EmptySearch: Story = {
+  render: () => renderFixture(fixture("byok")),
+  play: async ({ canvasElement }) => {
+    await userEvent.type(
+      await within(canvasElement).findByRole("searchbox", { name: "Search OpenRouter models" }),
+      "no-matching-model",
+    );
+  },
 };

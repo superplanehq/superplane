@@ -8,7 +8,7 @@ const meta = {
   component: CodexUsageConnections,
   decorators: [
     (Story) => (
-      <FactorySettingsPageFrame title="Codex usage" subtitle="Saved usage for your ChatGPT subscriptions.">
+      <FactorySettingsPageFrame title="Codex usage">
         <Story />
       </FactorySettingsPageFrame>
     ),

@@ -118,7 +118,11 @@ func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	return b.replaceClaudeModelAlias(resolved)
+	resolved, err = b.replaceClaudeModelAlias(resolved)
+	if err != nil {
+		return nil, err
+	}
+	return b.applyExecutionModelPolicy(resolved)
 }
 
 func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
@@ -2393,15 +2397,38 @@ func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, m
 	if override == "" {
 		return resolved, nil
 	}
+	if b.tx == nil || b.workflowID == uuid.Nil || b.nodeID == "" {
+		return resolved, nil
+	}
+	node, err := models.FindCanvasNode(b.tx, b.workflowID, b.nodeID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return resolved, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !isAgentModelRunner(node.ComponentName()) {
+		return resolved, nil
+	}
+	credentials, _ := resolved["credentials"].(map[string]any)
+	if credentials["source"] != "subscription" && models.IsClaudeFamilyAlias(override) {
+		candidates, err := b.claudeAliasCandidates(resolved)
+		if err != nil {
+			return nil, err
+		}
+		override = models.ConcreteClaudeModelID(override, candidates)
+	}
 
 	ok, err := b.nodeAcceptsDispatchModel(resolved, override)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		credentials, _ := resolved["credentials"].(map[string]any)
 		if credentials["source"] == "subscription" {
 			return nil, models.ErrSubscriptionModelUnavailable
+		}
+		if llmFundingSource(resolved) == models.UsageFundingSourceBYOK {
+			return nil, models.ErrSelectableLLMModelNotAllowed
 		}
 		return resolved, nil
 	}
@@ -2410,7 +2437,82 @@ func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, m
 	return resolved, nil
 }
 
+func (b *NodeConfigurationBuilder) applyExecutionModelPolicy(resolved map[string]any) (map[string]any, error) {
+	credentials, _ := resolved["credentials"].(map[string]any)
+	source, _ := credentials["source"].(string)
+	if source != "subscription" && source != "integration" && source != "secret" {
+		return resolved, nil
+	}
+	if b.tx == nil || b.workflowID == uuid.Nil || b.nodeID == "" {
+		return resolved, nil
+	}
+	node, err := models.FindCanvasNode(b.tx, b.workflowID, b.nodeID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return resolved, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !isAgentModelRunner(node.ComponentName()) {
+		return resolved, nil
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, err
+	}
+	if source == "subscription" {
+		if node.ComponentName() != "runnerCodex" || canvas.FactoryID == nil {
+			return nil, models.ErrSubscriptionTaskAssociation
+		}
+		runID, err := b.executionRunID()
+		if err != nil {
+			return nil, err
+		}
+		ownerID, err := models.RequireSubscriptionRunOwner(b.tx, canvas.OrganizationID, *canvas.FactoryID, runID)
+		if err != nil {
+			return nil, err
+		}
+		model, _ := resolved["model"].(string)
+		model, err = models.ResolveFactoryCodexSubscriptionModel(b.tx, canvas.OrganizationID, *canvas.FactoryID, ownerID, model)
+		if err != nil {
+			return nil, err
+		}
+		resolved["model"] = model
+		return resolved, nil
+	}
+	model, err := models.ResolveBYOKRunnerModel(b.tx, canvas.OrganizationID, canvas.FactoryID, node.ComponentName(), resolved)
+	if err != nil {
+		return nil, err
+	}
+	resolved["model"] = model
+	return resolved, nil
+}
+
+func isAgentModelRunner(component string) bool {
+	switch component {
+	case models.SuperPlaneRunnerComponent, "runnerCodex", "runnerClaudeCode", "runnerOpenRouter":
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *NodeConfigurationBuilder) executionRunID() (uuid.UUID, error) {
+	if b.runID != uuid.Nil || b.rootEventID == nil {
+		return b.runID, nil
+	}
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return run.ID, nil
+}
+
 func (b *NodeConfigurationBuilder) replaceClaudeModelAlias(resolved map[string]any) (map[string]any, error) {
+	credentials, _ := resolved["credentials"].(map[string]any)
+	if credentials["source"] == "subscription" {
+		return resolved, nil
+	}
 	model, _ := resolved["model"].(string)
 	if !models.IsClaudeFamilyAlias(model) {
 		return resolved, nil
@@ -2543,13 +2645,9 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 
 	credentials, _ := resolved["credentials"].(map[string]any)
 	if credentials["source"] == "subscription" && workflow.FactoryID != nil {
-		runID := b.runID
-		if runID == uuid.Nil && b.rootEventID != nil {
-			run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
-			if err != nil {
-				return false, err
-			}
-			runID = run.ID
+		runID, err := b.executionRunID()
+		if err != nil {
+			return false, err
 		}
 		ownerID, err := models.RequireSubscriptionRunOwner(b.tx, workflow.OrganizationID, *workflow.FactoryID, runID)
 		if err != nil {

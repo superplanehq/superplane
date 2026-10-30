@@ -140,7 +140,6 @@ export function CodexDeviceSignIn({
       <ConnectOptionRow
         icon={<IntegrationChoiceIcon name="openai" />}
         title={copy.subscription}
-        detail={copy.subscriptionHelper}
         selected={selected}
         connectLabel={phase === "start" || phase === "ready" ? "ChatGPT" : undefined}
         connected={phase === "ready"}

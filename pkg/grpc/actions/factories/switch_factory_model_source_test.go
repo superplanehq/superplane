@@ -337,6 +337,70 @@ func Test__SwitchFactoryModelSource__ReusesReadyIntegration(t *testing.T) {
 	assert.Equal(t, "kept", saved.Configuration.Data()["apiKey"])
 }
 
+func TestSwitchFactoryModelSourceKeepsPermittedAgentAndPlannerModels(t *testing.T) {
+	db := database.DB(t.Context())
+	catalog := []string{"claude-opus-5-5", "claude-sonnet-4-6", "native-permitted-model"}
+	for _, scenario := range []struct {
+		name               string
+		organizationModels []string
+		workspaceModels    []string
+		restrictWorkspace  bool
+		catalogUnavailable bool
+		want               string
+	}{
+		{name: "first connection initializes parent", want: "claude-opus-5-5"},
+		{name: "workspace subset", organizationModels: catalog, workspaceModels: []string{"native-permitted-model"}, restrictWorkspace: true, want: "native-permitted-model"},
+		{name: "organization subset", organizationModels: []string{"native-permitted-model"}, want: "native-permitted-model"},
+		{name: "saved empty organization policy", organizationModels: []string{}},
+		{name: "disabled workspace provider", organizationModels: catalog, restrictWorkspace: true},
+		{name: "unavailable catalog keeps saved restriction", organizationModels: catalog, workspaceModels: []string{"native-permitted-model"}, restrictWorkspace: true, catalogUnavailable: true, want: "native-permitted-model"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			r := support.Setup(t)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			canvas := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+			live, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+			require.NoError(t, err)
+			live.Nodes = append(live.Nodes, models.Node{ID: planningAgentNodeID, Name: "Planner", Type: models.NodeTypeComponent, Ref: models.NodeRef{Component: &models.ComponentRef{Name: models.SuperPlaneRunnerComponent}}, Configuration: map[string]any{}})
+			require.NoError(t, db.Model(live).Update("nodes", datatypes.NewJSONSlice(live.Nodes)).Error)
+			if scenario.organizationModels != nil {
+				_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string](scenario.organizationModels))
+				require.NoError(t, err)
+			}
+			if scenario.restrictWorkspace {
+				inherit := false
+				_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceBYOK, datatypes.JSONSlice[string](scenario.workspaceModels), &inherit)
+				require.NoError(t, err)
+			}
+			stubProviderModels(r.Registry, "claude", catalog)
+			if scenario.catalogUnavailable {
+				r.Registry.Integrations["claude"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{ListResources: func(string, core.ListResourcesContext) ([]core.IntegrationResource, error) {
+					return nil, core.NewProviderAPIError(503, "unavailable", errors.New("unavailable"))
+				}})
+			}
+			_, _, err = SwitchFactoryModelSourceInTransaction(t.Context(), r.Registry, r.Organization.ID.String(), factory.ID.String(), modelSourceAnthropic, "sk-test", "", "")
+			require.NoError(t, err)
+			policy, err := ListFactoryLLMModels(t.Context(), r.Organization.ID.String(), &pb.ListFactoryLLMModelsRequest{FactoryId: factory.ID.String(), Provider: models.UsageProviderAnthropic, FundingSource: models.UsageFundingSourceBYOK})
+			require.NoError(t, err)
+			expectedParent := scenario.organizationModels
+			if expectedParent == nil {
+				expectedParent = catalog
+			}
+			assert.ElementsMatch(t, expectedParent, codexLineModelIDs(policy.Parent))
+			current, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+			require.NoError(t, err)
+			for _, nodeID := range []string{"agent", planningAgentNodeID} {
+				node := findIntakeNode(current.Nodes, nodeID)
+				require.NotNil(t, node)
+				assert.Equal(t, "runnerClaudeCode", node.ComponentName())
+				assert.Equal(t, scenario.want, node.Configuration["model"])
+			}
+		})
+	}
+}
+
 func Test__SwitchFactoryModelSource__CustomProviderRequiresBothFlags(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))

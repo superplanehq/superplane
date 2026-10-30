@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -46,6 +47,9 @@ func SwitchFactoryModelSource(
 	factory, err := findFactory(database.DB(ctx), orgID, req.GetId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to switch model source")
+	}
+	if err := messages.PublishFactoryWorkOrderUpdated(factory.ID.String(), "", "model_policy"); err != nil {
+		log.WithError(err).Warn("Failed to publish workspace model source change")
 	}
 
 	return &pb.SwitchFactoryModelSourceResponse{

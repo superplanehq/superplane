@@ -1,6 +1,5 @@
 export const CODEX_CONNECTION_COPY = {
   subscription: "Use your ChatGPT subscription",
-  subscriptionHelper: "Sign in once. SuperPlane reuses that subscription on Codex runs.",
   subscriptionDevice: "Open this link and enter the code.",
   subscriptionCopyCode: "Copy sign-in code",
   subscriptionCodeCopied: "Sign-in code copied",
