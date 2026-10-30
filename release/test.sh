@@ -25,10 +25,13 @@ bash release/superplane/pipeline_test.sh
 bash release/runner/pipeline_test.sh
 bash release/fleet-manager/pipeline_test.sh
 bash release/superplane-single-host-tarball/test.sh
+bash release/generate_sbom_test.sh
 bash release/superplane/verify_prepared_archive_test.sh
 bash release/superplane/verify_image_test.sh
 
 bash -n \
+  release/generate-sbom.sh \
+  release/generate_sbom_test.sh \
   release/generate-component-sbom.sh \
   release/component-release-artifact.sh \
   release/component_release_artifact_test.sh \
