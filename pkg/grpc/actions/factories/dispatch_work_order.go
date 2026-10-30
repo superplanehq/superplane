@@ -216,6 +216,14 @@ func dispatchWorkOrderOnLineTx(
 	if err := validateLineDispatchModel(tx, orgID, factoryID, currentLine, model, normalizedThinking, subscriptionOrderOwnerID(tx, order)); err != nil {
 		return nil, err
 	}
+	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
+		return nil, err
+	}
+	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
+		if err := order.ClearStatusNote(tx, missingImplementBranchNoteKey); err != nil {
+			return nil, err
+		}
+	}
 
 	fromState := order.State
 	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
@@ -322,6 +330,134 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 	}
 	return nil
 }
+
+// requireSavedBranchForImplementation stops Implement when checkout would
+// discover a branch the later pull request cannot read. Create pull request
+// uses the saved task branch. An empty value fails after commits are pushed.
+// The check covers every step from the start index, so a line that reaches
+// Implement later cannot start without a saved branch. Read-only lines still
+// start and follow the remote default.
+func requireSavedBranchForImplementation(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	line *models.FactoryLine,
+	startIndex int,
+) error {
+	if line == nil || startIndex < 0 || startIndex >= len(line.Steps) {
+		return nil
+	}
+	appIDs := make([]uuid.UUID, 0, len(line.Steps)-startIndex)
+	for _, step := range line.Steps[startIndex:] {
+		appIDs = append(appIDs, step.AppID)
+	}
+	blocked, err := implementStepsMissingSavedBranch(tx, factory, order, appIDs)
+	if err != nil || !blocked {
+		return err
+	}
+	return invalidArgument(missingImplementBranchMessage)
+}
+
+const (
+	missingImplementBranchNoteKey = "missing-implement-branch"
+	missingImplementBranchMessage = "Set the default branch in Workspace settings → Repository before you start Implement."
+)
+
+// NoteMissingImplementBranch tells the task why the line stopped.
+func NoteMissingImplementBranch(tx *gorm.DB, order *models.FactoryWorkOrder) error {
+	if order == nil {
+		return nil
+	}
+	_, err := order.SetStatusNote(tx, models.FactoryWorkOrderStatusNoteParams{
+		Key:      missingImplementBranchNoteKey,
+		Headline: "Set the default branch",
+		Body:     missingImplementBranchMessage,
+	})
+	return err
+}
+
+// ImplementStepBlockedByMissingBranch reports whether this app is Implement
+// and the task has no branch to publish to. A database error is returned
+// separately so a caller can retry that lookup.
+func ImplementStepBlockedByMissingBranch(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	appID uuid.UUID,
+) (bool, error) {
+	return implementStepsMissingSavedBranch(tx, factory, order, []uuid.UUID{appID})
+}
+
+func implementStepsMissingSavedBranch(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	appIDs []uuid.UUID,
+) (bool, error) {
+	if factory == nil {
+		return false, nil
+	}
+	ids := make([]uuid.UUID, 0, len(appIDs))
+	for _, appID := range appIDs {
+		if appID != uuid.Nil {
+			ids = append(ids, appID)
+		}
+	}
+	if len(ids) == 0 {
+		return false, nil
+	}
+	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
+		return false, nil
+	}
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, ids)
+	if err != nil {
+		return false, err
+	}
+	for _, appID := range ids {
+		spec, ok := specs[appID]
+		if !ok {
+			continue
+		}
+		if models.FactoryAppTemplateID(spec.Nodes) == lineImplementationTemplateID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// resolvedWorkOrderDefaultBranch matches resolveOrderRepository. A task
+// snapshot is used only when it has both a repository and a branch.
+// Otherwise the workspace branch is the branch Implement will publish to.
+func resolvedWorkOrderDefaultBranch(order *models.FactoryWorkOrder, config models.FactoryOnboardingConfig) string {
+	if order != nil && strings.TrimSpace(derefString(order.Repository)) != "" && strings.TrimSpace(derefString(order.DefaultBranch)) != "" {
+		return strings.TrimSpace(derefString(order.DefaultBranch))
+	}
+	return strings.TrimSpace(config.DefaultBranch)
+}
+
+func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {
+	if level != runner.ThinkingLevelMinimal && level != runner.ThinkingLevelXHigh {
+		return nil
+	}
+	for _, step := range line.Steps {
+		if step.AppID == uuid.Nil {
+			continue
+		}
+		version, err := models.FindLiveCanvasVersionInTransaction(tx, step.AppID)
+		if err != nil {
+			return err
+		}
+		for _, node := range version.Nodes {
+			component := node.ComponentName()
+			_, isRunner := runnerComponentProvider(component)
+			if component != runnerCodex && (isRunner || component == models.SuperPlaneRunnerComponent) {
+				return invalidArgument("minimal and xhigh thinking levels require a line with only Codex runners")
+			}
+		}
+	}
+	return nil
+}
+
 
 // dispatchThinkingOverridesLevel reports whether a Start thinking value sets
 // a level. Empty keeps the agent level and default uses the runner default.

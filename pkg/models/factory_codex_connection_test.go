@@ -593,6 +593,24 @@ func TestSubscriptionOwnerChangesValidateBeforeMutation(t *testing.T) {
 	assert.Empty(t, codexLeases(t, db, connection.ID))
 }
 
+func TestSubscriptionOwnerCannotChangeWhileRunnerTaskIsPending(t *testing.T) {
+	db, connection, task, _ := newReadyCodexConnection(t)
+	factory, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
+	require.NoError(t, err)
+	subscription := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	runID := support.CreateCodexOwnedRun(t, db, connection, task.ID)
+	order, err := models.FindSubscriptionWorkOrderForRun(db, factory.OrganizationID, factory.ID, runID)
+	require.NoError(t, err)
+	// A finished run can still have unassigned runner work awaiting cancellation.
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", runID).Update("state", models.CanvasRunStateFinished).Error)
+	require.NoError(t, db.Model(task).Updates(map[string]any{"state": models.RunnerTaskStatePending, "runner_id": nil}).Error)
+	require.ErrorIs(t, order.UpdateAssignees(db, nil, connection.OwnerUserID), models.ErrSubscriptionOwnerBusy)
+	loaded, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []uuid.UUID{connection.OwnerUserID}, loaded.AssigneeIDs())
+}
+
 func TestMemberRemovalCleansQueuedWorkWithoutARunnerLease(t *testing.T) {
 	db, connection, _, _ := newReadyCodexConnection(t)
 	f, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)

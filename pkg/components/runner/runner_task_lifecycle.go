@@ -102,7 +102,8 @@ func processTaskStatus(
 	}
 
 	status := task.State
-	errorMessage := strings.TrimSpace(task.ErrorMessage)
+	result := taskResultAsAny(task.Result)
+	errorMessage := taskFailureMessage(task, finishedEventType, result)
 	if status == "lost" {
 		status = "failed"
 		if errorMessage == "" {
@@ -113,10 +114,47 @@ func processTaskStatus(
 	if errorMessage != "" {
 		out["error"] = errorMessage
 	}
-	if v := taskResultAsAny(task.Result); v != nil {
-		out["result"] = v
+	if result != nil {
+		out["result"] = result
+	}
+	if channel == FailedOutputChannel && !taskCanceled(task) && logger != nil {
+		fields := log.Fields{
+			"component":       "runner.task",
+			"organization_id": organizationID,
+			"task_id":         task.ID,
+			"event_type":      finishedEventType,
+			"status":          status,
+			"exit_code":       taskExitCode(task),
+		}
+		if errorMessage != "" {
+			fields["error"] = errorMessage
+		}
+		logger.WithFields(fields).Warn("runner: task failed")
 	}
 	return state.Emit(channel, finishedEventType, []any{out})
+}
+
+func taskFailureMessage(task *core.RunnerTask, finishedEventType string, result any) string {
+	message := strings.TrimSpace(task.ErrorMessage)
+	if finishedEventType != "runnerCodex.finished" || !strings.EqualFold(strings.TrimSpace(task.State), "failed") {
+		return message
+	}
+	if message != "" &&
+		message != fmt.Sprintf("exit code %d", taskExitCode(task)) &&
+		message != fmt.Sprintf("exit status %d", taskExitCode(task)) {
+		return message
+	}
+
+	payload, ok := result.(map[string]any)
+	if !ok || payload["type"] != "result" {
+		return message
+	}
+	isError, _ := payload["is_error"].(bool)
+	providerError, _ := payload["error"].(string)
+	if isError && strings.TrimSpace(providerError) != "" {
+		return strings.TrimSpace(providerError)
+	}
+	return message
 }
 
 func taskCanceled(task *core.RunnerTask) bool {

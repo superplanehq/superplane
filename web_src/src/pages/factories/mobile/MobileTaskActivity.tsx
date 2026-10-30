@@ -127,6 +127,8 @@ export function MobileTaskActivity({
                       phase={consoleFixture.phases.find((entry) => entry.id === automation.latest.id)}
                       phases={consoleFixture.phases}
                       organizationId={organizationId}
+                      factoryId={factoryId}
+                      orderId={orderId}
                       factoryKey={factoryKey}
                       orderNumber={orderNumber}
                       expandIdle={expandIdleCards && index + 1 === currentColumn}

@@ -109,7 +109,13 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 
 	rec = postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner",
 		`{"user":"payments-dev","reason":" https://evil.example/login "}`)
-	require.Equal(t, http.StatusBadRequest, rec.Code, "a reason that is only a link is empty after cleanup")
+	assertAssignedOwner(t, rec, owner.ID)
+	linkOnlyOrder, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	linkOnlySource, linkOnlyReason := latestOwnerEvent(t, linkOnlyOrder)
+	assert.Equal(t, models.TaskOwnerSourceAgent, linkOnlySource)
+	assert.Empty(t, linkOnlyReason, "a reason that is only a link is empty after cleanup")
+	assertUpdate()
 
 	rec = postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner",
 		`{"user":"@Payments-Dev","reason":"Changed pkg/payments/charge.go 3 times in 30 days. See https://evil.example"}`)
@@ -144,7 +150,7 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 	assert.Equal(t, other.ID, body.CurrentOwners[0].UserID)
 
 	t.Run("same owner succeeds without publishing", func(t *testing.T) {
-		rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", `{"user":"other-dev","reason":"Owns the code."}`)
+		rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", `{"user":"other-dev"}`)
 		assertAssignedOwner(t, rec, other.ID)
 		_, published, err := channel.Get(queueName, true)
 		require.NoError(t, err)
@@ -156,7 +162,6 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 		require.NoError(t, err)
 		for _, request := range []string{
 			`{"user":"` + uuid.NewString() + `","reason":"Owns the code."}`,
-			`{"user":"payments-dev","reason":"https://example.com"}`,
 		} {
 			rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner", request)
 			require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
@@ -189,6 +194,32 @@ func TestRunnerPlanningAssignOwner(t *testing.T) {
 			assert.Equal(t, []uuid.UUID{other.ID}, persisted.AssigneeIDs())
 		})
 	}
+
+	t.Run("only if unassigned keeps a manual owner", func(t *testing.T) {
+		require.NoError(t, order.UpdateAssignees(db, []uuid.UUID{owner.ID}, r.User))
+		for {
+			_, published, err := channel.Get(queueName, true)
+			require.NoError(t, err)
+			if !published {
+				break
+			}
+		}
+
+		rec := postPlanningRunner(t, server, token, "/api/v1/runner/planning-sessions/owner",
+			`{"user":"other-dev","reason":"Issue assignee.","only_if_unassigned":true}`)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		var body struct {
+			Status string `json:"status"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "kept", body.Status)
+		persisted, err := factoryModel.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []uuid.UUID{owner.ID}, persisted.AssigneeIDs())
+		_, published, err := channel.Get(queueName, true)
+		require.NoError(t, err)
+		assert.False(t, published, "keeping the current owner does not publish an update")
+	})
 }
 
 func assertAssignedOwner(t *testing.T, rec *httptest.ResponseRecorder, ownerID uuid.UUID) {

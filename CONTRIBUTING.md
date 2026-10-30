@@ -11,7 +11,8 @@ the core maintainers first.
 For features, larger bug fixes, or architectural changes:
 
 1. Find or open an issue that describes the change.
-2. Discuss the approach with us on the issue or on [Discord](https://discord.gg/KC78eCNsnw).
+2. Discuss the approach with us on the issue or on
+   [Discord](https://discord.superplane.com).
 3. Wait until a maintainer assigns the issue to you before you start implementation.
 
 This helps us avoid duplicate work. It also makes sure we agree on the
@@ -74,6 +75,17 @@ After the first setup, run `make dev.up` when the stack is not running, then
 `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you
 need a fresh `npm install`, codegen, or migrations.
 
+Billing stays enabled in local development. With `APP_ENV=development`,
+owner setup gives the Demo organization a manual Business plan and $1,000
+in development credit. This uses local billing records and does not create
+a Polar subscription. Other organizations keep normal billing defaults.
+The seed runs only when owner setup creates Demo. It does not reset balances
+when you restart the server or run `make dev.setup` again.
+
+To disable billing enforcement, set `SUPERPLANE_BILLING_ENABLED=no` in `.env`.
+Run `make dev.up`, then run `make dev.server` to apply changed container
+environment values.
+
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
 After owner setup, create the required installation fleets through the admin
@@ -127,7 +139,7 @@ sign-off, and the review process.
 
 ### Contributing
 
-- **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
+- **[Discord](https://discord.superplane.com)** - Join our Discord community for discussions, questions, and collaboration
 - **[Issue Tracking](docs/contributing/issue-tracking.md)** - How to report bugs, use the SuperPlane Board, and understand issue types
 - **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
