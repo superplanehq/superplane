@@ -463,7 +463,7 @@ describe("FactorySettingsLayout sidebar", () => {
         />,
       );
       const user = userEvent.setup();
-      await user.click(await screen.findByRole("tab", { name: "SuperPlane" }));
+      await user.click(await screen.findByRole("button", { name: "Switch to SuperPlane" }));
       expect(screen.getByRole("button", { name: "Switch to SuperPlane" })).toBeEnabled();
       expect(screen.queryByTestId("llm-models-connect-anthropic")).not.toBeInTheDocument();
       expect(screen.queryByTestId("llm-models-empty-banner")).not.toBeInTheDocument();
