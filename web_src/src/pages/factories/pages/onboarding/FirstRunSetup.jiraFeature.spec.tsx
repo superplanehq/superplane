@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -45,12 +46,19 @@ vi.mock("@/hooks/useMe", () => ({
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
-  useIntegrationResources: () => ({
-    data: [
-      { id: "todo", name: "To Do" },
-      { id: "qa", name: "QA" },
-      { id: "done", name: "Done" },
-    ],
+  useIntegrationResources: (_organizationId: string, _integrationId: string, resourceType: string) => ({
+    data:
+      resourceType === "team"
+        ? [{ id: "team-1", name: "Platform (PLT)" }]
+        : resourceType === "project"
+          ? [{ id: "project-1", name: "Checkout" }]
+          : resourceType === "label"
+            ? [{ id: "label-1", name: "bug" }]
+            : [
+                { id: "todo", name: "To Do" },
+                { id: "qa", name: "QA" },
+                { id: "done", name: "Done" },
+              ],
     isLoading: false,
     isError: false,
     isPending: false,
@@ -109,10 +117,7 @@ function LiveJiraSetup({
   setupOptions: SetupOptions;
   setupRef: { current: OnboardingSetupApi | null };
 }) {
-  const setup = useOnboardingSetupState("Payments Service", {
-    ...setupOptions,
-    initial: { vcsHost: "github", selectedRepo: "acme/api", ...setupOptions.initial },
-  });
+  const setup = useOnboardingSetupState("Payments Service", setupOptions);
   setupRef.current = setup;
   return <FirstRunSetup model={{ ...model, setup }} />;
 }
@@ -125,14 +130,6 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
-    codexSubscriptionOffered: false,
-    codexSubscriptionLoading: false,
-    codexConnection: undefined,
-    codexSubscriptionReady: false,
-    startCodexConnection: vi.fn(),
-    cancelCodexConnection: vi.fn(),
-    codexStarting: false,
-    codexCanceling: false,
     customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
@@ -145,13 +142,6 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
     bitbucketIntegrationId: "",
-    branchIntegrationId: "",
-    defaultBranchRequired: false,
-    chosenDefaultBranch: "",
-    setChosenDefaultBranch: vi.fn(),
-    requireDefaultBranch: vi.fn(),
-    clearDefaultBranchRequirement: vi.fn(),
-    saveChosenDefaultBranch: vi.fn().mockResolvedValue(true),
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
     saving: false,
@@ -170,12 +160,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
     linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
+    linearScope: EMPTY_LINEAR_INTAKE_SCOPE,
+    changeLinearScope: vi.fn(),
     ...overrides,
   };
 }
@@ -212,18 +198,20 @@ describe("FirstRunSetup Jira intake", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(
-      screen.getByRole("heading", { name: FIRST_RUN_COPY.tickets.setupHeadline(FIRST_RUN_COPY.tickets.jira) }),
-    ).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-jira-projects")).toBeInTheDocument();
     expect(setupRef.current?.issuesChoice).toBe("jira");
 
-    await user.click(screen.getByTestId("first-run-confirm-projects"));
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(model.saveIssues).toHaveBeenCalledWith("jira");
+    expect(model.finish).toHaveBeenCalledWith("jira");
   });
 
   it("keeps a saved Jira choice when the organization lookup fails", async () => {
@@ -243,16 +231,17 @@ describe("FirstRunSetup Jira intake", () => {
       initial: { issuesChoice: "jira" },
     });
 
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("first-run-confirm-projects"));
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(setupRef.current?.issuesChoice).toBe("jira");
 
-    await user.click(screen.getByTestId("first-run-analyze-tickets"));
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
-    await waitFor(() => expect(model.saveIssues).toHaveBeenCalledWith("jira"));
-    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
-    expect(model.finish).not.toHaveBeenCalled();
+    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+    expect(model.saveIssues).toHaveBeenCalledWith("jira");
+    expect(model.finish).toHaveBeenCalledWith("jira");
   });
 
   it("does not block ticket choices while the organization lookup is loading", () => {
@@ -261,9 +250,9 @@ describe("FirstRunSetup Jira intake", () => {
     renderLiveSetup(pageModel(), { simulateDiscovery: false });
 
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Jira issues/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Connect Jira" })).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Linear issues/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Connect Linear" })).toBeInTheDocument();
     expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
   });
 
@@ -273,8 +262,7 @@ describe("FirstRunSetup Jira intake", () => {
       hostedAgentReady: true,
       hostedModelsAvailable: true,
       linearIntegrationId: "linear-1",
-      linearProjectIds: ["project-1"],
-      linearProjects: [{ id: "project-1", name: "Platform" }],
+      linearScope: { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" },
     });
 
     const { setupRef } = renderLiveSetup(model, {
@@ -283,13 +271,18 @@ describe("FirstRunSetup Jira intake", () => {
       initial: { issuesChoice: "linear" },
     });
 
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-linear-choice-notice")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-linear-scope")).toBeInTheDocument();
     expect(setupRef.current?.issuesChoice).toBe("linear");
 
     await user.click(screen.getByTestId("linear-project-project-1"));
-    expect(model.toggleLinearProject).toHaveBeenCalledWith("project-1");
+    expect(model.changeLinearScope).toHaveBeenCalledWith({
+      ...EMPTY_LINEAR_INTAKE_SCOPE,
+      teamId: "team-1",
+      projectIds: ["project-1"],
+    });
   });
 
   it("keeps setup available after Connect GitHub selects a saved connection", async () => {
@@ -299,16 +292,14 @@ describe("FirstRunSetup Jira intake", () => {
 
     renderLiveSetup(model, { simulateDiscovery: false });
 
-    await user.click(screen.getByRole("button", { name: /GitHub issues/ }));
-    const connectGitHub = FIRST_RUN_COPY.tickets.stepConnect(FIRST_RUN_COPY.tickets.githubIssues);
-    await user.click(screen.getByRole("button", { name: connectGitHub }));
+    await user.click(screen.getByRole("button", { name: "Connect GitHub" }));
 
     await waitFor(() => {
       expect(requestConnect).toHaveBeenCalledWith("github");
       expect(screen.getByTestId("first-run-tickets")).not.toHaveAttribute("aria-busy");
     });
     expect(screen.getByTestId("first-run-back")).toBeEnabled();
-    expect(screen.getByRole("button", { name: connectGitHub })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Connect Jira" })).toBeEnabled();
   });
 
   it("keeps a saved Linear choice while the feature lookup is loading", () => {
@@ -317,8 +308,7 @@ describe("FirstRunSetup Jira intake", () => {
       hostedAgentReady: true,
       hostedModelsAvailable: true,
       linearIntegrationId: "linear-1",
-      linearProjectIds: ["project-1"],
-      linearProjects: [{ id: "project-1", name: "Platform" }],
+      linearScope: { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" },
     });
 
     const { setupRef } = renderLiveSetup(model, {
@@ -328,27 +318,8 @@ describe("FirstRunSetup Jira intake", () => {
     });
 
     expect(screen.queryByTestId("first-run-linear-choice-notice")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-confirm-projects")).toBeEnabled();
+    expect(screen.getByTestId("first-run-linear-scope")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(setupRef.current?.issuesChoice).toBe("linear");
   });
 });
-
-vi.mock("@/hooks/useOrganizationBilling", () => ({
-  organizationBillingQueryKey: (id: string) => ["organizations", id, "billing"],
-  useOrganizationBilling: () => ({
-    data: { billingEnabled: false, productFeatures: { byo_key: false } },
-    isSuccess: true,
-    refetch: async () => ({ data: { billingEnabled: false, productFeatures: { byo_key: false } } }),
-  }),
-}));
-
-vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
-  useOrganizationWorkspaceUsage: () => ({
-    data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" },
-    isSuccess: true,
-    isPending: false,
-    isError: false,
-    refetch: async () => ({ data: { defaultHostedProvider: "openrouter", defaultHostedModel: "openai/gpt-5" } }),
-  }),
-}));

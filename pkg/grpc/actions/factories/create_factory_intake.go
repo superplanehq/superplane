@@ -155,12 +155,12 @@ func CreateFactoryIntake(
 		resourceID = strings.Join(settings.SentryProjectIDs, ",")
 	}
 
-	binding, err := resolveIntakeBinding(db, factory, source, req.GetIntegrationId(), resourceID)
+	binding, err := resolveIntakeBinding(db, factory, source, req.GetIntegrationId(), resourceID, settings.LinearTeamID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
 	if source == models.FactoryIntakeSourceLinearIssues {
-		binding = withLinearSeedLabels(binding, settings.LinearLabels)
+		binding = withLinearIntakeScope(binding, settings)
 	}
 
 	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{
