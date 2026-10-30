@@ -361,7 +361,6 @@ function useMobileDraftStart(model: MobileTaskModel, startLineKey: string) {
   );
   const modelSelect = showsPhoneDraftModelSelect(model.planningEnabled, fixture.footer) ? (
     <MobileDraftStartModelSelect
-      orderId={model.orderId}
       organizationId={organizationId}
       factoryId={factoryId}
       lineName={model.lineName}

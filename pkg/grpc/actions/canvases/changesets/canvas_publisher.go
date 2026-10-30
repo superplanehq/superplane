@@ -150,6 +150,9 @@ func NewCanvasPublisher(tx *gorm.DB, canvas *models.Canvas, draft *models.Canvas
 }
 
 func (p *CanvasPublisher) Publish(ctx context.Context) error {
+	if err := models.ValidateSubscriptionIntakeOwners(p.tx, p.canvas, p.draft, p.live); err != nil {
+		return err
+	}
 	for _, change := range p.changeset.Changes {
 		if err := p.processChange(ctx, change); err != nil {
 			return err

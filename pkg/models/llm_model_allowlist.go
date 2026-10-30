@@ -24,6 +24,7 @@ var byokIntegrationAppNames = map[string]string{
 }
 
 var ErrModelNotInParentList = errors.New("model is not in the parent selected-model list")
+var ErrInheritedModelSelection = errors.New("inherited model policy cannot include selected models")
 
 // OrganizationBYOKModelAllowlist is the org-selected BYOK model list for one provider.
 type OrganizationBYOKModelAllowlist struct {
@@ -37,18 +38,29 @@ func (OrganizationBYOKModelAllowlist) TableName() string {
 	return "organization_byok_model_allowlists"
 }
 
-// FactoryLLMModelAllowlist is a factory subset of parent models.
-// An empty AllowedModels list means inherit the parent list.
+// FactoryLLMModelAllowlist is a workspace subset of parent models.
+// A nil InheritParent preserves legacy behavior: an empty list inherits.
 type FactoryLLMModelAllowlist struct {
 	FactoryID     uuid.UUID `gorm:"primaryKey"`
 	Provider      string    `gorm:"primaryKey"`
 	FundingSource string    `gorm:"primaryKey"`
 	AllowedModels datatypes.JSONSlice[string]
+	InheritParent *bool
 	UpdatedAt     time.Time
 }
 
 func (FactoryLLMModelAllowlist) TableName() string {
 	return "factory_llm_model_allowlists"
+}
+
+func (f *FactoryLLMModelAllowlist) InheritsParent() bool {
+	if f == nil {
+		return true
+	}
+	if f.InheritParent != nil {
+		return *f.InheritParent
+	}
+	return !hasAllowedModel(f.AllowedModels)
 }
 
 func NormalizeBYOKLLMProvider(provider string) (string, error) {
@@ -184,6 +196,9 @@ func FindFactoryLLMModelAllowlist(tx *gorm.DB, factoryID uuid.UUID, provider, fu
 	if err != nil {
 		return nil, err
 	}
+	if source == UsageFundingSourceSubscription && normalized != UsageProviderOpenAI {
+		return nil, errors.New("subscription model policies require provider openai")
+	}
 
 	var row FactoryLLMModelAllowlist
 	err = tx.Where("factory_id = ? AND provider = ? AND funding_source = ?", factoryID, normalized, source).First(&row).Error
@@ -196,7 +211,7 @@ func FindFactoryLLMModelAllowlist(tx *gorm.DB, factoryID uuid.UUID, provider, fu
 	return &row, nil
 }
 
-func UpsertFactoryLLMModelAllowlist(tx *gorm.DB, orgID, factoryID uuid.UUID, provider, fundingSource string, models datatypes.JSONSlice[string]) (*FactoryLLMModelAllowlist, error) {
+func UpsertFactoryLLMModelAllowlist(tx *gorm.DB, orgID, factoryID uuid.UUID, provider, fundingSource string, models datatypes.JSONSlice[string], inheritance ...*bool) (*FactoryLLMModelAllowlist, error) {
 	if _, err := FindFactory(tx, orgID, factoryID); err != nil {
 		return nil, err
 	}
@@ -212,13 +227,37 @@ func UpsertFactoryLLMModelAllowlist(tx *gorm.DB, orgID, factoryID uuid.UUID, pro
 	if err != nil {
 		return nil, err
 	}
+	var inheritParent *bool
+	if len(inheritance) > 0 {
+		inheritParent = inheritance[0]
+	}
+	if inheritParent != nil && *inheritParent && len(normalizedModels) > 0 {
+		return nil, ErrInheritedModelSelection
+	}
+	if source == UsageFundingSourceSubscription && normalized != UsageProviderOpenAI {
+		return nil, errors.New("subscription model policies require provider openai")
+	}
 	if source == UsageFundingSourceBYOK {
 		if err := RequireOrganizationBYOKAccess(tx, orgID, normalized); err != nil {
 			return nil, err
 		}
 	}
-	if err := assertFactoryModelsInParent(tx, orgID, normalized, source, normalizedModels); err != nil {
-		return nil, err
+	if source != UsageFundingSourceSubscription {
+		// Saved IDs that the parent list no longer offers stay in the policy.
+		// Only new IDs must be in the parent list.
+		previous, err := FindFactoryLLMModelAllowlist(tx, factoryID, normalized, source)
+		if err != nil {
+			return nil, err
+		}
+		var added datatypes.JSONSlice[string]
+		for _, model := range normalizedModels {
+			if previous == nil || !slices.Contains(previous.AllowedModels, model) {
+				added = append(added, model)
+			}
+		}
+		if err := assertFactoryModelsInParent(tx, orgID, normalized, source, added); err != nil {
+			return nil, err
+		}
 	}
 
 	row := FactoryLLMModelAllowlist{
@@ -226,6 +265,7 @@ func UpsertFactoryLLMModelAllowlist(tx *gorm.DB, orgID, factoryID uuid.UUID, pro
 		Provider:      normalized,
 		FundingSource: source,
 		AllowedModels: normalizedModels,
+		InheritParent: inheritParent,
 		UpdatedAt:     time.Now(),
 	}
 	err = tx.Clauses(clause.OnConflict{
@@ -234,7 +274,7 @@ func UpsertFactoryLLMModelAllowlist(tx *gorm.DB, orgID, factoryID uuid.UUID, pro
 			{Name: "provider"},
 			{Name: "funding_source"},
 		},
-		DoUpdates: clause.AssignmentColumns([]string{"allowed_models", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"allowed_models", "inherit_parent", "updated_at"}),
 	}).Create(&row).Error
 	if err != nil {
 		return nil, err
@@ -263,7 +303,7 @@ func assertFactoryModelsInParent(tx *gorm.DB, orgID uuid.UUID, provider, funding
 }
 
 // ResolveSelectableLLMModels returns the models a picker and run gate may use.
-// Factory lists that are missing or empty inherit the parent list.
+// Missing policies inherit. Explicit policies can disable every model.
 func ResolveSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provider, fundingSource string) ([]string, error) {
 	source, err := normalizeLLMFundingSource(fundingSource)
 	if err != nil {
@@ -278,15 +318,20 @@ func ResolveSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UU
 		return parent, nil
 	}
 
-	subset, err := FindFactoryLLMModelAllowlist(tx, *factoryID, provider, source)
+	return ApplyFactoryLLMModelPolicy(tx, *factoryID, provider, source, parent)
+}
+
+// ApplyFactoryLLMModelPolicy applies workspace policy to the supplied catalog.
+// Subscription callers supply the task owner's native catalog.
+func ApplyFactoryLLMModelPolicy(tx *gorm.DB, factoryID uuid.UUID, provider, fundingSource string, parent []string) ([]string, error) {
+	subset, err := FindFactoryLLMModelAllowlist(tx, factoryID, provider, fundingSource)
 	if err != nil {
 		return nil, err
 	}
-	resolved := parent
-	if subset != nil && hasAllowedModel(subset.AllowedModels) {
-		resolved = IntersectModelIDs(parent, subset.AllowedModels)
+	if subset.InheritsParent() {
+		return parent, nil
 	}
-	return resolved, nil
+	return IntersectModelIDs(parent, subset.AllowedModels), nil
 }
 
 func ModelIsSelectable(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provider, fundingSource, model string) (bool, error) {
@@ -298,6 +343,9 @@ func ModelIsSelectable(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provi
 }
 
 func parentSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, provider, fundingSource string) ([]string, error) {
+	if fundingSource == UsageFundingSourceSubscription {
+		return nil, errors.New("subscription models require a personal catalog")
+	}
 	if fundingSource == UsageFundingSourceBYOK {
 		enabled, err := OrganizationBYOKAccess(tx, orgID, provider)
 		if err != nil {
@@ -357,7 +405,7 @@ func FindReadyBYOKIntegration(tx *gorm.DB, orgID uuid.UUID, provider string) (*I
 
 func normalizeLLMFundingSource(source string) (string, error) {
 	normalized := strings.ToLower(strings.TrimSpace(source))
-	if normalized == UsageFundingSourceHosted || normalized == UsageFundingSourceBYOK {
+	if normalized == UsageFundingSourceHosted || normalized == UsageFundingSourceBYOK || normalized == UsageFundingSourceSubscription {
 		return normalized, nil
 	}
 	return "", fmt.Errorf("unsupported llm funding source: %s", source)

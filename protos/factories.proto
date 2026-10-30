@@ -970,6 +970,15 @@ service Factories {
     option (google.api.http) = { post: "/api/v1/factories/{factory_id}/work-orders/{order_id}:resume-handoff" body: "*" };
   }
 
+  rpc ListFactoryCodexUsage(ListFactoryCodexUsageRequest) returns (ListFactoryCodexUsageResponse) {
+    option (google.api.http) = { get: "/api/v1/factories/{factory_id}/codex-usage" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List connected members and ChatGPT usage";
+      description: "Returns saved usage snapshots for connected workspace members.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribeFactoryCodexConnection(DescribeFactoryCodexConnectionRequest) returns (DescribeFactoryCodexConnectionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/codex-connection"
@@ -1123,7 +1132,7 @@ message UpdateFactoryOnboardingResponse {
 
 message SwitchFactoryModelSourceRequest {
   string id = 1;
-  // hosted, anthropic, openai, openrouter, or custom.
+  // hosted, subscription, anthropic, openai, openrouter, or custom.
   string source = 2;
   // Provider API key. Required when this organization has no ready integration for the source.
   string api_key = 3;
@@ -1131,6 +1140,8 @@ message SwitchFactoryModelSourceRequest {
   string base_url = 4;
   // API type for a custom provider: anthropic, openai, or openai-compatible.
   string api_type = 5;
+  // Required for subscription switches. Replaces every intake default owner.
+  string default_owner_id = 6;
 }
 
 message SwitchFactoryModelSourceResponse {
@@ -1210,6 +1221,7 @@ message FactoryOnboarding {
   string app_repository_external_id = 15;
   // True when setup uses a ChatGPT subscription instead of an API key.
   bool codex_subscription = 16;
+  string codex_default_owner_id = 17;
 }
 
 // Automations the workspace Git host can run. Computed from vcs_provider.
@@ -2996,6 +3008,7 @@ message ListFactoryLLMModelsResponse {
   repeated FactoryLLMModel parent = 1;
   repeated FactoryLLMModel selected = 2;
   bool inherit_parent = 3;
+  repeated FactoryLLMModel configured_models = 4;
 }
 
 message UpdateFactoryLLMModelsRequest {
@@ -3003,6 +3016,7 @@ message UpdateFactoryLLMModelsRequest {
   string provider = 2;
   string funding_source = 3;
   repeated string allowed_models = 4;
+  optional bool inherit_parent = 5;
 }
 
 message UpdateFactoryLLMModelsResponse {
@@ -3447,6 +3461,7 @@ message ResumeHandOffWorkOrderResponse {
 message ListFactoryOwnerEligibilityRequest {
   string factory_id = 1;
   string order_id = 2;
+  bool prospective_subscription = 3;
 }
 
 message FactoryOwnerEligibility {
@@ -3460,4 +3475,34 @@ message ListFactoryOwnerEligibilityResponse {
   bool ownership_change_allowed = 2;
   string restriction_reason = 3;
   bool subscription = 4;
+}
+
+message ListFactoryCodexUsageRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryCodexUsageResponse {
+  repeated CodexMemberUsage members = 1;
+}
+
+message CodexMemberUsage {
+  string user_id = 1;
+  string display_name = 2;
+  string email = 3;
+  google.protobuf.Timestamp observed_at = 4;
+  repeated CodexUsageLimit limits = 5;
+}
+
+message CodexUsageLimit {
+  string limit_id = 1;
+  string limit_name = 2;
+  string plan_type = 3;
+  CodexUsageWindow primary = 4;
+  CodexUsageWindow secondary = 5;
+}
+
+message CodexUsageWindow {
+  double used_percent = 1;
+  optional int64 window_duration_mins = 2;
+  google.protobuf.Timestamp resets_at = 3;
 }

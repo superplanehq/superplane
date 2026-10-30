@@ -81,6 +81,9 @@ func ImportFactoryIntakeItem(
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := requireCallerCodexConnection(tx, factory, createdByID); err != nil {
+			return err
+		}
 		assignees, err := factory.DefaultSubscriptionAssignees(tx, &createdByID)
 		if err != nil {
 			return err

@@ -369,22 +369,25 @@ func Test__DispatchWorkOrder__RerunStepKeepsEarlierExecutions(t *testing.T) {
 
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6", "claude-opus-4-6")
 
 	order, err := factoryModel.CreateWorkOrder(db, "Improve AGENTS.md", "", &r.User, nil, nil)
 	require.NoError(t, err)
 
 	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "plan", "start-plan")
-	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-implement")
+	secondApp := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "hosted", "claude-sonnet-4-6")
 	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: "start"},
 	})
 	require.NoError(t, err)
 
 	firstResp, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
-		FactoryId: factoryModel.ID.String(),
-		OrderId:   order.ID.String(),
-		LineName:  line.Name,
+		FactoryId:     factoryModel.ID.String(),
+		OrderId:       order.ID.String(),
+		LineName:      line.Name,
+		Model:         "claude-sonnet-4-6",
+		ThinkingLevel: "low",
 	})
 	require.NoError(t, err)
 	require.Len(t, firstResp.Order.LineDispatches, 1)
@@ -406,6 +409,8 @@ func Test__DispatchWorkOrder__RerunStepKeepsEarlierExecutions(t *testing.T) {
 		LineName:       line.Name,
 		StartStepIndex: 1,
 		ReplaceActive:  true,
+		Model:          "claude-opus-4-6",
+		ThinkingLevel:  "high",
 	})
 	require.NoError(t, err)
 
@@ -421,7 +426,42 @@ func Test__DispatchWorkOrder__RerunStepKeepsEarlierExecutions(t *testing.T) {
 	}
 	assert.Equal(t, 1, planCount, "rerun of Implementation must keep the Planning execution")
 	require.Len(t, resp.Order.LineDispatches, 1)
+	assert.Equal(t, "claude-sonnet-4-6", resp.Order.LineDispatches[0].Model)
+	assert.Equal(t, "low", resp.Order.LineDispatches[0].ThinkingLevel)
 	require.GreaterOrEqual(t, len(resp.Order.LineDispatches[0].StepExecutions), 2)
+}
+
+func Test__DispatchWorkOrder__KeepsSavedOwnersOfOpenTaskOutsideSubscriptionWorkspaces(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	creator := support.CreateUser(t, r, r.Organization.ID)
+	owner := support.CreateUser(t, r, r.Organization.ID)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &creator.ID, []uuid.UUID{creator.ID, owner.ID}, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []uuid.UUID{creator.ID, owner.ID}, reloaded.AssigneeIDs())
 }
 
 func Test__DispatchWorkOrder__ReturnsOwnerNameAfterStart(t *testing.T) {

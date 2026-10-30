@@ -44,7 +44,7 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureOrganizationBYOK, f.ID)
 		assert.Equal(t, "Organization BYOK", f.Label)
-		assert.Equal(t, "Show the organization LLM Models settings page", f.Description)
+		assert.Equal(t, "Show the organization Models settings page", f.Description)
 	})
 
 	t.Run("known id returns organization byok custom provider feature", func(t *testing.T) {

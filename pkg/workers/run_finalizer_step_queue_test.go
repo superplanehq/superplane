@@ -441,7 +441,7 @@ func readyStepQueueOwner(t *testing.T, fixture *stepQueueFixture, ownerID uuid.U
 	t.Helper()
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(fixture.factory.OrganizationID, features.FeatureCodexSubscriptions))
-	connection, err := models.CreateFactoryCodexConnection(db, fixture.factory.OrganizationID, fixture.factory.ID, ownerID, time.Now())
+	connection, err := models.CreateCodexConnection(db, fixture.factory.OrganizationID, ownerID, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{
 		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle"),

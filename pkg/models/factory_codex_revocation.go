@@ -58,13 +58,10 @@ func (c *FactoryCodexConnection) CleanupRevocation(tx *gorm.DB, now time.Time) (
 		return nil, err
 	}
 	*c = current
-	var workspace Factory
-	if err := tx.Unscoped().Where("id = ? AND organization_id = ?", c.FactoryID, c.OrganizationID).First(&workspace).Error; err != nil {
-		return nil, err
-	}
 	var orders []FactoryWorkOrder
-	err = tx.Where("organization_id = ? AND factory_id = ?", c.OrganizationID, c.FactoryID).
-		Where("?", workspace.OnboardingConfigValue().CodexSubscription).Where("id IN (?)", tx.Model(&FactoryWorkOrderAssignee{}).Select("work_order_id").Where("user_id = ?", c.OwnerUserID)).Order("id").Find(&orders).Error
+	err = tx.Where("organization_id = ?", c.OrganizationID).
+		Where("factory_id IN (?)", tx.Model(&Factory{}).Select("id").Where("organization_id = ? AND onboarding_config->>'codex_subscription' = 'true'", c.OrganizationID)).
+		Where("id IN (?)", tx.Model(&FactoryWorkOrderAssignee{}).Select("work_order_id").Where("user_id = ?", c.OwnerUserID)).Order("id").Find(&orders).Error
 	if err != nil {
 		return nil, err
 	}
