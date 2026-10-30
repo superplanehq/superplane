@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import type { FirstRunArtScene } from "./firstRunArtScene";
-import { onboardingArtMountOptions, onboardingArtScriptUrl } from "./onboardingArt";
+import { mountOnboardingArt, onboardingArtMountOptions, onboardingArtScriptUrl } from "./onboardingArt";
 
 const globe: FirstRunArtScene = {
   mode: "globe",
@@ -9,6 +9,48 @@ const globe: FirstRunArtScene = {
   arrowColor: "#eeede9",
   count: 100,
 };
+
+afterEach(() => {
+  delete window.SuperplaneArt;
+});
+
+describe("mountOnboardingArt", () => {
+  it("removes only incomplete artwork when mounting throws", () => {
+    const target = document.createElement("div");
+    const existing = document.createElement("span");
+    target.append(existing);
+    const sibling = document.createElement("div");
+    document.body.append(target, sibling);
+    window.SuperplaneArt = {
+      mount: (container) => {
+        container.append(document.createElement("canvas"));
+        throw new Error("renderer initialization failed");
+      },
+    };
+
+    expect(mountOnboardingArt(target, globe)).toBeNull();
+    expect(target.childNodes).toHaveLength(1);
+    expect(existing.parentNode).toBe(target);
+    expect(sibling.isConnected).toBe(true);
+    target.remove();
+    sibling.remove();
+  });
+
+  it("retains successfully mounted artwork and its lifecycle handle", () => {
+    const target = document.createElement("div");
+    const canvas = document.createElement("canvas");
+    const handle = { setColors: vi.fn(), destroy: vi.fn() };
+    window.SuperplaneArt = {
+      mount: (container) => {
+        container.append(canvas);
+        return handle;
+      },
+    };
+
+    expect(mountOnboardingArt(target, globe)).toBe(handle);
+    expect(canvas.parentNode).toBe(target);
+  });
+});
 
 describe("onboardingArtScriptUrl", () => {
   it("requests the scripts from the asset route the production server serves", () => {

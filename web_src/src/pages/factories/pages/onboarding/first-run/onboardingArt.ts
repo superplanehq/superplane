@@ -98,5 +98,14 @@ export async function loadOnboardingArt(): Promise<void> {
 }
 
 export function mountOnboardingArt(target: HTMLElement, scene: FirstRunArtScene): OnboardingArtHandle | null {
-  return window.SuperplaneArt?.mount(target, onboardingArtMountOptions(scene)) ?? null;
+  const existingContent = new Set(target.childNodes);
+  try {
+    return window.SuperplaneArt?.mount(target, onboardingArtMountOptions(scene)) ?? null;
+  } catch {
+    // This target owns only the optional animation. Keep cleanup local to this mount.
+    for (const node of Array.from(target.childNodes)) {
+      if (!existingContent.has(node)) target.removeChild(node);
+    }
+    return null;
+  }
 }
