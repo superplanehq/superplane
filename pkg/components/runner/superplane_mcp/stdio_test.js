@@ -2,31 +2,32 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const http = require("node:http");
+const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 
 const SERVER = path.join(__dirname, "server.js");
+const OWNER_AND_TASK_TOOLS = ["suggest_owners", "assign_owner", "list_tasks", "create_task", "close_task", "remove_artifact"];
+const PNG = Buffer.concat([Buffer.from("\x89PNG\r\n\x1a\n", "binary"), Buffer.alloc(16)]);
 
-async function fakeRunnerAPI(t) {
+async function fakeRunnerAPI(t, tools = OWNER_AND_TASK_TOOLS) {
   const requests = [];
   const api = http.createServer((req, res) => {
-    let body = "";
+    const chunks = [];
     req.on("data", (chunk) => {
-      body += chunk;
+      chunks.push(chunk);
     });
     req.on("end", () => {
-      requests.push({ method: req.method, url: req.url, auth: req.headers.authorization, body });
+      const raw = Buffer.concat(chunks);
+      requests.push({ method: req.method, url: req.url, auth: req.headers.authorization, body: raw.toString("utf8"), raw });
       res.setHeader("Content-Type", "application/json");
       if (req.url === "/api/v1/runner/tools") {
-        res.end(
-          JSON.stringify({
-            tools: ["suggest_owners", "assign_owner", "list_tasks", "create_task", "close_task", "remove_artifact"],
-          }),
-        );
+        res.end(JSON.stringify({ tools }));
         return;
       }
-      res.end(JSON.stringify({ ok: true, url: req.url }));
+      res.end(JSON.stringify({ ok: true, url: req.url, file_id: "file-1" }));
     });
   });
   await new Promise((resolve) => api.listen(0, "127.0.0.1", resolve));
@@ -59,9 +60,9 @@ const framings = {
   },
 };
 
-function startServer(t, baseURL, framing) {
+function startServer(t, baseURL, framing, extraEnv = {}) {
   const child = spawn(process.execPath, [SERVER], {
-    env: { ...process.env, SUPERPLANE_BASE_URL: baseURL, SUPERPLANE_RUNNER_TOKEN: "runner-token" },
+    env: { ...process.env, SUPERPLANE_BASE_URL: baseURL, SUPERPLANE_RUNNER_TOKEN: "runner-token", ...extraEnv },
     stdio: ["pipe", "pipe", "inherit"],
   });
   t.after(() => child.kill());
@@ -132,3 +133,67 @@ for (const [name, framing] of Object.entries(framings)) {
     );
   });
 }
+
+test("server.js serves the flow tools with the runner token", async (t) => {
+  const flowTools = [
+    "propose_update",
+    "inspect_attachment",
+    "inspect_screenshot",
+    "upload_artifact",
+    "report_visual_evidence_unavailable",
+    "publish_link",
+    "report_merge_check",
+  ];
+  const api = await fakeRunnerAPI(t, flowTools);
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "global-mcp-"));
+  fs.mkdirSync(path.join(taskDir, "attachments"));
+  fs.mkdirSync(path.join(taskDir, "evidence"));
+  fs.writeFileSync(path.join(taskDir, "attachments", "mock.png"), PNG);
+  const screenshot = path.join(taskDir, "evidence", "checkout.png");
+  fs.writeFileSync(screenshot, PNG);
+  const specFile = path.join(taskDir, "spec.md");
+  const request = startServer(t, api.baseURL, framings.ndjson, {
+    SUPERPLANE_TASK_DIR: taskDir,
+    SUPERPLANE_ANALYSIS_SPEC_FILE: specFile,
+  });
+
+  const list = await request("tools/list", {});
+  assert.deepEqual(list.result.tools.map((tool) => tool.name), flowTools);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(taskDir, "visual-evidence.json"), "utf8")), {
+    status: "not_applicable",
+    reason: "",
+    artifacts: [],
+  });
+
+  const attachment = await request("tools/call", { name: "inspect_attachment", arguments: { path: "mock.png" } });
+  assert.equal(attachment.result.content[1].type, "image");
+  assert.equal(attachment.result.content[1].data, PNG.toString("base64"));
+  assert.equal(attachment.result.structuredContent.mimeType, "image/png");
+
+  const plan = await request("tools/call", { name: "propose_update", arguments: { spec: "# Plan" } });
+  assert.equal(plan.result.isError, undefined);
+  assert.equal(fs.readFileSync(specFile, "utf8"), "# Plan");
+
+  await request("tools/call", { name: "inspect_screenshot", arguments: { path: screenshot } });
+  const upload = await request("tools/call", { name: "upload_artifact", arguments: { path: screenshot, title: "Checkout" } });
+  assert.equal(upload.result.isError, undefined, JSON.stringify(upload.result));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(taskDir, "visual-evidence.json"), "utf8")).status, "captured");
+
+  await request("tools/call", { name: "publish_link", arguments: { url: "https://staging.example.com", title: "Staging" } });
+  await request("tools/call", { name: "report_merge_check", arguments: { check: "Risk", score: 2, summary: "Small change." } });
+
+  const calls = api.requests.filter((req) => req.url !== "/api/v1/runner/tools");
+  assert.deepEqual(
+    calls.map((req) => [req.method, req.url, req.auth]),
+    [
+      ["PUT", "/api/v1/runner/task/plan", "Bearer runner-token"],
+      ["POST", "/api/v1/runner/task/artifacts", "Bearer runner-token"],
+      ["POST", "/api/v1/runner/task/links", "Bearer runner-token"],
+      ["POST", "/api/v1/runner/task/merge-checks", "Bearer runner-token"],
+    ],
+  );
+  assert.deepEqual(JSON.parse(calls[0].body), { spec: "# Plan" });
+  assert.deepEqual(calls[1].raw, PNG);
+  assert.deepEqual(JSON.parse(calls[2].body), { url: "https://staging.example.com", title: "Staging", key: "" });
+  assert.deepEqual(JSON.parse(calls[3].body), { check: "risk", score: 2, summary: "Small change." });
+});
