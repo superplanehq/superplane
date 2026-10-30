@@ -61,6 +61,7 @@ type FactoryOnboardingConfig struct {
 	DefaultBranch           string `json:"default_branch,omitempty"`
 	IssuesSource            string `json:"issues_source,omitempty"`
 	AgentHarness            string `json:"agent_harness,omitempty"`
+	CodexDefaultOwnerID     string `json:"codex_default_owner_id,omitempty"`
 	CodexSubscription       bool   `json:"codex_subscription,omitempty"`
 	ProvisionedAppID        string `json:"provisioned_app_id,omitempty"`
 	ProvisionedLineID       string `json:"provisioned_line_id,omitempty"`
@@ -82,6 +83,7 @@ type FactoryOnboardingPatch struct {
 	DefaultBranch           *string
 	IssuesSource            *string
 	AgentHarness            *string
+	CodexDefaultOwnerID     *string
 	CodexSubscription       *bool
 	ProvisionedAppID        *string
 	ProvisionedLineID       *string
@@ -355,6 +357,9 @@ func mergeFactoryOnboardingConfig(current FactoryOnboardingConfig, patch Factory
 			return FactoryOnboardingConfig{}, err
 		}
 		next.AgentHarness = value
+	}
+	if patch.CodexDefaultOwnerID != nil {
+		next.CodexDefaultOwnerID = *patch.CodexDefaultOwnerID
 	}
 	if patch.CodexSubscription != nil {
 		next.CodexSubscription = *patch.CodexSubscription

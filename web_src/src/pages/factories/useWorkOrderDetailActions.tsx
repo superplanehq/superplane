@@ -1,3 +1,4 @@
+import { isCodexActionCancelled } from "@/pages/factories/codex/codexActionContext";
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import {
   useAddWorkOrderComment,
@@ -21,6 +22,7 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     try {
       await updateAssignees.mutateAsync({ orderId, assigneeIds: nextAssigneeIds });
     } catch (error) {
+      if (isCodexActionCancelled(error)) return;
       showErrorToast(getApiErrorMessage(error, "Failed to update the owner"));
       throw error;
     }
@@ -35,6 +37,7 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
       await closeWorkOrder.mutateAsync({ orderId, result });
       showSuccessToast(`Task closed as ${formatWorkOrderResult(result).toLowerCase()}.`);
     } catch (error) {
+      if (isCodexActionCancelled(error)) return;
       showErrorToast(getApiErrorMessage(error, "Failed to close task"));
     }
   };
@@ -44,6 +47,7 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
       await updateStatus.mutateAsync({ orderId, state, result });
       showSuccessToast(`Task moved to ${formatWorkOrderState(state).toLowerCase()}.`);
     } catch (error) {
+      if (isCodexActionCancelled(error)) return;
       showErrorToast(getApiErrorMessage(error, "Failed to update status"));
       throw error;
     }
@@ -54,6 +58,7 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
       await addComment.mutateAsync({ orderId, body, mentionedUserIds });
       showSuccessToast("Comment added.");
     } catch (error) {
+      if (isCodexActionCancelled(error)) return;
       showErrorToast(getApiErrorMessage(error, "Failed to add comment"));
       throw error;
     }

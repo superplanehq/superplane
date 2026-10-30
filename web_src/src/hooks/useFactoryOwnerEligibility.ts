@@ -7,16 +7,24 @@ export function factoryOwnerEligibilityKey(organizationId: string, factoryId: st
   return ["factories", organizationId, factoryId, "owner-eligibility", orderId, memberId] as const;
 }
 
-export function useFactoryOwnerEligibility(organizationId: string, factoryId: string, orderId?: string) {
+export function useFactoryOwnerEligibility(
+  organizationId: string,
+  factoryId: string,
+  orderId?: string,
+  prospectiveSubscription = false,
+) {
   const { currentUserId } = usePermissions();
   return useQuery({
-    queryKey: factoryOwnerEligibilityKey(organizationId, factoryId, orderId, currentUserId),
+    queryKey: [
+      ...factoryOwnerEligibilityKey(organizationId, factoryId, orderId, currentUserId),
+      prospectiveSubscription,
+    ],
     queryFn: async () => {
       const response = await factoriesListFactoryOwnerEligibility(
         withOrganizationHeader({
           organizationId,
           path: { factoryId },
-          query: { orderId },
+          query: { orderId, prospectiveSubscription },
         }),
       );
       if (!response.data) throw new Error("Could not load owner eligibility.");

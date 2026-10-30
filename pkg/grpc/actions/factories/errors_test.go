@@ -15,10 +15,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
+	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
 )
 
 func Test__factoryErrorToStatus(t *testing.T) {
+	t.Run("workspace model errors keep the recovery action", func(t *testing.T) {
+		original := fmt.Errorf("No models are enabled. Update Workspace Models: %w", models.ErrSelectableLLMModelNotAllowed)
+		err := factoryErrorToStatus(original, "failed to start task")
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, original.Error(), message)
+	})
 	t.Run("keeps a handler error and its client message", func(t *testing.T) {
 		original := grpcerrors.Unauthenticated(errors.New("missing user"), "user not authenticated")
 

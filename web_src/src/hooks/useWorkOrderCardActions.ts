@@ -1,4 +1,6 @@
+import { isCodexActionCancelled } from "@/pages/factories/codex/codexActionContext";
 import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useState } from "react";
 
@@ -23,8 +25,9 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
           model: input.model,
           thinkingLevel: input.thinkingLevel,
         });
-      } catch {
-        showErrorToast("Failed to dispatch task.");
+      } catch (error) {
+        if (isCodexActionCancelled(error)) return;
+        showErrorToast(getApiErrorMessage(error, "Failed to dispatch task."));
       } finally {
         setDispatchingOrderIds((current) => withoutOrderId(current, orderId));
       }
@@ -36,7 +39,8 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
     async (orderId: string, assigneeIds: string[]) => {
       try {
         await updateAssignees.mutateAsync({ orderId, assigneeIds });
-      } catch {
+      } catch (error) {
+        if (isCodexActionCancelled(error)) return;
         showErrorToast("Failed to update the owner.");
       }
     },

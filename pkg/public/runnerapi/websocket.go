@@ -410,13 +410,13 @@ func (s *Server) reconcileRunnerConnection(
 	}
 	publishedFactories := map[uuid.UUID]bool{}
 	for _, connection := range reservation.LoginConnections {
-		if publishedFactories[connection.FactoryID] {
+		if publishedFactories[connection.OrganizationID] {
 			continue
 		}
-		if err := messages.PublishFactoryCodexConnectionUpdated(connection.FactoryID.String()); err != nil {
+		if err := messages.PublishOrganizationCodexConnectionUpdated(database.DB(ctx), connection.OrganizationID); err != nil {
 			log.WithError(err).Warn("Failed to publish ChatGPT connection change")
 		}
-		publishedFactories[connection.FactoryID] = true
+		publishedFactories[connection.OrganizationID] = true
 	}
 	if s.nodeRequestExecutor != nil {
 		for _, failedTask := range reservation.FailedTasks {

@@ -1,3 +1,4 @@
+import { factoryModelSettingsRoutes } from "./factoryModelSettingsHandlers";
 import {
   ACTIVE_BILLING_PERIOD_ENDS_AT,
   ACTIVE_TRIAL_ENDS_AT,
@@ -73,7 +74,7 @@ function velocitySynced(factoryId: string): void {
   velocitySyncedAt.set(factoryId, new Date().toISOString());
 }
 
-interface FactoriesRoute {
+export interface FactoriesRoute {
   pattern: RegExp;
   resolve: (match: RegExpExecArray, method: string, body: Record<string, unknown> | null, url: URL) => FixtureResult;
 }
@@ -450,25 +451,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         },
       }),
     },
-    {
-      pattern: re("/api/v1/factories/([^/]+)/llm-models"),
-      resolve: (_match, method, body, url) => {
-        const request = (body ?? {}) as { provider?: string; fundingSource?: string; allowedModels?: unknown };
-        const provider =
-          url.searchParams.get("provider") || (typeof request.provider === "string" ? request.provider : "");
-        const models = storybookHostedLlmModels(provider).models;
-        if (method === "PUT") {
-          const allowed = stringArrayOrEmpty(request.allowedModels);
-          return {
-            json: {
-              selected: allowed.map((id) => ({ id, name: id })),
-              inheritParent: allowed.length === 0,
-            },
-          };
-        }
-        return { json: { parent: models, selected: models, inheritParent: true } };
-      },
-    },
+    ...factoryModelSettingsRoutes(fixture),
   ];
 }
 

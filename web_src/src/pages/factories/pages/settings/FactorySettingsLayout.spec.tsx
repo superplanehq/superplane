@@ -398,7 +398,7 @@ describe("FactorySettingsLayout sidebar", () => {
     }, 10000);
   });
 
-  it("does not show a workspace Models nav item", async () => {
+  it("shows Models after Repository in Workspace navigation", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
@@ -407,12 +407,12 @@ describe("FactorySettingsLayout sidebar", () => {
     );
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-models")).not.toBeInTheDocument();
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-models")).toHaveTextContent("Models");
   }, 10000);
 
   describe("organization-byok experimental feature", () => {
     it.each([{ features: [] }, { features: [FEATURE_ORGANIZATION_BYOK] }])(
-      "keeps the LLM Models nav item with features %j",
+      "keeps the Models nav item with features %j",
       async ({ features }) => {
         render(
           <FactoriesHarness
@@ -423,9 +423,7 @@ describe("FactorySettingsLayout sidebar", () => {
         );
 
         const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-        expect(await within(sidebar).findByTestId("factory-settings-nav-organization-models")).toHaveTextContent(
-          "LLM Models",
-        );
+        expect(await within(sidebar).findByTestId("factory-settings-nav-workspace-models")).toHaveTextContent("Models");
       },
       10000,
     );
@@ -433,7 +431,7 @@ describe("FactorySettingsLayout sidebar", () => {
     it("keeps hosted models available when the feature is off", async () => {
       render(
         <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
           factoriesFixture={{
             ...defaultFactoriesFixture,
             organizationWorkspaceUsage: HOSTED_DEFAULT_USAGE_REPORT,
@@ -448,7 +446,7 @@ describe("FactorySettingsLayout sidebar", () => {
     it("allows hosted recovery from the model route when the product permission is off", async () => {
       render(
         <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
           factoriesFixture={{
             ...defaultFactoriesFixture,
             organizationWorkspaceUsage: HOSTED_DEFAULT_USAGE_REPORT,
@@ -465,16 +463,16 @@ describe("FactorySettingsLayout sidebar", () => {
         />,
       );
       const user = userEvent.setup();
-      await user.click(await screen.findByRole("button", { name: "Use SuperPlane" }));
+      await user.click(await screen.findByRole("tab", { name: "SuperPlane" }));
       expect(screen.getByRole("button", { name: "Switch to SuperPlane" })).toBeEnabled();
       expect(screen.queryByTestId("llm-models-connect-anthropic")).not.toBeInTheDocument();
       expect(screen.queryByTestId("llm-models-empty-banner")).not.toBeInTheDocument();
     });
 
-    it("renders the LLM Models page when the feature is on", async () => {
+    it("renders the Models page when the feature is on", async () => {
       render(
         <FactoriesHarness
-          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`}
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
           factoriesFixture={defaultFactoriesFixture}
           experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
         />,
@@ -482,7 +480,7 @@ describe("FactorySettingsLayout sidebar", () => {
 
       await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       expect(await screen.findByTestId("factory-settings-llm-models")).toBeInTheDocument();
-      expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("LLM Models");
+      expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("Models");
     }, 10000);
   });
 

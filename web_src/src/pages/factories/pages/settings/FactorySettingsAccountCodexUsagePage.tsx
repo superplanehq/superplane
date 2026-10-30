@@ -1,11 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { meListCodexUsage, type MeCodexUsageConnection, type MeCodexUsageWindow } from "@/api-client";
+import { type MeCodexUsageConnection, type MeCodexUsageWindow } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-
-import { usePermissions } from "@/contexts/usePermissions";
+import { useCodexUsage } from "@/hooks/useCodexUsage";
 import { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
 import { FactoryCodexSubscriptionConnection } from "./FactoryCodexSubscriptionConnection";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -16,28 +13,19 @@ import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
 export function FactorySettingsAccountCodexUsagePage() {
   const { organizationId, factoryId } = useFactorySettingsLayout();
-  const { currentUserId } = usePermissions();
   const features = useExperimentalFeature(organizationId);
-  const connectionEnabled = !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const codex = useFactoryCodexConnection(organizationId, factoryId, connectionEnabled);
-  const query = useQuery({
-    queryKey: ["me", organizationId, "codex-usage", currentUserId],
-    queryFn: async () => {
-      const response = await meListCodexUsage(withOrganizationHeader({ organizationId }));
-      if (!response.data) throw new Error("Could not load Codex usage.");
-      return response.data.connections ?? [];
-    },
-    enabled: Boolean(organizationId),
-    refetchInterval: false,
-    refetchOnWindowFocus: false,
-  });
+  const enabled = !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS);
+  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
+  const query = useCodexUsage(organizationId, enabled);
 
   return (
-    <FactorySettingsPageFrame
-      title="Codex usage"
-      subtitle="Saved usage for your ChatGPT subscriptions. Usage outside SuperPlane can change the remaining quota."
-    >
-      {connectionEnabled ? <FactoryCodexSubscriptionConnection codex={codex} /> : null}
+    <FactorySettingsPageFrame title="Codex">
+      <FactorySettingsCard
+        title="Your Codex connection"
+        description="Connect once to use Codex across this organization’s workspaces."
+      >
+        <FactoryCodexSubscriptionConnection codex={codex} />
+      </FactorySettingsCard>
       {query.isPending ? <p role="status">Loading Codex usage…</p> : null}
       {query.isError ? (
         <FactorySettingsCard title="Could not load Codex usage.">
@@ -52,15 +40,6 @@ export function FactorySettingsAccountCodexUsagePage() {
 }
 
 export function CodexUsageConnections({ connections }: { connections: MeCodexUsageConnection[] }) {
-  if (!connections.length) {
-    return (
-      <FactorySettingsCard
-        title="No ChatGPT subscription connected"
-        description="Connect your ChatGPT subscription to see Codex usage here."
-      />
-    );
-  }
-
   return connections.map((connection) => (
     <FactorySettingsCard
       key={connection.id}

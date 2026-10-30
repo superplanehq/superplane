@@ -30,21 +30,20 @@ export function providerKeyIntegrationLink(provider: string): string {
 }
 
 export const ORGANIZATION_LLM_MODELS_COPY = {
-  pageTitle: "LLM Models",
+  pageTitle: "Models",
   pageSubtitle: "Select the models that agents in this workspace can use.",
   modelsTitle: "Models",
-  hostedModelsHelper:
-    "Choose the SuperPlane models this organization can use. An installation admin controls which models appear here. The choice applies to every workspace.",
   hostedModelsEmpty: "No SuperPlane-hosted models are available.",
   ownKeyHelper: "Agents in this workspace run with this key. Your provider bills these runs.",
   hostedBadge: "SuperPlane",
   ownKeyBadge: "Your key",
   subscriptionBadge: "ChatGPT",
   subscriptionTitle: "ChatGPT subscription",
-  subscriptionHelper: "All models available to this ChatGPT subscription are enabled.",
+  subscriptionHelper:
+    "Choose native models for this workspace. Each task owner uses their personal ChatGPT subscription.",
   subscriptionLoading: "Loading models from the ChatGPT subscription...",
   subscriptionEmptyCatalog: "Unable to list models from the ChatGPT subscription.",
-  subscriptionReconnect: "Connect ChatGPT again in workspace setup to load subscription models.",
+  subscriptionReconnect: "Connect your Codex account again to load subscription models.",
   noProviderTitle: "Connect a model provider",
   noProviderDescription: "Connect Claude, OpenAI, or OpenRouter on Integrations. All models from the key are enabled.",
   noProviderAction: "Open Integrations",
@@ -55,5 +54,5 @@ export const ORGANIZATION_LLM_MODELS_COPY = {
   saving: "Saving...",
   saveSuccess: "Models saved.",
   saveError: "Unable to save models.",
-  noPermission: "You do not have permission to update organization models.",
+  noPermission: "You do not have permission to update workspace models.",
 } as const;
