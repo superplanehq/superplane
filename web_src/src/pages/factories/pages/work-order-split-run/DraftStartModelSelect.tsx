@@ -1,4 +1,3 @@
-import { useFactoryTaskIdentity } from "../../factoryTaskContext";
 import { Bot, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -62,12 +61,12 @@ export function DraftStartModelSelect({
   disabled?: boolean;
   appearance?: Appearance;
 }) {
-  const task = useFactoryTaskIdentity();
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId ?? task.orderId);
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId);
   const selectedName =
     model === DRAFT_START_MODEL_AUTO
       ? "Auto"
-      : (models.data?.models ?? []).find((item) => item.id === model)?.name || model;
+      : (models.data?.models ?? []).find((item) => item.id === model)?.name ||
+        (models.isLoading ? model : `${model} (unavailable)`);
   const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
   const showName = appearance !== "icon";
 

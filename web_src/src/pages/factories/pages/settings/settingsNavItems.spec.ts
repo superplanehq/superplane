@@ -17,8 +17,8 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/api-keys")?.id).toBe(
       "organization-api-keys",
     );
-    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/models")?.id).toBe(
-      "organization-models",
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/models")?.id).toBe(
+      "workspace-models",
     );
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/superplane-mcp-server")?.id).toBe(
       "workspace-superplane-mcp-server",
@@ -50,12 +50,12 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Codex usage",
       "General",
       "Repository",
+      "Models",
       "MCP Server",
       "Usage",
       "General",
       "Members",
       "Integrations",
-      "LLM Models",
       "API keys",
       "Secrets",
       "Billing",
@@ -88,6 +88,7 @@ describe("filterFactorySettingsNavGroups", () => {
     expect(workspaceGroup?.items.map((item) => item.id)).toEqual([
       "workspace-general",
       "workspace-repository",
+      "workspace-models",
       "workspace-superplane-mcp-server",
       "workspace-usage",
     ]);
@@ -99,7 +100,7 @@ describe("filterFactorySettingsNavGroups", () => {
   });
 
   it("drops groups that have no matching items", () => {
-    const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "api keys");
+    const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "programmatic access");
     expect(filtered.map((group) => group.id)).toEqual(["organization"]);
     expect(filtered[0]?.items.map((item) => item.id)).toEqual(["organization-api-keys"]);
   });
@@ -138,7 +139,6 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
     ]);
     expect(filtered.find((group) => group.id === "organization")?.items.map((item) => item.id)).toEqual([
       "organization-general",
-      "organization-models",
       "organization-billing",
       "organization-spending",
     ]);

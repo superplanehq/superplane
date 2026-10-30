@@ -15,7 +15,7 @@ import (
 )
 
 func TestOnboardingRetryChangesSubscriptionCredentials(t *testing.T) {
-	for _, target := range []string{"subscription", "subscription-from-key", "hosted", "openai"} {
+	for _, target := range []string{"hosted", "openai"} {
 		t.Run(target, func(t *testing.T) {
 			r := support.Setup(t)
 			support.AssignOpenSystemTrial(t, r.Organization.ID)
@@ -27,15 +27,9 @@ func TestOnboardingRetryChangesSubscriptionCredentials(t *testing.T) {
 			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 			appID, lineID := createOnboardingResources(t, r, factory)
 			component, source := "runnerCodex", "subscription"
-			if target == "subscription" {
-				component, source = models.SuperPlaneRunnerComponent, "hosted"
-			}
-			if target == "subscription-from-key" {
-				component, source = "runnerClaudeCode", "integration"
-			}
 			app := createLineAppWithRunner(t, r, factory.ID, component, source, "old-model")
 			liveID := *app.LiveVersionID
-			subscription := target == "subscription" || target == "subscription-from-key"
+			subscription := false
 			harness := pb.FactoryOnboarding_AGENT_HARNESS_CODEX
 			agentID := ""
 			if target == "hosted" {
@@ -80,11 +74,6 @@ func TestOnboardingRetryChangesSubscriptionCredentials(t *testing.T) {
 			}
 			assert.Equal(t, "runnerCodex", agent.ComponentName())
 			credentials := agent.Configuration["credentials"].(map[string]any)
-			if subscription {
-				assert.Equal(t, map[string]any{"source": "subscription"}, credentials)
-				assert.Empty(t, agent.Configuration["model"])
-				return
-			}
 			assert.Equal(t, "integration", credentials["source"])
 			integration, err := models.FindIntegrationInTransaction(db, r.Organization.ID, uuid.MustParse(agentID))
 			require.NoError(t, err)
@@ -92,4 +81,31 @@ func TestOnboardingRetryChangesSubscriptionCredentials(t *testing.T) {
 			assert.NotEmpty(t, agent.Configuration["model"])
 		})
 	}
+}
+
+func TestOnboardingClearsOldSubscriptionChoiceAndRejectsNewChoice(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	subscription := true
+	harness := models.FactoryOnboardingAgentHarnessCodex
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription, AgentHarness: &harness}))
+	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	require.NoError(t, err)
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), CodexSubscription: &subscription})
+	require.Error(t, err)
+	response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String()})
+	require.NoError(t, err)
+	assert.False(t, response.Factory.Onboarding.CodexSubscription)
+	assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED, response.Factory.Onboarding.AgentHarness)
+	kept, err := models.FindFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User)
+	require.NoError(t, err)
+	assert.Equal(t, connection.ID, kept.ID)
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription, AgentHarness: &harness}))
+	require.NoError(t, db.Model(factory).Update("onboarding_completed_at", time.Now()).Error)
+	response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String()})
+	require.NoError(t, err)
+	assert.True(t, response.Factory.Onboarding.CodexSubscription)
+	assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_CODEX, response.Factory.Onboarding.AgentHarness)
 }

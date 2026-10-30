@@ -164,17 +164,70 @@ func (f *Factory) DefaultSubscriptionAssignees(tx *gorm.DB, userID *uuid.UUID) (
 // FindSubscriptionWorkOrderForRun uses persisted associations and ancestors.
 // Event payloads and agent-supplied task IDs are never authority for routing.
 func FindSubscriptionWorkOrderForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (*FactoryWorkOrder, error) {
-	var orders []FactoryWorkOrder
-	err := tx.Raw(factoryTaskRunAssociationsCTE+`
- SELECT DISTINCT o.* FROM factory_work_orders o
- JOIN associated_task_runs a ON a.work_order_id = o.id WHERE a.id = ?`, orgID, factoryID, runID).Scan(&orders).Error
+	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
 	if err != nil {
 		return nil, err
 	}
-	if len(orders) != 1 || orders[0].OrganizationID != orgID || orders[0].FactoryID != factoryID {
+	if len(orders) != 1 {
 		return nil, ErrSubscriptionTaskAssociation
 	}
 	return &orders[0], nil
+}
+
+// RequireSubscriptionRunOwner admits either an associated task or the trusted
+// scheduled proposal that runs before its task exists. Ambiguous task links
+// never fall back to an intake default.
+func RequireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (uuid.UUID, error) {
+	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if len(orders) > 1 {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	if len(orders) == 1 {
+		return orders[0].RequireSubscriptionOwner(tx, true)
+	}
+	ownerID, err := FindSubscriptionIntakeOwnerForRun(tx, orgID, factoryID, runID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	connected, err := SubscriptionOwnerEligible(tx, orgID, factoryID, ownerID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if !connected {
+		return uuid.Nil, ErrSubscriptionOwnerInvalid
+	}
+	return ownerID, nil
+}
+
+func subscriptionWorkOrdersForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) ([]FactoryWorkOrder, error) {
+	var orders []FactoryWorkOrder
+	// History excludes shared creator runs, but admission must see every
+	// creator link so an ambiguous run cannot fall back to an intake owner.
+	err := tx.Raw(factoryTaskRunAssociationsCTE+`
+ , source_ancestors AS (
+  SELECT id, parent_run_id FROM scoped_runs WHERE id = ?
+  UNION
+  SELECT r.id, r.parent_run_id FROM scoped_runs r
+  JOIN source_ancestors a ON r.id = a.parent_run_id
+ )
+ SELECT DISTINCT o.* FROM factory_work_orders o
+ WHERE o.id IN (SELECT work_order_id FROM associated_task_runs WHERE id = ?)
+    OR o.source_run_id IN (SELECT id FROM source_ancestors)`, orgID, factoryID, runID, runID).Scan(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, order := range orders {
+		if order.OrganizationID != orgID || order.FactoryID != factoryID {
+			return nil, ErrSubscriptionTaskAssociation
+		}
+	}
+	return orders, nil
 }
 
 // ResolveSubscriptionCatalogOwner never substitutes another member's catalog.
@@ -229,15 +282,12 @@ func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasI
 			model = strings.TrimSpace(model)
 		}
 		// Expressions resolve later. Dispatch checks the resolved value.
-		if model == "" || strings.Contains(model, "{{") {
+		if strings.Contains(model, "{{") {
 			continue
 		}
-		allowed, err := RunnerAcceptsModel(tx, o.OrganizationID, &o.FactoryID, node.ComponentName(), node.Configuration, model, ownerID)
+		_, err := ResolveFactoryCodexSubscriptionModel(tx, o.OrganizationID, o.FactoryID, ownerID, model)
 		if err != nil {
 			return err
-		}
-		if !allowed {
-			return ErrSubscriptionModelUnavailable
 		}
 	}
 	return nil
