@@ -1,4 +1,3 @@
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -15,25 +14,13 @@ import { useState } from "react";
 import {
   INTAKE_SETTINGS_COPY,
   intakeSupportsDelete,
+  linearIntakeScopeMissing,
   normalizeIntakeSourceSettings,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
-
-type IntakeSourceSettingsFooterProps = {
-  sourceId: LineIntakeSourceId;
-  draft: IntakeSourceSettings;
-  getDraft: () => IntakeSourceSettings;
-  savePending?: boolean;
-  saveError?: string;
-  deletePending: boolean;
-  deleteError?: string;
-  onDelete?: () => Promise<void> | void;
-  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
-  onClose: () => void;
-};
 
 export function IntakeSourceSettingsFooter({
   sourceId,
@@ -46,22 +33,33 @@ export function IntakeSourceSettingsFooter({
   getDraft,
   onSave,
   onClose,
-}: IntakeSourceSettingsFooterProps) {
+}: {
+  sourceId: LineIntakeSourceId;
+  draft: IntakeSourceSettings;
+  getDraft: () => IntakeSourceSettings;
+  savePending?: boolean;
+  saveError?: string;
+  deletePending: boolean;
+  deleteError?: string;
+  onDelete?: () => Promise<void> | void;
+  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
+  onClose: () => void;
+}) {
   const deleteControls = intakeSupportsDelete(sourceId);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const linearProjectsMissing = sourceId === "linear-issues" && draft.linearProjectIds.length === 0;
+  const linearScopeMissing = sourceId === "linear-issues" && linearIntakeScopeMissing(draft);
   const sentryProjectsMissing = sourceId === "sentry-exceptions" && draft.sentryProjectIds.length === 0;
-  const projectsMissing = linearProjectsMissing || sentryProjectsMissing;
+  const scopeMissing = linearScopeMissing || sentryProjectsMissing;
   const footerError =
     saveError ??
     (deleteOpen ? undefined : deleteError) ??
-    (linearProjectsMissing ? LINEAR_INTAKE_SETUP_COPY.projectsRequired : undefined) ??
+    (linearScopeMissing ? LINEAR_INTAKE_SETUP_COPY.teamRequired : undefined) ??
     (sentryProjectsMissing ? SENTRY_INTAKE_SETUP_COPY.projectsRequired : undefined);
 
   return (
     <>
-      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
-        <div className={cn("flex min-w-0 flex-1 items-center gap-2", sourceId === "github-issues" && "min-w-[7rem]")}>
+      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {deleteControls ? (
             <Button
               type="button"
@@ -81,16 +79,21 @@ export function IntakeSourceSettingsFooter({
             </p>
           ) : null}
         </div>
-        <IntakeSaveButtons
-          sourceId={sourceId}
-          draft={draft}
-          savePending={savePending}
-          deletePending={deletePending}
-          projectsMissing={projectsMissing}
-          getDraft={getDraft}
-          onSave={onSave}
-          onClose={onClose}
-        />
+        <Button
+          type="button"
+          disabled={savePending || scopeMissing}
+          onClick={async () => {
+            try {
+              await onSave(normalizeIntakeSourceSettings(getDraft(), sourceId));
+              onClose();
+            } catch {
+              // The parent supplies the actionable error message.
+            }
+          }}
+          data-testid="intake-source-settings-save"
+        >
+          {savePending ? INTAKE_SETTINGS_COPY.saving : INTAKE_SETTINGS_COPY.save}
+        </Button>
       </footer>
       {deleteControls ? (
         <IntakeDeleteConfirmDialog
@@ -102,50 +105,6 @@ export function IntakeSourceSettingsFooter({
         />
       ) : null}
     </>
-  );
-}
-
-function IntakeSaveButtons({
-  sourceId,
-  draft,
-  savePending,
-  deletePending,
-  projectsMissing,
-  getDraft,
-  onSave,
-  onClose,
-}: Pick<
-  IntakeSourceSettingsFooterProps,
-  "sourceId" | "draft" | "savePending" | "deletePending" | "getDraft" | "onSave" | "onClose"
-> & { projectsMissing: boolean }) {
-  const labelsMissing = sourceId === "github-issues" && draft.filterByLabel && draft.labels.length === 0;
-  return (
-    <div className="ml-auto flex shrink-0 items-center gap-3">
-      {sourceId === "github-issues" ? (
-        <Button type="button" variant="outline" disabled={savePending || deletePending} onClick={onClose}>
-          Cancel
-        </Button>
-      ) : null}
-      <Button
-        type="button"
-        disabled={savePending || projectsMissing || labelsMissing}
-        onClick={async () => {
-          try {
-            await onSave(normalizeIntakeSourceSettings(getDraft(), sourceId));
-            onClose();
-          } catch {
-            // The parent supplies the actionable error message.
-          }
-        }}
-        data-testid="intake-source-settings-save"
-      >
-        {savePending
-          ? INTAKE_SETTINGS_COPY.saving
-          : sourceId === "github-issues"
-            ? "Save changes"
-            : INTAKE_SETTINGS_COPY.save}
-      </Button>
-    </div>
   );
 }
 

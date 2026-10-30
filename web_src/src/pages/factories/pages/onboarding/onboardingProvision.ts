@@ -6,7 +6,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryAutomation,
-  FactoriesFactoryLineStep as FactoryLineStep,
+  FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import {
@@ -17,6 +17,7 @@ import {
   type FactoryAgentRewrite,
 } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
+import { linearIntakeScopeToApi, type LinearIntakeScope } from "../linearIntakeScope";
 import type { IssuesChoiceId } from "./onboardingFixtures";
 import {
   forgetOnboardingIntakeBinding,
@@ -177,29 +178,12 @@ export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 export type CreateFactoryIntake = (input: {
   source: FactoriesFactoryIntakeSource;
   skipInitialImport?: boolean;
-  /** Start with automatic intake off. The initial import still runs. */
-  paused?: boolean;
   integrationId?: string;
   resourceId?: string;
   settings?: FactoriesFactoryIntakeSettings;
 }) => Promise<FactoriesFactoryIntake>;
 
 export type DeleteFactoryIntake = (intakeId: string) => Promise<unknown>;
-
-export type UpdateFactoryIntake = (input: { intakeId: string; paused?: boolean }) => Promise<FactoriesFactoryIntake>;
-
-// A retried finish reuses the intake it created before the failure. The
-// Automatic intake switch may have changed since, so the reused intake takes
-// the current choice instead of the one it was created with.
-async function reuseIntake(
-  existing: FactoriesFactoryIntake,
-  paused: boolean | undefined,
-  updateIntake: UpdateFactoryIntake,
-): Promise<FactoriesFactoryIntake> {
-  const wantPaused = Boolean(paused);
-  if (!existing.id || Boolean(existing.paused) === wantPaused) return existing;
-  return updateIntake({ intakeId: existing.id, paused: wantPaused });
-}
 
 function isBacklogIntake(intake: FactoriesFactoryIntake): boolean {
   return (
@@ -236,29 +220,24 @@ async function removeProvisionedIntake(
 export async function provisionGithubIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  updateIntake: UpdateFactoryIntake;
   skipInitialImport?: boolean;
-  paused?: boolean;
 }): Promise<FactoriesFactoryIntake> {
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === GITHUB_INTAKE_SOURCE);
   if (existing) {
-    return reuseIntake(existing, args.paused, args.updateIntake);
+    return existing;
   }
 
   return args.createIntake({
     source: GITHUB_INTAKE_SOURCE,
     ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
-    ...(args.paused ? { paused: true } : {}),
   });
 }
 
 export async function provisionJiraIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  updateIntake: UpdateFactoryIntake;
   skipInitialImport?: boolean;
-  paused?: boolean;
   deleteIntake: DeleteFactoryIntake;
   integrationId: string;
   resourceId: string;
@@ -267,7 +246,7 @@ export async function provisionJiraIntake(args: {
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
   if (existing && intakeBindingMatches(existing, args.integrationId, args.resourceId)) {
-    return reuseIntake(existing, args.paused, args.updateIntake);
+    return existing;
   }
   if (existing) {
     await removeProvisionedIntake(args.deleteIntake, existing);
@@ -276,7 +255,6 @@ export async function provisionJiraIntake(args: {
   const created = await args.createIntake({
     source: JIRA_INTAKE_SOURCE,
     ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
-    ...(args.paused ? { paused: true } : {}),
     integrationId: args.integrationId,
     resourceId: args.resourceId,
     ...(args.settings ? { settings: args.settings } : {}),
@@ -288,43 +266,53 @@ export async function provisionJiraIntake(args: {
   return created;
 }
 
-function linearIntakeResourceId(projectIds: string[]): string {
-  return projectIds.join(",");
+function sameValues(left: string[] | undefined, right: string[]): boolean {
+  const sortedLeft = [...(left ?? [])].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.length === sortedRight.length && sortedLeft.every((value, index) => value === sortedRight[index]);
+}
+
+// A retried finish keeps the intake only when it already has the same
+// connection, team, and filters. The intake settings are the source of truth,
+// because a team intake has no project list as its resource.
+function linearIntakeMatches(intake: FactoriesFactoryIntake, integrationId: string, scope: LinearIntakeScope): boolean {
+  const settings = intake.settings;
+  // The "no project" choice only matters while projects narrow the team.
+  const sameProjectChoice =
+    scope.projectIds.length === 0 ||
+    (settings?.linearIncludeIssuesWithoutProject ?? true) === scope.includeIssuesWithoutProject;
+  return (
+    intake.integrationId === integrationId &&
+    (settings?.linearTeamId ?? "") === scope.teamId &&
+    sameValues(settings?.linearProjectIds, scope.projectIds) &&
+    sameValues(settings?.linearLabels, scope.labels) &&
+    sameProjectChoice
+  );
 }
 
 export async function provisionLinearIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  updateIntake: UpdateFactoryIntake;
   skipInitialImport?: boolean;
-  paused?: boolean;
   deleteIntake: DeleteFactoryIntake;
   integrationId: string;
-  projectIds: string[];
+  scope: LinearIntakeScope;
 }): Promise<FactoriesFactoryIntake> {
-  const resourceId = linearIntakeResourceId(args.projectIds);
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === LINEAR_INTAKE_SOURCE);
-  if (existing && intakeBindingMatches(existing, args.integrationId, resourceId)) {
-    return reuseIntake(existing, args.paused, args.updateIntake);
+  if (existing && linearIntakeMatches(existing, args.integrationId, args.scope)) {
+    return existing;
   }
   if (existing) {
     await removeProvisionedIntake(args.deleteIntake, existing);
   }
 
-  const created = await args.createIntake({
+  return args.createIntake({
     source: LINEAR_INTAKE_SOURCE,
     ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
-    ...(args.paused ? { paused: true } : {}),
     integrationId: args.integrationId,
-    resourceId,
-    settings: { linearProjectIds: args.projectIds },
+    settings: linearIntakeScopeToApi(args.scope),
   });
-  rememberOnboardingIntakeBinding(created.id, {
-    integrationId: args.integrationId,
-    resourceId,
-  });
-  return created;
 }
 
 // Create the selected backlog intake and remove a leftover intake from an
@@ -334,9 +322,7 @@ export async function provisionOnboardingIntake(args: {
   vcsProvider?: string;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  updateIntake: UpdateFactoryIntake;
   skipInitialImport?: boolean;
-  paused?: boolean;
   deleteIntake: DeleteFactoryIntake;
   issuesChoice: IssuesChoiceId | null;
   jira?: {
@@ -346,7 +332,7 @@ export async function provisionOnboardingIntake(args: {
   };
   linear?: {
     integrationId: string;
-    projectIds: string[];
+    scope: LinearIntakeScope;
   };
 }): Promise<FactoriesFactoryIntake | undefined> {
   const intakes = await args.listIntakes();
@@ -363,9 +349,7 @@ export async function provisionOnboardingIntake(args: {
     return provisionJiraIntake({
       listIntakes: args.listIntakes,
       createIntake: args.createIntake,
-      updateIntake: args.updateIntake,
       skipInitialImport: args.skipInitialImport,
-      paused: args.paused,
       deleteIntake: args.deleteIntake,
       integrationId: args.jira.integrationId,
       resourceId: args.jira.projectId,
@@ -373,18 +357,16 @@ export async function provisionOnboardingIntake(args: {
     });
   }
   if (args.issuesChoice === "linear") {
-    if (!args.linear?.integrationId || args.linear.projectIds.length === 0) {
-      throw new Error("Connect Linear, then choose a project.");
+    if (!args.linear?.integrationId || !args.linear.scope.teamId) {
+      throw new Error("Connect Linear, then choose a team.");
     }
     return provisionLinearIntake({
       listIntakes: args.listIntakes,
       createIntake: args.createIntake,
-      updateIntake: args.updateIntake,
       skipInitialImport: args.skipInitialImport,
-      paused: args.paused,
       deleteIntake: args.deleteIntake,
       integrationId: args.linear.integrationId,
-      projectIds: args.linear.projectIds,
+      scope: args.linear.scope,
     });
   }
   // GitHub Issues needs a GitHub repository, so other hosts get no intake.
@@ -392,9 +374,7 @@ export async function provisionOnboardingIntake(args: {
   return provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
-    updateIntake: args.updateIntake,
     skipInitialImport: args.skipInitialImport,
-    paused: args.paused,
   });
 }
 

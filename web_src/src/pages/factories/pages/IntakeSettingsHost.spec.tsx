@@ -9,6 +9,7 @@ import {
   DEPENDABOT_INTAKE,
   DEPENDABOT_INTAKE_CANVAS,
   deleteIntake,
+  LINEAR_INTAKE,
   PRODUCTIVE_INTAKE,
   renderHost,
   resetHostMocks,
@@ -173,6 +174,46 @@ describe("IntakeSettingsHost", () => {
       }),
       integrationId: "datadog-1",
       resourceId: "billing",
+    });
+  });
+
+  it("saves the project filter of a Linear team intake without rebinding the connection", async () => {
+    const user = userEvent.setup();
+    renderHost({ intake: LINEAR_INTAKE });
+
+    expect(screen.getByTestId("linear-team-team-1")).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByTestId("linear-project-ENG"));
+    await user.click(screen.getByRole("checkbox", { name: "Include tickets without a project" }));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-linear",
+      settings: expect.objectContaining({
+        linearTeamId: "team-1",
+        linearProjectIds: ["ENG"],
+        linearIncludeIssuesWithoutProject: false,
+      }),
+    });
+  });
+
+  it("rebinds an older Linear intake that has projects and no team when its projects change", async () => {
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        ...LINEAR_INTAKE,
+        settings: { ...LINEAR_INTAKE.settings, linearTeamId: "", linearProjectIds: ["ENG"] },
+        resourceId: "ENG",
+      },
+    });
+
+    await user.click(screen.getByTestId("linear-project-OPS"));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-linear",
+      settings: expect.objectContaining({ linearTeamId: "", linearProjectIds: ["ENG", "OPS"] }),
+      integrationId: "linear-1",
+      resourceId: "ENG,OPS",
     });
   });
 

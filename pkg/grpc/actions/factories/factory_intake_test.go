@@ -412,7 +412,112 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		}
 	})
 
-	t.Run("a Linear intake rejects a connection without a project", func(t *testing.T) {
+	createLinearTeamIntegration := func(t *testing.T) string {
+		t.Helper()
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "linear")
+		require.NoError(t, database.DB(t.Context()).
+			Model(&models.Integration{}).
+			Where("id = ?", integrationID).
+			Update("metadata", datatypes.NewJSONType(map[string]any{
+				"teams": []any{map[string]any{"id": "team-1", "key": "ENG", "name": "Engineering"}},
+			})).Error)
+		return integrationID
+	}
+
+	t.Run("a Linear intake can listen to a team without projects", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createLinearTeamIntegration(t)
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+			Settings:      &pb.FactoryIntake_Settings{LinearTeamId: "team-1", LinearLabels: []string{"bug"}},
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Equal(t, "team-1", trigger.Configuration["team"])
+		assert.Equal(t, []any{}, trigger.Configuration["projects"])
+		assert.Empty(t, nodeErrorMessage(trigger))
+		settings := intake.GetSettings()
+		assert.Equal(t, "team-1", settings.GetLinearTeamId())
+		assert.Empty(t, settings.GetLinearProjectIds())
+		assert.True(t, settings.GetLinearIncludeIssuesWithoutProject())
+		assert.Equal(t, []string{"bug"}, settings.GetLinearLabels())
+	})
+
+	t.Run("a Linear team intake keeps its project filter when it saves a new connection", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createLinearTeamIntegration(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+			Settings:      &pb.FactoryIntake_Settings{LinearTeamId: "team-1"},
+		})
+
+		resourceID := "project-1"
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &integrationID,
+			ResourceId:    &resourceID,
+			Settings: &pb.FactoryIntake_Settings{
+				LinearProjectIds:                  []string{"project-1"},
+				LinearIncludeIssuesWithoutProject: proto.Bool(false),
+			},
+		})
+		require.NoError(t, err)
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, response.GetIntake())
+		assert.Equal(t, "team-1", trigger.Configuration["team"])
+		assert.Equal(t, []any{}, trigger.Configuration["projects"])
+		settings := response.GetIntake().GetSettings()
+		assert.Equal(t, "team-1", settings.GetLinearTeamId())
+		assert.Equal(t, []string{"project-1"}, settings.GetLinearProjectIds())
+		assert.False(t, settings.GetLinearIncludeIssuesWithoutProject())
+	})
+
+	t.Run("a Linear intake with projects and no team saves without a team", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "linear")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "project-1",
+		})
+		assert.Empty(t, intake.GetSettings().GetLinearTeamId())
+
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings:  &pb.FactoryIntake_Settings{LinearProjectIds: []string{"project-1"}, ConfidencePct: 70},
+		})
+		require.NoError(t, err)
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, response.GetIntake())
+		assert.Equal(t, []any{"project-1"}, trigger.Configuration["projects"])
+		assert.NotContains(t, trigger.Configuration, "team")
+	})
+
+	t.Run("a Linear intake cannot save without a team or projects", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createLinearTeamIntegration(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "project-1",
+		})
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings:  &pb.FactoryIntake_Settings{},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, err.Error(), "a Linear team is required")
+	})
+
+	t.Run("a Linear intake rejects a connection without a team or project", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "linear")
 
