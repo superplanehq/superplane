@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { FactoriesWorkOrder } from "@/api-client";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP } from "../../__fixtures__/factoryOwnedCanvasFixture";
@@ -76,6 +77,42 @@ export const FailedImplementation: Story = {
       appFixture={failedImplementationCanvasFixture()}
     />
   ),
+};
+
+function fallbackIntakeTask(mcpClient?: FactoriesWorkOrder["mcpClient"]) {
+  return (
+    <FactoriesHarness
+      mode="app"
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/106?lineId=${REFUND_FACTORY_LINES[0].id}`}
+      factoriesFixture={{
+        ...lineMetricsFactoriesFixture,
+        workOrdersByFactoryId: {
+          ...lineMetricsFactoriesFixture.workOrdersByFactoryId,
+          [PRIMARY_FACTORY_ID]: [
+            {
+              ...BOARD_IMPLEMENT_FAILED_ORDER,
+              state: "STATE_OPEN",
+              result: undefined,
+              origin: undefined,
+              createdBy: DRAFT_WORK_ORDER.createdBy,
+              mcpClient,
+            },
+          ],
+        },
+      }}
+      appFixture={failedImplementationCanvasFixture()}
+    />
+  );
+}
+
+export const ManualIntake: Story = {
+  name: "Manual Intake",
+  render: () => fallbackIntakeTask(),
+};
+
+export const UnknownMcpIntake: Story = {
+  name: "Unknown MCP Intake",
+  render: () => fallbackIntakeTask({ id: "superplane-local", name: "Codex" }),
 };
 
 function refineChatOnBoard() {
