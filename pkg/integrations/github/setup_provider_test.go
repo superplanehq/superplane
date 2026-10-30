@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"github.com/superplanehq/superplane/test/support/logger"
+	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 	"google.golang.org/grpc/codes"
 )
 
@@ -602,6 +603,36 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "personal access token is required")
+	})
+
+	t.Run("enterPAT lists org repos through setup HTTP on Enterprise host", func(t *testing.T) {
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().CreateMany([]core.IntegrationPropertyDefinition{
+			{Name: common.PropertyOwner, Value: "acme"},
+			{Name: common.PropertyOwnerType, Value: common.OwnerTypeOrganization},
+			{Name: common.PropertyHost, Value: "acme.ghe.com"},
+		}))
+		repoList := mocks.GitHubResponse(http.StatusOK, `[]`)
+		repoList.Header.Set("Content-Type", "application/json")
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{repoList},
+		}
+
+		next, err := g.OnStepSubmit(core.SetupStepContext{
+			Step: core.StepInfo{Name: SetupStepEnterPAT, Inputs: map[string]any{
+				common.SecretPAT: "ghe_token",
+			}},
+			Logger:       log,
+			HTTP:         httpCtx,
+			Properties:   intCtx.Properties(),
+			Secrets:      intCtx.Secrets(),
+			Capabilities: &contexts.CapabilityContext{},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, next)
+		assert.Equal(t, "done", next.Name)
+		require.NotEmpty(t, httpCtx.Requests)
+		assert.Contains(t, httpCtx.Requests[0].URL.String(), "https://api.acme.ghe.com/")
 	})
 
 	t.Run("update PAT permissions submit enables requested capabilities", func(t *testing.T) {

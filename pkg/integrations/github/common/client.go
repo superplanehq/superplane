@@ -847,25 +847,33 @@ func newClientFromStorageContexts(httpCtx core.HTTPContext, properties core.Inte
 	}
 }
 
+// NewTokenGitHubClient builds a go-github client that sends PAT requests
+// through SuperPlane HTTP checks (private-address and redirect policy).
+func NewTokenGitHubClient(httpCtx core.HTTPContext, token string, host Host) (*github.Client, error) {
+	if httpCtx == nil {
+		return nil, fmt.Errorf("HTTP context is required")
+	}
+
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil, fmt.Errorf("PAT is required")
+	}
+
+	return ApplyHostToGitHubClient(github.NewClient(&http.Client{
+		Transport: &oauth2.Transport{
+			Base:   &transport{http: httpCtx},
+			Source: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}),
+		},
+	}), host)
+}
+
 func newPATClient(owner string, ownerType string, httpCtx core.HTTPContext, secrets core.IntegrationSecretStorageReader, host Host) (*Client, error) {
 	pat, err := secrets.Get(SecretPAT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PAT: %v", err)
 	}
 
-	pat = strings.TrimSpace(string(pat))
-	if pat == "" {
-		return nil, fmt.Errorf("PAT is required")
-	}
-
-	underlying, err := ApplyHostToGitHubClient(github.NewClient(&http.Client{
-		Transport: &oauth2.Transport{
-			Base: &transport{http: httpCtx},
-			Source: oauth2.StaticTokenSource(&oauth2.Token{
-				AccessToken: strings.TrimSpace(pat),
-			}),
-		},
-	}), host)
+	underlying, err := NewTokenGitHubClient(httpCtx, string(pat), host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure GitHub API host: %v", err)
 	}

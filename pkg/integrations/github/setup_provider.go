@@ -17,7 +17,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
-	"golang.org/x/oauth2"
 )
 
 //go:embed templates/setup-complete.tpl
@@ -219,7 +218,7 @@ func (g *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.Setu
 			return nil, fmt.Errorf("value is required")
 		}
 
-		_, err := validatePATConnection(ctx.Properties, token)
+		_, err := validatePATConnection(ctx.HTTP, ctx.Properties, token)
 		if err != nil {
 			return nil, err
 		}
@@ -767,7 +766,7 @@ func (g *SetupProvider) onEnterPATSubmit(input any, ctx core.SetupStepContext) (
 		return nil, fmt.Errorf("error creating secret: %v", err)
 	}
 
-	repos, err := validatePATConnection(ctx.Properties, token)
+	repos, err := validatePATConnection(ctx.HTTP, ctx.Properties, token)
 	if err != nil {
 		return nil, err
 	}
@@ -816,16 +815,9 @@ func (g *SetupProvider) onEnterPATRevert(ctx core.SetupStepContext) error {
 	return ctx.Secrets.Delete(common.SecretPAT)
 }
 
-func validatePATConnection(properties core.IntegrationPropertyStorageReader, token string) ([]*github.Repository, error) {
+func validatePATConnection(httpCtx core.HTTPContext, properties core.IntegrationPropertyStorageReader, token string) ([]*github.Repository, error) {
 	host := common.HostFromProperties(properties)
-	client := gh.NewClient(
-		oauth2.NewClient(
-			context.Background(),
-			oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}),
-		),
-	)
-	var err error
-	client, err = common.ApplyHostToGitHubClient(client, host)
+	client, err := common.NewTokenGitHubClient(httpCtx, token, host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure GitHub API host: %v", err)
 	}
