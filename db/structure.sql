@@ -562,7 +562,6 @@ CREATE TABLE public.factory_agent_resources (
 CREATE TABLE public.factory_codex_connections (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
-    factory_id uuid NOT NULL,
     owner_user_id uuid NOT NULL,
     status character varying(32) NOT NULL,
     resume_status character varying(32) DEFAULT ''::character varying NOT NULL,
@@ -599,8 +598,10 @@ CREATE TABLE public.factory_codex_leases (
     started_version bigint DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     revoked_at timestamp with time zone,
+    factory_id uuid,
     CONSTRAINT factory_codex_leases_generation_check CHECK (((generation >= 1) AND (started_version >= 0))),
-    CONSTRAINT factory_codex_leases_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['login'::character varying, 'run'::character varying])::text[])))
+    CONSTRAINT factory_codex_leases_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['login'::character varying, 'run'::character varying])::text[]))),
+    CONSTRAINT factory_codex_leases_scope_check CHECK (((((purpose)::text = 'login'::text) AND (factory_id IS NULL)) OR (((purpose)::text = 'run'::text) AND (factory_id IS NOT NULL))))
 );
 
 
@@ -650,8 +651,10 @@ CREATE TABLE public.factory_llm_model_allowlists (
     funding_source text NOT NULL,
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text]))),
-    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text])))
+    inherit_parent boolean,
+    CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text, 'subscription'::text]))),
+    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text]))),
+    CONSTRAINT factory_llm_model_allowlists_subscription_provider CHECK (((funding_source <> 'subscription'::text) OR (provider = 'openai'::text)))
 );
 
 
@@ -2655,11 +2658,11 @@ ALTER TABLE ONLY public.factory_agent_resources
 
 
 --
--- Name: factory_codex_connections factory_codex_connections_factory_owner_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: factory_codex_connections factory_codex_connections_organization_owner_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_codex_connections
-    ADD CONSTRAINT factory_codex_connections_factory_owner_key UNIQUE (factory_id, owner_user_id);
+    ADD CONSTRAINT factory_codex_connections_organization_owner_key UNIQUE (organization_id, owner_user_id);
 
 
 --
@@ -5301,14 +5304,6 @@ ALTER TABLE ONLY public.factory_agent_resources
 
 
 --
--- Name: factory_codex_connections factory_codex_connections_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_codex_connections
-    ADD CONSTRAINT factory_codex_connections_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
-
-
---
 -- Name: factory_codex_connections factory_codex_connections_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5330,6 +5325,14 @@ ALTER TABLE ONLY public.factory_codex_connections
 
 ALTER TABLE ONLY public.factory_codex_leases
     ADD CONSTRAINT factory_codex_leases_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.factory_codex_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_codex_leases factory_codex_leases_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_leases
+    ADD CONSTRAINT factory_codex_leases_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
 
 
 --
@@ -6540,7 +6543,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261029180446	f
+20261030121001	f
 \.
 
 

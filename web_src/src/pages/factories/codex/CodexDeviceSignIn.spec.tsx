@@ -2,10 +2,10 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
-import { FIRST_RUN_COPY } from "./firstRunCopy";
-import { FirstRunCodexSubscription } from "./FirstRunCodexSubscription";
+import { CODEX_CONNECTION_COPY } from "./codexConnectionCopy";
+import { CodexDeviceSignIn } from "./CodexDeviceSignIn";
 
-const copy = FIRST_RUN_COPY.agent;
+const copy = CODEX_CONNECTION_COPY;
 
 function renderPanel(
   connection: {
@@ -18,7 +18,7 @@ function renderPanel(
   handlers: { onStart?: () => void; onCancel?: () => void } = {},
 ) {
   return render(
-    <FirstRunCodexSubscription
+    <CodexDeviceSignIn
       selected
       disabled={false}
       starting={false}
@@ -31,7 +31,7 @@ function renderPanel(
   );
 }
 
-describe("FirstRunCodexSubscription", () => {
+describe("CodexDeviceSignIn", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("shows the device link and copies the sign-in code", async () => {

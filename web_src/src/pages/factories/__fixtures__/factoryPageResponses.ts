@@ -4,6 +4,7 @@ import type {
   OrganizationsPreviewSeatPurchaseResponse,
   OrganizationsPurchaseSeatsResponse,
   FactoriesFactory,
+  FactoriesFactoryCodexConnection,
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
   FactoriesFactoryLine,
@@ -370,6 +371,11 @@ export interface FactoriesFixture {
   byokSelectedByProvider?: Record<string, string[]>;
   /** Organization hosted selection. Omit to inherit all installation candidates. */
   hostedSelectedKeys?: string[];
+  /** Workspace policy state keyed by factory id, funding source, and provider. */
+  workspaceModelPolicies?: Record<string, { inheritParent: boolean; configuredModels: string[] }>;
+  workspaceModelPolicyError?: string;
+  workspaceModelPolicyDelayMs?: { GET?: number; PUT?: number };
+  codexConnection?: FactoriesFactoryCodexConnection;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /** Global GitHub App catalog state for Factory onboarding. */

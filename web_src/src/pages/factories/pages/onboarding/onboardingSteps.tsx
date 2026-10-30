@@ -66,7 +66,7 @@ export function ConnectOptionRow({
 }: {
   icon: ReactNode;
   title: string;
-  detail: string;
+  detail?: string;
   selected?: boolean;
   meta?: string;
   /** When set, show Connect / Connected on the right. */
@@ -111,7 +111,7 @@ export function ConnectOptionRow({
                 <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden />
               ) : null}
             </span>
-            <span className="mt-0.5 block text-[12px] text-muted-foreground">{detail}</span>
+            {detail ? <span className="mt-0.5 block text-[12px] text-muted-foreground">{detail}</span> : null}
           </span>
         </button>
         {connectLabel && !soon ? (

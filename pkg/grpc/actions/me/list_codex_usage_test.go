@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/metadata"
@@ -17,10 +18,11 @@ import (
 func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	now := time.Now()
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	_, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, now)
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, now)
 	require.NoError(t, err)
 	taskID := uuid.New()
 	require.NoError(t, connection.BeginLogin(db, taskID, now))
@@ -43,9 +45,8 @@ func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 
 	for _, ids := range [][2]string{{uuid.NewString(), r.Organization.ID.String()}, {r.User.String(), uuid.NewString()}} {
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-user-id", ids[0], "x-organization-id", ids[1]))
-		other, err := ListCodexUsage(ctx)
-		require.NoError(t, err)
-		assert.Empty(t, other.Connections)
+		_, err := ListCodexUsage(ctx)
+		require.Error(t, err)
 	}
 	_, err = ListCodexUsage(context.Background())
 	require.Error(t, err)

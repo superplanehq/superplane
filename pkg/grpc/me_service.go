@@ -4,10 +4,15 @@ import (
 	"context"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/authentication"
+
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/githubapp"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/me"
+	factorypb "github.com/superplanehq/superplane/pkg/protos/factories"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -15,12 +20,14 @@ import (
 const vcsProviderInstallationCheckInterval = 10 * time.Second
 
 type MeService struct {
+	encryptor          crypto.Encryptor
 	authService        authorization.Authorization
 	installationChecks *me.VCSProviderInstallationChecks
 }
 
-func NewMeService(authService authorization.Authorization) *MeService {
+func NewMeService(authService authorization.Authorization, encryptor crypto.Encryptor) *MeService {
 	return &MeService{
+		encryptor:          encryptor,
 		authService:        authService,
 		installationChecks: me.NewVCSProviderInstallationChecks(vcsProviderInstallationCheckInterval),
 	}
@@ -102,4 +109,40 @@ func (githubInstallationVerifier) VerifyInstallation(ctx context.Context, instal
 		return err
 	}
 	return catalog.VerifyInstallation(ctx, installationID)
+}
+
+func (s *MeService) DescribeCodexConnection(ctx context.Context, req *pb.DescribeCodexConnectionRequest) (*pb.DescribeCodexConnectionResponse, error) {
+	organizationID, _ := authentication.GetOrganizationIdFromMetadata(ctx)
+	result, err := factories.DescribeFactoryCodexConnection(ctx, organizationID, &factorypb.DescribeFactoryCodexConnectionRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.DescribeCodexConnectionResponse{Connection: result.Connection}, nil
+}
+
+func (s *MeService) StartCodexConnection(ctx context.Context, req *pb.StartCodexConnectionRequest) (*pb.StartCodexConnectionResponse, error) {
+	organizationID, _ := authentication.GetOrganizationIdFromMetadata(ctx)
+	result, err := factories.StartFactoryCodexConnection(ctx, s.encryptor, organizationID, &factorypb.StartFactoryCodexConnectionRequest{RefreshCatalog: req.GetRefreshCatalog()})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.StartCodexConnectionResponse{Connection: result.Connection}, nil
+}
+
+func (s *MeService) CancelCodexConnection(ctx context.Context, req *pb.CancelCodexConnectionRequest) (*pb.CancelCodexConnectionResponse, error) {
+	organizationID, _ := authentication.GetOrganizationIdFromMetadata(ctx)
+	result, err := factories.CancelFactoryCodexConnection(ctx, s.encryptor, organizationID, &factorypb.CancelFactoryCodexConnectionRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.CancelCodexConnectionResponse{Connection: result.Connection}, nil
+}
+
+func (s *MeService) DisconnectCodexConnection(ctx context.Context, req *pb.DisconnectCodexConnectionRequest) (*pb.DisconnectCodexConnectionResponse, error) {
+	organizationID, _ := authentication.GetOrganizationIdFromMetadata(ctx)
+	result, err := factories.DisconnectFactoryCodexConnection(ctx, organizationID, &factorypb.DisconnectFactoryCodexConnectionRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.DisconnectCodexConnectionResponse{Connection: result.Connection}, nil
 }

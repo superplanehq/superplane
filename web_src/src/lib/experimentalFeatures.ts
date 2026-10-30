@@ -16,7 +16,7 @@ export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 /** Organization experimental feature: workspace skills. */
 export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 
-/** Organization experimental feature: organization LLM Models (BYOK) settings page. */
+/** Organization experimental feature: organization Models (BYOK) settings page. */
 export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
 
 /** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */

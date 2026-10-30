@@ -160,7 +160,7 @@ func (w *RunnerCleanupWorker) Process() error {
 		notifier.RecordRuns(results)
 		notifier.Publish()
 		if len(results) > 0 || connections[i].RevocationPendingAt == nil {
-			_ = messages.PublishFactoryCodexConnectionUpdated(connections[i].FactoryID.String())
+			_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(context.Background()), connections[i].OrganizationID)
 		}
 	}
 	var logins []models.FactoryCodexConnection
