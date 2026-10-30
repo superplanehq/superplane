@@ -194,13 +194,20 @@ func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	assert.NotContains(t, joined, "approval_mode")
 }
 
-func TestCodexExecArgsAddsGlobalMCPWithApprovedTools(t *testing.T) {
+func TestCodexExecArgsStartsOnlyTheGlobalMCPWithARunnerToken(t *testing.T) {
 	for name, env := range map[string]map[string]string{
-		"task run": {"SUPERPLANE_RUNNER_TOKEN": "runner-token-secret"},
+		"task run": {
+			"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
+			"SUPERPLANE_RUNNER_TOKEN":   "runner-token-secret",
+		},
 		"planning": {
 			"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
 			"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 			"SUPERPLANE_RUNNER_TOKEN":          "runner-token-secret",
+		},
+		"merge confidence": {
+			"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "merge-token",
+			"SUPERPLANE_RUNNER_TOKEN":           "runner-token-secret",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -209,10 +216,11 @@ func TestCodexExecArgsAddsGlobalMCPWithApprovedTools(t *testing.T) {
 
 			assert.Contains(t, args, `mcp_servers.superplane_global.command="node"`)
 			assert.Contains(t, args, `mcp_servers.superplane_global.args=["/task/superplane_mcp/server.js"]`)
-			assert.Contains(t, args, `mcp_servers.superplane_global.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR"]`)
-			assert.Contains(t, args, `mcp_servers.superplane_global.tools.suggest_owners.approval_mode="approve"`)
-			assert.Contains(t, args, `mcp_servers.superplane_global.tools.assign_owner.approval_mode="approve"`)
-			assert.NotContains(t, joined, "mcp_servers.superplane.tools.suggest_owners")
+			assert.Contains(t, args, `mcp_servers.superplane_global.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ANALYSIS_SPEC_FILE"]`)
+			for _, tool := range []string{"assign_owner", "propose_update", "inspect_attachment", "upload_artifact", "publish_link", "report_merge_check"} {
+				assert.Contains(t, args, fmt.Sprintf(`mcp_servers.superplane_global.tools.%s.approval_mode="approve"`, tool))
+			}
+			assert.NotContains(t, joined, "mcp_servers.superplane.")
 			assert.NotContains(t, joined, "runner-token-secret")
 		})
 	}

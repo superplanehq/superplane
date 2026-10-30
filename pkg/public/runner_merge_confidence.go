@@ -28,6 +28,10 @@ func (s *Server) handleRunnerMergeConfidenceCheck(w http.ResponseWriter, r *http
 	if !ok {
 		return
 	}
+	s.reportRunnerMergeConfidenceCheck(w, r, scope)
+}
+
+func (s *Server) reportRunnerMergeConfidenceCheck(w http.ResponseWriter, r *http.Request, scope *runneraction.MergeConfidenceScope) {
 	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
 	var req mergeConfidenceCheckRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

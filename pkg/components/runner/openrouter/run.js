@@ -517,7 +517,8 @@ function buildOpenCodeConfig({
       }
     }
   }
-  if ((planning || artifactEnabled(env) || mergeConfidenceEnabled(env)) && taskDir) {
+  const globalMCP = envFlag(env, "SUPERPLANE_RUNNER_TOKEN");
+  if (!globalMCP && (planning || artifactEnabled(env) || mergeConfidenceEnabled(env)) && taskDir) {
     config.mcp = {
       superplane: {
         type: "local",
@@ -526,9 +527,8 @@ function buildOpenCodeConfig({
       },
     };
   }
-  if (envFlag(env, "SUPERPLANE_RUNNER_TOKEN") && taskDir) {
+  if (globalMCP && taskDir) {
     config.mcp = {
-      ...(config.mcp || {}),
       [GLOBAL_MCP_SERVER]: {
         type: "local",
         command: ["node", path.join(taskDir, "superplane_mcp", "server.js")],
