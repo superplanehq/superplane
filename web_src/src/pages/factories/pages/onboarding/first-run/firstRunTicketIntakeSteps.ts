@@ -1,3 +1,4 @@
+import type { LinearIntakeScope } from "../../linearIntakeScope";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import type { FirstRunStepperStep } from "./FirstRunStepper";
 import type { FirstRunTicketSource } from "./firstRunTypes";
@@ -13,10 +14,7 @@ export type FirstRunTicketProjectState = {
   jiraProjectsLoading: boolean;
   jiraProjectsError: boolean;
   jiraProjectId: string;
-  linearProjects: TicketProject[];
-  linearProjectsLoading: boolean;
-  linearProjectsError: boolean;
-  linearProjectIds: string[];
+  linearScope: LinearIntakeScope;
 };
 
 export function ticketSourceName(source: FirstRunTicketSource): string {
@@ -46,10 +44,8 @@ function projectStep(
   if (source === "linear") {
     return {
       id: "project",
-      label: copy.linearProjectHeading,
-      doneLabel: projects.linearProjectIds.length
-        ? copy.linearProjectsDone(projects.linearProjectIds.length)
-        : undefined,
+      label: copy.linearScopeHeading,
+      doneLabel: projects.linearScope.teamId ? copy.linearScopeDone : undefined,
     };
   }
   return {
@@ -82,7 +78,7 @@ export function ticketProjectChoiceComplete(
     return Boolean(projects.jiraProjectId) && !projects.jiraProjectsLoading && !projects.jiraProjectsError;
   }
   if (source === "linear") {
-    return projects.linearProjectIds.length > 0 && !projects.linearProjectsLoading && !projects.linearProjectsError;
+    return Boolean(projects.linearScope.teamId);
   }
   return true;
 }

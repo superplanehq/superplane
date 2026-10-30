@@ -1,5 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { vi } from "bun:test";
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
 
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -70,12 +71,8 @@ export function pageModel(overrides: Partial<OnboardingPageModel> = {}): Onboard
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
     linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
+    linearScope: EMPTY_LINEAR_INTAKE_SCOPE,
+    changeLinearScope: vi.fn(),
     ...overrides,
   };
 }

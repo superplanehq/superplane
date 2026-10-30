@@ -164,7 +164,7 @@ describe("provisionWorkspace", () => {
           paused: true,
           createIntake,
           jira: { integrationId: "jira-1", projectId: "project-1" },
-          linear: { integrationId: "linear-1", projectIds: ["project-1"] },
+          linear: { integrationId: "linear-1", scope: { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" } },
         }),
       );
       expect(createIntake).toHaveBeenCalledWith(expect.objectContaining({ paused: true }));
