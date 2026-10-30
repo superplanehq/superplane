@@ -1,4 +1,5 @@
 import React from "react";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 
@@ -27,7 +28,7 @@ export function RunNodeIcon({
       <img
         src={resolvedIconSrc}
         alt={alt}
-        className={cn("shrink-0 object-contain", dimensionClass, className)}
+        className={cn("shrink-0 object-contain", dimensionClass, logoDarkInvertClass(resolvedIconSrc), className)}
         style={{ width: `${size}px`, height: `${size}px` }}
       />
     );
