@@ -183,9 +183,13 @@ function AgentPanel({
   const modelUsedField = planningReviewModelUsedField(component.component, action?.configuration);
   const modelProvider = modelUsedField?.typeOptions?.hostedModel?.provider ?? "";
   const currentModel = typeof component.configuration.model === "string" ? component.configuration.model : "";
+  const credentials = component.configuration.credentials as { source?: string } | undefined;
   const byokModelDefault = useByokRunnerModelDefault({
     enabled:
-      modelUsedField?.type === "hosted-model" && modelProvider !== "" && modelProvider !== HOSTED_MODEL_ALL_PROVIDERS,
+      credentials?.source !== "subscription" &&
+      modelUsedField?.type === "hosted-model" &&
+      modelProvider !== "" &&
+      modelProvider !== HOSTED_MODEL_ALL_PROVIDERS,
     organizationId,
     factoryId,
     provider: modelProvider,

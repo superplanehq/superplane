@@ -18,7 +18,7 @@ func TestSubscriptionOwnerAdmissionDistinguishesLoginContention(t *testing.T) {
 	for _, scenario := range []string{"ongoing login", "revoked login", "stale connection", "subscription unavailable", "removed member"} {
 		t.Run(scenario, func(t *testing.T) {
 			db, connection, loginTask, _ := newDisconnectedCodexLogin(t)
-			factory, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
+			factory, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
 			require.NoError(t, err)
 			order, err := factory.CreateWorkOrder(db, "Await sign-in", "", &connection.OwnerUserID, []uuid.UUID{connection.OwnerUserID}, nil)
 			require.NoError(t, err)
@@ -60,7 +60,7 @@ func TestValidateSubscriptionCanvasModelsChecksLiteralChoicesOnly(t *testing.T) 
 	require.NoError(t, err)
 	subscription := true
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}}, time.Now()))
 	require.NoError(t, db.Model(connection).Updates(map[string]any{

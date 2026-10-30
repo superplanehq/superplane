@@ -1,10 +1,34 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryAutomation } from "@/api-client";
+import {
+  meDescribeCodexConnection,
+  factoriesListFactoryOwnerEligibility,
+  type FactoriesFactory,
+  type FactoriesFactoryCodexConnection,
+  type FactoriesFactoryIntake,
+  type FactoriesWorkOrder,
+  type FactoryAutomation,
+} from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
+import { showErrorToast } from "@/lib/toast";
 import { unmockedSrc } from "@/test/unmockedModule";
+import { CodexActionProvider } from "../codex/CodexActionProvider";
+import { factoryCodexConnectionKey } from "./onboarding/useFactoryCodexConnection";
+
+vi.mock("@/api-client", () => ({
+  ...unmockedSrc<Record<string, unknown>>("api-client/index.ts"),
+  meDescribeCodexConnection: vi.fn(),
+  factoriesListFactoryOwnerEligibility: vi.fn(),
+}));
+
+vi.mock("@/lib/toast", () => ({
+  ...unmockedSrc<Record<string, unknown>>("lib/toast"),
+  showErrorToast: vi.fn(),
+}));
 
 vi.mock("@monaco-editor/react", () => {
   function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
@@ -52,6 +76,24 @@ const searchFactoryIntakeItems = vi.fn(() => ({
 }));
 const importFactoryIntakeItem = vi.fn();
 const enabledExperimentalFeatures = new Set<string>();
+let codexConnection: FactoriesFactoryCodexConnection;
+
+function renderSubscriptionBoard() {
+  enabledExperimentalFeatures.add(FEATURE_CODEX_SUBSCRIPTIONS);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const openCreateWorkOrder = vi.fn();
+  render(
+    <QueryClientProvider client={client}>
+      <CodexActionProvider>
+        <LinesBoardSpecHarness
+          openCreateWorkOrder={openCreateWorkOrder}
+          factory={{ ...REFUND_FACTORY, onboarding: { ...REFUND_FACTORY.onboarding, codexSubscription: true } }}
+        />
+      </CodexActionProvider>
+    </QueryClientProvider>,
+  );
+  return { client, openCreateWorkOrder };
+}
 
 vi.mock("./planningSessionClient", () => ({
   findPlanningSessionByWorkOrder: vi.fn(async () => null),
@@ -180,6 +222,19 @@ describe("LinesPage backlog create", () => {
     searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
     importFactoryIntakeItem.mockReset();
     enabledExperimentalFeatures.clear();
+    codexConnection = { status: "disconnected", eligible: true };
+    vi.mocked(meDescribeCodexConnection)
+      .mockReset()
+      .mockImplementation(async () => ({ data: { connection: codexConnection } }) as never);
+    vi.mocked(factoriesListFactoryOwnerEligibility)
+      .mockReset()
+      .mockResolvedValue({
+        data: {
+          subscription: true,
+          members: [{ userId: "storybook-user", eligible: false }],
+        },
+      } as never);
+    vi.mocked(showErrorToast).mockClear();
   });
 
   afterEach(() => {
@@ -242,6 +297,61 @@ describe("LinesPage backlog create", () => {
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Create task manually" }));
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["lines-backlog-create", "lines-backlog-create-ghost"])(
+    "requests a connection before opening %s and resumes after sign-in",
+    async (trigger) => {
+      Element.prototype.scrollIntoView = vi.fn();
+      const { client, openCreateWorkOrder } = renderSubscriptionBoard();
+      const user = userEvent.setup();
+
+      await user.click(screen.getByTestId(trigger));
+      await screen.findByRole("heading", { name: "Connect Codex to continue" });
+      expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
+      expect(openCreateWorkOrder).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
+
+      await user.click(screen.getByTestId(trigger));
+      await user.click(await screen.findByRole("button", { name: "Connect Codex" }));
+      codexConnection = { status: "ready", eligible: true, availableModels: ["gpt-5.4"] };
+      await act(async () => {
+        client.setQueryData(factoryCodexConnectionKey("org-1", REFUND_FACTORY.id!, "storybook-user"), codexConnection);
+      });
+
+      expect(await screen.findByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Connect Codex" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Create task manually" }));
+      expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
+      expect(importFactoryIntakeItem).not.toHaveBeenCalled();
+    },
+  );
+
+  it("opens the menu directly when the current member has a subscription connected", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.mocked(factoriesListFactoryOwnerEligibility).mockResolvedValue({
+      data: { subscription: true, members: [{ userId: "storybook-user", eligible: true }] },
+    } as never);
+    renderSubscriptionBoard();
+
+    await userEvent.setup().click(screen.getByTestId("lines-backlog-create"));
+
+    expect(await screen.findByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Connect Codex to continue" })).not.toBeInTheDocument();
+  });
+
+  it("keeps creation closed when the connection check fails", async () => {
+    vi.mocked(factoriesListFactoryOwnerEligibility).mockRejectedValue(new Error("Connection unavailable"));
+    renderSubscriptionBoard();
+
+    await userEvent.setup().click(screen.getByTestId("lines-backlog-create"));
+
+    await waitFor(() => expect(showErrorToast).toHaveBeenCalled());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
   });
 
   it("does not refine a backlog draft from the task popup", async () => {

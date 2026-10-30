@@ -113,7 +113,7 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		Organizations: organizationService,
 		Integrations:  NewIntegrationService(cfg.Encryptor, cfg.Registry),
 		Secrets:       NewSecretService(cfg.Encryptor, cfg.AuthService),
-		Me:            NewMeService(cfg.AuthService),
+		Me:            NewMeService(cfg.AuthService, cfg.Encryptor),
 		Actions:       NewActionService(cfg.Registry),
 		Triggers:      NewTriggerService(cfg.Registry),
 		Widgets:       NewWidgetService(cfg.Registry),

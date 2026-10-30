@@ -1,3 +1,4 @@
+import { CodexActionProvider } from "../codex/CodexActionProvider";
 import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useMemo } from "react";
@@ -46,14 +47,16 @@ export function MobileSettingsBottomBar({
 
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
-      <MobileBottomBar />
-      {canCreateWorkOrder ? (
-        <CreateWorkOrderDialog
-          open={createWorkOrderOpen}
-          onClose={closeCreateWorkOrder}
-          onCreated={completeCreateWorkOrder}
-        />
-      ) : null}
+      <CodexActionProvider>
+        <MobileBottomBar />
+        {canCreateWorkOrder ? (
+          <CreateWorkOrderDialog
+            open={createWorkOrderOpen}
+            onClose={closeCreateWorkOrder}
+            onCreated={completeCreateWorkOrder}
+          />
+        ) : null}
+      </CodexActionProvider>
     </FactoriesLayoutContext.Provider>
   );
 }

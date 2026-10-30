@@ -138,6 +138,7 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		Initial:                 factory.IsInitialOnboarding(),
 		VcsProvider:             config.VCSProvider,
 		CodexSubscription:       config.CodexSubscription,
+		CodexDefaultOwnerId:     config.CodexDefaultOwnerID,
 	}
 
 	if factory.OnboardingCompletedAt != nil {

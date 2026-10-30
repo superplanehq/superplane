@@ -113,7 +113,7 @@ export interface OrgWorkspacePageOverrides {
   velocity?: ComponentType;
   /** Storybook-only Organization Spending explorer. Live app ignores this. */
   organizationSpending?: ComponentType;
-  /** Storybook-only LLM Models page. Live app ignores this. */
+  /** Storybook-only Models page. Live app ignores this. */
   llmModels?: ComponentType;
 }
 
@@ -253,13 +253,13 @@ function factorySettingsOrganizationSpendingRoute(OrganizationSpendingPage: Comp
   );
 }
 
-function factorySettingsOrganizationModelsRoute(LLMModelsPage: ComponentType) {
+function factorySettingsWorkspaceModelsRoute(LLMModelsPage: ComponentType) {
   return (
     <Route
-      key="factory-settings-organization-models"
-      path="organization/models"
+      key="factory-settings-workspace-models"
+      path="workspace/models"
       element={
-        <RequirePermission resource="org" action="read">
+        <RequirePermission resource="factories" action="read">
           <LLMModelsPage />
         </RequirePermission>
       }
@@ -273,10 +273,10 @@ function factorySettingsHarnessRoutes(OrganizationSpendingPage: ComponentType, L
       if (route.key === "factory-settings-organization-spending" || route.key === "factory-settings-legacy") {
         return false;
       }
-      return !(LLMModelsPage && route.key === "factory-settings-organization-models");
+      return !(LLMModelsPage && route.key === "factory-settings-workspace-models");
     }),
     factorySettingsOrganizationSpendingRoute(OrganizationSpendingPage),
-    ...(LLMModelsPage ? [factorySettingsOrganizationModelsRoute(LLMModelsPage)] : []),
+    ...(LLMModelsPage ? [factorySettingsWorkspaceModelsRoute(LLMModelsPage)] : []),
     <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,
   ];
 }
