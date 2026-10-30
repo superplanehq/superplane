@@ -2,7 +2,11 @@ import { isCodexActionCancelled } from "../codex/codexActionContext";
 import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import { Button } from "@/components/ui/button";
-import { useCreateFactoryIntake, useImportFactoryIntakeItem } from "@/hooks/useFactoryIntakeData";
+import {
+  useCreateFactoryIntake,
+  useImportFactoryIntakeItem,
+  useUpdateFactoryIntake,
+} from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState, useRef } from "react";
 
@@ -45,6 +49,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
   const [error, setError] = useState<string>();
   const createIntake = useCreateFactoryIntake(props.organizationId, props.factoryId);
   const owner = useIntakeOwnerDraft(props.organizationId, props.factoryId);
+  const updateIntake = useUpdateFactoryIntake(props.organizationId, props.factoryId);
   const importItem = useImportFactoryIntakeItem(props.organizationId, props.factoryId);
   const repository = props.repository || DEPENDABOT_INTAKE_SETUP_COPY.repositoryFallback;
   const dependabotSeverities = normalizeDependabotSeverities(settings.dependabotSeverities);
@@ -53,11 +58,17 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
     setError(undefined);
     setImportBusy(true);
     try {
-      const intake = createdIntakeId.current
-        ? { id: createdIntakeId.current }
+      const intakeSettings = { dependabotSeverities, ...owner.settings() };
+      const existingIntakeId = createdIntakeId.current;
+      if (existingIntakeId) {
+        // A retry can follow changed filters or owner. Save them before importing.
+        await updateIntake.mutateAsync({ intakeId: existingIntakeId, settings: intakeSettings });
+      }
+      const intake = existingIntakeId
+        ? { id: existingIntakeId }
         : await createIntake.mutateAsync({
             source: "SOURCE_DEPENDABOT_ALERTS",
-            settings: { dependabotSeverities, ...owner.settings() },
+            settings: intakeSettings,
             skipInitialImport: true,
           });
       if (!intake.id) {
