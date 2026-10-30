@@ -32,6 +32,8 @@ function popup(
           <TooltipProvider>
             <IntakeSourceSettingsPopup
               settings={settings}
+              canEdit
+              accessLoading={false}
               organizationId={organizationId}
               sourceId={sourceId}
               labelOptions={labelOptions}
