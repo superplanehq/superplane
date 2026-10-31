@@ -156,3 +156,15 @@ func (f *flushRecorder) Flush() {
 func criticalCanvasVersionsPath() string {
 	return "/api/v1/canvases/" + uuid.NewString() + "/versions"
 }
+
+func TestCloneGatewayRequestClonesHeaders(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/canvases", nil)
+	req.Header.Set("X-Account-Id", "original")
+
+	cloned := CloneGatewayRequest(req)
+	cloned.Header.Del("X-Account-Id")
+	cloned.Header.Set("X-User-Id", "gateway-only")
+
+	assert.Equal(t, "original", req.Header.Get("X-Account-Id"))
+	assert.Empty(t, req.Header.Get("X-User-Id"))
+}
