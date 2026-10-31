@@ -392,21 +392,7 @@ function readUsage(env) {
           return;
         }
         limitsComplete = true;
-        const result = message.result || {};
-        const buckets = Object.entries(result.rateLimitsByLimitId || {});
-        limits = buckets.length
-          ? buckets.map(([id, limit]) => ({
-              ...limit,
-              limitId: limit.limitId || id,
-            }))
-          : result.rateLimits
-            ? [
-                {
-                  ...result.rateLimits,
-                  limitId: result.rateLimits.limitId || "codex",
-                },
-              ]
-            : [];
+        limits = readQuotaLimits(message.result);
         finishSnapshot();
       } catch (_err) {
         finish(new Error("Codex usage response is invalid"));
@@ -424,6 +410,22 @@ function readUsage(env) {
       },
     });
   });
+}
+
+function readQuotaLimits(result) {
+  if (result == null) return [];
+  if (typeof result !== "object" || Array.isArray(result)) return undefined;
+  const byLimitId = result.rateLimitsByLimitId;
+  if (byLimitId != null && (typeof byLimitId !== "object" || Array.isArray(byLimitId))) return undefined;
+  const buckets = Object.entries(byLimitId || {});
+  if (buckets.length) {
+    if (buckets.some(([, limit]) => !limit || typeof limit !== "object" || Array.isArray(limit))) return undefined;
+    return buckets.map(([id, limit]) => ({ ...limit, limitId: limit.limitId || id }));
+  }
+  const limit = result.rateLimits;
+  if (limit == null) return [];
+  if (typeof limit !== "object" || Array.isArray(limit)) return undefined;
+  return [{ ...limit, limitId: limit.limitId || "codex" }];
 }
 
 function validCatalogModel(model) {

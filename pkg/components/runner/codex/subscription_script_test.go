@@ -479,7 +479,7 @@ if (process.argv[2] === "app-server") {
 // Exercise the delivered refresh command: incomplete pages must never become a
 // successful empty catalog, while quota failure must not block valid models.
 func TestSubscriptionCatalogRequiresCompleteModels(t *testing.T) {
-	for _, scenario := range []string{"quota-unavailable", "missing-model-data", "invalid-model", "invalid-model-fields", "second-page-error"} {
+	for _, scenario := range []string{"quota-unavailable", "quota-malformed", "missing-model-data", "invalid-model", "invalid-model-fields", "second-page-error"} {
 		t.Run(scenario, func(t *testing.T) {
 			taskDir := t.TempDir()
 			bin := filepath.Join(taskDir, "bin")
@@ -488,7 +488,8 @@ func TestSubscriptionCatalogRequiresCompleteModels(t *testing.T) {
 require("readline").createInterface({input:process.stdin}).on("line", line => {
  const req = JSON.parse(line);
  let reply = {result:{}};
- if (req.id === 2) reply = {error:{message:"quota unavailable"}};
+ if (req.id === 2) reply = process.env.CATALOG_SCENARIO === "quota-malformed"
+  ? {result:{rateLimitsByLimitId:{codex:null}}} : {error:{message:"quota unavailable"}};
  if (req.id === 3) {
   const scenario = process.env.CATALOG_SCENARIO;
   reply = {result:{data:[{id:"gpt-5.4",model:"gpt-5.4"}],nextCursor:"next"}};
@@ -520,7 +521,7 @@ require("readline").createInterface({input:process.stdin}).on("line", line => {
 			cmd := exec.Command("node", filepath.Join(filepath.Dir(caller), "codex_subscription.js"), "refresh")
 			cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"), "CATALOG_SCENARIO="+scenario, "SUPERPLANE_TASK_DIR="+taskDir, "SUPERPLANE_RESULT_FILE="+resultFile, "SUPERPLANE_BASE_URL="+server.URL, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=runner-token")
 			out, err := cmd.CombinedOutput()
-			if scenario == "quota-unavailable" {
+			if scenario == "quota-unavailable" || scenario == "quota-malformed" {
 				require.NoError(t, err, string(out))
 				require.Len(t, checkpoints, 1)
 				assert.Len(t, checkpoints[0], 1, "only usage metadata may be posted")
