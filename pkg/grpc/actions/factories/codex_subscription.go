@@ -143,7 +143,7 @@ func refreshFactoryCodexCatalog(
 		if err != nil {
 			return err
 		}
-		if err := connection.AttachLoginLease(tx); err != nil {
+		if err := connection.AttachSetupLeases(tx); err != nil {
 			return err
 		}
 		if lease.TaskID != taskID {
@@ -249,7 +249,7 @@ func CancelFactoryCodexConnection(
 				return err
 			}
 			if lease == nil || !lease.Catalog() || lease.ConnectionID != connection.ID {
-				return connection.AttachLoginLease(tx)
+				return connection.AttachSetupLeases(tx)
 			}
 			// Completion locks its task before the connection. Use the same order.
 			if _, err := models.FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE"}), catalogTaskID); err != nil && !errors.Is(err, models.ErrRunnerTaskNotFound) {
@@ -262,9 +262,9 @@ func CancelFactoryCodexConnection(
 			if err := connection.CancelCatalogRefresh(tx, catalogTaskID, time.Now()); err != nil {
 				return err
 			}
-			return connection.AttachLoginLease(tx)
+			return connection.AttachSetupLeases(tx)
 		}
-		if err := connection.AttachLoginLease(tx); err != nil {
+		if err := connection.AttachSetupLeases(tx); err != nil {
 			return err
 		}
 		if connection.LoginLease == nil {
@@ -281,7 +281,7 @@ func CancelFactoryCodexConnection(
 		if lockErr != nil {
 			return lockErr
 		}
-		return connection.AttachLoginLease(tx)
+		return connection.AttachSetupLeases(tx)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to cancel ChatGPT sign-in")
@@ -371,7 +371,7 @@ func loadCodexConnection(
 			return lockErr
 		}
 		if release {
-			if err := connection.AttachLoginLease(tx); err != nil {
+			if err := connection.AttachSetupLeases(tx); err != nil {
 				return err
 			}
 			beforeRelease = []models.FactoryCodexConnection{*connection}
@@ -383,7 +383,7 @@ func loadCodexConnection(
 				return lockErr
 			}
 		}
-		return connection.AttachLoginLease(tx)
+		return connection.AttachSetupLeases(tx)
 	})
 	if err != nil {
 		return nil, false, uuid.Nil, factoryErrorToStatus(err, "failed to describe ChatGPT subscription")

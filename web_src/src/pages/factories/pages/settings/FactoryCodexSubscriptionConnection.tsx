@@ -122,7 +122,13 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
   );
 }
 
-function ConnectedActions({ codex, state }: { codex: CodexConnection; state: ReturnType<typeof useCodexConnectionState> }) {
+function ConnectedActions({
+  codex,
+  state,
+}: {
+  codex: CodexConnection;
+  state: ReturnType<typeof useCodexConnectionState>;
+}) {
   const { connection, disabled, refreshing, cancelingRefresh } = state;
   const catalogRefreshTaskId = connection?.catalogRefreshTaskId;
   return (
