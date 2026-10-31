@@ -282,7 +282,7 @@ func (c *FactoryCodexConnection) BeginCatalogRefresh(tx *gorm.DB, taskID uuid.UU
 			return err
 		}
 		if lease != nil {
-			return c.AttachLoginLease(tx)
+			return c.AttachSetupLeases(tx)
 		}
 		if c.Status != CodexConnectionStatusReady || c.CredentialVersion < 1 || len(c.BundleCiphertext) == 0 {
 			return ErrCodexConnectionNotReady
@@ -300,14 +300,17 @@ func (c *FactoryCodexConnection) CancelCatalogRefresh(tx *gorm.DB, taskID uuid.U
 	if err != nil || lease == nil || lease.TaskID != taskID {
 		return err
 	}
-	if err := lease.revoke(tx, now); err != nil {
-		return err
-	}
 	task, err := FindRunnerTask(tx, taskID)
 	if errors.Is(err, ErrRunnerTaskNotFound) {
 		return nil
 	}
 	if err != nil {
+		return err
+	}
+	if task.IsTerminal() {
+		return nil
+	}
+	if err := lease.revoke(tx, now); err != nil {
 		return err
 	}
 	return task.RequestCancel(tx, now)

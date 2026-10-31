@@ -674,7 +674,7 @@ func TestCodexCatalogAuthorityRejectsInvalidScopeAndState(t *testing.T) {
 			case "missing bundle":
 				require.NoError(t, db.Model(connection).Update("bundle_ciphertext", []byte{}).Error)
 			case "credential version":
-				require.NoError(t, db.Model(connection).Update("credential_version", 0).Error)
+				require.NoError(t, db.Model(connection).Updates(map[string]any{"credential_version": 0, "final_checkpoint_version": 0}).Error)
 			case "task organization":
 				other, err := models.CreateOrganizationInTransaction(db, support.RandomName("other"), "")
 				require.NoError(t, err)
