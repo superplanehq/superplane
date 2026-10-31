@@ -1,3 +1,5 @@
+import type { CanvasesSubscriptionFailure } from "@/api-client";
+import { ChatGPTQuotaNotice } from "../../codex/ChatGPTQuotaNotice";
 import { TaskRefinementModelSelect } from "../../TaskRefinementModelSelect";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -60,6 +62,7 @@ export function AnalysisPopupHeader({
   reviewActions,
   showOwnerRow,
   planningSpend,
+  subscriptionFailure,
   views,
 }: {
   edits: AnalysisHeaderEdits;
@@ -82,6 +85,7 @@ export function AnalysisPopupHeader({
     savedTokens: number;
     savedCostCents: number;
   };
+  subscriptionFailure?: CanvasesSubscriptionFailure;
   views: ReactNode;
 }) {
   return (
@@ -104,6 +108,11 @@ export function AnalysisPopupHeader({
       }
       accessory={views}
     >
+      <ChatGPTQuotaNotice
+        failure={subscriptionFailure ?? fixture.subscriptionFailure}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+      />
       {planningSpend ? (
         <PlanningHeaderSpendCollector
           organizationId={organizationId}

@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -430,6 +431,8 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	out.ExecutionId = runtime.executionID
 	out.RunnerState = runtime.runnerState
 	out.BlockedByParallelismLimit = runtime.blockedByParallelismLimit
+	out.SubscriptionFailure = actions.SerializeSubscriptionFailure(runtime.subscriptionFailure)
+	out.UsageState = runtime.usageState
 	out.SelectableModelKey = session.SelectableModelKey
 	if draft := session.Draft(); strings.TrimSpace(draft.Title) != "" {
 		out.Draft = &pb.PlanningSessionDraft{
@@ -458,6 +461,8 @@ func serializePlanningSessionSummary(session *models.FactoryPlanningSession, run
 		ExecutionId:               runtime.executionID,
 		RunnerState:               runtime.runnerState,
 		BlockedByParallelismLimit: runtime.blockedByParallelismLimit,
+		SubscriptionFailure:       actions.SerializeSubscriptionFailure(runtime.subscriptionFailure),
+		UsageState:                runtime.usageState,
 	}
 	if survey := session.CurrentSurvey(); session.SurveyID != nil && len(survey.Questions) > 0 {
 		out.Survey = &pb.PlanningSessionSurvey{
@@ -560,6 +565,8 @@ type planningSessionRuntime struct {
 	executionID               string
 	runnerState               string
 	blockedByParallelismLimit bool
+	subscriptionFailure       *models.SubscriptionFailure
+	usageState                string
 }
 
 func planningSessionRuntimes(tx *gorm.DB, sessions []*models.FactoryPlanningSession) (map[uuid.UUID]planningSessionRuntime, error) {
@@ -595,6 +602,14 @@ func planningSessionRuntimes(tx *gorm.DB, sessions []*models.FactoryPlanningSess
 		return nil, err
 	}
 
+	runIDs := make([]uuid.UUID, 0, len(executionByRun))
+	for runID := range executionByRun {
+		runIDs = append(runIDs, runID)
+	}
+	summaries, err := models.ListRunnerResultSummariesForRuns(tx, runIDs)
+	if err != nil {
+		return nil, err
+	}
 	for _, session := range sessions {
 		if session == nil || session.CanvasRunID == nil {
 			continue
@@ -608,6 +623,8 @@ func planningSessionRuntimes(tx *gorm.DB, sessions []*models.FactoryPlanningSess
 			executionID:               executionID.String(),
 			runnerState:               runner.State,
 			blockedByParallelismLimit: runner.BlockedByParallelismLimit,
+			subscriptionFailure:       summaries[*session.CanvasRunID].SubscriptionFailure,
+			usageState:                summaries[*session.CanvasRunID].UsageState,
 		}
 	}
 	return runtimeBySession, nil

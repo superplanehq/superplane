@@ -561,11 +561,15 @@ func (s *Server) completeRunnerTask(
 			}
 			loginConnections = append(loginConnections, *connection)
 		}
+		result, err := subscriptionCompletionResult(tx, task, lease, complete.Result)
+		if err != nil {
+			return err
+		}
 		completedNow, err = task.Complete(
 			tx,
 			currentRunner,
 			hash,
-			datatypes.JSON(complete.Result),
+			datatypes.JSON(result),
 			complete.ExitCode,
 			complete.Error,
 			complete.Canceled,

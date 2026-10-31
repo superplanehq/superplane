@@ -173,8 +173,9 @@ func TestRunnerAdmissionRejectsInvalidSubscriptionAndContinuesFleetScan(t *testi
 }
 
 func TestRunnerSubscriptionContinuationIgnoresModelPolicyChanges(t *testing.T) {
-	db, connection, task, _, _ := queuedSubscriptionRunnerTask(t)
+	db, connection, task, runner, _ := queuedSubscriptionRunnerTask(t)
 	require.NoError(t, task.RequireSubscriptionLeaseAdmission(db))
+	require.NoError(t, task.Reserve(db, runner.ID))
 	require.NoError(t, task.RequireSubscriptionLeaseContinuation(db))
 
 	inherit := false
@@ -182,6 +183,18 @@ func TestRunnerSubscriptionContinuationIgnoresModelPolicyChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	require.ErrorIs(t, task.RequireSubscriptionLeaseAdmission(db), models.ErrSubscriptionModelUnavailable)
+	require.NoError(t, task.RequireSubscriptionLeaseContinuation(db))
+
+	require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", task.ID).Update("revoked_at", time.Now()).Error)
+	require.ErrorIs(t, task.RequireSubscriptionLeaseContinuation(db), models.ErrCodexConnectionStale)
+}
+
+func TestRunnerSubscriptionContinuationIgnoresDisabledAdmissionFlag(t *testing.T) {
+	db, connection, task, runner, _ := queuedSubscriptionRunnerTask(t)
+	require.NoError(t, task.Reserve(db, runner.ID))
+	require.NoError(t, models.DisableExperimentalFeature(connection.OrganizationID, features.FeatureCodexSubscriptions))
+
+	require.ErrorIs(t, task.RequireSubscriptionLeaseAdmission(db), models.ErrCodexConnectionUnavailable)
 	require.NoError(t, task.RequireSubscriptionLeaseContinuation(db))
 
 	require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", task.ID).Update("revoked_at", time.Now()).Error)

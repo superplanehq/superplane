@@ -100,6 +100,7 @@ func buildCodexTask(spec RunCodexSpec, usage string, setups []runner.Integration
 			return runner.PromptNodeCommand(promptName, model, spec.ThinkingLevel)
 		},
 	})
+	files = append(files, runner.TaskFile{Path: "rollout_observer.js", Content: rolloutObserverScript, Mode: "0644"})
 	if spec.Credentials.Source == runner.CredentialsSourceSubscription {
 		files = append(files, runner.TaskFile{
 			Path:    "codex_subscription.js",

@@ -291,10 +291,12 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 // of being joined/serialized per execution.
 type FactoryWorkOrderExecutionRecord struct {
 	FactoryWorkOrderExecution
-	CanvasID   *uuid.UUID
-	CanvasName string
-	RunState   string
-	RunResult  string
+	CanvasID            *uuid.UUID
+	CanvasName          string
+	RunState            string
+	RunResult           string
+	SubscriptionFailure *SubscriptionFailure `gorm:"-"`
+	UsageState          string               `gorm:"-"`
 }
 
 // ListFactoryWorkOrderExecutionsByLineDispatchIDs bulk-loads step executions
@@ -329,7 +331,21 @@ func ListFactoryWorkOrderExecutionsByLineDispatchIDs(
 		return nil, err
 	}
 
+	runIDs := make([]uuid.UUID, 0, len(records))
 	for _, record := range records {
+		if record.RunID != nil {
+			runIDs = append(runIDs, *record.RunID)
+		}
+	}
+	summaries, err := ListRunnerResultSummariesForRuns(tx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, record := range records {
+		if record.RunID != nil {
+			record.SubscriptionFailure = summaries[*record.RunID].SubscriptionFailure
+			record.UsageState = summaries[*record.RunID].UsageState
+		}
 		result[record.LineDispatchID] = append(result[record.LineDispatchID], record)
 	}
 

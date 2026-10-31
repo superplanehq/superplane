@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -11,8 +12,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	canvasespb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestPlanningSessionReportsRunnerCapacityThroughSessionAndBoardAPIs(t *testing.T) {
@@ -83,4 +86,51 @@ func TestPlanningSessionReportsRunnerCapacityThroughSessionAndBoardAPIs(t *testi
 	assertStatus(models.RunnerTaskStateReserved, false)
 	require.NoError(t, queued.Start(db, runner, "test", time.Now()))
 	assertStatus(models.RunnerTaskStateRunning, false)
+}
+
+func TestPlanningQuotaFailureSurvivesReloadAndClearsForNewTask(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	session := openAnalysisSession(t, r, db)
+	fleet := models.DefaultInstallationRunnerFleets("test")[0]
+	fleet.Slug = support.RandomName("quota")
+	require.NoError(t, fleet.Create(db))
+	result, err := json.Marshal(map[string]any{"usage_state": "partial", "failure": models.SubscriptionFailure{Reason: models.SubscriptionFailureChatGPTQuotaExhausted, SubscriptionOwnerID: r.User.String()}})
+	require.NoError(t, err)
+	task := &models.RunnerTask{ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateFailed, QueuedAt: time.Now(), PayloadCiphertext: []byte("encrypted"), Result: datatypes.JSON(result)}
+	require.NoError(t, db.Create(task).Error)
+	event := support.EmitCanvasEventForNode(t, *session.CanvasID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, *session.CanvasID, intakeAnalysisNodeID, event.ID, event.ID)
+	require.NoError(t, db.Model(execution).Update("run_id", *session.CanvasRunID).Error)
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, *session.CanvasID, intakeAnalysisNodeID, execution.ID, "task_id", task.ID.String()))
+	assertFailure := func(want bool) {
+		t.Helper()
+		response, err := DescribePlanningSession(ctx, r.Organization.ID.String(), &pb.DescribePlanningSessionRequest{FactoryId: session.FactoryID.String(), SessionId: session.ID.String()})
+		require.NoError(t, err)
+		listed, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{FactoryId: session.FactoryID.String()})
+		require.NoError(t, err)
+		require.Len(t, listed.Orders, 1)
+		if want {
+			assert.Equal(t, "partial", response.Session.GetUsageState())
+			assert.Equal(t, "partial", listed.Orders[0].GetPlanningSession().GetUsageState())
+		}
+		for _, failure := range []*canvasespb.SubscriptionFailure{response.Session.GetSubscriptionFailure(), listed.Orders[0].GetPlanningSession().GetSubscriptionFailure()} {
+			if !want {
+				assert.Nil(t, failure)
+				continue
+			}
+			require.NotNil(t, failure)
+			assert.Equal(t, "chatgpt_quota_exhausted", failure.GetReason())
+			assert.Equal(t, r.User.String(), failure.GetSubscriptionOwnerId())
+		}
+	}
+	assertFailure(true)
+	next := &models.RunnerTask{ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued, QueuedAt: time.Now(), PayloadCiphertext: []byte("encrypted")}
+	require.NoError(t, db.Create(next).Error)
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, *session.CanvasID, intakeAnalysisNodeID, execution.ID, "task_id", next.ID.String()))
+	assertFailure(false)
+	reloaded, err := models.FindRunnerTask(db, task.ID)
+	require.NoError(t, err)
+	require.NotNil(t, models.SubscriptionFailureFromResult(reloaded.Result), "historical failure must remain saved")
 }

@@ -507,6 +507,17 @@ func IsRunnerCreationIdempotencyKeyConflict(err error) bool {
 }
 
 func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
+	original := *r
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		return r.terminate(tx, reason)
+	})
+	if err != nil {
+		*r = original
+	}
+	return err
+}
+
+func (r *Runner) terminate(tx *gorm.DB, reason string) error {
 	if r.State == RunnerStateBusy {
 		return ErrRunnerBusy
 	}
@@ -595,6 +606,17 @@ func (r *Runner) MarkProviderDeleted(tx *gorm.DB, now time.Time) error {
 }
 
 func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {
+	var tasks []RunnerTask
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("runner_id = ? AND state = ?", runnerID, RunnerTaskStateReserved).
+		Find(&tasks).Error; err != nil {
+		return err
+	}
+	for i := range tasks {
+		if err := tasks[i].recordSetupAllocationUsage(tx, now); err != nil {
+			return err
+		}
+	}
 	// Read cancellation in the update so a concurrent request cannot leave a
 	// canceled reservation queued without a runner to finish it.
 	return tx.Model(&RunnerTask{}).
@@ -603,8 +625,10 @@ func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) e
 			"runner_id": nil,
 			"state": gorm.Expr("CASE WHEN cancel_requested_at IS NULL THEN ? ELSE ? END",
 				RunnerTaskStateQueued, RunnerTaskStateCanceled),
-			"finished_at": gorm.Expr("CASE WHEN cancel_requested_at IS NOT NULL THEN ? ELSE finished_at END", now),
-			"reserved_at": nil,
-			"updated_at":  now,
+			"finished_at":    gorm.Expr("CASE WHEN cancel_requested_at IS NOT NULL THEN ? ELSE finished_at END", now),
+			"reserved_at":    nil,
+			"started_at":     nil,
+			"setup_billable": false,
+			"updated_at":     now,
 		}).Error
 }

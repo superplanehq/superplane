@@ -19,6 +19,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/pkg/billing"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -33,6 +35,7 @@ import (
 )
 
 func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
+	t.Setenv(billing.BillingEnabledEnv, "no")
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
@@ -43,6 +46,7 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 	require.NoError(t, err)
 	taskID := uuid.New()
 	require.NoError(t, connection.BeginLogin(db, taskID, now))
+	allocateCodexHTTPTask(t, db, r.Organization.ID, taskID)
 	signer := jwt.NewSigner("test-codex-usage")
 	scope := runneraction.CodexSubscriptionScope{OrganizationID: r.Organization.ID, ConnectionID: connection.ID, TaskID: taskID, Generation: connection.ReservationGeneration}
 	token, err := runneraction.MintCodexSubscriptionToken(signer, scope, time.Hour)
@@ -166,15 +170,19 @@ func TestCodexRunCheckpointDoesNotReplaceTheRefreshToken(t *testing.T) {
 	}
 }
 
-func TestCodexRunningTaskKeepsCredentialsAfterWorkspaceModelPolicyChange(t *testing.T) {
+func TestCodexRunningTaskKeepsCredentialsAfterAdmissionPolicyChanges(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	connection, factory, _ := readyCodexRun(t, r)
+	connection, factory, secret := readyCodexRun(t, r)
 	var lease models.FactoryCodexLease
 	require.NoError(t, db.Where("connection_id = ? AND purpose = ?", connection.ID, models.CodexLeasePurposeRun).First(&lease).Error)
 	inherit := false
 	_, err := models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, []string{}, &inherit)
 	require.NoError(t, err)
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	t.Setenv(billing.BillingEnabledEnv, "yes")
+	// No plan or hosted credits can terminate the already allocated attempt.
+	require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
 	signer := jwt.NewSigner("test-codex-run")
 	token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
 		OrganizationID: r.Organization.ID,
@@ -184,12 +192,18 @@ func TestCodexRunningTaskKeepsCredentialsAfterWorkspaceModelPolicyChange(t *test
 		Generation:     lease.Generation,
 	}, time.Hour)
 	require.NoError(t, err)
-	server := &Server{jwt: signer, encryptor: r.Encryptor}
+	server := &Server{jwt: signer, encryptor: r.Encryptor, codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
+		return runneraction.CodexTokenSet{AccessToken: codexTestAccessToken(time.Now().Add(time.Hour)), RefreshToken: "rotated"}, nil
+	}}
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 	server.handleRunnerCodexSubscriptionCredentials(response, request)
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	refresh := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", strings.NewReader(`{"refresh_token":"`+secret+`"}`))
+	refreshed := httptest.NewRecorder()
+	server.handleRunnerCodexSubscriptionRefresh(refreshed, refresh)
+	require.Equal(t, http.StatusOK, refreshed.Code, refreshed.Body.String())
 
 	require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("id = ?", lease.ID).Update("revoked_at", time.Now()).Error)
 	revoked := httptest.NewRecorder()
@@ -216,10 +230,15 @@ func TestCodexRefreshIsSingleFlightAndHidesTheRefreshToken(t *testing.T) {
 				require.NoError(t, err)
 				otherTask := *previousTask
 				otherTask.ID = uuid.New()
+				otherTask.State = models.RunnerTaskStateQueued
+				otherTask.RunnerID = nil
+				otherTask.ReservedAt = nil
+				otherTask.StartedAt = nil
 				require.NoError(t, db.Create(&otherTask).Error)
 				runID := support.CreateCodexOwnedRunInWorkspace(t, db, connection, otherWorkspace.ID, otherTask.ID)
 				_, err = models.ReserveFactoryCodexConnection(db, r.Organization.ID, otherWorkspace.ID, runID, otherTask.ID, time.Now(), r.Encryptor)
 				require.NoError(t, err)
+				startCodexHTTPTask(t, db, &otherTask)
 				secondLease, err = models.FindCodexLeaseByTask(db, otherTask.ID)
 				require.NoError(t, err)
 				decrypted, err := r.Encryptor.Decrypt(t.Context(), secondLease.SecretCiphertext, []byte(connection.ID.String()))
@@ -502,6 +521,7 @@ func TestCodexRefreshDoesNotReportReconnectAfterCommitFailure(t *testing.T) {
 
 func readyCodexRun(t *testing.T, r *support.ResourceRegistry) (*models.FactoryCodexConnection, *models.Factory, string) {
 	t.Helper()
+	t.Setenv(billing.BillingEnabledEnv, "no")
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -526,6 +546,7 @@ func readyCodexRun(t *testing.T, r *support.ResourceRegistry) (*models.FactoryCo
 	require.NoError(t, db.Create(runTask).Error)
 	reserved, err := models.ReserveFactoryCodexConnection(db, r.Organization.ID, factory.ID, support.CreateCodexOwnedRun(t, db, connection, runTask.ID), runTask.ID, now, r.Encryptor)
 	require.NoError(t, err)
+	startCodexHTTPTask(t, db, runTask)
 	var lease models.FactoryCodexLease
 	require.NoError(t, db.Where("connection_id = ? AND purpose = ?", reserved.ID, models.CodexLeasePurposeRun).First(&lease).Error)
 	secret, err := r.Encryptor.Decrypt(t.Context(), lease.SecretCiphertext, []byte(reserved.ID.String()))
@@ -719,10 +740,32 @@ func addCodexCatalogTask(t *testing.T, r *support.ResourceRegistry, connection *
 	require.NoError(t, err)
 	task := *previous
 	task.ID = uuid.New()
+	task.State = models.RunnerTaskStateQueued
+	task.RunnerID = nil
+	task.ReservedAt = nil
+	task.StartedAt = nil
 	require.NoError(t, db.Create(&task).Error)
 	lease, err := connection.BeginCatalogRefresh(db, task.ID, r.Encryptor, time.Now())
 	require.NoError(t, err)
+	startCodexHTTPTask(t, db, &task)
 	secret, err := r.Encryptor.Decrypt(t.Context(), lease.SecretCiphertext, []byte(connection.ID.String()))
 	require.NoError(t, err)
 	return lease, string(secret)
+}
+
+func allocateCodexHTTPTask(t *testing.T, db *gorm.DB, organizationID, taskID uuid.UUID) {
+	t.Helper()
+	fleet := models.RunnerFleet{ID: uuid.New(), Slug: support.RandomName("fleet"), ScopeType: models.RunnerFleetScopeInstallation, Enabled: true, RunnerVersion: "test"}
+	require.NoError(t, fleet.Create(db))
+	task := &models.RunnerTask{ID: taskID, OrganizationID: organizationID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued, QueuedAt: time.Now(), PayloadCiphertext: []byte("payload")}
+	require.NoError(t, db.Create(task).Error)
+	startCodexHTTPTask(t, db, task)
+}
+
+func startCodexHTTPTask(t *testing.T, db *gorm.DB, task *models.RunnerTask) {
+	t.Helper()
+	runner := &models.Runner{ID: uuid.New(), FleetID: task.FleetID, State: models.RunnerStateIdle, RunnerVersion: "test"}
+	require.NoError(t, db.Create(runner).Error)
+	require.NoError(t, task.Reserve(db, runner.ID))
+	require.NoError(t, task.Start(db, runner, "test-store", time.Now()))
 }

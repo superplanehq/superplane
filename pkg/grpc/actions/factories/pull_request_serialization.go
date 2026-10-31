@@ -2,12 +2,15 @@ package factories
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
+	canvasespb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -98,8 +101,9 @@ func loadSerializedPullRequestsByWorkOrderIDs(
 }
 
 type pullRequestRunLedger struct {
-	usage  models.UsageTotals
-	models []string
+	usage        models.UsageTotals
+	models       []string
+	subscription models.RunnerResultSummary
 }
 
 func loadPullRequestSerialization(
@@ -140,6 +144,10 @@ func loadPullRequestSerialization(
 			runIDs = append(runIDs, linked.Run.ID)
 		}
 	}
+	subscriptions, err := models.ListRunnerResultSummariesForRuns(tx, runIDs)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("load pull request subscription summaries: %w", err)
+	}
 	usageByRun, modelsByRun, err := models.SumUsageAndModelsForRunTrees(tx, runIDs)
 	if err != nil {
 		log.WithError(err).Warnf(
@@ -152,8 +160,9 @@ func loadPullRequestSerialization(
 	ledgers := make(map[uuid.UUID]pullRequestRunLedger, len(runIDs))
 	for _, runID := range runIDs {
 		ledgers[runID] = pullRequestRunLedger{
-			usage:  usageByRun[runID],
-			models: modelsByRun[runID],
+			usage:        usageByRun[runID],
+			models:       modelsByRun[runID],
+			subscription: subscriptions[runID],
 		}
 	}
 	return runsByPullRequest, revisions, ledgers, nil
@@ -208,7 +217,7 @@ func serializePullRequestRuns(
 			Description: linked.Description,
 			TotalTokens: ledger.usage.TotalTokens,
 			CostCents:   ledger.usage.CostCents(),
-			Run:         canvases.SerializeCanvasRunRef(linked.Run),
+			Run:         serializePullRequestRunRef(linked.Run, ledger.subscription),
 			Models:      ledger.models,
 		})
 	}
@@ -223,7 +232,7 @@ func serializePullRequestActivities(
 	for _, linked := range runs {
 		ledger := ledgerByRun[linked.Run.ID]
 		activity := &pb.FactoryPullRequestActivity{
-			Run:         canvases.SerializeCanvasRunRef(linked.Run),
+			Run:         serializePullRequestRunRef(linked.Run, ledger.subscription),
 			Title:       linked.Title,
 			Description: linked.Description,
 			Access:      linked.Access,
@@ -244,6 +253,13 @@ func serializePullRequestActivities(
 		result = append(result, activity)
 	}
 	return result
+}
+
+func serializePullRequestRunRef(run models.CanvasRun, summary models.RunnerResultSummary) *canvasespb.CanvasRunRef {
+	serialized := canvases.SerializeCanvasRunRef(run)
+	serialized.SubscriptionFailure = actions.SerializeSubscriptionFailure(summary.SubscriptionFailure)
+	serialized.UsageState = summary.UsageState
+	return serialized
 }
 
 func serializePullRequestRevision(revision *models.FactoryPullRequestRevision) *pb.FactoryPullRequestRevision {

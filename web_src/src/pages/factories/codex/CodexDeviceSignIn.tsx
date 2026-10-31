@@ -1,3 +1,4 @@
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { showErrorToast } from "@/lib/toast";
 import { CopyButton } from "@/ui/CopyButton";
@@ -134,6 +135,7 @@ export function CodexDeviceSignIn({
 }) {
   const copy = CODEX_CONNECTION_COPY;
   const phase = codexPhase(connection);
+  const billingEnabled = useBillingProductEnabled();
   const signInCancelAction =
     cancelAction === undefined ? (
       <LoadingButton type="button" variant="outline" loading={canceling} onClick={onCancel}>
@@ -162,6 +164,12 @@ export function CodexDeviceSignIn({
         <WaitingSignIn phase={phase} connection={connection} cancelAction={signInCancelAction} />
       ) : null}
       {phase === "ready" ? <ReadySignIn connection={connection} /> : null}
+      {billingEnabled && phase === "start" ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          ChatGPT sign-in uses SuperPlane compute credit, including time waiting for sign-in. Subscription model usage
+          has no SuperPlane charge.
+        </p>
+      ) : null}
       {phase === "start" && connection?.status === "reconnect_required" ? (
         <p className="mt-3 text-[13px]">{copy.subscriptionReconnect}</p>
       ) : null}

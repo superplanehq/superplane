@@ -8,6 +8,7 @@
  */
 
 const fs = require("fs");
+const { randomUUID } = require("crypto");
 const { constants } = require("os");
 const path = require("path");
 const readline = require("readline");
@@ -372,6 +373,9 @@ function saveFailureResult(message) {
   if (!resultFile) {
     return;
   }
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  const usageFile = taskDir && path.join(taskDir, "llm_usage.js");
+  if (usageFile && fs.existsSync(usageFile)) require(usageFile).mergeResult(resultFile, taskDir);
   let previous = {};
   try {
     const saved = JSON.parse(fs.readFileSync(resultFile, "utf8"));
@@ -395,13 +399,14 @@ function saveFailureResult(message) {
   }
 }
 
-function superviseCodexProcessGroup(child) {
+function superviseCodexProcessGroup(child, beforeExit, detached = true) {
   let running = true;
   const stop = () => {
     if (!running || !child.pid) return;
     running = false;
     try {
-      process.kill(-child.pid, "SIGKILL");
+      if (detached) process.kill(-child.pid, "SIGKILL");
+      else child.kill("SIGKILL");
     } catch (_error) {
       child.kill("SIGKILL");
     }
@@ -412,6 +417,7 @@ function superviseCodexProcessGroup(child) {
   for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) {
     const handler = () => {
       stop();
+      beforeExit?.();
       process.exit(128 + constants.signals[signal]);
     };
     handlers.set(signal, handler);
@@ -438,14 +444,36 @@ async function runPrompt(promptFile, model, thinking) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
   let stopChild = () => {};
+  let observer;
+  let credentialFailure = false;
   const subscription = loadSubscriptionModule();
   subscription?.setCredentialFailureHandler?.((error) => {
-    // No untrusted output is safe after losing sight of credential rotation.
-    // Stop the npm launcher and its native child, and save only a fixed error.
+    // Redactors cannot run after an auth bundle disappears: observing the same
+    // missing bundle would re-enter this handler. Retain measured counters only.
+    if (credentialFailure) return;
+    credentialFailure = true;
     stopChild();
     process.stderr.write(`${error.message}\n`);
     try {
-      fs.writeFileSync(resultFile, `${JSON.stringify({ type: "result", is_error: true, error: error.message, result: "" })}\n`);
+      const measured = observer?.finish({ successful: false });
+      const safe = {
+        type: "result", is_error: true, error: error.message, result: "",
+        ...(measured ? {
+          attempt_id: measured.attempt_id, usage: measured.usage,
+          usage_state: measured.usage_state,
+          ...(measured.failure ? { failure: {
+            reason: "chatgpt_quota_exhausted",
+            ...(measured.failure.resets_at ? { resets_at: measured.failure.resets_at } : {}),
+          } } : {}),
+        } : {}),
+      };
+      const usageFile = path.join(sp, "llm_usage.js");
+      if (measured && fs.existsSync(usageFile)) {
+        const aggregate = require(usageFile).snapshotAttempt(sp, safe);
+        safe.usage = aggregate.usage;
+        safe.usage_state = aggregate.usage_state;
+      }
+      fs.writeFileSync(resultFile, `${JSON.stringify(safe)}\n`);
     } catch (_error) {
       process.stderr.write("The credential protection error could not be saved.\n");
     }
@@ -498,17 +526,46 @@ async function runPrompt(promptFile, model, thinking) {
   }
   codexArgs.push(prompt);
 
+  const attemptId = randomUUID();
+  const telemetry = loadTurnTelemetry();
+  const observerFile = path.join(sp, "rollout_observer.js");
+  const { createRolloutObserver } = require(fs.existsSync(observerFile) ? observerFile : "./rollout_observer");
+  let firstSnapshot = true;
+  observer = createRolloutObserver({
+    home: childEnv.CODEX_HOME,
+    threadId: sessionID,
+    attemptId,
+    subscription: Boolean(subscription?.subscriptionEnabled?.()),
+    onSnapshot(snapshot) {
+      if (credentialFailure) return;
+      telemetry.updateAttemptSnapshot(snapshot);
+      let previous = {};
+      try { previous = JSON.parse(fs.readFileSync(resultFile, "utf8")); } catch (_) { /* first snapshot */ }
+      if (!previous || typeof previous !== "object" || Array.isArray(previous)) previous = {};
+      if (firstSnapshot) { delete previous.failure; delete previous.error; previous.is_error = false; firstSnapshot = false; }
+      const payload = { ...previous, ...snapshot, type: "result", model: snapshot.model || model };
+      if (!snapshot.failure) delete payload.failure;
+      const activityModule = loadActivityStreamModule();
+      const safe = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
+      fs.writeFileSync(resultFile, `${redactSubscription(JSON.stringify(safe))}\n`);
+      const usageFile = path.join(sp, "llm_usage.js");
+      if (fs.existsSync(usageFile)) require(usageFile).snapshotAttempt(sp, safe);
+    },
+  });
+  observer.start();
   const detached = Boolean(subscription?.setCredentialFailureHandler);
   const child = spawn("codex", codexArgs, {
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
     detached,
   });
-  if (detached) stopChild = superviseCodexProcessGroup(child);
+  stopChild = superviseCodexProcessGroup(child, () => {
+    observer.finish({ successful: false });
+    saveFailureResult("Codex was interrupted.");
+  }, detached);
   const stderrDone = pipeRedactedStderr(child.stderr);
 
   let lastResult = {};
-  const telemetry = loadTurnTelemetry();
   const formatter = createCodexFormatter(telemetry, activity);
   const rl = readline.createInterface({
     input: child.stdout,
@@ -525,6 +582,7 @@ async function runPrompt(promptFile, model, thinking) {
         const nextSessionID = codexSessionIDFromEvent(event);
         if (nextSessionID) {
           writeSessionID(sp, nextSessionID);
+          observer.setThreadId(nextSessionID);
         }
         if (event.usage || (event.item && event.item.usage)) {
           lastResult = event;
@@ -556,9 +614,11 @@ async function runPrompt(promptFile, model, thinking) {
     }),
     new Promise((resolve) => rl.on("close", resolve)),
     stderrDone,
-  ]);
+  ]).catch((error) => { observer.finish({ successful: false }); throw error; });
 
-  const exitCode = formatter.errorMessage() && processExitCode === 0 ? 1 : processExitCode;
+  const measurement = observer.finish({ successful: processExitCode === 0 && !formatter.errorMessage() });
+  const failed = Boolean(measurement.failure || formatter.errorMessage());
+  const exitCode = failed && processExitCode === 0 ? 1 : processExitCode;
   if (exitCode !== 0 && !formatter.errorMessage()) {
     const message = `Codex failed with exit code ${exitCode}.`;
     formatter.reportError(stderr ? `${message}\n${stderr}` : message);
@@ -567,19 +627,14 @@ async function runPrompt(promptFile, model, thinking) {
   formatter.flush(exitCode !== 0);
   activity.end(exitCode === 0 ? "passed" : "failed");
   await activity.flush();
-  const usage = extractUsage(lastResult);
-  if (tokenTotal(usage) > 0) {
-    telemetry.updateCurrentUsage(usage);
-  }
-  const rollout = readRolloutContext(childEnv.CODEX_HOME, readSessionID(sp));
   const payload = {
     type: "result",
     is_error: exitCode !== 0,
     ...(exitCode !== 0 ? { error: formatter.errorMessage() } : {}),
     result: formatter.lastText() || lastResult.result || lastResult.text || "",
-    model: rollout.model || lastResult.model || model,
-    thinkingLevel: rollout.effort || thinking,
-    usage,
+    model: measurement.model || lastResult.model || model,
+    thinkingLevel: measurement.thinkingLevel || thinking,
+    ...measurement,
   };
   telemetry.attachToResult(payload);
   const activityModule = loadActivityStreamModule();
@@ -588,7 +643,8 @@ async function runPrompt(promptFile, model, thinking) {
     safePayload.result = redactSubscription(safePayload.result);
   }
   fs.writeFileSync(resultFile, `${redactSubscription(JSON.stringify(safePayload))}\n`);
-  accumulateLLMUsage(safePayload);
+  const usageScript = path.join(sp, "llm_usage.js");
+  if (fs.existsSync(usageScript)) require(usageScript).snapshotAttempt(sp, safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
     await require(path.join(sp, "agent_message.js")).recordAgentMessage(
@@ -603,7 +659,7 @@ async function runPrompt(promptFile, model, thinking) {
         : 1,
     duration_ms: Date.now() - startedAt,
   });
-  if (exitCode === 0 && subscription && subscription.subscriptionEnabled()) {
+  if (subscription && subscription.subscriptionEnabled()) {
     try {
       await subscription.reportUsage();
     } catch (err) {
@@ -611,19 +667,6 @@ async function runPrompt(promptFile, model, thinking) {
     }
   }
   return exitCode;
-}
-
-function tokenTotal(usage) {
-  if (!usage || typeof usage !== "object") {
-    return 0;
-  }
-  return (
-    Number(usage.input_tokens || 0) +
-    Number(usage.output_tokens || 0) +
-    Number(usage.cache_read_input_tokens || 0) +
-    Number(usage.cache_creation_input_tokens || 0) +
-    Number(usage.reasoning_tokens || 0)
-  );
 }
 
 function loadTurnTelemetry() {
@@ -645,69 +688,6 @@ function loadTurnTelemetry() {
     write: writeLiveLogRecord,
     sanitize: loadActivityStreamModule().sanitizeLogValue,
   });
-}
-
-function extractUsage(event) {
-  const source = event.usage || (event.item && event.item.usage) || event;
-  const usage = {
-    input_tokens: Number(source.input_tokens || source.prompt_tokens || 0),
-    output_tokens: Number(
-      source.output_tokens || source.completion_tokens || 0,
-    ),
-    cache_read_input_tokens: Number(
-      source.cached_input_tokens || source.cache_read_input_tokens || 0,
-    ),
-    cache_creation_input_tokens: Number(source.cache_write_input_tokens || 0),
-    reasoning_tokens: Number(
-      source.reasoning_output_tokens || source.reasoning_tokens || 0,
-    ),
-  };
-  const cost = event.total_cost_usd ?? source.total_cost_usd;
-  if (cost != null && Number.isFinite(Number(cost))) usage.total_cost_usd = Number(cost);
-  return usage;
-}
-
-function readRolloutContext(home, sessionID) {
-  const sessions = home && path.join(home, "sessions");
-  if (!sessions || !sessionID || !fs.existsSync(sessions)) {
-    return {};
-  }
-  try {
-    const suffix = `-${sessionID}.jsonl`;
-    const files = fs
-      .readdirSync(sessions, { recursive: true })
-      .filter((file) => path.basename(file).startsWith("rollout-") && file.endsWith(suffix))
-      .sort();
-    const context = {};
-    for (const file of files) {
-      for (const line of fs.readFileSync(path.join(sessions, file), "utf8").split("\n")) {
-        if (!line.trim()) continue;
-        try {
-          const record = JSON.parse(line);
-          if (record.type !== "turn_context" || !record.payload) continue;
-          if (typeof record.payload.model === "string") context.model = record.payload.model;
-          if (typeof record.payload.effort === "string") context.effort = record.payload.effort;
-        } catch (_err) {
-          // Rollout files are internal Codex state. Ignore records from formats we do not know.
-        }
-      }
-    }
-    return context;
-  } catch (_err) {
-    return {};
-  }
-}
-
-function accumulateLLMUsage(payload) {
-  const taskDir = process.env.SUPERPLANE_TASK_DIR;
-  if (!taskDir) {
-    return;
-  }
-  const script = path.join(taskDir, "llm_usage.js");
-  if (!fs.existsSync(script)) {
-    return;
-  }
-  require(script).accumulate(taskDir, payload);
 }
 
 function writeLiveLogRecord(rec) {
@@ -923,7 +903,6 @@ function createCodexFormatter(telemetry, activityOverride) {
         return;
       }
       if (event.type === "turn.completed" || event.type === "result") {
-        tracker.updateCurrentUsage(extractUsage(event));
         roundOpen = false;
         return;
       }
@@ -944,7 +923,7 @@ function createCodexFormatter(telemetry, activityOverride) {
         if (event.type === "item.completed") {
           const text = item.text || item.result || "";
           if (!roundOpen) {
-            tracker.beginTurn(item.usage || event.usage, {
+            tracker.beginTurn(undefined, {
               message:
                 typeof text === "string" && type !== "reasoning"
                   ? text
@@ -970,7 +949,7 @@ function createCodexFormatter(telemetry, activityOverride) {
       }
       if (event.type === "item.started") {
         if (!roundOpen) {
-          tracker.beginTurn(item.usage || event.usage);
+          tracker.beginTurn(undefined);
           roundOpen = true;
         }
         const id = rememberTool(item);
@@ -979,7 +958,7 @@ function createCodexFormatter(telemetry, activityOverride) {
       }
       if (event.type === "item.completed") {
         if (!roundOpen) {
-          tracker.beginTurn(item.usage || event.usage);
+          tracker.beginTurn(undefined);
           roundOpen = true;
         }
         completeTool(item);

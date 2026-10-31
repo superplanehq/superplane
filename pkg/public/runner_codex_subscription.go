@@ -409,10 +409,9 @@ func scopedCodexLease(tx *gorm.DB, connection *models.FactoryCodexConnection, sc
 	}
 	switch lease.Purpose {
 	case models.CodexLeasePurposeLogin:
-		if scope.FactoryID != uuid.Nil || lease.FactoryID != nil {
+		if scope.FactoryID != uuid.Nil || lease.FactoryID != nil || !time.Now().Before(lease.CreatedAt.Add(models.CodexLoginTimeout)) {
 			return nil, models.ErrCodexConnectionStale
 		}
-		return lease, nil
 	case models.CodexLeasePurposeCatalog:
 		if scope.FactoryID != uuid.Nil || lease.FactoryID != nil || !time.Now().Before(lease.CreatedAt.Add(models.CodexCatalogTimeout)) {
 			return nil, models.ErrCodexConnectionStale

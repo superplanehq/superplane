@@ -36,6 +36,7 @@ function addUsage(total, delta) {
     delta.cache_creation_input_tokens || delta.cache_write_tokens,
   );
   total.reasoning_tokens += asNumber(delta.reasoning_tokens);
+  if (delta.total_tokens != null) total.total_tokens = asNumber(total.total_tokens) + asNumber(delta.total_tokens);
   return total;
 }
 
@@ -64,7 +65,8 @@ function sidecarHasUsage(sidecar) {
     usage.cache_read_input_tokens > 0 ||
     usage.cache_creation_input_tokens > 0 ||
     usage.reasoning_tokens > 0 ||
-    asNumber(sidecar.total_cost_usd) > 0
+    asNumber(sidecar.total_cost_usd) > 0 ||
+    Boolean(sidecar.usage_state)
   );
 }
 
@@ -111,6 +113,30 @@ function accumulate(taskDir, payload) {
   return current;
 }
 
+function snapshotAttempt(taskDir, payload) {
+  if (!taskDir || !payload || !payload.attempt_id) return;
+  const current = readSidecar(taskDir);
+  if (!current.attempts) {
+    current.legacy_usage = current.usage;
+    current.attempts = {};
+  }
+  current.attempts[payload.attempt_id] = {
+    usage: payload.usage, usage_state: payload.usage_state,
+    ...(payload.failure ? { failure: payload.failure } : {}),
+  };
+  current.latest_attempt_id = payload.attempt_id;
+  current.usage = Object.values(current.attempts).reduce((total, attempt) => addUsage(total, attempt.usage), addUsage(emptyUsage(), current.legacy_usage));
+  const states = Object.values(current.attempts).map(attempt => attempt.usage_state);
+  current.usage_state = states.includes("partial") || (states.includes("unavailable") && states.includes("measured"))
+    ? "partial" : states.includes("pending") ? "pending" : states.includes("unavailable") ? "unavailable" : "measured";
+  if (payload.model) current.model = String(payload.model);
+  const file = sidecarPath(taskDir);
+  fs.writeFileSync(`${file}.next`, `${JSON.stringify(current)}\n`);
+  fs.renameSync(`${file}.next`, file);
+  mergeResult(process.env.SUPERPLANE_RESULT_FILE, taskDir);
+  return current;
+}
+
 function mergeResult(resultFile, taskDir) {
   if (!taskDir || !resultFile) {
     return;
@@ -135,6 +161,13 @@ function mergeResult(resultFile, taskDir) {
   const merged = Object.assign({}, parsed);
   if (sidecarHasUsage(sidecar)) {
     merged.usage = sidecar.usage;
+    if (sidecar.usage_state) merged.usage_state = sidecar.usage_state;
+    const latest = sidecar.attempts && sidecar.attempts[sidecar.latest_attempt_id];
+    if (latest) {
+      merged.attempt_id = sidecar.latest_attempt_id;
+      if (latest.failure) merged.failure = latest.failure;
+      else delete merged.failure;
+    }
     if (sidecar.model) {
       merged.model = sidecar.model;
     }
@@ -164,4 +197,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { accumulate, mergeResult, addUsage };
+module.exports = { accumulate, mergeResult, addUsage, snapshotAttempt };

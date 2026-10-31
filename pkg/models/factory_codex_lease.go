@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -188,27 +189,34 @@ func (c *FactoryCodexConnection) AttachSetupLeases(tx *gorm.DB) error {
 	return nil
 }
 
-// RequireSubscriptionLeaseAdmission rechecks revocation, membership, and the
-// workspace model policy before allocating a runner. It does not serialize the
-// execution of separate leases.
+// RequireSubscriptionLeaseAdmission rechecks authority, eligibility, billing,
+// and model policy before allocating a runner. It does not serialize separate
+// leases.
 func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
 	return t.requireSubscriptionLease(tx, true)
 }
 
 // RequireSubscriptionLeaseContinuation rechecks revocation, membership, the
-// workspace, and the run owner for a task that already runs. It does not apply
-// the current model policy. A policy change must not stop a running task from
+// workspace, and the run owner for an allocated task. It does not reapply
+// admission policy. Policy changes must not stop an allocated task from
 // refreshing its token.
 func (t *RunnerTask) RequireSubscriptionLeaseContinuation(tx *gorm.DB) error {
+	if t.ReservedAt == nil || t.RunnerID == nil ||
+		(t.State != RunnerTaskStateReserved && t.State != RunnerTaskStateRunning) {
+		return ErrCodexConnectionStale
+	}
 	return t.requireSubscriptionLease(tx, false)
 }
 
-func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool) error {
+func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkAdmission bool) error {
 	lease, err := FindCodexLeaseByTask(tx, t.ID)
 	if err != nil {
 		return err
 	}
 	if lease == nil {
+		if t.SetupPurpose != "" {
+			return ErrCodexConnectionNotFound
+		}
 		// Deleting a connection also deletes its leases. The execution retains
 		// the credential source, so this task must not run with a stale token.
 		execution, err := t.FindExecution(tx)
@@ -232,7 +240,12 @@ func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool
 	if err != nil {
 		return err
 	}
-	if _, err := ActiveCodexMember(tx, connection.OrganizationID, connection.OwnerUserID); err != nil {
+	if checkAdmission {
+		if err := requireCodexSubscriptionEligible(tx, connection.OrganizationID); err != nil {
+			return err
+		}
+	}
+	if _, err := activeHumanCodexMember(tx, connection.OrganizationID, connection.OwnerUserID); err != nil {
 		return err
 	}
 	// Re-read after locking membership. Removal can revoke the snapshot above
@@ -252,8 +265,11 @@ func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool
 		return ErrCodexConnectionStale
 	}
 	if lease.Login() {
-		if lease.FactoryID != nil {
+		if lease.FactoryID != nil || !time.Now().Before(lease.CreatedAt.Add(CodexLoginTimeout)) {
 			return ErrCodexConnectionStale
+		}
+		if checkAdmission {
+			return RequireCodexSetupAdmission(tx, connection.OrganizationID)
 		}
 		return nil
 	}
@@ -263,6 +279,9 @@ func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool
 		}
 		if connection.Status != CodexConnectionStatusReady || connection.CredentialVersion < 1 || len(connection.BundleCiphertext) == 0 {
 			return ErrCodexConnectionNotReady
+		}
+		if checkAdmission {
+			return RequireCodexSetupAdmission(tx, connection.OrganizationID)
 		}
 		return nil
 	}
@@ -285,15 +304,25 @@ func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool
 	if err != nil {
 		return err
 	}
-	ownerID, err := RequireSubscriptionRunOwner(tx, connection.OrganizationID, *lease.FactoryID, execution.RunID)
+	var ownerID uuid.UUID
+	if checkAdmission {
+		ownerID, err = RequireSubscriptionRunOwner(tx, connection.OrganizationID, *lease.FactoryID, execution.RunID)
+	} else {
+		ownerID, err = subscriptionRunOwnerForContinuation(tx, connection.OrganizationID, *lease.FactoryID, execution.RunID)
+	}
 	if err != nil {
 		return err
 	}
 	if ownerID != connection.OwnerUserID {
 		return ErrSubscriptionOwnerInvalid
 	}
-	if !checkModelPolicy {
+	if !checkAdmission {
 		return nil
+	}
+	if billing.Enabled() {
+		if err := billing.AssertOrganizationPlanAllowsRuns(tx, connection.OrganizationID); err != nil {
+			return err
+		}
 	}
 	model, _ := execution.Configuration.Data()["model"].(string)
 	resolved, err := connection.resolvePermittedModel(tx, *lease.FactoryID, model)

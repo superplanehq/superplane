@@ -833,6 +833,15 @@ message CanvasRunTask {
   string title = 3;
 }
 
+message SubscriptionFailure {
+  string reason = 1;
+  string limit_id = 2;
+  google.protobuf.Timestamp resets_at = 3;
+  // Captured from the admitted subscription lease by the server.
+  string subscription_owner_id = 4;
+}
+
+
 message CanvasRun {
   enum State {
     STATE_UNKNOWN = 0;
@@ -872,6 +881,10 @@ message CanvasRun {
   CanvasRunTask task = 19;
   // Trigger node that starts this run, including before its root event exists.
   string node_id = 20;
+  // Safe recovery metadata from the current admitted subscription attempt.
+  SubscriptionFailure subscription_failure = 21;
+  // Codex measurement state: pending, measured, partial, or unavailable.
+  string usage_state = 22;
 }
 
 message CanvasRunRef {
@@ -884,6 +897,9 @@ message CanvasRunRef {
   google.protobuf.Timestamp updated_at = 7;
   google.protobuf.Timestamp finished_at = 8;
   string description = 9;
+  // Durable subscription failure and measurement status for linked task runs.
+  SubscriptionFailure subscription_failure = 10;
+  string usage_state = 11;
 }
 
 message ListEventExecutionsRequest {

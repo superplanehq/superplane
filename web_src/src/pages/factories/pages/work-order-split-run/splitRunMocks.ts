@@ -1,3 +1,4 @@
+import { usageMeasurementState, type UsageMeasurementState } from "@/lib/agentRunTelemetry";
 import type {
   CanvasesCanvasRun,
   FactoriesAutomationRef,
@@ -7,6 +8,7 @@ import type {
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderCheck,
   FactoriesWorkOrderExecution,
+  CanvasesSubscriptionFailure,
 } from "@/api-client";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import {
@@ -140,6 +142,9 @@ export interface SplitRunStreamLine {
 }
 
 export interface SplitRunPhase {
+  subscriptionFailureHistory?: Array<{ runId: string; failure: CanvasesSubscriptionFailure }>;
+  usageState?: UsageMeasurementState;
+  subscriptionFailure?: CanvasesSubscriptionFailure;
   id: SplitRunPhaseId;
   name: string;
   /** Markdown details shown below the activity title. */
@@ -223,6 +228,8 @@ export function columnAppsFromFactoryApps(
 export type SplitRunIntakeCanvasKey = "intake" | "sentry" | "slack";
 
 export interface SplitRunFixture {
+  usageState?: UsageMeasurementState;
+  subscriptionFailure?: CanvasesSubscriptionFailure;
   title: string;
   /** Stored task key, for example `RF-101`. Empty when the order has no key. */
   identifier?: string;
@@ -506,6 +513,11 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   ];
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
+    subscriptionFailure:
+      displayStatus === "draft" ? order.planningSession?.subscriptionFailure : current?.subscriptionFailure,
+    usageState: usageMeasurementState(
+      displayStatus === "draft" ? order.planningSession?.usageState : current?.usageState,
+    ),
     title: order.title ?? "Task",
     identifier: order.key?.trim() ?? "",
     descriptionText: order.description ?? "",
@@ -932,6 +944,15 @@ function analysisAttemptsToPhase(
 
   const status = statusForAnalysisRun(latest.run, statusForCanvasRun(latest.run), delivered);
   const credit = backlogAnalysisCreditFailure([latest]);
+  const subscriptionFailure = latest.run.subscriptionFailure;
+  const subscriptionFailureHistory = attempts
+    .slice(0, -1)
+    .flatMap(({ run }) =>
+      run.id && run.subscriptionFailure?.reason === "chatgpt_quota_exhausted"
+        ? [{ runId: run.id, failure: run.subscriptionFailure }]
+        : [],
+    );
+
   const durationRunning = latest.run.state === "STATE_STARTED";
   // The card title is the Backlog automation. The score stays on the check.
   const componentName = "Backlog";
@@ -950,6 +971,9 @@ function analysisAttemptsToPhase(
     iconSlug: "box",
   };
   return {
+    subscriptionFailure,
+    ...(subscriptionFailureHistory.length ? { subscriptionFailureHistory } : {}),
+    usageState: usageMeasurementState(latest.run.usageState),
     id: `${ANALYSIS_PHASE_ID_PREFIX}${latest.workOrderId}`,
     name: "Analysis",
     status,
@@ -1097,6 +1121,7 @@ function phaseForColumnAppCheck(
   const componentName = columnAppCheckName(app, first, name);
   const latest = checks[checks.length - 1] ?? first;
   const span = columnAppCheckSpan(ref.runId, source);
+  const { run = {} } = span;
   const line = columnAppCheckLine(ref.runId, componentName, latest.updatedAt, span);
   return {
     id: `column-app-${ref.runId}`,
@@ -1104,8 +1129,8 @@ function phaseForColumnAppCheck(
     status: span.status,
     duration: span.duration,
     durationRunning: span.status === "running",
-    startedAt: span.run?.createdAt ?? first.updatedAt,
-    endedAt: span.status === "running" ? undefined : (span.run?.finishedAt ?? span.run?.updatedAt),
+    startedAt: run.createdAt ?? first.updatedAt,
+    endedAt: span.status === "running" ? undefined : (run.finishedAt ?? run.updatedAt),
     componentName,
     artifacts: artifactsForCanvasRun(artifacts, ref.runId),
     checks: presentWorkOrderChecks(checks),
@@ -1114,6 +1139,8 @@ function phaseForColumnAppCheck(
     appId: ref.appId,
     runId: ref.runId,
     columnKey,
+    subscriptionFailure: run.subscriptionFailure,
+    usageState: usageMeasurementState(run.usageState),
     ...columnAppRunLedger(ref.runId, source?.pullRequests, span.lookedUp),
   };
 }
@@ -1123,7 +1150,12 @@ function columnAppCheckSpan(runId: string, source: ColumnAppCheckSource | undefi
   const lookedUp = source?.canvasRuns?.runsById.get(runId);
   const run = linked ?? lookedUp;
   const loading = !run && Boolean(source?.canvasRuns?.loadingIds.has(runId));
-  const status = run ? statusForCanvasRun(run) : "passed";
+  const status =
+    run?.subscriptionFailure?.reason === "chatgpt_quota_exhausted"
+      ? "failed"
+      : run
+        ? statusForCanvasRun(run)
+        : "passed";
   return {
     run,
     lookedUp,
@@ -1409,7 +1441,8 @@ function prFeedbackPhaseDescription(entry: PRFeedbackLogRun) {
 }
 
 function prFeedbackRunToPhase(entry: PRFeedbackLogRun, columnApps: SplitRunColumnApp[] = []): SplitRunPhase {
-  const status = prFeedbackPhaseStatus(entry);
+  const status =
+    entry.run.subscriptionFailure?.reason === "chatgpt_quota_exhausted" ? "failed" : prFeedbackPhaseStatus(entry);
   const name = prFeedbackActivityName(entry);
   const componentName = prFeedbackComponentName(entry, columnApps);
   const duration = durationForExecution(
@@ -1442,6 +1475,8 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun, columnApps: SplitRunColum
     runId: entry.run.id,
     costCents: entry.costCents,
     totalTokens: entry.totalTokens,
+    subscriptionFailure: entry.run.subscriptionFailure,
+    usageState: usageMeasurementState(entry.run.usageState),
     model: joinRunnerModels(entry.models ?? []) || undefined,
     columnKey: consoleColumnForAppKey(columnAppForCanvas(columnApps, entry.canvasId)?.columnKey),
     pullRequestActivity: {
@@ -1774,6 +1809,8 @@ function executionToPhase(
     totalTokens: execution.totalTokens,
     model: modelsForExecution(order, execution),
     thinkingLevel: thinkingLevelForExecution(order, execution),
+    subscriptionFailure: execution.subscriptionFailure,
+    usageState: usageMeasurementState(execution.usageState),
   };
 }
 

@@ -337,6 +337,10 @@ doctor-local:
 	  rm -f "$$shot"; \
 	  test "$$missing" -eq 0'
 
+.PHONY: check.codex.incremental.usage
+check.codex.incremental.usage:
+	$(COMPOSE_RUNNER) run --rm -T --no-deps --entrypoint node -v "$(PWD):/workspace:ro" runner /workspace/scripts/check_codex_incremental_usage.js
+
 dev.console:
 	$(COMPOSE) run --rm app /bin/bash
 

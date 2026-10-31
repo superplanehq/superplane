@@ -72,6 +72,9 @@ func StartFactoryCodexConnection(
 		if lockErr != nil {
 			return lockErr
 		}
+		if err := models.RequireCodexSetupAdmission(tx, orgID); err != nil {
+			return err
+		}
 		member, memberErr := models.ActiveCodexMember(tx, orgID, callerID)
 		if memberErr != nil {
 			return memberErr
@@ -121,6 +124,9 @@ func refreshFactoryCodexCatalog(
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		err := validateCodexWorkspace(tx, organizationID, factoryRef)
 		if err != nil {
+			return err
+		}
+		if err := models.RequireCodexSetupAdmission(tx, organizationID); err != nil {
 			return err
 		}
 		member, err := models.ActiveCodexMember(tx, organizationID, callerID)
@@ -204,7 +210,14 @@ func createCodexConnectionTask(
 		ExecutionMode:  runner.ExecutionModeHost,
 		TimeoutSeconds: int(timeout / time.Second),
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	purpose := models.RunnerTaskSetupPurposeCodexLogin
+	if command == "refresh" {
+		purpose = models.RunnerTaskSetupPurposeCodexCatalog
+	}
+	return tx.Model(&models.RunnerTask{}).Where("id = ? AND organization_id = ?", taskID, organizationID).Update("setup_purpose", purpose).Error
 }
 
 func CancelFactoryCodexConnection(
@@ -311,7 +324,7 @@ func DisconnectFactoryCodexConnection(
 		if lockErr != nil {
 			return lockErr
 		}
-		member, memberErr := models.ActiveCodexMember(tx, orgID, callerID)
+		member, memberErr := models.ActiveCodexConnectionMember(tx, orgID, callerID)
 		if memberErr != nil {
 			return memberErr
 		}
@@ -429,6 +442,12 @@ func codexEligible(tx *gorm.DB, organizationID, callerID uuid.UUID) (bool, error
 	if err == nil {
 		return true, nil
 	}
+	if errors.Is(err, models.ErrCodexConnectionUnavailable) {
+		if _, memberErr := models.ActiveCodexConnectionMember(tx, organizationID, callerID); memberErr != nil {
+			return false, memberErr
+		}
+		return false, nil
+	}
 	return false, err
 }
 
@@ -472,7 +491,7 @@ func serializeCodexConnection(
 		view.CatalogRefreshTaskId = connection.CatalogLease.TaskID.String()
 		view.CatalogRefreshCanceling = connection.CatalogCancellationRequested
 	}
-	if eligible && callerID == connection.OwnerUserID && view.Status == models.CodexConnectionStatusPending {
+	if callerID == connection.OwnerUserID && view.Status == models.CodexConnectionStatusPending && connection.LoginLease != nil {
 		view.VerificationUrl = connection.VerificationURL
 		view.VerificationCode = connection.VerificationCode
 	}

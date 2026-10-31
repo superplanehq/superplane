@@ -301,7 +301,7 @@ function RunnerNotes({
     canvasId,
     analysisStatus,
   );
-  useReportLiveHeaderSpend(`${spendPhaseId}:${line.id}`, spend.tokens, spend.cents);
+  useReportLiveHeaderSpend(`${spendPhaseId}:${line.id}`, spend.tokens, spend.cents, spend.usageState);
   useReportPhaseAgentUsageSeries({
     nodeId: line.nodeId ?? line.id,
     fallbackName: line.componentName,

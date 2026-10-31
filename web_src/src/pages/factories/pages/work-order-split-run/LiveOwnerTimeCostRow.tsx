@@ -5,5 +5,10 @@ import { useLiveHeaderSpendOverlay } from "./liveHeaderSpendContext";
 
 export function LiveOwnerTimeCostRow(props: ComponentProps<typeof OwnerTimeCostRow>) {
   const liveSpend = useLiveHeaderSpendOverlay();
-  return <OwnerTimeCostRow {...props} liveSpend={liveSpend} />;
+  return (
+    <OwnerTimeCostRow
+      {...props}
+      liveSpend={{ ...liveSpend, usageState: liveSpend.usageState ?? props.fixture.usageState }}
+    />
+  );
 }

@@ -14,6 +14,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/billing"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -36,7 +37,8 @@ import (
 )
 
 func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
-	for _, scenario := range []string{"complete", "cancel", "queued subscription", "queued catalog"} {
+	t.Setenv(billing.BillingEnabledEnv, "no")
+	for _, scenario := range []string{"complete", "cancel", "queued subscription", "queued catalog", "quota failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			cancelOnHeartbeat := scenario == "cancel"
 			resource := support.Setup(t)
@@ -53,7 +55,7 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 				"script":         "echo hello",
 				"execution_mode": "host",
 			}
-			if scenario == "queued subscription" || scenario == "queued catalog" {
+			if scenario == "queued subscription" || scenario == "queued catalog" || scenario == "quota failure" {
 				require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
 				var err error
 				subscription, err = models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now().Add(-time.Hour))
@@ -180,13 +182,19 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 			}
 
 			requestID := uuid.New()
+			result := json.RawMessage(`{"value":"ok"}`)
+			exitCode := int32(0)
+			if scenario == "quota failure" {
+				exitCode = 1
+				result = json.RawMessage(`{"usage_state":"partial","usage":{"total_tokens":42},"failure":{"reason":"chatgpt_quota_exhausted","subscription_owner_id":"` + uuid.NewString() + `","limit_id":"codex","unsafe":"private rollout"}}`)
+			}
 			require.NoError(t, socket.WriteJSON(completeMessage{
 				Type:      messageTypeComplete,
 				RequestID: requestID.String(),
 				TaskID:    task.ID.String(),
-				ExitCode:  0,
+				ExitCode:  exitCode,
 				Canceled:  cancelOnHeartbeat,
-				Result:    json.RawMessage(`{"value":"ok"}`),
+				Result:    result,
 			}))
 
 			var ack ackMessage
@@ -203,8 +211,20 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 			if cancelOnHeartbeat {
 				expectedState = models.RunnerTaskStateCanceled
 			}
+			if scenario == "quota failure" {
+				expectedState = models.RunnerTaskStateFailed
+				failure := models.SubscriptionFailureFromResult(reloadedTask.Result)
+				require.NotNil(t, failure)
+				assert.Equal(t, subscription.OwnerUserID.String(), failure.SubscriptionOwnerID)
+				assert.Equal(t, "codex", failure.LimitID)
+				assert.NotContains(t, string(reloadedTask.Result), "private rollout")
+				lease, err := models.FindCodexLeaseByTask(db, task.ID)
+				require.NoError(t, err)
+				assert.Nil(t, lease, "the result must preserve the owner after lease cleanup")
+			} else {
+				assert.JSONEq(t, `{"value":"ok"}`, string(reloadedTask.Result))
+			}
 			assert.Equal(t, expectedState, reloadedTask.State)
-			assert.JSONEq(t, `{"value":"ok"}`, string(reloadedTask.Result))
 			lifecycle, err := reloadedTask.FindLifecycle(db)
 			require.NoError(t, err)
 			assert.Equal(t, runnerlogs.StoreFS, lifecycle.ActiveStore)
