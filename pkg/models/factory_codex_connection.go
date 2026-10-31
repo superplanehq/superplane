@@ -52,26 +52,28 @@ func (e *CodexConnectionBusyError) Error() string {
 // FactoryCodexConnection is one member’s ChatGPT subscription in an organization.
 // The ciphertext is the native Codex auth bundle, bound to this row ID.
 type FactoryCodexConnection struct {
-	ID                         uuid.UUID
-	OrganizationID             uuid.UUID
-	OwnerUserID                uuid.UUID
-	Status                     string
-	ResumeStatus               string
-	VerificationURL            string
-	VerificationCode           string
-	AccountLabel               string
-	UsageLimits                datatypes.JSONSlice[CodexUsageLimit]
-	AvailableModels            datatypes.JSONSlice[CodexModel]
-	UsageObservedAt            *time.Time
-	BundleCiphertext           []byte
-	CredentialVersion          int64
-	FinalCheckpointVersion     int64
-	ReservationGeneration      int64
-	CreatedAt                  time.Time
-	UpdatedAt                  time.Time
-	RevocationPendingAt        *time.Time
-	LoginLease                 *FactoryCodexLease `gorm:"-"`
-	LoginCancellationRequested bool               `gorm:"-"`
+	ID                           uuid.UUID
+	OrganizationID               uuid.UUID
+	OwnerUserID                  uuid.UUID
+	Status                       string
+	ResumeStatus                 string
+	VerificationURL              string
+	VerificationCode             string
+	AccountLabel                 string
+	UsageLimits                  datatypes.JSONSlice[CodexUsageLimit]
+	AvailableModels              datatypes.JSONSlice[CodexModel]
+	UsageObservedAt              *time.Time
+	BundleCiphertext             []byte
+	CredentialVersion            int64
+	FinalCheckpointVersion       int64
+	ReservationGeneration        int64
+	CreatedAt                    time.Time
+	UpdatedAt                    time.Time
+	RevocationPendingAt          *time.Time
+	LoginLease                   *FactoryCodexLease `gorm:"-"`
+	LoginCancellationRequested   bool               `gorm:"-"`
+	CatalogLease                 *FactoryCodexLease `gorm:"-"`
+	CatalogCancellationRequested bool               `gorm:"-"`
 }
 
 type CodexUsageLimit struct {
@@ -113,8 +115,7 @@ func (FactoryCodexConnection) TableName() string {
 	return "factory_codex_connections"
 }
 
-// Reserved reports an exclusive sign-in or catalog refresh.
-// Run leases do not mark the connection reserved.
+// Reserved reports an exclusive sign-in. Catalog and run leases remain shared.
 func (c *FactoryCodexConnection) Reserved() bool {
 	return c != nil && c.LoginLease != nil
 }
@@ -261,36 +262,55 @@ func (c *FactoryCodexConnection) BeginLogin(tx *gorm.DB, taskID uuid.UUID, now t
 	})
 }
 
-// BeginCatalogRefresh holds the connection for one model-catalog task.
-// The task checkpoints the real auth bundle, so it stays exclusive.
-func (c *FactoryCodexConnection) BeginCatalogRefresh(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
-	return tx.Transaction(func(tx *gorm.DB) error {
+// BeginCatalogRefresh shares the connection with runs and coalesces duplicate
+// requests, including requests made while catalog cancellation is pending.
+func (c *FactoryCodexConnection) BeginCatalogRefresh(tx *gorm.DB, taskID uuid.UUID, encryptor crypto.Encryptor, now time.Time) (*FactoryCodexLease, error) {
+	var lease *FactoryCodexLease
+	err := tx.Transaction(func(tx *gorm.DB) error {
 		if err := c.relock(tx); err != nil {
 			return err
 		}
+		login, err := FindCodexLoginLease(tx, c.ID)
+		if err != nil {
+			return err
+		}
+		if login != nil {
+			return &CodexConnectionBusyError{TaskID: login.TaskID}
+		}
+		lease, err = FindCodexCatalogLease(tx, c.ID)
+		if err != nil {
+			return err
+		}
+		if lease != nil {
+			return c.AttachLoginLease(tx)
+		}
 		if c.Status != CodexConnectionStatusReady || c.CredentialVersion < 1 || len(c.BundleCiphertext) == 0 {
-			if busy, err := c.busyLease(tx); err != nil {
-				return err
-			} else if busy != nil {
-				return &CodexConnectionBusyError{TaskID: busy.TaskID}
-			}
 			return ErrCodexConnectionNotReady
 		}
-		if busy, err := c.busyLease(tx); err != nil {
-			return err
-		} else if busy != nil {
-			return &CodexConnectionBusyError{TaskID: busy.TaskID}
-		}
-		if _, err := c.createLease(tx, taskID, CodexLeasePurposeLogin, nil, nil, now); err != nil {
-			return err
-		}
-		if err := tx.Model(c).Updates(map[string]any{"resume_status": c.Status, "updated_at": now}).Error; err != nil {
-			return err
-		}
-		c.ResumeStatus = c.Status
-		c.UpdatedAt = now
-		return nil
+		lease, err = c.createLease(tx, taskID, CodexLeasePurposeCatalog, nil, encryptor, now)
+		return err
 	})
+	return lease, err
+}
+
+// CancelCatalogRefresh revokes only the exact catalog task. The caller locks
+// the task before the connection so cancellation cannot deadlock completion.
+func (c *FactoryCodexConnection) CancelCatalogRefresh(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
+	lease, err := FindCodexCatalogLease(tx, c.ID)
+	if err != nil || lease == nil || lease.TaskID != taskID {
+		return err
+	}
+	if err := lease.revoke(tx, now); err != nil {
+		return err
+	}
+	task, err := FindRunnerTask(tx, taskID)
+	if errors.Is(err, ErrRunnerTaskNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return task.RequestCancel(tx, now)
 }
 
 func (c *FactoryCodexConnection) RecordDeviceCode(
@@ -593,7 +613,11 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 		return taskErr
 	}
 	if !task.IsTerminal() {
-		if !lease.Login() || now.Before(lease.CreatedAt.Add(CodexLoginTimeout)) {
+		if lease.Catalog() && !now.Before(lease.CreatedAt.Add(CodexCatalogTimeout)) {
+			if err := lease.revoke(tx, now); err != nil {
+				return err
+			}
+		} else if !lease.Login() || now.Before(lease.CreatedAt.Add(CodexLoginTimeout)) {
 			return nil
 		}
 		if err := task.RequestCancel(tx, now); err != nil {
@@ -602,6 +626,9 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 		if !task.IsTerminal() {
 			return nil
 		}
+	}
+	if lease.Catalog() && connection.RevocationPendingAt == nil {
+		return deleteCodexLease(tx, &lease)
 	}
 	if !lease.Login() && lease.RevokedAt == nil {
 		return deleteCodexLease(tx, &lease)

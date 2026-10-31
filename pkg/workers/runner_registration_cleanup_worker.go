@@ -166,7 +166,7 @@ func (w *RunnerCleanupWorker) Process() error {
 	var logins []models.FactoryCodexConnection
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		logins, err = models.ListCodexLoginConnections(tx)
+		logins, err = models.ListCodexSetupConnections(tx)
 		if err != nil {
 			return err
 		}

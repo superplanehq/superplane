@@ -52,7 +52,12 @@ func PublishCodexConnectionChanges(db *gorm.DB, previous []models.FactoryCodexCo
 			log.WithError(err).Warn("Failed to load completed ChatGPT sign-in")
 			continue
 		}
-		if current.Status == before.Status && current.ReservationGeneration == before.ReservationGeneration {
+		if err := current.AttachLoginLease(db); err != nil {
+			log.WithError(err).Warn("Failed to load ChatGPT catalog activity")
+			continue
+		}
+		if current.Status == before.Status && current.ReservationGeneration == before.ReservationGeneration &&
+			catalogTaskID(current) == catalogTaskID(&before) && current.CatalogCancellationRequested == before.CatalogCancellationRequested {
 			continue
 		}
 		organizationID := current.OrganizationID.String()
@@ -64,6 +69,13 @@ func PublishCodexConnectionChanges(db *gorm.DB, previous []models.FactoryCodexCo
 		}
 		published[organizationID] = true
 	}
+}
+
+func catalogTaskID(connection *models.FactoryCodexConnection) uuid.UUID {
+	if connection.CatalogLease == nil {
+		return uuid.Nil
+	}
+	return connection.CatalogLease.TaskID
 }
 
 // PublishOrganizationCodexConnectionUpdated carries no personal account details.

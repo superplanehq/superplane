@@ -445,7 +445,7 @@ func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRun
 			runner.Tags.Data()[models.RunnerTagProvider] != req.GetProvider() {
 			return fmt.Errorf("runner provider ownership does not match the confirming manager")
 		}
-		logins, err = models.ListCodexLoginConnections(tx)
+		logins, err = models.ListCodexSetupConnections(tx)
 		if err != nil {
 			return err
 		}

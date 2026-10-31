@@ -551,9 +551,12 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		if lease.Login() {
+		if lease.Login() || lease.Catalog() {
 			connection, err := models.FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
 			if err != nil {
+				return err
+			}
+			if err := connection.AttachLoginLease(tx); err != nil {
 				return err
 			}
 			loginConnections = append(loginConnections, *connection)
