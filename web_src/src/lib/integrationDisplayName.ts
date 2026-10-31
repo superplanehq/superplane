@@ -36,7 +36,6 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   perplexity: "Perplexity",
   sentry: "Sentry",
   coolify: "Coolify",
-  telegram: "Telegram",
   teams: "Teams",
   hetzner: "Hetzner",
   servicenow: "ServiceNow",
