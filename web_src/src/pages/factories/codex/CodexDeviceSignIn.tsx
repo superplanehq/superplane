@@ -1,11 +1,11 @@
-import { Loader2 } from "lucide-react";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { showErrorToast } from "@/lib/toast";
 import { CopyButton } from "@/ui/CopyButton";
 import type { FactoriesFactoryCodexConnection } from "@/api-client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { ExternalLink, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-import { ConnectOptionRow, IntegrationChoiceIcon } from "../pages/onboarding/onboardingSteps";
 import { CODEX_CONNECTION_COPY } from "./codexConnectionCopy";
 
 type CodexPhase = "device" | "pending" | "finishing" | "ready" | "start";
@@ -22,24 +22,17 @@ function codexPhase(connection?: FactoriesFactoryCodexConnection): CodexPhase {
 
 function DeviceSignIn({
   connection,
-  canceling,
-  onCancel,
+  cancelAction,
 }: {
   connection: FactoriesFactoryCodexConnection;
-  canceling: boolean;
-  onCancel: () => void;
+  cancelAction: ReactNode;
 }) {
   const copy = CODEX_CONNECTION_COPY;
   return (
-    <div className="mt-3 space-y-2 text-[13px]" data-testid="first-run-codex-device">
+    <div className="space-y-4 text-sm" data-testid="first-run-codex-device">
       <p>{copy.subscriptionDevice}</p>
-      <p>
-        <a className="underline" href={connection.verificationUrl} target="_blank" rel="noreferrer">
-          {connection.verificationUrl}
-        </a>
-      </p>
-      <div className="flex items-center gap-2">
-        <p className="font-mono text-base" data-testid="first-run-codex-code">
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-4 py-3">
+        <p className="break-all font-mono text-xl tracking-widest" data-testid="first-run-codex-code">
           {connection.verificationCode}
         </p>
         <CopyButton
@@ -49,10 +42,18 @@ function DeviceSignIn({
           onCopyError={() => showErrorToast(copy.subscriptionCopyFailed)}
         />
       </div>
+      <Button asChild className="w-full">
+        <a href={connection.verificationUrl} target="_blank" rel="noreferrer">
+          Open ChatGPT
+          <ExternalLink className="size-4" aria-hidden />
+        </a>
+      </Button>
       <p className="text-muted-foreground">{copy.subscriptionDeviceSettings}</p>
-      <LoadingButton type="button" variant="outline" loading={canceling} onClick={onCancel}>
-        {copy.subscriptionCancel}
-      </LoadingButton>
+      <div className="flex items-center gap-2 text-muted-foreground" role="status">
+        <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+        <p>{copy.subscriptionWaiting}</p>
+      </div>
+      {cancelAction}
     </div>
   );
 }
@@ -60,23 +61,22 @@ function DeviceSignIn({
 function WaitingSignIn({
   phase,
   connection,
-  canceling,
-  onCancel,
+  cancelAction,
 }: {
   phase: "pending" | "finishing";
   connection?: FactoriesFactoryCodexConnection;
-  canceling: boolean;
-  onCancel: () => void;
+  cancelAction: ReactNode;
 }) {
   const copy = CODEX_CONNECTION_COPY;
   return (
-    <div className="mt-3 space-y-2 text-[13px]" role="status">
-      {phase === "pending" ? <p>{copy.subscriptionPending}</p> : <FinishingSignIn connection={connection} />}
-      {phase === "pending" ? (
-        <LoadingButton type="button" variant="outline" loading={canceling} onClick={onCancel}>
-          {copy.subscriptionCancel}
-        </LoadingButton>
-      ) : null}
+    <div className="space-y-4 text-sm">
+      <div className="flex items-start gap-2 text-muted-foreground" role="status">
+        <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden />
+        <div className="space-y-2">
+          {phase === "pending" ? <p>{copy.subscriptionPending}</p> : <FinishingSignIn connection={connection} />}
+        </div>
+      </div>
+      {phase === "pending" ? cancelAction : null}
     </div>
   );
 }
@@ -99,10 +99,7 @@ function FinishingSignIn({ connection }: { connection?: FactoriesFactoryCodexCon
 
   return (
     <>
-      <p className="flex items-center gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-        {signInCleanupMessage(connection?.status)}
-      </p>
+      <p>{signInCleanupMessage(connection?.status)}</p>
       {delayed ? <p>{copy.subscriptionDelayed}</p> : null}
     </>
   );
@@ -112,56 +109,59 @@ function ReadySignIn({ connection }: { connection?: FactoriesFactoryCodexConnect
   const copy = CODEX_CONNECTION_COPY;
   const label = connection?.accountLabel;
   return (
-    <p className="mt-3 text-[13px]" role="status">
+    <p className="text-sm" role="status">
       {label ? copy.subscriptionReadyAs(label) : copy.subscriptionReady}
     </p>
   );
 }
 
 export function CodexDeviceSignIn({
-  selected,
   disabled,
   connection,
   starting,
   canceling,
-  onSelect,
   onStart,
   onCancel,
+  cancelAction,
 }: {
-  selected: boolean;
   disabled: boolean;
   connection?: FactoriesFactoryCodexConnection;
   starting: boolean;
   canceling: boolean;
-  onSelect: () => void;
   onStart: () => void;
   onCancel: () => void;
+  cancelAction?: ReactNode;
 }) {
   const copy = CODEX_CONNECTION_COPY;
   const phase = codexPhase(connection);
+  const signInCancelAction =
+    cancelAction === undefined ? (
+      <LoadingButton type="button" variant="outline" loading={canceling} onClick={onCancel}>
+        {copy.subscriptionCancel}
+      </LoadingButton>
+    ) : (
+      cancelAction
+    );
   return (
     <fieldset disabled={disabled} className="m-0 min-w-0 border-0 p-0" data-testid="first-run-codex-subscription">
-      <ConnectOptionRow
-        icon={<IntegrationChoiceIcon name="openai" />}
-        title={copy.subscription}
-        selected={selected}
-        connectLabel={phase === "start" || phase === "ready" ? "ChatGPT" : undefined}
-        connected={phase === "ready"}
-        disabled={disabled || starting || canceling}
-        onSelect={onSelect}
-        onConnect={onStart}
-      />
-      {selected ? (
-        <>
-          {phase === "device" && connection ? (
-            <DeviceSignIn connection={connection} canceling={canceling} onCancel={onCancel} />
-          ) : null}
-          {phase === "pending" || phase === "finishing" ? (
-            <WaitingSignIn phase={phase} connection={connection} canceling={canceling} onCancel={onCancel} />
-          ) : null}
-          {phase === "ready" ? <ReadySignIn connection={connection} /> : null}
-        </>
+      {phase === "start" ? (
+        <LoadingButton
+          type="button"
+          disabled={disabled || canceling}
+          loading={starting}
+          loadingText="Starting sign-in..."
+          onClick={onStart}
+        >
+          Connect ChatGPT
+        </LoadingButton>
       ) : null}
+      {phase === "device" && connection ? (
+        <DeviceSignIn connection={connection} cancelAction={signInCancelAction} />
+      ) : null}
+      {phase === "pending" || phase === "finishing" ? (
+        <WaitingSignIn phase={phase} connection={connection} cancelAction={signInCancelAction} />
+      ) : null}
+      {phase === "ready" ? <ReadySignIn connection={connection} /> : null}
       {phase === "start" && connection?.status === "reconnect_required" ? (
         <p className="mt-3 text-[13px]">{copy.subscriptionReconnect}</p>
       ) : null}

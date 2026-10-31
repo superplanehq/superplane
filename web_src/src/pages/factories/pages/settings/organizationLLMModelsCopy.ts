@@ -56,3 +56,8 @@ export const ORGANIZATION_LLM_MODELS_COPY = {
   saveError: "Unable to save models.",
   noPermission: "You do not have permission to update workspace models.",
 } as const;
+
+export function modelSourceSwitchLabel(source: string): string {
+  if (source === "subscription") return "Codex subscription";
+  return source === "hosted" ? "SuperPlane" : byokProviderProductName(source);
+}
