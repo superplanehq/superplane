@@ -54,21 +54,7 @@ export function useFactoryCodexConnection(
     refreshAttempted.current = false;
     invalidatedCatalog.current = "";
   }, [organizationId, factoryId, currentUserId]);
-  const query = useQuery({
-    queryKey,
-    enabled: enabled && Boolean(organizationId),
-    queryFn: async ({ signal }) => {
-      const response = await meDescribeCodexConnection(
-        withOrganizationHeader({
-          organizationId,
-          signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
-        }),
-      );
-      return response.data?.connection;
-    },
-    refetchInterval: (current) => codexConnectionPollInterval(current.state.data, current.state.status === "error"),
-    refetchIntervalInBackground: true,
-  });
+  const query = useCodexConnectionQuery(organizationId, queryKey, enabled);
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey });
@@ -170,6 +156,28 @@ export function useFactoryCodexConnection(
   }, [enabled, refreshModels, organizationId, factoryId, query.data, queryClient, refreshCatalog]);
 
   return { query, start, cancel, cancelCatalog, refreshCatalog, disconnect, refresh };
+}
+
+function useCodexConnectionQuery(
+  organizationId: string,
+  queryKey: ReturnType<typeof factoryCodexConnectionKey>,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey,
+    enabled: enabled && Boolean(organizationId),
+    queryFn: async ({ signal }) => {
+      const response = await meDescribeCodexConnection(
+        withOrganizationHeader({
+          organizationId,
+          signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
+        }),
+      );
+      return response.data?.connection;
+    },
+    refetchInterval: (current) => codexConnectionPollInterval(current.state.data, current.state.status === "error"),
+    refetchIntervalInBackground: true,
+  });
 }
 
 function codexConnectionPollInterval(connection: FactoriesFactoryCodexConnection | undefined, failed: boolean) {
