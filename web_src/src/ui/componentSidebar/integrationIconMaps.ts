@@ -24,7 +24,6 @@ import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
 import figmaIcon from "@/assets/icons/integrations/figma.svg";
 import firehydrantIcon from "@/assets/icons/integrations/firehydrant.svg";
-import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
@@ -97,7 +96,6 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   discord: discordIcon,
   firehydrant: firehydrantIcon,
   figma: figmaIcon,
-  telegram: telegramIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
@@ -162,7 +160,6 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   discord: discordIcon,
   firehydrant: firehydrantIcon,
   figma: figmaIcon,
-  telegram: telegramIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,

@@ -82,13 +82,13 @@ func TestDefaultResourceSourcesForSkillsBaseURL(t *testing.T) {
 func TestResourceFilenameUsesSourceKeyAndContentHash(t *testing.T) {
 	t.Parallel()
 
-	filenameA := resourceFilename("docs/components/Telegram.mdx", []byte("same-content"))
+	filenameA := resourceFilename("docs/components/Slack.mdx", []byte("same-content"))
 	filenameB := resourceFilename("skills/superplane-cli/SKILL.md", []byte("same-content"))
-	filenameUpdated := resourceFilename("docs/components/Telegram.mdx", []byte("updated-content"))
+	filenameUpdated := resourceFilename("docs/components/Slack.mdx", []byte("updated-content"))
 
 	assert.NotEqual(t, filenameA, filenameB)
 	assert.NotEqual(t, filenameA, filenameUpdated)
-	assert.Contains(t, filenameA, "TELEGRAM_")
+	assert.Contains(t, filenameA, "SLACK_")
 	assert.Contains(t, filenameB, "SUPERPLANE_CLI_SKILL_")
 }
 

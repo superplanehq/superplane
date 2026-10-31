@@ -170,11 +170,6 @@ import {
   eventStateRegistry as discordEventStateRegistry,
 } from "./discord";
 import {
-  componentMappers as telegramComponentMappers,
-  triggerRenderers as telegramTriggerRenderers,
-  eventStateRegistry as telegramEventStateRegistry,
-} from "./telegram";
-import {
   componentMappers as octopusComponentMappers,
   triggerRenderers as octopusTriggerRenderers,
   eventStateRegistry as octopusEventStateRegistry,
@@ -366,7 +361,6 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   aws: awsComponentMappers,
   azure: azureComponentMappers,
   discord: discordComponentMappers,
-  telegram: telegramComponentMappers,
   octopus: octopusComponentMappers,
   teams: teamsComponentMappers,
   openai: openaiComponentMappers,
@@ -417,7 +411,6 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   aws: awsTriggerRenderers,
   azure: azureTriggerRenderers,
   discord: discordTriggerRenderers,
-  telegram: telegramTriggerRenderers,
   octopus: octopusTriggerRenderers,
   teams: teamsTriggerRenderers,
   openai: openaiTriggerRenderers,
@@ -459,7 +452,6 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   sentry: sentryEventStateRegistry,
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
-  telegram: telegramEventStateRegistry,
   teams: teamsEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   incident: incidentEventStateRegistry,
