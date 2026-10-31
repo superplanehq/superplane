@@ -1,9 +1,20 @@
 package pulls
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
+	"github.com/google/go-github/v84/github"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
@@ -188,4 +199,84 @@ func Test__CreatePullRequest__Execute(t *testing.T) {
 
 		require.ErrorContains(t, err, "head and base branches must be different")
 	})
+
+	t.Run("fails when token minting fails with response body", func(t *testing.T) {
+		body := `{"message":"This installation has been suspended."}`
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusForbidden, body),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForLegacySetupFlow(testRSAPEM(t)),
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"head":       "feature",
+				"base":       "main",
+				"title":      "My PR",
+			},
+		})
+
+		require.ErrorContains(t, err, "failed to create pull request")
+		require.ErrorContains(t, err, "status 403 Forbidden")
+		require.ErrorContains(t, err, "This installation has been suspended.")
+		require.ErrorContains(t, err, "hint: the GitHub App installation is suspended")
+		require.ErrorContains(t, err, body)
+	})
 }
+
+func testRSAPEM(t *testing.T) []byte {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	return pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	})
+}
+
+func Test__ExplainGitHubError(t *testing.T) {
+	t.Run("unwraps github.ErrorResponse", func(t *testing.T) {
+		err := &github.ErrorResponse{
+			Message: "Validation Failed",
+			Errors: []github.Error{
+				{Message: "A pull request already exists for testhq:feature."},
+			},
+		}
+		explained := explainGitHubError(err)
+		require.Error(t, explained)
+		assert.Equal(t, "Validation Failed: A pull request already exists for testhq:feature.", explained.Error())
+	})
+
+	t.Run("unwraps ghinstallation.HTTPError and surfaces status and body", func(t *testing.T) {
+		body := `{"message":"This installation has been suspended.","documentation_url":"https://docs.github.com"}`
+		httpErr := &ghinstallation.HTTPError{
+			InstallationID: 168860812,
+			Response: &http.Response{
+				StatusCode: http.StatusForbidden,
+				Status:     "403 Forbidden",
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(body)),
+			},
+		}
+		wrapped := fmt.Errorf("could not refresh installation id 168860812's token: %w", httpErr)
+		explained := explainGitHubError(wrapped)
+		require.Error(t, explained)
+		assert.Contains(t, explained.Error(), "status 403 Forbidden")
+		assert.Contains(t, explained.Error(), "This installation has been suspended.")
+		assert.Contains(t, explained.Error(), "hint: the GitHub App installation is suspended")
+		assert.Contains(t, explained.Error(), body)
+
+		var target *ghinstallation.HTTPError
+		assert.True(t, errors.As(explained, &target))
+	})
+
+	t.Run("preserves unrelated error", func(t *testing.T) {
+		err := errors.New("context deadline exceeded")
+		assert.Equal(t, err, explainGitHubError(err))
+	})
+}
+
