@@ -530,7 +530,6 @@ func Test__SwitchFactoryModelSource__CustomProviderRequiresTokenWhenURLChanges(t
 func TestSwitchFactoryModelSourceSubscriptionRequiresConnectionAndAllowsHostedReturn(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	app := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
@@ -569,7 +568,6 @@ func TestSubscriptionSwitchReplacesAllIntakeDefaultsAtomically(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	ctx := onboardingContext(r)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	app := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")

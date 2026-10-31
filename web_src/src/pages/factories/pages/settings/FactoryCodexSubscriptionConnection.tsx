@@ -1,22 +1,15 @@
 import type { FactoriesFactoryCodexConnection } from "@/api-client";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 import { CodexDeviceSignIn } from "../../codex/CodexDeviceSignIn";
 import type { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
-import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
 type CodexConnection = ReturnType<typeof useFactoryCodexConnection>;
 
 function useCodexConnectionState(codex: CodexConnection) {
   const { isLoading } = usePermissions();
-  const { organizationId } = useFactorySettingsLayout();
-  const features = useExperimentalFeature(organizationId);
   const connection = codex.query.data;
-  const offered = [!features.isLoading, features.has(FEATURE_CODEX_SUBSCRIPTIONS), connection?.eligible === true].every(
-    Boolean,
-  );
+  const offered = connection?.eligible === true;
   const disabled = [isLoading, codex.query.isLoading, connection?.revocationPending === true, !offered].some(Boolean);
   const ready = connection?.status === "ready";
   const signingIn =
@@ -32,7 +25,7 @@ function useCodexConnectionState(codex: CodexConnection) {
     ready,
     refreshing,
     reconnect,
-    status: connectionStatus(features.isLoading || codex.query.isLoading, connection),
+    status: connectionStatus(codex.query.isLoading, connection),
   };
 }
 

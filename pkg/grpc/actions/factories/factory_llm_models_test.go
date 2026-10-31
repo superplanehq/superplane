@@ -65,7 +65,6 @@ func TestFactoryLLMModelsSeparatesConfiguredAndEffectiveSelections(t *testing.T)
 func TestFactorySubscriptionPolicyCombinesConnectedMembersCatalogs(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	other := support.CreateUser(t, r, r.Organization.ID)
@@ -128,10 +127,6 @@ func TestFactoryLLMModelsPreservesPersonalAndProviderAccessGates(t *testing.T) {
 	require.NoError(t, err)
 	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
 	subscription := &pb.ListFactoryLLMModelsRequest{FactoryId: factory.ID.String(), Provider: "openai", FundingSource: "subscription"}
-	_, err = ListFactoryLLMModels(ctx, r.Organization.ID.String(), subscription)
-	require.Error(t, err)
-	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	_, err = ListFactoryLLMModels(t.Context(), r.Organization.ID.String(), subscription)
 	require.Error(t, err)
 	assert.Equal(t, codes.Unauthenticated, grpcerrors.Code(err))
