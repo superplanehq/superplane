@@ -200,101 +200,101 @@ func TestCodexRunningTaskKeepsCredentialsAfterWorkspaceModelPolicyChange(t *test
 func TestCodexRefreshIsSingleFlightAndHidesTheRefreshToken(t *testing.T) {
 	for _, purpose := range []string{models.CodexLeasePurposeRun, models.CodexLeasePurposeCatalog} {
 		t.Run(purpose, func(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	connection, _, secret := readyCodexRun(t, r)
-	var originalLease models.FactoryCodexLease
-	require.NoError(t, db.Where("connection_id = ? AND purpose = ?", connection.ID, models.CodexLeasePurposeRun).First(&originalLease).Error)
-	var secondLease *models.FactoryCodexLease
-	var secondSecret string
-	if purpose == models.CodexLeasePurposeCatalog {
-		secondLease, secondSecret = addCodexCatalogTask(t, r, connection)
-	} else {
-		otherWorkspace, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("other-workspace"), "", "")
-		require.NoError(t, err)
-		previousTask, err := models.FindRunnerTask(db, originalLease.TaskID)
-		require.NoError(t, err)
-		otherTask := *previousTask
-		otherTask.ID = uuid.New()
-		require.NoError(t, db.Create(&otherTask).Error)
-		runID := support.CreateCodexOwnedRunInWorkspace(t, db, connection, otherWorkspace.ID, otherTask.ID)
-		_, err = models.ReserveFactoryCodexConnection(db, r.Organization.ID, otherWorkspace.ID, runID, otherTask.ID, time.Now(), r.Encryptor)
-		require.NoError(t, err)
-		secondLease, err = models.FindCodexLeaseByTask(db, otherTask.ID)
-		require.NoError(t, err)
-		decrypted, err := r.Encryptor.Decrypt(t.Context(), secondLease.SecretCiphertext, []byte(connection.ID.String()))
-		require.NoError(t, err)
-		secondSecret = string(decrypted)
-	}
-	require.NotEqual(t, originalLease.Generation, secondLease.Generation)
-	var calls atomic.Int32
-	nextAccess := codexTestAccessToken(time.Now().Add(time.Hour))
-	server := &Server{
-		encryptor: r.Encryptor,
-		codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
-			calls.Add(1)
-			return runneraction.CodexTokenSet{AccessToken: nextAccess, RefreshToken: "openai-refresh-2", IDToken: "id-token-2"}, nil
-		},
-	}
-	refresh := func(secret string) *httptest.ResponseRecorder {
-		body, err := json.Marshal(map[string]string{"grant_type": "refresh_token", "refresh_token": secret})
-		require.NoError(t, err)
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", bytes.NewReader(body))
-		response := httptest.NewRecorder()
-		server.handleRunnerCodexSubscriptionRefresh(response, request)
-		return response
-	}
-	responses := make(chan *httptest.ResponseRecorder, 2)
-	start := make(chan struct{})
-	for _, credential := range []string{secret, secondSecret} {
-		go func() { <-start; responses <- refresh(credential) }()
-	}
-	close(start)
-	var returnedSecrets []string
-	for range 2 {
-		response := <-responses
-		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
-		var payload map[string]string
-		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
-		returnedSecrets = append(returnedSecrets, payload["refresh_token"])
-		assert.NotContains(t, response.Body.String(), "openai-refresh")
-	}
-	assert.ElementsMatch(t, []string{secret, secondSecret}, returnedSecrets)
-	second := refresh(secret)
-	require.Equal(t, http.StatusOK, second.Code, second.Body.String())
-	assert.Equal(t, int32(1), calls.Load())
-	var payload map[string]string
-	require.NoError(t, json.Unmarshal(second.Body.Bytes(), &payload))
-	assert.Equal(t, secret, payload["refresh_token"])
-	assert.Equal(t, nextAccess, payload["access_token"])
-	assert.NotContains(t, second.Body.String(), "openai-refresh")
-	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
-	assert.Contains(t, string(connection.BundleCiphertext), "openai-refresh-2")
-	assert.NotContains(t, string(connection.BundleCiphertext), secret)
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			connection, _, secret := readyCodexRun(t, r)
+			var originalLease models.FactoryCodexLease
+			require.NoError(t, db.Where("connection_id = ? AND purpose = ?", connection.ID, models.CodexLeasePurposeRun).First(&originalLease).Error)
+			var secondLease *models.FactoryCodexLease
+			var secondSecret string
+			if purpose == models.CodexLeasePurposeCatalog {
+				secondLease, secondSecret = addCodexCatalogTask(t, r, connection)
+			} else {
+				otherWorkspace, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("other-workspace"), "", "")
+				require.NoError(t, err)
+				previousTask, err := models.FindRunnerTask(db, originalLease.TaskID)
+				require.NoError(t, err)
+				otherTask := *previousTask
+				otherTask.ID = uuid.New()
+				require.NoError(t, db.Create(&otherTask).Error)
+				runID := support.CreateCodexOwnedRunInWorkspace(t, db, connection, otherWorkspace.ID, otherTask.ID)
+				_, err = models.ReserveFactoryCodexConnection(db, r.Organization.ID, otherWorkspace.ID, runID, otherTask.ID, time.Now(), r.Encryptor)
+				require.NoError(t, err)
+				secondLease, err = models.FindCodexLeaseByTask(db, otherTask.ID)
+				require.NoError(t, err)
+				decrypted, err := r.Encryptor.Decrypt(t.Context(), secondLease.SecretCiphertext, []byte(connection.ID.String()))
+				require.NoError(t, err)
+				secondSecret = string(decrypted)
+			}
+			require.NotEqual(t, originalLease.Generation, secondLease.Generation)
+			var calls atomic.Int32
+			nextAccess := codexTestAccessToken(time.Now().Add(time.Hour))
+			server := &Server{
+				encryptor: r.Encryptor,
+				codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
+					calls.Add(1)
+					return runneraction.CodexTokenSet{AccessToken: nextAccess, RefreshToken: "openai-refresh-2", IDToken: "id-token-2"}, nil
+				},
+			}
+			refresh := func(secret string) *httptest.ResponseRecorder {
+				body, err := json.Marshal(map[string]string{"grant_type": "refresh_token", "refresh_token": secret})
+				require.NoError(t, err)
+				request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", bytes.NewReader(body))
+				response := httptest.NewRecorder()
+				server.handleRunnerCodexSubscriptionRefresh(response, request)
+				return response
+			}
+			responses := make(chan *httptest.ResponseRecorder, 2)
+			start := make(chan struct{})
+			for _, credential := range []string{secret, secondSecret} {
+				go func() { <-start; responses <- refresh(credential) }()
+			}
+			close(start)
+			var returnedSecrets []string
+			for range 2 {
+				response := <-responses
+				require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+				var payload map[string]string
+				require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
+				returnedSecrets = append(returnedSecrets, payload["refresh_token"])
+				assert.NotContains(t, response.Body.String(), "openai-refresh")
+			}
+			assert.ElementsMatch(t, []string{secret, secondSecret}, returnedSecrets)
+			second := refresh(secret)
+			require.Equal(t, http.StatusOK, second.Code, second.Body.String())
+			assert.Equal(t, int32(1), calls.Load())
+			var payload map[string]string
+			require.NoError(t, json.Unmarshal(second.Body.Bytes(), &payload))
+			assert.Equal(t, secret, payload["refresh_token"])
+			assert.Equal(t, nextAccess, payload["access_token"])
+			assert.NotContains(t, second.Body.String(), "openai-refresh")
+			require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+			assert.Contains(t, string(connection.BundleCiphertext), "openai-refresh-2")
+			assert.NotContains(t, string(connection.BundleCiphertext), secret)
 
-	credentials := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
-	lease := originalLease
-	signer := jwt.NewSigner("test-codex-run")
-	server.jwt = signer
-	token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
-		OrganizationID: connection.OrganizationID,
-		FactoryID:      *lease.FactoryID,
-		ConnectionID:   connection.ID,
-		TaskID:         lease.TaskID,
-		Generation:     lease.Generation,
-	}, time.Hour)
-	require.NoError(t, err)
-	credentials.Header.Set("Authorization", "Bearer "+token)
-	credentialResponse := httptest.NewRecorder()
-	server.handleRunnerCodexSubscriptionCredentials(credentialResponse, credentials)
-	require.Equal(t, http.StatusOK, credentialResponse.Code, credentialResponse.Body.String())
-	assert.Contains(t, credentialResponse.Body.String(), secret)
-	assert.NotContains(t, credentialResponse.Body.String(), "openai-refresh-2")
+			credentials := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
+			lease := originalLease
+			signer := jwt.NewSigner("test-codex-run")
+			server.jwt = signer
+			token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
+				OrganizationID: connection.OrganizationID,
+				FactoryID:      *lease.FactoryID,
+				ConnectionID:   connection.ID,
+				TaskID:         lease.TaskID,
+				Generation:     lease.Generation,
+			}, time.Hour)
+			require.NoError(t, err)
+			credentials.Header.Set("Authorization", "Bearer "+token)
+			credentialResponse := httptest.NewRecorder()
+			server.handleRunnerCodexSubscriptionCredentials(credentialResponse, credentials)
+			require.Equal(t, http.StatusOK, credentialResponse.Code, credentialResponse.Body.String())
+			assert.Contains(t, credentialResponse.Body.String(), secret)
+			assert.NotContains(t, credentialResponse.Body.String(), "openai-refresh-2")
 
-	assert.Equal(t, http.StatusUnauthorized, refresh("invalid-lease-secret").Code)
-	require.NoError(t, db.Model(&originalLease).Update("revoked_at", time.Now()).Error)
-	assert.Equal(t, http.StatusUnauthorized, refresh(secret).Code)
-	assert.Equal(t, int32(1), calls.Load(), "invalid and revoked leases must not reach the provider")
+			assert.Equal(t, http.StatusUnauthorized, refresh("invalid-lease-secret").Code)
+			require.NoError(t, db.Model(&originalLease).Update("revoked_at", time.Now()).Error)
+			assert.Equal(t, http.StatusUnauthorized, refresh(secret).Code)
+			assert.Equal(t, int32(1), calls.Load(), "invalid and revoked leases must not reach the provider")
 		})
 	}
 }
@@ -615,9 +615,9 @@ func TestCodexCatalogCheckpointChangesOnlyValidMetadata(t *testing.T) {
 	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
 	assert.Empty(t, connection.AvailableModels)
 	for _, checkpoint := range []struct {
-		body string
+		body   string
 		models []string
-		used float64
+		used   float64
 	}{
 		{`{"usage":{"models":[{"model":"gpt-5.4"}],"limits":[{"limitId":"codex","primary":{"usedPercent":25}}]}}`, []string{"gpt-5.4"}, 25},
 		{`{"usage":{"models":[{"model":"gpt-5.3"}],"limits":[{"limitId":"codex","primary":{"usedPercent":-1}}]}}`, []string{"gpt-5.3"}, 25},
@@ -651,11 +651,16 @@ func TestCodexCatalogAuthorityRejectsInvalidScopeAndState(t *testing.T) {
 			lease, secret := addCodexCatalogTask(t, r, connection)
 			scope := runneraction.CodexSubscriptionScope{OrganizationID: connection.OrganizationID, ConnectionID: connection.ID, TaskID: lease.TaskID, Generation: lease.Generation}
 			switch scenario {
-			case "organization": scope.OrganizationID = uuid.New()
-			case "connection": scope.ConnectionID = uuid.New()
-			case "task": scope.TaskID = uuid.New()
-			case "generation": scope.Generation++
-			case "workspace": scope.FactoryID = uuid.New()
+			case "organization":
+				scope.OrganizationID = uuid.New()
+			case "connection":
+				scope.ConnectionID = uuid.New()
+			case "task":
+				scope.TaskID = uuid.New()
+			case "generation":
+				scope.Generation++
+			case "workspace":
+				scope.FactoryID = uuid.New()
 			case "expired":
 				require.NoError(t, db.Model(lease).Update("created_at", time.Now().Add(-models.CodexCatalogTimeout)).Error)
 			case "revoked":

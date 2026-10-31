@@ -200,7 +200,7 @@ func createCodexConnectionTask(
 			Content: codex.SubscriptionScript(),
 			Mode:    "0644",
 		}},
-		Environment: environment,
+		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,
 		TimeoutSeconds: int(timeout / time.Second),
 	})
