@@ -43,7 +43,7 @@ var (
 	ErrRunnerConnectionReplaced  = errors.New("runner connection was replaced")
 )
 
-const runnerCreationIdempotencyKeyConstraint = "runners_creation_idempotency_key"
+const runnerCreationIdempotencyKeyConstraint = "runners_fleet_creation_idempotency_key"
 
 /*
  * Runner is a durable record for one provisioned execution agent.
@@ -268,6 +268,16 @@ func (r *Runner) Register(
 	accessTokenHash string,
 	now time.Time,
 ) error {
+	fleet, err := FindRunnerFleet(tx, r.FleetID)
+	if err != nil {
+		return err
+	}
+	if err := fleet.RequireAdmission(tx); err != nil {
+		if fleet.ScopeType == RunnerFleetScopeInstallation && errors.Is(err, ErrRunnerFleetDisabled) {
+			return fmt.Errorf("%w: fleet is unavailable", ErrRunnerRegistrationInvalid)
+		}
+		return err
+	}
 	var current Runner
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ?", r.ID).
@@ -276,6 +286,9 @@ func (r *Runner) Register(
 		return fmt.Errorf("%w: runner record is unavailable", ErrRunnerRegistrationInvalid)
 	}
 	*r = current
+	if r.FleetID != fleet.ID {
+		return fmt.Errorf("%w: fleet ownership changed", ErrRunnerRegistrationInvalid)
+	}
 
 	if r.State != RunnerStatePending || r.RunnerVersion != version {
 		if r.RunnerVersion != version {
@@ -285,7 +298,7 @@ func (r *Runner) Register(
 	}
 
 	var registration RunnerRegistration
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+	err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("jti = ? AND runner_id = ?", jti, r.ID).
 		First(&registration).
 		Error
@@ -301,16 +314,12 @@ func (r *Runner) Register(
 		return fmt.Errorf("%w: registration grant is expired", ErrRunnerRegistrationInvalid)
 	}
 
-	var fleet RunnerFleet
-	err = tx.Where("id = ? AND slug = ? AND enabled = ?", r.FleetID, fleetSlug, true).
-		First(&fleet).
-		Error
-	if err != nil {
+	if fleet.Slug != fleetSlug {
 		return fmt.Errorf("%w: fleet is unavailable", ErrRunnerRegistrationInvalid)
 	}
 
 	var task RunnerTask
-	taskErr := tx.
+	taskErr := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("runner_id = ? AND state IN ?", r.ID, []string{
 			RunnerTaskStateReserved,
 			RunnerTaskStateRunning,
@@ -324,6 +333,11 @@ func (r *Runner) Register(
 		return fmt.Errorf("%w: reserved task does not match token", ErrRunnerRegistrationInvalid)
 	case taskErr != nil && !errors.Is(taskErr, gorm.ErrRecordNotFound):
 		return taskErr
+	}
+	if taskErr == nil && (task.FleetID != fleet.ID ||
+		(fleet.ScopeType == RunnerFleetScopeOrganization &&
+			(fleet.ScopeID == nil || task.OrganizationID != *fleet.ScopeID))) {
+		return fmt.Errorf("%w: task ownership does not match fleet", ErrRunnerRegistrationInvalid)
 	}
 
 	credential := &RunnerCredential{
@@ -465,13 +479,13 @@ func (r *Runner) CloseConnection(tx *gorm.DB, connectionID uuid.UUID, now time.T
 	return nil
 }
 
-func FindInstallationRunnerByCreationIdempotencyKey(tx *gorm.DB, key string) (*Runner, error) {
+func FindRunnerByCreationIdempotencyKey(tx *gorm.DB, fleetID uuid.UUID, key string) (*Runner, error) {
 	var runner Runner
 	err := tx.Model(&Runner{}).
 		Select("runners.*").
 		Joins("JOIN runner_fleets ON runner_fleets.id = runners.fleet_id").
 		Where("runners.creation_idempotency_key = ?", key).
-		Where("runner_fleets.scope_type = ?", RunnerFleetScopeInstallation).
+		Where("runners.fleet_id = ?", fleetID).
 		Where("runner_fleets.deleted_at IS NULL").
 		First(&runner).
 		Error
@@ -488,8 +502,9 @@ func FindInstallationRunnerByCreationIdempotencyKey(tx *gorm.DB, key string) (*R
 // same logical provisioning request after its previous runner terminated.
 // Pending and active runners keep the key so concurrent retries continue to
 // return one runner.
-func ReleaseTerminatedRunnerCreationIdempotencyKey(tx *gorm.DB, key string) error {
+func ReleaseTerminatedRunnerCreationIdempotencyKey(tx *gorm.DB, fleetID uuid.UUID, key string) error {
 	return tx.Model(&Runner{}).
+		Where("fleet_id = ?", fleetID).
 		Where("creation_idempotency_key = ? AND state = ?", key, RunnerStateTerminated).
 		Updates(map[string]any{
 			"creation_idempotency_key": nil,
