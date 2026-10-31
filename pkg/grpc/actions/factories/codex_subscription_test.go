@@ -6,17 +6,21 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	runnerpayload "github.com/superplanehq/superplane/pkg/runners/api"
+	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"google.golang.org/protobuf/proto"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	runnerpayload "github.com/superplanehq/superplane/pkg/runners/api"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -158,7 +162,7 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 	}
 	type startResult struct {
 		response *pb.StartFactoryCodexConnectionResponse
-		err      error
+		err error
 	}
 	results := make(chan startResult, 2)
 	ready := make(chan struct{})
@@ -175,9 +179,7 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 		assert.False(t, view.ReservationHeld)
 		assert.Empty(t, view.ActiveTaskId)
 		require.NotEmpty(t, view.CatalogRefreshTaskId)
-		if taskID == "" {
-			taskID = view.CatalogRefreshTaskId
-		}
+		if taskID == "" { taskID = view.CatalogRefreshTaskId }
 		assert.Equal(t, taskID, view.CatalogRefreshTaskId)
 	}
 	var taskCount int64
@@ -188,9 +190,7 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 	var payload runnerpayload.TaskPayload
 	require.NoError(t, json.Unmarshal(task.PayloadCiphertext, &payload))
 	environment := map[string]string{}
-	for _, variable := range payload.Environment {
-		environment[variable.Name] = variable.Value
-	}
+	for _, variable := range payload.Environment { environment[variable.Name] = variable.Value }
 	assert.Equal(t, "https://superplane.example"+runner.CodexSubscriptionRefreshPath, environment[runner.EnvCodexRefreshTokenURL])
 	scope, err := runner.ParseCodexSubscriptionToken(jwt.NewSigner("catalog-task-test"), environment[runner.EnvCodexSubscriptionToken])
 	require.NoError(t, err)
@@ -258,4 +258,63 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 	stale := cancel(taskID)
 	assert.Equal(t, next.Connection.CatalogRefreshTaskId, stale.CatalogRefreshTaskId)
 	assert.False(t, stale.CatalogRefreshCanceling)
+}
+
+func TestDescribeCodexConnectionPublishesOnlyCatalogActivityChanges(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	fleet := models.DefaultInstallationRunnerFleets("test")[0]
+	require.NoError(t, fleet.Create(db))
+	task := &models.RunnerTask{ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleet.ID,
+		Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued,
+		QueuedAt: time.Now(), PayloadCiphertext: []byte(`{}`)}
+	require.NoError(t, db.Create(task).Error)
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{
+		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("saved"),
+	}).Error)
+	_, err = connection.BeginCatalogRefresh(db, task.ID, r.Encryptor, time.Now())
+	require.NoError(t, err)
+	url, err := config.RabbitMQURL()
+	require.NoError(t, err)
+	broker, err := amqp.Dial(url)
+	require.NoError(t, err)
+	defer broker.Close()
+	channel, err := broker.Channel()
+	require.NoError(t, err)
+	require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+	queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderUpdatedRoutingKey, messages.CanvasExchange, false, nil))
+	ctx := onboardingContext(r)
+	unchanged, err := DescribeFactoryCodexConnection(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCodexConnectionRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, task.ID.String(), unchanged.Connection.CatalogRefreshTaskId)
+	require.Never(t, func() bool {
+		_, found, err := channel.Get(queue.Name, true)
+		require.NoError(t, err)
+		return found
+	}, 100*time.Millisecond, 10*time.Millisecond, "polling unchanged activity must not publish another update")
+
+	// A persisted terminal task can reach Describe before periodic cleanup.
+	require.NoError(t, db.Model(task).Update("state", models.RunnerTaskStateCanceled).Error)
+	finished, err := DescribeFactoryCodexConnection(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCodexConnectionRequest{})
+	require.NoError(t, err)
+	assert.Empty(t, finished.Connection.CatalogRefreshTaskId)
+	require.Eventually(t, func() bool {
+		delivery, found, err := channel.Get(queue.Name, true)
+		require.NoError(t, err)
+		if !found { return false }
+		var update pb.FactoryWorkOrderUpdatedMessage
+		require.NoError(t, proto.Unmarshal(delivery.Body, &update))
+		if update.FactoryId != factory.ID.String() || update.Reason != "codex_connection" { return false }
+		lease, err := models.FindCodexLeaseByTask(db, task.ID)
+		require.NoError(t, err)
+		assert.Nil(t, lease, "activity removal must commit before notification")
+		return true
+	}, 3*time.Second, 10*time.Millisecond)
 }
