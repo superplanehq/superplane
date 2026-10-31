@@ -54,6 +54,24 @@ export const WithAvailableCredits: Story = {
     })),
   },
 };
+export const WithMonthlyCredits: Story = {
+  args: {
+    connections: Connected.args.connections.map((connection) => ({
+      ...connection,
+      limits: connection.limits.map((limit) => ({
+        ...limit,
+        planType: "Business",
+        credits: { hasCredits: true, unlimited: false },
+        individualLimit: {
+          limit: "5000",
+          used: "288.32",
+          remainingPercent: 94,
+          resetsAt: new Date(Date.now() + 86400000 * 20).toISOString(),
+        },
+      })),
+    })),
+  },
+};
 export const NoConnection: Story = { args: { connections: [] } };
 export const UsageUnavailable: Story = {
   args: { connections: [{ id: "connection-1", accountLabel: "ada@example.com", status: "ready" }] },

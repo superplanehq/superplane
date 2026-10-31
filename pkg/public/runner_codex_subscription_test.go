@@ -64,16 +64,28 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 		"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 25, "windowDurationMins": 300, "resetsAt": now.Add(time.Hour).Unix()}, "credits": map[string]any{"hasCredits": true, "unlimited": false, "balance": "4712"}}},
 		"models": []any{map[string]any{"id": "gpt-5.4", "model": "gpt-5.4", "displayName": "GPT-5.4", "defaultReasoningEffort": "medium", "supportedReasoningEfforts": []any{map[string]any{"reasoningEffort": "xhigh", "description": "Deep"}}, "isDefault": true}},
 	}
+	monthly := map[string]any{"limit": "5000", "used": "288.32", "remainingPercent": 94, "resetsAt": now.Add(30 * 24 * time.Hour).Unix()}
+	valid["limits"] = append(valid["limits"].([]any), map[string]any{
+		"limitId": "business", "credits": map[string]any{"hasCredits": true, "balance": nil}, "individualLimit": monthly,
+	})
 	require.Equal(t, http.StatusUnauthorized, checkpoint("", valid).Code)
 	response := checkpoint(token, valid)
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
-	require.Len(t, connection.UsageLimits, 1)
+	require.Len(t, connection.UsageLimits, 2)
 	assert.Equal(t, 25.0, *connection.UsageLimits[0].Primary.UsedPercent)
 	require.NotNil(t, connection.UsageLimits[0].Credits)
 	require.NotNil(t, connection.UsageLimits[0].Credits.Balance)
 	assert.Equal(t, "4712", *connection.UsageLimits[0].Credits.Balance)
 	assert.True(t, connection.UsageLimits[0].Credits.HasCredits)
+	persisted, err := json.Marshal(connection.UsageLimits[1])
+	require.NoError(t, err)
+	var snapshot map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(persisted, &snapshot))
+	expectedMonthly, err := json.Marshal(monthly)
+	require.NoError(t, err)
+	require.Contains(t, snapshot, "individualLimit", "monthly credits must survive checkpoint decoding and storage")
+	assert.JSONEq(t, string(expectedMonthly), string(snapshot["individualLimit"]))
 	require.NotNil(t, connection.UsageObservedAt)
 	require.Len(t, connection.AvailableModels, 1)
 	assert.Equal(t, "gpt-5.4", connection.AvailableModels[0].Model)
@@ -90,6 +102,23 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 		invalidUsage = append(invalidUsage, map[string]any{"limits": []any{map[string]any{
 			"limitId": "codex", "credits": map[string]any{"balance": balance},
 		}}})
+	}
+	for field, invalidValues := range map[string][]any{
+		"limit":            {nil, "", "invalid", "NaN", "Infinity", "-1", strings.Repeat("1", 65), 5000},
+		"used":             {nil, "", "invalid", "NaN", "Infinity", "-1", strings.Repeat("1", 65), 288.32},
+		"remainingPercent": {nil, -1, 101, "94"},
+		"resetsAt":         {-1, 0, int64(253402300800), "invalid"},
+	} {
+		for _, value := range invalidValues {
+			invalidLimit := map[string]any{}
+			for key, validValue := range monthly {
+				invalidLimit[key] = validValue
+			}
+			invalidLimit[field] = value
+			invalidUsage = append(invalidUsage, map[string]any{"limits": []any{map[string]any{
+				"limitId": "codex", "individualLimit": invalidLimit,
+			}}})
+		}
 	}
 	for _, usage := range invalidUsage {
 		response := checkpoint(token, usage)

@@ -75,12 +75,20 @@ type FactoryCodexConnection struct {
 }
 
 type CodexUsageLimit struct {
-	LimitID   string             `json:"limitId"`
-	LimitName string             `json:"limitName"`
-	PlanType  string             `json:"planType"`
-	Primary   *CodexUsageWindow  `json:"primary"`
-	Secondary *CodexUsageWindow  `json:"secondary"`
-	Credits   *CodexUsageCredits `json:"credits,omitempty"`
+	LimitID         string                     `json:"limitId"`
+	LimitName       string                     `json:"limitName"`
+	PlanType        string                     `json:"planType"`
+	Primary         *CodexUsageWindow          `json:"primary"`
+	Secondary       *CodexUsageWindow          `json:"secondary"`
+	Credits         *CodexUsageCredits         `json:"credits,omitempty"`
+	IndividualLimit *CodexUsageIndividualLimit `json:"individualLimit,omitempty"`
+}
+
+type CodexUsageIndividualLimit struct {
+	Limit            string   `json:"limit"`
+	Used             string   `json:"used"`
+	RemainingPercent *float64 `json:"remainingPercent"`
+	ResetsAt         *int64   `json:"resetsAt"`
 }
 
 type CodexUsageCredits struct {
@@ -793,9 +801,20 @@ func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 		}
 		seen[limit.LimitID] = true
 		if limit.Credits != nil && limit.Credits.Balance != nil {
-			balance, err := strconv.ParseFloat(*limit.Credits.Balance, 64)
-			if err != nil || len(*limit.Credits.Balance) > 64 || math.IsNaN(balance) || math.IsInf(balance, 0) || balance < 0 {
+			if !validCodexCreditAmount(*limit.Credits.Balance) {
 				return errors.New("invalid Codex credit balance")
+			}
+		}
+		if individual := limit.IndividualLimit; individual != nil {
+			if !validCodexCreditAmount(individual.Limit) || !validCodexCreditAmount(individual.Used) {
+				return errors.New("invalid Codex monthly credit allowance")
+			}
+			remaining := individual.RemainingPercent
+			if remaining == nil || math.IsNaN(*remaining) || math.IsInf(*remaining, 0) || *remaining < 0 || *remaining > 100 {
+				return errors.New("invalid Codex monthly credit percentage")
+			}
+			if err := validateCodexUsageReset(individual.ResetsAt); err != nil {
+				return err
 			}
 		}
 		for _, window := range []*CodexUsageWindow{limit.Primary, limit.Secondary} {
@@ -805,11 +824,11 @@ func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 			if window.UsedPercent == nil || math.IsNaN(*window.UsedPercent) || math.IsInf(*window.UsedPercent, 0) || *window.UsedPercent < 0 {
 				return errors.New("invalid Codex usage percentage")
 			}
-			if window.WindowDurationMins != nil && *window.WindowDurationMins <= 0 || window.ResetsAt != nil && *window.ResetsAt <= 0 {
+			if window.WindowDurationMins != nil && *window.WindowDurationMins <= 0 {
 				return errors.New("invalid Codex usage window")
 			}
-			if window.ResetsAt != nil && time.Unix(*window.ResetsAt, 0).UTC().Year() > 9999 {
-				return errors.New("Codex usage reset exceeds the API timestamp range")
+			if err := validateCodexUsageReset(window.ResetsAt); err != nil {
+				return err
 			}
 		}
 	}
@@ -970,4 +989,25 @@ func DeleteDrainedOrganizationCodexConnections(tx *gorm.DB, organizationID uuid.
 		}
 	}
 	return true, tx.Where("organization_id = ?", organizationID).Delete(&FactoryCodexConnection{}).Error
+}
+
+func validCodexCreditAmount(amount string) bool {
+	if len(amount) > 64 {
+		return false
+	}
+	value, err := strconv.ParseFloat(amount, 64)
+	return err == nil && !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
+}
+
+func validateCodexUsageReset(resetsAt *int64) error {
+	if resetsAt == nil {
+		return nil
+	}
+	if *resetsAt <= 0 {
+		return errors.New("invalid Codex usage reset time")
+	}
+	if time.Unix(*resetsAt, 0).UTC().Year() > 9999 {
+		return errors.New("Codex usage reset exceeds the API timestamp range")
+	}
+	return nil
 }
