@@ -25,7 +25,10 @@ const (
 	codexRefreshPersistenceReserve = 5 * time.Second
 )
 
-var errInvalidCodexBundle = errors.New("chatgpt subscription credentials are invalid")
+var (
+	errInvalidCodexBundle = errors.New("chatgpt subscription credentials are invalid")
+	errInvalidCodexCatalogCheckpoint = errors.New("catalog checkpoints can contain only usage metadata")
+)
 
 type codexCheckpointRequest struct {
 	Bundle  json.RawMessage `json:"bundle"`
@@ -66,7 +69,7 @@ func (s *Server) handleRunnerCodexSubscriptionCredentials(w http.ResponseWriter,
 		if decryptErr != nil {
 			return decryptErr
 		}
-		if lease.Purpose == models.CodexLeasePurposeRun {
+		if lease.Purpose == models.CodexLeasePurposeRun || lease.Catalog() {
 			secret, secretErr := s.encryptor.Decrypt(r.Context(), lease.SecretCiphertext, []byte(connection.ID.String()))
 			if secretErr != nil {
 				return secretErr
@@ -103,6 +106,11 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
 	var usage struct {
 		Limits json.RawMessage `json:"limits"`
 		Models json.RawMessage `json:"models"`
@@ -126,7 +134,14 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		if err != nil {
 			return err
 		}
-		if lease.Purpose == models.CodexLeasePurposeRun {
+		if lease.Catalog() {
+			for field := range fields {
+				if field != "usage" {
+					return errInvalidCodexCatalogCheckpoint
+				}
+			}
+		}
+		if lease.Purpose == models.CodexLeasePurposeRun || lease.Catalog() {
 			if err := connection.StoreUsage(tx, limits, availableModels, time.Now()); err != nil {
 				return err
 			}
@@ -155,6 +170,10 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		version = connection.CredentialVersion
 		return nil
 	})
+	if errors.Is(err, errInvalidCodexCatalogCheckpoint) {
+		http.Error(w, "Catalog checkpoints can contain only usage metadata", http.StatusBadRequest)
+		return
+	}
 	if errors.Is(err, errInvalidCodexBundle) {
 		http.Error(w, "ChatGPT subscription credentials are invalid", http.StatusBadRequest)
 		return
@@ -192,8 +211,12 @@ func (s *Server) handleRunnerCodexSubscriptionProgress(w http.ResponseWriter, r 
 		if lockErr != nil {
 			return lockErr
 		}
-		if _, err := scopedCodexLease(tx, connection, scope); err != nil {
+		lease, err := scopedCodexLease(tx, connection, scope)
+		if err != nil {
 			return err
+		}
+		if !lease.Login() {
+			return models.ErrCodexConnectionStale
 		}
 		return connection.RecordDeviceCode(tx, scope.TaskID, scope.Generation, verificationURL, verificationCode, time.Now())
 	})
@@ -228,7 +251,7 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 	var permanent *runneraction.CodexTokenRefreshError
 	var changedOrganizationID uuid.UUID
 	err = database.DB(operation).Transaction(func(tx *gorm.DB) error {
-		lease, err := models.FindCodexRunLeaseBySecret(tx, secret)
+		lease, err := models.FindCodexRefreshLeaseBySecret(tx, secret)
 		if err != nil {
 			return err
 		}
@@ -236,14 +259,18 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		if err != nil {
 			return err
 		}
-		if lease.FactoryID == nil {
-			return models.ErrCodexConnectionStale
-		}
 		locked, err := models.LockScopedFactoryCodexConnection(tx, connection.OrganizationID, lease.ConnectionID)
 		if err != nil {
 			return err
 		}
-		if _, err := scopedCodexLease(tx, locked, &runneraction.CodexSubscriptionScope{OrganizationID: locked.OrganizationID, FactoryID: *lease.FactoryID, ConnectionID: locked.ID, TaskID: lease.TaskID, Generation: lease.Generation}); err != nil {
+		scope := &runneraction.CodexSubscriptionScope{
+			OrganizationID: locked.OrganizationID, ConnectionID: locked.ID,
+			TaskID: lease.TaskID, Generation: lease.Generation,
+		}
+		if lease.FactoryID != nil {
+			scope.FactoryID = *lease.FactoryID
+		}
+		if _, err := scopedCodexLease(tx, locked, scope); err != nil {
 			return err
 		}
 		if locked.Status == models.CodexConnectionStatusReconnectRequired {
@@ -380,15 +407,22 @@ func scopedCodexLease(tx *gorm.DB, connection *models.FactoryCodexConnection, sc
 	if err != nil {
 		return nil, err
 	}
-	if lease.Login() {
+	switch lease.Purpose {
+	case models.CodexLeasePurposeLogin:
 		if scope.FactoryID != uuid.Nil || lease.FactoryID != nil {
 			return nil, models.ErrCodexConnectionStale
 		}
-	} else if lease.FactoryID == nil || *lease.FactoryID != scope.FactoryID {
-		return nil, models.ErrCodexConnectionStale
-	}
-	if lease.Login() {
 		return lease, nil
+	case models.CodexLeasePurposeCatalog:
+		if scope.FactoryID != uuid.Nil || lease.FactoryID != nil || !time.Now().Before(lease.CreatedAt.Add(models.CodexCatalogTimeout)) {
+			return nil, models.ErrCodexConnectionStale
+		}
+	case models.CodexLeasePurposeRun:
+		if lease.FactoryID == nil || *lease.FactoryID == uuid.Nil || *lease.FactoryID != scope.FactoryID {
+			return nil, models.ErrCodexConnectionStale
+		}
+	default:
+		return nil, models.ErrCodexConnectionStale
 	}
 	task, err := models.FindRunnerTask(tx, lease.TaskID)
 	if err != nil {
