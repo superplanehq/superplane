@@ -31,7 +31,15 @@ func TestListFactoryCodexUsageShowsOnlyConnectedMembersInOrganization(t *testing
 	balance := "4712"
 	used := 25.0
 	reset := now.Add(time.Hour).Unix()
-	require.NoError(t, connection.StoreUsage(db, []models.CodexUsageLimit{{LimitID: "codex", Credits: &models.CodexUsageCredits{HasCredits: true, Balance: &balance}, Primary: &models.CodexUsageWindow{UsedPercent: &used, ResetsAt: &reset}}}, nil, now))
+	remaining := 94.0
+	monthlyReset := now.Add(30 * 24 * time.Hour).Unix()
+	require.NoError(t, connection.StoreUsage(db, []models.CodexUsageLimit{
+		{LimitID: "codex", Credits: &models.CodexUsageCredits{HasCredits: true, Balance: &balance}, Primary: &models.CodexUsageWindow{UsedPercent: &used, ResetsAt: &reset}},
+		{
+			LimitID: "business", Credits: &models.CodexUsageCredits{HasCredits: true},
+			IndividualLimit: &models.CodexUsageIndividualLimit{Limit: "5000", Used: "288.32", RemainingPercent: &remaining, ResetsAt: &monthlyReset},
+		},
+	}, nil, now))
 	disconnected, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, now)
 	require.NoError(t, err)
 	assert.Equal(t, models.CodexConnectionStatusDisconnected, disconnected.Status)
@@ -50,12 +58,20 @@ func TestListFactoryCodexUsageShowsOnlyConnectedMembersInOrganization(t *testing
 	assert.Equal(t, owner.ID.String(), member.UserId)
 	assert.Equal(t, owner.Name, member.DisplayName)
 	assert.Equal(t, owner.GetEmail(), member.Email)
-	require.Len(t, member.Limits, 1)
+	require.Len(t, member.Limits, 2)
 	assert.Equal(t, used, member.Limits[0].Primary.UsedPercent)
 	require.NotNil(t, member.Limits[0].Credits)
 	require.NotNil(t, member.Limits[0].Credits.Balance)
 	assert.Equal(t, balance, *member.Limits[0].Credits.Balance)
 	assert.Equal(t, reset, member.Limits[0].Primary.ResetsAt.AsTime().Unix())
+	assert.Nil(t, member.Limits[0].IndividualLimit)
+	monthly := member.Limits[1].IndividualLimit
+	require.NotNil(t, monthly)
+	assert.Equal(t, "5000", monthly.Limit)
+	assert.Equal(t, "288.32", monthly.Used)
+	assert.Equal(t, remaining, monthly.RemainingPercent)
+	assert.Equal(t, monthlyReset, monthly.ResetsAt.AsTime().Unix())
+	assert.Nil(t, member.Limits[1].Credits.Balance)
 	assert.WithinDuration(t, now, member.ObservedAt.AsTime(), time.Second)
 	serialized, err := protojson.Marshal(response)
 	require.NoError(t, err)

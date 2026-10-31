@@ -53,7 +53,9 @@ export function CodexUsageConnections({ connections }: { connections: MeCodexUsa
           <p>Connect your ChatGPT subscription again to update usage.</p>
         ) : null}
         {connection.observedAt &&
-        connection.limits?.some((limit) => limit.primary || limit.secondary || limit.credits) ? (
+        connection.limits?.some(
+          (limit) => limit.primary || limit.secondary || limit.credits || limit.individualLimit,
+        ) ? (
           connection.limits.map((limit) => (
             <div key={limit.limitId} className="space-y-3">
               <p className="font-medium">
@@ -62,7 +64,9 @@ export function CodexUsageConnections({ connections }: { connections: MeCodexUsa
               </p>
               {limit.primary ? <CodexQuotaWindow window={limit.primary} label="Primary window" /> : null}
               {limit.secondary ? <CodexQuotaWindow window={limit.secondary} label="Secondary window" /> : null}
-              {limit.credits ? <CodexCreditsRemaining credits={limit.credits} /> : null}
+              {limit.credits || limit.individualLimit ? (
+                <CodexCreditsRemaining credits={limit.credits} individualLimit={limit.individualLimit} />
+              ) : null}
             </div>
           ))
         ) : (

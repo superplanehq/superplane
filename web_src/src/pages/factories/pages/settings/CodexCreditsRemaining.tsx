@@ -1,19 +1,41 @@
-import type { FactoriesCodexUsageCredits } from "@/api-client";
+import type { FactoriesCodexUsageLimit } from "@/api-client";
+import { useTimeHasPassed } from "@/hooks/useTimeHasPassed";
 
-export function CodexCreditsRemaining({ credits }: { credits: FactoriesCodexUsageCredits }) {
+export function CodexCreditsRemaining({
+  credits,
+  individualLimit,
+}: Pick<FactoriesCodexUsageLimit, "credits" | "individualLimit">) {
+  const monthlyLimit = !credits?.unlimited && credits?.balance == null ? individualLimit : undefined;
+  const expired = useTimeHasPassed(monthlyLimit?.resetsAt);
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2">
-      <span className="text-muted-foreground">Available credits</span>
-      <span className="shrink-0 font-medium">{formatCreditBalance(credits)}</span>
+    <div className="space-y-1.5">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <span className="text-muted-foreground">{monthlyLimit ? "Monthly credits" : "Available credits"}</span>
+        <span className="shrink-0 font-medium">
+          {expired ? "Update needed" : formatCreditBalance({ credits, individualLimit: monthlyLimit })}
+        </span>
+      </div>
+      {monthlyLimit?.resetsAt ? (
+        <p className="text-[12px] text-muted-foreground">
+          {expired ? "Reset time passed" : "Resets"}: {new Date(monthlyLimit.resetsAt).toLocaleString()}
+        </p>
+      ) : null}
     </div>
   );
 }
 
-function formatCreditBalance(credits: FactoriesCodexUsageCredits) {
-  if (credits.unlimited) return "Unlimited";
-  if (credits.balance !== undefined) {
+function formatCreditBalance({
+  credits,
+  individualLimit,
+}: Pick<FactoriesCodexUsageLimit, "credits" | "individualLimit">) {
+  if (credits?.unlimited) return "Unlimited";
+  if (credits?.balance != null) {
     const balance = new Intl.NumberFormat(undefined, { maximumFractionDigits: 20 }).format(Number(credits.balance));
     return `${balance} credits`;
   }
-  return credits.hasCredits ? "Available" : "0 credits";
+  if (individualLimit) {
+    const remaining = Math.max(0, Number(individualLimit.limit) - Number(individualLimit.used));
+    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(remaining)} credits`;
+  }
+  return credits?.hasCredits ? "Available" : "0 credits";
 }

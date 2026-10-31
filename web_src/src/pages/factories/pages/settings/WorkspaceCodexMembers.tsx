@@ -174,8 +174,12 @@ function ConnectedMember({
                     <div className="mt-2 space-y-3 text-muted-foreground">
                       {limit.primary ? <CodexQuotaWindow window={limit.primary} label="Primary window" /> : null}
                       {limit.secondary ? <CodexQuotaWindow window={limit.secondary} label="Secondary window" /> : null}
-                      {limit.credits ? <CodexCreditsRemaining credits={limit.credits} /> : null}
-                      {!limit.primary && !limit.secondary && !limit.credits ? <p>Usage unavailable</p> : null}
+                      {limit.credits || limit.individualLimit ? (
+                        <CodexCreditsRemaining credits={limit.credits} individualLimit={limit.individualLimit} />
+                      ) : null}
+                      {!limit.primary && !limit.secondary && !limit.credits && !limit.individualLimit ? (
+                        <p>Usage unavailable</p>
+                      ) : null}
                     </div>
                   </div>
                 ))
@@ -214,7 +218,7 @@ function UsageSummary({ limits }: { limits: FactoriesCodexMemberUsage["limits"] 
     ])
     .filter((item) => item !== null);
   const balances = (limits ?? []).flatMap((limit, index) =>
-    limit.credits ? [{ key: `${limit.limitId ?? index}-credits`, credits: limit.credits }] : [],
+    limit.credits || limit.individualLimit ? [{ key: `${limit.limitId ?? index}-credits`, limit }] : [],
   );
   const rowCount = windows.length + balances.length;
   if (rowCount === 0) return <p className="text-sm text-muted-foreground">Usage unavailable</p>;
@@ -225,7 +229,11 @@ function UsageSummary({ limits }: { limits: FactoriesCodexMemberUsage["limits"] 
         <CodexQuotaRemaining key={item.key} window={item.window} label={item.label} />
       ))}
       {balances.map((balance) => (
-        <CodexCreditsRemaining key={balance.key} credits={balance.credits} />
+        <CodexCreditsRemaining
+          key={balance.key}
+          credits={balance.limit.credits}
+          individualLimit={balance.limit.individualLimit}
+        />
       ))}
     </div>
   );
