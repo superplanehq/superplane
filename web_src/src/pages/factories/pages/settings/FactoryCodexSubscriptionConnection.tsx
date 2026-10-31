@@ -22,15 +22,17 @@ function useCodexConnectionState(codex: CodexConnection) {
   const signingIn =
     !ready &&
     (["pending", "finishing", "canceling"].includes(connection?.status ?? "") || connection?.reservationHeld === true);
-  const refreshing = ready && (codex.refreshCatalog.isPending || connection?.reservationHeld === true);
+  const refreshing = codex.refreshCatalog.isPending || Boolean(connection?.catalogRefreshTaskId);
+  const cancelingRefresh = codex.cancelCatalog.isPending || connection?.catalogRefreshCanceling === true;
   const reconnect = connection?.status === "reconnect_required";
 
   return {
     connection,
-    disabled: disabled || refreshing,
+    disabled,
     signingIn,
     ready,
     refreshing,
+    cancelingRefresh,
     reconnect,
     status: connectionStatus(features.isLoading || codex.query.isLoading, connection),
   };
@@ -44,7 +46,8 @@ function connectionStatus(loading: boolean, connection: FactoriesFactoryCodexCon
 }
 
 export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConnection }) {
-  const { connection, disabled, signingIn, ready, refreshing, reconnect, status } = useCodexConnectionState(codex);
+  const { connection, disabled, signingIn, ready, refreshing, cancelingRefresh, reconnect, status } = useCodexConnectionState(codex);
+  const catalogRefreshTaskId = connection?.catalogRefreshTaskId;
 
   if (signingIn)
     return (
@@ -78,17 +81,29 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
                 size="sm"
                 loading={refreshing}
                 aria-busy={refreshing}
-                disabled={disabled}
+                disabled={disabled || refreshing}
                 onClick={() => codex.refreshCatalog.mutate()}
               >
                 Refresh usage and models
               </LoadingButton>
+              {catalogRefreshTaskId ? (
+                <LoadingButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  loading={cancelingRefresh}
+                  disabled={disabled || cancelingRefresh}
+                  onClick={() => codex.cancelCatalog.mutate(catalogRefreshTaskId)}
+                >
+                  Cancel refresh
+                </LoadingButton>
+              ) : null}
               <LoadingButton
                 type="button"
                 variant="outline"
                 size="sm"
                 loading={codex.disconnect.isPending}
-                disabled={disabled}
+                disabled={disabled || refreshing}
                 onClick={() => codex.disconnect.mutate()}
               >
                 Disconnect ChatGPT
@@ -122,6 +137,11 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
           )}
         </div>
       </div>
+      {refreshing ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          {cancelingRefresh ? "Canceling refresh…" : "Refreshing usage and models…"}
+        </p>
+      ) : null}
       {connection?.revocationPending ? (
         <p role="status" className="text-xs text-muted-foreground">
           Stopping your previous tasks. You can reconnect when cleanup finishes.
