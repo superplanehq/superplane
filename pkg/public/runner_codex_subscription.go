@@ -26,7 +26,7 @@ const (
 )
 
 var (
-	errInvalidCodexBundle = errors.New("chatgpt subscription credentials are invalid")
+	errInvalidCodexBundle            = errors.New("chatgpt subscription credentials are invalid")
 	errInvalidCodexCatalogCheckpoint = errors.New("catalog checkpoints can contain only usage metadata")
 )
 

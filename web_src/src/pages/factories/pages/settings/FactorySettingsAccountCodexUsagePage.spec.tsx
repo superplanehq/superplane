@@ -228,9 +228,11 @@ describe("Codex usage", () => {
       expect(screen.queryByText(/Wait for connection setup to finish/)).not.toBeInTheDocument();
 
       screen.getByRole("button", { name: "Cancel refresh" }).click();
-      await waitFor(() => expect(meCancelCodexConnection).toHaveBeenCalledWith(
-        expect.objectContaining({ body: { catalogRefreshTaskId: "refresh-1" } }),
-      ));
+      await waitFor(() =>
+        expect(meCancelCodexConnection).toHaveBeenCalledWith(
+          expect.objectContaining({ body: { catalogRefreshTaskId: "refresh-1" } }),
+        ),
+      );
       expect(await screen.findByText("Canceling refresh…")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Cancel refresh" })).toBeDisabled();
       expect(screen.getByText("Connected")).toBeInTheDocument();
