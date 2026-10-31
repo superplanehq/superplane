@@ -28,9 +28,10 @@ func TestListFactoryCodexUsageShowsOnlyConnectedMembersInOrganization(t *testing
 	require.NoError(t, db.Model(connection).Updates(map[string]any{
 		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("private-credentials"), "account_label": "private-chatgpt-account",
 	}).Error)
+	balance := "4712"
 	used := 25.0
 	reset := now.Add(time.Hour).Unix()
-	require.NoError(t, connection.StoreUsage(db, []models.CodexUsageLimit{{LimitID: "codex", Primary: &models.CodexUsageWindow{UsedPercent: &used, ResetsAt: &reset}}}, nil, now))
+	require.NoError(t, connection.StoreUsage(db, []models.CodexUsageLimit{{LimitID: "codex", Credits: &models.CodexUsageCredits{HasCredits: true, Balance: &balance}, Primary: &models.CodexUsageWindow{UsedPercent: &used, ResetsAt: &reset}}}, nil, now))
 	disconnected, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, now)
 	require.NoError(t, err)
 	assert.Equal(t, models.CodexConnectionStatusDisconnected, disconnected.Status)
@@ -51,6 +52,9 @@ func TestListFactoryCodexUsageShowsOnlyConnectedMembersInOrganization(t *testing
 	assert.Equal(t, owner.GetEmail(), member.Email)
 	require.Len(t, member.Limits, 1)
 	assert.Equal(t, used, member.Limits[0].Primary.UsedPercent)
+	require.NotNil(t, member.Limits[0].Credits)
+	require.NotNil(t, member.Limits[0].Credits.Balance)
+	assert.Equal(t, balance, *member.Limits[0].Credits.Balance)
 	assert.Equal(t, reset, member.Limits[0].Primary.ResetsAt.AsTime().Unix())
 	assert.WithinDuration(t, now, member.ObservedAt.AsTime(), time.Second)
 	serialized, err := protojson.Marshal(response)
