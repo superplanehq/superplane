@@ -42,7 +42,7 @@ export function PlanningHeaderSpendCollector({
     { organizationId, canvasId: view.canvasId },
   );
   const spend = useReportedPlanningSpend(view.executionId, saved, headerSpendFromUsageSeries(usageSeries));
-  useReportLiveHeaderSpend(PLANNING_SESSION_PHASE_ID, spend.tokens, spend.cents);
+  useReportLiveHeaderSpend(PLANNING_SESSION_PHASE_ID, spend.tokens, spend.cents, spend.usageState);
   return null;
 }
 

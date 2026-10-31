@@ -1,8 +1,10 @@
+import { combinedMeasurementState, type UsageMeasurementState } from "./agentRunTelemetry";
 import { formatCompactTokenLabel } from "@/lib/formatTokenCount";
 
 export type LiveHeaderSpend = {
   tokens: number;
   cents: number;
+  usageState?: UsageMeasurementState;
 };
 
 export const EMPTY_LIVE_HEADER_SPEND: LiveHeaderSpend = { tokens: 0, cents: 0 };
@@ -10,11 +12,14 @@ export const EMPTY_LIVE_HEADER_SPEND: LiveHeaderSpend = { tokens: 0, cents: 0 };
 export function sumLiveHeaderSpend(spends: Iterable<LiveHeaderSpend>): LiveHeaderSpend {
   let tokens = 0;
   let cents = 0;
+  const states: Array<UsageMeasurementState | undefined> = [];
   for (const spend of spends) {
+    states.push(spend.usageState);
     tokens += spend.tokens;
     cents += spend.cents;
   }
-  return { tokens, cents };
+  const state = combinedMeasurementState(states).usage_state;
+  return { tokens, cents, ...(state ? { usageState: state } : {}) };
 }
 
 export function overlayHeaderSpend(
@@ -26,10 +31,19 @@ export function overlayHeaderSpend(
   const liveTokens = live?.tokens ?? 0;
   const savedCents = parseCostUsdToCents(savedCostUsd);
   const savedTokens = parseTokensLabel(savedTokensLabel);
+  const tokens = liveTokens > savedTokens ? formatCompactTokenLabel(liveTokens) : savedTokensLabel;
+  const state = live?.usageState;
   return {
     costUsd: liveCents > savedCents ? formatUsdCents(liveCents) : savedCostUsd,
-    tokensLabel: liveTokens > savedTokens ? formatCompactTokenLabel(liveTokens) : savedTokensLabel,
+    tokensLabel: measurementTokenLabel(tokens, liveTokens + savedTokens, state),
   };
+}
+
+function measurementTokenLabel(label: string, tokens: number, state?: UsageMeasurementState): string {
+  if (tokens === 0 && state === "unavailable") return "Tokens unavailable";
+  if (tokens === 0 && state === "pending") return "Waiting for token usage";
+  if (state === "partial" || state === "unavailable") return `${label} (partial)`;
+  return label;
 }
 
 function formatUsdCents(cents: number): string {

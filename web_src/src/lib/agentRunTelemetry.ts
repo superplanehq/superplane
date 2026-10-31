@@ -1,5 +1,13 @@
 import { parseAgentActivityRecordText } from "@/lib/agentActivity";
 
+export type UsageMeasurementState = "pending" | "measured" | "partial" | "unavailable";
+
+export function usageMeasurementState(value: unknown): UsageMeasurementState | undefined {
+  return value === "pending" || value === "measured" || value === "partial" || value === "unavailable"
+    ? value
+    : undefined;
+}
+
 export type AgentTurnUsage = {
   input_tokens: number;
   output_tokens: number;
@@ -8,6 +16,7 @@ export type AgentTurnUsage = {
   reasoning_tokens: number;
   total_cost_usd?: number;
   hosted_cost_usd?: number;
+  total_tokens?: number;
 };
 
 export type AgentTurnTool = {
@@ -19,6 +28,7 @@ export type AgentTurnTool = {
 };
 
 export type AgentTurnSnapshot = {
+  usage_state?: UsageMeasurementState;
   turn: number;
   usage: AgentTurnUsage;
   tools: AgentTurnTool[];
@@ -26,6 +36,7 @@ export type AgentTurnSnapshot = {
 };
 
 export type AgentRunTelemetry = {
+  usage_state?: UsageMeasurementState;
   num_turns: number;
   usage: AgentTurnUsage;
   tool_counts: Record<string, number>;
@@ -33,7 +44,13 @@ export type AgentRunTelemetry = {
 };
 
 export type AgentTelemetryLiveRecord =
-  | { type: "turn"; turn: number; usage: Partial<AgentTurnUsage>; message?: string }
+  | {
+      type: "turn";
+      turn: number;
+      usage: Partial<AgentTurnUsage>;
+      message?: string;
+      usage_state?: UsageMeasurementState;
+    }
   | { type: "tool_start"; turn?: number; id?: string; kind?: string; text?: string }
   | {
       type: "tool_end";
@@ -84,6 +101,9 @@ export function normalizeAgentTurnUsage(raw: unknown): AgentTurnUsage {
   if (src.hosted_cost_usd != null && Number.isFinite(Number(src.hosted_cost_usd))) {
     usage.hosted_cost_usd = Number(src.hosted_cost_usd);
   }
+  if (src.total_tokens != null && Number.isSafeInteger(src.total_tokens) && Number(src.total_tokens) >= 0) {
+    usage.total_tokens = Number(src.total_tokens);
+  }
   return usage;
 }
 
@@ -111,6 +131,9 @@ function addUsage(total: AgentTurnUsage, delta: AgentTurnUsage): AgentTurnUsage 
   if (total.hosted_cost_usd != null || delta.hosted_cost_usd != null) {
     next.hosted_cost_usd = (total.hosted_cost_usd ?? 0) + (delta.hosted_cost_usd ?? 0);
   }
+  if (total.total_tokens != null || delta.total_tokens != null) {
+    next.total_tokens = (total.total_tokens ?? 0) + (delta.total_tokens ?? 0);
+  }
   return next;
 }
 
@@ -124,7 +147,23 @@ function rebuild(turns: AgentTurnSnapshot[]): AgentRunTelemetry {
     usage: sumTurnUsage(turns),
     tool_counts: countTools(turns),
     turns,
+    ...combinedMeasurementState(turns.map((turn) => turn.usage_state)),
   };
+}
+
+export function combinedMeasurementState(states: Array<UsageMeasurementState | undefined>): {
+  usage_state?: UsageMeasurementState;
+} {
+  const known = states.filter((state): state is UsageMeasurementState => state !== undefined);
+  if (!known.length) return {};
+  if (
+    known.includes("partial") ||
+    (known.includes("measured") && (known.includes("unavailable") || known.includes("pending")))
+  )
+    return { usage_state: "partial" };
+  if (known.includes("unavailable")) return { usage_state: "unavailable" };
+  if (known.includes("pending")) return { usage_state: "pending" };
+  return { usage_state: "measured" };
 }
 
 function upsertTurn(
@@ -180,7 +219,11 @@ export function applyAgentTelemetryRecord(
 ): AgentRunTelemetry {
   if (record.type === "turn") {
     const usage = normalizeAgentTurnUsage(record.usage);
-    const turns = upsertTurn(state.turns, record.turn, usage, record.message);
+    const turns = upsertTurn(state.turns, record.turn, usage, record.message).map((turn) =>
+      turn.turn === record.turn
+        ? { ...turn, ...(record.usage_state ? { usage_state: record.usage_state } : {}) }
+        : turn,
+    );
     return rebuild(turns);
   }
 
@@ -233,6 +276,7 @@ export function telemetryFromFinishedResult(result: unknown): AgentRunTelemetry 
     return null;
   }
   const raw = telemetry as {
+    usage_state?: unknown;
     num_turns?: unknown;
     usage?: unknown;
     tool_counts?: unknown;
@@ -245,7 +289,7 @@ export function telemetryFromFinishedResult(result: unknown): AgentRunTelemetry 
     if (!item || typeof item !== "object") {
       return [];
     }
-    const turn = item as { turn?: unknown; usage?: unknown; tools?: unknown; message?: unknown };
+    const turn = item as { turn?: unknown; usage?: unknown; tools?: unknown; message?: unknown; usage_state?: unknown };
     const tools = Array.isArray(turn.tools)
       ? turn.tools.flatMap((tool): AgentTurnTool[] => {
           if (!tool || typeof tool !== "object") {
@@ -266,6 +310,7 @@ export function telemetryFromFinishedResult(result: unknown): AgentRunTelemetry 
     const message = typeof turn.message === "string" && turn.message.trim() ? turn.message : undefined;
     return [
       {
+        ...combinedMeasurementState([usageMeasurementState(turn.usage_state)]),
         turn: asNumber(turn.turn),
         usage: normalizeAgentTurnUsage(turn.usage),
         tools,
@@ -273,10 +318,7 @@ export function telemetryFromFinishedResult(result: unknown): AgentRunTelemetry 
       },
     ];
   });
-  if (turns.length === 0 && asNumber(raw.num_turns) === 0) {
-    return emptyAgentRunTelemetry();
-  }
-  const parsed = rebuild(turns);
+  const parsed = { ...rebuild(turns), ...combinedMeasurementState([usageMeasurementState(raw.usage_state)]) };
   if (raw.usage) {
     parsed.usage = normalizeAgentTurnUsage(raw.usage);
   }
@@ -302,14 +344,14 @@ export function telemetrySeriesFromFinishedResult(result: unknown): AgentPromptU
       }
       const row = item as { name?: unknown; telemetry?: unknown };
       const seriesTelemetry = telemetryFromFinishedResult({ telemetry: row.telemetry ?? item });
-      if (!seriesTelemetry || seriesTelemetry.turns.length === 0) {
+      if (!seriesTelemetry || (seriesTelemetry.turns.length === 0 && !seriesTelemetry.usage_state)) {
         return [];
       }
       return [{ name: typeof row.name === "string" ? row.name : "", telemetry: seriesTelemetry }];
     });
   }
   const single = telemetryFromFinishedResult(result);
-  if (!single || single.turns.length === 0) {
+  if (!single || (single.turns.length === 0 && !single.usage_state)) {
     return [];
   }
   return [{ name: "", telemetry: single }];
@@ -328,7 +370,7 @@ export function telemetryFromExecutionOutputs(outputs: unknown): AgentRunTelemet
       const row = event as { data?: { result?: unknown }; result?: unknown };
       const result = row.data?.result ?? row.result ?? row.data ?? event;
       const telemetry = telemetryFromFinishedResult(result);
-      if (telemetry && telemetry.turns.length > 0) {
+      if (telemetry && (telemetry.turns.length > 0 || telemetry.usage_state)) {
         return telemetry;
       }
     }
@@ -361,18 +403,29 @@ export function usageDelta(current: AgentTurnUsage, previous?: AgentTurnUsage): 
 
 export function parseAgentTurnLiveLogText(
   text: string,
-): { turn: number; usage: AgentTurnUsage; message?: string } | null {
+): { turn: number; usage: AgentTurnUsage; message?: string; usage_state?: UsageMeasurementState } | null {
   const trimmed = text.trim();
   if (!trimmed.startsWith("{")) {
     return null;
   }
   try {
-    const rec = JSON.parse(trimmed) as { type?: unknown; turn?: unknown; usage?: unknown; message?: unknown };
+    const rec = JSON.parse(trimmed) as {
+      type?: unknown;
+      turn?: unknown;
+      usage?: unknown;
+      message?: unknown;
+      usage_state?: unknown;
+    };
     if (rec.type !== "turn" || typeof rec.turn !== "number") {
       return null;
     }
     const message = typeof rec.message === "string" && rec.message.trim() ? rec.message : undefined;
-    return { turn: rec.turn, usage: normalizeAgentTurnUsage(rec.usage), ...(message ? { message } : {}) };
+    return {
+      turn: rec.turn,
+      usage: normalizeAgentTurnUsage(rec.usage),
+      ...combinedMeasurementState([usageMeasurementState(rec.usage_state)]),
+      ...(message ? { message } : {}),
+    };
   } catch {
     return null;
   }
@@ -415,7 +468,7 @@ export function startPromptUsageSeries(
     return state;
   }
   const completed =
-    state.current.turns.length > 0
+    state.current.turns.length > 0 || state.current.usage_state !== undefined
       ? [...state.completed, { name: state.currentName || name, telemetry: state.current }]
       : state.completed;
   return {
@@ -434,7 +487,7 @@ export function applyPromptUsageRecord(
 }
 
 export function promptUsageSeries(state: AgentPromptUsageState): AgentPromptUsageSeries[] {
-  if (state.current.turns.length === 0) {
+  if (state.current.turns.length === 0 && !state.current.usage_state) {
     return state.completed;
   }
   return [...state.completed, { name: state.currentName, telemetry: state.current }];

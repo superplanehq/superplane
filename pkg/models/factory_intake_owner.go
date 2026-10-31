@@ -12,6 +12,20 @@ import (
 // version. Event input and agent-supplied owner IDs cannot authorize intake.
 // An unrelated automation returns gorm.ErrRecordNotFound.
 func FindSubscriptionIntakeOwnerForRun(tx *gorm.DB, organizationID, factoryID, runID uuid.UUID) (uuid.UUID, error) {
+	ownerID, err := findSubscriptionIntakeOwnerForRun(tx, organizationID, factoryID, runID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if _, err := ActiveCodexMember(tx, organizationID, ownerID); err != nil {
+		if errors.Is(err, ErrCodexConnectionNotEligible) || errors.Is(err, ErrCodexConnectionUnavailable) {
+			return uuid.Nil, ErrSubscriptionOwnerInvalid
+		}
+		return uuid.Nil, err
+	}
+	return ownerID, nil
+}
+
+func findSubscriptionIntakeOwnerForRun(tx *gorm.DB, organizationID, factoryID, runID uuid.UUID) (uuid.UUID, error) {
 	run, err := FindUnscopedCanvasRun(tx, runID)
 	if err != nil {
 		return uuid.Nil, err
@@ -65,7 +79,7 @@ func FindSubscriptionIntakeOwnerForRun(tx *gorm.DB, organizationID, factoryID, r
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if _, err := ActiveCodexMember(tx, organizationID, ownerID); err != nil {
+	if _, err := activeHumanCodexMember(tx, organizationID, ownerID); err != nil {
 		if errors.Is(err, ErrCodexConnectionNotEligible) || errors.Is(err, ErrCodexConnectionUnavailable) {
 			return uuid.Nil, ErrSubscriptionOwnerInvalid
 		}

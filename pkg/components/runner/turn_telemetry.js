@@ -39,6 +39,7 @@ function normalizeUsage(raw) {
     cache_creation_input_tokens: asNumber(nested.cache_creation_input_tokens || nested.cache_write_tokens),
     reasoning_tokens: asNumber(nested.reasoning_tokens),
   };
+  if (nested.total_tokens != null) usage.total_tokens = asNumber(nested.total_tokens);
   const cost = src.total_cost_usd != null ? src.total_cost_usd : nested.total_cost_usd;
   if (cost != null && Number.isFinite(Number(cost))) {
     usage.total_cost_usd = Number(cost);
@@ -62,6 +63,7 @@ function addUsage(total, delta) {
   total.cache_read_input_tokens += asNumber(delta.cache_read_input_tokens);
   total.cache_creation_input_tokens += asNumber(delta.cache_creation_input_tokens);
   total.reasoning_tokens += asNumber(delta.reasoning_tokens);
+  if (delta.total_tokens != null) total.total_tokens = asNumber(total.total_tokens) + asNumber(delta.total_tokens);
   if (delta.total_cost_usd != null || total.total_cost_usd != null) {
     total.total_cost_usd = asNumber(total.total_cost_usd) + asNumber(delta.total_cost_usd);
   }
@@ -150,7 +152,10 @@ function appendPromptSeries(taskDir, name, telemetry) {
     return;
   }
   const series = readPromptSeries(taskDir);
-  series.push({ name: name || "", telemetry });
+  const entry = { name: name || "", telemetry };
+  const previous = telemetry.attempt_id ? series.findIndex(item => item.telemetry && item.telemetry.attempt_id === telemetry.attempt_id) : -1;
+  if (previous >= 0) series[previous] = entry;
+  else series.push(entry);
   fs.writeFileSync(seriesPath(taskDir), `${JSON.stringify({ series })}\n`);
 }
 
@@ -180,6 +185,7 @@ function buildTelemetry(state) {
   const turns = (state.turns || []).map((turn) => {
     const row = {
       turn: turn.turn,
+      ...(state.attempt ? { usage_state: state.attempt.usage_state } : {}),
       usage: { ...emptyUsage(), ...(turn.usage || {}) },
       tools: Array.isArray(turn.tools) ? turn.tools : [],
     };
@@ -189,8 +195,9 @@ function buildTelemetry(state) {
     return row;
   });
   return {
+    ...(state.attempt ? { attempt_id: state.attempt.attempt_id, usage_state: state.attempt.usage_state } : {}),
     num_turns: turns.length,
-    usage: turns.reduce((total, turn) => addUsage(total, turn.usage), emptyUsage()),
+    usage: state.attempt ? normalizeUsage(state.attempt.usage) : turns.reduce((total, turn) => addUsage(total, turn.usage), emptyUsage()),
     tool_counts: countTools(turns),
     turns,
   };
@@ -226,6 +233,7 @@ function createTurnTelemetry(options) {
 
   function persist() {
     saveState(taskDir, state);
+    if (state.attempt) appendPromptSeries(taskDir, "", sanitize(buildTelemetry(state)));
   }
 
   function emitTurn(snapshot) {
@@ -233,6 +241,7 @@ function createTurnTelemetry(options) {
       type: "turn",
       turn: snapshot.turn,
       usage: snapshot.usage,
+      ...(state.attempt ? { attempt_id: state.attempt.attempt_id, usage_state: state.attempt.usage_state } : {}),
     };
     if (snapshot.message) {
       record.message = snapshot.message;
@@ -241,13 +250,23 @@ function createTurnTelemetry(options) {
   }
 
   return {
+    updateAttemptSnapshot(snapshot) {
+      state.attempt = { ...snapshot, usage: normalizeUsage(snapshot.usage) };
+      if (!state.turns.length) {
+        state.currentTurn = 1;
+        state.turns.push({ turn: 1, usage: emptyUsage(), tools: [] });
+      }
+      state.turns[0].usage = normalizeUsage(snapshot.usage);
+      persist();
+      emitTurn(state.turns[0]);
+    },
     currentTurn() {
       return state.currentTurn;
     },
     beginTurn(usage, extra) {
       const opts = extra && typeof extra === "object" && !Array.isArray(extra) ? extra : {};
       const messageId = opts.messageId != null ? String(opts.messageId) : "";
-      const incoming = normalizeUsage(usage);
+      const incoming = state.attempt ? { ...emptyUsage(), total_tokens: 0 } : normalizeUsage(usage);
       const previous = currentSnapshot(state);
       if (messageId && state.lastMessageId === messageId && previous) {
         const nextUsage = preferCompleteUsage(previous.usage, incoming);
@@ -272,6 +291,13 @@ function createTurnTelemetry(options) {
         !opts.hasTools &&
         tokenTotal(incoming) > 0
       ) {
+        return state.currentTurn;
+      }
+      if (state.attempt && !state.firstEvent && previous) {
+        state.firstEvent = true;
+        if (opts.message) previous.message = String(opts.message).trim();
+        persist();
+        emitTurn(previous);
         return state.currentTurn;
       }
       state.currentTurn += 1;
@@ -305,6 +331,7 @@ function createTurnTelemetry(options) {
       return snapshot.turn;
     },
     updateCurrentUsage(usage, totalCostUsd) {
+      if (state.attempt) return state.currentTurn;
       const snapshot = currentSnapshot(state);
       if (!snapshot) {
         const incoming = normalizeUsage(usage);
@@ -402,7 +429,7 @@ function createTurnTelemetry(options) {
         return result;
       }
       const opts = extra && typeof extra === "object" && !Array.isArray(extra) ? extra : {};
-      if (result.usage) {
+      if (result.usage && !state.attempt) {
         this.applyBilledUsage(result);
       }
       const telemetry = sanitize(buildTelemetry(state));
