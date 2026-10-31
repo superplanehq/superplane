@@ -1,8 +1,9 @@
+import { ChatGPTQuotaHistory, ChatGPTQuotaNotice } from "../../../codex/ChatGPTQuotaNotice";
 import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 
 import { type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
 import type { ManualCustomAutomation } from "../../../lib/customAutomation";
@@ -124,27 +125,55 @@ export function ConsoleAutomationCard({
           queueSummary={mixedQueueSummary(automation.runs, queuedIds)}
           runAction={logsRunAction(manualRun, organizationId, factoryId, orderId)}
         />
-        <CollapsibleContent>
-          <FramePanel className="space-y-3">
-            <AutomationCardBody
-              queued={shownStatus === "queued"}
-              automation={automation}
-              phase={shownPhase}
-              phases={phases.map((entry) => (entry.id === latest.id && shownPhase ? shownPhase : entry))}
-              organizationId={organizationId}
-              factoryId={factoryId}
-              orderId={orderId}
-              factoryKey={factoryKey}
-              orderNumber={orderNumber}
-              onStop={stopRun}
-              onRetry={rerunStep}
-              actionBusy={actionBusy}
-            />
-          </FramePanel>
-        </CollapsibleContent>
+        <ConsoleCardDetails
+          queued={shownStatus === "queued"}
+          automation={automation}
+          phase={shownPhase}
+          phases={phases.map((entry) => (entry.id === latest.id && shownPhase ? shownPhase : entry))}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
+          factoryKey={factoryKey}
+          orderNumber={orderNumber}
+          onStop={stopRun}
+          onRetry={rerunStep}
+          actionBusy={actionBusy}
+        />
       </Collapsible>
     </Frame>
   );
+}
+
+function ConsoleCardDetails(props: ComponentProps<typeof AutomationCardBody> & { phases: SplitRunPhase[] }) {
+  return (
+    <>
+      <ChatGPTQuotaNotice
+        failure={props.phase?.subscriptionFailure}
+        organizationId={props.organizationId}
+        factoryKey={props.factoryKey}
+      />
+      <CollapsibleContent>
+        <FramePanel className="space-y-3">
+          <ChatGPTQuotaHistory
+            attempts={quotaHistory(props.automation, props.phases, props.phase)}
+            organizationId={props.organizationId}
+            factoryKey={props.factoryKey}
+          />
+          <AutomationCardBody {...props} />
+        </FramePanel>
+      </CollapsibleContent>
+    </>
+  );
+}
+
+function quotaHistory(automation: ConsoleAutomation, phases: SplitRunPhase[], latest?: SplitRunPhase) {
+  const earlierIDs = new Set(automation.runs.slice(0, -1).map((run) => run.id));
+  const earlier = phases
+    .filter((phase) => earlierIDs.has(phase.id))
+    .flatMap((phase) =>
+      phase.subscriptionFailure ? [{ runId: phase.runId ?? phase.id, failure: phase.subscriptionFailure }] : [],
+    );
+  return [...earlier, ...(latest?.subscriptionFailureHistory ?? [])];
 }
 
 function logsRunAction(

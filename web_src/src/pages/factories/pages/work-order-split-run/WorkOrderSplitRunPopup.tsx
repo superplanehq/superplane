@@ -231,6 +231,7 @@ function AnalysisWorkOrderPopup({
               reviewActions={reviewActions}
               showOwnerRow={!unified}
               planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
+              subscriptionFailure={viewFixture.footer.kind === "draft" ? analysis.view.subscriptionFailure : undefined}
               views={views}
             />
           )}

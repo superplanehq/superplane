@@ -376,3 +376,21 @@ func TestPollTaskExposesCodexFailureCause(t *testing.T) {
 		})
 	}
 }
+
+func TestFailedCodexOutputPreservesQuotaAndMeasuredUsage(t *testing.T) {
+	state := &contexts.ExecutionStateContext{}
+	result := json.RawMessage(`{"type":"result","is_error":true,"failure":{"reason":"chatgpt_quota_exhausted","limit_id":"codex","subscription_owner_id":"a8d2fa49-cf1f-4a3d-a65b-3205af2849df","untrusted":"discard"},"usage":{"input_tokens":8,"cache_read_input_tokens":2,"total_tokens":10},"usage_state":"partial","telemetry":{"usage_state":"partial"}}`)
+	require.NoError(t, pollTask(core.ActionHookContext{
+		RunnerTasks:    &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "task-quota", State: "failed", ExitCode: intPtr(1), Result: result}},
+		ExecutionState: state, Parameters: map[string]any{"task_id": "task-quota"},
+	}, "runnerCodex.finished"))
+	require.Len(t, state.Payloads, 1)
+	output := state.Payloads[0].(map[string]any)["data"].(map[string]any)
+	failure, ok := output["failure"].(*models.SubscriptionFailure)
+	require.True(t, ok)
+	assert.Equal(t, models.SubscriptionFailureChatGPTQuotaExhausted, failure.Reason)
+	assert.Equal(t, "a8d2fa49-cf1f-4a3d-a65b-3205af2849df", failure.SubscriptionOwnerID)
+	persisted := output["result"].(map[string]any)
+	assert.Equal(t, "partial", persisted["usage_state"])
+	assert.Equal(t, float64(10), persisted["usage"].(map[string]any)["total_tokens"])
+}

@@ -9,7 +9,10 @@ export function outputTokenTotal(usage: AgentTurnUsage): number {
 }
 
 export function agentRunNewTokenCount(telemetry: AgentRunTelemetry): number {
-  return agentRunInputTokenCount(telemetry) + agentRunOutputTokenCount(telemetry);
+  return (
+    (telemetry.usage_state ? telemetry.usage.total_tokens : undefined) ??
+    agentRunInputTokenCount(telemetry) + agentRunOutputTokenCount(telemetry)
+  );
 }
 
 export function agentRunInputTokenCount(telemetry: AgentRunTelemetry): number {

@@ -43,6 +43,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPreconditionWithReason("Connect your Codex account to take ownership of this task.", "CODEX_CONNECTION_REQUIRED")
 	case errors.Is(err, billing.ErrPaymentMethodRequired):
 		return grpcerrors.FailedPrecondition(err, "Add a payment method before you complete workspace setup.")
+	case errors.Is(err, billing.ErrHostedCreditEmpty):
+		return grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
 	case errors.Is(err, billing.ErrHostedSubscriptionRequired), errors.Is(err, billing.ErrHostedPaymentPastDue), errors.Is(err, billing.ErrHostedSubscriptionPaused):
 		return grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
 	case errors.Is(err, models.ErrSubscriptionModelUnavailable), errors.Is(err, models.ErrSubscriptionOwnerRequired), errors.Is(err, models.ErrSubscriptionOwnerInvalid), errors.Is(err, models.ErrSubscriptionOwnerBusy), errors.Is(err, models.ErrSubscriptionTaskAssociation):

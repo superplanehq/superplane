@@ -205,6 +205,46 @@ func RequireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID uuid.UUID)
 	return ownerID, nil
 }
 
+// subscriptionRunOwnerForContinuation verifies the persisted owner without
+// applying the current flag, plan, or model policy to an allocated attempt.
+func subscriptionRunOwnerForContinuation(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (uuid.UUID, error) {
+	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if len(orders) > 1 {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	if len(orders) == 0 {
+		ownerID, err := findSubscriptionIntakeOwnerForRun(tx, orgID, factoryID, runID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uuid.Nil, ErrSubscriptionTaskAssociation
+		}
+		return ownerID, err
+	}
+	var order FactoryWorkOrder
+	err = tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ? AND organization_id = ? AND factory_id = ?", orders[0].ID, orgID, factoryID).
+		First(&order).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return uuid.Nil, &CodexConnectionBusyError{}
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	owners, err := order.ListAssignees(tx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if len(owners) != 1 {
+		return uuid.Nil, ErrSubscriptionOwnerRequired
+	}
+	if _, err := activeHumanCodexMember(tx, orgID, owners[0].UserID); err != nil {
+		return uuid.Nil, err
+	}
+	return owners[0].UserID, nil
+}
+
 func subscriptionWorkOrdersForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) ([]FactoryWorkOrder, error) {
 	var orders []FactoryWorkOrder
 	// History excludes shared creator runs, but admission must see every

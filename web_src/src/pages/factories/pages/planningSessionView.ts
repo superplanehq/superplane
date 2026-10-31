@@ -1,3 +1,5 @@
+import { usageMeasurementState } from "@/lib/agentRunTelemetry";
+import type { CanvasesSubscriptionFailure } from "@/api-client";
 import { isPlanningRefineNote } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
@@ -14,6 +16,8 @@ export type PlanningSessionPayload = {
   waitState?: string;
   executionId?: string;
   runnerState?: string;
+  usageState?: string;
+  subscriptionFailure?: CanvasesSubscriptionFailure;
   blockedByParallelismLimit?: boolean;
   selectableModelKey?: string;
   kind?: "PLANNING_SESSION_KIND_TASK_CREATION" | "PLANNING_SESSION_KIND_WORK_ORDER_ANALYSIS";
@@ -157,6 +161,8 @@ export function createWithAgentViewFromSession(
     repository: session.repository ?? "",
     machineStatus: createWithAgentMachineStatus(session),
     runnerState: session.runnerState,
+    usageState: usageMeasurementState(session.usageState),
+    subscriptionFailure: session.subscriptionFailure,
     blockedByParallelismLimit: session.blockedByParallelismLimit,
     turnEnded: session.state === "ended",
     canvasId: session.canvasId ?? "",
@@ -284,9 +290,13 @@ export function isFailedPlanningCanvasRun(run: { result?: string } | null | unde
  */
 export function applyPlanningSessionLiveRun(
   view: CreateWithAgentView,
-  run: { result?: string } | null | undefined,
+  run: { result?: string; subscriptionFailure?: CanvasesSubscriptionFailure } | null | undefined,
   analysisDelivered = false,
 ): CreateWithAgentView {
+  const failure = run?.subscriptionFailure ?? view.subscriptionFailure;
+  if (failure?.reason === "chatgpt_quota_exhausted") {
+    return { ...view, subscriptionFailure: failure, machineStatus: "failed", turnEnded: true };
+  }
   if (isFailedPlanningCanvasRun(run)) {
     return { ...view, machineStatus: analysisStopStatus(analysisDelivered) };
   }
@@ -302,7 +312,7 @@ function analysisStopStatus(analysisDelivered: boolean): CreateWithAgentView["ma
 
 export type PlanningSessionMachineInput = Pick<
   PlanningSessionPayload,
-  "state" | "waitState" | "executionId" | "runnerState"
+  "state" | "waitState" | "executionId" | "runnerState" | "subscriptionFailure"
 >;
 
 /**
@@ -310,6 +320,9 @@ export type PlanningSessionMachineInput = Pick<
  * with the rewind. The live run marks a failed or cancelled turn as stopped.
  */
 function createWithAgentMachineStatus(session: PlanningSessionMachineInput): CreateWithAgentView["machineStatus"] {
+  if (session.subscriptionFailure?.reason === "chatgpt_quota_exhausted") {
+    return "failed";
+  }
   if (session.state === "ended") {
     return "waiting";
   }
