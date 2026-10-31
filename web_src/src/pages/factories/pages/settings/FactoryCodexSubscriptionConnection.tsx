@@ -46,7 +46,8 @@ function connectionStatus(loading: boolean, connection: FactoriesFactoryCodexCon
 }
 
 export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConnection }) {
-  const { connection, disabled, signingIn, ready, refreshing, cancelingRefresh, reconnect, status } = useCodexConnectionState(codex);
+  const { connection, disabled, signingIn, ready, refreshing, cancelingRefresh, reconnect, status } =
+    useCodexConnectionState(codex);
   const catalogRefreshTaskId = connection?.catalogRefreshTaskId;
 
   if (signingIn)

@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/components/runner"
-	"github.com/superplanehq/superplane/pkg/jwt"
-	runnerpayload "github.com/superplanehq/superplane/pkg/runners/api"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	runnerpayload "github.com/superplanehq/superplane/pkg/runners/api"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -158,7 +158,7 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 	}
 	type startResult struct {
 		response *pb.StartFactoryCodexConnectionResponse
-		err error
+		err      error
 	}
 	results := make(chan startResult, 2)
 	ready := make(chan struct{})
@@ -175,7 +175,9 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 		assert.False(t, view.ReservationHeld)
 		assert.Empty(t, view.ActiveTaskId)
 		require.NotEmpty(t, view.CatalogRefreshTaskId)
-		if taskID == "" { taskID = view.CatalogRefreshTaskId }
+		if taskID == "" {
+			taskID = view.CatalogRefreshTaskId
+		}
 		assert.Equal(t, taskID, view.CatalogRefreshTaskId)
 	}
 	var taskCount int64
@@ -186,7 +188,9 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 	var payload runnerpayload.TaskPayload
 	require.NoError(t, json.Unmarshal(task.PayloadCiphertext, &payload))
 	environment := map[string]string{}
-	for _, variable := range payload.Environment { environment[variable.Name] = variable.Value }
+	for _, variable := range payload.Environment {
+		environment[variable.Name] = variable.Value
+	}
 	assert.Equal(t, "https://superplane.example"+runner.CodexSubscriptionRefreshPath, environment[runner.EnvCodexRefreshTokenURL])
 	scope, err := runner.ParseCodexSubscriptionToken(jwt.NewSigner("catalog-task-test"), environment[runner.EnvCodexSubscriptionToken])
 	require.NoError(t, err)
