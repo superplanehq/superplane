@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,7 @@ import (
 	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
 )
 
 func Test__UpdateOrganization(t *testing.T) {
@@ -192,6 +194,75 @@ func Test__UpdateOrganization(t *testing.T) {
 type organizationGroupRecorder struct {
 	mu     sync.Mutex
 	groups []productanalytics.OrganizationGroupIdentity
+}
+
+func TestUpdateOrganizationPreservesOverlappingSuspensionTransition(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	for _, action := range []string{models.OrganizationSuspensionActionSuspend, models.OrganizationSuspensionActionReactivate} {
+		t.Run(action, func(t *testing.T) {
+			org, err := models.CreateOrganization(support.RandomName("org"), "")
+			require.NoError(t, err)
+			if action == models.OrganizationSuspensionActionReactivate {
+				require.NoError(t, org.Suspend(db, r.Account.ID, "review suspension"))
+				require.NoError(t, db.Model(&models.OrganizationSuspensionEvent{}).
+					Where("organization_id = ?", org.ID).
+					Update("cancellation_completed_at", time.Now()).Error)
+			}
+
+			// Commit the transition after the settings request reads its snapshot.
+			transitioned := false
+			callback := "test:organization_settings_overlap"
+			require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+				loaded, ok := tx.Statement.Dest.(*models.Organization)
+				if !ok || loaded.ID != org.ID || transitioned {
+					return
+				}
+				transitioned = true
+				if action == models.OrganizationSuspensionActionSuspend {
+					tx.AddError(org.Suspend(db, r.Account.ID, "review suspension"))
+					return
+				}
+				tx.AddError(org.Reactivate(db, r.Account.ID))
+			}))
+			t.Cleanup(func() { _ = db.Callback().Query().Remove(callback) })
+
+			response, err := UpdateOrganization(t.Context(), org.ID.String(), &protos.Organization{
+				Metadata: &protos.Organization_Metadata{
+					Name: "Updated organization", Description: "Updated description", Slug: support.RandomName("updated"),
+				},
+			})
+			require.NoError(t, err)
+			require.True(t, transitioned, "transition must overlap the settings request")
+
+			stored, err := models.FindOrganizationByID(org.ID.String())
+			require.NoError(t, err)
+			assert.Equal(t, response.Organization.Metadata.Name, stored.Name)
+			assert.Equal(t, response.Organization.Metadata.Description, stored.Description)
+			assert.Equal(t, response.Organization.Metadata.Slug, stored.Slug)
+			if org.SuspendedAt == nil {
+				assert.Nil(t, stored.SuspendedAt)
+			} else {
+				require.NotNil(t, stored.SuspendedAt)
+				assert.True(t, org.SuspendedAt.Equal(*stored.SuspendedAt))
+			}
+			assert.Equal(t, org.SuspendedByAccountID, stored.SuspendedByAccountID)
+			assert.Equal(t, org.SuspensionReason, stored.SuspensionReason)
+
+			events, err := models.ListOrganizationSuspensionEvents(db, org.ID)
+			require.NoError(t, err)
+			if action == models.OrganizationSuspensionActionSuspend {
+				require.Len(t, events, 1)
+				assert.Nil(t, events[0].CancellationCompletedAt)
+			} else {
+				require.Len(t, events, 2)
+				assert.NotNil(t, events[1].CancellationCompletedAt)
+			}
+			assert.Equal(t, action, events[0].Action)
+			assert.Equal(t, r.Account.ID, events[0].AccountID)
+			assert.Equal(t, org.SuspensionReason, events[0].Reason)
+		})
+	}
 }
 
 func (r *organizationGroupRecorder) Capture(productanalytics.Event) {}

@@ -29,7 +29,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service Organizations {
   rpc ListManagedRunnerFleets(ListManagedRunnerFleetsRequest) returns (ListManagedRunnerFleetsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/fleets:managed"
+      get: "/api/v1/organizations/{id}/fleets"
     };
   }
 
@@ -189,7 +189,7 @@ service Organizations {
 
   rpc ListOrganizationRunnerFleets(ListOrganizationRunnerFleetsRequest) returns (ListOrganizationRunnerFleetsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/fleets"
+      get: "/api/v1/organizations/{id}/fleets/available"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List organization runner fleets";

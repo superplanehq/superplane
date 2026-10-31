@@ -30,9 +30,14 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 		s.resource.Organization.ID.String(), models.DomainTypeOrganization))
 	s.token = apiToken(t, reader.ID)
 	base := "/api/v1/organizations/" + s.resource.Organization.ID.String() + "/fleets"
-	for _, path := range []string{base, base + ":managed", s.path, s.path + "/capacity", s.runnersPath() + "?fleet_id=direct", s.runnerPath(created.Runner.Id)} {
+	for _, path := range []string{base, base + "/available", s.path, s.path + "/capacity", s.runnersPath() + "?fleet_id=direct", s.runnerPath(created.Runner.Id)} {
 		s.request(http.MethodGet, path, nil, http.StatusOK)
 	}
+	available := &pb.ListOrganizationRunnerFleetsResponse{}
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, base+"/available", nil, http.StatusOK), available))
+	require.Len(t, available.Fleets, 1)
+	require.Equal(t, "direct", available.Fleets[0].Id)
+	require.Equal(t, models.RunnerFleetScopeOrganization, available.Fleets[0].Scope)
 	for _, request := range []struct{ method, path, body string }{
 		{http.MethodPost, base, `{"fleetId":"denied","runnerVersion":"dev","spec":{}}`},
 		{http.MethodPatch, s.path, `{"enabled":false}`},
@@ -88,9 +93,12 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 	require.NoError(t, models.DisableExperimentalFeature(s.resource.Organization.ID, features.FeatureOrganizationRunners))
 	require.NoError(t, owned.SetEnabled(db, false))
 	list := &pb.ListManagedRunnerFleetsResponse{}
-	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, base+":managed", nil, http.StatusOK), list))
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, base, nil, http.StatusOK), list))
 	require.Len(t, list.Fleets, 1)
 	require.False(t, list.Fleets[0].Enabled)
+	available = &pb.ListOrganizationRunnerFleetsResponse{}
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, base+"/available", nil, http.StatusOK), available))
+	require.Empty(t, available.Fleets)
 	for _, request := range []struct{ method, path, body string }{
 		{http.MethodPost, base, `{"fleetId":"disabled","runnerVersion":"dev","spec":{}}`},
 		{http.MethodPatch, s.path, `{"enabled":true}`},

@@ -22,7 +22,7 @@ func TestRunnerIdempotencyMigrationPreservesInstallationGrants(t *testing.T) {
 	other := newTestRunnerFleet()
 	other.Slug = "second-installation-fleet"
 	require.NoError(t, other.Create(db))
-	migration, err := os.ReadFile("../../db/migrations/20261031204546_scope-runner-idempotency-to-fleet.up.sql")
+	migration, err := os.ReadFile("../../db/migrations/20261031230416_scope-runner-idempotency-to-fleet.up.sql")
 	require.NoError(t, err)
 	// Restore the pre-migration index within one rollback-only transaction.
 	// This executes the real migration against historical installation rows.
@@ -63,4 +63,6 @@ func TestRunnerIdempotencyMigrationPreservesInstallationGrants(t *testing.T) {
 		copy.ID, copy.FleetID = uuid.New(), other.ID
 		require.NoError(t, tx.Create(&copy).Error)
 	}
+	// Local environments can already have the original branch migration.
+	require.NoError(t, tx.Exec(string(migration)).Error)
 }

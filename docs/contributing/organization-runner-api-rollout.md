@@ -1,9 +1,11 @@
 # Organization runner API rollout
 
 Organization fleet management uses
-`/api/v1/organizations/{id}/fleets`. The existing `GET /fleets` route
-continues to list enabled fleet choices for task selection. Use
-`GET /fleets:managed` to list organization fleets, including disabled fleets.
+`/api/v1/organizations/{id}/fleets`. Use `GET /fleets` to list organization
+fleets, including disabled fleets. The task-selection list moves to
+`GET /fleets/available`. It returns enabled installation and organization
+fleet choices, subject to feature availability. The regenerated SDK uses
+the new route for existing task-selection callers.
 
 Runner operations use `/api/v1/organizations/{id}/runners` and
 `/api/v1/organizations/{id}/runners/{runner_id}`. Supply `fleetId` in POST
@@ -18,7 +20,7 @@ selected internal organizations. Do not change organization defaults.
 ## Deployment order
 
 1. Keep `organization_runners` disabled.
-2. Apply the `scope-runner-idempotency-to-fleet` migration.
+2. Apply the `20261031230416_scope-runner-idempotency-to-fleet` migration.
 3. Deploy the API, runner gateway, and scheduler admission changes.
 4. Verify that all affected instances run the new code.
 5. Enable the feature for selected internal organizations.
