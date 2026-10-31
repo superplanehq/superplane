@@ -367,6 +367,10 @@ check.models.tx.debt:
 check.models.tx.debt.baseline.update:
 	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go --update-baseline
 
+.PHONY: check.admin.routes
+check.admin.routes:
+	@$(COMPOSE) exec app go run ./scripts/check_admin_routes.go
+
 # Core workflows depend on billing contracts; server binds Enterprise code.
 check.ee.imports:
 	@$(COMPOSE) exec app go run ./scripts/check_ee_imports.go
@@ -568,8 +572,49 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,api_keys,agents,files,admin/fleets,admin/keys
-REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,api_keys,agents,files,admin/fleets,admin/keys
+MODULES := \
+	authorization, \
+	organizations, \
+	integrations, \
+	factories, \
+	secrets, \
+	users, \
+	groups, \
+	roles, \
+	me, \
+	configuration, \
+	components, \
+	actions, \
+	triggers, \
+	widgets, \
+	canvases, \
+	api_keys, \
+	agents, \
+	files, \
+	admin/fleets, \
+	admin/keys, \
+	admin/organizations
+REST_API_MODULES := \
+	authorization, \
+	organizations, \
+	integrations, \
+	factories, \
+	secrets, \
+	users, \
+	groups, \
+	roles, \
+	me, \
+	configuration, \
+	actions, \
+	triggers, \
+	widgets, \
+	canvases, \
+	api_keys, \
+	agents, \
+	files, \
+	admin/fleets, \
+	admin/keys, \
+	admin/organizations
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.go
@@ -585,13 +630,13 @@ pb.gen.go: dev.test.is.running
 	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
 
 pb.gen.models:
-	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc.sh "$(MODULES)"
 
 pb.gen.gateway:
-	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh "$(REST_API_MODULES)"
 
 openapi.spec.gen: dev.test.is.running
-	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh "$(REST_API_MODULES)"
 
 # Recreate the output directory in the app container. A host rm and mkdir
 # leaves Docker Desktop with a stale directory, and the generator cannot write.
