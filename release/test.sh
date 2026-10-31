@@ -29,7 +29,7 @@ bash release/generate_sbom_test.sh
 bash release/superplane/verify_prepared_archive_test.sh
 bash release/superplane/verify_image_test.sh
 
-bash -n \
+for script in \
   release/generate-sbom.sh \
   release/generate_sbom_test.sh \
   release/generate-component-sbom.sh \
@@ -42,6 +42,8 @@ bash -n \
   release/verify_component_release_source_test.sh \
   release/verify-public-assets.sh \
   release/runner/build.sh \
+  release/runner/packer/aws/scripts/install.sh \
+  release/runner/packer/gce/scripts/install.sh \
   release/runner/upload.sh \
   release/fleet-manager/build.sh \
   release/fleet-manager/build-release.sh \
@@ -84,6 +86,9 @@ bash -n \
   release/fleet-manager/pipeline_test.sh \
   release/runner/publish-image.sh \
   release/runner/pipeline_test.sh
+do
+  bash -n "$script"
+done
 
 node --check release/component-release.js
 node --check release/superplane-helm-chart/update-component-release-defaults.js
