@@ -102,7 +102,10 @@ test("normalizes terminal control sequences and carriage-return progress", () =>
 
 test("redacts credentials from activity text", () => {
   const env = { OPENAI_API_KEY: "secret-value-123", OTHER: "safe" };
-  const jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhY2NvdW50In0.c2lnbmF0dXJl";
+  const jwt = [{ alg: "RS256" }, { sub: "account" }]
+    .map((part) => Buffer.from(JSON.stringify(part)).toString("base64url"))
+    .concat(Buffer.from("signature").toString("base64url"))
+    .join(".");
   const input = `Bearer abc.def.ghi secret-value-123 https://example.test/?token=visible ${jwt}`;
   const output = redactSensitiveText(input, env);
 
