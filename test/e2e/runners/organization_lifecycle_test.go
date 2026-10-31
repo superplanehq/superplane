@@ -67,7 +67,7 @@ func TestDirectOrganizationRunnerLifecycle(t *testing.T) {
 			}, 5*time.Second, 20*time.Millisecond)
 			if ephemeral {
 				s.assertProcessExited(processDone)
-				s.request(http.MethodDelete, s.path+"/runners/"+unused.Runner.Id, nil, http.StatusOK)
+				s.request(http.MethodDelete, s.runnerPath(unused.Runner.Id), nil, http.StatusOK)
 				s.compactLogs(first.ID, "completed-log")
 				return
 			}
@@ -85,7 +85,7 @@ func TestDirectOrganizationRunnerLifecycle(t *testing.T) {
 			require.NoError(t, contexts.NewRunnerTaskContext(database.DB(t.Context()), s.resource.Encryptor, s.resource.Organization.ID).RequestCancel(cancelled.ID.String()))
 			s.waitTask(cancelled.ID, models.RunnerTaskStateCanceled)
 			s.assertLogs(cancelled.ID, "cancellation-log")
-			s.request(http.MethodDelete, s.path+"/runners/"+created.Runner.Id, nil, http.StatusOK)
+			s.request(http.MethodDelete, s.runnerPath(created.Runner.Id), nil, http.StatusOK)
 			s.assertProcessExited(processDone)
 			s.compactLogs(cancelled.ID, "cancellation-log")
 		})
@@ -139,7 +139,7 @@ func newLifecycleSteps(t *testing.T) *lifecycleSteps {
 	}()
 	t.Cleanup(func() { cancel(); <-workerDone })
 	return &lifecycleSteps{t: t, resource: r, api: apiHTTP, gateway: runnerHTTP, store: store,
-		path: "/api/v1/organizations/" + r.Organization.ID.String() + "/runner-fleets/direct", token: rawToken}
+		path: "/api/v1/organizations/" + r.Organization.ID.String() + "/fleets/direct", token: rawToken}
 }
 
 func (s *lifecycleSteps) request(method, path string, body []byte, expected int) []byte {
@@ -159,7 +159,7 @@ func (s *lifecycleSteps) request(method, path string, body []byte, expected int)
 }
 
 func (s *lifecycleSteps) createFleet() {
-	s.request(http.MethodPost, "/api/v1/organizations/"+s.resource.Organization.ID.String()+"/runner-fleets",
+	s.request(http.MethodPost, "/api/v1/organizations/"+s.resource.Organization.ID.String()+"/fleets",
 		[]byte(`{"fleetId":"direct","runnerVersion":"dev","spec":{"operatingSystem":"linux","architecture":"amd64"}}`), http.StatusOK)
 }
 
@@ -177,15 +177,23 @@ func (s *lifecycleSteps) createTask(script string) *models.RunnerTask {
 
 func (s *lifecycleSteps) createRunner(ephemeral bool, taskID *uuid.UUID) *pb.CreateFleetRunnerResponse {
 	s.t.Helper()
-	request := &pb.CreateFleetRunnerRequest{Ephemeral: ephemeral, IdempotencyKey: uuid.NewString()}
+	request := &pb.CreateFleetRunnerRequest{FleetId: "direct", Ephemeral: ephemeral, IdempotencyKey: uuid.NewString()}
 	if taskID != nil {
 		request.TaskId = new(taskID.String())
 	}
 	body, err := protojson.Marshal(request)
 	require.NoError(s.t, err)
 	response := &pb.CreateFleetRunnerResponse{}
-	require.NoError(s.t, protojson.Unmarshal(s.request(http.MethodPost, s.path+"/runners", body, http.StatusOK), response))
+	require.NoError(s.t, protojson.Unmarshal(s.request(http.MethodPost, s.runnersPath(), body, http.StatusOK), response))
 	return response
+}
+
+func (s *lifecycleSteps) runnersPath() string {
+	return "/api/v1/organizations/" + s.resource.Organization.ID.String() + "/runners"
+}
+
+func (s *lifecycleSteps) runnerPath(id string) string {
+	return s.runnersPath() + "/" + id + "?fleet_id=direct"
 }
 
 func (s *lifecycleSteps) startRunner(binary string, created *pb.CreateFleetRunnerResponse) <-chan error {

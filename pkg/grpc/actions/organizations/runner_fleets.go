@@ -79,7 +79,7 @@ func (s *RunnerService) ListManagedRunnerFleets(ctx context.Context, req *pb.Lis
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list fleets")
 	}
-	out := &pb.ListManagedRunnerFleetsResponse{Fleets: []*pb.ManagedRunnerFleet{}}
+	out := &pb.ListManagedRunnerFleetsResponse{Fleets: []*pb.Fleet{}}
 	for i := range fleets {
 		out.Fleets = append(out.Fleets, managedFleet(lifecycle.SerializeFleet(&fleets[i])))
 	}
@@ -179,7 +179,7 @@ func (s *RunnerService) ListFleetRunners(ctx context.Context, req *pb.ListFleetR
 	if err != nil {
 		return nil, err
 	}
-	response := &pb.ListFleetRunnersResponse{Runners: []*pb.OrganizationRunner{}, TotalCount: out.TotalCount, HasNextPage: out.HasNextPage}
+	response := &pb.ListFleetRunnersResponse{Runners: []*pb.Runner{}, TotalCount: out.TotalCount, HasNextPage: out.HasNextPage}
 	for _, runner := range out.Runners {
 		response.Runners = append(response.Runners, organizationRunner(runner))
 	}
@@ -231,16 +231,16 @@ func lifecycleSpec(spec *pb.OrganizationRunnerFleetSpec) *adminpb.FleetSpec {
 		CpuMillicores: spec.CpuMillicores, MemoryMb: spec.MemoryMb, DiskGb: spec.DiskGb, Capabilities: spec.Capabilities}
 }
 
-func managedFleet(fleet *adminpb.Fleet) *pb.ManagedRunnerFleet {
+func managedFleet(fleet *adminpb.Fleet) *pb.Fleet {
 	spec := fleet.GetSpec()
-	return &pb.ManagedRunnerFleet{Id: fleet.Id, Enabled: fleet.Enabled, RunnerVersion: fleet.RunnerVersion,
+	return &pb.Fleet{Id: fleet.Id, Enabled: fleet.Enabled, RunnerVersion: fleet.RunnerVersion,
 		CreatedAt: fleet.CreatedAt, UpdatedAt: fleet.UpdatedAt, Spec: &pb.OrganizationRunnerFleetSpec{
 			OperatingSystem: spec.GetOperatingSystem(), Architecture: spec.GetArchitecture(), CpuMillicores: spec.GetCpuMillicores(),
 			MemoryMb: spec.GetMemoryMb(), DiskGb: spec.GetDiskGb(), Capabilities: spec.GetCapabilities()}}
 }
 
-func organizationRunner(runner *adminpb.Runner) *pb.OrganizationRunner {
-	return &pb.OrganizationRunner{Id: runner.Id, FleetId: runner.FleetId, State: runner.State, RunnerVersion: runner.RunnerVersion,
+func organizationRunner(runner *adminpb.Runner) *pb.Runner {
+	return &pb.Runner{Id: runner.Id, FleetId: runner.FleetId, State: runner.State, RunnerVersion: runner.RunnerVersion,
 		RegisteredAt: runner.RegisteredAt, LastSeenAt: runner.LastSeenAt, TerminationReason: runner.TerminationReason,
 		CreatedAt: runner.CreatedAt, UpdatedAt: runner.UpdatedAt, TerminatedAt: runner.TerminatedAt, Ephemeral: runner.Ephemeral,
 		Tags: runner.Tags, Os: runner.Os, Arch: runner.Arch, Hostname: runner.Hostname, Ip: runner.Ip, ProviderDeletedAt: runner.ProviderDeletedAt}

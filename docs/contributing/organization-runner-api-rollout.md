@@ -1,8 +1,15 @@
 # Organization runner API rollout
 
 Organization fleet management uses
-`/api/v1/organizations/{id}/runner-fleets`. The existing `/fleets` route
-continues to list enabled fleet choices for task selection.
+`/api/v1/organizations/{id}/fleets`. The existing `GET /fleets` route
+continues to list enabled fleet choices for task selection. Use
+`GET /fleets:managed` to list organization fleets, including disabled fleets.
+
+Runner operations use `/api/v1/organizations/{id}/runners` and
+`/api/v1/organizations/{id}/runners/{runner_id}`. Supply `fleetId` in POST
+request bodies or `fleet_id` in GET and DELETE query parameters. Provider
+cleanup uses `POST /runners/{runner_id}:provider-deleted` with `fleetId` in
+the request body. The fleet must belong to the authorized organization.
 
 The `organization_runners` feature is unreleased and disabled by default.
 Use the existing installation feature administration API to enable it for

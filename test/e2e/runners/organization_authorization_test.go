@@ -29,22 +29,22 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 	require.NoError(t, s.resource.AuthService.AssignRole(reader.ID.String(), models.RoleOrgOperator,
 		s.resource.Organization.ID.String(), models.DomainTypeOrganization))
 	s.token = apiToken(t, reader.ID)
-	base := "/api/v1/organizations/" + s.resource.Organization.ID.String() + "/runner-fleets"
-	for _, path := range []string{base, s.path, s.path + "/capacity", s.path + "/runners", s.path + "/runners/" + created.Runner.Id} {
+	base := "/api/v1/organizations/" + s.resource.Organization.ID.String() + "/fleets"
+	for _, path := range []string{base, base + ":managed", s.path, s.path + "/capacity", s.runnersPath() + "?fleet_id=direct", s.runnerPath(created.Runner.Id)} {
 		s.request(http.MethodGet, path, nil, http.StatusOK)
 	}
 	for _, request := range []struct{ method, path, body string }{
 		{http.MethodPost, base, `{"fleetId":"denied","runnerVersion":"dev","spec":{}}`},
 		{http.MethodPatch, s.path, `{"enabled":false}`},
-		{http.MethodPost, s.path + "/runners", `{"ephemeral":true}`},
-		{http.MethodDelete, s.path + "/runners/" + created.Runner.Id, ""},
-		{http.MethodPost, s.path + "/runners/" + created.Runner.Id + ":provider-deleted", `{"fleetManagerId":"manager","provider":"test"}`},
+		{http.MethodPost, s.runnersPath(), `{"fleetId":"direct","ephemeral":true}`},
+		{http.MethodDelete, s.runnerPath(created.Runner.Id), ""},
+		{http.MethodPost, s.runnersPath() + "/" + created.Runner.Id + ":provider-deleted", `{"fleetId":"direct","fleetManagerId":"manager","provider":"test"}`},
 	} {
 		s.request(request.method, request.path, []byte(request.body), http.StatusNotFound)
 	}
 	s.token = ownerToken
-	directCleanupPath := s.path + "/runners/" + created.Runner.Id + ":provider-deleted"
-	s.request(http.MethodPost, directCleanupPath, []byte(`{}`), http.StatusBadRequest)
+	directCleanupPath := s.runnersPath() + "/" + created.Runner.Id + ":provider-deleted"
+	s.request(http.MethodPost, directCleanupPath, []byte(`{"fleetId":"direct"}`), http.StatusBadRequest)
 	directRunner, err := models.FindRunner(db, uuid.MustParse(created.Runner.Id))
 	require.NoError(t, err)
 	require.Nil(t, directRunner.ProviderDeletedAt)
@@ -55,12 +55,18 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 	require.NoError(t, foreignFleet.Create(db))
 	foreignRunner := &models.Runner{ID: uuid.New(), FleetID: foreignFleet.ID, State: models.RunnerStatePending, RunnerVersion: "dev"}
 	require.NoError(t, db.Create(foreignRunner).Error)
-	for _, path := range []string{base + "/foreign", base + "/foreign/runners", s.path + "/runners/" + foreignRunner.ID.String(),
-		"/api/v1/organizations/" + foreign.ID.String() + "/runner-fleets/direct"} {
+	for _, path := range []string{base + "/foreign", s.runnersPath() + "?fleet_id=foreign", s.runnerPath(foreignRunner.ID.String()),
+		"/api/v1/organizations/" + foreign.ID.String() + "/fleets/direct"} {
 		s.request(http.MethodGet, path, nil, http.StatusNotFound)
 	}
+	// Body and query fleet references cannot bypass organization ownership.
+	s.request(http.MethodPost, s.runnersPath(), []byte(`{"fleetId":"foreign","ephemeral":true}`), http.StatusNotFound)
+	s.request(http.MethodDelete, s.runnersPath()+"/"+foreignRunner.ID.String()+"?fleet_id=foreign", nil, http.StatusNotFound)
+	s.request(http.MethodPost, s.runnersPath()+"/"+foreignRunner.ID.String()+":provider-deleted",
+		[]byte(`{"fleetId":"foreign"}`), http.StatusNotFound)
+	s.request(http.MethodGet, s.runnersPath(), nil, http.StatusNotFound)
 	page := &pb.ListFleetRunnersResponse{}
-	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, s.path+"/runners?after_id="+foreignRunner.ID.String(), nil, http.StatusOK), page))
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, s.runnersPath()+"?fleet_id=direct&after_id="+foreignRunner.ID.String(), nil, http.StatusOK), page))
 	require.Empty(t, page.Runners)
 	owned, err := models.FindOrganizationRunnerFleet(db, s.resource.Organization.ID, "direct")
 	require.NoError(t, err)
@@ -69,7 +75,7 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 		Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued,
 		PayloadCiphertext: []byte(`{}`), QueuedAt: time.Now()}
 	require.NoError(t, db.Create(task).Error)
-	s.request(http.MethodPost, s.path+"/runners", []byte(`{"taskId":"`+task.ID.String()+`","ephemeral":true,"idempotencyKey":"foreign-task"}`), http.StatusBadRequest)
+	s.request(http.MethodPost, s.runnersPath(), []byte(`{"fleetId":"direct","taskId":"`+task.ID.String()+`","ephemeral":true,"idempotencyKey":"foreign-task"}`), http.StatusBadRequest)
 	validTask := s.createTask("echo registration-ownership")
 	s.waitTask(validTask.ID, models.RunnerTaskStateQueued)
 	boundRunner := s.createRunner(true, &validTask.ID)
@@ -77,44 +83,45 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 	s.assertRegistrationRejected(boundRunner, http.StatusUnauthorized)
 	// Provider cleanup remains authorized after feature disablement.
 	ownedRunner := &pb.CreateFleetRunnerResponse{}
-	require.NoError(t, protojson.Unmarshal(s.request(http.MethodPost, s.path+"/runners",
-		[]byte(`{"ephemeral":true,"fleetManagerId":"manager","provider":"test"}`), http.StatusOK), ownedRunner))
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodPost, s.runnersPath(),
+		[]byte(`{"fleetId":"direct","ephemeral":true,"fleetManagerId":"manager","provider":"test"}`), http.StatusOK), ownedRunner))
 	require.NoError(t, models.DisableExperimentalFeature(s.resource.Organization.ID, features.FeatureOrganizationRunners))
 	require.NoError(t, owned.SetEnabled(db, false))
 	list := &pb.ListManagedRunnerFleetsResponse{}
-	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, base, nil, http.StatusOK), list))
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, base+":managed", nil, http.StatusOK), list))
 	require.Len(t, list.Fleets, 1)
 	require.False(t, list.Fleets[0].Enabled)
 	for _, request := range []struct{ method, path, body string }{
 		{http.MethodPost, base, `{"fleetId":"disabled","runnerVersion":"dev","spec":{}}`},
 		{http.MethodPatch, s.path, `{"enabled":true}`},
-		{http.MethodPost, s.path + "/runners", `{"ephemeral":true}`},
+		{http.MethodPost, s.runnersPath(), `{"fleetId":"direct","ephemeral":true}`},
 	} {
 		body := s.request(request.method, request.path, []byte(request.body), http.StatusBadRequest)
 		require.Contains(t, string(body), "organization_runners")
 	}
-	s.request(http.MethodDelete, s.path+"/runners/"+ownedRunner.Runner.Id, nil, http.StatusOK)
-	for _, body := range []string{`{}`, `{"fleetManagerId":"manager"}`, `{"provider":"test"}`,
-		`{"fleetManagerId":"wrong","provider":"test"}`, `{"fleetManagerId":"manager","provider":"wrong"}`} {
-		s.request(http.MethodPost, s.path+"/runners/"+ownedRunner.Runner.Id+":provider-deleted", []byte(body), http.StatusBadRequest)
+	s.request(http.MethodDelete, s.runnerPath(ownedRunner.Runner.Id), nil, http.StatusOK)
+	ownedCleanupPath := s.runnersPath() + "/" + ownedRunner.Runner.Id + ":provider-deleted"
+	for _, body := range []string{`{"fleetId":"direct"}`, `{"fleetId":"direct","fleetManagerId":"manager"}`, `{"fleetId":"direct","provider":"test"}`,
+		`{"fleetId":"direct","fleetManagerId":"wrong","provider":"test"}`, `{"fleetId":"direct","fleetManagerId":"manager","provider":"wrong"}`} {
+		s.request(http.MethodPost, ownedCleanupPath, []byte(body), http.StatusBadRequest)
 	}
-	s.request(http.MethodPost, s.path+"/runners/"+ownedRunner.Runner.Id+":provider-deleted",
-		[]byte(`{"fleetManagerId":"manager","provider":"test"}`), http.StatusOK)
+	s.request(http.MethodPost, ownedCleanupPath,
+		[]byte(`{"fleetId":"direct","fleetManagerId":"manager","provider":"test"}`), http.StatusOK)
 	runner, err := models.FindRunner(db, uuid.MustParse(ownedRunner.Runner.Id))
 	require.NoError(t, err)
 	require.NotNil(t, runner.ProviderDeletedAt)
 
 	// An administrator can confirm direct runner cleanup without provider tags.
-	s.request(http.MethodDelete, s.path+"/runners/"+created.Runner.Id, nil, http.StatusOK)
-	for _, body := range []string{`{"fleetManagerId":"manager","provider":"test"}`,
-		`{"fleetManagerId":"manager"}`, `{"provider":"test"}`} {
+	s.request(http.MethodDelete, s.runnerPath(created.Runner.Id), nil, http.StatusOK)
+	for _, body := range []string{`{"fleetId":"direct","fleetManagerId":"manager","provider":"test"}`,
+		`{"fleetId":"direct","fleetManagerId":"manager"}`, `{"fleetId":"direct","provider":"test"}`} {
 		s.request(http.MethodPost, directCleanupPath, []byte(body), http.StatusBadRequest)
 	}
 	directRunner, err = models.FindRunner(db, uuid.MustParse(created.Runner.Id))
 	require.NoError(t, err)
 	require.Nil(t, directRunner.ProviderDeletedAt)
 	confirmed := &pb.MarkFleetRunnerProviderDeletedResponse{}
-	require.NoError(t, protojson.Unmarshal(s.request(http.MethodPost, directCleanupPath, []byte(`{}`), http.StatusOK), confirmed))
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodPost, directCleanupPath, []byte(`{"fleetId":"direct"}`), http.StatusOK), confirmed))
 	require.NotNil(t, confirmed.Runner.ProviderDeletedAt)
 	directRunner, err = models.FindRunner(db, directRunner.ID)
 	require.NoError(t, err)
@@ -122,7 +129,7 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 	require.WithinDuration(t, confirmed.Runner.ProviderDeletedAt.AsTime(), *directRunner.ProviderDeletedAt, time.Microsecond)
 	// Repeated confirmation preserves the first deletion timestamp.
 	repeated := &pb.MarkFleetRunnerProviderDeletedResponse{}
-	require.NoError(t, protojson.Unmarshal(s.request(http.MethodPost, directCleanupPath, []byte(`{}`), http.StatusOK), repeated))
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodPost, directCleanupPath, []byte(`{"fleetId":"direct"}`), http.StatusOK), repeated))
 	require.Equal(t, directRunner.ProviderDeletedAt.UTC(), repeated.Runner.ProviderDeletedAt.AsTime())
 }
 
