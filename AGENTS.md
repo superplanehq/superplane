@@ -79,7 +79,7 @@ The development environment is **entirely Docker-based**: build, lint, test, and
 run commands execute inside containers via `docker compose`. You do not need Go
 or Node installed on the host, only Docker.
 
-- Go `1.26.10` (pinned in `go.mod`; provided by the dev container).
+- Go `1.27.3` (pinned in `go.mod`; provided by the dev container).
 - Node.js, npm, and Bun (provided by the dev container; used by Vite/frontend).
 - Docker with a working `docker compose`.
 
