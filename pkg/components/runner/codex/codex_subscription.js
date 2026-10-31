@@ -6,6 +6,8 @@ const { stripVTControlCharacters } = require("node:util");
 
 const CHECKPOINT_TIMEOUT_MS = 30000;
 
+class CodexCleanupError extends Error {}
+
 function subscriptionEnabled(env = process.env) {
   return Boolean(String(env.SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN || "").trim());
 }
@@ -125,7 +127,7 @@ async function fetchWithRetry(url, options) {
   }
 }
 
-async function restore(env = process.env, options = {}) {
+async function restore(env = process.env) {
   const payload = await requestJSON(
     env,
     "GET",
@@ -141,17 +143,13 @@ async function restore(env = process.env, options = {}) {
   const file = authPath(env);
   fs.writeFileSync(file, `${JSON.stringify(bundle)}\n`, { mode: 0o600 });
   fs.chmodSync(file, 0o600);
-  // A run keeps the lease secret in auth.json. Only a catalog refresh
-  // sends the real bundle back to SuperPlane.
-  if (options.final) {
-    return checkpoint({ env, final: true });
-  }
 }
 
 async function checkpoint(options = {}) {
   const env = options.env || process.env;
   // Read limits before the bundle: app-server can renew the saved credentials.
-  const usage = await readUsage(env).catch(() => {
+  const usage = await readUsage(env).catch((error) => {
+    if (error instanceof CodexCleanupError) throw error;
     process.stderr.write(
       "Codex usage is unavailable. Credentials will still be saved.\n",
     );
@@ -183,7 +181,9 @@ function readUsage(env) {
     const child = spawn("codex", ["app-server", "--listen", "stdio://"], {
       env: subscriptionChildEnv(env),
       stdio: ["pipe", "pipe", "ignore"],
+      detached: true,
     });
+    const stopped = new Promise((resolve) => child.once("close", resolve));
     const lines = readline.createInterface({ input: child.stdout });
     const timeout = setTimeout(() => {
       if (limits !== undefined || models !== undefined) {
@@ -202,9 +202,24 @@ function readUsage(env) {
       clearTimeout(timeout);
       lines.close();
       child.stdin.destroy();
-      child.kill("SIGKILL");
-      if (error) reject(error);
-      else resolve(usage);
+      // The npm launcher starts a native child. Stop the entire group so
+      // neither process can recreate credentials after cleanup.
+      if (child.pid) {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch (stopError) {
+          if (stopError.code !== "ESRCH") {
+            reject(new CodexCleanupError("Could not stop the Codex process"));
+            return;
+          }
+        }
+      }
+      // Codex can renew auth.json. Reap it before callers read the final
+      // bundle or remove its home, so no process can write credentials later.
+      stopped.then(() => {
+        if (error) reject(error);
+        else resolve(usage);
+      });
     }
     function send(message) {
       child.stdin.write(`${JSON.stringify(message)}\n`);
@@ -356,8 +371,19 @@ async function login(env = process.env) {
   if (!readBundle(env)) {
     throw new Error("ChatGPT device sign-in did not write credentials");
   }
-  await checkpoint({ env, final: true });
+  await finishSetup(env);
   process.stdout.write("ChatGPT sign-in saved\n");
+}
+
+async function finishSetup(env = process.env) {
+  await checkpoint({ env, final: true });
+  fs.rmSync(codexHome(env), { recursive: true, force: true });
+  if (env.SUPERPLANE_RESULT_FILE) {
+    fs.writeFileSync(
+      env.SUPERPLANE_RESULT_FILE,
+      `${JSON.stringify({ type: "result", is_error: false, codexSubscriptionSetupCleaned: true })}\n`,
+    );
+  }
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -368,7 +394,8 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
   if (command === "refresh") {
-    await restore(process.env, { final: true });
+    await restore();
+    await finishSetup();
     process.stdout.write("ChatGPT model catalog refreshed\n");
     return;
   }
