@@ -147,22 +147,21 @@ func (c *FactoryCodexConnection) AttachLoginLease(tx *gorm.DB) error {
 	return nil
 }
 
-// RequireSubscriptionLeaseAdmission rechecks revocation, membership, and the
-// workspace model policy before allocating a runner. It does not serialize the
-// execution of separate leases.
+// RequireSubscriptionLeaseAdmission rechecks factories access, revocation,
+// membership, and the workspace model policy before allocating a runner.
+// It does not serialize the execution of separate leases.
 func (t *RunnerTask) RequireSubscriptionLeaseAdmission(tx *gorm.DB) error {
 	return t.requireSubscriptionLease(tx, true)
 }
 
 // RequireSubscriptionLeaseContinuation rechecks revocation, membership, the
-// workspace, and the run owner for a task that already runs. It does not apply
-// the current model policy. A policy change must not stop a running task from
-// refreshing its token.
+// workspace, and the run owner for a task that already runs. Changes to factories
+// access or model policy must not stop a running task from refreshing its token.
 func (t *RunnerTask) RequireSubscriptionLeaseContinuation(tx *gorm.DB) error {
 	return t.requireSubscriptionLease(tx, false)
 }
 
-func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool) error {
+func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, admission bool) error {
 	lease, err := FindCodexLeaseByTask(tx, t.ID)
 	if err != nil {
 		return err
@@ -190,6 +189,11 @@ func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool
 	connection, err := FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
 	if err != nil {
 		return err
+	}
+	if admission {
+		if err := requireCodexFactoriesAccess(tx, connection.OrganizationID); err != nil {
+			return err
+		}
 	}
 	if _, err := ActiveCodexMember(tx, connection.OrganizationID, connection.OwnerUserID); err != nil {
 		return err
@@ -239,7 +243,7 @@ func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool
 	if ownerID != connection.OwnerUserID {
 		return ErrSubscriptionOwnerInvalid
 	}
-	if !checkModelPolicy {
+	if !admission {
 		return nil
 	}
 	model, _ := execution.Configuration.Data()["model"].(string)
@@ -304,7 +308,7 @@ func (c *FactoryCodexConnection) createLease(
 }
 
 func (c *FactoryCodexConnection) relock(tx *gorm.DB) error {
-	if _, err := activeHumanCodexMember(tx, c.OrganizationID, c.OwnerUserID); err != nil {
+	if _, err := ActiveCodexMember(tx, c.OrganizationID, c.OwnerUserID); err != nil {
 		return err
 	}
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", c.ID).First(c).Error; err != nil {

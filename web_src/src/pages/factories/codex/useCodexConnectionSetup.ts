@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { getApiErrorMessage } from "@/lib/errors";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 import { codexSubscriptionReady, useFactoryCodexConnection } from "../pages/onboarding/useFactoryCodexConnection";
 
 type CodexConnection = ReturnType<typeof useFactoryCodexConnection>;
@@ -92,9 +90,7 @@ function useConnectionCompletion({
 
 export function useCodexConnectionSetup({ organizationId, factoryId, open, onConnected, onClose }: SetupOptions) {
   const { isLoading: permissionsLoading } = usePermissions();
-  const features = useExperimentalFeature(organizationId);
-  const offered = features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const enabled = open && !features.isLoading && offered;
+  const enabled = open;
   const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
   const completion = useConnectionCompletion({
     open,
@@ -136,8 +132,6 @@ export function useCodexConnectionSetup({ organizationId, factoryId, open, onCon
   return {
     codex,
     disabled,
-    featuresLoading: features.isLoading,
-    offered,
     completionError: completion.error,
     retryCompletion: completion.retry,
     busy: closing || codex.start.isPending || codex.cancel.isPending,
