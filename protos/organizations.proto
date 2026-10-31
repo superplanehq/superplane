@@ -27,6 +27,36 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Organizations {
+  rpc ListManagedRunnerFleets(ListManagedRunnerFleetsRequest) returns (ListManagedRunnerFleetsResponse) {
+    option (google.api.http) = { get: "/api/v1/organizations/{id}/runner-fleets" };
+  }
+  rpc CreateRunnerFleet(CreateRunnerFleetRequest) returns (CreateRunnerFleetResponse) {
+    option (google.api.http) = { post: "/api/v1/organizations/{id}/runner-fleets" body: "*" };
+  }
+  rpc DescribeRunnerFleet(DescribeRunnerFleetRequest) returns (DescribeRunnerFleetResponse) {
+    option (google.api.http) = { get: "/api/v1/organizations/{id}/runner-fleets/{fleet_id}" };
+  }
+  rpc UpdateRunnerFleet(UpdateRunnerFleetRequest) returns (UpdateRunnerFleetResponse) {
+    option (google.api.http) = { patch: "/api/v1/organizations/{id}/runner-fleets/{fleet_id}" body: "*" };
+  }
+  rpc GetRunnerFleetCapacity(GetRunnerFleetCapacityRequest) returns (GetRunnerFleetCapacityResponse) {
+    option (google.api.http) = { get: "/api/v1/organizations/{id}/runner-fleets/{fleet_id}/capacity" };
+  }
+  rpc CreateFleetRunner(CreateFleetRunnerRequest) returns (CreateFleetRunnerResponse) {
+    option (google.api.http) = { post: "/api/v1/organizations/{id}/runner-fleets/{fleet_id}/runners" body: "*" };
+  }
+  rpc ListFleetRunners(ListFleetRunnersRequest) returns (ListFleetRunnersResponse) {
+    option (google.api.http) = { get: "/api/v1/organizations/{id}/runner-fleets/{fleet_id}/runners" };
+  }
+  rpc DescribeFleetRunner(DescribeFleetRunnerRequest) returns (DescribeFleetRunnerResponse) {
+    option (google.api.http) = { get: "/api/v1/organizations/{id}/runner-fleets/{fleet_id}/runners/{runner_id}" };
+  }
+  rpc TerminateFleetRunner(TerminateFleetRunnerRequest) returns (TerminateFleetRunnerResponse) {
+    option (google.api.http) = { delete: "/api/v1/organizations/{id}/runner-fleets/{fleet_id}/runners/{runner_id}" };
+  }
+  rpc MarkFleetRunnerProviderDeleted(MarkFleetRunnerProviderDeletedRequest) returns (MarkFleetRunnerProviderDeletedResponse) {
+    option (google.api.http) = { post: "/api/v1/organizations/{id}/runner-fleets/{fleet_id}/runners/{runner_id}:provider-deleted" body: "*" };
+  }
   rpc AcceptInvitation(AcceptInvitationRequest) returns (google.protobuf.Struct) {
     option (google.api.http) = { post: "/api/v1/invitations/{token}/accept" };
   }
@@ -839,6 +869,115 @@ message OrganizationCreditGrant {
 message ListOrganizationCreditGrantsResponse {
   repeated OrganizationCreditGrant grants = 1;
 }
+
+message ManagedRunnerFleet {
+  string id = 1;
+  bool enabled = 2;
+  OrganizationRunnerFleetSpec spec = 3;
+  string runner_version = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message OrganizationRunner {
+  string id = 1;
+  string fleet_id = 2;
+  string state = 3;
+  string runner_version = 4;
+  optional google.protobuf.Timestamp registered_at = 5;
+  optional google.protobuf.Timestamp last_seen_at = 6;
+  optional string termination_reason = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  optional google.protobuf.Timestamp terminated_at = 10;
+  bool ephemeral = 11;
+  map<string, string> tags = 12;
+  string os = 13;
+  string arch = 14;
+  string hostname = 15;
+  string ip = 16;
+  optional google.protobuf.Timestamp provider_deleted_at = 17;
+}
+
+message ListManagedRunnerFleetsRequest { string id = 1; }
+message ListManagedRunnerFleetsResponse { repeated ManagedRunnerFleet fleets = 1; }
+message CreateRunnerFleetRequest {
+  string id = 1;
+  string fleet_id = 2;
+  OrganizationRunnerFleetSpec spec = 3;
+  string runner_version = 4;
+  optional bool enabled = 5;
+}
+message CreateRunnerFleetResponse { ManagedRunnerFleet fleet = 1; }
+message DescribeRunnerFleetRequest { string id = 1; string fleet_id = 2; }
+message DescribeRunnerFleetResponse { ManagedRunnerFleet fleet = 1; }
+message UpdateRunnerFleetRequest {
+  string id = 1;
+  string fleet_id = 2;
+  optional string runner_version = 3;
+  optional bool enabled = 4;
+  OrganizationRunnerFleetSpec spec = 5;
+}
+message UpdateRunnerFleetResponse { ManagedRunnerFleet fleet = 1; }
+message GetRunnerFleetCapacityRequest {
+  string id = 1;
+  string fleet_id = 2;
+  optional string generation = 3;
+  optional int32 wait_seconds = 4;
+}
+message GetRunnerFleetCapacityResponse {
+  int64 runnable_tasks = 1;
+  int64 pending_runners = 2;
+  int64 idle_runners = 3;
+  int64 busy_runners = 4;
+  int64 terminated_runners = 5;
+  string generation = 6;
+}
+message CreateFleetRunnerRequest {
+  string id = 1;
+  string fleet_id = 2;
+  optional string task_id = 3;
+  string idempotency_key = 4;
+  bool ephemeral = 5;
+  string fleet_manager_id = 6;
+  string provider = 7;
+}
+message CreateFleetRunnerResponse {
+  OrganizationRunner runner = 1;
+  string registration_token = 2;
+  google.protobuf.Timestamp registration_expires_at = 3;
+  string runner_api_url = 4;
+  string display_name = 5;
+}
+message ListFleetRunnersRequest {
+  string id = 1;
+  string fleet_id = 2;
+  repeated string states = 3;
+  optional int32 limit = 4;
+  optional string after_id = 5;
+}
+message ListFleetRunnersResponse {
+  repeated OrganizationRunner runners = 1;
+  int64 total_count = 2;
+  bool has_next_page = 3;
+}
+message DescribeFleetRunnerRequest { string id = 1; string fleet_id = 2; string runner_id = 3; }
+message DescribeFleetRunnerResponse { OrganizationRunner runner = 1; }
+message TerminateFleetRunnerRequest {
+  string id = 1;
+  string fleet_id = 2;
+  string runner_id = 3;
+  repeated string states = 4;
+}
+message TerminateFleetRunnerResponse { OrganizationRunner runner = 1; }
+message MarkFleetRunnerProviderDeletedRequest {
+  string id = 1;
+  string fleet_id = 2;
+  string runner_id = 3;
+  string fleet_manager_id = 4;
+  string provider = 5;
+}
+message MarkFleetRunnerProviderDeletedResponse { OrganizationRunner runner = 1; }
 
 message ListOrganizationRunnerFleetsRequest {
   string id = 1;
