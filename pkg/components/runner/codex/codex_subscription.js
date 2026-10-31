@@ -438,6 +438,7 @@ function validCatalogModel(model) {
   return Array.isArray(efforts) && efforts.every((effort) =>
     effort &&
     typeof effort === "object" &&
+    !Array.isArray(effort) &&
     [effort.reasoningEffort, effort.description].every((value) => value == null || typeof value === "string"),
   );
 }

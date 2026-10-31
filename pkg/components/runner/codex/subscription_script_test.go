@@ -479,7 +479,7 @@ if (process.argv[2] === "app-server") {
 // Exercise the delivered refresh command: incomplete pages must never become a
 // successful empty catalog, while quota failure must not block valid models.
 func TestSubscriptionCatalogRequiresCompleteModels(t *testing.T) {
-	for _, scenario := range []string{"quota-unavailable", "quota-malformed", "missing-model-data", "invalid-model", "invalid-model-fields", "second-page-error"} {
+	for _, scenario := range []string{"quota-unavailable", "quota-malformed", "missing-model-data", "invalid-model", "invalid-model-fields", "invalid-reasoning-option", "second-page-error"} {
 		t.Run(scenario, func(t *testing.T) {
 			taskDir := t.TempDir()
 			bin := filepath.Join(taskDir, "bin")
@@ -498,6 +498,7 @@ require("readline").createInterface({input:process.stdin}).on("line", line => {
   if (scenario === "missing-model-data") reply = {result:{}};
   if (scenario === "invalid-model") reply = {result:{data:[null]}};
   if (scenario === "invalid-model-fields") reply = {result:{data:[{model:"gpt-5.4",displayName:{invalid:true}}]}};
+  if (scenario === "invalid-reasoning-option") reply = {result:{data:[{model:"gpt-5.4",supportedReasoningEfforts:[[]]}]}};
  }
  process.stdout.write(JSON.stringify({id:req.id,...reply})+"\n");
 });
