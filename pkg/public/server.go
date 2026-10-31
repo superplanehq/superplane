@@ -433,7 +433,8 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
 	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
 	s.adminRouter.PathPrefix("/installation/keys").Handler(adminGatewayHandler)
-	// Keep legacy organization handlers in place while new admin operations use protos.
+	// Define all new admin organization endpoints in protos/admin/organizations.proto.
+	// Keep existing HTTP handlers until they migrate to the admin gRPC gateway.
 	s.adminRouter.Handle("/organizations/{id}", adminGatewayHandler).Methods("DELETE")
 
 	// Public health check
