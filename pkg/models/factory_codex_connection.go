@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -317,7 +318,7 @@ func (c *FactoryCodexConnection) RecordDeviceCode(
 }
 
 // StoreBundle saves a newer auth bundle for the active reservation.
-// Login stays in finishing until the runner VM is confirmed deleted.
+// Login stays exclusive until setup confirms local cleanup or the VM is deleted.
 func (c *FactoryCodexConnection) StoreBundle(
 	tx *gorm.DB,
 	taskID uuid.UUID,
@@ -502,8 +503,8 @@ func MarkCodexConnectionUncertain(tx *gorm.DB, taskID uuid.UUID, now time.Time) 
 }
 
 // ReleaseCodexReservationForTask releases the lease for one runner task.
-// A run lease ends when the task is terminal. A login lease also waits until
-// its VM is confirmed deleted.
+// A run lease ends when the task is terminal. A successful login can also end
+// after confirmed local cleanup; other logins wait for VM deletion.
 func ReleaseCodexReservationForTask(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
 	lease, err := FindCodexLeaseByTask(tx, taskID)
 	if err != nil || lease == nil {
@@ -597,6 +598,12 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 	if !lease.Login() && lease.RevokedAt == nil {
 		return deleteCodexLease(tx, &lease)
 	}
+	if lease.Login() && lease.RevokedAt == nil && connection.RevocationPendingAt == nil &&
+		(connection.Status == CodexConnectionStatusFinishing || connection.Status == CodexConnectionStatusReady) &&
+		task.State == RunnerTaskStateSucceeded && task.CancelRequestedAt == nil &&
+		codexSetupCleaned(task) && codexFinalCheckpointSaved(&connection, &lease) {
+		return connection.finishLoginLease(tx, &lease, CodexConnectionStatusReady, now)
+	}
 	if task.RunnerID != nil {
 		runner, runnerErr := FindRunner(tx, *task.RunnerID)
 		if runnerErr != nil && !errors.Is(runnerErr, ErrRunnerNotFound) {
@@ -615,10 +622,20 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 	return connection.finishLoginLease(tx, &lease, codexLoginLeaseOutcome(&connection, &lease, task), now)
 }
 
-func codexLoginLeaseOutcome(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) string {
-	checkpointSaved := connection.FinalCheckpointVersion > lease.StartedVersion &&
+func codexSetupCleaned(task *RunnerTask) bool {
+	var result struct {
+		Cleaned bool `json:"codexSubscriptionSetupCleaned"`
+	}
+	return json.Unmarshal(task.Result, &result) == nil && result.Cleaned
+}
+
+func codexFinalCheckpointSaved(connection *FactoryCodexConnection, lease *FactoryCodexLease) bool {
+	return connection.FinalCheckpointVersion > lease.StartedVersion &&
 		connection.FinalCheckpointVersion == connection.CredentialVersion
-	if checkpointSaved {
+}
+
+func codexLoginLeaseOutcome(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) string {
+	if codexFinalCheckpointSaved(connection, lease) {
 		return CodexConnectionStatusReady
 	}
 	if connection.CredentialVersion > lease.StartedVersion {
