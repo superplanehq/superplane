@@ -463,6 +463,15 @@ func SetOrganizationCreatedByAccount(tx *gorm.DB, organizationID, accountID uuid
 		Error
 }
 
+// UpdateSettings writes editable metadata without replacing concurrent state changes.
+func (o *Organization) UpdateSettings(tx *gorm.DB) error {
+	now := time.Now()
+	o.UpdatedAt = &now
+	return tx.Model(o).
+		Select("name", "slug", "description", "updated_at").
+		Updates(o).Error
+}
+
 func ListOrganizationsCreatedByAccount(tx *gorm.DB, accountID uuid.UUID) ([]Organization, error) {
 	var organizations []Organization
 	err := tx.

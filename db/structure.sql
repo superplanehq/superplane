@@ -4901,6 +4901,13 @@ CREATE UNIQUE INDEX organization_invitations_pending_email_idx ON public.organiz
 
 
 --
+-- Name: organization_suspension_events_history_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_suspension_events_history_idx ON public.organization_suspension_events USING btree (organization_id, created_at DESC, id DESC);
+
+
+--
 -- Name: organization_suspension_events_pending_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6585,7 +6592,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261031210450	f
+20261031212204	f
 \.
 
 
