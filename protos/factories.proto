@@ -2380,6 +2380,8 @@ message WorkOrderExecution {
   // hosted credit failures: no_hosted_credit,
   // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
+  Superplane.Canvases.SubscriptionFailure subscription_failure = 15;
+  string usage_state = 16;
 }
 
 message WorkOrderExecutionStep {
@@ -3276,6 +3278,7 @@ message PlanningSessionSurvey {
 
 // PlanningSessionSummary is the lines-board view of an analysis session.
 // It omits messages, activities, and the draft body.
+
 message PlanningSessionSummary {
   string id = 1;
   string state = 2;
@@ -3286,6 +3289,8 @@ message PlanningSessionSummary {
   string runner_state = 6;
   // True when the organization parallelism limit blocks a pending task.
   bool blocked_by_parallelism_limit = 7;
+  Superplane.Canvases.SubscriptionFailure subscription_failure = 8;
+  string usage_state = 9;
 }
 
 message PlanningSession {
@@ -3308,6 +3313,8 @@ message PlanningSession {
   string runner_state = 16;
   // True when the organization parallelism limit blocks a pending task.
   bool blocked_by_parallelism_limit = 17;
+  Superplane.Canvases.SubscriptionFailure subscription_failure = 18;
+  string usage_state = 19;
 }
 
 enum PlanningSessionKind {

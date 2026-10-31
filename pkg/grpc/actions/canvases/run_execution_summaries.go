@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"gorm.io/gorm"
@@ -56,6 +57,23 @@ func attachExecutionSummaries(db *gorm.DB, runs []models.CanvasRun, serialized [
 				execution.ComponentName = components[execution.NodeId]
 			}
 		}
+	}
+	return attachSubscriptionSummaries(db, runs, serialized)
+}
+
+func attachSubscriptionSummaries(db *gorm.DB, runs []models.CanvasRun, serialized []*pb.CanvasRun) error {
+	runIDs := make([]uuid.UUID, 0, len(runs))
+	for _, run := range runs {
+		runIDs = append(runIDs, run.ID)
+	}
+	summaries, err := models.ListRunnerResultSummariesForRuns(db, runIDs)
+	if err != nil {
+		return fmt.Errorf("load subscription run summaries: %w", err)
+	}
+	for i, run := range runs {
+		summary := summaries[run.ID]
+		serialized[i].SubscriptionFailure = actions.SerializeSubscriptionFailure(summary.SubscriptionFailure)
+		serialized[i].UsageState = summary.UsageState
 	}
 	return nil
 }

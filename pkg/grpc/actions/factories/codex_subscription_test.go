@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -26,6 +27,7 @@ import (
 )
 
 func TestPersonalCodexConnectionDoesNotActivateWorkspace(t *testing.T) {
+	t.Setenv(billing.BillingEnabledEnv, "no")
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
@@ -56,9 +58,24 @@ func TestPersonalCodexConnectionDoesNotActivateWorkspace(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, saved.OnboardingConfigValue().CodexSubscription)
 	assert.Empty(t, saved.OnboardingConfigValue().CodexDefaultOwnerID)
+	task, err := models.FindRunnerTask(db, lease.TaskID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskSetupPurposeCodexLogin, task.SetupPurpose)
+	runnerModel := &models.Runner{ID: uuid.New(), FleetID: task.FleetID, State: models.RunnerStateIdle, RunnerVersion: "test"}
+	require.NoError(t, db.Create(runnerModel).Error)
+	require.NoError(t, task.Reserve(db, runnerModel.ID))
+	require.NoError(t, task.Start(db, runnerModel, "test-store", time.Now()))
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"verification_url": "https://auth.openai.com/codex/device", "verification_code": "LOGIN-CODE"}).Error)
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	view, err = DescribeFactoryCodexConnection(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCodexConnectionRequest{})
+	require.NoError(t, err)
+	assert.False(t, view.Connection.Eligible)
+	assert.Equal(t, "LOGIN-CODE", view.Connection.VerificationCode, "allocated sign-in remains readable after admission is disabled")
+	assert.Equal(t, "https://auth.openai.com/codex/device", view.Connection.VerificationUrl)
 }
 
 func TestCancelFactoryCodexConnectionReportsCancellationUntilRunnerDeletion(t *testing.T) {
+	t.Setenv(billing.BillingEnabledEnv, "no")
 	for _, test := range []struct {
 		status          string
 		cancelingStatus string
@@ -140,6 +157,7 @@ func TestCancelFactoryCodexConnectionReportsCancellationUntilRunnerDeletion(t *t
 }
 
 func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) {
+	t.Setenv(billing.BillingEnabledEnv, "no")
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
@@ -266,6 +284,7 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 }
 
 func TestDescribeCodexConnectionPublishesOnlyCatalogActivityChanges(t *testing.T) {
+	t.Setenv(billing.BillingEnabledEnv, "no")
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))

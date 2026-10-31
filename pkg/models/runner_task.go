@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -27,6 +28,9 @@ const (
 	RunnerTaskLogStateArchivable = "archivable"
 	RunnerTaskLogStateArchiving  = "archiving"
 	RunnerTaskLogStateArchived   = "archived"
+
+	RunnerTaskSetupPurposeCodexLogin   = "codex_login"
+	RunnerTaskSetupPurposeCodexCatalog = "codex_catalog"
 )
 
 const runnerTaskReservationAttemptLimit = 10
@@ -67,6 +71,8 @@ type RunnerTask struct {
 	FinishedAt        *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	SetupPurpose      string
+	SetupBillable     bool
 
 	/*
 	 * PayloadCiphertext protects task inputs, which can contain credentials and other secrets.
@@ -401,6 +407,29 @@ func (t *RunnerTask) Complete(
 	canceled bool,
 	now time.Time,
 ) (bool, error) {
+	originalTask, originalRunner := *t, *runner
+	var completed bool
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		var err error
+		completed, err = t.complete(tx, runner, completionHash, result, exitCode, errorMessage, canceled, now)
+		return err
+	})
+	if err != nil {
+		*t, *runner = originalTask, originalRunner
+	}
+	return completed && err == nil, err
+}
+
+func (t *RunnerTask) complete(
+	tx *gorm.DB,
+	runner *Runner,
+	completionHash string,
+	result datatypes.JSON,
+	exitCode int32,
+	errorMessage string,
+	canceled bool,
+	now time.Time,
+) (bool, error) {
 	// Lock the runner before the task so completion cannot deadlock with cancellation.
 	currentRunner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runner.ID)
 	if err != nil {
@@ -428,6 +457,9 @@ func (t *RunnerTask) Complete(
 	}
 	if t.State != RunnerTaskStateRunning {
 		return false, ErrRunnerTaskNotCompletable
+	}
+	if err := t.recordSetupAllocationUsage(tx, now); err != nil {
+		return false, err
 	}
 
 	state := RunnerTaskStateSucceeded
@@ -575,7 +607,9 @@ func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTas
 			return err
 		}
 		if err := task.reserveLocked(tx, r); err != nil {
-			if IsPermanentSubscriptionAdmissionError(err) || errors.Is(err, ErrSelectableLLMModelNotAllowed) {
+			if IsPermanentSubscriptionAdmissionError(err) || errors.Is(err, ErrSelectableLLMModelNotAllowed) ||
+				errors.Is(err, billing.ErrPaymentMethodRequired) || errors.Is(err, billing.ErrHostedSubscriptionRequired) ||
+				errors.Is(err, billing.ErrHostedCreditEmpty) {
 				reservation, err = task.rejectSubscriptionAdmission(tx, err)
 			}
 			return err
@@ -649,13 +683,15 @@ func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
 	}
 
 	now := time.Now()
+	billableSetup := t.SetupPurpose != "" && billing.Enabled()
 	result := tx.Model(t).
 		Where("state = ? AND runner_id IS NULL AND cancel_requested_at IS NULL", RunnerTaskStateQueued).
 		Updates(map[string]any{
-			"runner_id":   runner.ID,
-			"state":       RunnerTaskStateReserved,
-			"reserved_at": now,
-			"updated_at":  now,
+			"runner_id":      runner.ID,
+			"state":          RunnerTaskStateReserved,
+			"reserved_at":    now,
+			"setup_billable": billableSetup,
+			"updated_at":     now,
 		})
 	if result.Error != nil {
 		return result.Error
@@ -666,6 +702,7 @@ func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
 	t.RunnerID = &runner.ID
 	t.State = RunnerTaskStateReserved
 	t.ReservedAt = &now
+	t.SetupBillable = billableSetup
 	t.UpdatedAt = now
 	return nil
 }

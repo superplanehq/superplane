@@ -222,9 +222,9 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
       );
       setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_end", status, duration_ms: durationMs, id, turn }));
     },
-    onTurn: (turn, usage, message) => {
+    onTurn: (turn, usage, message, usageState) => {
       setState((prev) => withClearedError(prev));
-      setUsage((prev) => applyPromptUsageRecord(prev, { type: "turn", turn, usage, message }));
+      setUsage((prev) => applyPromptUsageRecord(prev, { type: "turn", turn, usage, message, usage_state: usageState }));
     },
   };
 }

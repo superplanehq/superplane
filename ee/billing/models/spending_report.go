@@ -14,6 +14,7 @@ import (
 
 const (
 	SpendingGroupByWorkspace     = "workspace"
+	SpendingChatGPTSetupID       = "chatgpt_setup"
 	SpendingGroupByUser          = "user"
 	SpendingGroupByModel         = "model"
 	SpendingGroupByMachine       = "machine"
@@ -458,7 +459,8 @@ func spendingGroupExpressions(groupBy string) (idExpr string, groupExpr string) 
 	case SpendingGroupByFundingSource:
 		return spendingFundingSourceGroupExpr, spendingFundingSourceGroupExpr
 	default:
-		return "COALESCE(workspace_usage_events.factory_id::text, '')", "COALESCE(workspace_usage_events.factory_id::text, '')"
+		expression := "CASE WHEN workspace_usage_events.setup_purpose <> '' THEN 'chatgpt_setup' ELSE COALESCE(workspace_usage_events.factory_id::text, '') END"
+		return expression, expression
 	}
 }
 
@@ -616,6 +618,9 @@ func spendingLabelMap(catalogs SpendingCatalogs, groupBy string) map[string]stri
 		items = catalogs.Machines
 	}
 	out := make(map[string]string, len(items))
+	if groupBy == SpendingGroupByWorkspace {
+		out[SpendingChatGPTSetupID] = "ChatGPT setup"
+	}
 	for _, item := range items {
 		out[item.ID] = item.Label
 	}

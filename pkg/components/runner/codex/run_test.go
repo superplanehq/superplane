@@ -47,8 +47,12 @@ const id = "thread-123";
 const dir = path.join(process.env.CODEX_HOME, "sessions", "2026", "10", "19");
 fs.mkdirSync(dir, { recursive: true });
 fs.writeFileSync(path.join(dir, "rollout-test-" + id + ".jsonl"), [
+  JSON.stringify({ type: "session_meta", payload: { id, session_id: id } }),
   JSON.stringify({ type: "turn_context", payload: { model: "gpt-5.4", effort: "xhigh" } }),
-  "{invalid"
+  JSON.stringify({ type: "event_msg", payload: { type: "task_started", turn_id: "turn-1" } }),
+  JSON.stringify({ type: "token_usage_record", payload: { thread_id: id, session_id: id, turn_id: "turn-1", response_id: "response-1", usage: { input_tokens: 10, cached_input_tokens: 3, cache_write_input_tokens: 2, output_tokens: 4, reasoning_output_tokens: 1, total_tokens: 14 } } }),
+  JSON.stringify({ type: "event_msg", payload: { type: "task_complete", turn_id: "turn-1" } }),
+  ""
 ].join("\n"));
 process.stdout.write(JSON.stringify({ type: "thread.started", thread_id: id }) + "\n");
 process.stdout.write(JSON.stringify({ type: "turn.completed", usage: { input_tokens: 10, output_tokens: 4, cache_read_input_tokens: 3, cache_write_input_tokens: 2, reasoning_output_tokens: 1 } }) + "\n");
@@ -1105,7 +1109,7 @@ func liveLogRecords(t *testing.T, output string) []map[string]any {
 	return records
 }
 
-func TestFormatCodexJsonLinesEmitsCompletedUsage(t *testing.T) {
+func TestFormatCodexJsonLinesIgnoresUnprovenCumulativeUsage(t *testing.T) {
 	output := runCodexFormatter(t, []string{
 		`{"type":"item.completed","item":{"id":"answer","type":"agent_message","text":"done"}}`,
 		`{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":30,"output_tokens":20},"total_cost_usd":0.12}`,
@@ -1119,9 +1123,55 @@ func TestFormatCodexJsonLinesEmitsCompletedUsage(t *testing.T) {
 	}
 	require.NotNil(t, last)
 	usage := last["usage"].(map[string]any)
-	assert.Equal(t, float64(100), usage["input_tokens"])
-	assert.Equal(t, float64(30), usage["cache_read_input_tokens"])
-	assert.Equal(t, float64(20), usage["output_tokens"])
-	require.Contains(t, usage, "total_cost_usd")
-	assert.InDelta(t, 0.12, usage["total_cost_usd"], 1e-9)
+	assert.Zero(t, usage["input_tokens"])
+	assert.Zero(t, usage["cache_read_input_tokens"])
+	assert.Zero(t, usage["output_tokens"])
+	assert.NotContains(t, usage, "total_cost_usd")
+}
+
+func TestCodexQuotaResultSurvivesPlanningArtifactWriteFailure(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	resultFile := filepath.Join(taskDir, "result.json")
+	require.NoError(t, os.WriteFile(prompt, []byte("Analyze the task."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	for _, file := range []string{"llm_usage.js", "turn_telemetry.js"} {
+		content, err := os.ReadFile(filepath.Join("..", file))
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(taskDir, file), content, 0o600))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), []byte(`module.exports={subscriptionEnabled:()=>true,reportUsage:async()=>{}};`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "agent_message.js"), []byte(`module.exports.recordAgentMessage=async()=>{
+ require("fs").writeFileSync(process.env.SUPERPLANE_RESULT_FILE,JSON.stringify({plan:"saved-plan"}));
+ throw new Error("Planning message upload failed");
+};`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(`#!/usr/bin/env node
+const fs=require("fs"),path=require("path"),id="thread-quota";
+const dir=path.join(process.env.CODEX_HOME,"sessions");fs.mkdirSync(dir,{recursive:true});
+const records=[
+ {type:"session_meta",payload:{id,session_id:id}},
+ {type:"event_msg",payload:{type:"task_started",turn_id:"turn-quota"}},
+ {type:"token_usage_record",payload:{thread_id:id,session_id:id,turn_id:"turn-quota",response_id:"response-quota",usage:{input_tokens:10,cached_input_tokens:2,output_tokens:4,reasoning_output_tokens:1,total_tokens:14}}},
+ {type:"event_msg",payload:{type:"task_complete",turn_id:"turn-quota",error:{codex_error_info:"usage_limit_exceeded",message:"You reached a subscription limit."}}}
+];
+fs.writeFileSync(path.join(dir,"rollout-test-"+id+".jsonl"),records.map(r=>JSON.stringify(r)).join("\n")+"\n");
+process.stdout.write(JSON.stringify({type:"thread.started",thread_id:id})+"\n");
+process.stdout.write(JSON.stringify({type:"turn.failed",error:{message:"You reached a subscription limit."}})+"\n");
+process.exitCode=1;
+`), 0o700))
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	command := exec.Command("node", script, prompt)
+	command.Env = append(withoutCodexAPIKeys(os.Environ()), "PATH="+taskDir+":"+os.Getenv("PATH"), "SUPERPLANE_TASK_DIR="+taskDir, "SUPERPLANE_RESULT_FILE="+resultFile, "CODEX_HOME="+filepath.Join(taskDir, "codex-home"), "OPENAI_API_KEY=test-api-key", "SUPERPLANE_PLANNING_SESSION_ID=planning-1", "SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis")
+	out, err := command.CombinedOutput()
+	require.Error(t, err, string(out))
+	encoded, err := os.ReadFile(resultFile)
+	require.NoError(t, err)
+	var result map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &result))
+	assert.Equal(t, "saved-plan", result["plan"])
+	assert.Equal(t, true, result["is_error"])
+	assert.Equal(t, "chatgpt_quota_exhausted", result["failure"].(map[string]any)["reason"])
+	assert.Equal(t, "partial", result["usage_state"])
+	assert.Equal(t, float64(14), result["usage"].(map[string]any)["total_tokens"])
 }

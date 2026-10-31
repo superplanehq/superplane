@@ -1,3 +1,4 @@
+import type { UsageMeasurementState } from "@/lib/agentRunTelemetry";
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -168,7 +169,9 @@ export function PopupHeader({
   );
 }
 
-type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "costUsd" | "tokensLabel">;
+type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "costUsd" | "tokensLabel"> & {
+  usageState?: UsageMeasurementState;
+};
 
 /** Owner and spend. No elapsed time, status, author, or ticket key. */
 export function OwnerTimeCostRow({

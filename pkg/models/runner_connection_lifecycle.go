@@ -9,6 +9,21 @@ import (
 
 // MarkLost returns the running task it ended, if any.
 func (r *Runner) MarkLost(tx *gorm.DB, lastSeenBefore, now time.Time) (*RunnerTask, error) {
+	original := *r
+	var task *RunnerTask
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		var err error
+		task, err = r.markLost(tx, lastSeenBefore, now)
+		return err
+	})
+	if err != nil {
+		*r = original
+		return nil, err
+	}
+	return task, err
+}
+
+func (r *Runner) markLost(tx *gorm.DB, lastSeenBefore, now time.Time) (*RunnerTask, error) {
 	if r.LastSeenAt == nil ||
 		r.LastSeenAt.After(lastSeenBefore) ||
 		(r.State != RunnerStateIdle && r.State != RunnerStateBusy) {
@@ -22,6 +37,9 @@ func (r *Runner) MarkLost(tx *gorm.DB, lastSeenBefore, now time.Time) (*RunnerTa
 
 	var lostRunningTask *RunnerTask
 	if taskErr == nil {
+		if err := task.recordSetupAllocationUsage(tx, now); err != nil {
+			return nil, err
+		}
 		wasRunning := task.State == RunnerTaskStateRunning
 		if err := tx.Model(task).Updates(map[string]any{
 			"state":       RunnerTaskStateLost,

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
+	canvasespb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -38,4 +39,15 @@ func SerializeCodexUsageWindow(window *models.CodexUsageWindow) *pb.CodexUsageWi
 		view.ResetsAt = timestamppb.New(time.Unix(*window.ResetsAt, 0))
 	}
 	return view
+}
+
+func SerializeSubscriptionFailure(failure *models.SubscriptionFailure) *canvasespb.SubscriptionFailure {
+	if failure == nil {
+		return nil
+	}
+	out := &canvasespb.SubscriptionFailure{Reason: failure.Reason, LimitId: failure.LimitID, SubscriptionOwnerId: failure.SubscriptionOwnerID}
+	if failure.ResetsAt != nil {
+		out.ResetsAt = timestamppb.New(*failure.ResetsAt)
+	}
+	return out
 }

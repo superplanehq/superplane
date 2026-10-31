@@ -1,3 +1,5 @@
+import { CodexSetupFailure } from "../../codex/CodexSetupFailure";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import type { FactoriesFactoryCodexConnection } from "@/api-client";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -18,6 +20,7 @@ function useCodexConnectionState(codex: CodexConnection) {
     Boolean,
   );
   const disabled = [isLoading, codex.query.isLoading, connection?.revocationPending === true, !offered].some(Boolean);
+  const recoveryDisabled = [isLoading, codex.query.isLoading].some(Boolean);
   const ready = connection?.status === "ready";
   const signingIn =
     !ready &&
@@ -29,6 +32,7 @@ function useCodexConnectionState(codex: CodexConnection) {
   return {
     connection,
     disabled,
+    recoveryDisabled,
     signingIn,
     ready,
     refreshing,
@@ -48,11 +52,13 @@ function connectionStatus(loading: boolean, connection: FactoriesFactoryCodexCon
 export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConnection }) {
   const state = useCodexConnectionState(codex);
   const { connection, disabled, signingIn, ready, refreshing, cancelingRefresh, reconnect, status } = state;
+  const billingEnabled = useBillingProductEnabled();
+  const { organizationId } = useFactorySettingsLayout();
 
   if (signingIn)
     return (
       <CodexDeviceSignIn
-        disabled={disabled}
+        disabled={state.recoveryDisabled}
         connection={connection}
         starting={codex.start.isPending}
         canceling={codex.cancel.isPending}
@@ -93,7 +99,7 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
                   variant="outline"
                   size="sm"
                   loading={codex.disconnect.isPending}
-                  disabled={disabled}
+                  disabled={state.recoveryDisabled}
                   onClick={() => codex.disconnect.mutate()}
                 >
                   Disconnect ChatGPT
@@ -103,6 +109,12 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
           )}
         </div>
       </div>
+      {billingEnabled ? (
+        <p className="text-xs text-muted-foreground">
+          ChatGPT sign-in and refresh use SuperPlane compute credit. Subscription model usage has no SuperPlane charge.
+        </p>
+      ) : null}
+      <CodexSetupFailure error={codex.start.error ?? codex.refreshCatalog.error} organizationId={organizationId} />
       {refreshing ? (
         <p role="status" className="text-xs text-muted-foreground">
           {cancelingRefresh ? "Canceling refresh…" : "Refreshing usage and models…"}
@@ -150,7 +162,7 @@ function ConnectedActions({
           variant="outline"
           size="sm"
           loading={cancelingRefresh}
-          disabled={disabled || cancelingRefresh}
+          disabled={state.recoveryDisabled || cancelingRefresh}
           onClick={() => codex.cancelCatalog.mutate(catalogRefreshTaskId)}
         >
           Cancel refresh
@@ -161,7 +173,7 @@ function ConnectedActions({
         variant="outline"
         size="sm"
         loading={codex.disconnect.isPending}
-        disabled={disabled || refreshing}
+        disabled={state.recoveryDisabled || refreshing}
         onClick={() => codex.disconnect.mutate()}
       >
         Disconnect ChatGPT

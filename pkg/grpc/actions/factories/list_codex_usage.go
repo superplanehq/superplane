@@ -20,7 +20,7 @@ func ListFactoryCodexUsage(ctx context.Context, organizationID string, req *pb.L
 	if _, err := findFactory(db, orgID, req.GetFactoryId()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to load workspace")
 	}
-	connections, err := models.ListEligibleCodexConnections(db, orgID)
+	connections, err := models.ListConnectedCodexConnections(db, orgID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to load connected ChatGPT members")
 	}

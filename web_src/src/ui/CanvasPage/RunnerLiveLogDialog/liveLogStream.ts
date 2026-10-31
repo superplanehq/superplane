@@ -6,6 +6,8 @@ import {
   promptUsageSeries,
   startPromptUsageSeries,
   type AgentPromptUsageSeries,
+  type UsageMeasurementState,
+  usageMeasurementState,
 } from "@/lib/agentRunTelemetry";
 import { withHostedUsageCost, type HostedUsagePricing } from "@/lib/hostedUsagePricing";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -21,6 +23,7 @@ export type LiveLogRecordEnvelope = {
   index?: number;
   turn?: number;
   usage?: Record<string, number>;
+  usage_state?: UsageMeasurementState;
   status?: "passed" | "failed";
   duration_ms?: number;
   started_at?: number;
@@ -73,7 +76,7 @@ export type LiveLogStreamHandlers = {
     turn?: number,
     commandIndex?: number,
   ) => void;
-  onTurn?: (turn: number, usage: Record<string, number>, message?: string) => void;
+  onTurn?: (turn: number, usage: Record<string, number>, message?: string, usageState?: UsageMeasurementState) => void;
 };
 
 async function fetchRunnerLiveLogSession(
@@ -163,7 +166,11 @@ function dispatchLineRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamH
   }
   const nestedTurn = parseAgentTurnLiveLogText(rec.text);
   if (nestedTurn) {
-    handlers.onTurn?.(nestedTurn.turn, nestedTurn.usage, nestedTurn.message);
+    if (nestedTurn.usage_state) {
+      handlers.onTurn?.(nestedTurn.turn, nestedTurn.usage, nestedTurn.message, nestedTurn.usage_state);
+    } else {
+      handlers.onTurn?.(nestedTurn.turn, nestedTurn.usage, nestedTurn.message);
+    }
     return true;
   }
   const nestedActivity = parseAgentActivityRecordText(rec.text);
@@ -237,11 +244,14 @@ function dispatchTurnRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamH
   if (rec.type !== "turn" || typeof rec.turn !== "number") {
     return false;
   }
-  handlers.onTurn?.(
-    rec.turn,
-    rec.usage && typeof rec.usage === "object" ? rec.usage : {},
-    typeof rec.message === "string" ? rec.message : undefined,
-  );
+  const usage = rec.usage && typeof rec.usage === "object" ? rec.usage : {};
+  const message = typeof rec.message === "string" ? rec.message : undefined;
+  const state = usageMeasurementState(rec.usage_state);
+  if (state) {
+    handlers.onTurn?.(rec.turn, usage, message, state);
+  } else {
+    handlers.onTurn?.(rec.turn, usage, message);
+  }
   return true;
 }
 
@@ -310,8 +320,8 @@ export function reducePromptUsageFromLiveLogLines(lines: string[]): AgentPromptU
     onToolEnd: (status, durationMs, id, turn) => {
       state = applyPromptUsageRecord(state, { type: "tool_end", status, duration_ms: durationMs, id, turn });
     },
-    onTurn: (turn, usage, message) => {
-      state = applyPromptUsageRecord(state, { type: "turn", turn, usage, message });
+    onTurn: (turn, usage, message, usageState) => {
+      state = applyPromptUsageRecord(state, { type: "turn", turn, usage, message, usage_state: usageState });
     },
   };
   for (const line of lines) {
@@ -432,7 +442,8 @@ export class LiveLogStream {
       const onTurn = handlers.onTurn;
       handlers = {
         ...handlers,
-        onTurn: (turn, usage, message) => onTurn?.(turn, withHostedUsageCost(usage, pricing), message),
+        onTurn: (turn, usage, message, usageState) =>
+          onTurn?.(turn, withHostedUsageCost(usage, pricing), message, usageState),
       };
     }
     if (required.backend === "integrated") {

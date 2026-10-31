@@ -1,3 +1,5 @@
+import type { UsageMeasurementState } from "@/lib/agentRunTelemetry";
+import type { CanvasesSubscriptionFailure } from "@/api-client";
 export type CreateWithAgentMachineStatus = "queued" | "starting" | "running" | "waiting" | "passed" | "failed";
 
 export type CreateWithAgentCreatedOrder = {
@@ -60,6 +62,8 @@ export type CreateWithAgentView = {
   repository: string;
   machineStatus: CreateWithAgentMachineStatus;
   runnerState?: string;
+  usageState?: UsageMeasurementState;
+  subscriptionFailure?: CanvasesSubscriptionFailure;
   blockedByParallelismLimit?: boolean;
   /**
    * True when the agent run for this turn has finished. The chat still waits

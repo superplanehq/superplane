@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
@@ -113,6 +114,18 @@ func processTaskStatus(
 	out := map[string]any{"status": status, "exit_code": taskExitCode(task)}
 	if errorMessage != "" {
 		out["error"] = errorMessage
+	}
+	if finishedEventType == "runnerCodex.finished" {
+		failure := models.SubscriptionFailureFromResult(task.Result)
+		if payload, ok := result.(map[string]any); ok {
+			delete(payload, "failure")
+			if failure != nil {
+				payload["failure"] = failure
+			}
+		}
+		if channel == FailedOutputChannel && failure != nil {
+			out["failure"] = failure
+		}
 	}
 	if result != nil {
 		out["result"] = result

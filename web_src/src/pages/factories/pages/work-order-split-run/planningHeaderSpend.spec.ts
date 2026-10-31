@@ -160,3 +160,9 @@ describe("planningHeaderSpendToReport", () => {
     expect(saved.spend).toEqual({ tokens: 2100, cents: 45 });
   });
 });
+
+it("keeps the established counting behavior for other harnesses with a raw total", () => {
+  const otherHarness = prompt(10, 0);
+  otherHarness.telemetry.usage.total_tokens = 999;
+  expect(headerSpendFromUsageSeries([otherHarness]).tokens).toBe(10);
+});

@@ -1,3 +1,5 @@
+import { combinedMeasurementState } from "@/lib/agentRunTelemetry";
+import { ChatGPTQuotaHistory, ChatGPTQuotaNotice } from "../../codex/ChatGPTQuotaNotice";
 import { emptyAgentRunTelemetry, type AgentPromptUsageSeries, type AgentRunTelemetry } from "@/lib/agentRunTelemetry";
 import { agentRunNewTokenCount } from "@/lib/agentRunTelemetryChart";
 
@@ -336,6 +338,7 @@ type PhaseLogCardProps = {
   runHref?: string;
   collapsible?: boolean;
   organizationId?: string;
+  factoryKey?: string;
   canvasId?: string;
   /** Collapse setup noise and bash in the planning session log. */
   compactSessionLog?: boolean;
@@ -432,6 +435,7 @@ export function PhaseLogCard({
   actionBusy = false,
   collapsible = true,
   organizationId,
+  factoryKey,
   canvasId,
   compactSessionLog = false,
   showHeader = true,
@@ -483,6 +487,16 @@ export function PhaseLogCard({
               description={phaseMarkdownDescription(phase, files, layout.showDescription)}
             />
           )}
+          <ChatGPTQuotaNotice
+            failure={phase.subscriptionFailure}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+          />
+          <ChatGPTQuotaHistory
+            attempts={phase.subscriptionFailureHistory}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+          />
           {layout.showStream ? (
             <PhaseLogCardStream
               phase={phase}
@@ -945,7 +959,9 @@ function PhaseMetrics({ phase }: { phase: SplitRunPhase }) {
     : formatGoDurationLabel(phase.duration ?? "");
   const agents = usePhaseAgentUsageAgents();
   const { tokens, cents } = displayedPhaseSpend(phase, agents);
-  useReportLiveHeaderSpend(phase.id, tokens, cents);
+  const usageState =
+    combinedMeasurementState(agents.map((agent) => agent.telemetry.usage_state)).usage_state ?? phase.usageState;
+  useReportLiveHeaderSpend(phase.id, tokens, cents, usageState);
   const modelIds = useSpecificModelIds();
   const model = modelNameWithThinking(displayRunnerModel(phase.model ?? "", modelIds), phase.thinkingLevel);
   const { spendParts, restParts } = phaseMetricParts(cents, tokens, model, clock);

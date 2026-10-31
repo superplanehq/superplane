@@ -46,6 +46,11 @@ func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 	assert.Equal(t, balance, *snapshot.Limits[0].Credits.Balance)
 	assert.Equal(t, duration, *snapshot.Limits[0].Primary.WindowDurationMins)
 	assert.Equal(t, reset, snapshot.Limits[0].Primary.ResetsAt.AsTime().Unix())
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	response, err = ListCodexUsage(meContext(r))
+	require.NoError(t, err)
+	require.Len(t, response.Connections, 1, "saved usage remains readable while new admission is disabled")
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 
 	for _, ids := range [][2]string{{uuid.NewString(), r.Organization.ID.String()}, {r.User.String(), uuid.NewString()}} {
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-user-id", ids[0], "x-organization-id", ids[1]))

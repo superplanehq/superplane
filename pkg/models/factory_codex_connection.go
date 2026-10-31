@@ -164,9 +164,6 @@ func FindFactoryCodexConnectionByID(tx *gorm.DB, id uuid.UUID) (*FactoryCodexCon
 
 // LockScopedFactoryCodexConnection locks the exact connection in a signed scope.
 func LockScopedFactoryCodexConnection(tx *gorm.DB, organizationID, connectionID uuid.UUID) (*FactoryCodexConnection, error) {
-	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
-		return nil, err
-	}
 	snapshot, err := FindFactoryCodexConnectionByID(tx, connectionID)
 	if err != nil {
 		return nil, err
@@ -174,7 +171,7 @@ func LockScopedFactoryCodexConnection(tx *gorm.DB, organizationID, connectionID 
 	if snapshot.OrganizationID != organizationID {
 		return nil, ErrCodexConnectionStale
 	}
-	if _, err := ActiveCodexMember(tx, organizationID, snapshot.OwnerUserID); err != nil {
+	if _, err := activeHumanCodexMember(tx, organizationID, snapshot.OwnerUserID); err != nil {
 		return nil, err
 	}
 	c, err := FindFactoryCodexConnectionByID(tx.Clauses(clause.Locking{Strength: "UPDATE"}), connectionID)
@@ -812,6 +809,12 @@ func ActiveCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, er
 	return activeHumanCodexMember(tx, organizationID, userID)
 }
 
+// ActiveCodexConnectionMember permits existing connection reads and recovery
+// after new subscription admissions have been disabled.
+func ActiveCodexConnectionMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, error) {
+	return activeHumanCodexMember(tx, organizationID, userID)
+}
+
 func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 	if len(limits) == 0 || len(limits) > 32 {
 		return errors.New("invalid Codex usage limits")
@@ -974,6 +977,11 @@ func ListEligibleCodexConnections(tx *gorm.DB, organizationID uuid.UUID) ([]Fact
 	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
 		return nil, err
 	}
+	return ListConnectedCodexConnections(tx, organizationID)
+}
+
+// ListConnectedCodexConnections keeps usage reads available when admission is disabled.
+func ListConnectedCodexConnections(tx *gorm.DB, organizationID uuid.UUID) ([]FactoryCodexConnection, error) {
 	var connections []FactoryCodexConnection
 	err := tx.Model(&FactoryCodexConnection{}).Select("factory_codex_connections.*").
 		Joins("JOIN users ON users.id = factory_codex_connections.owner_user_id AND users.organization_id = factory_codex_connections.organization_id").

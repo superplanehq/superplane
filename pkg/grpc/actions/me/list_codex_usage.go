@@ -20,8 +20,8 @@ func ListCodexUsage(ctx context.Context) (*pb.ListCodexUsageResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := models.ActiveCodexMember(database.DB(ctx), orgID, userID); err != nil {
-		return nil, grpcerrors.PermissionDenied(err, "Codex requires active organization membership and the Codex feature")
+	if _, err := models.ActiveCodexConnectionMember(database.DB(ctx), orgID, userID); err != nil {
+		return nil, grpcerrors.PermissionDenied(err, "Codex requires active organization membership")
 	}
 	connections, err := models.ListOwnedFactoryCodexConnections(database.DB(ctx), orgID, userID)
 	if err != nil {

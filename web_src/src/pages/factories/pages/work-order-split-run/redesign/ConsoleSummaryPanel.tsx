@@ -75,7 +75,10 @@ export function ConsoleSummaryPanel({
   onOwnerSave,
 }: ConsoleSummaryPanelProps) {
   const liveSpend = useLiveHeaderSpendOverlay();
-  const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
+  const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, {
+    ...liveSpend,
+    usageState: liveSpend.usageState ?? fixture.usageState,
+  });
   const panel = consolePanelFacts({ fixture, outcome, stages, pullRequests, artifacts, source, panelReview });
   const shownOwner = owner ?? outcome.owner;
   const shownAssigneeIds = assigneeIds ?? fixture.assigneeIds;

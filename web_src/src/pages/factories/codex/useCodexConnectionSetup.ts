@@ -95,7 +95,7 @@ export function useCodexConnectionSetup({ organizationId, factoryId, open, onCon
   const features = useExperimentalFeature(organizationId);
   const offered = features.has(FEATURE_CODEX_SUBSCRIPTIONS);
   const enabled = open && !features.isLoading && offered;
-  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
+  const codex = useFactoryCodexConnection(organizationId, factoryId, open, enabled);
   const completion = useConnectionCompletion({
     open,
     enabled: enabled && codex.query.data?.eligible === true,
@@ -134,6 +134,7 @@ export function useCodexConnectionSetup({ organizationId, factoryId, open, onCon
   };
 
   return {
+    organizationId,
     codex,
     disabled,
     featuresLoading: features.isLoading,
