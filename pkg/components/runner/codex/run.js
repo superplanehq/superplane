@@ -8,6 +8,7 @@
  */
 
 const fs = require("fs");
+const { constants } = require("os");
 const path = require("path");
 const readline = require("readline");
 const { spawn } = require("child_process");
@@ -394,6 +395,39 @@ function saveFailureResult(message) {
   }
 }
 
+function superviseCodexProcessGroup(child) {
+  let running = true;
+  const stop = () => {
+    if (!running || !child.pid) return;
+    running = false;
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch (_error) {
+      child.kill("SIGKILL");
+    }
+  };
+  // Host runners terminate the task group before escalating to SIGKILL.
+  // Codex has its own group so credential failures can stop its native child.
+  const handlers = new Map();
+  for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) {
+    const handler = () => {
+      stop();
+      process.exit(128 + constants.signals[signal]);
+    };
+    handlers.set(signal, handler);
+    process.once(signal, handler);
+  }
+  process.once("exit", stop);
+  child.once("close", () => {
+    running = false;
+    process.removeListener("exit", stop);
+    for (const [signal, handler] of handlers) {
+      process.removeListener(signal, handler);
+    }
+  });
+  return stop;
+}
+
 async function runPrompt(promptFile, model, thinking) {
   const sp = process.env.SUPERPLANE_TASK_DIR;
   if (!sp) {
@@ -403,18 +437,12 @@ async function runPrompt(promptFile, model, thinking) {
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
-  let child;
+  let stopChild = () => {};
   const subscription = loadSubscriptionModule();
   subscription?.setCredentialFailureHandler?.((error) => {
     // No untrusted output is safe after losing sight of credential rotation.
     // Stop the npm launcher and its native child, and save only a fixed error.
-    if (child?.pid) {
-      try {
-        process.kill(-child.pid, "SIGKILL");
-      } catch (_error) {
-        child.kill("SIGKILL");
-      }
-    }
+    stopChild();
     process.stderr.write(`${error.message}\n`);
     try {
       fs.writeFileSync(resultFile, `${JSON.stringify({ type: "result", is_error: true, error: error.message, result: "" })}\n`);
@@ -470,11 +498,13 @@ async function runPrompt(promptFile, model, thinking) {
   }
   codexArgs.push(prompt);
 
-  child = spawn("codex", codexArgs, {
+  const detached = Boolean(subscription?.setCredentialFailureHandler);
+  const child = spawn("codex", codexArgs, {
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
-    detached: Boolean(subscription?.setCredentialFailureHandler),
+    detached,
   });
+  if (detached) stopChild = superviseCodexProcessGroup(child);
   const stderrDone = pipeRedactedStderr(child.stderr);
 
   let lastResult = {};
