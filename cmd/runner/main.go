@@ -105,6 +105,9 @@ func run() error {
 			"--registration-token or RUNNER_REGISTRATION_TOKEN is required",
 		)
 	}
+	// Creation APIs return the runner endpoint. The protocol clients use the
+	// server root and append /runner/v1 for registration, sockets, and logs.
+	*apiURL = strings.TrimSuffix(strings.TrimRight(strings.TrimSpace(*apiURL), "/"), "/runner/v1")
 	if *tagsFromEC2 {
 		cloudTags, err := hosttags.FromEC2(context.Background())
 		if err != nil {

@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -23,8 +25,10 @@ const (
 )
 
 var (
-	ErrRunnerFleetNotFound   = errors.New("runner fleet not found")
-	ErrRunnerFleetIDConflict = errors.New("runner fleet ID conflicts with an existing fleet")
+	ErrRunnerFleetNotFound         = errors.New("runner fleet not found")
+	ErrRunnerFleetIDConflict       = errors.New("runner fleet ID conflicts with an existing fleet")
+	ErrRunnerFleetDisabled         = errors.New("fleet is disabled")
+	ErrOrganizationRunnersDisabled = errors.New("organization_runners feature is disabled")
 )
 
 type RunnerFleetSpec struct {
@@ -214,6 +218,7 @@ func ListEnabledRunnerFleetsForOrganization(tx *gorm.DB, organizationID uuid.UUI
 	var fleets []RunnerFleet
 	err := tx.
 		Where("enabled = ?", true).
+		Where(organizationFleetFeatureAvailable).
 		Where(
 			"(scope_type = ? AND scope_id IS NULL) OR (scope_type = ? AND scope_id = ?)",
 			RunnerFleetScopeInstallation,
@@ -263,7 +268,83 @@ func FindEnabledRunnerFleetForOrganization(
 	if err != nil {
 		return nil, err
 	}
+	if fleet.ScopeType == RunnerFleetScopeOrganization {
+		enabled, err := OrganizationHasExperimentalFeatures(tx, organizationID, features.FeatureOrganizationRunners)
+		if err != nil {
+			return nil, err
+		}
+		if !enabled {
+			return nil, ErrOrganizationRunnersDisabled
+		}
+	}
 	return &fleet, nil
+}
+
+// Selection reads persisted owner state instead of cached authorization.
+const organizationFleetFeatureAvailable = `(scope_type = 'installation' OR EXISTS (
+ SELECT 1 FROM organizations owner WHERE owner.id = runner_fleets.scope_id
+ AND owner.deleted_at IS NULL
+ AND owner.enabled_experimental_features @> '["organization_runners"]'::jsonb))`
+
+func ListOrganizationRunnerFleets(tx *gorm.DB, organizationID uuid.UUID) ([]RunnerFleet, error) {
+	var fleets []RunnerFleet
+	err := tx.Where("scope_type = ? AND scope_id = ?", RunnerFleetScopeOrganization, organizationID).
+		Order("slug ASC").Find(&fleets).Error
+	return fleets, err
+}
+
+func FindOrganizationRunnerFleet(tx *gorm.DB, organizationID uuid.UUID, slug string) (*RunnerFleet, error) {
+	var fleet RunnerFleet
+	err := tx.Where("scope_type = ? AND scope_id = ? AND slug = ?", RunnerFleetScopeOrganization, organizationID, slug).
+		First(&fleet).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrRunnerFleetNotFound
+	}
+	return &fleet, err
+}
+
+// LockAdmission establishes organization -> fleet ordering. The locks last
+// until the caller's transaction commits, including nested transactions.
+// Disabled errors follow locking so active reservations can still continue.
+func (f *RunnerFleet) LockAdmission(tx *gorm.DB) error {
+	var featureErr error
+	if f.ScopeType == RunnerFleetScopeOrganization {
+		if f.ScopeID == nil {
+			return ErrRunnerFleetNotFound
+		}
+		featureErr = RequireOrganizationRunnerFeature(tx, *f.ScopeID)
+		if featureErr != nil && !errors.Is(featureErr, ErrOrganizationRunnersDisabled) {
+			return featureErr
+		}
+	}
+	current, err := FindRunnerFleet(tx.Clauses(clause.Locking{Strength: "SHARE"}), f.ID)
+	if err != nil {
+		return err
+	}
+	*f = *current
+	return featureErr
+}
+
+func RequireOrganizationRunnerFeature(tx *gorm.DB, organizationID uuid.UUID) error {
+	var organization Organization
+	if err := tx.Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).
+		First(&organization, "id = ?", organizationID).Error; err != nil {
+		return err
+	}
+	if !organization.HasExperimentalFeature(features.FeatureOrganizationRunners) {
+		return ErrOrganizationRunnersDisabled
+	}
+	return nil
+}
+
+func (f *RunnerFleet) RequireAdmission(tx *gorm.DB) error {
+	if err := f.LockAdmission(tx); err != nil {
+		return err
+	}
+	if !f.Enabled {
+		return ErrRunnerFleetDisabled
+	}
+	return nil
 }
 
 func FindRunnerFleet(tx *gorm.DB, id uuid.UUID) (*RunnerFleet, error) {

@@ -320,24 +320,30 @@ func TestCreateTaskSpecificRunnerRequiresIdempotencyKey(t *testing.T) {
 	assert.Zero(t, runnerCount)
 }
 
-func TestCreateRunnerRejectsReusedIdempotencyKeyForDifferentRequest(t *testing.T) {
+func TestCreateRunnerScopesRequestKeysToFleet(t *testing.T) {
 	resource := support.Setup(t)
 	firstFleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
 	secondFleet := createTestFleetWithSlug(t, "other-linux-amd64")
 	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
 	service := newTestRunnerService()
 
-	_, err := service.CreateRunner(ctx, &pb.CreateRunnerRequest{
+	first, err := service.CreateRunner(ctx, &pb.CreateRunnerRequest{
 		FleetId:        firstFleet.Slug,
 		IdempotencyKey: "request-1",
 		Ephemeral:      true,
 	})
 	require.NoError(t, err)
 
-	_, err = service.CreateRunner(ctx, &pb.CreateRunnerRequest{
+	second, err := service.CreateRunner(ctx, &pb.CreateRunnerRequest{
 		FleetId:        secondFleet.Slug,
 		IdempotencyKey: "request-1",
 		Ephemeral:      true,
+	})
+	require.NoError(t, err)
+	assert.NotEqual(t, first.Runner.Id, second.Runner.Id)
+	_, err = service.CreateRunner(ctx, &pb.CreateRunnerRequest{
+		FleetId: firstFleet.Slug, IdempotencyKey: "request-1", Ephemeral: true,
+		FleetManagerId: "different-manager", Provider: "aws",
 	})
 	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 }
