@@ -141,28 +141,28 @@ func buildAgentStep(stepNumber int, original, dispatched AgentStep, nodeWorkingD
 		command := stringPtrValue(original.Command)
 		scriptName := stepSlug + ".sh"
 		return TaskFile{
-				Path:    "steps/" + scriptName,
-				Content: stringPtrValue(dispatched.Command),
-				Mode:    "0644",
-			}, TaskCommand{
-				Name:    AgentStepLabel(original.Name, scriptName),
-				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
-				Kind:    LiveLogKindBash,
-				Preview: LiveLogText(command),
-			}
+			Path:    "steps/" + scriptName,
+			Content: stringPtrValue(dispatched.Command),
+			Mode:    "0644",
+		}, TaskCommand{
+			Name:    AgentStepLabel(original.Name, scriptName),
+			Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
+			Kind:    LiveLogKindBash,
+			Preview: LiveLogText(command),
+		}
 	default:
 		prompt := stringPtrValue(original.Prompt)
 		promptName := stepSlug + ".txt"
 		return TaskFile{
-				Path:    "prompts/" + promptName,
-				Content: FormatAgentPrompt(stringPtrValue(dispatched.Prompt), usage, attachments, inspectImages),
-				Mode:    "0644",
-			}, TaskCommand{
-				Name:    AgentStepLabel(original.Name, promptName),
-				Command: WrapAgentStepCommand(WrapPromptCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
-				Kind:    LiveLogKindPrompt,
-				Preview: LiveLogText(prompt),
-			}
+			Path:    "prompts/" + promptName,
+			Content: FormatAgentPrompt(stringPtrValue(dispatched.Prompt), usage, attachments, inspectImages),
+			Mode:    "0644",
+		}, TaskCommand{
+			Name:    AgentStepLabel(original.Name, promptName),
+			Command: WrapAgentStepCommand(WrapPromptCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
+			Kind:    LiveLogKindPrompt,
+			Preview: LiveLogText(prompt),
+		}
 	}
 }
 
