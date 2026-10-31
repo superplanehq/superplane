@@ -6,7 +6,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func serializeFleet(fleet *models.RunnerFleet) *pb.Fleet {
+func SerializeFleet(fleet *models.RunnerFleet) *pb.Fleet {
 	spec := fleet.Spec.Data()
 
 	return &pb.Fleet{
