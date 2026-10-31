@@ -365,7 +365,7 @@ function readUsage(env) {
           if (
             !result ||
             !Array.isArray(result.data) ||
-            result.data.some((model) => !model || typeof model.model !== "string" || !model.model.trim()) ||
+            result.data.some((model) => !validCatalogModel(model)) ||
             (result.nextCursor != null && typeof result.nextCursor !== "string") ||
             (result.nextCursor && modelCursors.has(result.nextCursor))
           ) {
@@ -424,6 +424,20 @@ function readUsage(env) {
       },
     });
   });
+}
+
+function validCatalogModel(model) {
+  if (!model || typeof model.model !== "string" || !model.model.trim()) return false;
+  const optionalStrings = [model.id, model.displayName, model.defaultReasoningEffort];
+  if (optionalStrings.some((value) => value != null && typeof value !== "string")) return false;
+  if (model.isDefault != null && typeof model.isDefault !== "boolean") return false;
+  const efforts = model.supportedReasoningEfforts;
+  if (efforts == null) return true;
+  return Array.isArray(efforts) && efforts.every((effort) =>
+    effort &&
+    typeof effort === "object" &&
+    [effort.reasoningEffort, effort.description].every((value) => value == null || typeof value === "string"),
+  );
 }
 
 function parseDeviceAuth(text) {
