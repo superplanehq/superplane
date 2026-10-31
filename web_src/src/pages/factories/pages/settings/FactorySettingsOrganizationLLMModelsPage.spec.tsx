@@ -410,21 +410,74 @@ describe("workspace LLM model settings", () => {
     { name: "unknown balance", credits: { hasCredits: true }, expected: "Available" },
     { name: "no credits", credits: { hasCredits: false }, expected: "0 credits" },
     { name: "fractional balance", credits: { hasCredits: true, balance: "4712.5" }, expected: "4,712.5 credits" },
-  ])("shows $name without quota windows", async ({ credits, expected }) => {
-    vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({
-      data: { members: [{ userId: "other", displayName: "Other member", limits: [{ limitId: "codex", credits }] }] },
-    } as never);
-    renderPage("AGENT_HARNESS_CODEX", true);
-    const row = await screen.findByRole("row", { name: /Other member/ });
-    expect(within(row).getByText("Available credits")).toBeInTheDocument();
-    expect(within(row).getByText(expected)).toBeInTheDocument();
-    expect(within(row).queryByText("Usage unavailable")).not.toBeInTheDocument();
-    const user = userEvent.setup();
-    await user.click(within(row).getByRole("button", { name: "Options for Other member" }));
-    const details = screen.getByRole("menu");
-    expect(within(details).getByText(expected)).toBeInTheDocument();
-    expect(within(details).queryByText("Usage unavailable")).not.toBeInTheDocument();
-  });
+    {
+      name: "monthly allowance with an unknown balance",
+      credits: { hasCredits: true, balance: null },
+      individualLimit: { limit: "5000", used: "288.32", remainingPercent: 94 },
+      expected: "4,712 credits",
+      label: "Monthly credits",
+    },
+    {
+      name: "monthly allowance without credits",
+      individualLimit: { limit: "5000", used: "288.32", remainingPercent: 94 },
+      expected: "4,712 credits",
+      label: "Monthly credits",
+    },
+    {
+      name: "exhausted monthly allowance",
+      credits: { hasCredits: false },
+      individualLimit: { limit: "5000", used: "5000.5", remainingPercent: 0 },
+      expected: "0 credits",
+      label: "Monthly credits",
+    },
+    {
+      name: "balance before monthly allowance",
+      credits: { hasCredits: true, balance: "12.5" },
+      individualLimit: { limit: "5000", used: "288.32", remainingPercent: 94 },
+      expected: "12.5 credits",
+    },
+    {
+      name: "unlimited balance before monthly allowance",
+      credits: { hasCredits: true, unlimited: true },
+      individualLimit: { limit: "5000", used: "288.32", remainingPercent: 94 },
+      expected: "Unlimited",
+    },
+  ])(
+    "shows $name without quota windows",
+    async ({ credits, individualLimit, expected, label = "Available credits" }) => {
+      const resetsAt = new Date(Date.now() + 86400000 * 20).toISOString();
+      vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({
+        data: {
+          members: [
+            {
+              userId: "other",
+              displayName: "Other member",
+              limits: [
+                {
+                  limitId: "codex",
+                  credits,
+                  individualLimit: individualLimit ? { ...individualLimit, resetsAt } : undefined,
+                },
+              ],
+            },
+          ],
+        },
+      } as never);
+      renderPage("AGENT_HARNESS_CODEX", true);
+      const row = await screen.findByRole("row", { name: /Other member/ });
+      expect(within(row).getByText(label)).toBeInTheDocument();
+      expect(within(row).getByText(expected)).toBeInTheDocument();
+      const reset = within(row).queryByText(`Resets: ${new Date(resetsAt).toLocaleString()}`);
+      if (label === "Monthly credits") expect(reset).toBeInTheDocument();
+      if (label !== "Monthly credits") expect(reset).not.toBeInTheDocument();
+      expect(within(row).queryByText("Usage unavailable")).not.toBeInTheDocument();
+      const user = userEvent.setup();
+      await user.click(within(row).getByRole("button", { name: "Options for Other member" }));
+      const details = screen.getByRole("menu");
+      expect(within(details).getByText(expected)).toBeInTheDocument();
+      expect(within(details).queryByText("Usage unavailable")).not.toBeInTheDocument();
+    },
+  );
 
   it("can retry a failed member usage request", async () => {
     vi.mocked(factoriesListFactoryCodexUsage).mockRejectedValueOnce(new Error("Unavailable"));
