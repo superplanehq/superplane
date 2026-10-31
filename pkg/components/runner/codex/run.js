@@ -404,6 +404,9 @@ async function runPrompt(promptFile, model, thinking) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
   const childEnv = codexExecEnv(process.env);
+  // Restore runs in a separate process. Observe credentials here before Codex
+  // can replace or remove the auth file.
+  redactSubscription("");
 
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
@@ -672,12 +675,12 @@ function loadSubscriptionModule(env = process.env) {
   return require(file);
 }
 
-function redactSubscription(value) {
+function redactSubscription(value, options = {}) {
   const helper = loadSubscriptionModule();
   if (!helper || !helper.redactSecrets) {
     return String(value);
   }
-  return helper.redactSecrets(String(value));
+  return helper.redactSecrets(String(value), process.env, options);
 }
 
 function writeStdout(value) {
@@ -764,16 +767,17 @@ function createCodexFormatter(telemetry, activityOverride) {
     return queue.shift() || `${type}-${contentSeq++}`;
   }
 
-  function appendContentDelta(contentKind, id, text) {
+  function appendContentDelta(contentKind, id, text, options = {}) {
     if (typeof text !== "string" || !text) {
       return;
     }
+    const safe = safeLogText(redactSubscription(text, options));
     const previous = contentText.get(id) || "";
-    const delta = text.startsWith(previous)
-      ? text.slice(previous.length)
-      : text;
+    const delta = safe.startsWith(previous)
+      ? safe.slice(previous.length)
+      : safe;
     activity.appendContent(contentKind, id, delta);
-    contentText.set(id, text);
+    contentText.set(id, safe);
   }
 
   function rememberTool(item) {
@@ -884,7 +888,7 @@ function createCodexFormatter(telemetry, activityOverride) {
         if (event.type === "item.started") {
           activity.startContent(contentKind, id);
           const initialText = item.text || item.result || "";
-          appendContentDelta(contentKind, id, initialText);
+          appendContentDelta(contentKind, id, initialText, { incomplete: true });
           return;
         }
         if (event.type === "item.completed") {
