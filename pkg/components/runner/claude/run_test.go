@@ -95,7 +95,7 @@ func TestClaudeStartsOnlyTheGlobalMCPServerWithARunnerToken(t *testing.T) {
 	}{
 		{name: "task run", env: []string{"SUPERPLANE_ARTIFACT_TOKEN=artifact-token", "SUPERPLANE_PUBLISH_LINKS=yes"}, tools: "Bash,Read,Edit,Write,mcp__superplane_global"},
 		{name: "planning", env: []string{"SUPERPLANE_PLANNING_SESSION_ID=session-1", "SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis"}, tools: "Read,Bash,mcp__superplane_global"},
-		{name: "merge confidence", env: []string{"SUPERPLANE_MERGE_CONFIDENCE_TOKEN=merge-token"}, tools: "Bash,Read,Edit,Write,mcp__superplane_global"},
+		{name: "merge confidence", env: nil, tools: "Bash,Read,Edit,Write,mcp__superplane_global"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			run := runClaudeWithFakeCLI(t, append(tc.env, "SUPERPLANE_RUNNER_TOKEN=runner-token")...)
@@ -109,7 +109,7 @@ func TestClaudeStartsOnlyTheGlobalMCPServerWithARunnerToken(t *testing.T) {
 }
 
 func TestClaudeStartsTheLegacyMCPServerWithoutARunnerToken(t *testing.T) {
-	run := runClaudeWithFakeCLI(t, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN=merge-token")
+	run := runClaudeWithFakeCLI(t)
 
 	assert.Equal(t, "Bash,Read,Edit,Write", run.allowedTools)
 	assert.Nil(t, run.mcpServers)
@@ -201,8 +201,7 @@ func TestAllowedClaudeToolsIgnoresLegacyScoreEnv(t *testing.T) {
 
 func TestAllowedClaudeToolsAllowsMergeConfidenceReport(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{
-		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
-		"SUPERPLANE_BASE_URL":               "https://app.example",
+		"SUPERPLANE_BASE_URL": "https://app.example",
 	})
 
 	assert.Contains(t, tools, "Bash")

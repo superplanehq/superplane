@@ -33,12 +33,14 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	db := database.DB(t.Context())
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
-	env := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{{Name: runner.EnvSuperplaneRunnerToken, Value: "untrusted"}}, 60)
+	env := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{{Name: runner.EnvSuperplaneRunnerToken, Value: "untrusted"}}, 60, nil)
 	token := runnerTokenFrom(env)
 	require.NotEmpty(t, token)
 	require.NotEqual(t, "untrusted", token)
 	assert.False(t, runner.HasArtifactUploadToken(env))
-	assert.False(t, runner.HasMergeConfidenceToken(env))
+	for _, item := range env {
+		assert.NotEqual(t, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN", item.Name)
+	}
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
 	t.Run("code history follows the saved task repository", func(t *testing.T) {
 		integration := models.NewIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), nil)
@@ -163,7 +165,7 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 		rec := assignRunnerOwner(t, server, invalidToken, `{"user":"implementation-dev","reason":"Owns pkg."}`)
 		require.Equal(t, http.StatusUnauthorized, rec.Code)
 	}
-	for _, route := range []string{"/api/v1/runner/tasks/owner", "/api/v1/runner/planning-sessions/owner", "/api/v1/runner/artifacts/links", "/api/v1/runner/artifacts/markdown", "/api/v1/runner/merge-confidence/checks"} {
+	for _, route := range []string{"/api/v1/runner/tasks/owner", "/api/v1/runner/planning-sessions/owner", "/api/v1/runner/artifacts/links", "/api/v1/runner/artifacts/markdown"} {
 		rec := postPlanningRunner(t, server, token, route, `{}`)
 		require.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 	}
@@ -180,7 +182,7 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 		} {
 			require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
 		}
-		assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60)))
+		assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60, nil)))
 		eventsAfter, err := persisted.ListEvents(db, 0, nil)
 		require.NoError(t, err)
 		assert.Equal(t, eventsBefore, eventsAfter)
@@ -189,7 +191,7 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 		assert.Equal(t, []uuid.UUID{owner.ID}, unchanged.AssigneeIDs())
 	}
 	ctx.RunID = uuid.New()
-	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60)))
+	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60, nil)))
 }
 
 func TestRunnerAssignOwnerReasonIsOptional(t *testing.T) {
@@ -197,7 +199,7 @@ func TestRunnerAssignOwnerReasonIsOptional(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	db := database.DB(t.Context())
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	require.NotEmpty(t, token)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
 	owner := mustTaskOwnerMember(t, r, "implementation-dev")
@@ -245,7 +247,7 @@ func latestOwnerPayload(t *testing.T, order *models.FactoryWorkOrder) factoryeve
 
 func assertRunnerOwnerAccess(t *testing.T, server *Server, ctx core.ExecutionContext, env []runner.TaskEnvironmentVariable, orderID uuid.UUID) string {
 	t.Helper()
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60, nil))
 	require.NotEmpty(t, token)
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
 	require.NoError(t, err)

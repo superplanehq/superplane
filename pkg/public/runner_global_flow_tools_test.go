@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,7 +51,7 @@ func TestRunnerGlobalPlanUpdate(t *testing.T) {
 	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
 
 	ctx, _, _ := mustTaskLinkedAgentRun(t, r)
-	taskToken := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	taskToken := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	rec = runnerRequest(t, server, http.MethodPut, taskToken, "/api/v1/runner/task/plan", `{"spec":"# Plan"}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	rec = runnerRequest(t, server, http.MethodPut, planningToken, "/api/v1/runner/task/plan", `{"spec":"# Plan"}`)
@@ -77,7 +76,8 @@ func TestRunnerGlobalMergeCheck(t *testing.T) {
 	require.NoError(t, err)
 	execution := createExecutionForCanvasRun(t, run, rootEvent.ID, nodeID)
 	require.NoError(t, db.Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
-	mergeToken, err := runner.MintMergeConfidenceToken(signer, runner.MergeConfidenceScope{
+	ctx := core.ExecutionContext{ID: execution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://app.test"}
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, &runner.MergeConfidenceScope{
 		OrganizationID:  r.Organization.ID,
 		FactoryID:       factoryModel.ID,
 		WorkOrderID:     order.ID,
@@ -85,10 +85,7 @@ func TestRunnerGlobalMergeCheck(t *testing.T) {
 		NodeExecutionID: execution.ID,
 		EnabledChecks:   []string{"api-latency"},
 		CheckLabels:     map[string]string{"api-latency": "API latency"},
-	}, time.Hour)
-	require.NoError(t, err)
-	ctx := core.ExecutionContext{ID: execution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://app.test"}
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{{Name: runner.EnvSuperplaneMergeConfidenceToken, Value: mergeToken}}, 60))
+	}))
 	require.NotEmpty(t, token)
 
 	assert.Equal(t, append(append([]string{}, everyGlobalRunnerTool...), "report_merge_check"), listRunnerTools(t, server, token))
@@ -107,7 +104,7 @@ func TestRunnerGlobalMergeCheck(t *testing.T) {
 	assert.Equal(t, run.ID, *checks[0].RunID)
 
 	taskCtx, _, _ := mustTaskLinkedAgentRun(t, r)
-	taskToken := runnerTokenFrom(runner.AttachRunnerEnv(taskCtx, nil, 60))
+	taskToken := runnerTokenFrom(runner.AttachRunnerEnv(taskCtx, nil, 60, nil))
 	rec = runnerRequest(t, server, http.MethodPost, taskToken, "/api/v1/runner/task/merge-checks", `{"check":"api-latency","score":2,"summary":"Wrong flow."}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 }
@@ -125,7 +122,7 @@ func TestRunnerGlobalArtifactUpload(t *testing.T) {
 
 	env := runner.AttachArtifactUploadEnv(ctx, nil, 60, true)
 	require.True(t, runner.HasVisualEvidence(env))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60, nil))
 	require.NotEmpty(t, token)
 	assert.Equal(t, append(append([]string{}, everyGlobalRunnerTool...),
 		"inspect_screenshot", "upload_artifact", "report_visual_evidence_unavailable"), listRunnerTools(t, server, token))
@@ -144,11 +141,11 @@ func TestRunnerGlobalArtifactUpload(t *testing.T) {
 	links := runnerTokenFrom(runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplaneArtifactToken, Value: "artifact-token"},
 		{Name: runner.EnvSuperplanePublishLinks, Value: "yes"},
-	}, 60))
+	}, 60, nil))
 	rec = postRunnerArtifactFile(t, server, links, png)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 
-	withoutEvidence := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	withoutEvidence := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	rec = postRunnerArtifactFile(t, server, withoutEvidence, png)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 }
@@ -162,7 +159,7 @@ func TestRunnerGlobalArtifactLink(t *testing.T) {
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplaneArtifactToken, Value: "artifact-token"},
 		{Name: runner.EnvSuperplanePublishLinks, Value: "yes"},
-	}, 60))
+	}, 60, nil))
 	require.NotEmpty(t, token)
 	assert.Equal(t, append(append([]string{}, everyGlobalRunnerTool...), "publish_link"), listRunnerTools(t, server, token))
 
@@ -180,7 +177,7 @@ func TestRunnerGlobalArtifactLink(t *testing.T) {
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/markdown", markdown)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 
-	withoutLinks := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	withoutLinks := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	rec = runnerRequest(t, server, http.MethodPost, withoutLinks, "/api/v1/runner/task/links", body)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	rec = runnerRequest(t, server, http.MethodPost, withoutLinks, "/api/v1/runner/task/markdown", markdown)
@@ -202,7 +199,7 @@ func mustPlanningGlobalRunnerToken(t *testing.T, r *support.ResourceRegistry, se
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplanePlanningID, Value: session.ID.String()},
 		{Name: runner.EnvSuperplaneRunToken, Value: planningToken},
-	}, 60))
+	}, 60, nil))
 	require.NotEmpty(t, token)
 	return token
 }
