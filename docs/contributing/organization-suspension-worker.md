@@ -8,6 +8,11 @@ Cancellation requests remain durable until workflow finalization, runner
 completion, and confirmed agent stopping finish. Reactivation remains blocked
 while cancellation is incomplete. Schedules retain their future configuration.
 
+Agent cancellation checks every stored session, including locally idle, failed,
+and terminated sessions. Local status does not prove that remote work stopped.
+Each confirmed stop records the suspension event ID. A previous suspension's
+confirmation cannot release reactivation for a later suspension.
+
 ## Process configuration
 
 - Regular workers require the existing database configuration and `RABBITMQ_URL`.
@@ -18,7 +23,7 @@ while cancellation is incomplete. Schedules retain their future configuration.
 - Managed-agent cancellation requires `ANTHROPIC_API_KEY`, `ANTHROPIC_AGENT_ID`,
   and `ANTHROPIC_ENVIRONMENT_ID` on regular workers. The provider uses
   `https://api.anthropic.com/v1`. Missing configuration leaves agent cancellation
-  pending. Organizations without active managed agents can still complete.
+  pending. Organizations without stored managed-agent sessions can still complete.
 
 ## Deployment source inspection
 
@@ -37,6 +42,7 @@ Its worker Secret wiring remains unverified. Live Secret contents also remain
 unverified. Confirm the three keys reach regular workers in managed-agent
 installations before suspension events can target those sessions.
 
+Apply the agent-session confirmation migration before deploying this worker.
 Deploy this worker after the model foundation. Deploy the subsequent suspension
 API, UI, and admission enforcement after this worker. No companion source
 change is prepared in the unavailable hosted chart repository.

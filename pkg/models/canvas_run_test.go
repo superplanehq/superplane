@@ -270,6 +270,7 @@ func Test__CanvasRun__CancellationDrainMakesBoundedProgress(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	db := database.DB(t.Context())
 	for i := 0; i < 101; i++ {
+		createExecutionForRun(t, run, execution.RootEventID, "node-1")
 		queue := support.CreateQueueItem(t, run.WorkflowID, "node-1", execution.RootEventID, execution.RootEventID)
 		require.NoError(t, db.Model(queue).Update("run_id", run.ID).Error)
 	}
@@ -283,6 +284,9 @@ func Test__CanvasRun__CancellationDrainMakesBoundedProgress(t *testing.T) {
 	open, err := run.FindOpenWork(db)
 	require.NoError(t, err)
 	require.True(t, open.HasQueueItems)
+	eligible, err := run.ListExecutionsInStates(db, []string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted})
+	require.NoError(t, err)
+	require.Len(t, eligible, 2)
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		var err error
 		result, err = run.RequestCancellationBatch(tx)
@@ -292,6 +296,43 @@ func Test__CanvasRun__CancellationDrainMakesBoundedProgress(t *testing.T) {
 	open, err = run.FindOpenWork(db)
 	require.NoError(t, err)
 	require.False(t, open.HasQueueItems)
+	eligible, err = run.ListExecutionsInStates(db, []string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted})
+	require.NoError(t, err)
+	require.Empty(t, eligible)
+}
+
+func Test__CanvasRun__OrdinaryTerminationDrainsAllWork(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		completion bool
+	}{{name: "cancellation"}, {name: "completion", completion: true}} {
+		t.Run(test.name, func(t *testing.T) {
+			run, execution := setupRunWithExecution(t)
+			db := database.DB(t.Context())
+			for i := 0; i < 101; i++ {
+				createExecutionForRun(t, run, execution.RootEventID, "node-1")
+				queue := support.CreateQueueItem(t, run.WorkflowID, "node-1", execution.RootEventID, execution.RootEventID)
+				require.NoError(t, db.Model(queue).Update("run_id", run.ID).Error)
+				event := support.EmitCanvasEventForNode(t, run.WorkflowID, "node-1", "default", nil)
+				require.NoError(t, db.Model(event).Update("run_id", run.ID).Error)
+			}
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				if test.completion {
+					_, err := run.RequestCompletion(tx, nil)
+					return err
+				}
+				_, err := run.RequestCancellation(tx, nil)
+				return err
+			}))
+			eligible, err := run.ListExecutionsInStates(db, []string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted})
+			require.NoError(t, err)
+			require.Empty(t, eligible)
+			open, err := run.FindOpenWork(db)
+			require.NoError(t, err)
+			require.False(t, open.HasQueueItems)
+			require.False(t, open.HasPendingEvents)
+		})
+	}
 }
 
 func Test__CanvasRun__StaleCancellationPreservesFinishedExecution(t *testing.T) {

@@ -9,10 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/runners/control"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -194,6 +196,76 @@ func TestSuspensionAgentStopSurvivesFailureAndBlocksReactivationDuringProviderCa
 	require.NoError(t, w.Process(t.Context()))
 	require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
 	streamUnlock()
+	require.NoError(t, w.Process(t.Context()))
+	require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
+}
+
+func TestSuspensionConfirmsRemoteStopForLocallyInactiveAgents(t *testing.T) {
+	for _, status := range []string{models.AgentSessionStatusFailed, models.AgentSessionStatusIdle, models.AgentSessionStatusTerminated} {
+		t.Run(status, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			db := database.DB(t.Context())
+			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+			session := models.AgentSession{OrganizationID: r.Organization.ID, UserID: r.User, CanvasID: canvas.ID, Provider: "test", ProviderSessionID: "remote-turn", Status: status}
+			require.NoError(t, db.Create(&session).Error)
+			require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop remote turn"))
+			events, err := models.ListOrganizationSuspensionEvents(db, r.Organization.ID)
+			require.NoError(t, err)
+			require.NoError(t, events[0].WithCurrentSuspension(db, events[0].CompleteCancellation))
+			require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
+			p := &suspensionProvider{failure: errors.New("remote stop unavailable")}
+			w := NewOrganizationSuspensionWorker(agents.NewService(p, nil))
+			require.Error(t, w.Process(t.Context()))
+			require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
+			p.failure = nil
+			require.NoError(t, w.Process(t.Context()))
+			require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
+			p.stopped = true
+			require.NoError(t, w.Process(t.Context()))
+			require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
+			// Confirmation from a previous suspension cannot authorize reactivation.
+			require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Check a later generation"))
+			p.stopped = false
+			w = NewOrganizationSuspensionWorker(agents.NewService(p, nil))
+			require.NoError(t, w.Process(t.Context()))
+			require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
+			p.stopped = true
+			require.NoError(t, w.Process(t.Context()))
+			require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
+		})
+	}
+}
+
+func TestSuspensionStopsDeletedCanvasComponentBeforeReactivation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	cancelled := false
+	component := "deleted-canvas-cancel-" + uuid.NewString()
+	r.Registry.Actions[component] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name:       component,
+		CancelFunc: func(core.ExecutionContext) error { cancelled = true; return nil },
+	})
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "work", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: component}})},
+	}, nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "work", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "work", event.ID, event.ID)
+	require.NoError(t, db.Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+	require.NoError(t, db.Delete(canvas).Error)
+	require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop deleted canvas"))
+	w := NewOrganizationSuspensionWorker(nil)
+	require.NoError(t, w.Process(t.Context()))
+	require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
+	terminator := NewExecutionTerminator("", r.AuthService, r.Encryptor, r.Registry)
+	require.NoError(t, terminator.LockAndCancelExecution(*execution))
+	require.True(t, cancelled)
+	stored, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionStateFinished, stored.State)
+	require.Equal(t, models.CanvasNodeExecutionResultCancelled, stored.Result)
+	require.NoError(t, NewRunFinalizer("", r.Registry).finalizeRun(canvas.ID, execution.RunID, runFinalizerTriggerSweep))
 	require.NoError(t, w.Process(t.Context()))
 	require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
 }

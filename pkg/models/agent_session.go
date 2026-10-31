@@ -25,6 +25,7 @@ type AgentSession struct {
 	CanvasID                uuid.UUID
 	Provider                string
 	ProviderSessionID       string
+	SuspensionStopEventID   *uuid.UUID
 	AgentToolSchemaRevision string
 	Status                  string
 	LastActiveAt            *time.Time

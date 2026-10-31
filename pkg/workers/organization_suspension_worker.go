@@ -210,7 +210,9 @@ func (w *OrganizationSuspensionWorker) stopAgent(ctx context.Context, event *mod
 	if err := messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{SessionID: session.ID.String(), Event: "turn_completed", Status: models.AgentSessionStatusIdle}); err != nil {
 		return err
 	}
-	return event.WithCurrentSuspension(database.DB(ctx), session.CompleteSuspensionStop)
+	return event.WithCurrentSuspension(database.DB(ctx), func(tx *gorm.DB) error {
+		return session.CompleteSuspensionStop(tx, event.ID)
+	})
 }
 
 func tryOrganizationSuspensionLock(ctx context.Context, organizationID uuid.UUID) (func(), bool, error) {

@@ -160,7 +160,7 @@ func ListCancellingNodeExecutions(db *gorm.DB) ([]CanvasNodeExecution, error) {
 		Where("workflow_node_executions.cancelled_at IS NOT NULL").
 		Order("workflow_node_executions.cancelled_at ASC")
 
-	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+	err := query.
 		Find(&executions).
 		Error
 	if err != nil {
@@ -170,7 +170,7 @@ func ListCancellingNodeExecutions(db *gorm.DB) ([]CanvasNodeExecution, error) {
 	return executions, nil
 }
 
-func LockCancellingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
+func LockCancellingNodeExecution(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
 	var execution CanvasNodeExecution
 
 	query := tx.
@@ -184,7 +184,7 @@ func LockCancellingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*Canv
 		Where("workflow_node_executions.id = ?", id).
 		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStateCancelling)
 
-	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+	err := query.
 		First(&execution).
 		Error
 	if err != nil {
