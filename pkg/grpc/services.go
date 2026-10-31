@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
+	pbAdminOrganizations "github.com/superplanehq/superplane/pkg/protos/admin/organizations"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
@@ -34,23 +35,24 @@ import (
 )
 
 type Services struct {
-	Users         pbUsers.UsersServer
-	Groups        pbGroups.GroupsServer
-	Roles         pbRoles.RolesServer
-	Organizations pbOrganizations.OrganizationsServer
-	Integrations  pbIntegrations.IntegrationsServer
-	Secrets       pbSecrets.SecretsServer
-	Me            pbMe.MeServer
-	Actions       pbActions.ActionsServer
-	Triggers      pbTriggers.TriggersServer
-	Widgets       pbWidgets.WidgetsServer
-	Canvases      pbCanvases.CanvasesServer
-	Factories     pbFactories.FactoriesServer
-	Files         pbFiles.FilesServer
-	APIKeys       pbAPIKeys.ApiKeysServer
-	Agents        pbAgents.AgentsServer
-	AdminRunners  pbAdminRunners.RunnersServer
-	AdminKeys     pbAdminKeys.KeysServer
+	Users              pbUsers.UsersServer
+	Groups             pbGroups.GroupsServer
+	Roles              pbRoles.RolesServer
+	Organizations      pbOrganizations.OrganizationsServer
+	Integrations       pbIntegrations.IntegrationsServer
+	Secrets            pbSecrets.SecretsServer
+	Me                 pbMe.MeServer
+	Actions            pbActions.ActionsServer
+	Triggers           pbTriggers.TriggersServer
+	Widgets            pbWidgets.WidgetsServer
+	Canvases           pbCanvases.CanvasesServer
+	Factories          pbFactories.FactoriesServer
+	Files              pbFiles.FilesServer
+	APIKeys            pbAPIKeys.ApiKeysServer
+	Agents             pbAgents.AgentsServer
+	AdminRunners       pbAdminRunners.RunnersServer
+	AdminKeys          pbAdminKeys.KeysServer
+	AdminOrganizations pbAdminOrganizations.AdminOrganizationsServer
 }
 
 type ServicesConfig struct {
@@ -138,6 +140,7 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 				cfg.RunnerAPIBaseURL,
 			),
 		),
-		AdminKeys: NewAdminKeysService(cfg.EncryptionStore),
+		AdminKeys:          NewAdminKeysService(cfg.EncryptionStore),
+		AdminOrganizations: NewAdminOrganizationsService(cfg.AuthService),
 	}, nil
 }
