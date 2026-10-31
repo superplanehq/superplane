@@ -371,6 +371,9 @@ func loadCodexConnection(
 			return lockErr
 		}
 		if release {
+			if err := connection.AttachLoginLease(tx); err != nil {
+				return err
+			}
 			beforeRelease = []models.FactoryCodexConnection{*connection}
 			if err := models.ReleaseConfirmedCodexReservations(tx, time.Now(), connection.ID); err != nil {
 				return err
