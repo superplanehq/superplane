@@ -43,10 +43,7 @@ func ListFactoryCodexUsage(ctx context.Context, organizationID string, req *pb.L
 			member.ObservedAt = timestamppb.New(*connection.UsageObservedAt)
 		}
 		for _, limit := range connection.UsageLimits {
-			member.Limits = append(member.Limits, &pb.CodexUsageLimit{
-				LimitId: limit.LimitID, LimitName: limit.LimitName, PlanType: limit.PlanType,
-				Primary: actions.SerializeCodexUsageWindow(limit.Primary), Secondary: actions.SerializeCodexUsageWindow(limit.Secondary),
-			})
+			member.Limits = append(member.Limits, actions.SerializeCodexUsageLimit(limit))
 		}
 		response.Members = append(response.Members, member)
 	}

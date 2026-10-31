@@ -27,10 +27,11 @@ func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 	taskID := uuid.New()
 	require.NoError(t, connection.BeginLogin(db, taskID, now))
 	require.NoError(t, connection.StoreBundle(db, taskID, connection.ReservationGeneration, 1, []byte("secret"), "ada@example.com", true, now))
+	balance := "0"
 	used := 25.0
 	duration := int64(300)
 	reset := now.Add(time.Hour).Unix()
-	limits := []models.CodexUsageLimit{{LimitID: "codex", Primary: &models.CodexUsageWindow{UsedPercent: &used, WindowDurationMins: &duration, ResetsAt: &reset}}}
+	limits := []models.CodexUsageLimit{{LimitID: "codex", Credits: &models.CodexUsageCredits{HasCredits: false, Balance: &balance}, Primary: &models.CodexUsageWindow{UsedPercent: &used, WindowDurationMins: &duration, ResetsAt: &reset}}}
 	require.NoError(t, connection.StoreUsage(db, limits, nil, now))
 	response, err := ListCodexUsage(meContext(r))
 	require.NoError(t, err)
@@ -40,6 +41,9 @@ func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 	assert.WithinDuration(t, now, snapshot.ObservedAt.AsTime(), time.Second)
 	require.Len(t, snapshot.Limits, 1)
 	assert.Equal(t, used, snapshot.Limits[0].Primary.UsedPercent)
+	require.NotNil(t, snapshot.Limits[0].Credits)
+	require.NotNil(t, snapshot.Limits[0].Credits.Balance)
+	assert.Equal(t, balance, *snapshot.Limits[0].Credits.Balance)
 	assert.Equal(t, duration, *snapshot.Limits[0].Primary.WindowDurationMins)
 	assert.Equal(t, reset, snapshot.Limits[0].Primary.ResetsAt.AsTime().Unix())
 

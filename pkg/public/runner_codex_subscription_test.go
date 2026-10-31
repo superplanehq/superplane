@@ -56,7 +56,7 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 		return response
 	}
 	valid := map[string]any{
-		"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 25, "windowDurationMins": 300, "resetsAt": now.Add(time.Hour).Unix()}}},
+		"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 25, "windowDurationMins": 300, "resetsAt": now.Add(time.Hour).Unix()}, "credits": map[string]any{"hasCredits": true, "unlimited": false, "balance": "4712"}}},
 		"models": []any{map[string]any{"id": "gpt-5.4", "model": "gpt-5.4", "displayName": "GPT-5.4", "defaultReasoningEffort": "medium", "supportedReasoningEfforts": []any{map[string]any{"reasoningEffort": "xhigh", "description": "Deep"}}, "isDefault": true}},
 	}
 	require.Equal(t, http.StatusUnauthorized, checkpoint("", valid).Code)
@@ -65,18 +65,28 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
 	require.Len(t, connection.UsageLimits, 1)
 	assert.Equal(t, 25.0, *connection.UsageLimits[0].Primary.UsedPercent)
+	require.NotNil(t, connection.UsageLimits[0].Credits)
+	require.NotNil(t, connection.UsageLimits[0].Credits.Balance)
+	assert.Equal(t, "4712", *connection.UsageLimits[0].Credits.Balance)
+	assert.True(t, connection.UsageLimits[0].Credits.HasCredits)
 	require.NotNil(t, connection.UsageObservedAt)
 	require.Len(t, connection.AvailableModels, 1)
 	assert.Equal(t, "gpt-5.4", connection.AvailableModels[0].Model)
 	observed := *connection.UsageObservedAt
 	version := connection.CredentialVersion
-	for _, usage := range []any{
+	invalidUsage := []any{
 		nil,
 		map[string]any{"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": -1}}}},
 		map[string]any{"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": "invalid"}}}},
 		map[string]any{"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{}}}},
 		map[string]any{"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 25, "resetsAt": int64(253402300800)}}}},
-	} {
+	}
+	for _, balance := range []any{"invalid", "NaN", "Infinity", "-1", 4712} {
+		invalidUsage = append(invalidUsage, map[string]any{"limits": []any{map[string]any{
+			"limitId": "codex", "credits": map[string]any{"balance": balance},
+		}}})
+	}
+	for _, usage := range invalidUsage {
 		response := checkpoint(token, usage)
 		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 		require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
@@ -84,6 +94,7 @@ func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
 		assert.Equal(t, version, connection.CredentialVersion)
 		assert.Equal(t, observed, *connection.UsageObservedAt)
 		assert.Equal(t, 25.0, *connection.UsageLimits[0].Primary.UsedPercent)
+		assert.Equal(t, "4712", *connection.UsageLimits[0].Credits.Balance)
 	}
 	response = checkpoint(token, map[string]any{"models": []any{map[string]any{"model": "gpt-5.3"}}})
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
@@ -118,7 +129,7 @@ func TestCodexRunCheckpointDoesNotReplaceTheRefreshToken(t *testing.T) {
 	body, err := json.Marshal(map[string]any{
 		"bundle": map[string]any{"access_token": "access-token", "refresh_token": "stolen-refresh-token", "id_token": "id-token"},
 		"usage": map[string]any{
-			"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 40, "windowDurationMins": 300, "resetsAt": time.Now().Add(time.Hour).Unix()}}},
+			"limits": []any{map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 40, "windowDurationMins": 300, "resetsAt": time.Now().Add(time.Hour).Unix()}, "credits": map[string]any{"hasCredits": false, "balance": "0"}}},
 			"models": []any{map[string]any{"model": "gpt-5.4"}},
 		},
 	})
@@ -132,6 +143,9 @@ func TestCodexRunCheckpointDoesNotReplaceTheRefreshToken(t *testing.T) {
 	assert.Equal(t, original, []byte(connection.BundleCiphertext))
 	require.Len(t, connection.UsageLimits, 1)
 	assert.Equal(t, 40.0, *connection.UsageLimits[0].Primary.UsedPercent)
+	require.NotNil(t, connection.UsageLimits[0].Credits)
+	require.NotNil(t, connection.UsageLimits[0].Credits.Balance)
+	assert.Equal(t, "0", *connection.UsageLimits[0].Credits.Balance)
 	assert.NotContains(t, string(connection.BundleCiphertext), secret)
 	for _, workspaceID := range []uuid.UUID{uuid.Nil, uuid.New()} {
 		wrongScope, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{

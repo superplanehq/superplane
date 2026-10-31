@@ -232,7 +232,7 @@ if (process.argv[2] === "app-server") {
     if (request.method === "account/rateLimits/read") {
       const reply = fs.existsSync(path.join(process.env.CODEX_HOME, "unavailable"))
         ? { error: { message: "provider unavailable access-token-value" } }
-        : { result: { rateLimits: { limitId: "codex", primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1900000000 }, secondary: null } } };
+        : { result: { rateLimits: { limitId: "codex", primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1900000000 }, secondary: { usedPercent: 67, windowDurationMins: 10080, resetsAt: 1900000000 }, credits: { hasCredits: true, unlimited: false, balance: "4712" } } } };
       if (reply.result && fs.existsSync(path.join(process.env.CODEX_HOME, "multi"))) {
         reply.result.rateLimitsByLimitId = {
           codex: reply.result.rateLimits,
@@ -323,6 +323,8 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 	primary := limits[0].(map[string]any)["primary"].(map[string]any)
 	assert.Equal(t, float64(25), primary["usedPercent"])
 	assert.Equal(t, float64(300), primary["windowDurationMins"])
+	assert.Equal(t, float64(10080), limits[0].(map[string]any)["secondary"].(map[string]any)["windowDurationMins"])
+	assert.Equal(t, map[string]any{"hasCredits": true, "unlimited": false, "balance": "4712"}, limits[0].(map[string]any)["credits"])
 	for _, checkpoint := range checkpoints[1 : len(checkpoints)-1] {
 		usage, ok := checkpoint["usage"].(map[string]any)
 		require.True(t, ok, "an unavailable quota must not discard the catalog")
