@@ -2,6 +2,8 @@
 "use strict";
 
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
 const ACTIVITY_SCHEMA_VERSION = 2;
 const DEFAULT_LIMITS = Object.freeze({
@@ -44,8 +46,11 @@ function redactSensitiveText(value, env = process.env) {
   for (const secret of secretValues(env)) {
     text = text.replace(new RegExp(escapeRegExp(secret), "g"), "[REDACTED]");
   }
+  const subscription = subscriptionRedactor(env);
+  if (subscription) text = subscription.redactSecrets(text, env);
   text = text
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[REDACTED]")
     .replace(/\b(?:sk|rk|gh[pousr]|github_pat|xox[baprs]|glpat|npm_)-?[A-Za-z0-9_-]{8,}\b/g, "[REDACTED]")
     .replace(/\b(?:AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35})\b/g, "[REDACTED]")
     .replace(
@@ -56,6 +61,19 @@ function redactSensitiveText(value, env = process.env) {
   return text;
 }
 
+function subscriptionRedactor(env) {
+  const taskDir = env.SUPERPLANE_TASK_DIR;
+  if (!taskDir) return null;
+  const candidates = [
+    path.join(taskDir, "codex_subscription.js"),
+    path.join(__dirname, "codex", "codex_subscription.js"),
+  ];
+  const file = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!file) return null;
+  const subscription = require(file);
+  return typeof subscription.redactSecrets === "function" ? subscription : null;
+}
+
 function sanitizeLogValue(value, env = process.env) {
   if (typeof value === "string") return sanitizeLogText(value, env);
   if (Array.isArray(value)) return value.map((item) => sanitizeLogValue(item, env));
@@ -63,11 +81,11 @@ function sanitizeLogValue(value, env = process.env) {
   if (value.type === "image") {
     return {
       type: "image",
-      ...(value.mimeType ? { mimeType: String(value.mimeType) } : {}),
+      ...(value.mimeType ? { mimeType: redactSensitiveText(value.mimeType, env) } : {}),
       summary: "[image content omitted from logs]",
     };
   }
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeLogValue(item, env)]));
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [redactSensitiveText(key, env), sanitizeLogValue(item, env)]));
 }
 
 function sanitizeLogText(value, env = process.env) {
@@ -176,7 +194,7 @@ function createActivityStream(options = {}) {
       return;
     }
     sequence += 1;
-    writeRecord({
+    writeRecord(sanitizeLogValue({
       ...record,
       schema_version: ACTIVITY_SCHEMA_VERSION,
       event_id: `${activityId}:${sequence}`,
@@ -185,7 +203,7 @@ function createActivityStream(options = {}) {
       timestamp: new Date(now()).toISOString(),
       provider,
       turn,
-    });
+    }, env));
     persistence.schedule(persistImmediately);
   }
 
@@ -433,7 +451,7 @@ function createActivityStream(options = {}) {
   }
 
   function snapshot() {
-    const value = {
+    const value = sanitizeLogValue({
       schema_version: ACTIVITY_SCHEMA_VERSION,
       activity_id: activityId,
       provider,
@@ -443,7 +461,7 @@ function createActivityStream(options = {}) {
       started_at: startedAt,
       completed_at: completedAt,
       items: items.map(snapshotItem),
-    };
+    }, env);
     if (byteLength(JSON.stringify(value)) <= limits.snapshotBytes) {
       return value;
     }

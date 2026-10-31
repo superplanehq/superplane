@@ -99,12 +99,14 @@ test("normalizes terminal control sequences and carriage-return progress", () =>
 
 test("redacts credentials from activity text", () => {
   const env = { OPENAI_API_KEY: "secret-value-123", OTHER: "safe" };
-  const input = "Bearer abc.def.ghi secret-value-123 https://example.test/?token=visible";
+  const jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhY2NvdW50In0.c2lnbmF0dXJl";
+  const input = `Bearer abc.def.ghi secret-value-123 https://example.test/?token=visible ${jwt}`;
   const output = redactSensitiveText(input, env);
 
   assert.equal(output.includes("secret-value-123"), false);
   assert.equal(output.includes("abc.def.ghi"), false);
   assert.equal(output.includes("token=visible"), false);
+  assert.equal(output.includes(jwt), false);
   assert.match(output, /\[REDACTED\]/);
 });
 
