@@ -916,7 +916,7 @@ func (c *FactoryCodexConnection) resolvePermittedModel(tx *gorm.DB, factoryID uu
 		return model, nil
 	}
 	if len(permitted) == 0 {
-		return "", fmt.Errorf("No ChatGPT models are enabled for this task owner. Update Workspace Models: %w", ErrSubscriptionModelUnavailable)
+		return "", fmt.Errorf("No ChatGPT models are enabled for this task owner. Update Models in workspace settings: %w", ErrSubscriptionModelUnavailable)
 	}
 	for _, candidate := range c.AvailableModels {
 		if candidate.IsDefault && slices.Contains(permitted, candidate.Model) {

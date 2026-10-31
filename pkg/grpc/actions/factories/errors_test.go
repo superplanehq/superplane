@@ -21,7 +21,7 @@ import (
 
 func Test__factoryErrorToStatus(t *testing.T) {
 	t.Run("workspace model errors keep the recovery action", func(t *testing.T) {
-		original := fmt.Errorf("No models are enabled. Update Workspace Models: %w", models.ErrSelectableLLMModelNotAllowed)
+		original := fmt.Errorf("No models are enabled. Update Models in workspace settings: %w", models.ErrSelectableLLMModelNotAllowed)
 		err := factoryErrorToStatus(original, "failed to start task")
 		code, message, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
