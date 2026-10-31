@@ -43,6 +43,11 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 		s.request(request.method, request.path, []byte(request.body), http.StatusNotFound)
 	}
 	s.token = ownerToken
+	directCleanupPath := s.path + "/runners/" + created.Runner.Id + ":provider-deleted"
+	s.request(http.MethodPost, directCleanupPath, []byte(`{}`), http.StatusBadRequest)
+	directRunner, err := models.FindRunner(db, uuid.MustParse(created.Runner.Id))
+	require.NoError(t, err)
+	require.Nil(t, directRunner.ProviderDeletedAt)
 	foreign, err := models.CreateOrganization("Foreign fleet organization", "")
 	require.NoError(t, err)
 	foreignFleet := &models.RunnerFleet{ID: uuid.New(), Slug: "foreign", ScopeType: models.RunnerFleetScopeOrganization,
@@ -89,13 +94,36 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 		require.Contains(t, string(body), "organization_runners")
 	}
 	s.request(http.MethodDelete, s.path+"/runners/"+ownedRunner.Runner.Id, nil, http.StatusOK)
-	s.request(http.MethodPost, s.path+"/runners/"+ownedRunner.Runner.Id+":provider-deleted",
-		[]byte(`{"fleetManagerId":"wrong","provider":"test"}`), http.StatusBadRequest)
+	for _, body := range []string{`{}`, `{"fleetManagerId":"manager"}`, `{"provider":"test"}`,
+		`{"fleetManagerId":"wrong","provider":"test"}`, `{"fleetManagerId":"manager","provider":"wrong"}`} {
+		s.request(http.MethodPost, s.path+"/runners/"+ownedRunner.Runner.Id+":provider-deleted", []byte(body), http.StatusBadRequest)
+	}
 	s.request(http.MethodPost, s.path+"/runners/"+ownedRunner.Runner.Id+":provider-deleted",
 		[]byte(`{"fleetManagerId":"manager","provider":"test"}`), http.StatusOK)
 	runner, err := models.FindRunner(db, uuid.MustParse(ownedRunner.Runner.Id))
 	require.NoError(t, err)
 	require.NotNil(t, runner.ProviderDeletedAt)
+
+	// An administrator can confirm direct runner cleanup without provider tags.
+	s.request(http.MethodDelete, s.path+"/runners/"+created.Runner.Id, nil, http.StatusOK)
+	for _, body := range []string{`{"fleetManagerId":"manager","provider":"test"}`,
+		`{"fleetManagerId":"manager"}`, `{"provider":"test"}`} {
+		s.request(http.MethodPost, directCleanupPath, []byte(body), http.StatusBadRequest)
+	}
+	directRunner, err = models.FindRunner(db, uuid.MustParse(created.Runner.Id))
+	require.NoError(t, err)
+	require.Nil(t, directRunner.ProviderDeletedAt)
+	confirmed := &pb.MarkFleetRunnerProviderDeletedResponse{}
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodPost, directCleanupPath, []byte(`{}`), http.StatusOK), confirmed))
+	require.NotNil(t, confirmed.Runner.ProviderDeletedAt)
+	directRunner, err = models.FindRunner(db, directRunner.ID)
+	require.NoError(t, err)
+	require.NotNil(t, directRunner.ProviderDeletedAt)
+	require.WithinDuration(t, confirmed.Runner.ProviderDeletedAt.AsTime(), *directRunner.ProviderDeletedAt, time.Microsecond)
+	// Repeated confirmation preserves the first deletion timestamp.
+	repeated := &pb.MarkFleetRunnerProviderDeletedResponse{}
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodPost, directCleanupPath, []byte(`{}`), http.StatusOK), repeated))
+	require.Equal(t, directRunner.ProviderDeletedAt.UTC(), repeated.Runner.ProviderDeletedAt.AsTime())
 }
 
 func apiToken(t *testing.T, userID uuid.UUID) string {

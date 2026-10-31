@@ -455,9 +455,12 @@ func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRun
 		if err != nil {
 			return err
 		}
-		if req.GetFleetManagerId() == "" || req.GetProvider() == "" ||
-			runner.Tags.Data()[models.RunnerTagFleetManagerID] != req.GetFleetManagerId() ||
-			runner.Tags.Data()[models.RunnerTagProvider] != req.GetProvider() {
+		tags := runner.Tags.Data()
+		directOrganizationRunner := fleet.ScopeType == models.RunnerFleetScopeOrganization &&
+			tags[models.RunnerTagFleetManagerID] == "" && tags[models.RunnerTagProvider] == ""
+		if (!directOrganizationRunner && (req.GetFleetManagerId() == "" || req.GetProvider() == "")) ||
+			tags[models.RunnerTagFleetManagerID] != req.GetFleetManagerId() ||
+			tags[models.RunnerTagProvider] != req.GetProvider() {
 			return fmt.Errorf("runner provider ownership does not match the confirming manager")
 		}
 		logins, err = models.ListCodexLoginConnections(tx)
