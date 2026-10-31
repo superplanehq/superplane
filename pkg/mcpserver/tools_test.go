@@ -1034,7 +1034,6 @@ func TestHandOffTaskReturnsPendingBacklogTarget(t *testing.T) {
 	r := support.Setup(t)
 	enableFactories(t, r.Organization.ID)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, "Personal subscriptions", "", "PERS")
 	require.NoError(t, err)
 	subscription := true
