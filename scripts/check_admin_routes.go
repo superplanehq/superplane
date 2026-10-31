@@ -122,21 +122,20 @@ func manualAdminRoutes(function *ast.FuncDecl) []adminRoute {
 	var calls []*ast.CallExpr
 	ast.Inspect(function.Body, func(node ast.Node) bool {
 		// Track the router and gateway aliases used by route registration helpers.
-		if assignment, ok := node.(*ast.AssignStmt); ok {
-			for index, value := range assignment.Rhs {
-				if index >= len(assignment.Lhs) {
+		switch declaration := node.(type) {
+		case *ast.AssignStmt:
+			for index, value := range declaration.Rhs {
+				if index >= len(declaration.Lhs) {
 					break
 				}
-				name, ok := assignment.Lhs[index].(*ast.Ident)
-				if !ok {
-					continue
+				bindings.bind(declaration.Lhs[index], value)
+			}
+		case *ast.ValueSpec:
+			for index, value := range declaration.Values {
+				if index >= len(declaration.Names) {
+					break
 				}
-				if prefix, ok := bindings.adminRouter(value); ok {
-					bindings.adminRouters[name.Name] = prefix
-				}
-				if bindings.gateway(value) {
-					bindings.gateways[name.Name] = true
-				}
+				bindings.bind(declaration.Names[index], value)
 			}
 		}
 		if call, ok := node.(*ast.CallExpr); ok {
@@ -177,6 +176,19 @@ func manualAdminRoutes(function *ast.FuncDecl) []adminRoute {
 		}
 	}
 	return routes
+}
+
+func (b routeBindings) bind(target, value ast.Expr) {
+	name, ok := target.(*ast.Ident)
+	if !ok {
+		return
+	}
+	if prefix, ok := b.adminRouter(value); ok {
+		b.adminRouters[name.Name] = prefix
+	}
+	if b.gateway(value) {
+		b.gateways[name.Name] = true
+	}
 }
 
 func isNotFoundHandler(expression ast.Expr) bool {
