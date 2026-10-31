@@ -50,11 +50,9 @@ export function useFactoryCodexConnection(
   const queryKey = factoryCodexConnectionKey(organizationId, factoryId, currentUserId);
   const refreshAttempted = useRef(false);
   const invalidatedCatalog = useRef("");
-  const activeCatalogTask = useRef("");
   useEffect(() => {
     refreshAttempted.current = false;
     invalidatedCatalog.current = "";
-    activeCatalogTask.current = "";
   }, [organizationId, factoryId, currentUserId]);
   const query = useQuery({
     queryKey,
@@ -132,32 +130,14 @@ export function useFactoryCodexConnection(
     onError: () => showErrorToast("SuperPlane could not cancel ChatGPT sign-in. Try again."),
   });
 
-  const cancelCatalog = useMutation({
-    mutationFn: async (catalogRefreshTaskId: string) => {
-      if (!catalogRefreshTaskId) throw new Error("A refresh task is required");
-      const response = await meCancelCodexConnection(
-        withOrganizationHeader({
-          organizationId,
-          body: { catalogRefreshTaskId },
-          signal: AbortSignal.timeout(15000),
-        }),
-      );
-      return response.data?.connection;
-    },
-    onSuccess: saveConnection,
-    onSettled: refresh,
-    onError: () => showErrorToast("SuperPlane could not cancel the ChatGPT refresh. Try again."),
+  const cancelCatalog = useCatalogRefreshActivity({
+    organizationId,
+    factoryId,
+    currentUserId,
+    connection: query.data,
+    saveConnection,
+    refresh,
   });
-
-  useEffect(() => {
-    if (!query.data) return;
-    const taskId = query.data.catalogRefreshTaskId || "";
-    const completed = activeCatalogTask.current && !taskId;
-    activeCatalogTask.current = taskId;
-    if (!completed) return;
-    void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
-    void queryClient.invalidateQueries({ queryKey: ["me", organizationId, "codex-usage"] });
-  }, [query.data, queryClient, organizationId, factoryId]);
 
   const disconnect = useMutation({
     mutationFn: async () => meDisconnectCodexConnection(withOrganizationHeader({ organizationId })),
@@ -200,4 +180,54 @@ function codexConnectionPollInterval(connection: FactoriesFactoryCodexConnection
     ["pending", "canceling", "finishing"].includes(connection?.status ?? "") ||
     connection?.reservationHeld;
   return active ? 2000 : false;
+}
+
+function useCatalogRefreshActivity({
+  organizationId,
+  factoryId,
+  currentUserId,
+  connection,
+  saveConnection,
+  refresh,
+}: {
+  organizationId: string;
+  factoryId: string;
+  currentUserId: string | undefined;
+  connection: FactoriesFactoryCodexConnection | undefined;
+  saveConnection: (connection: FactoriesFactoryCodexConnection | undefined) => Promise<void>;
+  refresh: () => Promise<void>;
+}) {
+  const queryClient = useQueryClient();
+  const activeCatalogTask = useRef("");
+  useEffect(() => {
+    activeCatalogTask.current = "";
+  }, [organizationId, factoryId, currentUserId]);
+  const cancelCatalog = useMutation({
+    mutationFn: async (catalogRefreshTaskId: string) => {
+      if (!catalogRefreshTaskId) throw new Error("A refresh task is required");
+      const response = await meCancelCodexConnection(
+        withOrganizationHeader({
+          organizationId,
+          body: { catalogRefreshTaskId },
+          signal: AbortSignal.timeout(15000),
+        }),
+      );
+      return response.data?.connection;
+    },
+    onSuccess: saveConnection,
+    onSettled: refresh,
+    onError: () => showErrorToast("SuperPlane could not cancel the ChatGPT refresh. Try again."),
+  });
+
+  useEffect(() => {
+    if (!connection) return;
+    const taskId = connection.catalogRefreshTaskId || "";
+    const completed = activeCatalogTask.current && !taskId;
+    activeCatalogTask.current = taskId;
+    if (!completed) return;
+    void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
+    void queryClient.invalidateQueries({ queryKey: ["me", organizationId, "codex-usage"] });
+  }, [connection, queryClient, organizationId, factoryId]);
+
+  return cancelCatalog;
 }
