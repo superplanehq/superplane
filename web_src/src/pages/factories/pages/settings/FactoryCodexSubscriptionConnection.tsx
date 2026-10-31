@@ -42,12 +42,10 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
   if (signingIn)
     return (
       <CodexDeviceSignIn
-        selected
         disabled={disabled}
         connection={connection}
         starting={codex.start.isPending}
         canceling={codex.cancel.isPending}
-        onSelect={() => {}}
         onStart={() => codex.start.mutate()}
         onCancel={() => codex.cancel.mutate()}
       />

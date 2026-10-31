@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"bufio"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,9 +9,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -262,6 +267,10 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 }
 (async () => {
   await restore();
+  if ((fs.statSync(child.CODEX_HOME).mode & 0o777) !== 0o700 ||
+      (fs.statSync(child.CODEX_HOME + "/auth.json").mode & 0o777) !== 0o600) {
+    throw new Error("restored credentials have unsafe permissions");
+  }
   const auth = fs.readFileSync(process.env.SUPERPLANE_TASK_DIR + "/codex-home/auth.json", "utf8");
   const redacted = redactSecrets("token " + JSON.parse(auth).refresh_token);
   if (redacted.includes(JSON.parse(auth).refresh_token)) {
@@ -324,10 +333,124 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 	assert.Equal(t, "https://auth.openai.com/codex/device", progress["verificationUrl"])
 	assert.Equal(t, "CODE-1234", progress["verificationCode"])
 
-	info, err := os.Stat(filepath.Join(taskDir, "codex-home", "auth.json"))
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
-	home, err := os.Stat(filepath.Join(taskDir, "codex-home"))
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o700), home.Mode().Perm())
+	_, err = os.Stat(filepath.Join(taskDir, "codex-home"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestSubscriptionSetupCommandsCleanBeforeSuccess(t *testing.T) {
+	for _, command := range []string{"login", "refresh"} {
+		for _, failure := range []string{"", "checkpoint", "cleanup"} {
+			t.Run(command+"/"+failure, func(t *testing.T) {
+				taskDir := t.TempDir()
+				home := filepath.Join(taskDir, "codex-home")
+				resultFile := filepath.Join(taskDir, "result.json")
+				bin := filepath.Join(taskDir, "bin")
+				require.NoError(t, os.Mkdir(bin, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(bin, "codex"), []byte(`#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+fs.mkdirSync(process.env.CODEX_HOME, {recursive:true});
+fs.writeFileSync(path.join(process.env.CODEX_HOME, "auth.json"), JSON.stringify({access_token:"final-access-token"}));
+if (process.argv[2] === "app-server") {
+ fs.writeFileSync(path.join(process.env.SUPERPLANE_TASK_DIR, "usage.pid"), String(process.pid));
+ // Model the npm launcher, whose native child can outlive the launcher.
+ const writer = require("child_process").spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {stdio:"ignore"});
+ fs.writeFileSync(path.join(process.env.SUPERPLANE_TASK_DIR, "writer.pid"), String(writer.pid));
+ require("readline").createInterface({input:process.stdin}).on("line", line => {
+  const req = JSON.parse(line);
+  if (req.id) process.stdout.write(JSON.stringify({id:req.id, result: req.id === 3 ? {data:[]} : {}})+"\n");
+ });
+}
+`), 0o755))
+				t.Cleanup(func() {
+					contents, err := os.ReadFile(filepath.Join(taskDir, "writer.pid"))
+					if err == nil {
+						pid, _ := strconv.Atoi(string(contents))
+						if pid > 0 {
+							_ = syscall.Kill(pid, syscall.SIGKILL)
+						}
+					}
+				})
+				checkpointed := false
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if strings.HasSuffix(r.URL.Path, "/credentials") {
+						_ = json.NewEncoder(w).Encode(map[string]any{"bundle": map[string]any{"access_token": "restored-access-token"}})
+						return
+					}
+					require.True(t, strings.HasSuffix(r.URL.Path, "/checkpoint"))
+					pidBytes, err := os.ReadFile(filepath.Join(taskDir, "usage.pid"))
+					require.NoError(t, err)
+					pid, err := strconv.Atoi(string(pidBytes))
+					require.NoError(t, err)
+					assert.ErrorIs(t, syscall.Kill(pid, 0), syscall.ESRCH, "Codex must stop before the final checkpoint")
+					writerBytes, err := os.ReadFile(filepath.Join(taskDir, "writer.pid"))
+					require.NoError(t, err)
+					writer, err := strconv.Atoi(string(writerBytes))
+					require.NoError(t, err)
+					// The native child can finish exiting after the launcher closes.
+					assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+						state, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(writer), "stat"))
+						if os.IsNotExist(err) {
+							return
+						}
+						if assert.NoError(collect, err) {
+							assert.Equal(collect, "Z", strings.Fields(string(state))[2])
+						}
+					}, 5*time.Second, 10*time.Millisecond, "the native Codex child must stop after its process group is killed")
+					var body map[string]any
+					require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+					assert.Equal(t, true, body["final"])
+					assert.Equal(t, "final-access-token", body["bundle"].(map[string]any)["access_token"])
+					checkpointed = true
+					_ = json.NewEncoder(w).Encode(map[string]any{"accepted": failure != "checkpoint", "version": 2})
+				}))
+				t.Cleanup(server.Close)
+				_, caller, _, ok := runtime.Caller(0)
+				require.True(t, ok)
+				cmd := exec.Command("node", filepath.Join(filepath.Dir(caller), "codex_subscription.js"), command)
+				cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"), "SUPERPLANE_TASK_DIR="+taskDir, "CODEX_HOME="+home, "SUPERPLANE_RESULT_FILE="+resultFile, "SUPERPLANE_BASE_URL="+server.URL, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=runner-token")
+				if failure == "cleanup" {
+					preload := filepath.Join(taskDir, "fail-cleanup.js")
+					require.NoError(t, os.WriteFile(preload, []byte(`require("fs").rmSync = () => { throw new Error("cleanup denied"); };`), 0o600))
+					cmd.Env = append(cmd.Env, "NODE_OPTIONS=--require="+preload)
+				}
+				stdout, err := cmd.StdoutPipe()
+				require.NoError(t, err)
+				require.NoError(t, cmd.Start())
+				// The success line is observable before process exit: credentials must
+				// already be absent when a runner sees it.
+				var output string
+				scanner := bufio.NewScanner(stdout)
+				for scanner.Scan() {
+					output += scanner.Text()
+					if failure == "" {
+						_, statErr := os.Stat(home)
+						assert.True(t, os.IsNotExist(statErr), "temporary credentials must be removed before reporting success")
+					}
+				}
+				require.NoError(t, scanner.Err())
+				err = cmd.Wait()
+				require.True(t, checkpointed)
+				if failure == "" {
+					require.NoError(t, err)
+					assert.NotEmpty(t, output)
+					_, statErr := os.Stat(home)
+					assert.True(t, os.IsNotExist(statErr))
+				} else {
+					require.Error(t, err)
+					assert.Empty(t, output)
+				}
+				contents, err := os.ReadFile(resultFile)
+				require.NoError(t, err)
+				var result map[string]any
+				require.NoError(t, json.Unmarshal(contents, &result))
+				if failure == "" {
+					assert.Equal(t, true, result["codexSubscriptionSetupCleaned"])
+				} else {
+					assert.NotEqual(t, true, result["codexSubscriptionSetupCleaned"])
+					assert.Equal(t, true, result["is_error"])
+				}
+			})
+		}
+	}
 }

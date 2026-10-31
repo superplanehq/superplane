@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -30,6 +31,10 @@ type RunnerScope struct {
 	NodeID            string
 	Flow              RunnerFlow
 	Scopes            []RunnerToolScope
+	// MergeChecks and MergeCheckLabels come from the merge confidence token.
+	// The backend reports a merge check only when its id is in MergeChecks.
+	MergeChecks      []string
+	MergeCheckLabels map[string]string
 }
 
 func (s *RunnerScope) HasScope(scope RunnerToolScope) bool {
@@ -63,7 +68,7 @@ func MintRunnerToken(signer *jwt.Signer, scope RunnerScope, ttl time.Duration) (
 	if ttl <= 0 {
 		ttl = time.Duration(DefaultExecutionTimeoutSeconds)*time.Second + artifactTokenGracePeriod
 	}
-	return signer.GenerateWithClaims(ttl, map[string]string{
+	claims := map[string]string{
 		"purpose":             RunnerTokenPurpose,
 		"org_id":              scope.OrganizationID.String(),
 		"factory_id":          scope.FactoryID.String(),
@@ -75,7 +80,16 @@ func MintRunnerToken(signer *jwt.Signer, scope RunnerScope, ttl time.Duration) (
 		"node_id":             scope.NodeID,
 		"flow":                string(scope.Flow),
 		"scopes":              joinRunnerScopes(scope.Scopes),
-	})
+		"merge_checks":        strings.Join(scope.MergeChecks, ","),
+	}
+	if len(scope.MergeCheckLabels) > 0 {
+		encoded, err := json.Marshal(scope.MergeCheckLabels)
+		if err != nil {
+			return "", fmt.Errorf("merge check labels: %w", err)
+		}
+		claims["merge_check_labels"] = string(encoded)
+	}
+	return signer.GenerateWithClaims(ttl, claims)
 }
 
 func ParseRunnerToken(signer *jwt.Signer, token string) (*RunnerScope, error) {
@@ -112,10 +126,60 @@ func ParseRunnerToken(signer *jwt.Signer, token string) (*RunnerScope, error) {
 	scope.Flow = RunnerFlow(flow)
 	rawScopes, _ := claims["scopes"].(string)
 	scope.Scopes = splitRunnerScopes(rawScopes)
+	if rawChecks, _ := claims["merge_checks"].(string); strings.TrimSpace(rawChecks) != "" {
+		scope.MergeChecks = parseMergeConfidenceChecksClaim(rawChecks)
+	}
+	labels, _ := claims["merge_check_labels"].(string)
+	scope.MergeCheckLabels = parseMergeConfidenceCheckLabels(labels)
 	if err := scope.complete(); err != nil {
 		return nil, err
 	}
 	return scope, nil
+}
+
+// PlanningSessionScope returns the planning session of a planning run.
+func (s *RunnerScope) PlanningSessionScope() (*PlanningSessionScope, bool) {
+	if s.Flow != RunnerFlowPlanning {
+		return nil, false
+	}
+	return &PlanningSessionScope{
+		OrganizationID: s.OrganizationID,
+		FactoryID:      s.FactoryID,
+		SessionID:      s.PlanningSessionID,
+		CanvasRunID:    s.CanvasRunID,
+	}, true
+}
+
+// ArtifactUploadScope returns the task artifact scope of a task run.
+func (s *RunnerScope) ArtifactUploadScope() (*ArtifactUploadScope, bool) {
+	if s.Flow != RunnerFlowTask {
+		return nil, false
+	}
+	return &ArtifactUploadScope{
+		OrganizationID:  s.OrganizationID,
+		FactoryID:       s.FactoryID,
+		WorkOrderID:     s.WorkOrderID,
+		CanvasID:        s.CanvasID,
+		CanvasRunID:     s.CanvasRunID,
+		NodeExecutionID: s.NodeExecutionID,
+		NodeID:          s.NodeID,
+	}, true
+}
+
+// MergeConfidenceScope returns the merge check scope of a merge confidence run.
+func (s *RunnerScope) MergeConfidenceScope() (*MergeConfidenceScope, bool) {
+	if s.Flow != RunnerFlowMergeConfidence {
+		return nil, false
+	}
+	return &MergeConfidenceScope{
+		OrganizationID:  s.OrganizationID,
+		FactoryID:       s.FactoryID,
+		WorkOrderID:     s.WorkOrderID,
+		CanvasRunID:     s.CanvasRunID,
+		NodeExecutionID: s.NodeExecutionID,
+		EnabledChecks:   s.MergeChecks,
+		CheckLabels:     s.MergeCheckLabels,
+	}, true
 }
 
 func HasRunnerToken(environment []TaskEnvironmentVariable) bool {

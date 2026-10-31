@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -60,6 +60,7 @@ function useCommittedModelSource(factory: FactoriesFactory, providers: ReturnTyp
 }
 
 export function useWorkspaceModelSettings() {
+  const changeSourceButtonRef = useRef<HTMLButtonElement>(null);
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const permissions = usePermissions();
   const canRead = permissions.canAct("factories", "read") && !permissions.isLoading;
@@ -74,11 +75,10 @@ export function useWorkspaceModelSettings() {
     selection.onSaved,
     factory.onboarding?.codexDefaultOwnerId,
   );
-  const integrationsHref = useIntegrationsBasePath(organizationId);
   const chooseSource = (target: string) => {
-    if (target === selection.source || !canUpdate || switcher.saving) return;
+    if ((target === selection.source && target !== "own-key") || !canUpdate || switcher.saving) return;
     if (target === "subscription") {
-      switcher.setSubscriptionDialog("warn");
+      switcher.setDialog({ step: "subscription" });
       return;
     }
     if (target === "hosted") {
@@ -92,6 +92,7 @@ export function useWorkspaceModelSettings() {
     if (provider) switcher.setDialog({ target: provider, step: "warn" });
   };
   return {
+    changeSourceButtonRef,
     organizationId,
     factoryId,
     factory,
@@ -103,7 +104,7 @@ export function useWorkspaceModelSettings() {
     ...selection,
     subscription,
     switcher,
-    integrationsHref,
+    integrationsHref: useIntegrationsBasePath(organizationId),
     chooseSource,
   };
 }

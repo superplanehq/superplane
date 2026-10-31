@@ -11,20 +11,25 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"go.opentelemetry.io/otel"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -668,4 +673,50 @@ func createRunnerTaskPoll(t *testing.T, resource *support.ResourceRegistry, task
 	require.NoError(t, db.Create(&poll).Error)
 
 	return execution, &poll
+}
+
+func TestCompleteRunnerTaskPublishesReleasedCodexConnection(t *testing.T) {
+	resource := support.Setup(t)
+	defer resource.Close()
+	db := database.DB(t.Context())
+	runner, task, fleet, socketID := createRunningRunnerTask(t, resource)
+	factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.BeginLogin(db, task.ID, time.Now()))
+	require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 1, []byte("saved"), "ada@example.com", true, time.Now()))
+	url, err := config.RabbitMQURL()
+	require.NoError(t, err)
+	broker, err := amqp.Dial(url)
+	require.NoError(t, err)
+	defer broker.Close()
+	channel, err := broker.Channel()
+	require.NoError(t, err)
+	require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+	queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderUpdatedRoutingKey, messages.CanvasExchange, false, nil))
+	server, err := NewServer(jwt.NewSigner("secret"), resource.Encryptor, runnerlogs.StoreFS, nil)
+	require.NoError(t, err)
+	completion := completeMessage{RequestID: uuid.NewString(), TaskID: task.ID.String(), Result: json.RawMessage(`{"codexSubscriptionSetupCleaned":true}`)}
+	require.NoError(t, server.completeRunnerTask(t.Context(), runner, socketID, completion, fleet.Slug, fleet.ScopeType))
+	require.Eventually(t, func() bool {
+		delivery, found, err := channel.Get(queue.Name, true)
+		require.NoError(t, err)
+		if !found {
+			return false
+		}
+		var update pb.FactoryWorkOrderUpdatedMessage
+		require.NoError(t, proto.Unmarshal(delivery.Body, &update))
+		if update.FactoryId != factory.ID.String() || update.Reason != "codex_connection" {
+			return false
+		}
+		stored, err := models.FindFactoryCodexConnectionByID(db, connection.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CodexConnectionStatusReady, stored.Status, "notification must follow commit")
+		return true
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.Nil(t, runner.ProviderDeletedAt)
+	assert.Equal(t, models.RunnerStateTerminated, runner.State)
 }
