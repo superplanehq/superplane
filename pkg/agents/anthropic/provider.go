@@ -383,6 +383,33 @@ func (p *Provider) RetrieveSessionUsage(ctx context.Context, providerSessionID s
 	return tokenUsage(session.Usage), nil
 }
 
+func (p *Provider) SessionStopped(ctx context.Context, providerSessionID string) (bool, error) {
+	if providerSessionID == "" {
+		return false, fmt.Errorf("anthropic: provider session id is required")
+	}
+	data, err := p.client.executeHTTP(ctx, http.MethodGet, "/sessions/"+url.PathEscape(providerSessionID), nil)
+	if err != nil {
+		if isProviderSessionUnavailable(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	var session struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(data, &session); err != nil {
+		return false, fmt.Errorf("decode session status: %w", err)
+	}
+	switch session.Status {
+	case "idle", "terminated", "archived":
+		return true, nil
+	case "running", "streaming", "starting", "stopping":
+		return false, nil
+	default:
+		return false, fmt.Errorf("anthropic: unconfirmed session status %q", session.Status)
+	}
+}
+
 func forwardSSE(ctx context.Context, body io.Reader, onEvent func(agents.ProviderEvent) error) error {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)

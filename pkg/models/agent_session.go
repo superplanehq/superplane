@@ -15,6 +15,7 @@ const (
 	AgentSessionStatusStreaming  = "streaming"
 	AgentSessionStatusFailed     = "failed"
 	AgentSessionStatusTerminated = "terminated"
+	AgentSessionStatusStopping   = "stopping"
 )
 
 type AgentSession struct {
@@ -24,6 +25,7 @@ type AgentSession struct {
 	CanvasID                uuid.UUID
 	Provider                string
 	ProviderSessionID       string
+	SuspensionStopEventID   *uuid.UUID
 	AgentToolSchemaRevision string
 	Status                  string
 	LastActiveAt            *time.Time
@@ -36,6 +38,11 @@ type AgentSession struct {
 func (AgentSession) TableName() string { return "agent_sessions" }
 
 var ErrAgentSessionNotFound = errors.New("agent session not found")
+var ErrAgentSessionStopping = errors.New("agent session is stopping")
+
+func (s *AgentSession) IsBusy() bool {
+	return s.Status == AgentSessionStatusStreaming || s.Status == AgentSessionStatusStopping
+}
 
 func CreateAgentSessionInTransaction(tx *gorm.DB, session *AgentSession) error {
 	return tx.Create(session).Error
@@ -109,8 +116,9 @@ func ListAgentSessionsForOrganizationInTransaction(tx *gorm.DB, organizationID u
 
 func UpdateAgentSessionStatusInTransaction(tx *gorm.DB, sessionID uuid.UUID, status string) error {
 	now := time.Now()
-	return tx.Model(&AgentSession{}).
+	result := tx.Model(&AgentSession{}).
 		Where("id = ?", sessionID).
+		Where("status <> ?", AgentSessionStatusStopping).
 		Updates(map[string]any{
 			"status":         status,
 			"last_active_at": &now,
@@ -120,6 +128,17 @@ func UpdateAgentSessionStatusInTransaction(tx *gorm.DB, sessionID uuid.UUID, sta
 			"heartbeat_at": gorm.Expr("NULL"),
 		}).
 		Error
+	if result != nil {
+		return result
+	}
+	var stopping int64
+	if err := tx.Model(&AgentSession{}).Where("id = ? AND status = ?", sessionID, AgentSessionStatusStopping).Count(&stopping).Error; err != nil {
+		return err
+	}
+	if stopping > 0 {
+		return ErrAgentSessionStopping
+	}
+	return nil
 }
 
 func UpdateAgentSessionStatus(sessionID uuid.UUID, status string) error {
@@ -167,6 +186,7 @@ func UpdateAgentSessionProviderSessionInTransaction(tx *gorm.DB, sessionID uuid.
 	now := time.Now()
 	return tx.Model(&AgentSession{}).
 		Where("id = ?", sessionID).
+		Where("status <> ?", AgentSessionStatusStopping).
 		Updates(map[string]any{
 			"provider_session_id":        providerSessionID,
 			"agent_tool_schema_revision": toolSchemaRevision,
@@ -180,7 +200,7 @@ func UpdateAgentSessionProviderSessionInTransaction(tx *gorm.DB, sessionID uuid.
 
 func UpdateAgentSessionStatusIfUnchangedInTransaction(tx *gorm.DB, sessionID uuid.UUID, status string, unchangedSince *time.Time) (bool, error) {
 	now := time.Now()
-	query := tx.Model(&AgentSession{}).Where("id = ?", sessionID)
+	query := tx.Model(&AgentSession{}).Where("id = ? AND status <> ?", sessionID, AgentSessionStatusStopping)
 	if unchangedSince == nil {
 		query = query.Where("updated_at IS NULL")
 	} else {
@@ -261,6 +281,7 @@ func FailStuckStreamingSessions(heartbeatCutoff, legacyCutoff time.Time) ([]Agen
 		now := time.Now()
 		return tx.Model(&AgentSession{}).
 			Where("id IN ?", ids).
+			Where("status = ?", AgentSessionStatusStreaming).
 			Updates(map[string]any{
 				"status":       AgentSessionStatusFailed,
 				"updated_at":   &now,
