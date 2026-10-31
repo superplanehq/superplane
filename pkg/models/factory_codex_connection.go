@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,11 +75,18 @@ type FactoryCodexConnection struct {
 }
 
 type CodexUsageLimit struct {
-	LimitID   string            `json:"limitId"`
-	LimitName string            `json:"limitName"`
-	PlanType  string            `json:"planType"`
-	Primary   *CodexUsageWindow `json:"primary"`
-	Secondary *CodexUsageWindow `json:"secondary"`
+	LimitID   string             `json:"limitId"`
+	LimitName string             `json:"limitName"`
+	PlanType  string             `json:"planType"`
+	Primary   *CodexUsageWindow  `json:"primary"`
+	Secondary *CodexUsageWindow  `json:"secondary"`
+	Credits   *CodexUsageCredits `json:"credits,omitempty"`
+}
+
+type CodexUsageCredits struct {
+	HasCredits bool    `json:"hasCredits"`
+	Unlimited  bool    `json:"unlimited"`
+	Balance    *string `json:"balance"`
 }
 
 type CodexUsageWindow struct {
@@ -784,6 +792,12 @@ func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 			return errors.New("invalid Codex usage bucket")
 		}
 		seen[limit.LimitID] = true
+		if limit.Credits != nil && limit.Credits.Balance != nil {
+			balance, err := strconv.ParseFloat(*limit.Credits.Balance, 64)
+			if err != nil || len(*limit.Credits.Balance) > 64 || math.IsNaN(balance) || math.IsInf(balance, 0) || balance < 0 {
+				return errors.New("invalid Codex credit balance")
+			}
+		}
 		for _, window := range []*CodexUsageWindow{limit.Primary, limit.Secondary} {
 			if window == nil {
 				continue

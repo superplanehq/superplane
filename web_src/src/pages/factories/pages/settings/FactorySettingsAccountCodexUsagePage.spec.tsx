@@ -109,6 +109,23 @@ describe("Codex usage", () => {
     expect(screen.getByText(/Last updated/)).toBeInTheDocument();
   });
 
+  it("shows a credit balance when no quota windows are reported", () => {
+    render(
+      <CodexUsageConnections
+        connections={[
+          {
+            id: "connection-1",
+            observedAt: new Date().toISOString(),
+            limits: [{ limitId: "codex", credits: { hasCredits: true, balance: "4712" } }],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Available credits")).toBeInTheDocument();
+    expect(screen.getByText("4,712 credits")).toBeInTheDocument();
+    expect(screen.queryByText(/Usage unavailable/)).not.toBeInTheDocument();
+  });
+
   it("shows unavailable usage without a snapshot and hides usage without a connection", () => {
     const view = render(
       <CodexUsageConnections connections={[{ id: "connection-1", accountLabel: "ada@example.com" }]} />,

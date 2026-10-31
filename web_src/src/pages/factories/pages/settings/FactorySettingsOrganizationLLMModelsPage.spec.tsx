@@ -1,5 +1,4 @@
-import { QueryClient } from "@tanstack/react-query";
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -13,8 +12,6 @@ import {
 } from "@/api-client";
 import { showErrorToast } from "@/lib/toast";
 import { unmockedSrc } from "@/test/unmockedModule";
-import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
-import { factoryCodexConnectionKey } from "../onboarding/useFactoryCodexConnection";
 
 import { renderPage } from "./organizationLLMModels.spec.render";
 import { subscriptionModelSourceSwitchCases } from "./organizationLLMModels.subscription.spec.cases";
@@ -344,8 +341,10 @@ describe("workspace LLM model settings", () => {
     renderPage("AGENT_HARNESS_CODEX", true);
     expect(await screen.findByText("Other member")).toBeInTheDocument();
     expect(screen.getByText("other@example.com")).toBeInTheDocument();
-    expect(screen.queryByText("5-hour window")).not.toBeInTheDocument();
+    expect(screen.getByText("5-hour window")).toBeInTheDocument();
     expect(screen.getByText("75% remaining")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Connected members" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change default task owner" })).not.toBeInTheDocument();
     expect(screen.queryByText("personal@example.com")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /(?:Connect|Reconnect|Disconnect) ChatGPT|Refresh usage/ }),
@@ -353,46 +352,13 @@ describe("workspace LLM model settings", () => {
     expect(meStartCodexConnection).not.toHaveBeenCalled();
   });
 
-  it("connects Codex and saves an owner in an empty subscription workspace without changing sources", async () => {
-    vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({ data: { members: [] } } as never);
-    vi.mocked(factoriesListFactoryOwnerEligibility).mockImplementation(
-      async () =>
-        ({
-          data: {
-            subscription: true,
-            ownershipChangeAllowed: true,
-            members: [{ userId: "me", eligible: codexConnection?.status === "ready" }],
-          },
-        }) as never,
-    );
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    renderPage("AGENT_HARNESS_CODEX", true, client);
-    const user = userEvent.setup();
-    expect(await screen.findByText("No members have a connected ChatGPT account.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Change default task owner" }));
-    expect(screen.getByRole("dialog", { name: "Change default task owner" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save default owner" })).toBeDisabled();
-    await user.click(await screen.findByRole("button", { name: "Connect Codex" }));
-    await user.click(await screen.findByRole("button", { name: "Connect ChatGPT" }));
-    expect(meStartCodexConnection).toHaveBeenCalledTimes(1);
-    codexConnection = { status: "ready", eligible: true, availableModels: ["gpt-5.4"] };
-    await act(async () =>
-      client.setQueryData(factoryCodexConnectionKey("org-1", REFUND_FACTORY.id ?? "factory-1", "me"), codexConnection),
-    );
-    await waitFor(() => expect(screen.getByRole("button", { name: "Save default owner" })).toBeEnabled());
-    expect(screen.getByRole("dialog", { name: "Change default task owner" })).toBeInTheDocument();
-    expect(switchSource).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Save default owner" }));
-    expect(switchSource).toHaveBeenCalledWith({ source: "subscription", defaultOwnerId: "me", apiKey: undefined });
-    expect(await screen.findByRole("status", { name: "ChatGPT subscriptions is active" })).toBeInTheDocument();
-  });
-
-  it("disables owner recovery for readers in an empty subscription workspace", async () => {
+  it("shows an empty subscription workspace without owner controls for readers", async () => {
     canUpdate = false;
     vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({ data: { members: [] } } as never);
     renderPage("AGENT_HARNESS_CODEX", true);
     expect(await screen.findByText("No members have a connected ChatGPT account.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Change default task owner" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Change default task owner" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change model source" })).toBeDisabled();
   });
 
   it("shows unavailable usage for saved limits with no quota windows", async () => {
@@ -417,7 +383,9 @@ describe("workspace LLM model settings", () => {
                 limitId: "codex",
                 primary: { usedPercent: 25, windowDurationMins: "300" },
                 secondary: { usedPercent: 50, windowDurationMins: "10080" },
+                credits: { hasCredits: true, balance: "4712" },
               },
+              { limitId: "monthly", primary: { usedPercent: 10, windowDurationMins: "43200" } },
             ],
           },
         ],
@@ -429,7 +397,33 @@ describe("workspace LLM model settings", () => {
     expect(within(row).getByText("75% remaining")).toBeInTheDocument();
     expect(within(row).getByText("7-day window")).toBeInTheDocument();
     expect(within(row).getByText("50% remaining")).toBeInTheDocument();
+    expect(within(row).getByText("30-day window")).toBeInTheDocument();
+    expect(within(row).getByText("90% remaining")).toBeInTheDocument();
+    expect(within(row).getByText("Available credits")).toBeInTheDocument();
+    expect(within(row).getByText("4,712 credits")).toBeInTheDocument();
     expect(within(row).queryByText("Usage unavailable")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { name: "zero balance", credits: { hasCredits: false, balance: "0" }, expected: "0 credits" },
+    { name: "unlimited balance", credits: { hasCredits: true, unlimited: true }, expected: "Unlimited" },
+    { name: "unknown balance", credits: { hasCredits: true }, expected: "Available" },
+    { name: "no credits", credits: { hasCredits: false }, expected: "0 credits" },
+    { name: "fractional balance", credits: { hasCredits: true, balance: "4712.5" }, expected: "4,712.5 credits" },
+  ])("shows $name without quota windows", async ({ credits, expected }) => {
+    vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({
+      data: { members: [{ userId: "other", displayName: "Other member", limits: [{ limitId: "codex", credits }] }] },
+    } as never);
+    renderPage("AGENT_HARNESS_CODEX", true);
+    const row = await screen.findByRole("row", { name: /Other member/ });
+    expect(within(row).getByText("Available credits")).toBeInTheDocument();
+    expect(within(row).getByText(expected)).toBeInTheDocument();
+    expect(within(row).queryByText("Usage unavailable")).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(within(row).getByRole("button", { name: "Options for Other member" }));
+    const details = screen.getByRole("menu");
+    expect(within(details).getByText(expected)).toBeInTheDocument();
+    expect(within(details).queryByText("Usage unavailable")).not.toBeInTheDocument();
   });
 
   it("can retry a failed member usage request", async () => {

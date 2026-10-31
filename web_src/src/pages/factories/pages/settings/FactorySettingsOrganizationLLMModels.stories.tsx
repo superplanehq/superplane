@@ -1,7 +1,7 @@
 import { userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { FactoriesFactoryCodexConnection } from "@/api-client";
+import type { FactoriesCodexUsageLimit, FactoriesFactoryCodexConnection } from "@/api-client";
 import { PermissionsContext } from "@/contexts/permissionsContextState";
 import { usePermissions } from "@/contexts/usePermissions";
 import { FEATURE_CODEX_SUBSCRIPTIONS, FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
@@ -157,6 +157,94 @@ export const Subscription: Story = {
   render: () =>
     renderFixture(fixture("subscription", { workspaceModelPolicies: policy("subscription", "openai", ["gpt-5.4"]) })),
 };
+const fiveHourWindow = {
+  usedPercent: 19,
+  windowDurationMins: "300",
+  resetsAt: new Date(Date.now() + 3600000).toISOString(),
+};
+const weeklyWindow = {
+  usedPercent: 67,
+  windowDurationMins: "10080",
+  resetsAt: new Date(Date.now() + 86400000 * 4).toISOString(),
+};
+
+function renderSubscriptionUsage(limits: FactoriesCodexUsageLimit[]) {
+  return renderFixture(
+    fixture("subscription", {
+      codexMembers: [
+        {
+          userId: "ada",
+          displayName: "Ada Lovelace",
+          email: "ada@example.com",
+          observedAt: new Date().toISOString(),
+          limits,
+        },
+      ],
+    }),
+  );
+}
+
+export const FiveHourLimit: Story = {
+  render: () => renderSubscriptionUsage([{ limitId: "codex", primary: fiveHourWindow }]),
+};
+export const FiveHourAndWeeklyLimits: Story = {
+  render: () => renderSubscriptionUsage([{ limitId: "codex", primary: fiveHourWindow, secondary: weeklyWindow }]),
+};
+export const MonthlyLimit: Story = {
+  render: () =>
+    renderSubscriptionUsage([
+      {
+        limitId: "codex",
+        primary: {
+          usedPercent: 35,
+          windowDurationMins: "43200",
+          resetsAt: new Date(Date.now() + 86400000 * 20).toISOString(),
+        },
+      },
+    ]),
+};
+export const FiveHourWeeklyAndCredits: Story = {
+  name: "5-hour and 7-day limits with available credits",
+  render: () =>
+    renderSubscriptionUsage([
+      {
+        limitId: "codex",
+        limitName: "Codex",
+        primary: fiveHourWindow,
+        secondary: weeklyWindow,
+        credits: { hasCredits: true, balance: "4712" },
+      },
+    ]),
+};
+export const ExhaustedCredits: Story = {
+  render: () =>
+    renderSubscriptionUsage([
+      {
+        limitId: "codex",
+        primary: { ...fiveHourWindow, usedPercent: 100 },
+        secondary: { ...weeklyWindow, usedPercent: 100 },
+        credits: { hasCredits: false, balance: "0" },
+      },
+    ]),
+};
+export const UnlimitedCredits: Story = {
+  render: () =>
+    renderSubscriptionUsage([
+      {
+        limitId: "codex",
+        primary: fiveHourWindow,
+        secondary: weeklyWindow,
+        credits: { hasCredits: true, unlimited: true },
+      },
+    ]),
+};
+export const CreditsOnly: Story = {
+  render: () => renderSubscriptionUsage([{ limitId: "codex", credits: { hasCredits: true, balance: "4712" } }]),
+};
+export const CreditBalanceUnavailable: Story = {
+  render: () => renderSubscriptionUsage([{ limitId: "codex", credits: { hasCredits: true } }]),
+};
+
 export const UnavailableSubscriptionModels: Story = {
   render: () =>
     renderFixture(
