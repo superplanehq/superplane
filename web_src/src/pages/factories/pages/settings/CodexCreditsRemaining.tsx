@@ -1,18 +1,24 @@
 import type { FactoriesCodexUsageLimit } from "@/api-client";
+import { useTimeHasPassed } from "@/hooks/useTimeHasPassed";
 
 export function CodexCreditsRemaining({
   credits,
   individualLimit,
 }: Pick<FactoriesCodexUsageLimit, "credits" | "individualLimit">) {
   const monthlyLimit = !credits?.unlimited && credits?.balance == null ? individualLimit : undefined;
+  const expired = useTimeHasPassed(monthlyLimit?.resetsAt);
   return (
     <div className="space-y-1.5">
       <div className="flex min-w-0 items-center justify-between gap-2">
         <span className="text-muted-foreground">{monthlyLimit ? "Monthly credits" : "Available credits"}</span>
-        <span className="shrink-0 font-medium">{formatCreditBalance({ credits, individualLimit: monthlyLimit })}</span>
+        <span className="shrink-0 font-medium">
+          {expired ? "Update needed" : formatCreditBalance({ credits, individualLimit: monthlyLimit })}
+        </span>
       </div>
       {monthlyLimit?.resetsAt ? (
-        <p className="text-[12px] text-muted-foreground">Resets: {new Date(monthlyLimit.resetsAt).toLocaleString()}</p>
+        <p className="text-[12px] text-muted-foreground">
+          {expired ? "Reset time passed" : "Resets"}: {new Date(monthlyLimit.resetsAt).toLocaleString()}
+        </p>
       ) : null}
     </div>
   );

@@ -1,22 +1,8 @@
-import { useEffect, useState } from "react";
 import type { FactoriesCodexUsageWindow } from "@/api-client";
+import { useTimeHasPassed } from "@/hooks/useTimeHasPassed";
 
 function useQuotaWindowStatus(window: FactoriesCodexUsageWindow, fallbackLabel: string) {
-  const [now, setNow] = useState(Date.now);
-  const resetsAt = window.resetsAt ? new Date(window.resetsAt).getTime() : NaN;
-  useEffect(() => {
-    if (!Number.isFinite(resetsAt)) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const scheduleReset = () => {
-      const current = Date.now();
-      setNow(current);
-      if (resetsAt > current) {
-        timer = setTimeout(scheduleReset, Math.min(resetsAt - current, 2147483647));
-      }
-    };
-    scheduleReset();
-    return () => clearTimeout(timer);
-  }, [resetsAt]);
+  const expired = useTimeHasPassed(window.resetsAt);
   const minutes = Number(window.windowDurationMins);
   const windowLabel =
     minutes > 0
@@ -26,7 +12,6 @@ function useQuotaWindowStatus(window: FactoriesCodexUsageWindow, fallbackLabel: 
           ? `${minutes / 60}-hour window`
           : `${minutes}-minute window`
       : fallbackLabel;
-  const expired = resetsAt <= Math.max(now, Date.now());
   const remaining = window.usedPercent === undefined ? undefined : Math.max(0, Math.min(100, 100 - window.usedPercent));
   const status = expired ? "Update needed" : remaining === undefined ? "Usage unavailable" : `${remaining}% remaining`;
 
