@@ -626,23 +626,30 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 func (e *CanvasNodeExecution) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) error {
 	now := time.Now()
 
-	e.State = CanvasNodeExecutionStateCancelling
-	e.CancelledBy = cancelledBy
-	e.CancelledAt = &now
-	e.UpdatedAt = &now
-
-	err := tx.Model(e).
+	result := tx.Model(e).
+		Where("state IN ?", []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted}).
 		Updates(map[string]any{
 			"state":        CanvasNodeExecutionStateCancelling,
 			"cancelled_by": cancelledBy,
 			"cancelled_at": &now,
 			"updated_at":   &now,
-		}).Error
+		})
 
-	if err != nil {
-		return err
+	if result.Error != nil {
+		return result.Error
 	}
-
+	if result.RowsAffected == 0 {
+		current, err := FindNodeExecutionInTransaction(tx, e.WorkflowID, e.ID)
+		if err != nil {
+			return err
+		}
+		*e = *current
+		return nil
+	}
+	e.State = CanvasNodeExecutionStateCancelling
+	e.CancelledBy = cancelledBy
+	e.CancelledAt = &now
+	e.UpdatedAt = &now
 	return nil
 }
 

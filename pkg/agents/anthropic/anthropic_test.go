@@ -26,6 +26,38 @@ func newTestProvider(t *testing.T, server *httptest.Server) *Provider {
 	return p
 }
 
+func TestSessionStoppedRequiresRemoteConfirmation(t *testing.T) {
+	for _, tc := range []struct {
+		status  string
+		code    int
+		stopped bool
+		failed  bool
+	}{
+		{"running", 200, false, false}, {"idle", 200, true, false},
+		{"terminated", 200, true, false}, {"unknown", 200, false, true},
+		{"", 404, true, false}, {"", 503, false, true},
+	} {
+		t.Run(tc.status+http.StatusText(tc.code), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost {
+					w.WriteHeader(http.StatusAccepted)
+					_, _ = w.Write([]byte(`{}`))
+					return
+				}
+				assert.Equal(t, "/sessions/session-1", r.URL.Path)
+				w.WriteHeader(tc.code)
+				_ = json.NewEncoder(w).Encode(map[string]string{"status": tc.status})
+			}))
+			defer server.Close()
+			p := newTestProvider(t, server)
+			require.NoError(t, p.InterruptSession(t.Context(), "session-1"))
+			stopped, err := p.SessionStopped(t.Context(), "session-1")
+			assert.Equal(t, tc.stopped, stopped)
+			assert.Equal(t, tc.failed, err != nil)
+		})
+	}
+}
+
 func TestNew_RequiresAllFields(t *testing.T) {
 	cases := []struct {
 		name string

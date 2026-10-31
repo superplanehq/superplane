@@ -942,6 +942,13 @@ func (r *CanvasRun) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*R
 	return r.requestTermination(tx, cancelledBy, "")
 }
 
+// RequestCancellationBatch uses the normal lifecycle for one run. Organization
+// cancellation scans every run (including descendants) independently, avoiding
+// an unbounded recursive traversal while holding the organization lock.
+func (r *CanvasRun) RequestCancellationBatch(tx *gorm.DB) (*RunCancellationResult, error) {
+	return r.requestRunTermination(tx, nil, "")
+}
+
 func (r *CanvasRun) requestTermination(tx *gorm.DB, stoppedBy *uuid.UUID, requestedResult string) (*RunCancellationResult, error) {
 	descendants, err := listDescendantRuns(tx, r.ID)
 	if err != nil {
@@ -1053,7 +1060,9 @@ func (r *CanvasRun) setRequestedResult(tx *gorm.DB, requestedResult string) erro
 }
 
 func (r *CanvasRun) DrainForCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationDrainResult, error) {
-	executions, err := r.ListExecutionsInStates(tx, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted})
+	var executions []CanvasNodeExecution
+	err := tx.Where("run_id = ? AND state IN ?", r.ID, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted}).
+		Order("id").Limit(100).Find(&executions).Error
 	if err != nil {
 		return nil, err
 	}
@@ -1063,12 +1072,12 @@ func (r *CanvasRun) DrainForCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*
 		return nil, err
 	}
 
-	deletedQueueItems, err := r.DeleteQueueItems(tx)
+	deletedQueueItems, err := r.deleteQueueItems(tx, 100)
 	if err != nil {
 		return nil, err
 	}
 
-	supersededEvents, err := r.SupersedePendingEvents(tx)
+	supersededEvents, err := r.supersedePendingEvents(tx, 100)
 	if err != nil {
 		return nil, err
 	}
@@ -1081,12 +1090,19 @@ func (r *CanvasRun) DrainForCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*
 }
 
 func (r *CanvasRun) SupersedePendingEvents(tx *gorm.DB) ([]CanvasEvent, error) {
+	return r.supersedePendingEvents(tx, 0)
+}
+
+func (r *CanvasRun) supersedePendingEvents(tx *gorm.DB, limit int) ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	err := tx.
+	query := tx.
 		Where("run_id = ?", r.ID).
 		Where("state = ?", CanvasEventStatePending).
-		Find(&events).
-		Error
+		Order("id")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	err := query.Find(&events).Error
 
 	if err != nil {
 		return nil, err
@@ -1098,8 +1114,7 @@ func (r *CanvasRun) SupersedePendingEvents(tx *gorm.DB) ([]CanvasEvent, error) {
 
 	err = tx.
 		Model(&CanvasEvent{}).
-		Where("run_id = ?", r.ID).
-		Where("state = ?", CanvasEventStatePending).
+		Where("id IN ?", canvasEventIDs(events)).
 		Update("state", CanvasEventStateRouted).
 		Error
 	if err != nil {
@@ -1183,11 +1198,18 @@ func (r *CanvasRun) ListExecutionsInStates(tx *gorm.DB, states []string) ([]Canv
 }
 
 func (r *CanvasRun) DeleteQueueItems(tx *gorm.DB) ([]CanvasNodeQueueItem, error) {
+	return r.deleteQueueItems(tx, 0)
+}
+
+func (r *CanvasRun) deleteQueueItems(tx *gorm.DB, limit int) ([]CanvasNodeQueueItem, error) {
 	var deletedQueueItems []CanvasNodeQueueItem
+	ids := tx.Model(&CanvasNodeQueueItem{}).Select("id").Where("workflow_id = ? AND run_id = ?", r.WorkflowID, r.ID).Order("id")
+	if limit > 0 {
+		ids = ids.Limit(limit)
+	}
 	err := tx.
 		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}, {Name: "workflow_id"}}}).
-		Where("workflow_id = ?", r.WorkflowID).
-		Where("run_id = ?", r.ID).
+		Where("id IN (?)", ids).
 		Delete(&deletedQueueItems).
 		Error
 	if err != nil {
@@ -1195,6 +1217,14 @@ func (r *CanvasRun) DeleteQueueItems(tx *gorm.DB) ([]CanvasNodeQueueItem, error)
 	}
 
 	return deletedQueueItems, nil
+}
+
+func canvasEventIDs(events []CanvasEvent) []uuid.UUID {
+	ids := make([]uuid.UUID, len(events))
+	for i := range events {
+		ids[i] = events[i].ID
+	}
+	return ids
 }
 
 func (r *CanvasRun) MarkAsCancelling(tx *gorm.DB, cancelledBy *uuid.UUID) error {

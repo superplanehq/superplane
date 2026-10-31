@@ -266,6 +266,45 @@ func Test__CanvasRun__RequestCancellation__OverridesCompletionRequest(t *testing
 	assert.Equal(t, models.CanvasRunResultCancelled, result)
 }
 
+func Test__CanvasRun__CancellationDrainMakesBoundedProgress(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+	for i := 0; i < 101; i++ {
+		queue := support.CreateQueueItem(t, run.WorkflowID, "node-1", execution.RootEventID, execution.RootEventID)
+		require.NoError(t, db.Model(queue).Update("run_id", run.ID).Error)
+	}
+	var result *models.RunCancellationResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		result, err = run.RequestCancellationBatch(tx)
+		return err
+	}))
+	require.Len(t, result.Drain.DeletedQueueItems, 100)
+	open, err := run.FindOpenWork(db)
+	require.NoError(t, err)
+	require.True(t, open.HasQueueItems)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		result, err = run.RequestCancellationBatch(tx)
+		return err
+	}))
+	require.Len(t, result.Drain.DeletedQueueItems, 1)
+	open, err = run.FindOpenWork(db)
+	require.NoError(t, err)
+	require.False(t, open.HasQueueItems)
+}
+
+func Test__CanvasRun__StaleCancellationPreservesFinishedExecution(t *testing.T) {
+	_, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{"state": models.CanvasNodeExecutionStateFinished, "result": models.CanvasNodeExecutionResultPassed}).Error)
+	require.NoError(t, execution.RequestCancellation(db, nil))
+	stored, err := models.FindNodeExecutionInTransaction(db, execution.WorkflowID, execution.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionStateFinished, stored.State)
+	require.Equal(t, models.CanvasNodeExecutionResultPassed, stored.Result)
+}
+
 func Test__CanvasRun__RequestCancellation__StopsDescendantsOfFinishedExecutions(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	db := database.DB(t.Context())
