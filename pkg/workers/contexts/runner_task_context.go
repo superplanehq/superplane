@@ -47,32 +47,37 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 	if err != nil {
 		return err
 	}
-	fleet, err := models.FindEnabledRunnerFleetForOrganization(c.tx, c.organizationID, fleetID)
-	if err != nil {
-		return err
-	}
-	encrypted, err := c.encryptor.Encrypt(
-		context.Background(),
-		payload,
-		[]byte(id.String()),
-	)
-	if err != nil {
-		return fmt.Errorf("encrypt runner task payload: %w", err)
-	}
+	return c.tx.Transaction(func(tx *gorm.DB) error {
+		fleet, err := models.FindEnabledRunnerFleetForOrganization(tx, c.organizationID, fleetID)
+		if err != nil {
+			return err
+		}
+		if err := fleet.RequireAdmission(tx); err != nil {
+			return err
+		}
+		encrypted, err := encryption.ForDB(tx, c.encryptor).Encrypt(
+			context.Background(),
+			payload,
+			[]byte(id.String()),
+		)
+		if err != nil {
+			return fmt.Errorf("encrypt runner task payload: %w", err)
+		}
 
-	now := time.Now()
-	task := &models.RunnerTask{
-		ID:                id,
-		OrganizationID:    c.organizationID,
-		FleetID:           fleet.ID,
-		Backend:           models.RunnerTaskBackendIntegrated,
-		State:             models.RunnerTaskStatePending,
-		PayloadCiphertext: encrypted,
-		QueuedAt:          now,
-		CreatedAt:         now,
-		UpdatedAt:         now,
-	}
-	return c.tx.Create(task).Error
+		now := time.Now()
+		task := &models.RunnerTask{
+			ID:                id,
+			OrganizationID:    c.organizationID,
+			FleetID:           fleet.ID,
+			Backend:           models.RunnerTaskBackendIntegrated,
+			State:             models.RunnerTaskStatePending,
+			PayloadCiphertext: encrypted,
+			QueuedAt:          now,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		}
+		return tx.Create(task).Error
+	})
 }
 
 func withDefaultLogUploadPolicy(payload []byte) ([]byte, error) {
