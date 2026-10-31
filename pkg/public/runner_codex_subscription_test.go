@@ -177,51 +177,112 @@ func TestCodexRunningTaskKeepsCredentialsAfterWorkspaceModelPolicyChange(t *test
 	assert.Equal(t, http.StatusConflict, revoked.Code, "revocation must still stop a running task")
 }
 
-func TestCodexRunningTaskKeepsCredentialsAfterFactoriesDisabled(t *testing.T) {
+func TestCodexCatalogRefreshCannotFetchCredentialsAfterOrganizationDeletion(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	connection, factory, secret := readyCodexRun(t, r)
-	lease, err := models.FindCodexRunLeaseBySecret(db, secret)
-	require.NoError(t, err)
-	signer := jwt.NewSigner("test-codex-run")
+	connection, _, _ := readyCodexRun(t, r)
+	require.NoError(t, db.Where("connection_id = ?", connection.ID).Delete(&models.FactoryCodexLease{}).Error)
+	taskID := uuid.New()
+	require.NoError(t, connection.BeginCatalogRefresh(db, taskID, time.Now()))
+	signer := jwt.NewSigner("test-codex-catalog-refresh")
 	token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
-		OrganizationID: r.Organization.ID, FactoryID: factory.ID, ConnectionID: connection.ID,
-		TaskID: lease.TaskID, Generation: lease.Generation,
+		OrganizationID: r.Organization.ID, ConnectionID: connection.ID,
+		TaskID: taskID, Generation: connection.ReservationGeneration,
 	}, time.Hour)
 	require.NoError(t, err)
-	nextAccess := codexTestAccessToken(time.Now().Add(time.Hour))
-	server := &Server{
-		jwt: signer, encryptor: r.Encryptor,
-		codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
-			return runneraction.CodexTokenSet{AccessToken: nextAccess, RefreshToken: "openai-refresh-2", IDToken: "id-token-2"}, nil
-		},
-	}
-	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
-	credentials := func() *httptest.ResponseRecorder {
-		request := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
-		request.Header.Set("Authorization", "Bearer "+token)
-		response := httptest.NewRecorder()
-		server.handleRunnerCodexSubscriptionCredentials(response, request)
-		return response
-	}
-	refresh := func() *httptest.ResponseRecorder {
-		body, err := json.Marshal(map[string]string{"refresh_token": secret})
-		require.NoError(t, err)
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", bytes.NewReader(body))
-		response := httptest.NewRecorder()
-		server.handleRunnerCodexSubscriptionRefresh(response, request)
-		return response
-	}
-	response := credentials()
-	assert.Equal(t, http.StatusOK, response.Code, response.Body.String())
-	response = refresh()
-	assert.Equal(t, http.StatusOK, response.Code, response.Body.String())
-	assert.Contains(t, response.Body.String(), nextAccess)
-	assert.NotContains(t, response.Body.String(), "openai-refresh-2")
+	server := &Server{jwt: signer, encryptor: r.Encryptor}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	response := httptest.NewRecorder()
+	server.handleRunnerCodexSubscriptionCredentials(response, request)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	assert.Contains(t, response.Body.String(), "openai-refresh")
 
-	require.NoError(t, db.Model(lease).Update("revoked_at", time.Now()).Error)
-	assert.Equal(t, http.StatusConflict, credentials().Code, "revocation must still stop credential access")
-	assert.Equal(t, http.StatusUnauthorized, refresh().Code, "revocation must still stop token refresh")
+	require.NoError(t, models.SoftDeleteOrganizationInTransaction(db, r.Organization.ID.String()))
+	response = httptest.NewRecorder()
+	server.handleRunnerCodexSubscriptionCredentials(response, request)
+	assert.Equal(t, http.StatusForbidden, response.Code, response.Body.String())
+	assert.NotContains(t, response.Body.String(), "openai-refresh")
+}
+
+func TestCodexRunningTaskCredentialsAfterOrganizationChange(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		changeOrganization func(*support.ResourceRegistry) error
+		wantStatus         int
+	}{
+		{
+			name: "factories disabled",
+			changeOrganization: func(r *support.ResourceRegistry) error {
+				return models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories)
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "organization deleted",
+			changeOrganization: func(r *support.ResourceRegistry) error {
+				return models.SoftDeleteOrganizationInTransaction(database.DB(t.Context()), r.Organization.ID.String())
+			},
+			wantStatus: http.StatusForbidden,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			connection, factory, secret := readyCodexRun(t, r)
+			lease, err := models.FindCodexRunLeaseBySecret(db, secret)
+			require.NoError(t, err)
+			signer := jwt.NewSigner("test-codex-run")
+			token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
+				OrganizationID: r.Organization.ID, FactoryID: factory.ID, ConnectionID: connection.ID,
+				TaskID: lease.TaskID, Generation: lease.Generation,
+			}, time.Hour)
+			require.NoError(t, err)
+			var refreshCalls int
+			nextAccess := codexTestAccessToken(time.Now().Add(time.Hour))
+			server := &Server{
+				jwt: signer, encryptor: r.Encryptor,
+				codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
+					refreshCalls++
+					return runneraction.CodexTokenSet{AccessToken: nextAccess, RefreshToken: "openai-refresh-2", IDToken: "id-token-2"}, nil
+				},
+			}
+			require.NoError(t, tc.changeOrganization(r))
+			credentials := func() *httptest.ResponseRecorder {
+				request := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
+				request.Header.Set("Authorization", "Bearer "+token)
+				response := httptest.NewRecorder()
+				server.handleRunnerCodexSubscriptionCredentials(response, request)
+				return response
+			}
+			refresh := func() *httptest.ResponseRecorder {
+				body, err := json.Marshal(map[string]string{"refresh_token": secret})
+				require.NoError(t, err)
+				request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", bytes.NewReader(body))
+				response := httptest.NewRecorder()
+				server.handleRunnerCodexSubscriptionRefresh(response, request)
+				return response
+			}
+			response := credentials()
+			assert.Equal(t, tc.wantStatus, response.Code, response.Body.String())
+			if tc.wantStatus != http.StatusOK {
+				assert.NotContains(t, response.Body.String(), secret)
+			}
+			response = refresh()
+			assert.Equal(t, tc.wantStatus, response.Code, response.Body.String())
+			if tc.wantStatus != http.StatusOK {
+				assert.NotContains(t, response.Body.String(), nextAccess)
+				assert.Zero(t, refreshCalls, "a deleted organization must not refresh provider credentials")
+				return
+			}
+			assert.Contains(t, response.Body.String(), nextAccess)
+			assert.NotContains(t, response.Body.String(), "openai-refresh-2")
+
+			require.NoError(t, db.Model(lease).Update("revoked_at", time.Now()).Error)
+			assert.Equal(t, http.StatusConflict, credentials().Code, "revocation must still stop credential access")
+			assert.Equal(t, http.StatusUnauthorized, refresh().Code, "revocation must still stop token refresh")
+		})
+	}
 }
 
 func TestCodexRefreshIsSingleFlightAndHidesTheRefreshToken(t *testing.T) {

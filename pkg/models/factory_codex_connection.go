@@ -760,11 +760,18 @@ func (c *FactoryCodexConnection) MarkReconnectRequired(tx *gorm.DB, now time.Tim
 	return nil
 }
 
-// ActiveCodexMember locks membership before connection mutation. Removal uses
-// the same order, so it cannot race sign-in or subscription admission.
+// ActiveCodexMember requires an active organization and locks membership before
+// connection mutation. Member removal takes the same lock before revocation.
 func ActiveCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, error) {
+	_, err := FindOrganizationByIDInTransaction(tx, organizationID.String())
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrCodexConnectionNotEligible
+	}
+	if err != nil {
+		return nil, err
+	}
 	var user User
-	err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+	err = tx.Clauses(clause.Locking{Strength: "SHARE"}).
 		Where("organization_id = ? AND id = ? AND type = ?", organizationID, userID, UserTypeHuman).
 		First(&user).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
