@@ -85,7 +85,7 @@ type RunnerTask struct {
 type RunnerTaskReservationResult struct {
 	Task             *RunnerTask
 	FailedTasks      []*RunnerTask
-	LoginConnections []FactoryCodexConnection
+	SetupConnections []FactoryCodexConnection
 }
 
 // FindExecution resolves the execution that created this task through its KV.
@@ -318,7 +318,7 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, erro
 				return err
 			}
 			reservation.FailedTasks = append(reservation.FailedTasks, attempt.FailedTasks...)
-			reservation.LoginConnections = append(reservation.LoginConnections, attempt.LoginConnections...)
+			reservation.SetupConnections = append(reservation.SetupConnections, attempt.SetupConnections...)
 			if attempt.Task != nil {
 				reservation.Task = attempt.Task
 				return nil
@@ -592,16 +592,30 @@ func (t *RunnerTask) rejectSubscriptionAdmission(tx *gorm.DB, admissionError err
 	if err != nil {
 		return result, err
 	}
-	if lease != nil && lease.Login() {
+	if lease.Login() || lease.Catalog() {
 		connection, err := FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
 		if err != nil && !errors.Is(err, ErrCodexConnectionNotFound) {
 			return result, err
 		}
 		if connection != nil {
-			result.LoginConnections = append(result.LoginConnections, *connection)
+			if err := connection.AttachLoginLease(tx); err != nil {
+				return result, err
+			}
+			result.SetupConnections = append(result.SetupConnections, *connection)
 		}
 	}
-	if err := t.FailQueued(tx, admissionError.Error(), time.Now()); err != nil {
+	now := time.Now()
+	if lease.Catalog() && !now.Before(lease.CreatedAt.Add(CodexCatalogTimeout)) {
+		if err := lease.revoke(tx, now); err != nil {
+			return RunnerTaskReservationResult{}, err
+		}
+		if err := t.RequestCancel(tx, now); err != nil {
+			return RunnerTaskReservationResult{}, err
+		}
+		if err := ReleaseCodexReservationForTask(tx, t.ID, now); err != nil {
+			return RunnerTaskReservationResult{}, err
+		}
+	} else if err := t.FailQueued(tx, admissionError.Error(), now); err != nil {
 		return RunnerTaskReservationResult{}, err
 	}
 	result.FailedTasks = append(result.FailedTasks, t)

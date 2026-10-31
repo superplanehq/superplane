@@ -409,7 +409,7 @@ func (s *Server) reconcileRunnerConnection(
 		messages.PublishPlanningRunnerStatus(database.DB(ctx), failedTask)
 	}
 	publishedFactories := map[uuid.UUID]bool{}
-	for _, connection := range reservation.LoginConnections {
+	for _, connection := range reservation.SetupConnections {
 		if publishedFactories[connection.OrganizationID] {
 			continue
 		}

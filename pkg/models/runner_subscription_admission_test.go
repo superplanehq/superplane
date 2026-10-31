@@ -228,26 +228,48 @@ func TestRunnerAdmissionStopsAfterTenCandidatesAndResumesOnNextCall(t *testing.T
 	assert.Empty(t, reservation.FailedTasks)
 }
 
-func TestRunnerAdmissionCommitsLoneSubscriptionFailureAndReleasesLogin(t *testing.T) {
-	db, connection, task, previousRunner := newDisconnectedCodexLogin(t)
-	runner := &models.Runner{ID: uuid.New(), FleetID: previousRunner.FleetID, State: models.RunnerStateIdle, RunnerVersion: previousRunner.RunnerVersion}
-	require.NoError(t, db.Create(runner).Error)
-	require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", task.ID).Update("revoked_at", time.Now()).Error)
+func TestRunnerAdmissionReleasesRejectedSetupAndCapturesActivity(t *testing.T) {
+	for _, scenario := range []string{"revoked login", "expired catalog"} {
+		t.Run(scenario, func(t *testing.T) {
+			db, connection, task, previousRunner := newDisconnectedCodexLogin(t)
+			runner := &models.Runner{ID: uuid.New(), FleetID: previousRunner.FleetID, State: models.RunnerStateIdle, RunnerVersion: previousRunner.RunnerVersion}
+			require.NoError(t, db.Create(runner).Error)
+			if scenario == "expired catalog" {
+				require.NoError(t, db.Where("connection_id = ?", connection.ID).Delete(&models.FactoryCodexLease{}).Error)
+				require.NoError(t, db.Model(connection).Updates(map[string]any{
+					"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("saved"),
+				}).Error)
+				_, err := connection.BeginCatalogRefresh(db, task.ID, crypto.NewNoOpEncryptor(), time.Now().Add(-models.CodexCatalogTimeout))
+				require.NoError(t, err)
+			} else {
+				require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", task.ID).Update("revoked_at", time.Now()).Error)
+			}
 
-	reserved, err := runner.ReserveNextTask(db)
-	require.NoError(t, err)
-	assert.Nil(t, reserved.Task)
-	require.Len(t, reserved.FailedTasks, 1)
-	assert.Equal(t, task.ID, reserved.FailedTasks[0].ID)
-	require.Len(t, reserved.LoginConnections, 1)
-	assert.Equal(t, connection.ID, reserved.LoginConnections[0].ID)
-	stored, err := models.FindRunnerTask(db, task.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.RunnerTaskStateFailed, stored.State)
-	require.NotNil(t, stored.ErrorMessage)
-	assert.Equal(t, models.ErrCodexConnectionStale.Error(), *stored.ErrorMessage)
-	assert.NotNil(t, stored.FinishedAt)
-	assert.Empty(t, codexLeases(t, db, connection.ID))
+			reserved, err := runner.ReserveNextTask(db)
+			require.NoError(t, err)
+			assert.Nil(t, reserved.Task)
+			require.Len(t, reserved.FailedTasks, 1)
+			assert.Equal(t, task.ID, reserved.FailedTasks[0].ID)
+			require.Len(t, reserved.SetupConnections, 1)
+			assert.Equal(t, connection.ID, reserved.SetupConnections[0].ID)
+			stored, err := models.FindRunnerTask(db, task.ID)
+			require.NoError(t, err)
+			if scenario == "expired catalog" {
+				assert.Equal(t, models.RunnerTaskStateCanceled, stored.State)
+				require.NotNil(t, reserved.SetupConnections[0].CatalogLease)
+				assert.Equal(t, task.ID, reserved.SetupConnections[0].CatalogLease.TaskID)
+				ready := reloadCodexConnection(t, db, connection.ID)
+				assert.Equal(t, models.CodexConnectionStatusReady, ready.Status)
+				assert.Equal(t, []byte("saved"), []byte(ready.BundleCiphertext))
+			} else {
+				assert.Equal(t, models.RunnerTaskStateFailed, stored.State)
+				require.NotNil(t, stored.ErrorMessage)
+				assert.Equal(t, models.ErrCodexConnectionStale.Error(), *stored.ErrorMessage)
+			}
+			assert.NotNil(t, stored.FinishedAt)
+			assert.Empty(t, codexLeases(t, db, connection.ID))
+		})
+	}
 }
 
 func TestRunnerAdmissionKeepsContendedSubscriptionQueuedAndReleasesLocks(t *testing.T) {

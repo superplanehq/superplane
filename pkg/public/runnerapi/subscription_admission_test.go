@@ -5,9 +5,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"google.golang.org/protobuf/proto"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -79,4 +84,61 @@ func TestRunnerReservationFailureProcessesSavedErrorAfterCommit(t *testing.T) {
 	storedRunner, err := models.FindRunner(db, runner.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerStateIdle, storedRunner.State)
+}
+
+func TestExpiredCatalogReservationPublishesReleasedActivityAfterCommit(t *testing.T) {
+	resource := support.Setup(t)
+	defer resource.Close()
+	db := database.DB(t.Context())
+	runner, _, fleet := createRegistrationFixture(t)
+	connectionID := uuid.New()
+	require.NoError(t, db.Model(runner).Updates(map[string]any{"state": models.RunnerStateIdle, "current_connection_id": connectionID}).Error)
+	task := &models.RunnerTask{ID: uuid.New(), OrganizationID: resource.Organization.ID, FleetID: fleet.ID,
+		Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued,
+		QueuedAt: time.Now(), PayloadCiphertext: []byte(`{}`)}
+	require.NoError(t, db.Create(task).Error)
+	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
+	factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{
+		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("saved"),
+	}).Error)
+	_, err = connection.BeginCatalogRefresh(db, task.ID, resource.Encryptor, time.Now().Add(-models.CodexCatalogTimeout))
+	require.NoError(t, err)
+	url, err := config.RabbitMQURL()
+	require.NoError(t, err)
+	broker, err := amqp.Dial(url)
+	require.NoError(t, err)
+	defer broker.Close()
+	channel, err := broker.Channel()
+	require.NoError(t, err)
+	require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+	queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderUpdatedRoutingKey, messages.CanvasExchange, false, nil))
+	server, err := NewServer(jwt.NewSigner("secret"), resource.Encryptor, runnerlogs.StoreFS, nil)
+	require.NoError(t, err)
+
+	require.NoError(t, server.reconcileRunnerConnection(t.Context(), nil, runner, connectionID, "", fleet.Slug, fleet.ScopeType))
+	require.Eventually(t, func() bool {
+		delivery, found, err := channel.Get(queue.Name, true)
+		require.NoError(t, err)
+		if !found { return false }
+		var update pb.FactoryWorkOrderUpdatedMessage
+		require.NoError(t, proto.Unmarshal(delivery.Body, &update))
+		if update.FactoryId != factory.ID.String() || update.Reason != "codex_connection" { return false }
+		lease, err := models.FindCodexLeaseByTask(db, task.ID)
+		require.NoError(t, err)
+		assert.Nil(t, lease, "activity removal must commit before notification")
+		stored, err := models.FindRunnerTask(db, task.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.RunnerTaskStateCanceled, stored.State)
+		ready, err := models.FindFactoryCodexConnectionByID(db, connection.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CodexConnectionStatusReady, ready.Status)
+		assert.Equal(t, []byte("saved"), []byte(ready.BundleCiphertext))
+		return true
+	}, 3*time.Second, 10*time.Millisecond)
 }
