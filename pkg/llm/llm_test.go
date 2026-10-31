@@ -123,7 +123,7 @@ func TestOpenAI_ListModelsAndComplete(t *testing.T) {
 	resp, err := client.Complete(context.Background(), CompleteRequest{Model: "gpt-5-mini", Prompt: "hi"})
 	require.NoError(t, err)
 	assert.Equal(t, "ok", resp.Text)
-	assert.Equal(t, int64(10), resp.Usage.InputTokens)
+	assert.Equal(t, int64(8), resp.Usage.InputTokens) // prompt_tokens 10 includes 2 cached (#9049)
 	assert.Equal(t, int64(4), resp.Usage.OutputTokens)
 	assert.Equal(t, int64(2), resp.Usage.CacheReadTokens)
 	assert.Equal(t, int64(1), resp.Usage.ReasoningTokens)

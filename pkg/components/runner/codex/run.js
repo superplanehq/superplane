@@ -718,14 +718,23 @@ function loadTurnTelemetry() {
 
 function extractUsage(event) {
   const source = event.usage || (event.item && event.item.usage) || event;
+  const cacheRead = Number(
+    source.cached_input_tokens || source.cache_read_input_tokens || 0,
+  );
+  let input = Number(source.input_tokens || source.prompt_tokens || 0);
+  // OpenAI reports cached_input_tokens as a subset of input_tokens (unlike
+  // Anthropic's disjoint cache_read_input_tokens). Keep the buckets disjoint so
+  // token totals and EstimateMicros don't count cached input twice (#9049).
+  // Same rule as pkg/integrations/openai/text_prompt.go.
+  if (source.cached_input_tokens != null && cacheRead > 0 && cacheRead <= input) {
+    input -= cacheRead;
+  }
   const usage = {
-    input_tokens: Number(source.input_tokens || source.prompt_tokens || 0),
+    input_tokens: input,
     output_tokens: Number(
       source.output_tokens || source.completion_tokens || 0,
     ),
-    cache_read_input_tokens: Number(
-      source.cached_input_tokens || source.cache_read_input_tokens || 0,
-    ),
+    cache_read_input_tokens: cacheRead,
     cache_creation_input_tokens: Number(source.cache_write_input_tokens || 0),
     reasoning_tokens: Number(
       source.reasoning_output_tokens || source.reasoning_tokens || 0,
@@ -1260,6 +1269,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  extractUsage,
   formatCodexJsonLines,
   formatTurnResult,
   createCodexFormatter,

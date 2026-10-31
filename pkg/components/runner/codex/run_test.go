@@ -1272,9 +1272,44 @@ func TestFormatCodexJsonLinesEmitsCompletedUsage(t *testing.T) {
 	}
 	require.NotNil(t, last)
 	usage := last["usage"].(map[string]any)
-	assert.Equal(t, float64(100), usage["input_tokens"])
+	// cached_input_tokens is a subset of input_tokens, so 30 of the 100 are
+	// reported only as cache reads (#9049).
+	assert.Equal(t, float64(70), usage["input_tokens"])
 	assert.Equal(t, float64(30), usage["cache_read_input_tokens"])
 	assert.Equal(t, float64(20), usage["output_tokens"])
 	require.Contains(t, usage, "total_cost_usd")
 	assert.InDelta(t, 0.12, usage["total_cost_usd"], 1e-9)
+}
+
+func extractUsageFromScript(t *testing.T, event string) map[string]float64 {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { extractUsage } = require(process.argv[1]); process.stdout.write(JSON.stringify(extractUsage(JSON.parse(process.argv[2]))));`,
+		script,
+		event,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var usage map[string]float64
+	require.NoError(t, json.Unmarshal(out, &usage))
+	return usage
+}
+
+// OpenAI's cached_input_tokens is a subset of input_tokens (#9049).
+func TestExtractUsageKeepsOpenAICachedInputDisjoint(t *testing.T) {
+	usage := extractUsageFromScript(t, `{"type":"turn.completed","usage":{"input_tokens":56305375,"cached_input_tokens":55524598,"output_tokens":223089}}`)
+	assert.Equal(t, float64(780777), usage["input_tokens"])
+	assert.Equal(t, float64(55524598), usage["cache_read_input_tokens"])
+	assert.Equal(t, float64(223089), usage["output_tokens"])
+}
+
+// Anthropic-style cache_read_input_tokens is already disjoint; leave it alone.
+func TestExtractUsageLeavesDisjointCacheReadUnchanged(t *testing.T) {
+	usage := extractUsageFromScript(t, `{"usage":{"input_tokens":780777,"cache_read_input_tokens":55524598,"output_tokens":223089}}`)
+	assert.Equal(t, float64(780777), usage["input_tokens"])
+	assert.Equal(t, float64(55524598), usage["cache_read_input_tokens"])
 }
