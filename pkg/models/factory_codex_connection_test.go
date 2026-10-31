@@ -556,9 +556,14 @@ func TestCodexCatalogCancellationAndExpiryRetainActivityUntilCleanup(t *testing.
 					require.NoError(t, connection.CancelCatalogRefresh(db, task.ID, now))
 					require.NoError(t, connection.CancelCatalogRefresh(db, task.ID, now))
 					_, err = models.FindCodexRefreshLeaseBySecret(db, lease.Secret)
-					require.ErrorIs(t, err, models.ErrCodexConnectionStale)
-					require.NoError(t, connection.AttachLoginLease(db))
-					assert.True(t, connection.CatalogCancellationRequested)
+					terminal := state == "missing" || state == models.RunnerTaskStateLost
+					if terminal {
+						require.NoError(t, err, "finished and missing cancellation targets are no-ops")
+					} else {
+						require.ErrorIs(t, err, models.ErrCodexConnectionStale)
+					}
+					require.NoError(t, connection.AttachSetupLeases(db))
+					assert.Equal(t, !terminal, connection.CatalogCancellationRequested)
 					coalesced, err := connection.BeginCatalogRefresh(db, uuid.New(), crypto.NewNoOpEncryptor(), now)
 					require.NoError(t, err)
 					assert.Equal(t, task.ID, coalesced.TaskID)

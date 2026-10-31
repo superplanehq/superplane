@@ -556,7 +556,7 @@ func (s *Server) completeRunnerTask(
 			if err != nil {
 				return err
 			}
-			if err := connection.AttachLoginLease(tx); err != nil {
+			if err := connection.AttachSetupLeases(tx); err != nil {
 				return err
 			}
 			loginConnections = append(loginConnections, *connection)

@@ -52,7 +52,7 @@ func PublishCodexConnectionChanges(db *gorm.DB, previous []models.FactoryCodexCo
 			log.WithError(err).Warn("Failed to load completed ChatGPT sign-in")
 			continue
 		}
-		if err := current.AttachLoginLease(db); err != nil {
+		if err := current.AttachSetupLeases(db); err != nil {
 			log.WithError(err).Warn("Failed to load ChatGPT catalog activity")
 			continue
 		}

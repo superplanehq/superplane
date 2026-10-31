@@ -598,7 +598,7 @@ func (t *RunnerTask) rejectSubscriptionAdmission(tx *gorm.DB, admissionError err
 			return result, err
 		}
 		if connection != nil {
-			if err := connection.AttachLoginLease(tx); err != nil {
+			if err := connection.AttachSetupLeases(tx); err != nil {
 				return result, err
 			}
 			result.SetupConnections = append(result.SetupConnections, *connection)

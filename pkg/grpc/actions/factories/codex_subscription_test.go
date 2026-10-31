@@ -10,18 +10,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/components/runner"
-	"github.com/superplanehq/superplane/pkg/jwt"
-	runnerpayload "github.com/superplanehq/superplane/pkg/runners/api"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"google.golang.org/protobuf/proto"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	runnerpayload "github.com/superplanehq/superplane/pkg/runners/api"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
 )
 
@@ -162,7 +162,7 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 	}
 	type startResult struct {
 		response *pb.StartFactoryCodexConnectionResponse
-		err error
+		err      error
 	}
 	results := make(chan startResult, 2)
 	ready := make(chan struct{})
@@ -179,7 +179,9 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 		assert.False(t, view.ReservationHeld)
 		assert.Empty(t, view.ActiveTaskId)
 		require.NotEmpty(t, view.CatalogRefreshTaskId)
-		if taskID == "" { taskID = view.CatalogRefreshTaskId }
+		if taskID == "" {
+			taskID = view.CatalogRefreshTaskId
+		}
 		assert.Equal(t, taskID, view.CatalogRefreshTaskId)
 	}
 	var taskCount int64
@@ -190,7 +192,9 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 	var payload runnerpayload.TaskPayload
 	require.NoError(t, json.Unmarshal(task.PayloadCiphertext, &payload))
 	environment := map[string]string{}
-	for _, variable := range payload.Environment { environment[variable.Name] = variable.Value }
+	for _, variable := range payload.Environment {
+		environment[variable.Name] = variable.Value
+	}
 	assert.Equal(t, "https://superplane.example"+runner.CodexSubscriptionRefreshPath, environment[runner.EnvCodexRefreshTokenURL])
 	scope, err := runner.ParseCodexSubscriptionToken(jwt.NewSigner("catalog-task-test"), environment[runner.EnvCodexSubscriptionToken])
 	require.NoError(t, err)
@@ -204,6 +208,7 @@ func TestCatalogRefreshCoalescesAndCancellationTargetsOnlyItsTask(t *testing.T) 
 	assert.Equal(t, int(models.CodexCatalogTimeout/time.Second), *payload.ExecutionTimeoutSeconds)
 	worker := &models.Runner{ID: uuid.New(), FleetID: fleet.ID, State: models.RunnerStateIdle, RunnerVersion: "test", Ephemeral: true, CreatedAt: now, UpdatedAt: now}
 	require.NoError(t, db.Create(worker).Error)
+	require.NoError(t, db.Model(task).Update("state", models.RunnerTaskStateQueued).Error)
 	require.NoError(t, task.Reserve(db, worker.ID))
 	require.NoError(t, task.Start(db, worker, "test", time.Now()))
 	runTask := &models.RunnerTask{ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued, PayloadCiphertext: []byte("run"), QueuedAt: now}
@@ -308,10 +313,14 @@ func TestDescribeCodexConnectionPublishesOnlyCatalogActivityChanges(t *testing.T
 	require.Eventually(t, func() bool {
 		delivery, found, err := channel.Get(queue.Name, true)
 		require.NoError(t, err)
-		if !found { return false }
+		if !found {
+			return false
+		}
 		var update pb.FactoryWorkOrderUpdatedMessage
 		require.NoError(t, proto.Unmarshal(delivery.Body, &update))
-		if update.FactoryId != factory.ID.String() || update.Reason != "codex_connection" { return false }
+		if update.FactoryId != factory.ID.String() || update.Reason != "codex_connection" {
+			return false
+		}
 		lease, err := models.FindCodexLeaseByTask(db, task.ID)
 		require.NoError(t, err)
 		assert.Nil(t, lease, "activity removal must commit before notification")

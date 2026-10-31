@@ -744,7 +744,7 @@ func TestCompleteRunnerTaskPublishesReleasedCodexConnection(t *testing.T) {
 				stored, err := models.FindFactoryCodexConnectionByID(db, connection.ID)
 				require.NoError(t, err)
 				assert.Equal(t, models.CodexConnectionStatusReady, stored.Status, "notification must follow commit")
-				require.NoError(t, stored.AttachLoginLease(db))
+				require.NoError(t, stored.AttachSetupLeases(db))
 				assert.Nil(t, stored.CatalogLease)
 				if purpose == models.CodexLeasePurposeCatalog {
 					assert.Equal(t, generation, stored.ReservationGeneration, "catalog completion must not increment generations")

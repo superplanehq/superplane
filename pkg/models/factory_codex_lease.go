@@ -27,8 +27,8 @@ const (
 
 // FactoryCodexLease is one task using a factory ChatGPT connection.
 // A login lease is exclusive and may checkpoint the real auth bundle.
-// Run leases share one connection. Each run lease secret stands in for the
-// OpenAI refresh token on that runner.
+// Run and catalog leases share one connection. Their lease secrets replace
+// the provider refresh token on each runner.
 type FactoryCodexLease struct {
 	ID               uuid.UUID
 	FactoryID        *uuid.UUID
@@ -54,19 +54,6 @@ func (l *FactoryCodexLease) Login() bool {
 
 func (l *FactoryCodexLease) Catalog() bool {
 	return l != nil && l.Purpose == CodexLeasePurposeCatalog
-}
-
-func (l *FactoryCodexLease) revoke(tx *gorm.DB, now time.Time) error {
-	if l.RevokedAt != nil {
-		return nil
-	}
-	if err := tx.Model(l).Updates(map[string]any{"revoked_at": now, "secret_hash": "", "secret_ciphertext": nil}).Error; err != nil {
-		return err
-	}
-	l.RevokedAt = &now
-	l.SecretHash = ""
-	l.SecretCiphertext = nil
-	return nil
 }
 
 func FindCodexCatalogLease(tx *gorm.DB, connectionID uuid.UUID) (*FactoryCodexLease, error) {
@@ -104,7 +91,7 @@ func ListCodexSetupConnections(tx *gorm.DB) ([]FactoryCodexConnection, error) {
 		return nil, err
 	}
 	for i := range connections {
-		if err := connections[i].AttachLoginLease(tx); err != nil {
+		if err := connections[i].AttachSetupLeases(tx); err != nil {
 			return nil, err
 		}
 	}
@@ -162,7 +149,7 @@ func CountCodexLeases(tx *gorm.DB, connectionID uuid.UUID) (int64, error) {
 	return count, err
 }
 
-func (c *FactoryCodexConnection) AttachLoginLease(tx *gorm.DB) error {
+func (c *FactoryCodexConnection) AttachSetupLeases(tx *gorm.DB) error {
 	if c == nil {
 		return nil
 	}
@@ -423,4 +410,17 @@ func newCodexLeaseSecret(encryptor crypto.Encryptor, connectionID uuid.UUID) (st
 func codexLeaseSecretHash(secret string) string {
 	sum := sha256.Sum256([]byte(secret))
 	return hex.EncodeToString(sum[:])
+}
+
+func (l *FactoryCodexLease) revoke(tx *gorm.DB, now time.Time) error {
+	if l.RevokedAt != nil {
+		return nil
+	}
+	if err := tx.Model(l).Updates(map[string]any{"revoked_at": now, "secret_hash": "", "secret_ciphertext": nil}).Error; err != nil {
+		return err
+	}
+	l.RevokedAt = &now
+	l.SecretHash = ""
+	l.SecretCiphertext = nil
+	return nil
 }

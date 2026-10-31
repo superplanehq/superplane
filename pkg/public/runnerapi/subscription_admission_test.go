@@ -10,15 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"google.golang.org/protobuf/proto"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestRunnerReservationWithoutTaskKeepsRunnerIdle(t *testing.T) {
@@ -125,10 +125,14 @@ func TestExpiredCatalogReservationPublishesReleasedActivityAfterCommit(t *testin
 	require.Eventually(t, func() bool {
 		delivery, found, err := channel.Get(queue.Name, true)
 		require.NoError(t, err)
-		if !found { return false }
+		if !found {
+			return false
+		}
 		var update pb.FactoryWorkOrderUpdatedMessage
 		require.NoError(t, proto.Unmarshal(delivery.Body, &update))
-		if update.FactoryId != factory.ID.String() || update.Reason != "codex_connection" { return false }
+		if update.FactoryId != factory.ID.String() || update.Reason != "codex_connection" {
+			return false
+		}
 		lease, err := models.FindCodexLeaseByTask(db, task.ID)
 		require.NoError(t, err)
 		assert.Nil(t, lease, "activity removal must commit before notification")
