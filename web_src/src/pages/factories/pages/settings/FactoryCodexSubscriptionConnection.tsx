@@ -46,9 +46,8 @@ function connectionStatus(loading: boolean, connection: FactoriesFactoryCodexCon
 }
 
 export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConnection }) {
-  const { connection, disabled, signingIn, ready, refreshing, cancelingRefresh, reconnect, status } =
-    useCodexConnectionState(codex);
-  const catalogRefreshTaskId = connection?.catalogRefreshTaskId;
+  const state = useCodexConnectionState(codex);
+  const { connection, disabled, signingIn, ready, refreshing, cancelingRefresh, reconnect, status } = state;
 
   if (signingIn)
     return (
@@ -75,41 +74,7 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
         </div>
         <div className="flex flex-wrap gap-2">
           {ready ? (
-            <>
-              <LoadingButton
-                type="button"
-                variant="outline"
-                size="sm"
-                loading={refreshing}
-                aria-busy={refreshing}
-                disabled={disabled || refreshing}
-                onClick={() => codex.refreshCatalog.mutate()}
-              >
-                Refresh usage and models
-              </LoadingButton>
-              {catalogRefreshTaskId ? (
-                <LoadingButton
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  loading={cancelingRefresh}
-                  disabled={disabled || cancelingRefresh}
-                  onClick={() => codex.cancelCatalog.mutate(catalogRefreshTaskId)}
-                >
-                  Cancel refresh
-                </LoadingButton>
-              ) : null}
-              <LoadingButton
-                type="button"
-                variant="outline"
-                size="sm"
-                loading={codex.disconnect.isPending}
-                disabled={disabled || refreshing}
-                onClick={() => codex.disconnect.mutate()}
-              >
-                Disconnect ChatGPT
-              </LoadingButton>
-            </>
+            <ConnectedActions codex={codex} state={state} />
           ) : (
             <>
               <LoadingButton
@@ -154,5 +119,47 @@ export function FactoryCodexSubscriptionConnection({ codex }: { codex: CodexConn
         </p>
       ) : null}
     </div>
+  );
+}
+
+function ConnectedActions({ codex, state }: { codex: CodexConnection; state: ReturnType<typeof useCodexConnectionState> }) {
+  const { connection, disabled, refreshing, cancelingRefresh } = state;
+  const catalogRefreshTaskId = connection?.catalogRefreshTaskId;
+  return (
+    <>
+      <LoadingButton
+        type="button"
+        variant="outline"
+        size="sm"
+        loading={refreshing}
+        aria-busy={refreshing}
+        disabled={disabled || refreshing}
+        onClick={() => codex.refreshCatalog.mutate()}
+      >
+        Refresh usage and models
+      </LoadingButton>
+      {catalogRefreshTaskId ? (
+        <LoadingButton
+          type="button"
+          variant="outline"
+          size="sm"
+          loading={cancelingRefresh}
+          disabled={disabled || cancelingRefresh}
+          onClick={() => codex.cancelCatalog.mutate(catalogRefreshTaskId)}
+        >
+          Cancel refresh
+        </LoadingButton>
+      ) : null}
+      <LoadingButton
+        type="button"
+        variant="outline"
+        size="sm"
+        loading={codex.disconnect.isPending}
+        disabled={disabled || refreshing}
+        onClick={() => codex.disconnect.mutate()}
+      >
+        Disconnect ChatGPT
+      </LoadingButton>
+    </>
   );
 }
