@@ -17,10 +17,12 @@ import (
 )
 
 const (
-	CodexLoginTimeout = 15 * time.Minute
+	CodexLoginTimeout   = 15 * time.Minute
+	CodexCatalogTimeout = 15 * time.Minute
 
-	CodexLeasePurposeLogin = "login"
-	CodexLeasePurposeRun   = "run"
+	CodexLeasePurposeLogin   = "login"
+	CodexLeasePurposeRun     = "run"
+	CodexLeasePurposeCatalog = "catalog"
 )
 
 // FactoryCodexLease is one task using a factory ChatGPT connection.
@@ -50,6 +52,35 @@ func (l *FactoryCodexLease) Login() bool {
 	return l != nil && l.Purpose == CodexLeasePurposeLogin
 }
 
+func (l *FactoryCodexLease) Catalog() bool {
+	return l != nil && l.Purpose == CodexLeasePurposeCatalog
+}
+
+func (l *FactoryCodexLease) revoke(tx *gorm.DB, now time.Time) error {
+	if l.RevokedAt != nil {
+		return nil
+	}
+	if err := tx.Model(l).Updates(map[string]any{"revoked_at": now, "secret_hash": "", "secret_ciphertext": nil}).Error; err != nil {
+		return err
+	}
+	l.RevokedAt = &now
+	l.SecretHash = ""
+	l.SecretCiphertext = nil
+	return nil
+}
+
+func FindCodexCatalogLease(tx *gorm.DB, connectionID uuid.UUID) (*FactoryCodexLease, error) {
+	var lease FactoryCodexLease
+	err := tx.Where("connection_id = ? AND purpose = ?", connectionID, CodexLeasePurposeCatalog).First(&lease).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &lease, nil
+}
+
 func FindCodexLoginLease(tx *gorm.DB, connectionID uuid.UUID) (*FactoryCodexLease, error) {
 	var lease FactoryCodexLease
 	err := tx.Where("connection_id = ? AND purpose = ?", connectionID, CodexLeasePurposeLogin).First(&lease).Error
@@ -62,14 +93,22 @@ func FindCodexLoginLease(tx *gorm.DB, connectionID uuid.UUID) (*FactoryCodexLeas
 	return &lease, nil
 }
 
-// ListCodexLoginConnections captures connection state before lease cleanup.
+// ListCodexSetupConnections captures connection and setup activity before cleanup.
 // Callers use the snapshot to publish changes after their transaction commits.
-func ListCodexLoginConnections(tx *gorm.DB) ([]FactoryCodexConnection, error) {
+func ListCodexSetupConnections(tx *gorm.DB) ([]FactoryCodexConnection, error) {
 	var connections []FactoryCodexConnection
 	err := tx.Select("id", "organization_id", "status", "reservation_generation").
-		Where("id IN (?)", tx.Model(&FactoryCodexLease{}).Select("connection_id").Where("purpose = ?", CodexLeasePurposeLogin)).
+		Where("id IN (?)", tx.Model(&FactoryCodexLease{}).Select("connection_id").Where("purpose IN ?", []string{CodexLeasePurposeLogin, CodexLeasePurposeCatalog})).
 		Find(&connections).Error
-	return connections, err
+	if err != nil {
+		return nil, err
+	}
+	for i := range connections {
+		if err := connections[i].AttachLoginLease(tx); err != nil {
+			return nil, err
+		}
+	}
+	return connections, nil
 }
 
 func FindCodexLeaseForTask(tx *gorm.DB, connectionID, taskID uuid.UUID, generation int64) (*FactoryCodexLease, error) {
@@ -99,14 +138,14 @@ func FindCodexLeaseByTask(tx *gorm.DB, taskID uuid.UUID) (*FactoryCodexLease, er
 	return &lease, nil
 }
 
-func FindCodexRunLeaseBySecret(tx *gorm.DB, secret string) (*FactoryCodexLease, error) {
+func FindCodexRefreshLeaseBySecret(tx *gorm.DB, secret string) (*FactoryCodexLease, error) {
 	if secret == "" {
 		return nil, ErrCodexConnectionStale
 	}
 	var lease FactoryCodexLease
 	err := tx.Where(
-		"purpose = ? AND secret_hash = ? AND revoked_at IS NULL",
-		CodexLeasePurposeRun, codexLeaseSecretHash(secret),
+		"purpose IN ? AND secret_hash = ? AND revoked_at IS NULL",
+		[]string{CodexLeasePurposeRun, CodexLeasePurposeCatalog}, codexLeaseSecretHash(secret),
 	).First(&lease).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrCodexConnectionStale
@@ -133,17 +172,32 @@ func (c *FactoryCodexConnection) AttachLoginLease(tx *gorm.DB) error {
 	}
 	c.LoginLease = lease
 	c.LoginCancellationRequested = false
-	if lease == nil {
-		return nil
+	if lease != nil {
+		task, err := FindRunnerTask(tx, lease.TaskID)
+		if err != nil && !errors.Is(err, ErrRunnerTaskNotFound) {
+			return err
+		}
+		if task != nil {
+			c.LoginCancellationRequested = task.CancelRequestedAt != nil || task.State == RunnerTaskStateCanceled
+		}
 	}
-	task, err := FindRunnerTask(tx, lease.TaskID)
-	if errors.Is(err, ErrRunnerTaskNotFound) {
-		return nil
-	}
+	catalog, err := FindCodexCatalogLease(tx, c.ID)
 	if err != nil {
 		return err
 	}
-	c.LoginCancellationRequested = task.CancelRequestedAt != nil || task.State == RunnerTaskStateCanceled
+	c.CatalogLease = catalog
+	c.CatalogCancellationRequested = false
+	if catalog == nil {
+		return nil
+	}
+	c.CatalogCancellationRequested = catalog.RevokedAt != nil
+	task, err := FindRunnerTask(tx, catalog.TaskID)
+	if err != nil && !errors.Is(err, ErrRunnerTaskNotFound) {
+		return err
+	}
+	if task != nil {
+		c.CatalogCancellationRequested = c.CatalogCancellationRequested || task.CancelRequestedAt != nil || task.State == RunnerTaskStateCanceled
+	}
 	return nil
 }
 
@@ -216,6 +270,18 @@ func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, checkModelPolicy bool
 		}
 		return nil
 	}
+	if lease.Catalog() {
+		if lease.FactoryID != nil || !time.Now().Before(lease.CreatedAt.Add(CodexCatalogTimeout)) {
+			return ErrCodexConnectionStale
+		}
+		if connection.Status != CodexConnectionStatusReady || connection.CredentialVersion < 1 || len(connection.BundleCiphertext) == 0 {
+			return ErrCodexConnectionNotReady
+		}
+		return nil
+	}
+	if lease.Purpose != CodexLeasePurposeRun {
+		return ErrCodexConnectionStale
+	}
 	if lease.FactoryID == nil || *lease.FactoryID == uuid.Nil {
 		return ErrCodexConnectionStale
 	}
@@ -272,7 +338,7 @@ func (c *FactoryCodexConnection) createLease(
 		StartedVersion: c.CredentialVersion,
 		CreatedAt:      now,
 	}
-	if purpose == CodexLeasePurposeRun {
+	if purpose == CodexLeasePurposeRun || purpose == CodexLeasePurposeCatalog {
 		plain, hash, ciphertext, err := newCodexLeaseSecret(encryptor, c.ID)
 		if err != nil {
 			return nil, err
@@ -300,6 +366,10 @@ func (c *FactoryCodexConnection) createLease(
 	if lease.Login() {
 		c.LoginLease = lease
 	}
+	if lease.Catalog() {
+		c.CatalogLease = lease
+		c.CatalogCancellationRequested = false
+	}
 	return lease, nil
 }
 
@@ -322,7 +392,7 @@ func (c *FactoryCodexConnection) busyLease(tx *gorm.DB) (*FactoryCodexLease, err
 		return login, err
 	}
 	var run FactoryCodexLease
-	err = tx.Where("connection_id = ? AND purpose = ?", c.ID, CodexLeasePurposeRun).
+	err = tx.Where("connection_id = ? AND purpose IN ?", c.ID, []string{CodexLeasePurposeRun, CodexLeasePurposeCatalog}).
 		Order("created_at, id").
 		First(&run).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

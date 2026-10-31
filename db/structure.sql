@@ -600,8 +600,8 @@ CREATE TABLE public.factory_codex_leases (
     revoked_at timestamp with time zone,
     factory_id uuid,
     CONSTRAINT factory_codex_leases_generation_check CHECK (((generation >= 1) AND (started_version >= 0))),
-    CONSTRAINT factory_codex_leases_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['login'::character varying, 'run'::character varying])::text[]))),
-    CONSTRAINT factory_codex_leases_scope_check CHECK (((((purpose)::text = 'login'::text) AND (factory_id IS NULL)) OR (((purpose)::text = 'run'::text) AND (factory_id IS NOT NULL))))
+    CONSTRAINT factory_codex_leases_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['login'::character varying, 'run'::character varying, 'catalog'::character varying])::text[]))),
+    CONSTRAINT factory_codex_leases_scope_check CHECK (((((purpose)::text = ANY ((ARRAY['login'::character varying, 'catalog'::character varying])::text[])) AND (factory_id IS NULL)) OR (((purpose)::text = 'run'::text) AND (factory_id IS NOT NULL))))
 );
 
 
@@ -3687,6 +3687,13 @@ CREATE UNIQUE INDEX factories_url_id_key ON public.factories USING btree (url_id
 --
 
 CREATE INDEX factory_codex_connections_revocation_pending_idx ON public.factory_codex_connections USING btree (revocation_pending_at) WHERE (revocation_pending_at IS NOT NULL);
+
+
+--
+-- Name: factory_codex_leases_catalog_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factory_codex_leases_catalog_idx ON public.factory_codex_leases USING btree (connection_id) WHERE ((purpose)::text = 'catalog'::text);
 
 
 --
