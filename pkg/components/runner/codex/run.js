@@ -403,6 +403,26 @@ async function runPrompt(promptFile, model, thinking) {
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
+  let child;
+  const subscription = loadSubscriptionModule();
+  subscription?.setCredentialFailureHandler?.((error) => {
+    // No untrusted output is safe after losing sight of credential rotation.
+    // Stop the npm launcher and its native child, and save only a fixed error.
+    if (child?.pid) {
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch (_error) {
+        child.kill("SIGKILL");
+      }
+    }
+    process.stderr.write(`${error.message}\n`);
+    try {
+      fs.writeFileSync(resultFile, `${JSON.stringify({ type: "result", is_error: true, error: error.message, result: "" })}\n`);
+    } catch (_error) {
+      process.stderr.write("The credential protection error could not be saved.\n");
+    }
+    process.exit(1);
+  });
   const childEnv = codexExecEnv(process.env);
   // Restore runs in a separate process. Observe credentials here before Codex
   // can replace or remove the auth file.
@@ -450,9 +470,10 @@ async function runPrompt(promptFile, model, thinking) {
   }
   codexArgs.push(prompt);
 
-  const child = spawn("codex", codexArgs, {
+  child = spawn("codex", codexArgs, {
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: Boolean(subscription?.setCredentialFailureHandler),
   });
   const stderrDone = pipeRedactedStderr(child.stderr);
 
@@ -552,7 +573,6 @@ async function runPrompt(promptFile, model, thinking) {
         : 1,
     duration_ms: Date.now() - startedAt,
   });
-  const subscription = loadSubscriptionModule();
   if (exitCode === 0 && subscription && subscription.subscriptionEnabled()) {
     try {
       await subscription.reportUsage();
