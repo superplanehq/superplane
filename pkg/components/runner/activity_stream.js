@@ -42,12 +42,24 @@ function escapeRegExp(value) {
 }
 
 function redactSensitiveText(value, env = process.env) {
+  return createTextRedactor(env)(value);
+}
+
+function createTextRedactor(env) {
+  const secrets = secretValues(env);
+  const subscription = subscriptionRedactor(env);
+  const redactSubscription = subscription?.createSecretRedactor
+    ? subscription.createSecretRedactor(env)
+    : (text) => subscription ? subscription.redactSecrets(text, env) : text;
+  return (value) => redactText(value, secrets, redactSubscription);
+}
+
+function redactText(value, secrets, redactSubscription) {
   let text = normalizeTerminalText(value);
-  for (const secret of secretValues(env)) {
+  for (const secret of secrets) {
     text = text.replace(new RegExp(escapeRegExp(secret), "g"), "[REDACTED]");
   }
-  const subscription = subscriptionRedactor(env);
-  if (subscription) text = subscription.redactSecrets(text, env);
+  text = redactSubscription(text);
   text = text
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[REDACTED]")
@@ -75,31 +87,39 @@ function subscriptionRedactor(env) {
 }
 
 function sanitizeLogValue(value, env = process.env) {
-  if (typeof value === "string") return sanitizeLogText(value, env);
-  if (Array.isArray(value)) return value.map((item) => sanitizeLogValue(item, env));
+  return sanitizeValue(value, createTextRedactor(env));
+}
+
+function sanitizeValue(value, redact) {
+  if (typeof value === "string") return sanitizeText(value, redact);
+  if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, redact));
   if (!value || typeof value !== "object") return value;
   if (value.type === "image") {
     return {
       type: "image",
-      ...(value.mimeType ? { mimeType: redactSensitiveText(value.mimeType, env) } : {}),
+      ...(value.mimeType ? { mimeType: redact(value.mimeType) } : {}),
       summary: "[image content omitted from logs]",
     };
   }
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [redactSensitiveText(key, env), sanitizeLogValue(item, env)]));
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [redact(key), sanitizeValue(item, redact)]));
 }
 
 function sanitizeLogText(value, env = process.env) {
+  return sanitizeText(value, createTextRedactor(env));
+}
+
+function sanitizeText(value, redact) {
   const text = String(value || "");
   const trimmed = text.trim();
   if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
     try {
       const start = text.indexOf(trimmed);
-      return `${text.slice(0, start)}${JSON.stringify(sanitizeLogValue(JSON.parse(trimmed), env))}${text.slice(start + trimmed.length)}`;
+      return `${text.slice(0, start)}${JSON.stringify(sanitizeValue(JSON.parse(trimmed), redact))}${text.slice(start + trimmed.length)}`;
     } catch (_error) {
       // The value is normal text that happens to look like JSON.
     }
   }
-  return redactSensitiveText(text, env);
+  return redact(text);
 }
 
 function byteLength(value) {

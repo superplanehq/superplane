@@ -10,6 +10,12 @@ const CREDENTIAL_FIELD_PATTERN = /token|secret|password|api[_-]?key|(?:account|u
 
 class CodexCleanupError extends Error {}
 
+class CodexCredentialsUnavailableError extends Error {
+  constructor() {
+    super("ChatGPT credentials became unavailable. The run stopped to protect subscription credentials.");
+  }
+}
+
 function subscriptionEnabled(env = process.env) {
   return Boolean(String(env.SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN || "").trim());
 }
@@ -40,8 +46,16 @@ function subscriptionChildEnv(env = process.env) {
 }
 
 function redactSecrets(text, env = process.env, options = {}) {
-  let output = String(text ?? "");
+  return createSecretRedactor(env)(text, options);
+}
+
+function createSecretRedactor(env = process.env) {
   const secrets = [...observeCredentials(env)].sort((left, right) => right.length - left.length);
+  return (text, options = {}) => redactRegisteredSecrets(text, secrets, options);
+}
+
+function redactRegisteredSecrets(text, secrets, options) {
+  let output = String(text ?? "");
   for (const secret of secrets) {
     output = output.split(secret).join("[redacted]");
   }
@@ -81,10 +95,25 @@ function registerCredentials(bundle, env) {
   for (const secret of secretValues(bundle)) registry.secrets.add(secret);
 }
 
+function setCredentialFailureHandler(handler, env = process.env) {
+  const registry = credentialRegistry(env);
+  if (!registry) return;
+  registry.onFailure = handler;
+  registry.required = subscriptionEnabled(env);
+}
+
 function observeCredentials(env) {
   const registry = credentialRegistry(env);
   if (!registry) return [];
-  readBundle(env);
+  const bundle = readBundle(env);
+  if (registry.unavailable || (!bundle && (registry.observed || registry.required))) {
+    // A replacement can be removed before the watcher reads it. Previously
+    // retained values cannot protect output containing that unknown bundle.
+    registry.unavailable = true;
+    const error = new CodexCredentialsUnavailableError();
+    registry.onFailure?.(error);
+    throw error;
+  }
   const file = authPath(env);
   if (!registry.watcher && fs.existsSync(path.dirname(file))) {
     // Watch the directory because Codex replaces auth.json atomically. Retain
@@ -110,6 +139,15 @@ function observeCredentials(env) {
 }
 
 function sanitizeErrorMessage(message) {
+  try {
+    return redactErrorMessage(message);
+  } catch (error) {
+    if (error instanceof CodexCredentialsUnavailableError) return error.message;
+    throw error;
+  }
+}
+
+function redactErrorMessage(message) {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
   const activityModule = [
     path.join(taskDir, "activity_stream.js"),
@@ -144,6 +182,7 @@ function readBundle(env = process.env) {
   try {
     const bundle = JSON.parse(fs.readFileSync(authPath(env), "utf8"));
     registerCredentials(bundle, env);
+    credentialRegistry(env).observed = true;
     return bundle;
   } catch (_err) {
     return null;
@@ -510,6 +549,8 @@ module.exports = {
   subscriptionEnabled,
   subscriptionChildEnv,
   redactSecrets,
+  createSecretRedactor,
+  setCredentialFailureHandler,
   restore,
   checkpoint,
   reportUsage,

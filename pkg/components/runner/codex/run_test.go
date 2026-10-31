@@ -473,8 +473,11 @@ process.exitCode = %d;
 
 func TestCodexRunRedactsSubscriptionCredentialsAcrossRotation(t *testing.T) {
 	for _, activityEnabled := range []bool{false, true} {
-		for _, failed := range []bool{false, true} {
-			t.Run(fmt.Sprintf("activity=%t/failed=%t", activityEnabled, failed), func(t *testing.T) {
+		for _, state := range []struct{ failed, removeAuth bool }{
+			{}, {failed: true}, {removeAuth: true}, {failed: true, removeAuth: true},
+		} {
+			failed, removeAuth := state.failed, state.removeAuth
+			t.Run(fmt.Sprintf("removed=%t/activity=%t/failed=%t", removeAuth, activityEnabled, failed), func(t *testing.T) {
 				taskDir := t.TempDir()
 				prompt := filepath.Join(taskDir, "prompt.txt")
 				resultPath := filepath.Join(taskDir, "result.json")
@@ -556,9 +559,7 @@ const tool = (id, text) => emit({id, type: "command_execution", command: "cat " 
   await new Promise((resolve) => setTimeout(resolve, 100));
   fs.writeFileSync(auth + ".next", JSON.stringify(rotated));
   fs.renameSync(auth + ".next", auth);
-  // Leave the replacement observable before removing it, even without output.
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  fs.unlinkSync(auth);
+  if (%t) fs.unlinkSync(auth);
   const all = values(initial) + " " + values(rotated) + " " + process.env.SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN + " api-key-opaque-value";
   tool("removed-auth", "Useful tool output " + all);
   emit({id: "final-answer", type: "agent_message", text: "Useful final answer " + all});
@@ -568,13 +569,13 @@ const tool = (id, text) => emit({id, type: "command_execution", command: "cat " 
     process.exitCode = 1;
   }
 })().catch(() => process.exit(2));
-`, rotatedJSON, failed)), 0o700))
+`, rotatedJSON, removeAuth, failed)), 0o700))
 				script, err := filepath.Abs("run.js")
 				require.NoError(t, err)
 				cmd := exec.Command("node", script, prompt)
 				cmd.Env = env
 				output, runErr := cmd.CombinedOutput()
-				if failed {
+				if failed || removeAuth {
 					require.Error(t, runErr, string(output))
 				} else {
 					require.NoError(t, runErr, string(output))
@@ -583,9 +584,14 @@ const tool = (id, text) => emit({id, type: "command_execution", command: "cat " 
 				require.NoError(t, err)
 				var payload map[string]any
 				require.NoError(t, json.Unmarshal(result, &payload))
-				assert.Equal(t, failed, payload["is_error"])
-				assert.Contains(t, payload["result"], "Useful final answer")
-				if failed {
+				assert.Equal(t, failed || removeAuth, payload["is_error"])
+				if removeAuth {
+					assert.Contains(t, payload["error"], "ChatGPT credentials became unavailable")
+					assert.Empty(t, payload["result"])
+				} else {
+					assert.Contains(t, payload["result"], "Useful final answer")
+				}
+				if failed && !removeAuth {
 					assert.Contains(t, payload["error"], "Reconnect your ChatGPT account.")
 				}
 				mu.Lock()
@@ -593,11 +599,17 @@ const tool = (id, text) => emit({id, type: "command_execution", command: "cat " 
 				mu.Unlock()
 				if activityEnabled {
 					require.NotEmpty(t, persisted)
-					assert.Contains(t, persisted, "Useful tool output")
-					assert.Contains(t, persisted, "Useful final answer")
+					if !removeAuth {
+						assert.Contains(t, persisted, "Useful tool output")
+						assert.Contains(t, persisted, "Useful final answer")
+					}
 					message, err := os.ReadFile(messagePath)
-					require.NoError(t, err)
-					persisted += string(message)
+					if removeAuth {
+						assert.ErrorIs(t, err, os.ErrNotExist, "unsafe assistant messages must not be saved")
+					} else {
+						require.NoError(t, err)
+						persisted += string(message)
+					}
 				}
 				surfaces := string(restored) + string(output) + string(result) + persisted
 				for _, bundle := range []map[string]any{initial, rotated} {
@@ -608,8 +620,10 @@ const tool = (id, text) => emit({id, type: "command_execution", command: "cat " 
 				assert.NotContains(t, surfaces, "scoped-lease-opaque-value")
 				assert.NotContains(t, surfaces, "api-key-opaque-value")
 				assert.NotContains(t, surfaces, "initial-acce", "streamed credential fragments must stay out of activity")
-				assert.Contains(t, string(output), "Useful diagnostic")
-				assert.Contains(t, string(output), "Useful tool output")
+				if !removeAuth {
+					assert.Contains(t, string(output), "Useful diagnostic")
+					assert.Contains(t, string(output), "Useful tool output")
+				}
 				assert.Contains(t, surfaces, "Useful nonsecret i")
 				assert.Contains(t, string(output), `"type":"tool_start"`)
 			})
@@ -656,6 +670,9 @@ process.stdout.write('{"type":"thread.started","thread_id":"thread-1"}\n{"type":
 			}
 			if test.subscription {
 				require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), []byte(subscriptionScript), 0o600))
+				home := filepath.Join(taskDir, "codex-home")
+				require.NoError(t, os.Mkdir(home, 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"tokens":{"access_token":"restored-opaque-credential"}}`), 0o600))
 				cmd.Env = append(cmd.Env, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=subscription-token")
 			}
 			output, err := cmd.CombinedOutput()
