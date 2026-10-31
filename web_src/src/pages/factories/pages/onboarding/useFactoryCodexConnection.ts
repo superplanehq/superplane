@@ -54,26 +54,18 @@ export function useFactoryCodexConnection(
     refreshAttempted.current = false;
     invalidatedCatalog.current = "";
   }, [organizationId, factoryId, currentUserId]);
-  const query = useQuery({
-    queryKey,
-    enabled: enabled && Boolean(organizationId),
-    queryFn: async ({ signal }) => {
-      const response = await meDescribeCodexConnection(
-        withOrganizationHeader({
-          organizationId,
-          signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
-        }),
-      );
-      return response.data?.connection;
-    },
-    refetchInterval: (current) => codexConnectionPollInterval(current.state.data, current.state.status === "error"),
-    refetchIntervalInBackground: true,
-  });
+  const query = useCodexConnectionQuery(organizationId, queryKey, enabled);
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey });
     await invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
     await queryClient.invalidateQueries({ queryKey: ["me", organizationId] });
+  };
+
+  const saveConnection = async (connection: FactoriesFactoryCodexConnection | undefined) => {
+    if (!connection) return;
+    await queryClient.cancelQueries({ queryKey });
+    queryClient.setQueryData(queryKey, connection);
   };
 
   const start = useMutation({
@@ -102,6 +94,7 @@ export function useFactoryCodexConnection(
       );
       return response.data?.connection;
     },
+    onSuccess: saveConnection,
     onSettled: refresh,
     retry: 2,
     onError: () => showErrorToast("SuperPlane could not load your ChatGPT models. Reload the page to try again."),
@@ -118,13 +111,18 @@ export function useFactoryCodexConnection(
       );
       return response.data?.connection;
     },
-    onSuccess: async (connection) => {
-      if (!connection) return;
-      await queryClient.cancelQueries({ queryKey });
-      queryClient.setQueryData(queryKey, connection);
-    },
+    onSuccess: saveConnection,
     onSettled: refresh,
     onError: () => showErrorToast("SuperPlane could not cancel ChatGPT sign-in. Try again."),
+  });
+
+  const cancelCatalog = useCatalogRefreshActivity({
+    organizationId,
+    factoryId,
+    currentUserId,
+    connection: query.data,
+    saveConnection,
+    refresh,
   });
 
   const disconnect = useMutation({
@@ -144,6 +142,10 @@ export function useFactoryCodexConnection(
       invalidatedCatalog.current = catalog;
       void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
     }
+    if (query.data.catalogRefreshTaskId) {
+      refreshAttempted.current = true;
+      return;
+    }
     if (availableModels.length > 0) {
       return;
     }
@@ -153,14 +155,87 @@ export function useFactoryCodexConnection(
     }
   }, [enabled, refreshModels, organizationId, factoryId, query.data, queryClient, refreshCatalog]);
 
-  return { query, start, cancel, refreshCatalog, disconnect, refresh };
+  return { query, start, cancel, cancelCatalog, refreshCatalog, disconnect, refresh };
+}
+
+function useCodexConnectionQuery(
+  organizationId: string,
+  queryKey: ReturnType<typeof factoryCodexConnectionKey>,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey,
+    enabled: enabled && Boolean(organizationId),
+    queryFn: async ({ signal }) => {
+      const response = await meDescribeCodexConnection(
+        withOrganizationHeader({
+          organizationId,
+          signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
+        }),
+      );
+      return response.data?.connection;
+    },
+    refetchInterval: (current) => codexConnectionPollInterval(current.state.data, current.state.status === "error"),
+    refetchIntervalInBackground: true,
+  });
 }
 
 function codexConnectionPollInterval(connection: FactoriesFactoryCodexConnection | undefined, failed: boolean) {
   if (failed) return 2000;
   const active =
     connection?.revocationPending ||
+    connection?.catalogRefreshTaskId ||
     ["pending", "canceling", "finishing"].includes(connection?.status ?? "") ||
     connection?.reservationHeld;
   return active ? 2000 : false;
+}
+
+function useCatalogRefreshActivity({
+  organizationId,
+  factoryId,
+  currentUserId,
+  connection,
+  saveConnection,
+  refresh,
+}: {
+  organizationId: string;
+  factoryId: string;
+  currentUserId: string | undefined;
+  connection: FactoriesFactoryCodexConnection | undefined;
+  saveConnection: (connection: FactoriesFactoryCodexConnection | undefined) => Promise<void>;
+  refresh: () => Promise<void>;
+}) {
+  const queryClient = useQueryClient();
+  const activeCatalogTask = useRef("");
+  useEffect(() => {
+    activeCatalogTask.current = "";
+  }, [organizationId, factoryId, currentUserId]);
+  const cancelCatalog = useMutation({
+    mutationFn: async (catalogRefreshTaskId: string) => {
+      if (!catalogRefreshTaskId) throw new Error("A refresh task is required");
+      const response = await meCancelCodexConnection(
+        withOrganizationHeader({
+          organizationId,
+          body: { catalogRefreshTaskId },
+          signal: AbortSignal.timeout(15000),
+        }),
+      );
+      return response.data?.connection;
+    },
+    onSuccess: saveConnection,
+    onSettled: refresh,
+    onError: () => showErrorToast("SuperPlane could not cancel the ChatGPT refresh. Try again."),
+  });
+
+  useEffect(() => {
+    if (!connection) return;
+    const taskId = connection.catalogRefreshTaskId || "";
+    const completed = activeCatalogTask.current && !taskId;
+    activeCatalogTask.current = taskId;
+    if (!completed) return;
+    void invalidateSubscriptionCatalogs(queryClient, organizationId, factoryId);
+    void queryClient.invalidateQueries({ queryKey: ["me", organizationId, "codex-usage"] });
+  }, [connection, queryClient, organizationId, factoryId]);
+
+  return cancelCatalog;
 }

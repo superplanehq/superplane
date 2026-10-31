@@ -409,7 +409,7 @@ func (s *Server) reconcileRunnerConnection(
 		messages.PublishPlanningRunnerStatus(database.DB(ctx), failedTask)
 	}
 	publishedFactories := map[uuid.UUID]bool{}
-	for _, connection := range reservation.LoginConnections {
+	for _, connection := range reservation.SetupConnections {
 		if publishedFactories[connection.OrganizationID] {
 			continue
 		}
@@ -551,9 +551,12 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		if lease.Login() {
+		if lease.Login() || lease.Catalog() {
 			connection, err := models.FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
 			if err != nil {
+				return err
+			}
+			if err := connection.AttachSetupLeases(tx); err != nil {
 				return err
 			}
 			loginConnections = append(loginConnections, *connection)

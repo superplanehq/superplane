@@ -12,7 +12,7 @@ import (
 )
 
 // Mint the run token at delivery so queue time does not consume its lifetime.
-// Login tokens keep their original deadline because login leases expire in queue.
+// Login and catalog tokens keep their deadline because their leases expire in queue.
 func (s *Server) refreshCodexSubscriptionTaskToken(ctx context.Context, task *models.RunnerTask, payload []byte) ([]byte, error) {
 	db := database.DB(ctx)
 	lease, err := models.FindCodexLeaseByTask(db, task.ID)
@@ -25,11 +25,14 @@ func (s *Server) refreshCodexSubscriptionTaskToken(ctx context.Context, task *mo
 	if lease == nil || lease.Login() {
 		return payload, nil
 	}
-	if lease.FactoryID == nil {
-		return nil, models.ErrCodexConnectionStale
-	}
 	if err := task.RequireSubscriptionLeaseAdmission(db); err != nil {
 		return nil, err
+	}
+	if lease.Catalog() {
+		return payload, nil
+	}
+	if lease.Purpose != models.CodexLeasePurposeRun || lease.FactoryID == nil {
+		return nil, models.ErrCodexConnectionStale
 	}
 	connection, err := models.FindFactoryCodexConnectionByID(db, lease.ConnectionID)
 	if err != nil {

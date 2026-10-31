@@ -40,42 +40,34 @@ func TestCodexConnectionStaysReservedUntilTheLoginVMIsDeleted(t *testing.T) {
 }
 
 func TestCodexCleanedSetupReleasesBeforeProviderDeletion(t *testing.T) {
-	for _, refresh := range []bool{false, true} {
-		t.Run(map[bool]string{false: "login", true: "catalog refresh"}[refresh], func(t *testing.T) {
-			db, connection, task, runner := newReadyCodexConnection(t)
-			now := time.Now()
-			if refresh {
-				require.NoError(t, connection.BeginCatalogRefresh(db, task.ID, now))
-			} else {
-				require.NoError(t, connection.BeginLogin(db, task.ID, now))
-			}
-			require.NoError(t, clearProviderDeletion(db, runner))
-			generation := connection.ReservationGeneration
-			require.NoError(t, connection.StoreBundle(db, task.ID, generation, connection.CredentialVersion+1, []byte("saved-login"), "ada@example.com", true, now))
-			require.NoError(t, db.Model(task).Update("result", datatypes.JSON(`{"codexSubscriptionSetupCleaned":true}`)).Error)
-			require.NoError(t, markRunnerTask(db, task, models.RunnerTaskStateSucceeded, &runner.ID, now))
-			require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return models.ReleaseCodexReservationForTask(tx, task.ID, now) }))
-			ready := reloadCodexConnection(t, db, connection.ID)
-			require.Equal(t, models.CodexConnectionStatusReady, ready.Status)
-			require.Empty(t, codexLeases(t, db, connection.ID))
-			assert.Nil(t, reloadRunner(t, db, runner.ID).ProviderDeletedAt)
-			err := ready.StoreBundle(db, task.ID, generation, ready.CredentialVersion+1, []byte("late"), "late@example.com", true, now)
-			require.ErrorIs(t, err, models.ErrCodexConnectionStale)
-			// Keep a real queued task alive while deletion of the old runner arrives.
-			nextTask := &models.RunnerTask{ID: uuid.New(), OrganizationID: task.OrganizationID, FleetID: task.FleetID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued, PayloadCiphertext: []byte("payload"), QueuedAt: now}
-			require.NoError(t, db.Create(nextTask).Error)
-			_, err = reserveCodexRun(t, db, ready, nextTask.ID, now)
-			require.NoError(t, err)
-			leases := codexLeases(t, db, ready.ID)
-			require.Len(t, leases, 1)
-			require.NoError(t, runner.MarkProviderDeleted(db, now))
-			after := reloadCodexConnection(t, db, ready.ID)
-			assert.Equal(t, ready.Status, after.Status)
-			assert.Equal(t, ready.CredentialVersion, after.CredentialVersion)
-			assert.Equal(t, ready.BundleCiphertext, after.BundleCiphertext)
-			assert.Equal(t, leases, codexLeases(t, db, ready.ID))
-		})
-	}
+	db, connection, task, runner := newReadyCodexConnection(t)
+	now := time.Now()
+	require.NoError(t, connection.BeginLogin(db, task.ID, now))
+	require.NoError(t, clearProviderDeletion(db, runner))
+	generation := connection.ReservationGeneration
+	require.NoError(t, connection.StoreBundle(db, task.ID, generation, connection.CredentialVersion+1, []byte("saved-login"), "ada@example.com", true, now))
+	require.NoError(t, db.Model(task).Update("result", datatypes.JSON(`{"codexSubscriptionSetupCleaned":true}`)).Error)
+	require.NoError(t, markRunnerTask(db, task, models.RunnerTaskStateSucceeded, &runner.ID, now))
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return models.ReleaseCodexReservationForTask(tx, task.ID, now) }))
+	ready := reloadCodexConnection(t, db, connection.ID)
+	require.Equal(t, models.CodexConnectionStatusReady, ready.Status)
+	require.Empty(t, codexLeases(t, db, connection.ID))
+	assert.Nil(t, reloadRunner(t, db, runner.ID).ProviderDeletedAt)
+	err := ready.StoreBundle(db, task.ID, generation, ready.CredentialVersion+1, []byte("late"), "late@example.com", true, now)
+	require.ErrorIs(t, err, models.ErrCodexConnectionStale)
+	// Keep a real queued task alive while deletion of the old runner arrives.
+	nextTask := &models.RunnerTask{ID: uuid.New(), OrganizationID: task.OrganizationID, FleetID: task.FleetID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued, PayloadCiphertext: []byte("payload"), QueuedAt: now}
+	require.NoError(t, db.Create(nextTask).Error)
+	_, err = reserveCodexRun(t, db, ready, nextTask.ID, now)
+	require.NoError(t, err)
+	leases := codexLeases(t, db, ready.ID)
+	require.Len(t, leases, 1)
+	require.NoError(t, runner.MarkProviderDeleted(db, now))
+	after := reloadCodexConnection(t, db, ready.ID)
+	assert.Equal(t, ready.Status, after.Status)
+	assert.Equal(t, ready.CredentialVersion, after.CredentialVersion)
+	assert.Equal(t, ready.BundleCiphertext, after.BundleCiphertext)
+	assert.Equal(t, leases, codexLeases(t, db, ready.ID))
 }
 
 func TestCodexSetupWithoutCleanupProofWaitsForProviderDeletion(t *testing.T) {
@@ -184,6 +176,30 @@ func TestCodexConnectionAllowsParallelRunLeases(t *testing.T) {
 	}
 }
 
+func TestCodexCatalogRefreshOverlapsRunLeases(t *testing.T) {
+	for _, catalogFirst := range []bool{false, true} {
+		t.Run(map[bool]string{false: "run then catalog", true: "catalog then run"}[catalogFirst], func(t *testing.T) {
+			db, connection, task, _ := newReadyCodexConnection(t)
+			now := time.Now()
+			catalogTaskID := uuid.New()
+			if catalogFirst {
+				_, err := connection.BeginCatalogRefresh(db, catalogTaskID, crypto.NewNoOpEncryptor(), now)
+				require.NoError(t, err)
+			}
+			_, err := reserveCodexRun(t, db, connection, task.ID, now)
+			require.NoError(t, err)
+			if !catalogFirst {
+				_, err := connection.BeginCatalogRefresh(db, catalogTaskID, crypto.NewNoOpEncryptor(), now)
+				require.NoError(t, err)
+			}
+			assert.Len(t, codexLeases(t, db, connection.ID), 2)
+			assert.Equal(t, models.CodexConnectionStatusReady, reloadCodexConnection(t, db, connection.ID).Status)
+			var busy *models.CodexConnectionBusyError
+			require.ErrorAs(t, connection.BeginLogin(db, uuid.New(), now), &busy)
+		})
+	}
+}
+
 func TestCodexConnectionIsSharedAcrossOrganizationWorkspaces(t *testing.T) {
 	db, connection, _, _ := newReadyCodexConnection(t)
 	other, err := models.CreateFactory(db, connection.OrganizationID, support.RandomName("workspace"), "", "")
@@ -216,7 +232,8 @@ func TestCodexConnectionIsSharedAcrossOrganizationWorkspaces(t *testing.T) {
 	assert.Len(t, codexLeases(t, db, connection.ID), 2)
 	require.ErrorIs(t, connection.Disconnect(db, time.Now()), models.ErrCodexConnectionActive)
 	var busy *models.CodexConnectionBusyError
-	require.ErrorAs(t, connection.BeginCatalogRefresh(db, uuid.New(), time.Now()), &busy)
+	_, err = connection.BeginCatalogRefresh(db, uuid.New(), crypto.NewNoOpEncryptor(), time.Now())
+	require.NoError(t, err)
 	require.ErrorAs(t, connection.BeginLogin(db, uuid.New(), time.Now()), &busy)
 	for _, scope := range [][2]uuid.UUID{{uuid.New(), connection.OwnerUserID}, {connection.OrganizationID, uuid.New()}} {
 		_, err := models.FindCodexConnection(db, scope[0], scope[1])
@@ -481,28 +498,112 @@ func TestCodexLoginSuccessWithoutFinalCheckpointRequiresReconnect(t *testing.T) 
 	assert.Equal(t, models.CodexConnectionStatusReconnectRequired, released.Status)
 }
 
-func TestCodexCatalogRefreshFailureBeforeCheckpointKeepsConnectionReady(t *testing.T) {
-	for _, state := range []string{models.RunnerTaskStateFailed, models.RunnerTaskStateCanceled} {
+func TestCodexCatalogTerminalCleanupKeepsHealthyConnectionAndRuns(t *testing.T) {
+	for _, state := range []string{models.RunnerTaskStateSucceeded, models.RunnerTaskStateFailed, models.RunnerTaskStateCanceled, models.RunnerTaskStateLost} {
 		t.Run(state, func(t *testing.T) {
-			db, connection, previousTask, _ := newReadyCodexConnection(t)
+			db, connection, previousTask, runner := newReadyCodexConnection(t)
 			now := time.Now()
 			task := &models.RunnerTask{
 				ID: uuid.New(), OrganizationID: connection.OrganizationID, FleetID: previousTask.FleetID,
 				Backend: models.RunnerTaskBackendIntegrated, State: state,
 				PayloadCiphertext: []byte("ciphertext"), QueuedAt: now,
-				CreatedAt: now, UpdatedAt: now, FinishedAt: &now,
+				CreatedAt: now, UpdatedAt: now, FinishedAt: &now, RunnerID: &runner.ID,
 			}
 			require.NoError(t, db.Create(task).Error)
-			require.NoError(t, connection.BeginCatalogRefresh(db, task.ID, now))
+			_, err := connection.BeginCatalogRefresh(db, task.ID, crypto.NewNoOpEncryptor(), now)
+			require.NoError(t, err)
+			require.NoError(t, clearProviderDeletion(db, runner))
+			require.NoError(t, markRunnerTask(db, previousTask, models.RunnerTaskStateRunning, &runner.ID, now))
+			_, err = reserveCodexRun(t, db, connection, previousTask.ID, now)
+			require.NoError(t, err)
 			require.NoError(t, models.ReleaseConfirmedCodexReservations(db, now))
 			released := reloadCodexConnection(t, db, connection.ID)
 			assert.Equal(t, models.CodexConnectionStatusReady, released.Status)
 			assert.Equal(t, []byte("bundle"), []byte(released.BundleCiphertext))
-			assert.Empty(t, codexLeases(t, db, connection.ID))
-			_, err := reserveCodexRun(t, db, released, uuid.New(), now)
-			require.NoError(t, err)
+			leases := codexLeases(t, db, connection.ID)
+			require.Len(t, leases, 1)
+			assert.Equal(t, models.CodexLeasePurposeRun, leases[0].Purpose)
+			assert.Nil(t, reloadRunner(t, db, runner.ID).ProviderDeletedAt)
 		})
 	}
+}
+
+func TestCodexCatalogCancellationAndExpiryRetainActivityUntilCleanup(t *testing.T) {
+	for _, state := range []string{models.RunnerTaskStateQueued, models.RunnerTaskStateReserved, models.RunnerTaskStateRunning, models.RunnerTaskStateLost, "missing"} {
+		for _, expire := range []bool{false, true} {
+			t.Run(state+map[bool]string{false: "/cancel", true: "/expire"}[expire], func(t *testing.T) {
+				db, connection, task, runner := newReadyCodexConnection(t)
+				now := time.Now()
+				started := now
+				if expire {
+					started = now.Add(-models.CodexCatalogTimeout)
+				}
+				lease, err := connection.BeginCatalogRefresh(db, task.ID, crypto.NewNoOpEncryptor(), started)
+				require.NoError(t, err)
+				require.NotEmpty(t, lease.Secret)
+				require.NoError(t, clearProviderDeletion(db, runner))
+				if state == "missing" {
+					require.NoError(t, db.Delete(task).Error)
+				} else if state == models.RunnerTaskStateQueued {
+					require.NoError(t, markRunnerTask(db, task, state, nil, now))
+				} else {
+					require.NoError(t, markRunnerTask(db, task, state, &runner.ID, now))
+				}
+				if !expire {
+					require.NoError(t, connection.CancelCatalogRefresh(db, uuid.New(), now))
+					_, err := models.FindCodexRefreshLeaseBySecret(db, lease.Secret)
+					require.NoError(t, err, "a stale cancellation must preserve the current task")
+					require.NoError(t, connection.CancelCatalogRefresh(db, task.ID, now))
+					require.NoError(t, connection.CancelCatalogRefresh(db, task.ID, now))
+					_, err = models.FindCodexRefreshLeaseBySecret(db, lease.Secret)
+					terminal := state == "missing" || state == models.RunnerTaskStateLost
+					if terminal {
+						require.NoError(t, err, "finished and missing cancellation targets are no-ops")
+					} else {
+						require.ErrorIs(t, err, models.ErrCodexConnectionStale)
+					}
+					require.NoError(t, connection.AttachSetupLeases(db))
+					assert.Equal(t, !terminal, connection.CatalogCancellationRequested)
+					coalesced, err := connection.BeginCatalogRefresh(db, uuid.New(), crypto.NewNoOpEncryptor(), now)
+					require.NoError(t, err)
+					assert.Equal(t, task.ID, coalesced.TaskID)
+				}
+				require.NoError(t, models.ReleaseConfirmedCodexReservations(db, now))
+				if state == models.RunnerTaskStateRunning || state == models.RunnerTaskStateReserved {
+					held := codexLeases(t, db, connection.ID)
+					require.Len(t, held, 1)
+					assert.NotNil(t, held[0].RevokedAt)
+					stored, err := models.FindRunnerTask(db, task.ID)
+					require.NoError(t, err)
+					assert.NotNil(t, stored.CancelRequestedAt)
+					require.NoError(t, markRunnerTask(db, task, models.RunnerTaskStateLost, &runner.ID, now))
+					require.NoError(t, models.ReleaseConfirmedCodexReservations(db, now))
+				}
+				assert.Empty(t, codexLeases(t, db, connection.ID))
+				ready := reloadCodexConnection(t, db, connection.ID)
+				assert.Equal(t, models.CodexConnectionStatusReady, ready.Status)
+				assert.Equal(t, connection.CredentialVersion, ready.CredentialVersion)
+				assert.Equal(t, connection.BundleCiphertext, ready.BundleCiphertext)
+				assert.Nil(t, reloadRunner(t, db, runner.ID).ProviderDeletedAt)
+			})
+		}
+	}
+}
+
+func TestCodexCatalogConnectionRevocationWaitsForProviderDeletion(t *testing.T) {
+	db, connection, task, runner := newReadyCodexConnection(t)
+	now := time.Now()
+	_, err := connection.BeginCatalogRefresh(db, task.ID, crypto.NewNoOpEncryptor(), now)
+	require.NoError(t, err)
+	require.NoError(t, clearProviderDeletion(db, runner))
+	require.NoError(t, markRunnerTask(db, task, models.RunnerTaskStateLost, &runner.ID, now))
+	member, err := models.FindActiveUserByIDInTransaction(db, connection.OrganizationID.String(), connection.OwnerUserID.String())
+	require.NoError(t, err)
+	require.NoError(t, member.SoftDelete(db, now, ""))
+	require.NoError(t, models.ReleaseConfirmedCodexReservations(db, now))
+	assert.Len(t, codexLeases(t, db, connection.ID), 1)
+	require.NoError(t, runner.MarkProviderDeleted(db, now))
+	assert.Empty(t, codexLeases(t, db, connection.ID))
 }
 
 func TestCodexConnectionCancelBeforeCheckpointRestoresPreviousStatus(t *testing.T) {

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router";
 
 import {
+  meCancelCodexConnection,
   meDescribeCodexConnection,
   meStartCodexConnection,
   meListCodexUsage,
@@ -16,6 +17,7 @@ import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 
 vi.mock("@/api-client", () => ({
   meListCodexUsage: vi.fn(),
+  meCancelCodexConnection: vi.fn(),
   meDescribeCodexConnection: vi.fn(),
   meStartCodexConnection: vi.fn(),
 }));
@@ -23,6 +25,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({ has: () => true, isLoading: false }),
 }));
 beforeEach(() => {
+  vi.mocked(meCancelCodexConnection).mockReset();
   vi.mocked(meDescribeCodexConnection).mockResolvedValue({
     data: { connection: { status: "disconnected", eligible: true } },
   } as never);
@@ -189,7 +192,7 @@ describe("Codex usage", () => {
     });
   }
 
-  it("keeps the connected view busy until the refresh task finishes", async () => {
+  it("keeps the connection usable and targets refresh cancellation until cleanup finishes", async () => {
     let connection: FactoriesFactoryCodexConnection = {
       status: "ready",
       eligible: true,
@@ -199,7 +202,11 @@ describe("Codex usage", () => {
     };
     vi.mocked(meDescribeCodexConnection).mockImplementation(async () => ({ data: { connection } }) as never);
     vi.mocked(meStartCodexConnection).mockImplementation(async () => {
-      connection = { ...connection, reservationHeld: true };
+      connection = { ...connection, catalogRefreshTaskId: "refresh-1" };
+      return { data: { connection } } as never;
+    });
+    vi.mocked(meCancelCodexConnection).mockImplementation(async () => {
+      connection = { ...connection, catalogRefreshCanceling: true };
       return { data: { connection } } as never;
     });
     vi.mocked(meListCodexUsage).mockResolvedValue({ data: { connections: [] } } as never);
@@ -212,14 +219,25 @@ describe("Codex usage", () => {
       await waitFor(() => expect(meStartCodexConnection).toHaveBeenCalledTimes(1));
       await waitFor(() => expect(queryClient.isMutating()).toBe(0));
 
-      expect(screen.getByRole("status")).toHaveTextContent("Connected");
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+      expect(screen.getByText("Refreshing usage and models…")).toBeInTheDocument();
       expect(screen.getByText("ada@example.com")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Refresh usage and models" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "Refresh usage and models" })).toHaveAttribute("aria-busy", "true");
       expect(screen.getByRole("button", { name: "Disconnect ChatGPT" })).toBeDisabled();
       expect(screen.queryByText(/Wait for connection setup to finish/)).not.toBeInTheDocument();
 
-      connection = { ...connection, reservationHeld: false };
+      screen.getByRole("button", { name: "Cancel refresh" }).click();
+      await waitFor(() =>
+        expect(meCancelCodexConnection).toHaveBeenCalledWith(
+          expect.objectContaining({ body: { catalogRefreshTaskId: "refresh-1" } }),
+        ),
+      );
+      expect(await screen.findByText("Canceling refresh…")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cancel refresh" })).toBeDisabled();
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+
+      connection = { ...connection, catalogRefreshTaskId: "", catalogRefreshCanceling: false };
       await act(() => queryClient.invalidateQueries({ queryKey: ["factory-codex-connection", "org-1"] }));
 
       await waitFor(() => expect(screen.getByRole("button", { name: "Refresh usage and models" })).toBeEnabled());
