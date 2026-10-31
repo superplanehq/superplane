@@ -678,48 +678,64 @@ func createRunnerTaskPoll(t *testing.T, resource *support.ResourceRegistry, task
 }
 
 func TestCompleteRunnerTaskPublishesReleasedCodexConnection(t *testing.T) {
-	resource := support.Setup(t)
-	defer resource.Close()
-	db := database.DB(t.Context())
-	runner, task, fleet, socketID := createRunningRunnerTask(t, resource)
-	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
-	factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now())
-	require.NoError(t, err)
-	require.NoError(t, connection.BeginLogin(db, task.ID, time.Now()))
-	require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 1, []byte("saved"), "ada@example.com", true, time.Now()))
-	url, err := config.RabbitMQURL()
-	require.NoError(t, err)
-	broker, err := amqp.Dial(url)
-	require.NoError(t, err)
-	defer broker.Close()
-	channel, err := broker.Channel()
-	require.NoError(t, err)
-	require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
-	queue, err := channel.QueueDeclare("", false, true, true, false, nil)
-	require.NoError(t, err)
-	require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderUpdatedRoutingKey, messages.CanvasExchange, false, nil))
-	server, err := NewServer(jwt.NewSigner("secret"), resource.Encryptor, runnerlogs.StoreFS, nil)
-	require.NoError(t, err)
-	completion := completeMessage{RequestID: uuid.NewString(), TaskID: task.ID.String(), Result: json.RawMessage(`{"codexSubscriptionSetupCleaned":true}`)}
-	require.NoError(t, server.completeRunnerTask(t.Context(), runner, socketID, completion, fleet.Slug, fleet.ScopeType))
-	require.Eventually(t, func() bool {
-		delivery, found, err := channel.Get(queue.Name, true)
-		require.NoError(t, err)
-		if !found {
-			return false
-		}
-		var update pb.FactoryWorkOrderUpdatedMessage
-		require.NoError(t, proto.Unmarshal(delivery.Body, &update))
-		if update.FactoryId != factory.ID.String() || update.Reason != "codex_connection" {
-			return false
-		}
-		stored, err := models.FindFactoryCodexConnectionByID(db, connection.ID)
-		require.NoError(t, err)
-		assert.Equal(t, models.CodexConnectionStatusReady, stored.Status, "notification must follow commit")
-		return true
-	}, 5*time.Second, 10*time.Millisecond)
-	assert.Nil(t, runner.ProviderDeletedAt)
-	assert.Equal(t, models.RunnerStateTerminated, runner.State)
+	for _, purpose := range []string{models.CodexLeasePurposeLogin, models.CodexLeasePurposeCatalog} {
+		t.Run(purpose, func(t *testing.T) {
+			resource := support.Setup(t)
+			defer resource.Close()
+			db := database.DB(t.Context())
+			runner, task, fleet, socketID := createRunningRunnerTask(t, resource)
+			require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
+			factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now())
+			require.NoError(t, err)
+			if purpose == models.CodexLeasePurposeLogin {
+				require.NoError(t, connection.BeginLogin(db, task.ID, time.Now()))
+				require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 1, []byte("saved"), "ada@example.com", true, time.Now()))
+			} else {
+				require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("saved")}).Error)
+				_, err := connection.BeginCatalogRefresh(db, task.ID, resource.Encryptor, time.Now())
+				require.NoError(t, err)
+			}
+			generation := connection.ReservationGeneration
+			url, err := config.RabbitMQURL()
+			require.NoError(t, err)
+			broker, err := amqp.Dial(url)
+			require.NoError(t, err)
+			defer broker.Close()
+			channel, err := broker.Channel()
+			require.NoError(t, err)
+			require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+			queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+			require.NoError(t, err)
+			require.NoError(t, channel.QueueBind(queue.Name, messages.FactoryWorkOrderUpdatedRoutingKey, messages.CanvasExchange, false, nil))
+			server, err := NewServer(jwt.NewSigner("secret"), resource.Encryptor, runnerlogs.StoreFS, nil)
+			require.NoError(t, err)
+			completion := completeMessage{RequestID: uuid.NewString(), TaskID: task.ID.String(), Result: json.RawMessage(`{"codexSubscriptionSetupCleaned":true}`)}
+			require.NoError(t, server.completeRunnerTask(t.Context(), runner, socketID, completion, fleet.Slug, fleet.ScopeType))
+			require.Eventually(t, func() bool {
+				delivery, found, err := channel.Get(queue.Name, true)
+				require.NoError(t, err)
+				if !found {
+					return false
+				}
+				var update pb.FactoryWorkOrderUpdatedMessage
+				require.NoError(t, proto.Unmarshal(delivery.Body, &update))
+				if update.FactoryId != factory.ID.String() || update.Reason != "codex_connection" {
+					return false
+				}
+				stored, err := models.FindFactoryCodexConnectionByID(db, connection.ID)
+				require.NoError(t, err)
+				assert.Equal(t, models.CodexConnectionStatusReady, stored.Status, "notification must follow commit")
+				require.NoError(t, stored.AttachLoginLease(db))
+				assert.Nil(t, stored.CatalogLease)
+				if purpose == models.CodexLeasePurposeCatalog {
+					assert.Equal(t, generation, stored.ReservationGeneration, "catalog completion must not increment generations")
+				}
+				return true
+			}, 5*time.Second, 10*time.Millisecond)
+			assert.Nil(t, runner.ProviderDeletedAt)
+			assert.Equal(t, models.RunnerStateTerminated, runner.State)
+		})
+	}
 }
