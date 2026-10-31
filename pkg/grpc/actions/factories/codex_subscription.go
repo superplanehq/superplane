@@ -139,15 +139,22 @@ func refreshFactoryCodexCatalog(
 		}
 
 		taskID := uuid.New()
-		if err := connection.BeginCatalogRefresh(tx, taskID, time.Now()); err != nil {
+		lease, err := connection.BeginCatalogRefresh(tx, taskID, encryptor, time.Now())
+		if err != nil {
 			return err
+		}
+		if err := connection.AttachLoginLease(tx); err != nil {
+			return err
+		}
+		if lease.TaskID != taskID {
+			return nil
 		}
 		token, err := runner.MintCodexSubscriptionToken(jwt.NewSigner(secret), runner.CodexSubscriptionScope{
 			OrganizationID: organizationID,
 			ConnectionID:   connection.ID,
 			TaskID:         taskID,
-			Generation:     connection.ReservationGeneration,
-		}, models.CodexLoginTimeout)
+			Generation:     lease.Generation,
+		}, models.CodexCatalogTimeout)
 		if err != nil {
 			return err
 		}
@@ -168,6 +175,17 @@ func createCodexConnectionTask(
 	organizationID, taskID uuid.UUID,
 	token, baseURL, name, command string,
 ) error {
+	environment := []runner.TaskEnvironmentVariable{
+		{Name: runner.EnvCodexSubscriptionToken, Value: token},
+		{Name: runner.EnvSuperplaneBaseURL, Value: baseURL},
+	}
+	timeout := models.CodexLoginTimeout
+	if command == "refresh" {
+		environment = append(environment, runner.TaskEnvironmentVariable{
+			Name: runner.EnvCodexRefreshTokenURL, Value: baseURL + runner.CodexSubscriptionRefreshPath,
+		})
+		timeout = models.CodexCatalogTimeout
+	}
 	tasks := contexts.NewRunnerTaskContext(tx, encryptor, organizationID)
 	_, err := runner.CreateTask(tasks, runner.CreateTaskParams{
 		TaskID:      taskID.String(),
@@ -182,12 +200,9 @@ func createCodexConnectionTask(
 			Content: codex.SubscriptionScript(),
 			Mode:    "0644",
 		}},
-		Environment: []runner.TaskEnvironmentVariable{
-			{Name: runner.EnvCodexSubscriptionToken, Value: token},
-			{Name: runner.EnvSuperplaneBaseURL, Value: baseURL},
-		},
+		Environment: environment,
 		ExecutionMode:  runner.ExecutionModeHost,
-		TimeoutSeconds: int(models.CodexLoginTimeout / time.Second),
+		TimeoutSeconds: int(timeout / time.Second),
 	})
 	return err
 }
@@ -206,6 +221,13 @@ func CancelFactoryCodexConnection(
 	if err != nil {
 		return nil, err
 	}
+	var catalogTaskID uuid.UUID
+	if req.GetCatalogRefreshTaskId() != "" {
+		catalogTaskID, err = uuid.Parse(req.GetCatalogRefreshTaskId())
+		if err != nil || catalogTaskID == uuid.Nil {
+			return nil, grpcerrors.InvalidArgument(errors.New("catalog refresh task ID is invalid"), "Catalog refresh task ID is invalid")
+		}
+	}
 	var connection *models.FactoryCodexConnection
 	var eligible bool
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
@@ -220,6 +242,27 @@ func CancelFactoryCodexConnection(
 		connection, lockErr = models.FindCodexConnection(tx, orgID, callerID)
 		if lockErr != nil {
 			return lockErr
+		}
+		if catalogTaskID != uuid.Nil {
+			lease, err := models.FindCodexLeaseByTask(tx, catalogTaskID)
+			if err != nil {
+				return err
+			}
+			if lease == nil || !lease.Catalog() || lease.ConnectionID != connection.ID {
+				return connection.AttachLoginLease(tx)
+			}
+			// Completion locks its task before the connection. Use the same order.
+			if _, err := models.FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE"}), catalogTaskID); err != nil && !errors.Is(err, models.ErrRunnerTaskNotFound) {
+				return err
+			}
+			connection, err = models.LockCodexConnection(tx, orgID, callerID)
+			if err != nil {
+				return err
+			}
+			if err := connection.CancelCatalogRefresh(tx, catalogTaskID, time.Now()); err != nil {
+				return err
+			}
+			return connection.AttachLoginLease(tx)
 		}
 		if err := connection.AttachLoginLease(tx); err != nil {
 			return err
@@ -421,6 +464,10 @@ func serializeCodexConnection(
 	view.AvailableModels = models.CompactModelIDs(codexModelIDs(connection.AvailableModels))
 	if connection.LoginLease != nil {
 		view.ActiveTaskId = connection.LoginLease.TaskID.String()
+	}
+	if connection.CatalogLease != nil {
+		view.CatalogRefreshTaskId = connection.CatalogLease.TaskID.String()
+		view.CatalogRefreshCanceling = connection.CatalogCancellationRequested
 	}
 	if eligible && callerID == connection.OwnerUserID && view.Status == models.CodexConnectionStatusPending {
 		view.VerificationUrl = connection.VerificationURL

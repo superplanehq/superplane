@@ -36,7 +36,7 @@ import (
 )
 
 func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
-	for _, scenario := range []string{"complete", "cancel", "queued subscription"} {
+	for _, scenario := range []string{"complete", "cancel", "queued subscription", "queued catalog"} {
 		t.Run(scenario, func(t *testing.T) {
 			cancelOnHeartbeat := scenario == "cancel"
 			resource := support.Setup(t)
@@ -46,24 +46,37 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 
 			taskID := uuid.New()
 			var subscription *models.FactoryCodexConnection
+			var catalogToken string
 			document := map[string]any{
 				"id":             taskID.String(),
 				"run_mode":       "bash_script",
 				"script":         "echo hello",
 				"execution_mode": "host",
 			}
-			if scenario == "queued subscription" {
+			if scenario == "queued subscription" || scenario == "queued catalog" {
 				require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
-				factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
-				require.NoError(t, err)
+				var err error
 				subscription, err = models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now().Add(-time.Hour))
 				require.NoError(t, err)
 				require.NoError(t, db.Model(subscription).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
-				subscription, err = models.ReserveFactoryCodexConnection(db, resource.Organization.ID, factory.ID, support.CreateCodexOwnedRun(t, db, subscription, taskID), taskID, time.Now().Add(-time.Hour), resource.Encryptor)
-				require.NoError(t, err)
-				expired, err := signer.GenerateWithClaims(-time.Minute, map[string]string{"purpose": runneraction.CodexSubscriptionTokenPurpose})
-				require.NoError(t, err)
-				document["environment"] = []runneraction.TaskEnvironmentVariable{{Name: runneraction.EnvCodexSubscriptionToken, Value: expired}}
+				if scenario == "queued catalog" {
+					lease, err := subscription.BeginCatalogRefresh(db, taskID, resource.Encryptor, time.Now().Add(-5*time.Minute))
+					require.NoError(t, err)
+					catalogToken, err = runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
+						OrganizationID: resource.Organization.ID, ConnectionID: subscription.ID,
+						TaskID: taskID, Generation: lease.Generation,
+					}, 10*time.Minute)
+					require.NoError(t, err)
+					document["environment"] = []runneraction.TaskEnvironmentVariable{{Name: runneraction.EnvCodexSubscriptionToken, Value: catalogToken}}
+				} else {
+					factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+					require.NoError(t, err)
+					subscription, err = models.ReserveFactoryCodexConnection(db, resource.Organization.ID, factory.ID, support.CreateCodexOwnedRun(t, db, subscription, taskID), taskID, time.Now().Add(-time.Hour), resource.Encryptor)
+					require.NoError(t, err)
+					expired, err := signer.GenerateWithClaims(-time.Minute, map[string]string{"purpose": runneraction.CodexSubscriptionTokenPurpose})
+					require.NoError(t, err)
+					document["environment"] = []runneraction.TaskEnvironmentVariable{{Name: runneraction.EnvCodexSubscriptionToken, Value: expired}}
+				}
 				document["execution_timeout_seconds"] = 30
 			}
 			payload, err := json.Marshal(document)
@@ -147,6 +160,10 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, task.ID, scope.TaskID)
 				assert.Equal(t, subscription.ID, scope.ConnectionID)
+				if scenario == "queued catalog" {
+					assert.Equal(t, uuid.Nil, scope.FactoryID)
+					assert.Equal(t, catalogToken, received.Environment[0].Value, "queue time must not extend catalog authority")
+				}
 				claims, err := signer.ValidateAndGetClaims(received.Environment[0].Value)
 				require.NoError(t, err)
 				assert.GreaterOrEqual(t, int64(claims["exp"].(float64)), time.Now().Add(29*time.Second).Unix())
