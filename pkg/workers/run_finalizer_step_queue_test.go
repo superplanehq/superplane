@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
@@ -440,7 +439,6 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 func readyStepQueueOwner(t *testing.T, fixture *stepQueueFixture, ownerID uuid.UUID) *models.FactoryCodexConnection {
 	t.Helper()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(fixture.factory.OrganizationID, features.FeatureCodexSubscriptions))
 	connection, err := models.CreateCodexConnection(db, fixture.factory.OrganizationID, ownerID, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{

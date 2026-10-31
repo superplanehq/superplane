@@ -14,26 +14,17 @@ import { useCodexConnectionSetup } from "./useCodexConnectionSetup";
 
 type CodexConnection = ReturnType<typeof useFactoryCodexConnection>;
 
-function CodexConnectionNotices({
-  codex,
-  featuresLoading,
-  offered,
-}: {
-  codex: CodexConnection;
-  featuresLoading: boolean;
-  offered: boolean;
-}) {
+function CodexConnectionNotices({ codex }: { codex: CodexConnection }) {
   const connection = codex.query.data;
   return (
     <>
-      {featuresLoading || codex.query.isLoading ? <p role="status">Loading Codex connection...</p> : null}
+      {codex.query.isLoading ? <p role="status">Loading Codex connection...</p> : null}
       {codex.query.isError ? (
         <p role="alert">Could not load your Codex connection. Close this dialog and try again.</p>
       ) : null}
       {connection?.revocationPending ? (
         <p role="status">Stopping your previous tasks. You can reconnect when cleanup finishes.</p>
       ) : null}
-      {!featuresLoading && !offered ? <p role="alert">Codex subscriptions are unavailable in this workspace.</p> : null}
       {connection?.eligible === false ? <p role="alert">Your account cannot connect Codex in this workspace.</p> : null}
       {codex.start.isError ? <p role="alert">Could not start Codex sign-in. Try again.</p> : null}
       {codex.cancel.isError ? <p role="alert">Could not cancel Codex sign-in. Try again.</p> : null}
@@ -48,7 +39,7 @@ export function CodexConnectionSetupContent({ setup }: { setup: ReturnType<typeo
   const { codex } = setup;
   return (
     <>
-      <CodexConnectionNotices codex={codex} featuresLoading={setup.featuresLoading} offered={setup.offered} />
+      <CodexConnectionNotices codex={codex} />
       <CodexDeviceSignIn
         disabled={setup.disabled}
         connection={codex.query.data}
