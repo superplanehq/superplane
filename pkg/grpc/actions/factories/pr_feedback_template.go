@@ -38,9 +38,12 @@ const (
 	prFeedbackMachineType    = runner.MachineTypeE1LargeAMD64
 	prFeedbackTimeoutSeconds = 3600
 
-	prFeedbackDefaultMaximumAttempts = 3
-	prFeedbackMaximumAttemptsMin     = 1
-	prFeedbackMaximumAttemptsMax     = 10
+	prFeedbackDefaultMaximumAttempts    = 3
+	prFeedbackMaximumAttemptsMin        = 1
+	prFeedbackMaximumAttemptsMax        = 10
+	prFeedbackDefaultMergeConflictHours = 1
+	prFeedbackMergeConflictHoursMin     = 1
+	prFeedbackMergeConflictHoursMax     = 168
 
 	bitbucketPRCommentAcknowledgement = `Sure, looking into this. Follow along: [{{ $["Find Pull Request"].data.workOrder.key }}]({{ $["Find Pull Request"].data.workOrder.url }})`
 
@@ -70,15 +73,18 @@ var prFeedbackTriggerNodeIDs = []string{
 }
 
 type prFeedbackBuildRequest struct {
-	Name                   string
-	Repository             string
-	Mention                string
-	IgnoreBots             bool
-	AddressAllBots         bool
-	IncludeVisualEvidence  bool
-	AllowedBots            []string
-	CheckNames             []string
-	MaximumAttempts        int
+	Name                  string
+	Repository            string
+	Mention               string
+	IgnoreBots            bool
+	AddressAllBots        bool
+	IncludeVisualEvidence bool
+	AllowedBots           []string
+	CheckNames            []string
+	MaximumAttempts       int
+	// FixMergeConflicts is nil when the caller did not set it. Nil means on.
+	FixMergeConflicts      *bool
+	MergeConflictHours     int
 	RunnerIntegrationNames []string
 	Binding                *intakeBinding
 	Agent                  *intakeAgent

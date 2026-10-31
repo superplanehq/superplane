@@ -1003,6 +1003,7 @@ func materializePRFeedbackDefaults(
 		TriggerSettings:        prFeedbackTriggerSettingsFromGraph(graph, savedSettings),
 		OmitCommitIdentity:     true,
 	}
+	applyPRFeedbackConflictSettings(&request, settings)
 
 	templateID := prFeedbackDiscussionTemplateID
 	triggerID := prFeedbackCommentTriggerNodeID

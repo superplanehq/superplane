@@ -343,6 +343,7 @@ func TestMergeRoutesRequirePullRequestMergeFeature(t *testing.T) {
 	routes := []HTTPRoute{
 		{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/prs/{pr_id}/mergeability"},
 		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/prs/{pr_id}/merge"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/prs/{pr_id}/fix-conflicts"},
 	}
 	for _, route := range routes {
 		rule, ok := rules[route]

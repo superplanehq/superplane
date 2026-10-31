@@ -38,6 +38,8 @@ function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFe
     allowedBots: [],
     checkNames: [],
     maximumAttempts: 3,
+    fixMergeConflicts: true,
+    mergeConflictHours: 1,
     runnerIntegrationIds: [],
     ...overrides,
   };
@@ -188,9 +190,22 @@ describe("prFeedbackDraftIsValid", () => {
           mention: "",
           checkNames: [],
           maximumAttempts: 3,
+          fixMergeConflicts: false,
         }),
       ),
     ).toBe(false);
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "checks",
+          name: "Fix pull request checks",
+          mention: "",
+          checkNames: [],
+          maximumAttempts: 3,
+          fixMergeConflicts: true,
+        }),
+      ),
+    ).toBe(true);
     expect(
       prFeedbackDraftIsValid(
         discussionDraft({
@@ -261,6 +276,8 @@ describe("prFeedbackDraftFromHandler", () => {
       source: "checks",
       checkNames: ["lint", "unit"],
       maximumAttempts: 4,
+      fixMergeConflicts: true,
+      mergeConflictHours: 1,
       runnerIntegrationIds: ["int-1"],
     });
   });
@@ -312,7 +329,13 @@ describe("prFeedbackSettingsToApi", () => {
       ),
     ).toEqual({
       subject: { repository: "acme/app" },
-      checks: { names: ["lint"], maximumAttempts: 4, runnerIntegrationIds: ["int-1"] },
+      checks: {
+        names: ["lint"],
+        maximumAttempts: 4,
+        fixMergeConflicts: true,
+        mergeConflictHours: 1,
+        runnerIntegrationIds: ["int-1"],
+      },
     });
   });
 });

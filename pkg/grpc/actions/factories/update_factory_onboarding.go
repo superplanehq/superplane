@@ -179,21 +179,50 @@ func ensureOnboardingDiscussionHandler(
 		if err != nil {
 			return err
 		}
+		hasDiscussion := false
+		hasChecks := false
 		for _, handler := range handlers {
-			if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
-				return nil
+			switch handler.Source {
+			case models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion:
+				hasDiscussion = true
+			case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
+				hasChecks = true
 			}
 		}
+		if !hasDiscussion {
+			_, err = createFactoryPRFeedbackHandler(ctx, deps, organizationID, tx, &pb.CreateFactoryPRFeedbackHandlerRequest{
+				FactoryId: factory.ID.String(),
+				Settings: &pb.FactoryPRFeedbackHandler_Settings{
+					Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+						Repository: repository,
+					},
+					Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+						Mention:        prFeedbackDefaultMention,
+						IgnoreBots:     true,
+						AddressAllBots: true,
+					},
+				},
+			})
+			if err != nil {
+				return err
+			}
+		}
+		if hasChecks {
+			return nil
+		}
+
+		fixMergeConflicts := true
+		mergeConflictHours := int32(prFeedbackDefaultMergeConflictHours)
 		_, err = createFactoryPRFeedbackHandler(ctx, deps, organizationID, tx, &pb.CreateFactoryPRFeedbackHandlerRequest{
 			FactoryId: factory.ID.String(),
+			Source:    pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS,
 			Settings: &pb.FactoryPRFeedbackHandler_Settings{
 				Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
 					Repository: repository,
 				},
-				Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
-					Mention:        prFeedbackDefaultMention,
-					IgnoreBots:     true,
-					AddressAllBots: true,
+				Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
+					FixMergeConflicts:  &fixMergeConflicts,
+					MergeConflictHours: &mergeConflictHours,
 				},
 			},
 		})

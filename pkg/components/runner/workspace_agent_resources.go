@@ -608,6 +608,9 @@ checkout_bitbucket_pull_request() {
   cd "$_sp_root" || exit 1
 }
 
+case "${PR_HEAD:-}" in null) PR_HEAD="" ;; esac
+case "${PR_REVISION:-}" in null) PR_REVISION="" ;; esac
+
 if [ -n "${SOURCE_REPO:-}" ] && [ -n "${PR_REVISION:-}" ]; then
   checkout_bitbucket_revision
 elif [ -n "${PR_HEAD:-}" ] && [ "${PR_HEAD}" != "null" ] && { [ -z "${BITBUCKET_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; }; then

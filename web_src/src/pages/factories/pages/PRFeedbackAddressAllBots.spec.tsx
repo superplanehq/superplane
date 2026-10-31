@@ -37,6 +37,8 @@ function allBotsDraft(): PRFeedbackDraftSettings {
     allowedBots: [],
     checkNames: [],
     maximumAttempts: 3,
+    fixMergeConflicts: true,
+    mergeConflictHours: 24,
     runnerIntegrationIds: [],
   };
 }

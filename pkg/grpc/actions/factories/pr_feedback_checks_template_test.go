@@ -167,6 +167,33 @@ func TestPrFeedbackChecksRepairDescriptionExpression(t *testing.T) {
 	)
 }
 
+func TestPrFeedbackFailedChecksExpression_EmptyWhenTheWaitNodeDidNotRun(t *testing.T) {
+	for _, provider := range []string{"", "bitbucket"} {
+		source := templateExpressionSource(t, prFeedbackFailedChecksExpressionFor(provider))
+		env := map[string]any{
+			"$": map[string]any{
+				prFeedbackWaitChecksNodeName: nil,
+			},
+		}
+		program, err := expr.Compile(source, expr.AsAny(), expr.Env(env))
+		require.NoError(t, err)
+		got, err := expr.Run(program, env)
+		require.NoError(t, err)
+		assert.Equal(t, "", got)
+	}
+
+	listed := evalWaitChecksExpression(t, prFeedbackFailedChecksExpression(), map[string]any{
+		"failedChecks": []any{
+			map[string]any{
+				"name":       "lint",
+				"conclusion": "failure",
+				"detailsUrl": "https://example.com/lint",
+			},
+		},
+	})
+	assert.Equal(t, "lint failure https://example.com/lint", listed)
+}
+
 func TestPrFeedbackBitbucketBuildListExpressions(t *testing.T) {
 	got := evalWaitChecksExpression(t, prFeedbackChecksRepairDescriptionExpressionFor("bitbucket"), map[string]any{
 		"failedBuilds": []any{

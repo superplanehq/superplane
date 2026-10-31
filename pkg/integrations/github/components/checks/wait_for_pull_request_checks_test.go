@@ -109,22 +109,26 @@ func Test__WaitForPullRequestChecks__Execute(t *testing.T) {
 		assert.Empty(t, requests.Action)
 	})
 
-	t.Run("rejects empty check names", func(t *testing.T) {
+	t.Run("passes without a poll when no check names are selected", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		requests := &contexts.RequestContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: WaitForPullRequestChecksConfiguration{
 				Repository: "hello",
 				Ref:        sha,
 			},
-			HTTP:           newSnapshotHTTP("", ""),
+			HTTP:           &contexts.HTTPContext{},
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
-			ExecutionState: &contexts.ExecutionStateContext{},
-			Requests:       &contexts.RequestContext{},
+			ExecutionState: executionState,
+			Requests:       requests,
 			Metadata:       &contexts.MetadataContext{},
 			Logger:         logrus.NewEntry(logrus.New()),
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "checkNames is required")
+		require.NoError(t, err)
+		assert.Equal(t, waitChecksPassedChannel, executionState.Channel)
+		assert.Empty(t, requests.Action)
+		assert.Empty(t, requests.Duration)
 	})
 
 	t.Run("emits failed when a selected check failed", func(t *testing.T) {

@@ -267,6 +267,12 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
+	case errors.Is(err, errFactoryPullRequestConflictHandlerMissing):
+		return grpcerrors.FailedPrecondition(err, "Set up Fix pull request checks for this repository before you fix conflicts.")
+	case errors.Is(err, errFactoryPullRequestConflictFixDisabled):
+		return grpcerrors.FailedPrecondition(err, "Turn on merge conflicts in Fix pull request checks before you fix this pull request.")
+	case errors.Is(err, errFactoryPullRequestConflictFixesPaused):
+		return grpcerrors.FailedPrecondition(err, "Automatic fixes are paused for this pull request.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
 	case errors.Is(err, errSuperPlaneMCPServerDisabled):
@@ -302,6 +308,10 @@ var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server fi
 var errListMCPTools = errors.New("could not list MCP tools")
 var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
+var errFactoryPullRequestConflictHandlerMissing = errors.New("fix pull request checks is not set up")
+var errFactoryPullRequestConflictFixDisabled = errors.New("merge conflict fixes are turned off")
+var errFactoryPullRequestConflictFixesPaused = errors.New("automatic fixes are paused")
+var errConflictFixSkipped = errors.New("conflict fix skipped")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
 var errSuperPlaneMCPServerDisabled = errors.New("superplane MCP server is not enabled")
 var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")

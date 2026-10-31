@@ -489,7 +489,7 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		})
 		runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
 		assert.Contains(t, runnerEnv(t, runner, "FAILED_CHECKS"), "Wait For Pull Request Checks")
-		assert.Contains(t, runnerEnv(t, runner, "PR_REVISION"), "pull_request.head.sha")
+		assert.Contains(t, runnerEnv(t, runner, "PR_REVISION"), "pull_request?.head?.sha")
 
 		push := runnerStepCommand(t, runner, "Commit and Push")
 		assert.Contains(t, push, "REMOTE_HEAD")

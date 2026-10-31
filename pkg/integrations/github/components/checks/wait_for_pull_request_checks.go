@@ -152,7 +152,7 @@ func (c *WaitForPullRequestChecks) Configuration() []configuration.Field {
 			Name:        "checkNames",
 			Label:       "Check Names",
 			Type:        configuration.FieldTypeList,
-			Required:    true,
+			Required:    false,
 			Description: "Exact check or status names to require.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -343,6 +343,27 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
+	if len(ctx.Configuration.CheckNames) == 0 {
+		metadata.Repository = ctx.Configuration.Repository
+		metadata.SHA = strings.TrimSpace(ctx.Configuration.Ref)
+		metadata.Outcome = waitChecksOutcomePassed
+		completedAt := now
+		metadata.CompletedAt = &completedAt
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return err
+		}
+		if err := ctx.ExecutionState.SetKV(waitChecksRefKV, waitChecksRefValue(metadata.Repository, metadata.SHA)); err != nil {
+			return err
+		}
+		return ctx.ExecutionState.Emit(waitChecksPassedChannel, waitChecksPayloadType, []any{
+			WaitForPullRequestChecksOutput{
+				Repository:  metadata.Repository,
+				SHA:         metadata.SHA,
+				StartedAt:   metadata.StartedAt,
+				CompletedAt: completedAt,
+			},
+		})
+	}
 
 	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
@@ -496,9 +517,6 @@ func decodeWaitChecksConfig(raw any) (WaitForPullRequestChecksConfiguration, err
 		return config, fmt.Errorf("ref is required")
 	}
 	config.CheckNames = normalizeWaitCheckNames(config.CheckNames)
-	if len(config.CheckNames) == 0 {
-		return config, fmt.Errorf("checkNames is required")
-	}
 	return config, nil
 }
 

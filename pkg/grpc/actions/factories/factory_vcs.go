@@ -130,24 +130,28 @@ func mergeabilityToVCS(result *factoryPullRequestMergeability) vcs.Mergeability 
 		return vcs.Mergeability{}
 	}
 	return vcs.Mergeability{
-		CanMerge:       result.CanMerge,
-		BlockedReason:  mergeabilityBlockedReasonName(result.BlockedReason),
-		Message:        result.Message,
-		AllowedMethods: allowedMethodNames(result.AllowedMethods),
-		HeadSHA:        result.HeadSHA,
-		CanRetry:       result.canRetry,
+		CanMerge:            result.CanMerge,
+		BlockedReason:       mergeabilityBlockedReasonName(result.BlockedReason),
+		Message:             result.Message,
+		AllowedMethods:      allowedMethodNames(result.AllowedMethods),
+		HeadSHA:             result.HeadSHA,
+		HeadRef:             result.HeadRef,
+		CanRetry:            result.canRetry,
+		MergeabilityUnknown: result.MergeabilityUnknown,
 	}
 }
 
 func mergeabilityFromVCS(pullRequest *models.FactoryPullRequest, read vcs.Mergeability) *factoryPullRequestMergeability {
 	return &factoryPullRequestMergeability{
-		CanMerge:       read.CanMerge,
-		BlockedReason:  mergeabilityBlockedReasonFromName(read.BlockedReason),
-		Message:        read.Message,
-		AllowedMethods: mergeMethodsFromNames(read.AllowedMethods),
-		HeadSHA:        read.HeadSHA,
-		PullRequest:    pullRequest,
-		canRetry:       read.CanRetry,
+		CanMerge:            read.CanMerge,
+		BlockedReason:       mergeabilityBlockedReasonFromName(read.BlockedReason),
+		Message:             read.Message,
+		AllowedMethods:      mergeMethodsFromNames(read.AllowedMethods),
+		HeadSHA:             read.HeadSHA,
+		HeadRef:             read.HeadRef,
+		MergeabilityUnknown: read.MergeabilityUnknown,
+		PullRequest:         pullRequest,
+		canRetry:            read.CanRetry,
 	}
 }
 

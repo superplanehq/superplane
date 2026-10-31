@@ -169,6 +169,8 @@ func applyPRFeedbackSettings(
 					configuration = map[string]any{}
 				}
 				configuration["repository"] = updated.Repository
+				configuration["fixMergeConflicts"] = updated.FixMergeConflicts
+				configuration["mergeConflictHours"] = updated.MergeConflictHours
 				// ponytail: wait nodes name required builds per provider
 				delete(configuration, "checkNames")
 				delete(configuration, "buildKeys")

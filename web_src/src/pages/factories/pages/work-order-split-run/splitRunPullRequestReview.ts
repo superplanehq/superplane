@@ -153,6 +153,8 @@ export const PULL_REQUEST_REVIEW_COPY = {
   moreActions: "More actions",
   merge: "Merge",
   merging: "Merging",
+  fixConflicts: "Fix conflicts",
+  fixingConflicts: "Starting the fix",
   mergeMethod: "Merge method",
   merged: "The pull request is merged.",
   permission: "You do not have permission to manage this task.",

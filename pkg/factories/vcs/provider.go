@@ -45,12 +45,14 @@ type MergedPullRequest struct {
 // Mergeability is the merge status of one open pull request.
 // BlockedReason and AllowedMethods use the stored column names.
 type Mergeability struct {
-	CanMerge       bool
-	BlockedReason  string
-	Message        string
-	AllowedMethods []string
-	HeadSHA        string
-	CanRetry       bool
+	CanMerge            bool
+	BlockedReason       string
+	Message             string
+	AllowedMethods      []string
+	HeadSHA             string
+	HeadRef             string
+	CanRetry            bool
+	MergeabilityUnknown bool
 }
 
 // PullRequestRef identifies one pull request to close.
