@@ -9,11 +9,14 @@ import { GITHUB_INTAKE_SETUP_COPY } from "./githubIntakeSetupCopy";
 
 const mocks = vi.hoisted(() => ({
   subscription: false,
+  retainedOwner: "",
   createIntake: vi.fn(),
 }));
 
 vi.mock("../layout/factoriesLayoutContext", () => ({
-  useOptionalFactoriesLayout: () => ({ factory: { onboarding: { codexSubscription: mocks.subscription } } }),
+  useOptionalFactoriesLayout: () => ({
+    factory: { onboarding: { codexSubscription: mocks.subscription, codexDefaultOwnerId: mocks.retainedOwner } },
+  }),
 }));
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganizationUsers: () => ({
@@ -49,6 +52,7 @@ function renderDialog(onCreated = vi.fn()) {
 describe("GitHubIntakeSetupDialog", () => {
   beforeEach(() => {
     mocks.subscription = false;
+    mocks.retainedOwner = "";
     mocks.createIntake.mockReset();
     mocks.createIntake.mockResolvedValue({ id: "intake-1", canvasId: "canvas-1" });
   });
@@ -61,6 +65,21 @@ describe("GitHubIntakeSetupDialog", () => {
     expect(mocks.createIntake).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent("Select a default task owner");
     await user.click(screen.getByRole("combobox", { name: /Default task owner/ }));
+    await user.click(await screen.findByRole("option", { name: "Alice" }));
+    await user.click(screen.getByTestId("github-setup-finish"));
+    await waitFor(() =>
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_GITHUB_ISSUES",
+        settings: { defaultOwnerId: "alice" },
+      }),
+    );
+  });
+  it("submits an optional selected owner without reusing the subscription default", async () => {
+    mocks.retainedOwner = "retained-owner";
+    const user = userEvent.setup();
+    renderDialog();
+    expect(screen.getByRole("button", { name: "Default task owner" })).toHaveTextContent("No owner");
+    await user.click(screen.getByRole("button", { name: "Default task owner" }));
     await user.click(await screen.findByRole("option", { name: "Alice" }));
     await user.click(screen.getByTestId("github-setup-finish"));
     await waitFor(() =>

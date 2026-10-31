@@ -113,7 +113,7 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		agentID := createReadyOnboardingIntegration(t, organization.ID, models.CustomLLMAppName)
 		require.NoError(t, models.EnableExperimentalFeature(organization.ID, features.FeatureOrganizationBYOK))
 		require.NoError(t, models.EnableExperimentalFeature(organization.ID, features.FeatureOrganizationBYOKCustomProvider))
-		_, err := models.UpsertOrganizationBYOKModelAllowlist(
+		_, err := support.SaveProviderModelCatalog(
 			db,
 			organization.ID,
 			models.UsageProviderCustom,

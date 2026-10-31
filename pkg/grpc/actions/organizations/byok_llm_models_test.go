@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/superplanehq/superplane/pkg/features"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -18,14 +19,12 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
-	"gorm.io/datatypes"
 )
 
 func Test__ListBYOKLLMModels(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	t.Cleanup(func() {
-		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
 	})
 
 	t.Run("invalid organization id", func(t *testing.T) {
@@ -47,103 +46,62 @@ func Test__ListBYOKLLMModels(t *testing.T) {
 	})
 
 	t.Run("no connected integration", func(t *testing.T) {
-		_, err := models.UpsertOrganizationBYOKModelAllowlist(database.Conn(), r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-4.1"})
-		require.NoError(t, err)
-
-		resp, err := ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{
-			Provider: "openai",
-		})
+		resp, err := ListBYOKLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{Provider: "openai"})
 		require.NoError(t, err)
 		assert.False(t, resp.Connected)
-		require.Len(t, resp.Selected, 1)
-		assert.Equal(t, "gpt-4.1", resp.Selected[0].Id)
+		assert.Empty(t, resp.Selected)
 		assert.Empty(t, resp.Candidates)
 	})
-
-	t.Run("lists candidates from connected integration", func(t *testing.T) {
-		integration, err := models.CreateIntegration(
-			uuid.New(),
-			r.Organization.ID,
-			"openai",
-			support.RandomName("openai"),
-			map[string]any{},
-		)
-		require.NoError(t, err)
-		require.NoError(t, database.Conn().Model(integration).Update("state", models.IntegrationStateReady).Error)
-
-		r.Registry.Integrations["openai"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-			ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-				assert.Equal(t, "model", resourceType)
-				return []core.IntegrationResource{
-					{ID: "gpt-4.1", Name: "GPT 4.1"},
-					{Name: "gpt-4o"},
-				}, nil
-			},
-		})
-
-		resp, err := ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{
-			Provider: "openai",
-		})
-		require.NoError(t, err)
-		assert.True(t, resp.Connected)
-		assert.Equal(t, integration.ID.String(), resp.IntegrationId)
-		require.Len(t, resp.Candidates, 2)
-		assert.Equal(t, "GPT 4.1", resp.Candidates[0].Name)
-		require.Len(t, resp.Selected, 1)
-		assert.Equal(t, "GPT 4.1", resp.Selected[0].Name)
-	})
-
-	t.Run("does not overwrite a saved list during default enable", func(t *testing.T) {
+	t.Run("refreshes provider catalog and preserves successful observations on failure", func(t *testing.T) {
+		db := database.DB(t.Context())
 		integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "openai", support.RandomName("openai"), map[string]any{})
 		require.NoError(t, err)
-		require.NoError(t, database.Conn().Model(integration).Update("state", models.IntegrationStateReady).Error)
-		_, err = models.UpsertOrganizationBYOKModelAllowlist(
-			database.Conn(),
-			r.Organization.ID,
-			models.UsageProviderOpenAI,
-			datatypes.JSONSlice[string]{},
-		)
+		require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+		snapshot, err := models.FindIntegrationModelCatalog(db, integration.ID)
 		require.NoError(t, err)
-
+		assert.Nil(t, snapshot, "missing catalog differs from a successful empty result")
+		resources := []core.IntegrationResource{{ID: "gpt-4.1", Name: "GPT 4.1"}, {Name: "gpt-4o"}}
+		var providerError error
 		r.Registry.Integrations["openai"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-			ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-				return []core.IntegrationResource{{ID: "gpt-4.1"}, {ID: "gpt-4o"}}, nil
+			ListResources: func(string, core.ListResourcesContext) ([]core.IntegrationResource, error) {
+				return resources, providerError
 			},
 		})
-
-		resp, err := ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{
-			Provider: "openai",
-		})
+		list := func() *pb.ListBYOKLLMModelsResponse {
+			response, err := ListBYOKLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{Provider: "openai"})
+			require.NoError(t, err)
+			return response
+		}
+		response := list()
+		assert.True(t, response.Connected)
+		assert.Equal(t, integration.ID.String(), response.IntegrationId)
+		require.Len(t, response.Selected, 2)
+		assert.Equal(t, "GPT 4.1", response.Selected[0].Name)
+		snapshot, err = models.FindIntegrationModelCatalog(db, integration.ID)
 		require.NoError(t, err)
-		assert.True(t, resp.Connected)
-		assert.Empty(t, resp.Selected)
-
-		saved, err := models.FindOrganizationBYOKModelAllowlist(database.Conn(), r.Organization.ID, models.UsageProviderOpenAI)
+		require.NotNil(t, snapshot)
+		assert.WithinDuration(t, time.Now(), snapshot.ObservedAt, time.Second)
+		assert.Equal(t, "GPT 4.1", snapshot.Models[0].Name)
+		providerError = core.NewProviderTransportError("timeout", fmt.Errorf("timeout"))
+		_, err = ListBYOKLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{Provider: "openai"})
+		require.Error(t, err)
+		retained, err := models.FindIntegrationModelCatalog(db, integration.ID)
 		require.NoError(t, err)
-		assert.Empty(t, saved.AllowedModels)
-	})
-
-	t.Run("selects every candidate when no list is saved", func(t *testing.T) {
-		integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "openrouter", support.RandomName("openrouter"), map[string]any{})
+		assert.Equal(t, snapshot, retained)
+		providerError = nil
+		resources = nil
+		response = list()
+		assert.Empty(t, response.Candidates)
+		assert.Empty(t, response.Selected)
+		empty, err := models.FindIntegrationModelCatalog(db, integration.ID)
 		require.NoError(t, err)
-		require.NoError(t, database.Conn().Model(integration).Update("state", models.IntegrationStateReady).Error)
-		r.Registry.Integrations["openrouter"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-			ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-				return []core.IntegrationResource{{ID: "x-ai/grok-4.6"}, {ID: "openai/gpt-5"}}, nil
-			},
-		})
-
-		resp, err := ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{
-			Provider: "openrouter",
-		})
+		require.NotNil(t, empty)
+		assert.Empty(t, empty.Models)
+		replacement := models.NewIntegration(uuid.New(), r.Organization.ID, "openai", support.RandomName("replacement"), map[string]any{})
+		require.NoError(t, db.Create(replacement).Error)
+		missing, err := models.FindIntegrationModelCatalog(db, replacement.ID)
 		require.NoError(t, err)
-		require.Len(t, resp.Selected, 2)
-		assert.Equal(t, "x-ai/grok-4.6", resp.Selected[0].Id)
-		assert.Equal(t, "openai/gpt-5", resp.Selected[1].Id)
-
-		saved, err := models.FindOrganizationBYOKModelAllowlist(database.Conn(), r.Organization.ID, models.UsageProviderOpenRouter)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"x-ai/grok-4.6", "openai/gpt-5"}, []string(saved.AllowedModels))
+		assert.Nil(t, missing, "a different key must not reuse the previous integration catalog")
 	})
 
 	t.Run("candidate list failure", func(t *testing.T) {
@@ -206,37 +164,5 @@ func Test__ListBYOKLLMModels(t *testing.T) {
 				assert.Equal(t, tt.expectedMsg, message)
 			})
 		}
-	})
-}
-
-func Test__UpdateBYOKLLMModels(t *testing.T) {
-	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
-	t.Cleanup(func() {
-		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
-	})
-
-	t.Run("invalid organization id", func(t *testing.T) {
-		_, err := UpdateBYOKLLMModels(context.Background(), "bad", &pb.UpdateBYOKLLMModelsRequest{Provider: "openai"})
-		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-	})
-
-	t.Run("duplicate models", func(t *testing.T) {
-		_, err := UpdateBYOKLLMModels(context.Background(), r.Organization.ID.String(), &pb.UpdateBYOKLLMModelsRequest{
-			Provider:      "openai",
-			AllowedModels: []string{"gpt-4.1", "gpt-4.1"},
-		})
-		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-	})
-
-	t.Run("saves selected models", func(t *testing.T) {
-		resp, err := UpdateBYOKLLMModels(context.Background(), r.Organization.ID.String(), &pb.UpdateBYOKLLMModelsRequest{
-			Provider:      "openai",
-			AllowedModels: []string{"gpt-4.1", "gpt-4o"},
-		})
-		require.NoError(t, err)
-		require.Len(t, resp.Selected, 2)
-		assert.Equal(t, "gpt-4.1", resp.Selected[0].Id)
-		assert.Equal(t, "gpt-4o", resp.Selected[1].Id)
 	})
 }

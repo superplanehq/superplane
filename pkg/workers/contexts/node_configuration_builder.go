@@ -2393,6 +2393,9 @@ func (b *NodeConfigurationBuilder) applyLineDispatchModel(
 }
 
 func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, model string) (map[string]any, error) {
+	if !models.RunnerInvokesModel(resolved) {
+		return resolved, nil
+	}
 	override := strings.TrimSpace(model)
 	if override == "" {
 		return resolved, nil
@@ -2408,6 +2411,17 @@ func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, m
 		return nil, err
 	}
 	if !isAgentModelRunner(node.ComponentName()) {
+		return resolved, nil
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, err
+	}
+	matches, err := models.RunnerMatchesModel(b.tx, canvas.OrganizationID, canvas.FactoryID, node.ComponentName(), resolved, override)
+	if err != nil {
+		return nil, err
+	}
+	if !matches {
 		return resolved, nil
 	}
 	credentials, _ := resolved["credentials"].(map[string]any)
@@ -2438,6 +2452,9 @@ func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, m
 }
 
 func (b *NodeConfigurationBuilder) applyExecutionModelPolicy(resolved map[string]any) (map[string]any, error) {
+	if !models.RunnerInvokesModel(resolved) {
+		return resolved, nil
+	}
 	credentials, _ := resolved["credentials"].(map[string]any)
 	source, _ := credentials["source"].(string)
 	if source != "subscription" && source != "integration" && source != "secret" {
@@ -2509,6 +2526,9 @@ func (b *NodeConfigurationBuilder) executionRunID() (uuid.UUID, error) {
 }
 
 func (b *NodeConfigurationBuilder) replaceClaudeModelAlias(resolved map[string]any) (map[string]any, error) {
+	if !models.RunnerInvokesModel(resolved) {
+		return resolved, nil
+	}
 	credentials, _ := resolved["credentials"].(map[string]any)
 	if credentials["source"] == "subscription" {
 		return resolved, nil
@@ -2548,6 +2568,15 @@ func (b *NodeConfigurationBuilder) claudeAliasCandidates(resolved map[string]any
 			return nil, nil
 		}
 		return nil, err
+	}
+	if llmFundingSource(resolved) == models.UsageFundingSourceBYOK && canvas.FactoryID != nil {
+		policy, err := models.FindFactoryLLMModelAllowlist(b.tx, *canvas.FactoryID, provider, models.UsageFundingSourceBYOK)
+		if err != nil {
+			return nil, err
+		}
+		if !policy.InheritsParent() {
+			return models.CompactModelIDs(policy.AllowedModels), nil
+		}
 	}
 	return models.ResolveSelectableLLMModels(
 		b.tx,

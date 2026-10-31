@@ -9,11 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -33,7 +31,6 @@ func TestOrganizationHostedLLMModels(t *testing.T) {
 		previous[provider] = snapshotHostedLLMProvider(t, db, provider)
 	}
 	t.Cleanup(func() {
-		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
 		for _, provider := range providers {
 			restoreHostedLLMProvider(db, provider, previous[provider])
 		}
@@ -53,43 +50,12 @@ func TestOrganizationHostedLLMModels(t *testing.T) {
 	assert.ElementsMatch(t, list.Candidates, list.Selected)
 	assertHostedCandidate(t, list.Candidates, anthropicKey, "anthropic/claude-sonnet", models.UsageProviderAnthropic)
 	assertHostedCandidate(t, list.Candidates, openRouterKey, "anthropic/claude-sonnet", models.UsageProviderOpenRouter)
-	row, err := models.FindOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic)
-	require.NoError(t, err)
-	assert.Nil(t, row, "reading must not save a selection")
-
-	for _, invalid := range [][]string{
-		{models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderAnthropic, "not-enabled")},
-		{models.FormatSelectableLLMModelKey("byok", models.UsageProviderAnthropic, "claude-sonnet")},
-		{anthropicKey, anthropicKey},
-	} {
-		_, err := UpdateOrganizationHostedLLMModels(ctx, orgID, &pb.UpdateOrganizationHostedLLMModelsRequest{AllowedModels: invalid})
-		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-	}
-	saved, err := UpdateOrganizationHostedLLMModels(ctx, orgID, &pb.UpdateOrganizationHostedLLMModelsRequest{AllowedModels: []string{anthropicKey}})
-	require.NoError(t, err)
-	require.Len(t, saved.Selected, 1)
-	assert.Equal(t, anthropicKey, saved.Selected[0].Key)
-	for _, provider := range models.KnownHostedLLMProviders() {
-		row, err := models.FindOrganizationHostedModelAllowlist(db, r.Organization.ID, provider)
-		require.NoError(t, err)
-		require.NotNil(t, row, "every provider must be saved, including unconfigured providers")
-	}
-
-	const probe = "organization-selection-probe"
-	require.NoError(t, addHostedLLMModel(db, models.UsageProviderOpenAI, probe))
-	probeKey := models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenAI, probe)
+	require.NoError(t, addHostedLLMModel(db, models.UsageProviderOpenAI, "new-model"))
 	list, err = ListOrganizationHostedLLMModels(ctx, orgID)
 	require.NoError(t, err)
-	assertHostedCandidate(t, list.Candidates, probeKey, "openai/"+probe, models.UsageProviderOpenAI)
-	require.Len(t, list.Selected, 1)
-	assert.Equal(t, anthropicKey, list.Selected[0].Key)
+	assert.ElementsMatch(t, list.Candidates, list.Selected)
+	assertHostedCandidate(t, list.Selected, models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenAI, "new-model"), "openai/new-model", models.UsageProviderOpenAI)
 
-	_, err = UpdateOrganizationHostedLLMModels(ctx, orgID, &pb.UpdateOrganizationHostedLLMModelsRequest{})
-	require.NoError(t, err)
-	list, err = ListOrganizationHostedLLMModels(ctx, orgID)
-	require.NoError(t, err)
-	assertHostedCandidate(t, list.Candidates, probeKey, "openai/"+probe, models.UsageProviderOpenAI)
-	assert.Empty(t, list.Selected)
 }
 
 func snapshotHostedLLMProvider(t *testing.T, db *gorm.DB, provider string) *models.HostedLLMProvider {

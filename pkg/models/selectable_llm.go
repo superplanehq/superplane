@@ -21,8 +21,8 @@ var (
 )
 
 type SelectableLLMNamedID struct {
-	ID   string
-	Name string
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type SelectableLLMModel struct {
@@ -149,6 +149,26 @@ func ListSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID)
 	for _, id := range customIDs {
 		out = append(out, newSelectableLLMModel(UsageFundingSourceBYOK, UsageProviderCustom, id))
 	}
+	catalogs := map[string]map[string]string{}
+	for i := range out {
+		model := &out[i]
+		if model.Source.ID != UsageFundingSourceBYOK {
+			continue
+		}
+		names, loaded := catalogs[model.Provider.ID]
+		if !loaded {
+			catalog, err := FindProviderModelCatalog(tx, orgID, model.Provider.ID)
+			if err != nil {
+				return nil, err
+			}
+			names = catalog.ModelNames()
+			catalogs[model.Provider.ID] = names
+		}
+		if name := names[model.Model.ID]; name != "" {
+			model.Model.Name = name
+		}
+	}
+
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Label != out[j].Label {
 			return strings.ToLower(out[i].Label) < strings.ToLower(out[j].Label)

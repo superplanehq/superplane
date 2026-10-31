@@ -69,7 +69,7 @@ export function useDatadogIntakeSetup(organizationId: string, factoryId: string)
     try {
       const ownerSettings = owner.settings();
       await createIntake.mutateAsync({
-        ...(owner.required ? { settings: ownerSettings } : {}),
+        ...(Object.keys(ownerSettings).length ? { settings: ownerSettings } : {}),
         source: "SOURCE_DATADOG",
         integrationId,
         resourceId,

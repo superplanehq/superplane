@@ -334,7 +334,7 @@ describe("IntakeSettingsHost", () => {
     expect(within(form).getByText("Repository")).toBeInTheDocument();
     expect(within(form).getByText("superplanehq/superplane")).toBeInTheDocument();
     expect(within(form).getByText("Create a task for these severities:")).toBeInTheDocument();
-    expect(within(form).queryByRole("button", { name: "Default task owner" })).not.toBeInTheDocument();
+    expect(within(form).getByRole("button", { name: "Default task owner" })).toHaveTextContent("No owner");
     expect(within(form).getByRole("checkbox", { name: "Critical" })).toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "Low" })).toBeChecked();
     await user.click(within(dialog).getByRole("tab", { name: "Runs" }));

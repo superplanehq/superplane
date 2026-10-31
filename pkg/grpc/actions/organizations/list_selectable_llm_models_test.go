@@ -25,12 +25,10 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
-		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
-		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
 	})
 	saveEmptyHostedModelSelections(t, db, r.Organization.ID)
 
-	resp, err := ListSelectableLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
+	resp, err := ListSelectableLLMModels(context.Background(), nil, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
 	require.NoError(t, err)
 	assert.Empty(t, resp.Models)
 
@@ -41,16 +39,12 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
 	})
 	require.NoError(t, err)
-	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
-		"claude-sonnet-4-6",
-	})
-	require.NoError(t, err)
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
 		"claude-sonnet-4-6",
 	})
 	require.NoError(t, err)
 
-	resp, err = ListSelectableLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
+	resp, err = ListSelectableLLMModels(context.Background(), nil, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
 	require.NoError(t, err)
 	require.Len(t, resp.Models, 2)
 	assert.Equal(t, "byok::anthropic::claude-sonnet-4-6", resp.Models[0].Key)
@@ -73,21 +67,19 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 	require.Error(t, err)
 }
 
-func Test__ListSelectableLLMModels__EnablesConnectedKeyModelsByDefault(t *testing.T) {
+func TestSelectableModelsReuseSnapshotsUntilProviderCatalogRefresh(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.Conn()
-	t.Cleanup(func() {
-		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
-		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
-	})
 	saveEmptyHostedModelSelections(t, db, r.Organization.ID)
 
 	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "openai", support.RandomName("openai"), map[string]any{})
 	require.NoError(t, err)
 	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	requests := 0
 	r.Registry.Integrations["openai"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+			requests++
 			return []core.IntegrationResource{{ID: "gpt-5"}, {ID: "gpt-4.1"}}, nil
 		},
 	})
@@ -100,17 +92,54 @@ func Test__ListSelectableLLMModels__EnablesConnectedKeyModelsByDefault(t *testin
 	}
 	assert.ElementsMatch(t, []string{"byok::openai::gpt-5", "byok::openai::gpt-4.1"}, keys)
 
-	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{})
+	_, err = support.SaveProviderModelCatalog(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{})
 	require.NoError(t, err)
 	resp, err = ListSelectableLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
 	require.NoError(t, err)
-	assert.Empty(t, resp.Models)
+	assert.Empty(t, resp.Models, "a successful empty catalog stays known")
+	assert.Equal(t, 1, requests, "pickers must reuse snapshots without waiting on providers")
+	_, err = ListBYOKLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{Provider: "openai"})
+	require.NoError(t, err)
+	resp, err = ListSelectableLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
+	require.NoError(t, err)
+	assert.Len(t, resp.Models, 2)
+	assert.Equal(t, 2, requests, "explicit catalog requests refresh snapshots")
 }
 
 func saveEmptyHostedModelSelections(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
 	t.Helper()
 	for _, provider := range models.KnownHostedLLMProviders() {
-		_, err := models.UpsertOrganizationHostedModelAllowlist(db, orgID, provider, datatypes.JSONSlice[string]{})
-		require.NoError(t, err)
+		previous := snapshotHostedLLMProvider(t, db, provider)
+		t.Cleanup(func() { restoreHostedLLMProvider(db, provider, previous) })
+		require.NoError(t, db.Where("provider = ?", provider).Delete(&models.HostedLLMProvider{}).Error)
 	}
+}
+
+func TestSelectableCatalogRefreshRespectsCustomProviderAccess(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	integration := models.NewIntegration(uuid.New(), r.Organization.ID, models.CustomLLMAppName, support.RandomName("custom"), map[string]any{})
+	integration.State = models.IntegrationStateReady
+	require.NoError(t, db.Create(integration).Error)
+	requests := 0
+	r.Registry.Integrations[models.CustomLLMAppName] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{ListResources: func(string, core.ListResourcesContext) ([]core.IntegrationResource, error) {
+		requests++
+		return []core.IntegrationResource{{ID: "custom-model", Name: "Custom model"}}, nil
+	}})
+	_, err := ListSelectableLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
+	require.NoError(t, err)
+	assert.Zero(t, requests, "disabled providers must not receive discovery requests")
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
+	response, err := ListSelectableLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, requests)
+	found := false
+	for _, model := range response.Models {
+		if model.Key == "byok::custom::custom-model" {
+			found = true
+			assert.Equal(t, "Custom model", model.Model.Name)
+		}
+	}
+	assert.True(t, found)
 }

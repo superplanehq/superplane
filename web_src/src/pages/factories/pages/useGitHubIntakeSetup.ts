@@ -17,7 +17,7 @@ export function useGitHubIntakeSetup(organizationId: string, factoryId: string) 
     try {
       const ownerSettings = owner.settings();
       await createIntake.mutateAsync({
-        ...(owner.required ? { settings: ownerSettings } : {}),
+        ...(Object.keys(ownerSettings).length ? { settings: ownerSettings } : {}),
         source: "SOURCE_GITHUB_ISSUES",
         ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });

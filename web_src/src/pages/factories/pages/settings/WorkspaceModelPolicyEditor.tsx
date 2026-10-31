@@ -84,7 +84,7 @@ function ModelPolicyError({ label, onReload }: { label: string; onReload: () => 
 
 const EMPTY_CATALOG_MESSAGES = {
   subscription: "Connect Codex or ask a connected member to refresh their models.",
-  hosted: "Ask an organization admin to make models available.",
+  hosted: "Ask an installation admin to enable hosted models.",
   byok: "Check the provider integration, then reload the models.",
 };
 
