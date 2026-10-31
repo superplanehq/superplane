@@ -36,6 +36,9 @@ type Organization struct {
 	AllowedProviders            datatypes.JSONSlice[string]
 	EnabledExperimentalFeatures datatypes.JSONSlice[string]
 	UsageRetentionWindowDays    *int32
+	SuspendedAt                 *time.Time
+	SuspendedByAccountID        *uuid.UUID
+	SuspensionReason            string
 	CreatedAt                   *time.Time
 	UpdatedAt                   *time.Time
 	DeletedAt                   gorm.DeletedAt `gorm:"index"`
