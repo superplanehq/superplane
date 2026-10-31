@@ -416,8 +416,12 @@ if (process.argv[2] === "app-server") {
 					}, 5*time.Second, 10*time.Millisecond, "the native Codex child must stop after its process group is killed")
 					var body map[string]any
 					require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-					assert.Equal(t, true, body["final"])
-					assert.Equal(t, "final-access-token", body["bundle"].(map[string]any)["access_token"])
+					if command == "login" {
+						assert.Equal(t, true, body["final"])
+						assert.Equal(t, "final-access-token", body["bundle"].(map[string]any)["access_token"])
+					} else {
+						assert.Equal(t, map[string]any{"usage": map[string]any{"limits": []any{}, "models": []any{}}}, body)
+					}
 					checkpointed = true
 					_ = json.NewEncoder(w).Encode(map[string]any{"accepted": failure != "checkpoint", "version": 2})
 				}))
@@ -469,5 +473,70 @@ if (process.argv[2] === "app-server") {
 				}
 			})
 		}
+	}
+}
+
+// Exercise the delivered refresh command: incomplete pages must never become a
+// successful empty catalog, while quota failure must not block valid models.
+func TestSubscriptionCatalogRequiresCompleteModels(t *testing.T) {
+	for _, scenario := range []string{"quota-unavailable", "missing-model-data", "invalid-model", "second-page-error"} {
+		t.Run(scenario, func(t *testing.T) {
+			taskDir := t.TempDir()
+			bin := filepath.Join(taskDir, "bin")
+			require.NoError(t, os.Mkdir(bin, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "codex"), []byte(`#!/usr/bin/env node
+require("readline").createInterface({input:process.stdin}).on("line", line => {
+ const req = JSON.parse(line);
+ let reply = {result:{}};
+ if (req.id === 2) reply = {error:{message:"quota unavailable"}};
+ if (req.id === 3) {
+  const scenario = process.env.CATALOG_SCENARIO;
+  reply = {result:{data:[{id:"gpt-5.4",model:"gpt-5.4"}],nextCursor:"next"}};
+  if (req.params.cursor) reply = scenario === "second-page-error"
+   ? {error:{message:"models unavailable"}} : {result:{data:[{id:"gpt-5.3",model:"gpt-5.3"}]}};
+  if (scenario === "missing-model-data") reply = {result:{}};
+  if (scenario === "invalid-model") reply = {result:{data:[null]}};
+ }
+ process.stdout.write(JSON.stringify({id:req.id,...reply})+"\n");
+});
+`), 0o755))
+			var checkpoints []map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasSuffix(r.URL.Path, "/credentials") {
+					_ = json.NewEncoder(w).Encode(map[string]any{"bundle": map[string]any{"access_token": "access-secret", "refresh_token": "lease-secret"}})
+					return
+				}
+				require.True(t, strings.HasSuffix(r.URL.Path, "/checkpoint"))
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				checkpoints = append(checkpoints, body)
+				_ = json.NewEncoder(w).Encode(map[string]any{"accepted": true})
+			}))
+			t.Cleanup(server.Close)
+			_, caller, _, ok := runtime.Caller(0)
+			require.True(t, ok)
+			resultFile := filepath.Join(taskDir, "result.json")
+			cmd := exec.Command("node", filepath.Join(filepath.Dir(caller), "codex_subscription.js"), "refresh")
+			cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"), "CATALOG_SCENARIO="+scenario, "SUPERPLANE_TASK_DIR="+taskDir, "SUPERPLANE_RESULT_FILE="+resultFile, "SUPERPLANE_BASE_URL="+server.URL, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=runner-token")
+			out, err := cmd.CombinedOutput()
+			if scenario == "quota-unavailable" {
+				require.NoError(t, err, string(out))
+				require.Len(t, checkpoints, 1)
+				assert.Len(t, checkpoints[0], 1, "only usage metadata may be posted")
+				usage := checkpoints[0]["usage"].(map[string]any)
+				assert.Len(t, usage["models"], 2, "all catalog pages must be saved")
+				assert.NotContains(t, usage, "limits", "unavailable quota must preserve its saved snapshot")
+				return
+			}
+			assert.Error(t, err, string(out))
+			assert.Empty(t, checkpoints, "incomplete discovery must preserve the saved catalog")
+			contents, readErr := os.ReadFile(resultFile)
+			require.NoError(t, readErr)
+			var result map[string]any
+			require.NoError(t, json.Unmarshal(contents, &result))
+			assert.Equal(t, true, result["is_error"])
+			assert.NotContains(t, string(out)+string(contents), "access-secret")
+			assert.NotContains(t, string(out)+string(contents), "lease-secret")
+		})
 	}
 }
