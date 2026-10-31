@@ -156,11 +156,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Software factories for tasks",
             },
             {
-              id: "workspace_models",
-              label: "Workspace Models",
-              description: "Show the in-progress workspace Models settings page",
-            },
-            {
               id: "organization_byok",
               label: "Organization BYOK",
               description: "Show the organization Models settings page",
