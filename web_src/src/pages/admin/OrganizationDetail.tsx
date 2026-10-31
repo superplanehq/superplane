@@ -8,6 +8,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
+import { DeleteOrganizationControl } from "./DeleteOrganizationControl";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
 import { OrgIntegrationsTable } from "./OrgIntegrationsTable";
 import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
@@ -211,13 +212,18 @@ const OrganizationDetail: React.FC = () => {
           <ArrowLeft size={14} />
           All organizations
         </Link>
-        {orgId ? (
-          <OrganizationPinControl
-            orgId={orgId}
-            pinned={detail.organization ? Boolean(detail.organization.pinned) : null}
-            onPinnedChange={detail.setPinned}
-          />
-        ) : null}
+        <div className="flex items-center gap-2">
+          {orgId ? (
+            <OrganizationPinControl
+              orgId={orgId}
+              pinned={detail.organization ? Boolean(detail.organization.pinned) : null}
+              onPinnedChange={detail.setPinned}
+            />
+          ) : null}
+          {detail.organization ? (
+            <DeleteOrganizationControl key={detail.organization.id} organization={detail.organization} />
+          ) : null}
+        </div>
       </div>
       <Tabs
         value={tab}

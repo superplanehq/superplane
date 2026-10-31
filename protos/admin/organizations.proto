@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package Superplane.Admin.Organizations;
+
+import "google/api/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/admin/organizations";
+
+service AdminOrganizations {
+  rpc DeleteOrganization(DeleteOrganizationRequest) returns (DeleteOrganizationResponse) {
+    option (google.api.http) = {
+      delete: "/admin/api/organizations/{id}"
+    };
+  }
+}
+
+message DeleteOrganizationRequest {
+  string id = 1;
+}
+
+message DeleteOrganizationResponse {}

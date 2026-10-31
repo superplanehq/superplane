@@ -185,6 +185,12 @@ Cross-cutting rules when extending the backend:
   environment variables.
 - After adding new API endpoints, ensure they are covered in
   `pkg/authorization/interceptor.go`.
+- Define all new admin API endpoints in `protos/admin/`. Register them with
+  the admin gRPC gateway behind the existing admin authentication middleware.
+  Do not add manual admin HTTP handlers in core or `ee/`. Existing handlers
+  remain until they migrate. Run `make check.admin.routes` to check this rule.
+  Remove migrated routes from `.admin-http-routes-baseline.txt`. Do not add
+  new routes to the baseline.
 
 Further reading:
 
