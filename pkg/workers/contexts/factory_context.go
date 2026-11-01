@@ -113,7 +113,7 @@ func (c *FactoryContext) WithRunsCancelled(callback func([]*models.RunCancellati
 }
 
 // FileBindCleanup is blob deletion work that must run after the surrounding
-// database transaction commits. Apply it with ApplyFileBindCleanups.
+// database transaction completes. Apply it with ApplyFileBindCleanups.
 type FileBindCleanup struct {
 	OrganizationID uuid.UUID
 	FactoryID      uuid.UUID
@@ -163,6 +163,36 @@ func (c *FactoryContext) WithRemoteImageFetch(fetch storedfiles.FetchFunc) *Fact
 }
 
 func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+	var order *core.WorkOrder
+	var created bool
+	var cleanups []FileBindCleanup
+	// The executor can commit an execution failure. A savepoint keeps a failed
+	// creation atomic without committing the counter outside its transaction.
+	err := c.tx.Transaction(func(tx *gorm.DB) error {
+		creation := *c
+		creation.tx = tx
+		creation.onFileBindCleanup = func(job FileBindCleanup) { cleanups = append(cleanups, job) }
+		var err error
+		order, created, err = creation.createWorkOrder(params)
+		return err
+	})
+	for _, job := range cleanups {
+		if err != nil {
+			job.BindErr = err
+		}
+		if c.onFileBindCleanup != nil {
+			c.onFileBindCleanup(job)
+		} else {
+			ApplyFileBindCleanups([]FileBindCleanup{job}, err)
+		}
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return order, created, nil
+}
+
+func (c *FactoryContext) createWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
 	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
 	if err == nil {
@@ -230,12 +260,28 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	}
 
 	sourceRunID := c.execution.RunID
-	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
+	preparedOrder := &models.FactoryWorkOrder{
+		ID: uuid.New(), OrganizationID: f.OrganizationID, FactoryID: f.ID,
+		Description: params.Description, SourceRunID: &sourceRunID,
+	}
+	preparation := &storedfiles.Preparation{}
+	c.prepareWorkOrderFiles(preparedOrder, preparation)
+	err = preparation.PrepareBindings(context.Background(), c.tx, blob.Current(), f.OrganizationID, f.ID, preparedOrder.ID, preparedOrder.Description)
+	if keys := preparation.ObjectKeys(); len(keys) > 0 {
+		job := FileBindCleanup{OrganizationID: f.OrganizationID, FactoryID: f.ID,
+			Result: preparation.BindResult(), BindErr: err}
+		c.onFileBindCleanup(job)
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	params.Description = preparedOrder.Description
+	order, err := c.createFactoryWorkOrder(f, params, sourceRunID, models.WorkOrderCreationOptions{ID: preparedOrder.ID})
 	if err != nil {
 		return nil, false, err
 	}
 
-	if err := c.prepareWorkOrderFiles(order); err != nil {
+	if err = preparation.Persist(c.tx); err != nil {
 		return nil, false, err
 	}
 	c.recordSentryWebhookTask(order)
@@ -435,9 +481,10 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	factoryModel *models.Factory,
 	params core.WorkOrderParams,
 	sourceRunID uuid.UUID,
+	options models.WorkOrderCreationOptions,
 ) (*models.FactoryWorkOrder, error) {
 	if factoryModel.OnboardingConfigValue().CodexSubscription {
-		order, err := factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, c.originFromSourceRun(sourceRunID))
+		order, err := factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, c.originFromSourceRun(sourceRunID), options)
 		if !errors.Is(err, models.ErrSubscriptionOwnerRequired) {
 			return order, err
 		}
@@ -473,10 +520,11 @@ func (c *FactoryContext) createFactoryWorkOrder(
 			assigneeIDs,
 			&sourceRunID,
 			*origin,
+			options,
 		)
 	}
 
-	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, assigneeIDs, &sourceRunID)
+	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, assigneeIDs, &sourceRunID, options)
 }
 
 func (c *FactoryContext) recordSentryWebhookTask(order *models.FactoryWorkOrder) {
@@ -559,15 +607,14 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 	return models.OriginFromIntakeRootEvent(event)
 }
 
-func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) error {
-	c.ingestGitHubImages(order)
-	c.ingestProductiveFiles(order)
-	c.ingestJiraFiles(order)
-	c.ingestLinearFiles(order)
-	return c.bindDescriptionFiles(order)
+func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) {
+	c.ingestGitHubImages(order, preparation)
+	c.ingestProductiveFiles(order, preparation)
+	c.ingestJiraFiles(order, preparation)
+	c.ingestLinearFiles(order, preparation)
 }
 
-func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
+func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) {
 	if order == nil {
 		return
 	}
@@ -589,20 +636,12 @@ func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
 		order.ID,
 		nil,
 		order.Description,
+		preparation,
 	)
 	if err != nil || next.Markdown == order.Description {
 		return
 	}
-	if err := order.UpdateContent(c.tx, nil, &next.Markdown); err != nil {
-		_ = storedfiles.SweepObjects(
-			context.Background(),
-			database.Conn(),
-			blob.Current(),
-			order.OrganizationID,
-			order.FactoryID,
-			next.ObjectKeys,
-		)
-	}
+	order.Description = next.Markdown
 }
 
 func (c *FactoryContext) remoteImageFetcher() storedfiles.FetchFunc {
@@ -619,33 +658,6 @@ func (c *FactoryContext) remoteImageFetcher() storedfiles.FetchFunc {
 	return func(ctx context.Context, req *http.Request) (*http.Response, error) {
 		return client.HTTPDo(req.WithContext(ctx))
 	}
-}
-
-func (c *FactoryContext) bindDescriptionFiles(order *models.FactoryWorkOrder) error {
-	if order == nil {
-		return nil
-	}
-	result, err := storedfiles.BindDescriptionFiles(
-		context.Background(),
-		c.tx,
-		blob.Current(),
-		order.OrganizationID,
-		order.FactoryID,
-		order.ID,
-		order.Description,
-	)
-	job := FileBindCleanup{
-		OrganizationID: order.OrganizationID,
-		FactoryID:      order.FactoryID,
-		Result:         result,
-		BindErr:        err,
-	}
-	if c.onFileBindCleanup != nil {
-		c.onFileBindCleanup(job)
-		return err
-	}
-	ApplyFileBindCleanups([]FileBindCleanup{job}, err)
-	return err
 }
 
 func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
