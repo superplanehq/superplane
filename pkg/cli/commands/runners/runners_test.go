@@ -44,12 +44,7 @@ func TestCreateRunnerPassesLifecycleAndRendersRegistration(t *testing.T) {
 	assert.Equal(t, "task-1", request.GetTaskId())
 	assert.Equal(t, "request-1", request.GetIdempotencyKey())
 	assert.True(t, request.GetEphemeral())
-	assert.Contains(t, stdout.String(), "runner-1")
-	assert.Contains(t, stdout.String(), "registration-token")
-	assert.Contains(t, stdout.String(), "http://localhost:8000")
-	assert.Contains(t, stdout.String(), "2026-10-02T19:00:00Z")
-	assert.NotContains(t, stdout.String(), "ago")
-	assert.Contains(t, stdout.String(), "runner --url 'http://localhost:8000' --registration-token 'registration-token'")
+	assert.Equal(t, "ID: runner-1\nRegistration token: registration-token\nExpires at: 2026-10-02T19:00:00Z\nRunner API URL: http://localhost:8000\n", stdout.String())
 }
 
 func TestListRunnersPassesFleetAndFilters(t *testing.T) {

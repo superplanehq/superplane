@@ -84,27 +84,14 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		writer := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-		if _, err := fmt.Fprintln(
-			writer,
-			"ID\tREGISTRATION_TOKEN\tEXPIRES_AT\tRUNNER_API_URL",
-		); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintf(
-			writer,
-			"%s\t%s\t%s\t%s\n",
+		_, err := fmt.Fprintf(
+			stdout,
+			"ID: %s\nRegistration token: %s\nExpires at: %s\nRunner API URL: %s\n",
 			response.Runner.GetId(),
 			response.GetRegistrationToken(),
 			formatTime(response.RegistrationExpiresAt),
 			response.GetRunnerApiUrl(),
-		); err != nil {
-			return err
-		}
-		if err := writer.Flush(); err != nil {
-			return err
-		}
-		_, err := fmt.Fprintf(stdout, "\nStart the runner:\nrunner --url %s --registration-token %s\n", shellQuote(response.GetRunnerApiUrl()), shellQuote(response.GetRegistrationToken()))
+		)
 		return err
 	})
 }
@@ -302,8 +289,4 @@ func formatTime(value *time.Time) string {
 		return "-"
 	}
 	return value.UTC().Format(time.RFC3339)
-}
-
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }

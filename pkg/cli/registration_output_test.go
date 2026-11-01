@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRegistrationOutputSupportsScriptsAndDirectStartup(t *testing.T) {
-	for _, format := range []string{"text", "json", "yaml"} {
+func TestRegistrationOutputPreservesStructuredCredentials(t *testing.T) {
+	for _, format := range []string{"json", "yaml"} {
 		t.Run(format, func(t *testing.T) {
 			setupViper(t)
 			expires := time.Now().UTC().Add(5 * time.Minute).Truncate(time.Second).Format(time.RFC3339)
@@ -23,19 +23,13 @@ func TestRegistrationOutputSupportsScriptsAndDirectStartup(t *testing.T) {
 				_, _ = fmt.Fprintf(w, `{"runner":{"id":"runner"},"registrationToken":"token'quoted","registrationExpiresAt":%q,"runnerApiUrl":"https://runner.example.com","displayName":"direct"}`, expires)
 			}))
 			defer server.Close()
-			t.Setenv(EnvAPIURL, server.URL)
-			t.Setenv(EnvAPIToken, "management-token")
+			t.Setenv(EnvURL, server.URL)
+			t.Setenv(EnvToken, "management-token")
 			root := fleetRoot(t)
 			var out bytes.Buffer
 			root.SetOut(&out)
 			root.SetArgs([]string{"runners", "create", "--fleet", "direct", "--installation", "--output", format})
 			require.NoError(t, root.Execute())
-			if format == "text" {
-				require.Contains(t, out.String(), `runner --url 'https://runner.example.com' --registration-token 'token'"'"'quoted'`)
-				require.Contains(t, out.String(), expires)
-				require.Contains(t, out.String(), "runner")
-				return
-			}
 			var result map[string]any
 			require.NoError(t, yaml.Unmarshal(out.Bytes(), &result))
 			require.Equal(t, "token'quoted", result["registrationToken"])
@@ -57,8 +51,8 @@ func TestInstallationPermissionErrorDoesNotFallback(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer server.Close()
-	t.Setenv(EnvAPIURL, server.URL)
-	t.Setenv(EnvAPIToken, "credential")
+	t.Setenv(EnvURL, server.URL)
+	t.Setenv(EnvToken, "credential")
 	root := fleetRoot(t)
 	root.SetErr(&bytes.Buffer{})
 	root.SetOut(&bytes.Buffer{})

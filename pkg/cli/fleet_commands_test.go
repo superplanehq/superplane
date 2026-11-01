@@ -91,15 +91,15 @@ func TestFleetCommandsRouteExplicitScopes(t *testing.T) {
 				}))
 				defer server.Close()
 				if installation {
-					t.Setenv(EnvAPIURL, server.URL)
-					t.Setenv(EnvAPIToken, "credential")
+					t.Setenv(EnvURL, server.URL)
+					t.Setenv(EnvToken, "credential")
 				} else {
 					_, err := UpsertContext(ConfigContext{URL: server.URL, APIToken: "credential", OrganizationID: "selected"})
 					require.NoError(t, err)
 					// Environment credentials on the same server preserve the selected organization.
 					if tc.args[0] == "fleets" && tc.args[1] == "list" {
-						t.Setenv(EnvAPIURL, server.URL+"/")
-						t.Setenv(EnvAPIToken, "credential")
+						t.Setenv(EnvURL, server.URL+"/")
+						t.Setenv(EnvToken, "credential")
 					}
 				}
 				before, err := os.ReadFile(viper.ConfigFileUsed())
@@ -158,8 +158,8 @@ func TestRunnerReusableScopeAndPermissionErrors(t *testing.T) {
 				w.WriteHeader(http.StatusForbidden)
 			}))
 			defer server.Close()
-			t.Setenv(EnvAPIURL, server.URL)
-			t.Setenv(EnvAPIToken, "credential")
+			t.Setenv(EnvURL, server.URL)
+			t.Setenv(EnvToken, "credential")
 			root := fleetRoot(t)
 			root.SetOut(&bytes.Buffer{})
 			root.SetErr(&bytes.Buffer{})
@@ -204,8 +204,8 @@ func TestFleetCommandsResolveOrganizationOnEnvironmentServer(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	t.Setenv(EnvAPIURL, server.URL+"/")
-	t.Setenv(EnvAPIToken, "local-token")
+	t.Setenv(EnvURL, server.URL+"/")
+	t.Setenv(EnvToken, "local-token")
 	root := fleetRoot(t)
 	var out bytes.Buffer
 	root.SetOut(&out)

@@ -88,12 +88,10 @@ environment values.
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
-After owner setup, create the required installation fleets through the admin
-API or `superplane fleets create --installation --file fleet.yaml`.
-Create a personal API token for the installation administrator.
-Set `INSTALLATION_ADMIN_TOKEN` in `.env`. The Docker Fleet
-Manager then creates an ephemeral runner for each integrated task. The
-`new_runners` feature is enabled for every organization.
+`make dev.setup` creates the local installation fleet. After owner setup, the
+Docker Fleet Manager generates its credentials and creates ephemeral runners
+for integrated tasks. Set `INSTALLATION_ADMIN_TOKEN` in `.env` only to override
+the generated credentials. The `new_runners` feature is enabled for every organization.
 
 A local dump lets you create a new environment without owner setup or GitHub
 connection. This is the intended path when a script or agent creates local
@@ -125,11 +123,9 @@ installation administration without an organization context. Permission errors
 do not change the scope.
 
 The separate `admin` binary and `.superplane-admin.yaml` configuration are removed.
-Use `.superplane.yaml` contexts or set both `SUPERPLANE_API_URL` and
-`SUPERPLANE_API_TOKEN`. This pair takes precedence over `SUPERPLANE_URL` and
-`SUPERPLANE_TOKEN`. If either variable in a pair is present, both must be nonempty.
-Credentials from different pairs are never combined. Without environment
-credentials, the selected saved context supplies credentials.
+Use `.superplane.yaml` contexts or set both `SUPERPLANE_URL` and
+`SUPERPLANE_TOKEN`. If either variable is present, both must be nonempty.
+Without environment credentials, the selected saved context supplies credentials.
 
 Replace these commands:
 
