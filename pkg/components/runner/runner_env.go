@@ -81,7 +81,7 @@ func resolveRunnerScope(db *gorm.DB, signer *jwt.Signer, ctx core.ExecutionConte
 	if scope.Flow == RunnerFlowTask {
 		scope.Scopes = append(scope.Scopes, TaskCapabilityScopes(environment)...)
 	}
-	if err := ValidateRunnerScope(db, scope); err != nil {
+	if err := validateRunnerTokenScope(db, scope); err != nil {
 		return nil, err
 	}
 	if scope.Flow == RunnerFlowPlanning {
