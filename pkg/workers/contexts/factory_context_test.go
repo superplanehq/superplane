@@ -182,6 +182,70 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 	})
 }
 
+func TestFactoryContext_CreateWorkOrderCommitsWithSingleConnection(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, execution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+	onWorkOrderCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "on-work-order",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(onWorkOrderCanvas).Update("factory_id", factoryModel.ID).Error)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	maxOpen := sqlDB.Stats().MaxOpenConnections
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() {
+		sqlDB.SetMaxOpenConns(maxOpen)
+		sqlDB.SetMaxIdleConns(maxOpen)
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	var order *core.WorkOrder
+	var newEvents []models.CanvasEvent
+	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var inserted bool
+		factoryContext := NewFactoryContext(tx, canvas, execution).WithNewEvents(func(events []models.CanvasEvent) {
+			newEvents = append(newEvents, events...)
+		})
+		order, inserted, err = factoryContext.CreateWorkOrder(core.WorkOrderParams{
+			Title: "Create task without another database connection",
+		})
+		if err != nil {
+			return err
+		}
+		if !inserted {
+			return errors.New("work order was not created")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	persisted, err := factoryModel.FindWorkOrder(db, uuid.MustParse(order.ID))
+	require.NoError(t, err)
+	assert.Equal(t, order.Title, persisted.Title)
+	events, err := models.ListCanvasEvents(db, onWorkOrderCanvas.ID, "on-work-order", 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Len(t, newEvents, 1)
+	assert.Equal(t, events[0].ID, newEvents[0].ID)
+	assert.Equal(t, order.ID, onWorkOrderEventWorkOrder(t, events[0])["id"])
+}
+
 func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

@@ -220,7 +220,7 @@ func TestEmitWorkOrderCreatedSkipsBacklogWhenPlanningOff(t *testing.T) {
 
 	order, err := factoryModel.CreateWorkOrder(db, "Skip analysis", "A ticket", &r.User, nil, nil)
 	require.NoError(t, err)
-	require.NoError(t, emitWorkOrderCreated(db, factoryModel, order, uuid.Nil, nil))
+	require.NoError(t, emitWorkOrderCreated(db, factoryModel, order, uuid.Nil, nil, publishWorkOrderCreatedEvents))
 
 	backlogEvents, err := models.ListCanvasEvents(db, backlog.ID, models.FactoryAppBacklogTriggerID, 10, nil)
 	require.NoError(t, err)

@@ -373,7 +373,9 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			w.logger.Warnf("failed to publish canvas event %s: %v", event.ID, err)
+		}
 	}
 
 	for _, pendingRun := range pendingRuns {
@@ -514,6 +516,7 @@ func (w *NodeExecutor) executeActionNode(
 		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
 		Runs:        contexts.NewRunExecutionContext(tx, workflow, node, execution).WithPendingRunCreated(onPendingRunCreated),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithNewEvents(onNewEvents).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithWorkOrderNotification(onFactoryWorkOrderNotification).
 			WithRunsCancelled(runCancellations.RecordRuns).

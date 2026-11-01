@@ -53,6 +53,7 @@ type FactoryContext struct {
 	onRunsCancelled         func([]*models.RunCancellationResult)
 	onFileBindCleanup       func(FileBindCleanup)
 	onProductAnalytics      func(productanalytics.Event)
+	onNewEvents             func([]models.CanvasEvent)
 
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
@@ -90,6 +91,11 @@ func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.Can
 
 func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, reason string)) *FactoryContext {
 	c.onWorkOrderUpdated = callback
+	return c
+}
+
+func (c *FactoryContext) WithNewEvents(callback func([]models.CanvasEvent)) *FactoryContext {
+	c.onNewEvents = callback
 	return c
 }
 
@@ -241,7 +247,10 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	c.recordSentryWebhookTask(order)
 	c.recordDatadogWebhookTask(order)
 	c.recordLinearWebhookTask(order)
-	EmitWorkOrderCreated(c.tx, f, order)
+	// The executor publishes these events after commit to release the factory lock first.
+	if err := emitWorkOrderCreated(c.tx, f, order, uuid.Nil, nil, c.onNewEvents); err != nil {
+		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
+	}
 	c.captureProductAnalytics(productanalytics.Event{
 		Name:           productanalytics.EventFactoryTaskCreated,
 		EventID:        productanalytics.StableEventID(productanalytics.EventFactoryTaskCreated, order.ID.String()),
