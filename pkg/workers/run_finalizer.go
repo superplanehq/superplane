@@ -377,7 +377,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
-		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger, eventCollector, executionCollector)
+		finalized, skipReason, err = w.maybeFinalizeRun(tx, workflowID, runID, trigger, eventCollector, executionCollector)
 		if skipReason != "" {
 			outcome = executorOutcomeSkipped
 			reason = skipReason
@@ -502,10 +502,20 @@ func (w *RunFinalizer) startAutomaticCustomAutomationsForRun(runID uuid.UUID) {
 	}
 }
 
-func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, error) {
-	run, err := models.LockCanvasRunInTransaction(tx, runID)
+func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, workflowID, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, error) {
+	var run *models.CanvasRun
+	var err error
+	if trigger == runFinalizerTriggerSweep {
+		run, err = models.LockCanvasRun(tx, workflowID, runID)
+	} else {
+		run, err = models.LockCanvasRunInTransaction(tx, runID)
+	}
 	if err != nil {
 		return false, "", err
+	}
+	if run == nil {
+		// A recovery candidate can be locked or deleted before this transaction.
+		return false, executorReasonLocked, nil
 	}
 
 	if run.State == models.CanvasRunStateFinished {

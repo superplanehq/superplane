@@ -1,10 +1,12 @@
 package workers
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -238,6 +240,199 @@ func Test__RunFinalizer_SweepTouchesUpdatedAtWhenRunHasOpenWork(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, touchedRun.UpdatedAt.After(staleUpdatedAt))
 	assert.Equal(t, models.CanvasRunStateStarted, touchedRun.State)
+}
+
+func Test__RunFinalizer_SweepSkipsLockedRunAndRetriesLater(t *testing.T) {
+	callbacks := make(chan uuid.UUID, 2)
+	finalizer, run := setupRunWithFinishedHook(t, func(ctx core.TriggerHookContext) (map[string]any, error) {
+		callback, err := core.DecodeRunFinishedCallback(ctx.Parameters)
+		if err == nil {
+			callbacks <- callback.Run.ID
+		}
+		return nil, err
+	})
+	unlockedRun, err := models.CreateCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.NodeID, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+
+	// Put the locked candidate first so it cannot hide behind a completed run.
+	stale := time.Now().Add(-time.Hour)
+	require.NoError(t, database.Conn().Model(run).Update("updated_at", stale).Error)
+	run, err = models.FindCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.ID)
+	require.NoError(t, err)
+
+	connection, err := amqp.Dial(finalizer.rabbitMQURL)
+	require.NoError(t, err)
+	t.Cleanup(func() { connection.Close() })
+	channel, err := connection.Channel()
+	require.NoError(t, err)
+	t.Cleanup(func() { channel.Close() })
+	queue, err := channel.QueueDeclare("", false, true, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, channel.ExchangeDeclare(messages.CanvasExchange, "direct", true, false, false, false, nil))
+	require.NoError(t, channel.QueueBind(queue.Name, messages.CanvasRunRoutingKey, messages.CanvasExchange, false, nil))
+	assertPublication := func(runID uuid.UUID) {
+		t.Helper()
+		delivery, received, err := channel.Get(queue.Name, true)
+		require.NoError(t, err)
+		require.True(t, received, "expected a run completion publication")
+		message := &pb.CanvasRunMessage{}
+		require.NoError(t, proto.Unmarshal(delivery.Body, message))
+		assert.Equal(t, runID.String(), message.Id)
+	}
+	assertNoPublication := func() {
+		t.Helper()
+		_, received, err := channel.Get(queue.Name, true)
+		require.NoError(t, err)
+		assert.False(t, received, "unexpected run completion publication")
+	}
+
+	holder := database.Conn().Begin()
+	require.NoError(t, holder.Error)
+	defer holder.Rollback()
+	_, err = models.LockCanvasRunInTransaction(holder, run.ID)
+	require.NoError(t, err)
+
+	sweepDone := make(chan struct{})
+	var sweepErr error
+	go func() {
+		defer close(sweepDone)
+		sweepErr = finalizer.sweepStartedRuns()
+	}()
+	// Always release the lock before waiting for a failed sweep to exit.
+	defer func() {
+		holder.Rollback()
+		select {
+		case <-sweepDone:
+		case <-time.After(5 * time.Second):
+			t.Error("recovery sweep did not exit after releasing the run lock")
+		}
+	}()
+
+	select {
+	case <-sweepDone:
+		require.NoError(t, sweepErr)
+	case <-time.After(5 * time.Second):
+		t.Fatal("recovery sweep waited for a locked run")
+	}
+
+	unchanged, err := models.FindCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, run, unchanged, "skipping must preserve the run, including its timestamps")
+	finished, err := models.FindCanvasRunInTransaction(database.Conn(), unlockedRun.WorkflowID, unlockedRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, finished.State)
+	select {
+	case <-callbacks:
+		t.Fatal("skipped run dispatched its completion callback")
+	default:
+	}
+
+	assertPublication(unlockedRun.ID)
+	assertNoPublication()
+
+	require.NoError(t, holder.Rollback().Error)
+	require.NoError(t, finalizer.sweepStartedRuns())
+	finished, err = models.FindCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, finished.State)
+	assert.Equal(t, models.CanvasRunResultPassed, finished.Result)
+	assert.NotNil(t, finished.FinishedAt)
+	select {
+	case callbackRunID := <-callbacks:
+		assert.Equal(t, run.ID, callbackRunID)
+	default:
+		t.Fatal("later sweep did not dispatch the completion callback")
+	}
+	assertPublication(run.ID)
+
+	require.NoError(t, finalizer.sweepStartedRuns())
+	require.NoError(t, finalizer.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep))
+	select {
+	case <-callbacks:
+		t.Fatal("repeated finalization dispatched another completion callback")
+	default:
+	}
+	assertNoPublication()
+}
+
+func Test__RunFinalizer_SweepLockBlocksChildInsertUntilCommit(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	hookStarted := make(chan struct{})
+	releaseHook := make(chan struct{})
+	finalizer, run := setupRunWithFinishedHook(t, func(core.TriggerHookContext) (map[string]any, error) {
+		close(hookStarted)
+		select {
+		case <-releaseHook:
+			return nil, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	})
+
+	finalized := make(chan struct{})
+	var finalizeErr error
+	go func() {
+		defer close(finalized)
+		finalizeErr = finalizer.finalizeRun(run.WorkflowID, run.ID, runFinalizerTriggerSweep)
+	}()
+	defer func() {
+		cancel()
+		select {
+		case <-finalized:
+		case <-time.After(5 * time.Second):
+			t.Error("finalizer did not exit during cleanup")
+		}
+	}()
+	select {
+	case <-hookStarted:
+	case <-ctx.Done():
+		t.Fatal("finalizer did not reach its completion callback")
+	}
+
+	writer := database.Conn().WithContext(ctx).Begin()
+	require.NoError(t, writer.Error)
+	defer func() {
+		cancel()
+		writer.Rollback()
+	}()
+	var writerPID int
+	require.NoError(t, writer.Raw("SELECT pg_backend_pid()").Scan(&writerPID).Error)
+	now := time.Now()
+	event := models.CanvasEvent{
+		WorkflowID: run.WorkflowID,
+		RunID:      run.ID,
+		NodeID:     run.NodeID,
+		Channel:    "default",
+		State:      models.CanvasEventStatePending,
+		Data:       models.NewJSONValue(map[string]any{}),
+		CreatedAt:  &now,
+	}
+	inserted := make(chan error, 1)
+	go func() { inserted <- writer.Create(&event).Error }()
+
+	// Observe an actual PostgreSQL lock wait, rather than relying on timing.
+	require.Eventually(t, func() bool {
+		var blocked bool
+		err := database.Conn().WithContext(ctx).
+			Raw("SELECT cardinality(pg_blocking_pids(?)) > 0", writerPID).Scan(&blocked).Error
+		return err == nil && blocked
+	}, 5*time.Second, 10*time.Millisecond, "finalization must block a concurrent foreign-key child insert")
+
+	close(releaseHook)
+	select {
+	case <-finalized:
+		require.NoError(t, finalizeErr)
+	case <-ctx.Done():
+		t.Fatal("finalizer did not commit after releasing the callback")
+	}
+	select {
+	case err := <-inserted:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("child insert did not proceed after finalization committed")
+	}
+	require.NoError(t, writer.Commit().Error)
 }
 
 func Test__RunFinalizer_FinalizesCancellingRunWithRequestedResult(t *testing.T) {
@@ -1271,6 +1466,34 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__RollsUpUsageWhenAlreadyFini
 		Where("line_dispatch_id = ?", firstExecution.LineDispatchID).
 		Count(&stepCount).Error)
 	assert.Equal(t, int64(2), stepCount)
+}
+
+func setupRunWithFinishedHook(t *testing.T, hook func(core.TriggerHookContext) (map[string]any, error)) (*RunFinalizer, *models.CanvasRun) {
+	t.Helper()
+	triggerName := "run_finalizer_finished_" + uuid.NewString()
+	registry.RegisterTrigger(triggerName, impl.NewDummyTrigger(impl.DummyTriggerOptions{
+		Name:           triggerName,
+		Hooks:          []core.Hook{{Name: "onRunFinished", Type: core.HookTypeInternal}},
+		HandleHookFunc: hook,
+	}))
+	r := support.Setup(t)
+	t.Cleanup(r.Close)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "entry",
+		Type:   models.NodeTypeTrigger,
+		Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
+	}}, nil)
+	run, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "entry", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	run.Callbacks = datatypes.NewJSONSlice([]core.RunCallback{{
+		When: core.RunCallbackWhenFinished,
+		On:   core.RunCallbackOnEntry,
+		Hook: "onRunFinished",
+	}})
+	require.NoError(t, database.Conn().Save(run).Error)
+	amqpURL, err := config.RabbitMQURL()
+	require.NoError(t, err)
+	return NewRunFinalizer(amqpURL, r.Registry), run
 }
 
 func setupCancelledComponentRun(t *testing.T, r *support.ResourceRegistry) (*models.Canvas, *models.CanvasRun) {
