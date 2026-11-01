@@ -20,19 +20,25 @@ import (
 // skipped so no planning or analysis run starts. Failures are logged:
 // the work order already exists, and a missed score can be retried by
 // creating the item again.
-func EmitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) {
+// Call this outside a transaction. Workers collect events for publication
+// after their transaction commits.
+func EmitWorkOrderCreated(db *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) {
 	if factoryModel == nil || order == nil {
 		return
 	}
 
-	if err := emitWorkOrderCreated(tx, factoryModel, order, uuid.Nil, nil); err != nil {
+	events, err := emitWorkOrderCreated(db, factoryModel, order, uuid.Nil, nil)
+	if err != nil {
 		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
+		return
 	}
+	publishWorkOrderCreatedEvents(factoryModel.OrganizationID, events)
 }
 
-func EmitWorkOrderCreatedOnCanvas(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder, canvasID uuid.UUID) error {
+// CreateWorkOrderEventsOnCanvas persists events for publication after commit.
+func CreateWorkOrderEventsOnCanvas(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder, canvasID uuid.UUID) ([]models.CanvasEvent, error) {
 	if factoryModel == nil || order == nil || canvasID == uuid.Nil {
-		return nil
+		return nil, nil
 	}
 	refinementEnabled := true
 	return emitWorkOrderCreated(tx, factoryModel, order, canvasID, &refinementEnabled)
@@ -44,23 +50,23 @@ func emitWorkOrderCreated(
 	order *models.FactoryWorkOrder,
 	onlyCanvas uuid.UUID,
 	refinementEnabledOverride *bool,
-) error {
+) ([]models.CanvasEvent, error) {
 	if factoryModel.OnboardingConfigValue().CodexSubscription {
 		owners, err := order.ListAssignees(tx)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(owners) != 1 {
-			return nil
+			return nil, nil
 		}
 		eligible, err := models.SubscriptionOwnerEligible(tx, order.OrganizationID, order.FactoryID, owners[0].UserID)
 		if err != nil || !eligible {
-			return err
+			return nil, err
 		}
 	}
 	canvases, err := factoryModel.ListCanvases(tx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	live := make([]models.Canvas, 0, len(canvases))
@@ -73,12 +79,12 @@ func emitWorkOrderCreated(
 		ids = append(ids, canvases[i].ID)
 	}
 	if len(live) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, ids)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride
@@ -106,24 +112,26 @@ func emitWorkOrderCreated(
 
 		node, err := models.FindCanvasNode(tx, live[i].ID, nodeID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		events := NewEventContext(tx, node, nil, func(created []models.CanvasEvent) {
 			emitted = append(emitted, created...)
 		})
 		if err := events.Emit(factory.OnWorkOrderPayloadType, payload); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	for i := range emitted {
-		if err := messages.PublishCanvasEventCreatedMessage(&emitted[i]); err != nil {
-			log.Warnf("failed to publish onWorkOrder event %s: %v", emitted[i].ID, err)
+	return emitted, nil
+}
+
+func publishWorkOrderCreatedEvents(organizationID uuid.UUID, events []models.CanvasEvent) {
+	for i := range events {
+		if err := messages.NewCanvasEventCreatedMessage(events[i].WorkflowID.String(), organizationID.String(), &events[i]).Publish(); err != nil {
+			log.Warnf("failed to publish onWorkOrder event %s: %v", events[i].ID, err)
 		}
 	}
-
-	return nil
 }
 
 func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[string]any {
