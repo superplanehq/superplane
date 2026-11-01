@@ -5,19 +5,26 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	"github.com/superplanehq/superplane/pkg/cli"
+	clifleets "github.com/superplanehq/superplane/pkg/cli/commands/fleets"
+	clirunners "github.com/superplanehq/superplane/pkg/cli/commands/runners"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/enterprise"
@@ -25,6 +32,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/public"
 	"github.com/superplanehq/superplane/pkg/public/runnerapi"
@@ -159,8 +167,7 @@ func (s *lifecycleSteps) request(method, path string, body []byte, expected int)
 }
 
 func (s *lifecycleSteps) createFleet() {
-	s.request(http.MethodPost, "/api/v1/organizations/"+s.resource.Organization.ID.String()+"/fleets",
-		[]byte(`{"fleetId":"direct","runnerVersion":"dev","spec":{"operatingSystem":"linux","architecture":"amd64"}}`), http.StatusOK)
+	s.runCLI("fleetId: direct\nrunnerVersion: dev\nspec:\n  operatingSystem: linux\n  architecture: amd64\n", "fleets", "create", "--file", "-")
 }
 
 func (s *lifecycleSteps) createTask(script string) *models.RunnerTask {
@@ -177,15 +184,34 @@ func (s *lifecycleSteps) createTask(script string) *models.RunnerTask {
 
 func (s *lifecycleSteps) createRunner(ephemeral bool, taskID *uuid.UUID) *pb.CreateFleetRunnerResponse {
 	s.t.Helper()
-	request := &pb.CreateFleetRunnerRequest{FleetId: "direct", Ephemeral: ephemeral, IdempotencyKey: uuid.NewString()}
+	args := []string{"runners", "create", "--fleet", "direct", fmt.Sprintf("--ephemeral=%t", ephemeral), "--idempotency-key", uuid.NewString()}
 	if taskID != nil {
-		request.TaskId = new(taskID.String())
+		args = append(args, "--task", taskID.String())
 	}
-	body, err := protojson.Marshal(request)
-	require.NoError(s.t, err)
 	response := &pb.CreateFleetRunnerResponse{}
-	require.NoError(s.t, protojson.Unmarshal(s.request(http.MethodPost, s.runnersPath(), body, http.StatusOK), response))
+	require.NoError(s.t, protojson.Unmarshal(s.runCLI("", args...), response))
 	return response
+}
+
+func (s *lifecycleSteps) runCLI(input string, args ...string) []byte {
+	s.t.Helper()
+	options := core.BindOptions{
+		NewAPIClient: func() *openapi_client.APIClient {
+			return cli.NewAPIClient(&cli.ClientConfig{BaseURL: s.api.URL, APIToken: s.token})
+		},
+		NewConfigContext: func() core.ConfigContext {
+			return cli.NewCurrentContext(cli.ConfigContext{OrganizationID: s.resource.Organization.ID.String()})
+		},
+		DefaultOutputFormat: func() string { return "json" },
+	}
+	root := &cobra.Command{Use: "superplane"}
+	root.AddCommand(clifleets.NewCommand(options), clirunners.NewCommand(options))
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetIn(strings.NewReader(input))
+	root.SetArgs(args)
+	require.NoError(s.t, root.Execute())
+	return out.Bytes()
 }
 
 func (s *lifecycleSteps) runnersPath() string {

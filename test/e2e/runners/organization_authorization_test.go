@@ -30,7 +30,7 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 		s.resource.Organization.ID.String(), models.DomainTypeOrganization))
 	s.token = apiToken(t, reader.ID)
 	base := "/api/v1/organizations/" + s.resource.Organization.ID.String() + "/fleets"
-	for _, path := range []string{base, base + "/available", s.path, s.path + "/capacity", s.runnersPath() + "?fleet_id=direct", s.runnerPath(created.Runner.Id)} {
+	for _, path := range []string{base, base + "/available", s.path, s.path + "/capacity", s.path + "/tasks", s.runnersPath() + "?fleet_id=direct", s.runnerPath(created.Runner.Id)} {
 		s.request(http.MethodGet, path, nil, http.StatusOK)
 	}
 	available := &pb.ListOrganizationRunnerFleetsResponse{}
@@ -80,6 +80,14 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 		Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued,
 		PayloadCiphertext: []byte(`{}`), QueuedAt: time.Now()}
 	require.NoError(t, db.Create(task).Error)
+	tasks := &pb.ListRunnerFleetTasksResponse{}
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, s.path+"/tasks", nil, http.StatusOK), tasks))
+	require.Empty(t, tasks.Tasks)
+	require.Zero(t, tasks.TotalCount)
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, s.path+"/tasks?after_id="+task.ID.String(), nil, http.StatusOK), tasks))
+	require.Empty(t, tasks.Tasks)
+	s.request(http.MethodGet, base+"/foreign/tasks", nil, http.StatusNotFound)
+	s.request(http.MethodGet, "/api/v1/organizations/"+foreign.ID.String()+"/fleets/foreign/tasks", nil, http.StatusNotFound)
 	s.request(http.MethodPost, s.runnersPath(), []byte(`{"fleetId":"direct","taskId":"`+task.ID.String()+`","ephemeral":true,"idempotencyKey":"foreign-task"}`), http.StatusBadRequest)
 	validTask := s.createTask("echo registration-ownership")
 	s.waitTask(validTask.ID, models.RunnerTaskStateQueued)
@@ -96,6 +104,9 @@ func TestOrganizationRunnerAPIAuthorizationAndCleanup(t *testing.T) {
 	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, base, nil, http.StatusOK), list))
 	require.Len(t, list.Fleets, 1)
 	require.False(t, list.Fleets[0].Enabled)
+	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, s.path+"/tasks", nil, http.StatusOK), tasks))
+	require.Empty(t, tasks.Tasks)
+	require.Zero(t, tasks.TotalCount)
 	available = &pb.ListOrganizationRunnerFleetsResponse{}
 	require.NoError(t, protojson.Unmarshal(s.request(http.MethodGet, base+"/available", nil, http.StatusOK), available))
 	require.Empty(t, available.Fleets)

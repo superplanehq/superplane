@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/superplanehq/superplane/pkg/admincli/display"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/cli/display"
+	"github.com/superplanehq/superplane/pkg/cli/fleetapi"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -23,7 +24,11 @@ func newListCommand(options core.BindOptions) *cobra.Command {
 }
 
 func (c *listCommand) Execute(ctx core.CommandContext) error {
-	response, _, err := ctx.API.RunnersAPI.RunnersListFleets(ctx.Context).Execute()
+	api, err := fleetapi.New(ctx)
+	if err != nil {
+		return err
+	}
+	response, err := api.ListFleets()
 	if err != nil {
 		return core.FormatCommandError(err)
 	}
@@ -76,12 +81,16 @@ func newDescribeCommand(options core.BindOptions) *cobra.Command {
 }
 
 func (c *describeCommand) Execute(ctx core.CommandContext) error {
-	fleetResponse, _, err := ctx.API.RunnersAPI.RunnersDescribeFleet(ctx.Context, c.FleetID).Execute()
+	api, err := fleetapi.New(ctx)
+	if err != nil {
+		return err
+	}
+	fleetResponse, err := api.DescribeFleet(c.FleetID)
 	if err != nil {
 		return core.FormatCommandError(err)
 	}
 
-	capacity, _, err := ctx.API.RunnersAPI.RunnersGetFleetCapacity(ctx.Context, c.FleetID).Execute()
+	capacity, err := api.Capacity(c.FleetID)
 	if err != nil {
 		return core.FormatCommandError(err)
 	}
@@ -162,7 +171,11 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("runnerVersion is required")
 	}
 
-	response, _, err := ctx.API.RunnersAPI.RunnersCreateFleet(ctx.Context).Body(request).Execute()
+	api, err := fleetapi.New(ctx)
+	if err != nil {
+		return err
+	}
+	response, err := api.CreateFleet(request)
 	if err != nil {
 		return core.FormatCommandError(err)
 	}
@@ -171,6 +184,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 
 type updateCommand struct {
 	fileCommand
+	FleetID string
 }
 
 type updateFile struct {
@@ -185,7 +199,8 @@ type updateFile struct {
 
 func newUpdateCommand(options core.BindOptions) *cobra.Command {
 	handler := &updateCommand{}
-	cmd := &cobra.Command{Use: "update", Short: "Update a fleet", Args: cobra.NoArgs}
+	cmd := &cobra.Command{Use: "update <fleet-id>", Short: "Update a fleet", Args: cobra.ExactArgs(1),
+		PreRun: func(_ *cobra.Command, args []string) { handler.FleetID = args[0] }}
 	addFileFlag(cmd, &handler.fileCommand)
 	core.Bind(cmd, handler, options)
 	return cmd
@@ -196,8 +211,8 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if err := decodeFleetFile(ctx, c.File, &file); err != nil {
 		return err
 	}
-	if strings.TrimSpace(file.FleetID) == "" {
-		return fmt.Errorf("fleetId is required")
+	if file.FleetID != "" && file.FleetID != c.FleetID {
+		return fmt.Errorf("file fleetId %q conflicts with fleet %q", file.FleetID, c.FleetID)
 	}
 	if file.RunnerVersion == nil && file.Enabled == nil && file.Spec == nil {
 		return fmt.Errorf("at least one of runnerVersion, enabled, or spec is required")
@@ -208,7 +223,11 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		Enabled:       file.Enabled,
 		Spec:          file.Spec,
 	}
-	response, _, err := ctx.API.RunnersAPI.RunnersUpdateFleet(ctx.Context, file.FleetID).Body(request).Execute()
+	api, err := fleetapi.New(ctx)
+	if err != nil {
+		return err
+	}
+	response, err := api.UpdateFleet(c.FleetID, request)
 	if err != nil {
 		return core.FormatCommandError(err)
 	}

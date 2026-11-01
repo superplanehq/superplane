@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 	clitest "github.com/superplanehq/superplane/test/support/cli"
 )
@@ -26,7 +28,7 @@ func TestCreateFleetReadsDefinitionFromStdin(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, stdout := clitest.NewCommandContext(t, server, "json")
+	ctx, stdout := installationContext(t, server, "json")
 	ctx.Cmd.SetIn(strings.NewReader(`
 fleetId: aws-large-amd64
 runnerVersion: v0.0.1
@@ -45,7 +47,7 @@ spec:
 }
 
 func TestCreateFleetRejectsUnknownFields(t *testing.T) {
-	ctx, _ := clitest.NewCommandContext(t, nil, "json")
+	ctx, _ := installationContext(t, nil, "json")
 	ctx.Cmd.SetIn(strings.NewReader(`
 fleetId: aws-large-amd64
 runnerVersion: v0.0.1
@@ -62,17 +64,17 @@ func TestDecodeFleetFileReadsFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "fleet.yml")
 	require.NoError(t, os.WriteFile(path, []byte("fleetId: aws-large-amd64\n"), 0600))
 
-	ctx, _ := clitest.NewCommandContext(t, nil, "json")
+	ctx, _ := installationContext(t, nil, "json")
 	var request openapi_client.RunnersCreateFleetRequest
 	require.NoError(t, decodeFleetFile(ctx, path, &request))
 	assert.Equal(t, "aws-large-amd64", request.GetFleetId())
 }
 
 func TestUpdateFleetRequiresMutableFields(t *testing.T) {
-	ctx, _ := clitest.NewCommandContext(t, nil, "json")
+	ctx, _ := installationContext(t, nil, "json")
 	ctx.Cmd.SetIn(strings.NewReader("fleetId: aws-large-amd64\n"))
 
-	err := (&updateCommand{fileCommand: fileCommand{File: "-"}}).Execute(ctx)
+	err := (&updateCommand{FleetID: "aws-large-amd64", fileCommand: fileCommand{File: "-"}}).Execute(ctx)
 	require.EqualError(t, err, "at least one of runnerVersion, enabled, or spec is required")
 }
 
@@ -92,7 +94,7 @@ func TestDescribeFleetGetsCapacityWithoutLongPolling(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, stdout := clitest.NewCommandContext(t, server, "json")
+	ctx, stdout := installationContext(t, server, "json")
 	err := (&describeCommand{FleetID: "aws-large-amd64"}).Execute(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, []string{
@@ -124,7 +126,7 @@ func TestDescribeFleetTextUsesRelativeTimes(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, stdout := clitest.NewCommandContext(t, server, "text")
+	ctx, stdout := installationContext(t, server, "text")
 	err := (&describeCommand{FleetID: "aws-large-amd64"}).Execute(ctx)
 
 	require.NoError(t, err)
@@ -163,22 +165,29 @@ func TestDescribeYAMLCanBeEditedAndUsedForUpdate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	describeContext, described := clitest.NewCommandContext(t, server, "yaml")
+	describeContext, described := installationContext(t, server, "yaml")
 	require.NoError(
 		t,
 		(&describeCommand{FleetID: "aws-large-amd64"}).Execute(describeContext),
 	)
 	definition := strings.Replace(described.String(), "v0.0.1", "v0.0.2", 1)
 
-	updateContext, _ := clitest.NewCommandContext(t, server, "yaml")
+	updateContext, _ := installationContext(t, server, "yaml")
 	updateContext.Cmd.SetIn(strings.NewReader(definition))
 	require.NoError(
 		t,
-		(&updateCommand{fileCommand: fileCommand{File: "-"}}).Execute(updateContext),
+		(&updateCommand{FleetID: "aws-large-amd64", fileCommand: fileCommand{File: "-"}}).Execute(updateContext),
 	)
 
 	require.NotNil(t, update.RunnerVersion)
 	assert.Equal(t, "v0.0.2", *update.RunnerVersion)
 	assert.Equal(t, "linux", update.Spec.GetOperatingSystem())
 	assert.Nil(t, update.Capacity)
+}
+
+func installationContext(t *testing.T, server *httptest.Server, format string) (core.CommandContext, *bytes.Buffer) {
+	t.Helper()
+	ctx, out := clitest.NewCommandContext(t, server, format)
+	ctx.Cmd.Flags().Bool("installation", true, "")
+	return ctx, out
 }
