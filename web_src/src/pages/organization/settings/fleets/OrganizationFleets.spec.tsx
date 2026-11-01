@@ -5,7 +5,8 @@ import { Link, MemoryRouter, Route, Routes, useParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { client } from "@/api-client/client.gen";
 import { PermissionsContext } from "@/contexts/permissionsContextState";
-import { OrganizationFleets, OrganizationFleetDetails, OrganizationRunnerDetails } from "./OrganizationFleets";
+import { OrganizationFleets, OrganizationFleetDetails } from "./OrganizationFleets";
+import { fleetCapacityResponse } from "./fleetTestFixtures";
 import { useOrganizationFleetAccess } from "@/hooks/useOrganizationFleetManagement";
 
 const fleet = {
@@ -59,11 +60,6 @@ function runnerHost() {
   return { registeredAt: new Date().toISOString(), hostname: "my-host", os: "linux", arch: "amd64", ip: "192.0.2.1" };
 }
 
-function capacityResponse() {
-  if (capacityFailure) return Response.json({ code: 14 }, { status: 503 });
-  return Response.json({ runnableTasks: "3", idleRunners: "1", terminatedRunners: "2" });
-}
-
 function mount(path = "/org-1/fleets", organizationId = "org-1") {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -87,12 +83,6 @@ function mount(path = "/org-1/fleets", organizationId = "org-1") {
                 <OrganizationFleetDetails organizationId={organizationId} basePath={`/${organizationId}/fleets`} />
               }
             />
-            <Route
-              path="/:organizationId/fleets/:fleetId/runners/:runnerId"
-              element={
-                <OrganizationRunnerDetails organizationId={organizationId} basePath={`/${organizationId}/fleets`} />
-              }
-            />
           </Routes>
         </MemoryRouter>
       </PermissionsContext.Provider>
@@ -108,6 +98,7 @@ async function refresh() {
 
 async function generateRegistration() {
   fireEvent.click(await screen.findByRole("button", { name: "Connect runner" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
   fireEvent.click(screen.getByRole("button", { name: "Generate registration" }));
 }
 
@@ -144,7 +135,7 @@ beforeEach(() => {
         ...runnerHost(),
       };
       const json = (body: unknown, status = 200) => Response.json(body, { status });
-      if (url.pathname.endsWith("/capacity")) return capacityResponse();
+      if (url.pathname.endsWith("/capacity")) return fleetCapacityResponse(capacityFailure);
       if (url.pathname.endsWith("/fleets")) {
         if (request.method === "POST") {
           const body = await request.json();
@@ -210,14 +201,18 @@ describe("organization fleet management", () => {
     expect(await screen.findByRole("button", { name: "Create fleet" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
-  it("creates an enabled fleet and edits its full specification without changing its ID", async () => {
+  it("creates an enabled fleet and changes its runner version without changing its ID", async () => {
     const view = mount();
     fireEvent.click(await screen.findByRole("button", { name: "Create fleet" }));
+    fireEvent.change(screen.getByLabelText("Fleet ID"), { target: { value: "new-fleet" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.change(screen.getByLabelText("Runner version"), { target: { value: "v2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Architecture" }));
+    await user.click(await screen.findByRole("option", { name: "ARM64 (arm64)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     for (const [label, value] of [
-      ["Fleet ID", "new-fleet"],
-      ["Runner version", "v2"],
-      ["Operating system", "linux"],
-      ["Architecture", "arm64"],
       ["CPU millicores", "2000"],
       ["Memory MB", "4096"],
       ["Disk GB", "40"],
@@ -225,7 +220,7 @@ describe("organization fleet management", () => {
     ]) {
       fireEvent.change(screen.getByLabelText(label), { target: { value } });
     }
-    fireEvent.click(screen.getByRole("button", { name: "Save fleet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create fleet" }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
       fleetId: "new-fleet",
@@ -242,13 +237,11 @@ describe("organization fleet management", () => {
     });
     view.unmount();
     mount("/org-1/fleets/self-hosted");
-    fireEvent.click(await screen.findByRole("button", { name: "Edit fleet" }));
-    expect(screen.getByLabelText("Fleet ID")).toBeDisabled();
-    fireEvent.click(screen.getByRole("switch", { name: "Enabled" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Change runner version" }));
     fireEvent.change(screen.getByLabelText("Runner version"), { target: { value: "v3" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save fleet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(bodies).toHaveLength(2));
-    expect(bodies[1]).toMatchObject({ enabled: false, runnerVersion: "v3", spec: fleet.spec });
+    expect(bodies[1]).toEqual({ runnerVersion: "v3" });
     expect(bodies[1]).not.toHaveProperty("fleetId");
   });
   it("hides setup navigation only after a disabled empty catalog is confirmed", async () => {
@@ -309,7 +302,7 @@ describe("organization fleet management", () => {
     mount("/org-1/fleets/self-hosted");
     await generateRegistration();
     await waitFor(() => expect(signal).toBeDefined());
-    fireEvent.click(screen.getByRole("button", { name: "Close setup" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to fleet" }));
     await act(async () => {
       resolveCreate(
         Response.json({
@@ -343,8 +336,8 @@ describe("organization fleet management", () => {
       "href",
       "/org-1/fleets/self-hosted",
     );
-    expect(screen.getByText("Disabled")).toBeInTheDocument();
-    await screen.findByText("Terminated runners");
+    expect(screen.getByRole("button", { name: "This fleet is disabled." })).toBeInTheDocument();
+    await screen.findByRole("button", { name: "Idle runners: 1" });
     capacityFailure = true;
     await refresh();
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not load capacity");
@@ -365,8 +358,11 @@ describe("organization fleet management", () => {
     await screen.findByText(/runner --url/);
     enabled = false;
     await refresh();
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Edit fleet" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Change runner version" })).not.toBeInTheDocument(),
+    );
     expect(screen.queryByRole("button", { name: "Connect runner" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Disable fleet" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain(syntheticToken);
     expect(screen.getByRole("heading", { name: "Runners" })).toBeInTheDocument();
@@ -374,15 +370,14 @@ describe("organization fleet management", () => {
 
   it("keeps administrator actions unavailable to read-only users", async () => {
     writable = false;
-    mount("/org-1/fleets/self-hosted/runners/runner-1");
-    await screen.findByText("Lifecycle mode");
+    mount("/org-1/fleets/self-hosted");
+    await screen.findByText("runner-1");
     expect(screen.queryByRole("button", { name: "Terminate runner" })).not.toBeInTheDocument();
   });
 
   it("sends page cursors and retains the current page during refresh", async () => {
     mount("/org-1/fleets/self-hosted");
-    const next = await screen.findByRole("button", { name: "Next" });
-    fireEvent.click(next);
+    fireEvent.click(await screen.findByRole("button", { name: "Next" }));
     await waitFor(() =>
       expect(requests.some((request) => new URL(request.url).searchParams.get("afterId") === "runner-1")).toBe(true),
     );
@@ -393,14 +388,18 @@ describe("organization fleet management", () => {
     expect(last.searchParams.get("fleetId")).toBe("self-hosted");
     expect(last.searchParams.get("limit")).toBe("50");
     const user = userEvent.setup();
-    await user.click(screen.getByRole("combobox", { name: "State" }));
-    await user.click(await screen.findByRole("option", { name: "busy" }));
-    await waitFor(() => {
-      const matching = requests.filter((request) => new URL(request.url).pathname.endsWith("/runners"));
-      const filtered = new URL(matching.at(-1)!.url);
-      expect(filtered.searchParams.getAll("states")).toEqual(["busy"]);
-      expect(filtered.searchParams.has("afterId")).toBe(false);
-    });
+    for (const [label, state] of [
+      ["Idle runners: 1", "idle"],
+      ["Terminated runners: 5", "terminated"],
+    ]) {
+      await user.click(screen.getByRole("tab", { name: label }));
+      await waitFor(() => {
+        const matching = requests.filter((request) => new URL(request.url).pathname.endsWith("/runners"));
+        const filtered = new URL(matching.at(-1)!.url);
+        expect(filtered.searchParams.getAll("states")).toEqual([state]);
+        expect(filtered.searchParams.has("afterId")).toBe(false);
+      });
+    }
   });
 
   for (const mode of ["ephemeral", "reusable"]) {
@@ -411,18 +410,18 @@ describe("organization fleet management", () => {
       fireEvent.click(await screen.findByRole("button", { name: "Connect runner" }));
       if (mode === "reusable") {
         const user = userEvent.setup();
-        await user.click(screen.getByRole("combobox", { name: "Lifecycle mode" }));
-        await user.click(await screen.findByRole("option", { name: "Reusable" }));
+        await user.click(screen.getByRole("button", { name: "Reusable" }));
       }
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
       fireEvent.click(screen.getByRole("button", { name: "Generate registration" }));
       expect(await screen.findByText(/runner --url/)).toHaveTextContent(
-        `runner --url 'https://runner.example' --registration-token '${syntheticToken}'`,
+        `./runner --url 'https://runner.example' --registration-token '${syntheticToken}'`,
       );
       const clipboard = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
       fireEvent.click(screen.getByRole("button", { name: "Copy command" }));
       await waitFor(() =>
         expect(clipboard).toHaveBeenCalledWith(
-          `runner --url 'https://runner.example' --registration-token '${syntheticToken}'`,
+          `./runner --url 'https://runner.example' --registration-token '${syntheticToken}'`,
         ),
       );
       expect(bodies.at(-1)).toMatchObject({
@@ -437,7 +436,7 @@ describe("organization fleet management", () => {
       expect(queryClient.getMutationCache().getAll()).toHaveLength(0);
       expect(storage.mock.calls.flat().join()).not.toContain(syntheticToken);
       expect(diagnostics.mock.calls.flat().join()).not.toContain(syntheticToken);
-      fireEvent.click(screen.getByRole("button", { name: "Close setup" }));
+      fireEvent.click(screen.getByRole("button", { name: "Back to fleet" }));
       expect(screen.queryByText(/runner --url/)).not.toBeInTheDocument();
     });
   }
@@ -491,17 +490,17 @@ describe("organization fleet management", () => {
     it(`waits for server-confirmed termination of an ${state} runner with the feature disabled`, async () => {
       enabled = false;
       runnerState = state;
-      mount("/org-1/fleets/self-hosted/runners/runner-1");
+      mount("/org-1/fleets/self-hosted");
       fireEvent.click(await screen.findByRole("button", { name: "Terminate runner" }));
       expect(screen.getByText("Termination does not delete the host machine.")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Confirm termination" }));
       if (state === "busy") {
-        expect(await screen.findByText(/Waiting for the server to confirm termination/)).toBeInTheDocument();
-        expect(screen.queryByText("Runner terminated. The host machine remains.")).not.toBeInTheDocument();
+        expect(await screen.findByText("Termination requested.")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Terminate runner" })).toBeDisabled();
         runnerState = "terminated";
         await refresh();
       }
-      expect(await screen.findByText("Runner terminated. The host machine remains.")).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole("button", { name: "Terminate runner" })).not.toBeInTheDocument());
       const deletion = requests.find((request) => request.method === "DELETE")!;
       expect(new URL(deletion.url).pathname).toBe("/api/v1/organizations/org-1/runners/runner-1");
       expect(new URL(deletion.url).searchParams.get("fleetId")).toBe("self-hosted");
@@ -512,10 +511,10 @@ describe("organization fleet management", () => {
     runnerState = "busy";
     ephemeral = false;
     terminateConflict = true;
-    mount("/org-1/fleets/self-hosted/runners/runner-1");
+    mount("/org-1/fleets/self-hosted");
     fireEvent.click(await screen.findByRole("button", { name: "Terminate runner" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm termination" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("wait for the task to finish and retry");
-    expect(screen.queryByText("Runner terminated. The host machine remains.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Terminate runner" })).toBeEnabled();
   });
 });

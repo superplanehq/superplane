@@ -53,7 +53,6 @@ export const factorySettingsSectionRoutes = [
     [
       ["organization/fleets", "catalog"],
       ["organization/fleets/:fleetId", "fleet"],
-      ["organization/fleets/:fleetId/runners/:runnerId", "runner"],
     ] as const
   ).map(([path, detail]) => (
     <Route
@@ -66,6 +65,15 @@ export const factorySettingsSectionRoutes = [
       }
     />
   )),
+  <Route
+    key="factory-settings-runner-redirect"
+    path="organization/fleets/:fleetId/runners/:runnerId"
+    element={
+      <RequirePermission resource="org" action="read">
+        <Navigate to="../.." relative="path" replace />
+      </RequirePermission>
+    }
+  />,
   <Route
     key="factory-settings-account-codex-usage"
     path="account/codex-usage"

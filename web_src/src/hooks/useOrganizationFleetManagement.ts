@@ -5,7 +5,6 @@ import {
   organizationsDescribeRunnerFleet,
   organizationsGetRunnerFleetCapacity,
   organizationsListFleetRunners,
-  organizationsDescribeFleetRunner,
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -92,25 +91,11 @@ export function useOrganizationFleetRunners(organizationId: string, fleetId: str
         withOrganizationHeader({
           organizationId,
           path: { id: organizationId },
-          query: { fleetId, states: state === "all" ? [] : [state], limit: 50, afterId },
+          query: { fleetId, states: [state], limit: 50, afterId },
           signal,
         }),
       );
       return response.data;
-    },
-  });
-}
-
-export function useOrganizationFleetRunner(organizationId: string, fleetId: string, runnerId: string) {
-  return useQuery({
-    ...activeQuery,
-    queryKey: [...organizationFleetKeys.all(organizationId), fleetId, "runner", runnerId],
-    queryFn: async ({ signal }) => {
-      const response = await organizationsDescribeFleetRunner(
-        withOrganizationHeader({ organizationId, path: { id: organizationId, runnerId }, query: { fleetId }, signal }),
-      );
-      if (!response.data.runner) throw new Error("Runner unavailable");
-      return response.data.runner;
     },
   });
 }

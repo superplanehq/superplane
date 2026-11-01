@@ -1,129 +1,168 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { CheckCircle2, ChevronLeft, Circle } from "lucide-react";
+import type { SuperplaneOrganizationsFleet } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRunnerRegistration } from "@/hooks/useRunnerRegistration";
-import type { OrganizationsCreateFleetRunnerResponse } from "@/api-client";
+import { FleetWizardProgress } from "./FleetWizardProgress";
+import { RunnerInstructions } from "./RunnerInstructions";
 
-const shellQuote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`;
+const steps = ["Lifecycle", "Setup method"] as const;
 
 export function ConnectRunner({
   organizationId,
-  fleetId,
+  fleet,
   onClose,
   refresh,
 }: {
   organizationId: string;
-  fleetId: string;
+  fleet: SuperplaneOrganizationsFleet;
   onClose: () => void;
   refresh: () => void;
 }) {
-  const { mode, registration, status, error, setError, create, chooseMode, retryStatus } = useRunnerRegistration({
+  const [step, setStep] = useState(0);
+  const { mode, registration, status, error, create, chooseMode, retryStatus } = useRunnerRegistration({
     organizationId,
-    fleetId,
+    fleetId: fleet.id!,
     refresh,
   });
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Connect runner</DialogTitle>
-          <DialogDescription>
-            Run a compatible runner executable on your machine. Registration does not start a process or provision
-            infrastructure.
-          </DialogDescription>
-        </DialogHeader>
-        <p className="text-sm">
-          An ephemeral runner exits after one task. A reusable runner waits for successive tasks.
-        </p>
-        {status === "ready" && (
+    <div className="space-y-5 text-[13px]">
+      <Button variant="ghost" size="sm" onClick={onClose} className="px-0 text-muted-foreground">
+        <ChevronLeft className="size-3.5" aria-hidden="true" />
+        Back to fleet
+      </Button>
+      <div className="space-y-5 rounded-lg border border-border bg-card p-5">
+        <div>
+          <h2 className="text-base font-medium">Connect runner</h2>
+          <p className="mt-1 text-muted-foreground">Connect a machine to {fleet.id}.</p>
+        </div>
+        <FleetWizardProgress steps={steps} current={step} />
+        {step === 0 ? (
+          <RunnerLifecycleStep mode={mode} onModeChange={chooseMode} onNext={() => setStep(1)} />
+        ) : (
           <>
-            <Label htmlFor="runner-mode">Lifecycle mode</Label>
-            <Select value={mode} disabled={!!error} onValueChange={chooseMode}>
-              <SelectTrigger id="runner-mode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ephemeral">Ephemeral</SelectItem>
-                <SelectItem value="reusable">Reusable</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={() => void create()}>{error ? "Retry registration" : "Generate registration"}</Button>
+            <div>
+              <h3 className="font-medium">Choose how to run it</h3>
+              <p className="mt-1 text-muted-foreground">
+                Prepare your machine, then generate a short-lived registration command.
+              </p>
+            </div>
+            <RunnerInstructions fleet={fleet} registration={registration}>
+              {(ready) => (
+                <>
+                  {status === "ready" && (
+                    <Button size="sm" disabled={!ready} onClick={() => void create()}>
+                      {error ? "Retry registration" : "Generate registration"}
+                    </Button>
+                  )}
+                  {status === "creating" && <p role="status">Creating registration…</p>}
+                </>
+              )}
+            </RunnerInstructions>
+            <RegistrationStatus status={status} create={create} />
+            {error && (
+              <p role="alert" className="text-destructive">
+                {error}
+              </p>
+            )}
+            {error && status === "waiting" && (
+              <Button size="sm" variant="outline" onClick={retryStatus}>
+                Retry status check
+              </Button>
+            )}
+            <div className="flex justify-between border-t border-border pt-4">
+              {status !== "connected" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={status === "creating"}
+                  onClick={() => {
+                    chooseMode(mode);
+                    setStep(0);
+                  }}
+                >
+                  Back
+                </Button>
+              )}
+              <Button size="sm" variant={status === "connected" ? "default" : "ghost"} onClick={onClose}>
+                {status === "connected" ? "Done" : "Cancel"}
+              </Button>
+            </div>
           </>
         )}
-        {status === "creating" && <p role="status">Creating registration…</p>}
-        {registration && <RegistrationOutput registration={registration} setError={setError} />}
-        {status === "connected" && <p role="status">Runner connected. Registration confirmed by the server.</p>}
-        {status === "expired" && (
-          <p role="status">Registration expired. Create a new registration and use its command.</p>
-        )}
-        {status === "terminated" && <p role="status">Runner terminated. Create a new registration.</p>}
-        {(status === "expired" || status === "terminated") && (
-          <Button
-            onClick={() => {
-              void create(true);
-            }}
-          >
-            Create new registration
-          </Button>
-        )}
-        {error && <p role="alert">{error}</p>}
-        {error && status === "waiting" && (
-          <Button variant="outline" onClick={retryStatus}>
-            Retry status check
-          </Button>
-        )}
-        <Button variant="outline" onClick={onClose}>
-          Close setup
-        </Button>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
 
-function RegistrationOutput({
-  registration,
-  setError,
+function RegistrationStatus({ status, create }: { status: string; create: (replacement: boolean) => Promise<void> }) {
+  if (status === "connected") return <p role="status">Runner connected. Registration confirmed by the server.</p>;
+  if (status !== "expired" && status !== "terminated") return null;
+  return (
+    <div className="space-y-3">
+      <p role="status">
+        {status === "expired"
+          ? "Registration expired. Create a new registration and use its command."
+          : "Runner terminated. Create a new registration."}
+      </p>
+      <Button size="sm" onClick={() => void create(true)}>
+        Create new registration
+      </Button>
+    </div>
+  );
+}
+
+function RunnerLifecycleStep({
+  mode,
+  onModeChange,
+  onNext,
 }: {
-  registration: OrganizationsCreateFleetRunnerResponse;
-  setError: (message: string) => void;
+  mode: string;
+  onModeChange: (value: string) => void;
+  onNext: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
-  const expiresAt = Date.parse(registration.registrationExpiresAt!);
-  const [expired, setExpired] = useState(Date.now() >= expiresAt);
-  useEffect(() => {
-    if (expired) return;
-    const timer = setTimeout(() => setExpired(true), Math.max(0, expiresAt - Date.now()));
-    return () => clearTimeout(timer);
-  }, [expiresAt, expired]);
-  const command = `runner --url ${shellQuote(registration.runnerApiUrl!)} --registration-token ${shellQuote(registration.registrationToken!)}`;
-  const copy = async () => {
-    if (Date.now() >= expiresAt) return;
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-    } catch {
-      setError("Could not copy the command. Copy it manually.");
-    }
-  };
   return (
     <>
-      <p role="status">Waiting for runner registration.</p>
-      <p>Expires: {new Date(expiresAt).toLocaleString()}</p>
-      {!expired ? (
-        <>
-          <pre className="whitespace-pre-wrap break-all rounded border p-3 text-xs">{command}</pre>
-          <Button onClick={() => void copy()}>{copied ? "Copied" : "Copy command"}</Button>
-        </>
-      ) : (
-        <p>Checking final registration state before expiration.</p>
-      )}
+      <div>
+        <h3 className="font-medium">Choose the runner lifecycle</h3>
+        <p className="mt-1 text-muted-foreground">
+          Choose whether the runner exits after one task or stays available for more work.
+        </p>
+      </div>
+      <div role="group" aria-label="Runner lifecycle" className="grid gap-3 sm:grid-cols-2">
+        {(
+          [
+            ["ephemeral", "Ephemeral", "Run one task, then exit."],
+            ["reusable", "Reusable", "Keep running and accept more tasks."],
+          ] as const
+        ).map(([value, label, description]) => (
+          <Button
+            key={value}
+            type="button"
+            variant="outline"
+            aria-label={label}
+            aria-pressed={mode === value}
+            className={`h-auto flex-col items-start gap-1 whitespace-normal rounded-lg p-4 text-left ${mode === value ? "border-foreground/40 bg-muted dark:bg-muted ring-1 ring-foreground/20" : ""}`}
+            onClick={() => onModeChange(value)}
+          >
+            <span className="flex w-full items-center justify-between gap-4">
+              <span className="text-[13px] font-semibold">{label}</span>
+              {mode === value ? (
+                <CheckCircle2 className="size-4 text-foreground" aria-hidden="true" />
+              ) : (
+                <Circle className="size-4 text-muted-foreground" aria-hidden="true" />
+              )}
+            </span>
+            <span className="text-[12px] font-normal text-muted-foreground">{description}</span>
+            {mode === value && <span className="mt-2 text-[11px] font-medium">Selected</span>}
+          </Button>
+        ))}
+      </div>
+      <div className="flex justify-end border-t border-border pt-4">
+        <Button size="sm" onClick={onNext}>
+          Next
+        </Button>
+      </div>
     </>
   );
 }

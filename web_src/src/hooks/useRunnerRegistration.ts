@@ -138,10 +138,13 @@ export function useRunnerRegistration(context: RegistrationContext) {
     registration,
     status,
     error,
-    setError,
     create,
     retryStatus: () => setRetry((value) => value + 1),
     chooseMode: (value: string) => {
+      request.current?.abort();
+      setRegistration(null);
+      setStatus("ready");
+      setError("");
       setMode(value);
       attempt.current = { key: crypto.randomUUID(), ephemeral: value === "ephemeral" };
     },

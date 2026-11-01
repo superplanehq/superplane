@@ -1,207 +1,67 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import {
-  organizationsCreateRunnerFleet,
-  organizationsUpdateRunnerFleet,
-  type SuperplaneOrganizationsFleet,
-} from "@/api-client";
+import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { useFleetConfiguration } from "@/hooks/useFleetConfiguration";
+import { FleetConfigurationFields } from "./FleetConfigurationFields";
+import { FleetWizardProgress } from "./FleetWizardProgress";
 
-function useFleetForm({
+const steps = ["Fleet", "Runner version", "Platform", "Resources"] as const;
+const sections = ["identity", "version", "platform", "resources"] as const;
+const descriptions = [
+  "Choose a stable ID for this fleet. You cannot change it after creation.",
+  "Choose the runner release that machines in this fleet must use.",
+  "Set the operating system and CPU architecture for this fleet.",
+  "Set the resources and capabilities that runners must provide.",
+];
+
+export function FleetForm({
   organizationId,
-  fleet,
   onSaved,
+  onCancel,
   refresh,
 }: {
   organizationId: string;
-  fleet?: SuperplaneOrganizationsFleet;
-  onSaved: (fleetId: string) => void;
-  refresh: () => void;
-}) {
-  const [fleetId, setFleetId] = useState(fleet?.id ?? "");
-  const [runnerVersion, setRunnerVersion] = useState(fleet?.runnerVersion ?? "");
-  const [enabled, setEnabled] = useState(fleet?.enabled ?? true);
-  const [spec, setSpec] = useState(fleet?.spec ?? {});
-  const [capabilities, setCapabilities] = useState(fleet?.spec?.capabilities?.join(", ") ?? "");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const abort = useRef<AbortController | null>(null);
-  useEffect(() => () => abort.current?.abort(), []);
-
-  const save = async (event: FormEvent) => {
-    event.preventDefault();
-    if (saving) return;
-    const request = new AbortController();
-    abort.current = request;
-    setSaving(true);
-    setError("");
-    const body = {
-      enabled,
-      runnerVersion: runnerVersion.trim(),
-      spec: {
-        operatingSystem: spec.operatingSystem?.trim(),
-        architecture: spec.architecture?.trim(),
-        cpuMillicores: spec.cpuMillicores,
-        memoryMb: spec.memoryMb,
-        diskGb: spec.diskGb,
-        capabilities: capabilities
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean),
-      },
-    };
-    try {
-      if (fleet) {
-        await organizationsUpdateRunnerFleet(
-          withOrganizationHeader({
-            organizationId,
-            path: { id: organizationId, fleetId },
-            body,
-            signal: request.signal,
-          }),
-        );
-      } else {
-        await organizationsCreateRunnerFleet(
-          withOrganizationHeader({
-            organizationId,
-            path: { id: organizationId },
-            body: { ...body, fleetId: fleetId.trim() },
-            signal: request.signal,
-          }),
-        );
-      }
-      if (!request.signal.aborted) {
-        refresh();
-        onSaved(fleetId.trim());
-      }
-    } catch (failure) {
-      if (request.signal.aborted) return;
-      const code = typeof failure === "object" && failure !== null && "code" in failure ? failure.code : undefined;
-      setError(
-        code === 6
-          ? "This fleet ID already exists. Choose a different ID."
-          : "Could not save the fleet. Check access and specification, then retry.",
-      );
-      refresh();
-    } finally {
-      if (!request.signal.aborted) setSaving(false);
-    }
-  };
-
-  return {
-    fleetId,
-    setFleetId,
-    runnerVersion,
-    setRunnerVersion,
-    enabled,
-    setEnabled,
-    spec,
-    setSpec,
-    capabilities,
-    setCapabilities,
-    error,
-    saving,
-    save,
-  };
-}
-
-export function FleetForm(props: {
-  organizationId: string;
-  fleet?: SuperplaneOrganizationsFleet;
   onSaved: (fleetId: string) => void;
   onCancel: () => void;
   refresh: () => void;
 }) {
-  const { fleet, onCancel } = props;
-  const {
-    fleetId,
-    setFleetId,
-    runnerVersion,
-    setRunnerVersion,
-    enabled,
-    setEnabled,
-    spec,
-    setSpec,
-    capabilities,
-    setCapabilities,
-    error,
-    saving,
-    save,
-  } = useFleetForm(props);
+  const [step, setStep] = useState(0);
+  const { draft, setDraft, error, saving, save } = useFleetConfiguration({ organizationId, onSaved, refresh });
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (step < steps.length - 1) {
+      setStep(step + 1);
+      return;
+    }
+    void save();
+  };
   return (
-    <form onSubmit={save} className="space-y-4 rounded-md border p-4">
-      <h2 className="text-lg font-medium">{fleet ? "Edit fleet" : "Create fleet"}</h2>
-      <Label htmlFor="fleet-id">Fleet ID</Label>
-      <Input
-        id="fleet-id"
-        required
-        value={fleetId}
-        disabled={!!fleet || saving}
-        onChange={(event) => setFleetId(event.target.value)}
-      />
-      <Label htmlFor="runner-version">Runner version</Label>
-      <Input
-        id="runner-version"
-        required
-        value={runnerVersion}
-        onChange={(event) => setRunnerVersion(event.target.value)}
-      />
-      {(
-        [
-          ["operatingSystem", "Operating system"],
-          ["architecture", "Architecture"],
-        ] as const
-      ).map(([field, label]) => (
-        <div key={field}>
-          <Label htmlFor={field}>{label}</Label>
-          <Input
-            id={field}
-            required
-            value={spec[field] ?? ""}
-            onChange={(event) => setSpec({ ...spec, [field]: event.target.value })}
-          />
-        </div>
-      ))}
-      {(
-        [
-          ["cpuMillicores", "CPU millicores"],
-          ["memoryMb", "Memory MB"],
-          ["diskGb", "Disk GB"],
-        ] as const
-      ).map(([field, label]) => (
-        <div key={field}>
-          <Label htmlFor={field}>{label}</Label>
-          <Input
-            id={field}
-            type="number"
-            required
-            min={1}
-            step={1}
-            value={spec[field] ?? ""}
-            onChange={(event) => setSpec({ ...spec, [field]: Number(event.target.value) })}
-          />
-        </div>
-      ))}
-      <Label htmlFor="capabilities">Capabilities (comma-separated)</Label>
-      <Input id="capabilities" value={capabilities} onChange={(event) => setCapabilities(event.target.value)} />
-      <div className="flex items-center gap-2">
-        <Switch id="fleet-enabled" checked={enabled} onCheckedChange={setEnabled} />
-        <Label htmlFor="fleet-enabled">Enabled</Label>
+    <form onSubmit={submit} className="space-y-5 rounded-lg border border-border bg-card p-5 text-[13px]">
+      <h2 className="text-base font-medium">Create fleet</h2>
+      <FleetWizardProgress steps={steps} current={step} />
+      <div>
+        <h3 className="font-medium">{steps[step]}</h3>
+        <p className="mt-1 text-muted-foreground">{descriptions[step]}</p>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Disabling stops new work. Active work, inspection, and cleanup remain available.
-      </p>
-      {error && <p role="alert">{error}</p>}
-      <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save fleet"}
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
+      <FleetConfigurationFields section={sections[step]} draft={draft} onChange={setDraft} disabled={saving} />
+      {error && (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      )}
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
+        <div className="flex gap-2">
+          {step > 0 && (
+            <Button type="button" size="sm" variant="outline" onClick={() => setStep(step - 1)} disabled={saving}>
+              Back
+            </Button>
+          )}
+          <Button type="submit" size="sm" disabled={saving}>
+            {saving ? "Creating…" : step === steps.length - 1 ? "Create fleet" : "Next"}
+          </Button>
+        </div>
       </div>
     </form>
   );

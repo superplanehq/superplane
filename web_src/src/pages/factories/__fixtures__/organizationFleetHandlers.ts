@@ -11,10 +11,17 @@ function fleetResponse(
   body: Record<string, unknown> | null,
 ) {
   const fleets = management.fleets;
-  if (match[4] === "capacity")
+  if (match[4] === "capacity") {
+    const runners = management.runners.filter((runner) => runner.fleetId === match[3]);
     return {
-      json: { runnableTasks: "2", pendingRunners: "1", idleRunners: "1", busyRunners: "0", terminatedRunners: "1" },
+      json: Object.fromEntries(
+        ["pending", "idle", "busy", "terminated"].map((state) => [
+          `${state}Runners`,
+          String(runners.filter((runner) => runner.state === state).length),
+        ]),
+      ),
     };
+  }
   if (!match[3]) {
     if (method === "POST")
       fleets.push({
@@ -35,6 +42,7 @@ function runnerResponse(
   match: RegExpExecArray,
   method: string,
   body: Record<string, unknown> | null,
+  url: URL,
 ) {
   const runners = management.runners;
   if (method === "POST") {
@@ -56,7 +64,14 @@ function runnerResponse(
       },
     };
   }
-  if (!match[3]) return { json: { runners, totalCount: String(runners.length), hasNextPage: false } };
+  if (!match[3]) {
+    const states = url.searchParams.getAll("states");
+    const filtered = runners.filter(
+      (runner) =>
+        runner.fleetId === url.searchParams.get("fleetId") && (!states.length || states.includes(runner.state ?? "")),
+    );
+    return { json: { runners: filtered, totalCount: String(filtered.length), hasNextPage: false } };
+  }
   const runner = runners.find((record) => record.id === match[3]);
   if (!runner) return { status: 404, json: { code: 5 } };
   if (management.connection === "connected")
@@ -77,10 +92,10 @@ export function organizationFleetRoutes(fixture: FactoriesFixture): FactoriesRou
   return [
     {
       pattern: /^\/api\/v1\/organizations\/([^/]+)\/(fleets|runners)(?:\/([^/]+))?(?:\/(capacity))?$/,
-      resolve: (match, method, body) => {
+      resolve: (match, method, body, url) => {
         if (management.error) return { status: 503, json: { code: 14 } };
         if (match[2] === "fleets") return fleetResponse(management, match, method, body);
-        return runnerResponse(management, match, method, body);
+        return runnerResponse(management, match, method, body, url);
       },
     },
   ];

@@ -46,7 +46,7 @@ import { IntegrationSetupReturn } from "./components/IntegrationSetupReturn";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
 import { Server } from "lucide-react";
 import { useOrganizationFleetAccess } from "@/hooks/useOrganizationFleetManagement";
-import { OrganizationFleets, OrganizationFleetDetails, OrganizationRunnerDetails } from "./fleets/OrganizationFleets";
+import { OrganizationFleets, OrganizationFleetDetails } from "./fleets/OrganizationFleets";
 
 function settingsSidebarNavLinkClass(active: boolean) {
   return cn(
@@ -450,10 +450,7 @@ export function OrganizationSettings() {
               path="fleets/:fleetId/runners/:runnerId"
               element={
                 <RequirePermission resource="org" action="read">
-                  <OrganizationRunnerDetails
-                    organizationId={organizationId}
-                    basePath={`/${organizationId}/settings/fleets`}
-                  />
+                  <Navigate to="../.." relative="path" replace />
                 </RequirePermission>
               }
             />

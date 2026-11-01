@@ -1,11 +1,7 @@
 import { useParams } from "react-router";
 
 import { Members } from "@/pages/organization/settings/Members";
-import {
-  OrganizationFleets,
-  OrganizationFleetDetails,
-  OrganizationRunnerDetails,
-} from "@/pages/organization/settings/fleets/OrganizationFleets";
+import { OrganizationFleets, OrganizationFleetDetails } from "@/pages/organization/settings/fleets/OrganizationFleets";
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 
 import { FactorySettingsApiKeysPage } from "./FactorySettingsApiKeysPage";
@@ -27,18 +23,29 @@ export function FactoryOrganizationMembersPage() {
   );
 }
 
-export function FactoryOrganizationFleetsPage({ detail = "catalog" }: { detail?: "catalog" | "fleet" | "runner" }) {
+export function FactoryOrganizationFleetsPage({ detail = "catalog" }: { detail?: "catalog" | "fleet" }) {
   const { organizationId = "", factoryKey = "" } = useParams();
   const basePath = factorySettingsSectionPath(organizationId, factoryKey, "organization", "fleets");
+  if (detail === "catalog")
+    return (
+      <OrganizationFleets
+        key={organizationId}
+        organizationId={organizationId}
+        basePath={basePath}
+        renderPage={(content, actions) => (
+          <FactorySettingsPageFrame
+            title="Fleets"
+            subtitle="Manage organization fleets and directly connected runners."
+            actions={actions}
+          >
+            {content}
+          </FactorySettingsPageFrame>
+        )}
+      />
+    );
   return (
     <FactorySettingsPageFrame title="Fleets" subtitle="Manage organization fleets and directly connected runners.">
-      {detail === "catalog" ? (
-        <OrganizationFleets key={organizationId} organizationId={organizationId} basePath={basePath} />
-      ) : detail === "fleet" ? (
-        <OrganizationFleetDetails organizationId={organizationId} basePath={basePath} />
-      ) : (
-        <OrganizationRunnerDetails organizationId={organizationId} basePath={basePath} />
-      )}
+      <OrganizationFleetDetails organizationId={organizationId} basePath={basePath} />
     </FactorySettingsPageFrame>
   );
 }

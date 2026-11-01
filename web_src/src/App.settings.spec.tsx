@@ -70,7 +70,6 @@ vi.mock("@/hooks/useOrganizationFleetManagement", () => ({
 vi.mock("@/pages/organization/settings/fleets/OrganizationFleets", () => ({
   OrganizationFleets: () => <div>Fleets content</div>,
   OrganizationFleetDetails: () => <div>Fleet detail content</div>,
-  OrganizationRunnerDetails: () => <div>Runner detail content</div>,
 }));
 vi.mock("@/pages/organization/settings/Groups", () => ({ Groups: () => <div>Groups content</div> }));
 vi.mock("@/pages/organization/settings/ApiKeys", () => ({ APIKeys: () => <div>API keys content</div> }));
@@ -108,14 +107,14 @@ describe("App legacy settings routes", () => {
         access.deniedResource = "org";
         visit(`/org-123/${prefix}/fleets/own/runners/runner-1`);
         expect(await screen.findByRole("heading", { name: "Permission denied" })).toBeInTheDocument();
-        expect(screen.queryByText("Runner detail content")).not.toBeInTheDocument();
+        expect(screen.queryByText("Fleet detail content")).not.toBeInTheDocument();
       });
     }
   }
   for (const [suffix, content] of [
     ["fleets", "Fleets content"],
     ["fleets/own", "Fleet detail content"],
-    ["fleets/own/runners/runner-1", "Runner detail content"],
+    ["fleets/own/runners/runner-1", "Fleet detail content"],
   ]) {
     for (const prefix of ["settings", "workspaces/demo/settings/organization"]) {
       for (const factoriesEnabled of [true, false]) {
@@ -127,14 +126,14 @@ describe("App legacy settings routes", () => {
       }
     }
   }
-  it("preserves runner inspection after factories are disabled on an open workspace page", async () => {
+  it("preserves fleet inspection after factories are disabled on an open workspace page", async () => {
     access.factoriesEnabled = true;
-    const view = visit("/org-123/workspaces/demo/settings/organization/fleets/own/runners/runner-1?state=busy#runner");
-    await screen.findByText("Runner detail content");
+    const view = visit("/org-123/workspaces/demo/settings/organization/fleets/own?state=busy#runner");
+    await screen.findByText("Fleet detail content");
     access.factoriesEnabled = false;
     view.rerender(<App />);
-    expect(await screen.findByText("Runner detail content")).toBeInTheDocument();
-    await waitFor(() => expect(window.location.pathname).toBe("/org-123/settings/fleets/own/runners/runner-1"));
+    expect(await screen.findByText("Fleet detail content")).toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe("/org-123/settings/fleets/own"));
     expect(window.location.search).toBe("?state=busy");
     expect(window.location.hash).toBe("#runner");
   });
