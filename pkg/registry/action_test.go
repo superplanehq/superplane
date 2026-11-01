@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -171,4 +172,99 @@ func TestPanicableAction_ValidateNodeConfiguration_Forwards(t *testing.T) {
 func TestPanicableAction_ValidateNodeConfiguration_NoOpWhenMissing(t *testing.T) {
 	panicable := NewPanicableAction(&panickingAction{name: "plain-action"})
 	require.NoError(t, panicable.ValidateNodeConfiguration(nil))
+}
+
+type preparingAction struct {
+	panickingAction
+	prepare func(core.ExecutionContext) (core.PreparedExecution, error)
+}
+
+func (a *preparingAction) Prepare(ctx core.ExecutionContext) (core.PreparedExecution, error) {
+	return a.prepare(ctx)
+}
+
+func TestPanicableAction_ExecutionPreparer_NilWithoutImplementation(t *testing.T) {
+	action := NewPanicableAction(impl.NewDummyAction(impl.DummyActionOptions{}))
+	require.Nil(t, action.ExecutionPreparer())
+}
+
+func TestPanicableAction_ExecutionPreparer_ForwardsContextsAndDispatchError(t *testing.T) {
+	preparationID, dispatchID := uuid.New(), uuid.New()
+	dispatchFailure := errors.New("dispatch failed")
+	var dispatched bool
+	action := NewPanicableAction(&preparingAction{
+		prepare: func(ctx core.ExecutionContext) (core.PreparedExecution, error) {
+			require.Equal(t, preparationID, ctx.ID)
+			return func(ctx core.ExecutionContext) error {
+				dispatched = true
+				require.Equal(t, dispatchID, ctx.ID)
+				return dispatchFailure
+			}, nil
+		},
+	})
+	preparer := action.ExecutionPreparer()
+	require.NotNil(t, preparer)
+	dispatch, err := preparer.Prepare(core.ExecutionContext{ID: preparationID})
+	require.NoError(t, err)
+	require.NotNil(t, dispatch)
+	require.False(t, dispatched, "preparation must defer dispatch")
+	require.ErrorIs(t, dispatch(core.ExecutionContext{ID: dispatchID}), dispatchFailure)
+	require.True(t, dispatched)
+}
+
+func TestPanicableAction_ExecutionPreparer_WithoutDispatch(t *testing.T) {
+	failure := errors.New("preparation failed")
+	for _, test := range []struct {
+		name     string
+		dispatch core.PreparedExecution
+		err      error
+	}{
+		{name: "no dispatch"},
+		{name: "preparation error", err: failure},
+		{name: "discard dispatch on error", dispatch: func(core.ExecutionContext) error {
+			t.Fatal("failed preparation must not dispatch")
+			return nil
+		}, err: failure},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			action := NewPanicableAction(&preparingAction{
+				prepare: func(core.ExecutionContext) (core.PreparedExecution, error) {
+					return test.dispatch, test.err
+				},
+			})
+			dispatch, err := action.ExecutionPreparer().Prepare(core.ExecutionContext{})
+			require.Nil(t, dispatch)
+			if test.err != nil {
+				require.ErrorIs(t, err, test.err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestPanicableAction_ExecutionPreparer_CatchesPanics(t *testing.T) {
+	for _, phase := range []string{"Prepare", "PreparedExecution"} {
+		t.Run(phase, func(t *testing.T) {
+			action := NewPanicableAction(&preparingAction{
+				panickingAction: panickingAction{name: "preparing-action"},
+				prepare: func(core.ExecutionContext) (core.PreparedExecution, error) {
+					if phase == "Prepare" {
+						panic("preparation panic")
+					}
+					return func(core.ExecutionContext) error { panic("dispatch panic") }, nil
+				},
+			})
+			ctx := core.ExecutionContext{Logger: log.NewEntry(log.New())}
+			dispatch, err := action.ExecutionPreparer().Prepare(ctx)
+			if phase == "Prepare" {
+				require.Nil(t, dispatch)
+				require.EqualError(t, err, "action preparing-action panicked in Prepare(): preparation panic")
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, dispatch)
+			require.EqualError(t, dispatch(ctx), "action preparing-action panicked in PreparedExecution(): dispatch panic")
+		})
+	}
 }
