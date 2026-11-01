@@ -87,6 +87,40 @@ func (s *PanicableAction) QueueItemProcessor() core.QueueItemProcessor {
 	return &panicableQueueItemProcessor{underlying: processor}
 }
 
+// ExecutionPreparer returns nil for actions with the standard execution path.
+func (s *PanicableAction) ExecutionPreparer() core.ExecutionPreparer {
+	preparer, ok := s.underlying.(core.ExecutionPreparer)
+	if !ok {
+		return nil
+	}
+	return &panicableExecutionPreparer{action: s, underlying: preparer}
+}
+
+type panicableExecutionPreparer struct {
+	action     *PanicableAction
+	underlying core.ExecutionPreparer
+}
+
+func (p *panicableExecutionPreparer) Prepare(ctx core.ExecutionContext) (prepared core.PreparedExecution, err error) {
+	defer p.recoverPanic(ctx, "Prepare", &err)
+	prepared, err = p.underlying.Prepare(ctx)
+	if err != nil || prepared == nil {
+		return nil, err
+	}
+	dispatch := prepared
+	return func(ctx core.ExecutionContext) (err error) {
+		defer p.recoverPanic(ctx, "PreparedExecution", &err)
+		return dispatch(ctx)
+	}, nil
+}
+
+func (p *panicableExecutionPreparer) recoverPanic(ctx core.ExecutionContext, phase string, err *error) {
+	if r := recover(); r != nil {
+		ctx.Logger.Errorf("Action %s panicked in %s(): %v\nStack: %s", p.action.Name(), phase, r, debug.Stack())
+		*err = fmt.Errorf("action %s panicked in %s(): %v", p.action.Name(), phase, r)
+	}
+}
+
 type panicableQueueItemProcessor struct {
 	underlying core.QueueItemProcessor
 }

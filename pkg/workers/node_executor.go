@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -307,8 +306,18 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 
 	runCancellations := &RunCancellationNotifier{}
 
+	preparation, err := w.prepareActionExecution(id)
+	if err != nil {
+		metricReason = classifyProcessError(err)
+		metricOutcome = executorOutcomeFailed
+		if errors.Is(err, ErrRecordLocked) {
+			metricOutcome = executorOutcomeSkipped
+		}
+		return err
+	}
+
 	var processedRunID uuid.UUID
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
 		// If we can't, it means another worker is already processing it.
@@ -346,7 +355,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		if models.IsAgentRunnerComponent(metricComponent) {
 			processedRunID = execution.RunID
 		}
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
+		processErr := w.executeActionNode(tx, execution, node, preparation, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -427,6 +436,7 @@ func (w *NodeExecutor) executeActionNode(
 	tx *gorm.DB,
 	execution *models.CanvasNodeExecution,
 	node *models.CanvasNode,
+	preparation *actionExecutionPreparation,
 	onNewEvents func([]models.CanvasEvent),
 	onMemoryChanged func(uuid.UUID),
 	onPendingRunCreated func(workflowID, runID uuid.UUID),
@@ -448,6 +458,9 @@ func (w *NodeExecutor) executeActionNode(
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 	logger = logging.WithCanvasWorkspace(logger, workflow)
+	if preparation != nil && !preparation.matches(execution, node, workflow) {
+		return errExecutionPreparationChanged
+	}
 
 	err = execution.StartInTransaction(tx)
 	if err != nil {
@@ -455,14 +468,7 @@ func (w *NodeExecutor) executeActionNode(
 		return fmt.Errorf("failed to start execution: %w", err)
 	}
 
-	ref := node.Ref.Data()
-	componentName := ""
-	if ref.Component != nil {
-		componentName = ref.Component.Name
-	}
-	if frozen := execution.FrozenComponentName(); frozen != "" {
-		componentName = frozen
-	}
+	componentName := executionComponentName(execution, node)
 	action, err := w.registry.GetAction(componentName)
 	if err != nil {
 		logger.Errorf("action %s not found: %v", componentName, err)
@@ -548,42 +554,29 @@ func (w *NodeExecutor) executeActionNode(
 	}
 
 	ctx.Logger = logger
-	if err := billing.AssertOrganizationPaymentMethod(tx, workflow.OrganizationID); err != nil {
-		// Only a confirmed missing card fails the node. Temporary verification
-		// errors roll back the transaction, so the pending execution is retried.
-		if !errors.Is(err, billing.ErrPaymentMethodRequired) {
+	// Recheck payment, plan, and BYOK access after preparation.
+	if err := assertExecutionActionAccess(tx, workflow, execution, componentName); err != nil {
+		if !isExecutionAccessDenied(err) {
 			return err
 		}
 		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 	}
-	// Every agent run needs an active paid plan or an open trial. Credit and
-	// BYOK keys do not replace the plan. Database failures leave the execution
-	// pending for the worker retry.
-	if models.IsAgentRunnerComponent(componentName) {
-		if err := billing.AssertOrganizationPlanAllowsRuns(tx, workflow.OrganizationID); err != nil {
-			if !errors.Is(err, billing.ErrHostedSubscriptionRequired) {
+	var actionErr error
+	if executionPreparer(action) != nil {
+		if preparation == nil || (preparation.dispatch == nil && preparation.err == nil) {
+			return errExecutionPreparationChanged
+		}
+		actionErr = preparation.err
+		// A dispatch failure must roll back the task, KV, metadata, and poll request.
+		if actionErr == nil {
+			if err := preparation.dispatch(ctx); err != nil {
 				return err
 			}
-			return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 		}
+	} else {
+		actionErr = action.Execute(ctx)
 	}
-	// Recheck saved BYOK configurations immediately before a new runner action.
-	// Database failures leave the execution pending for the worker retry.
-	if slices.Contains([]string{"runnerClaudeCode", "runnerCodex", "runnerOpenRouter"}, componentName) {
-		configuration := execution.Configuration.Data()
-		credentials, _ := configuration["credentials"].(map[string]any)
-		source, _ := credentials["source"].(string)
-		if source == "integration" || source == "secret" {
-			provider, _ := configuration["llmProvider"].(string)
-			if err := models.RequireOrganizationBYOKAccess(tx, workflow.OrganizationID, provider); err != nil {
-				if !errors.Is(err, models.ErrBYOKAccessDenied) {
-					return err
-				}
-				return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
-			}
-		}
-	}
-	if err := action.Execute(ctx); err != nil {
+	if err := actionErr; err != nil {
 		var busy *models.CodexConnectionBusyError
 		if errors.As(err, &busy) {
 			// Keep the execution pending while ChatGPT sign-in holds the subscription.
