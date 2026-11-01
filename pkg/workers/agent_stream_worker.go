@@ -400,6 +400,24 @@ func (w *AgentStreamWorker) streamProviderTurn(
 ) error {
 	ctx, cancel := context.WithTimeout(parentCtx, agentStreamTimeout)
 	defer cancel()
+	// A quiet SSE stream may emit no further event after an interrupt. Poll
+	// local stopping intent so its ownership lock is released in that case too.
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				current, err := models.FindAgentSession(session.ID)
+				if err == nil && current.Status == models.AgentSessionStatusStopping {
+					cancel()
+					return
+				}
+			}
+		}
+	}()
 
 	var streamErr error
 	customTools := newCustomToolTurnState()

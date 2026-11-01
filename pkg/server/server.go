@@ -211,6 +211,11 @@ func startWorkers(
 	if os.Getenv("START_REGULAR_WORKERS") == "no" {
 		return
 	}
+	var suspensionAgents *agents.Service
+	if agentProvider != nil {
+		suspensionAgents = agents.NewService(agentProvider, authService)
+	}
+	go workers.NewOrganizationSuspensionWorker(suspensionAgents).Start(context.Background())
 
 	rabbitMQURL, err := config.RabbitMQURL()
 	if err != nil {
