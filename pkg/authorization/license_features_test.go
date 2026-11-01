@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/licensing"
+	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -57,10 +59,12 @@ func TestLicenseDoesNotGateAccessRemovalOrReads(t *testing.T) {
 }
 
 func TestGatewayAuthorizerEnforcesLicenseFeatures(t *testing.T) {
+	organization, err := models.CreateOrganization("license-auth-"+uuid.NewString()[:8], "")
+	require.NoError(t, err)
 	createRole := HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/roles"}
 	r := httptestRequest(t, map[string]string{
 		"x-user-id":         "22222222-2222-4222-8222-222222222222",
-		"x-organization-id": "11111111-1111-4111-8111-111111111111",
+		"x-organization-id": organization.ID.String(),
 	})
 
 	t.Run("denies without entitlements", func(t *testing.T) {

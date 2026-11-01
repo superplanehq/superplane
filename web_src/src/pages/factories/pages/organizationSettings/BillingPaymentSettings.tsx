@@ -19,6 +19,7 @@ type BillingAction = { planKey?: string; seats?: number; paymentMethod?: boolean
 type BillingPaymentSettingsProps = {
   organizationId: string;
   canManageBilling: boolean;
+  canAccessBillingPortal?: boolean;
   subscriptionPending?: boolean;
   onCancelSubscription?: () => void | Promise<void>;
   onKeepSubscription?: () => void | Promise<void>;
@@ -27,6 +28,7 @@ type BillingPaymentSettingsProps = {
 export function BillingPaymentSettings({
   organizationId,
   canManageBilling,
+  canAccessBillingPortal = canManageBilling,
   subscriptionPending = false,
   onCancelSubscription,
   onKeepSubscription,
@@ -49,15 +51,16 @@ export function BillingPaymentSettings({
         <BillingPaymentFailedBanner
           failedAt={billing.paymentFailedAt}
           accessEndsAt={billing.paidAccessEndsAt}
-          canManageBilling={canManageBilling}
+          canManageBilling={canAccessBillingPortal}
           pending={busy}
-          onUpdatePaymentMethod={payment.updatePaymentMethod}
+          onUpdatePaymentMethod={canManageBilling ? payment.updatePaymentMethod : () => payment.submit()}
         />
       )}
       <BillingCurrentPlan
         changePlanButtonRef={changePlanButton}
         billing={billing}
         canManageBilling={canManageBilling}
+        canAccessBillingPortal={canAccessBillingPortal}
         busy={busy}
         onChangePlan={() => setPlansOpen(true)}
         onManagePayment={() => (manageInPortal ? payment.submit() : cardSetup.open())}

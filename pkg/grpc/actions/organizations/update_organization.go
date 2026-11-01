@@ -72,6 +72,7 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 
 	response := &pb.UpdateOrganizationResponse{
 		Organization: &pb.Organization{
+			Suspended: organization.IsSuspended(),
 			Metadata: &pb.Organization_Metadata{
 				Id:          organization.ID.String(),
 				Name:        organization.Name,

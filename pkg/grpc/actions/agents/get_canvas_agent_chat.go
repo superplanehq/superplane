@@ -9,7 +9,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/billing"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 )
 
@@ -29,6 +31,13 @@ func GetCanvasAgentChat(ctx context.Context, svc AgentsService, orgID, userID st
 	if authentication.IsSupportSessionFromMetadata(ctx) {
 		return getExistingCanvasAgentChat(svc, org, user, canvas)
 	}
+	organization, err := models.FindOrganizationSuspensionStatus(database.DB(ctx), org)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load organization")
+	}
+	if organization.IsSuspended() {
+		return getExistingCanvasAgentChat(svc, org, user, canvas)
+	}
 
 	session, err := svc.EnsureSession(ctx, org, user, canvas)
 	if err != nil {
@@ -45,7 +54,7 @@ func GetCanvasAgentChat(ctx context.Context, svc AgentsService, orgID, userID st
 }
 
 // getExistingCanvasAgentChat loads the chat without provisioning or
-// refreshing it, so a read-only support session does not create state.
+// refreshing it, so read-only access does not create state.
 func getExistingCanvasAgentChat(svc AgentsService, org, user, canvas uuid.UUID) (*pb.GetCanvasAgentChatResponse, error) {
 	session, err := svc.FindCanvasSession(org, user, canvas)
 	if err != nil {
@@ -53,7 +62,7 @@ func getExistingCanvasAgentChat(svc AgentsService, org, user, canvas uuid.UUID) 
 		return nil, grpcerrors.Internal(err, "failed to load agent chat")
 	}
 	if session == nil {
-		return nil, grpcerrors.FailedPrecondition(nil, "This user has no agent chat for this canvas. A read-only support session cannot create one.")
+		return nil, grpcerrors.FailedPrecondition(nil, "This user has no agent chat for this canvas. Read-only access cannot create one.")
 	}
 	return &pb.GetCanvasAgentChatResponse{Chat: serializeChat(session)}, nil
 }

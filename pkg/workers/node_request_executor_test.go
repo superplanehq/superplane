@@ -85,6 +85,42 @@ func Test__NodeRequestExecutor_RunNow(t *testing.T) {
 	}
 }
 
+func TestSuspensionDelayedScheduleDoesNotReplayAfterReactivation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
+	configuration := map[string]any{"type": "minutes", "minutesInterval": 1}
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "schedule", Type: models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+		Configuration: datatypes.NewJSONType(configuration),
+	}}, nil)
+	require.NoError(t, r.Organization.Suspend(db, r.Account.ID, "Missed timer"))
+	request := models.CanvasNodeRequest{ID: uuid.New(), WorkflowID: canvas.ID, NodeID: "schedule", Type: models.NodeRequestTypeInvokeAction, State: models.NodeExecutionRequestStatePending, RunAt: time.Now(),
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{InvokeAction: &models.InvokeAction{ActionName: "emitEvent"}})}
+	require.NoError(t, db.Create(&request).Error)
+	require.NoError(t, NewOrganizationSuspensionWorker().Process(t.Context()))
+	require.NoError(t, r.Organization.Reactivate(db, r.Account.ID))
+	require.NoError(t, executor.Execute(request))
+	stored, err := models.FindCanvasNodeRequest(db, request.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.NodeExecutionRequestStateCompleted, stored.State)
+	var count int64
+	require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&count).Error)
+	require.Zero(t, count)
+	var next models.CanvasNodeRequest
+	require.NoError(t, db.Where("workflow_id = ? AND state = ?", canvas.ID, models.NodeExecutionRequestStatePending).First(&next).Error)
+	require.True(t, next.RunAt.After(time.Now()))
+	node, err := models.FindCanvasNode(db, canvas.ID, "schedule")
+	require.NoError(t, err)
+	require.Equal(t, "minutes", node.Configuration.Data()["type"])
+	require.EqualValues(t, 1, node.Configuration.Data()["minutesInterval"])
+	require.NoError(t, executor.RunNow(next))
+	require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&count).Error)
+	require.EqualValues(t, 1, count)
+}
+
 func Test__NodeRequestExecutor_InvokeTriggerAction_DefersRunTitleResolutionUntilEventEmit(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

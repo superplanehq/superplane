@@ -33,11 +33,15 @@ func ListRunnerTaskSchedulingOrganizations(tx *gorm.DB, after uuid.UUID, limit i
 func ScheduleOrganizationRunnerTasks(tx *gorm.DB, organizationID uuid.UUID, batchSize int) ([]RunnerTask, error) {
 	var scheduled []RunnerTask
 	err := tx.Transaction(func(tx *gorm.DB) error {
-		if err := lockRunnerTaskOrganization(tx, organizationID, "SKIP LOCKED"); err != nil {
+		organization, err := lockRunnerTaskOrganization(tx, organizationID, "SKIP LOCKED")
+		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil
 			}
 			return err
+		}
+		if organization.IsSuspended() {
+			return nil
 		}
 		if err := lockOrganizationTaskFleets(tx, organizationID); err != nil {
 			return err
@@ -87,7 +91,7 @@ func ScheduleOrganizationRunnerTasks(tx *gorm.DB, organizationID uuid.UUID, batc
 func RequeueUnavailableFleetRunnerTasks(tx *gorm.DB, organizationID uuid.UUID, batchSize int) ([]RunnerTask, error) {
 	var tasks []RunnerTask
 	err := tx.Transaction(func(tx *gorm.DB) error {
-		if err := lockRunnerTaskOrganization(tx, organizationID, "SKIP LOCKED"); err != nil {
+		if _, err := lockRunnerTaskOrganization(tx, organizationID, "SKIP LOCKED"); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil
 			}
@@ -149,12 +153,13 @@ func unassignedIntegratedRunnerTasks(tx *gorm.DB) *gorm.DB {
 		Where("runner_tasks.backend = ? AND runner_tasks.runner_id IS NULL", RunnerTaskBackendIntegrated)
 }
 
-func lockRunnerTaskOrganization(tx *gorm.DB, organizationID uuid.UUID, options string) error {
+func lockRunnerTaskOrganization(tx *gorm.DB, organizationID uuid.UUID, options string) (*Organization, error) {
 	var organization Organization
 	// NO KEY UPDATE serializes admissions without blocking foreign-key checks
 	// when another transaction adds queued work for the organization.
-	return tx.Select("id").Clauses(clause.Locking{Strength: "NO KEY UPDATE", Options: options}).
+	err := tx.Select("id", "suspended_at").Clauses(clause.Locking{Strength: "NO KEY UPDATE", Options: options}).
 		Where("id = ?", organizationID).First(&organization).Error
+	return &organization, err
 }
 
 // availableOrganizationRunnerSlots returns nil for unlimited organizations.

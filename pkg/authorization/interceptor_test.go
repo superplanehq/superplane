@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -187,12 +188,14 @@ func TestHasRequiredScopedTokenPermissionForScopes(t *testing.T) {
 
 func TestGatewayAuthorizerAllowsLegacyCanvasUpdateVersionOnlyForStagingDraftWrites(t *testing.T) {
 	clearOrganizationPermissionCacheForTest()
+	organization, err := models.CreateOrganization("legacy-draft-auth-"+uuid.NewString()[:8], "")
+	require.NoError(t, err)
 	authorizer := NewGatewayAuthorizer(actionPermissionChecker{
 		"canvases:update_version": true,
 	})
 	r := httptestRequest(t, map[string]string{
 		"x-user-id":         "22222222-2222-4222-8222-222222222222",
-		"x-organization-id": "11111111-1111-4111-8111-111111111111",
+		"x-organization-id": organization.ID.String(),
 	})
 	pathParams := map[string]string{"canvas_id": "canvas-123"}
 

@@ -65,6 +65,26 @@ func (e *NodeRequestExecutor) execute(
 	lockRequest func(*gorm.DB, uuid.UUID) (*models.CanvasNodeRequest, error),
 ) error {
 	defer e.publishExecution(request)
+	// Read before invoking provider hooks. Runnable admission rechecks inside
+	// its own transaction; completion hooks remain available.
+	canvas, err := models.FindUnscopedCanvasInTransaction(database.DB(context.Background()), request.WorkflowID)
+	if err != nil {
+		return err
+	}
+	organization, err := models.FindOrganizationSuspensionStatus(database.DB(context.Background()), canvas.OrganizationID)
+	if err != nil {
+		return err
+	}
+	if organization.IsSuspended() && request.ExecutionID == nil {
+		node, err := models.FindUnscopedCanvasNode(database.DB(context.Background()), request.WorkflowID, request.NodeID)
+		if err != nil {
+			return err
+		}
+		ref := node.Ref.Data()
+		if ref.Trigger == nil || ref.Trigger.Name != "schedule" {
+			return request.Complete(database.DB(context.Background()))
+		}
+	}
 
 	if request.Type == models.NodeRequestTypePullRequestChecksStart {
 		events, err := factoryactions.ProcessPullRequestChecksStartRequest(context.Background(), e.factoryIntakeDeps(), request.ID)
@@ -128,7 +148,7 @@ func (e *NodeRequestExecutor) execute(
 
 	runCancellations := &RunCancellationNotifier{}
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := lockRequest(tx, request.ID)
 		if err == nil {
 			return e.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
@@ -300,6 +320,19 @@ func (e *NodeRequestExecutor) invokeTriggerHook(logger *log.Entry, tx *gorm.DB, 
 		Events:        contexts.NewEventContext(tx, node, nil, onNewEvents),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 	}
+	if nodeRef.Trigger.Name == "schedule" && spec.InvokeAction.ActionName == "emitEvent" {
+		canvas, err := models.FindUnscopedCanvasInTransaction(tx, node.WorkflowID)
+		if err != nil {
+			return err
+		}
+		missed, err := models.OrganizationSuspendedAt(tx, canvas.OrganizationID, request.RunAt)
+		if err != nil {
+			return err
+		}
+		if missed {
+			hookCtx.Events = discardedScheduleEvents{}
+		}
+	}
 
 	if node.WebhookID != nil {
 		hookCtx.Webhook = contexts.NewNodeWebhookContext(context.Background(), tx, e.encryptor, node, e.webhookBaseURL)
@@ -334,6 +367,12 @@ func (e *NodeRequestExecutor) invokeTriggerHook(logger *log.Entry, tx *gorm.DB, 
 	logger.Infof("Request completed")
 	return request.Complete(tx)
 }
+
+// A missed timer still maintains metadata and schedules its next occurrence.
+type discardedScheduleEvents struct{}
+
+func (discardedScheduleEvents) Emit(string, any) error                     { return nil }
+func (discardedScheduleEvents) EmitDeduplicated(string, any, string) error { return nil }
 
 func (e *NodeRequestExecutor) invokeNodeComponentHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	nodeRef := node.Ref.Data()

@@ -121,6 +121,9 @@ func DispatchWorkOrderOnLine(
 ) (*models.Factory, *models.FactoryWorkOrder, error) {
 	var result *workOrderLineDispatchResult
 	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := models.RequireActiveOrganization(tx, factory.OrganizationID); err != nil {
+			return err
+		}
 		var err error
 		result, err = dispatchWorkOrderOnLineTx(tx, factory, orderID, line, actor, startIndex, replaceActive, model, thinkingLevel)
 		return err

@@ -49,6 +49,28 @@ func decodeToolJSON(t *testing.T, result ToolResult) map[string]any {
 	return payload
 }
 
+func TestSuspensionMCPReadsRemainAvailableAndWritesCreateNoTask(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Suspended MCP", "", "SUS")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Existing task", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, r.Organization.Suspend(db, r.Account.ID, "Private reason"))
+	runtime := &Runtime{Auth: r.AuthService}
+	claims := toolClaims(r, factory.ID)
+	result, err := runtime.CallTool(t.Context(), claims, "get_task", map[string]any{"task": order.ID.String()})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	_, err = runtime.CallTool(t.Context(), claims, "create_task", map[string]any{"title": "Blocked task"})
+	require.ErrorContains(t, err, "organization is suspended")
+	require.NotContains(t, err.Error(), "Private reason")
+	var count int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factory.ID).Count(&count).Error)
+	require.EqualValues(t, 1, count)
+}
+
 func TestListTasksAppliesMineAndStates(t *testing.T) {
 	r := support.Setup(t)
 	enableFactories(t, r.Organization.ID)
