@@ -125,34 +125,42 @@ func (c *RunOpenRouter) Setup(ctx core.SetupContext) error {
 }
 
 func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
-	spec, err := decodeRunOpenRouterSpec(ctx.Configuration)
+	prepared, err := c.Prepare(ctx)
 	if err != nil {
 		return err
 	}
+	return prepared(ctx)
+}
+
+func (c *RunOpenRouter) Prepare(ctx core.ExecutionContext) (core.PreparedExecution, error) {
+	spec, err := decodeRunOpenRouterSpec(ctx.Configuration)
+	if err != nil {
+		return nil, err
+	}
 	if err := validateRunOpenRouterSpec(spec); err != nil {
-		return err
+		return nil, err
 	}
 
 	resolved, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	environment, err := injectOpenRouterCredentials(ctx, resolved.Variables, spec.Credentials)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment, analysis := runner.PreparePlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 
 	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasVisualEvidence(environment))
 	dispatched.Steps = runner.AppendPublishLinkProtocol(dispatched.Steps, runner.HasPublishLinks(environment))
@@ -167,18 +175,26 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps)
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
-	taskID, err := runner.CreateTask(ctx.RunnerTasks, runner.CreateTaskParams{
+	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		Files:          task.Files,
 		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
-	})
-	if err != nil {
-		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID)
+	return func(ctx core.ExecutionContext) error {
+		if analysis {
+			if err := runner.MarkAnalysisSession(ctx.ExecutionState); err != nil {
+				return err
+			}
+		}
+		taskID, err := runner.CreateTask(ctx.RunnerTasks, params)
+		if err != nil {
+			return fmt.Errorf("create task: %w", err)
+		}
+		return runner.AfterRunnerTaskCreated(ctx, taskID)
+	}, nil
 }
 
 func injectOpenRouterCredentials(ctx core.ExecutionContext, environment []runner.TaskEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.TaskEnvironmentVariable, error) {

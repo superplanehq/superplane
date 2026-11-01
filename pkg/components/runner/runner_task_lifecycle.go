@@ -165,7 +165,12 @@ func markAnalysisSession(state core.ExecutionStateContext) {
 	if state == nil {
 		return
 	}
-	_ = state.SetKV(executionKVAnalysisSession, "true")
+	_ = MarkAnalysisSession(state)
+}
+
+// MarkAnalysisSession persists the analysis marker with the runner task.
+func MarkAnalysisSession(state core.ExecutionStateContext) error {
+	return state.SetKV(executionKVAnalysisSession, "true")
 }
 
 func isAnalysisSessionExecution(state core.ExecutionStateContext) bool {

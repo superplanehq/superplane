@@ -97,40 +97,49 @@ func HasPlanningSessionToken(environment []TaskEnvironmentVariable) bool {
 }
 
 func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int) []TaskEnvironmentVariable {
+	environment, analysis := PreparePlanningSessionEnv(ctx, environment, timeoutSeconds)
+	if analysis {
+		markAnalysisSession(ctx.ExecutionState)
+	}
+	return environment
+}
+
+// PreparePlanningSessionEnv returns the environment and analysis-session marker
+// without changing execution state. The caller persists the marker at dispatch.
+func PreparePlanningSessionEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int) ([]TaskEnvironmentVariable, bool) {
 	if ctx.RunID == uuid.Nil {
-		return environment
+		return environment, false
 	}
 	session, err := models.FindPlanningSessionByRun(database.DB(context.Background()), ctx.RunID)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.WithError(err).Warn("skip planning session token: session not found for run")
 		}
-		return environment
+		return environment, false
 	}
 	if !session.IsAnalysisSession() {
-		return environment
+		return environment, false
 	}
-	markAnalysisSession(ctx.ExecutionState)
 
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
 	if baseURL == "" {
 		if ctx.Logger != nil {
 			ctx.Logger.Warn("skip planning session token: public SuperPlane URL is missing")
 		}
-		return environment
+		return environment, true
 	}
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	if secret == "" {
 		if ctx.Logger != nil {
 			ctx.Logger.Warn("skip planning session token: JWT_SECRET is missing")
 		}
-		return environment
+		return environment, true
 	}
 	if session.CanvasRunID == nil {
 		if ctx.Logger != nil {
 			ctx.Logger.Warn("skip planning session token: canvas run is missing")
 		}
-		return environment
+		return environment, true
 	}
 
 	ttl := time.Duration(timeoutSeconds) * time.Second
@@ -144,7 +153,7 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []TaskEnvir
 		if ctx.Logger != nil {
 			ctx.Logger.WithError(err).Warn("skip planning session token: failed to mint token")
 		}
-		return environment
+		return environment, true
 	}
 	if ctx.Logger != nil {
 		ctx.Logger.WithField("planning_session_id", session.ID).Info("attached planning session token")
@@ -180,7 +189,7 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []TaskEnvir
 		Name:  EnvSuperplaneAnalysisScoreFile,
 		Value: "/tmp/intake-analysis.json",
 	})
-	return environment
+	return environment, true
 }
 
 func planningScoreEnvValue(enabled bool) string {
