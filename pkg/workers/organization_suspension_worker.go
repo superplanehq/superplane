@@ -225,10 +225,7 @@ func tryOrganizationSuspensionLock(ctx context.Context, organizationID uuid.UUID
 		_ = db.Close()
 		return nil, false, err
 	}
-	// Two-key locks use a separate namespace from single-key agent stream locks.
-	const namespace = 73421
-	var acquired bool
-	err = conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1, hashtext($2))", namespace, organizationID.String()).Scan(&acquired)
+	acquired, err := models.TryLockOrganizationSuspension(ctx, conn, organizationID)
 	if err != nil || !acquired {
 		_ = conn.Close()
 		_ = db.Close()
@@ -239,7 +236,7 @@ func tryOrganizationSuspensionLock(ctx context.Context, organizationID uuid.UUID
 		defer conn.Close()
 		releaseCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		if _, err := conn.ExecContext(releaseCtx, "SELECT pg_advisory_unlock($1, hashtext($2))", namespace, organizationID.String()); err != nil {
+		if err := models.UnlockOrganizationSuspension(releaseCtx, conn, organizationID); err != nil {
 			log.WithError(err).Warn("Failed to release organization suspension lock")
 		}
 	}, true, nil

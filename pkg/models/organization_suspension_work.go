@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -10,6 +12,23 @@ import (
 )
 
 const SuspensionWorkBatchSize = 100
+
+// Two-key locks use a separate namespace from single-key agent stream locks.
+const organizationSuspensionLockNamespace = 73421
+
+// TryLockOrganizationSuspension uses an explicit, dedicated SQL connection
+// because a session-scoped lock must outlive the worker's row transactions.
+// The caller must release the lock on the same connection before closing it.
+func TryLockOrganizationSuspension(ctx context.Context, conn *sql.Conn, organizationID uuid.UUID) (bool, error) {
+	var acquired bool
+	err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1, hashtext($2))", organizationSuspensionLockNamespace, organizationID.String()).Scan(&acquired)
+	return acquired, err
+}
+
+func UnlockOrganizationSuspension(ctx context.Context, conn *sql.Conn, organizationID uuid.UUID) error {
+	_, err := conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1, hashtext($2))", organizationSuspensionLockNamespace, organizationID.String())
+	return err
+}
 
 func ListPendingOrganizationSuspensions(tx *gorm.DB, after uuid.UUID) ([]OrganizationSuspensionEvent, error) {
 	var events []OrganizationSuspensionEvent
