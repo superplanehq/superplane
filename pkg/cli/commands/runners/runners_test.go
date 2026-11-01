@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 	clitest "github.com/superplanehq/superplane/test/support/cli"
 )
@@ -30,7 +32,7 @@ func TestCreateRunnerPassesLifecycleAndRendersRegistration(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, stdout := clitest.NewCommandContext(t, server, "text")
+	ctx, stdout := installationContext(t, server, "text")
 	err := (&createCommand{
 		FleetID:        "e1-large-arm64",
 		TaskID:         "task-1",
@@ -47,6 +49,7 @@ func TestCreateRunnerPassesLifecycleAndRendersRegistration(t *testing.T) {
 	assert.Contains(t, stdout.String(), "http://localhost:8000")
 	assert.Contains(t, stdout.String(), "2026-10-02T19:00:00Z")
 	assert.NotContains(t, stdout.String(), "ago")
+	assert.Contains(t, stdout.String(), "runner --url 'http://localhost:8000' --registration-token 'registration-token'")
 }
 
 func TestListRunnersPassesFleetAndFilters(t *testing.T) {
@@ -68,7 +71,7 @@ func TestListRunnersPassesFleetAndFilters(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, stdout := clitest.NewCommandContext(t, server, "text")
+	ctx, stdout := installationContext(t, server, "text")
 	err := (&listCommand{
 		FleetID: "aws-large-amd64",
 		States:  []string{"idle", "busy"},
@@ -93,7 +96,7 @@ func TestListRunnersPassesAfterID(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, _ := clitest.NewCommandContext(t, server, "text")
+	ctx, _ := installationContext(t, server, "text")
 	err := (&listCommand{
 		FleetID: "aws-large-amd64",
 		Limit:   200,
@@ -108,7 +111,7 @@ func TestDescribeRunnerUsesFleetAndRunnerIDs(t *testing.T) {
 	server := runnerServer(t, http.MethodGet, times)
 	defer server.Close()
 
-	ctx, stdout := clitest.NewCommandContext(t, server, "text")
+	ctx, stdout := installationContext(t, server, "text")
 	err := (&describeCommand{runnerCommand: runnerCommand{
 		FleetID:  "aws-large-amd64",
 		RunnerID: "runner-1",
@@ -135,7 +138,7 @@ func TestDescribeRunnerJSONKeepsAbsoluteTimestamp(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, stdout := clitest.NewCommandContext(t, server, "json")
+	ctx, stdout := installationContext(t, server, "json")
 	err := (&describeCommand{runnerCommand: runnerCommand{
 		FleetID:  "aws-large-amd64",
 		RunnerID: "runner-1",
@@ -151,7 +154,7 @@ func TestDeleteRunnerUsesFleetAndRunnerIDs(t *testing.T) {
 	server := runnerServer(t, http.MethodDelete, times)
 	defer server.Close()
 
-	ctx, stdout := clitest.NewCommandContext(t, server, "text")
+	ctx, stdout := installationContext(t, server, "text")
 	err := (&deleteCommand{runnerCommand: runnerCommand{
 		FleetID:  "aws-large-amd64",
 		RunnerID: "runner-1",
@@ -169,6 +172,13 @@ type runnerTimes struct {
 	seen       time.Time
 	created    time.Time
 	updated    time.Time
+}
+
+func installationContext(t *testing.T, server *httptest.Server, format string) (core.CommandContext, *bytes.Buffer) {
+	t.Helper()
+	ctx, out := clitest.NewCommandContext(t, server, format)
+	ctx.Cmd.Flags().Bool("installation", true, "")
+	return ctx, out
 }
 
 func sampleRunnerTimes() runnerTimes {

@@ -19,11 +19,11 @@ runner_compose=(
   --profile local-runner
   --profile local-runner-image
 )
-admin=(
-  "${compose[@]}" exec -T -e "INSTALLATION_ADMIN_TOKEN=${admin_token}" app
-  go run ./cmd/admin/main.go
-  --url http://localhost:8000
-  --output text
+cli=(
+  "${compose[@]}" exec -T -e "SUPERPLANE_API_TOKEN=${admin_token}"
+  -e SUPERPLANE_API_URL=http://localhost:8000 app
+  go run ./cmd/cli/main.go
+  --output json
 )
 
 if [[ -z "$("${compose[@]}" ps --status running -q app 2>/dev/null)" ]]; then
@@ -40,8 +40,8 @@ if ! docker image inspect "${runner_image}" >/dev/null 2>&1; then
 fi
 
 fleet="${RUNNER_FLEET:-e1-large-amd64}"
-fleets="$("${admin[@]}" fleets list)"
-if ! awk -v fleet="${fleet}" 'NR > 1 && $1 == fleet { found = 1 } END { exit !found }' <<<"${fleets}"; then
+fleets="$("${cli[@]}" fleets list --installation)"
+if ! jq -e --arg fleet "${fleet}" '.fleets | any(.id == $fleet)' <<<"${fleets}" >/dev/null; then
   echo "Runner fleet ${fleet} does not exist." >&2
   exit 1
 fi
@@ -68,13 +68,11 @@ if [[ -n "$("${runner_compose[@]}" ps --status running -q fleet-manager 2>/dev/n
   "${runner_compose[@]}" stop fleet-manager
 fi
 
-created="$("${admin[@]}" runners create --fleet "${fleet}" --ephemeral)"
-
-read -r runner_id registration_token <<<"$(
-  printf '%s\n' "${created}" | awk 'NR == 2 { print $1, $2 }'
-)"
+created="$("${cli[@]}" runners create --fleet "${fleet}" --installation --ephemeral)"
+runner_id="$(jq -er '.runner.id | select(type == "string" and length > 0)' <<<"${created}")"
+registration_token="$(jq -er '.registrationToken | select(type == "string" and length > 0)' <<<"${created}")"
 if [[ -z "${runner_id}" || -z "${registration_token}" ]]; then
-  echo "Admin CLI did not return runner registration credentials." >&2
+  echo "SuperPlane CLI did not return runner registration credentials." >&2
   exit 1
 fi
 

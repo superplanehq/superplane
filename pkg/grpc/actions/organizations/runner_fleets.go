@@ -232,6 +232,36 @@ func managedFleet(fleet *models.RunnerFleet) *pb.Fleet {
 			MemoryMb: spec.MemoryMB, DiskGb: spec.DiskGB, Capabilities: append([]string(nil), spec.Capabilities...)}}
 }
 
+func (s *RunnerService) ListRunnerFleetTasks(ctx context.Context, req *pb.ListRunnerFleetTasksRequest) (*pb.ListRunnerFleetTasksResponse, error) {
+	fleet, err := s.fleet(ctx, req.GetId(), req.GetFleetId())
+	if err != nil {
+		return nil, err
+	}
+	page, err := runneractions.ListFleetTasks(ctx, fleet, req.GetStates(), req.GetLimit(), req.GetAfterId())
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.ListRunnerFleetTasksResponse{Tasks: []*pb.RunnerFleetTask{}, TotalCount: page.TotalCount, HasNextPage: page.HasNextPage}
+	for _, task := range page.Tasks {
+		item := &pb.RunnerFleetTask{Id: task.ID.String(), OrganizationId: task.OrganizationID.String(), FleetId: fleet.Slug,
+			State: task.State, QueuedAt: timestamppb.New(task.QueuedAt)}
+		if task.RunnerID != nil {
+			item.RunnerId = new(task.RunnerID.String())
+		}
+		if task.ReservedAt != nil {
+			item.ReservedAt = timestamppb.New(*task.ReservedAt)
+		}
+		if task.StartedAt != nil {
+			item.StartedAt = timestamppb.New(*task.StartedAt)
+		}
+		if task.FinishedAt != nil {
+			item.FinishedAt = timestamppb.New(*task.FinishedAt)
+		}
+		out.Tasks = append(out.Tasks, item)
+	}
+	return out, nil
+}
+
 func organizationRunner(runner *models.Runner, fleetID string) *pb.Runner {
 	out := &pb.Runner{
 		Id:            runner.ID.String(),

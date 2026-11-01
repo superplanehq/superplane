@@ -27,6 +27,11 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Organizations {
+  rpc ListRunnerFleetTasks(ListRunnerFleetTasksRequest) returns (ListRunnerFleetTasksResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/fleets/{fleet_id}/tasks"
+    };
+  }
   rpc ListManagedRunnerFleets(ListManagedRunnerFleetsRequest) returns (ListManagedRunnerFleetsResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/fleets"
@@ -935,6 +940,32 @@ message Runner {
 
 message ListManagedRunnerFleetsRequest {
   string id = 1;
+}
+
+message RunnerFleetTask {
+  string id = 1;
+  string organization_id = 2;
+  string fleet_id = 3;
+  optional string runner_id = 4;
+  string state = 5;
+  google.protobuf.Timestamp queued_at = 6;
+  optional google.protobuf.Timestamp reserved_at = 7;
+  optional google.protobuf.Timestamp started_at = 8;
+  optional google.protobuf.Timestamp finished_at = 9;
+}
+
+message ListRunnerFleetTasksRequest {
+  string id = 1;
+  string fleet_id = 2;
+  repeated string states = 3;
+  optional int32 limit = 4;
+  optional string after_id = 5;
+}
+
+message ListRunnerFleetTasksResponse {
+  repeated RunnerFleetTask tasks = 1;
+  int64 total_count = 2;
+  bool has_next_page = 3;
 }
 
 message ListManagedRunnerFleetsResponse {
