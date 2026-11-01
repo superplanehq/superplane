@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/superplanehq/superplane/pkg/admincli/display"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/cli/display"
+	"github.com/superplanehq/superplane/pkg/cli/fleetapi"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -21,6 +22,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Use:   "runners",
 		Short: "Manage runners",
 	}
+	root.PersistentFlags().Bool("installation", false, "use installation administration")
 	root.AddCommand(newCreateCommand(options))
 	root.AddCommand(newListCommand(options))
 	root.AddCommand(newDescribeCommand(options))
@@ -62,10 +64,15 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		request.SetIdempotencyKey(key)
 	}
 
-	response, _, err := ctx.API.RunnersAPI.
-		RunnersCreateRunner(ctx.Context, c.FleetID).
-		Body(request).
-		Execute()
+	installation, _ := ctx.Cmd.Flags().GetBool("installation")
+	if installation && !c.Ephemeral {
+		return fmt.Errorf("installation fleet runners must be ephemeral")
+	}
+	api, err := fleetapi.New(ctx)
+	if err != nil {
+		return err
+	}
+	response, err := api.CreateRunner(c.FleetID, request)
 	if err != nil {
 		return core.FormatCommandError(err)
 	}
@@ -94,7 +101,11 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		); err != nil {
 			return err
 		}
-		return writer.Flush()
+		if err := writer.Flush(); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintf(stdout, "\nStart the runner:\nrunner --url %s --registration-token %s\n", shellQuote(response.GetRunnerApiUrl()), shellQuote(response.GetRegistrationToken()))
+		return err
 	})
 }
 
@@ -127,14 +138,11 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
-	request := ctx.API.RunnersAPI.RunnersListRunners(ctx.Context, c.FleetID).Limit(c.Limit)
-	if len(c.States) > 0 {
-		request = request.States(c.States)
+	api, err := fleetapi.New(ctx)
+	if err != nil {
+		return err
 	}
-	if afterID := strings.TrimSpace(c.AfterID); afterID != "" {
-		request = request.AfterId(afterID)
-	}
-	response, _, err := request.Execute()
+	response, err := api.ListRunners(c.FleetID, c.States, c.Limit, strings.TrimSpace(c.AfterID))
 	if err != nil {
 		return core.FormatCommandError(err)
 	}
@@ -210,9 +218,11 @@ func newDescribeCommand(options core.BindOptions) *cobra.Command {
 }
 
 func (c *describeCommand) Execute(ctx core.CommandContext) error {
-	response, _, err := ctx.API.RunnersAPI.
-		RunnersDescribeRunner(ctx.Context, c.FleetID, c.RunnerID).
-		Execute()
+	api, err := fleetapi.New(ctx)
+	if err != nil {
+		return err
+	}
+	response, err := api.DescribeRunner(c.FleetID, c.RunnerID)
 	if err != nil {
 		return core.FormatCommandError(err)
 	}
@@ -221,23 +231,28 @@ func (c *describeCommand) Execute(ctx core.CommandContext) error {
 
 type deleteCommand struct {
 	runnerCommand
+	States []string
 }
 
 func newDeleteCommand(options core.BindOptions) *cobra.Command {
 	handler := &deleteCommand{}
-	return bindRunnerCommand(
+	cmd := bindRunnerCommand(
 		"delete <runner-id>",
-		"Delete a runner",
+		"Terminate a runner",
 		&handler.runnerCommand,
 		handler,
 		options,
 	)
+	cmd.Flags().StringSliceVar(&handler.States, "state", nil, "terminate only in these states (repeatable)")
+	return cmd
 }
 
 func (c *deleteCommand) Execute(ctx core.CommandContext) error {
-	response, _, err := ctx.API.RunnersAPI.
-		RunnersDeleteRunner(ctx.Context, c.FleetID, c.RunnerID).
-		Execute()
+	api, err := fleetapi.New(ctx)
+	if err != nil {
+		return err
+	}
+	response, err := api.DeleteRunner(c.FleetID, c.RunnerID, c.States)
 	if err != nil {
 		return core.FormatCommandError(err)
 	}
@@ -287,4 +302,8 @@ func formatTime(value *time.Time) string {
 		return "-"
 	}
 	return value.UTC().Format(time.RFC3339)
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
