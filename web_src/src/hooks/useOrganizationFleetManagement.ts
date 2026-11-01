@@ -43,13 +43,14 @@ export function useOrganizationFleetAccess(organizationId: string) {
   const feature = useExperimentalFeature(organizationId);
   const catalog = useManagedOrganizationFleets(organizationId, active);
   const resolved = organization.isSuccess && feature.organizationReady && !feature.isLoading && !feature.lookupFailed;
-  const enabled = resolved && feature.has(FEATURE_ORGANIZATION_RUNNERS);
+  const featureEnabled = feature.has(FEATURE_ORGANIZATION_RUNNERS);
+  const enabled = resolved && featureEnabled;
   return {
     catalog,
     enabled,
     canConfigure: canAct("org", "update") && enabled && catalog.isSuccess,
     canTerminate: canAct("org", "update"),
-    showNavigation: readable && !(resolved && !enabled && catalog.isSuccess && catalog.data.length === 0),
+    showNavigation: readable && (featureEnabled || (catalog.data?.length ?? 0) > 0),
     accessError: organization.isError || feature.lookupFailed,
     resolved,
   };

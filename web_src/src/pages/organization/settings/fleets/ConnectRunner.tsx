@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, ChevronLeft, Circle } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import type { SuperplaneOrganizationsFleet } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useRunnerRegistration } from "@/hooks/useRunnerRegistration";
@@ -142,19 +142,11 @@ function RunnerLifecycleStep({
             variant="outline"
             aria-label={label}
             aria-pressed={mode === value}
-            className={`h-auto flex-col items-start gap-1 whitespace-normal rounded-lg p-4 text-left ${mode === value ? "border-foreground/40 bg-muted dark:bg-muted ring-1 ring-foreground/20" : ""}`}
+            className="h-auto min-h-24 flex-col items-start justify-start gap-1 whitespace-normal rounded-lg border-border bg-card p-4 text-left shadow-none hover:bg-muted/50 aria-pressed:border-foreground/30 aria-pressed:bg-foreground/10 aria-pressed:hover:bg-foreground/10 dark:border-border dark:bg-card dark:hover:bg-muted/50 dark:aria-pressed:border-foreground/30 dark:aria-pressed:bg-foreground/15 dark:aria-pressed:hover:bg-foreground/15"
             onClick={() => onModeChange(value)}
           >
-            <span className="flex w-full items-center justify-between gap-4">
-              <span className="text-[13px] font-semibold">{label}</span>
-              {mode === value ? (
-                <CheckCircle2 className="size-4 text-foreground" aria-hidden="true" />
-              ) : (
-                <Circle className="size-4 text-muted-foreground" aria-hidden="true" />
-              )}
-            </span>
+            <span className="text-[13px] font-semibold">{label}</span>
             <span className="text-[12px] font-normal text-muted-foreground">{description}</span>
-            {mode === value && <span className="mt-2 text-[11px] font-medium">Selected</span>}
           </Button>
         ))}
       </div>

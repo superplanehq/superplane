@@ -244,7 +244,7 @@ describe("organization fleet management", () => {
     expect(bodies[1]).toEqual({ runnerVersion: "v3" });
     expect(bodies[1]).not.toHaveProperty("fleetId");
   });
-  it("hides setup navigation only after a disabled empty catalog is confirmed", async () => {
+  it("hides fleet navigation when the feature is disabled and no fleets exist", async () => {
     enabled = false;
     fleets = [];
     mount();
