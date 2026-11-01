@@ -181,8 +181,8 @@ Cross-cutting rules when extending the backend:
   constants in `pkg/models`. Check the `Proto*` and `*ToProto` functions in
   `pkg/grpc/actions/common.go`.
 - When adding a new worker in `pkg/workers`, add its startup to
-  `cmd/server/main.go` and update the docker compose files with any new
-  environment variables.
+  `pkg/server/server.go` and update the docker compose files with any new
+  environment variables. `cmd/server/main.go` calls `server.Start()`.
 - After adding new API endpoints, ensure they are covered in
   `pkg/authorization/interceptor.go`.
 - Define all new admin API endpoints in `protos/admin/`. Register them with
