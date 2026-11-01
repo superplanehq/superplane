@@ -1,14 +1,19 @@
 # Organization suspension cancellation
 
-The regular worker polls pending suspension events every five seconds.
+The regular worker polls pending suspension events once per minute.
 Without pending events, it does not cancel work.
 
-Each processing pass uses one short transaction for a bounded batch.
+Queued work and run cancellation use separate bounded transactions.
+This avoids holding factory-line locks while taking run locks.
 It locks the organization first, then the pending suspension event, with
 `FOR UPDATE SKIP LOCKED`. Other replicas skip busy rows and retry later.
 The worker checks that the event still matches the current suspension before
 it changes any work. All row locks are released when the transaction ends.
 No dedicated database connection, advisory lock, or processing status is needed.
+
+Logs include `worker=OrganizationSuspensionWorker`, the organization ID, and
+the suspension event ID. The worker logs processing, committed batch counts,
+completion, and errors. Empty polls do not produce logs.
 
 The worker discards queued factory work and requests cancellation of workflow
 runs and runner tasks. It publishes notifications after the transaction commits.

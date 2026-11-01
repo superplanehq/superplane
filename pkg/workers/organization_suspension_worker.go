@@ -17,21 +17,26 @@ import (
 type suspensionCursor struct{ runs, tasks, executions uuid.UUID }
 
 type OrganizationSuspensionWorker struct {
+	logger        *log.Entry
 	after         uuid.UUID
 	cursors       map[uuid.UUID]suspensionCursor
 	publishRunner func(control.Notification) error
 }
 
 func NewOrganizationSuspensionWorker() *OrganizationSuspensionWorker {
-	return &OrganizationSuspensionWorker{cursors: make(map[uuid.UUID]suspensionCursor), publishRunner: control.Publish}
+	return &OrganizationSuspensionWorker{
+		logger:        log.WithField("worker", "OrganizationSuspensionWorker"),
+		cursors:       make(map[uuid.UUID]suspensionCursor),
+		publishRunner: control.Publish,
+	}
 }
 
 func (w *OrganizationSuspensionWorker) Start(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for {
 		if err := w.Process(ctx); err != nil {
-			log.WithError(err).Error("Failed to cancel suspended organization work")
+			w.logger.WithError(err).Error("Failed to cancel suspended organization work")
 		}
 		select {
 		case <-ctx.Done():
@@ -53,7 +58,10 @@ func (w *OrganizationSuspensionWorker) Process(ctx context.Context) error {
 		}
 		w.after = event.ID
 		if err := w.process(ctx, event); err != nil {
-			log.WithError(err).WithField("organization_id", event.OrganizationID).Error("Suspension cancellation remains pending")
+			w.logger.WithError(err).WithFields(log.Fields{
+				"organization_id":     event.OrganizationID,
+				"suspension_event_id": event.ID,
+			}).Error("Suspension cancellation remains pending")
 			failures = append(failures, err)
 		}
 	}
@@ -66,15 +74,23 @@ func (w *OrganizationSuspensionWorker) Process(ctx context.Context) error {
 func (w *OrganizationSuspensionWorker) process(parent context.Context, event models.OrganizationSuspensionEvent) error {
 	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
+	logger := w.logger.WithFields(log.Fields{
+		"organization_id":     event.OrganizationID,
+		"suspension_event_id": event.ID,
+	})
 	// Commit queue discard before taking run locks. Run finalization takes
 	// run locks before line locks, so retaining both would invert that order.
-	if err := event.WithCurrentSuspension(database.DB(ctx), event.DiscardQueuedWork); err != nil {
+	if err := event.WithCurrentSuspension(database.DB(ctx), func(tx *gorm.DB) error {
+		logger.Info("Processing organization suspension cancellation")
+		return event.DiscardQueuedWork(tx)
+	}); err != nil {
 		return err
 	}
 	cursor := w.cursors[event.ID]
 	notifier := &RunCancellationNotifier{}
 	var tasks []models.RunnerTask
 	var executions []models.CanvasNodeExecution
+	var runCount int
 	claimed := false
 	err := event.WithCurrentSuspension(database.DB(ctx), func(tx *gorm.DB) error {
 		claimed = true
@@ -82,6 +98,7 @@ func (w *OrganizationSuspensionWorker) process(parent context.Context, event mod
 		if err != nil {
 			return err
 		}
+		runCount = len(runs)
 		for _, run := range runs {
 			result, err := run.RequestCancellationBatch(tx)
 			if err != nil {
@@ -122,6 +139,16 @@ func (w *OrganizationSuspensionWorker) process(parent context.Context, event mod
 		delete(w.cursors, event.ID)
 	} else {
 		w.cursors[event.ID] = cursor
+	}
+	if claimed {
+		logger.WithFields(log.Fields{
+			"run_count":                  runCount,
+			"runner_task_count":          len(tasks),
+			"cancelling_execution_count": len(executions),
+		}).Info("Processed suspension cancellation batch")
+		if event.CancellationCompletedAt != nil {
+			logger.Info("Organization suspension cancellation completed")
+		}
 	}
 	// Notifications only follow committed changes. Pending work is selected
 	// again on later passes, so publication failures survive process restarts.
