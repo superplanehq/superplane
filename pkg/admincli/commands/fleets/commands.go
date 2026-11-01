@@ -109,7 +109,7 @@ type fleetDescription struct {
 }
 
 func newFleetDescription(
-	fleet *openapi_client.RunnersFleet,
+	fleet *openapi_client.AdminRunnersFleet,
 	capacity *openapi_client.RunnersGetFleetCapacityResponse,
 ) (fleetDescription, error) {
 	if fleet == nil {
@@ -235,7 +235,7 @@ func decodeFleetFile(ctx core.CommandContext, path string, target any) error {
 	return nil
 }
 
-func renderFleetResponse(ctx core.CommandContext, fleet *openapi_client.RunnersFleet) error {
+func renderFleetResponse(ctx core.CommandContext, fleet *openapi_client.AdminRunnersFleet) error {
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(fleet)
 	}
@@ -245,7 +245,7 @@ func renderFleetResponse(ctx core.CommandContext, fleet *openapi_client.RunnersF
 }
 
 func renderFleetDescription(stdout io.Writer, description fleetDescription) error {
-	fleet := &openapi_client.RunnersFleet{
+	fleet := &openapi_client.AdminRunnersFleet{
 		Id:            &description.FleetID,
 		Enabled:       &description.Enabled,
 		Spec:          &description.Spec,
@@ -270,7 +270,7 @@ func renderFleetDescription(stdout io.Writer, description fleetDescription) erro
 	return err
 }
 
-func renderFleet(stdout io.Writer, fleet *openapi_client.RunnersFleet) error {
+func renderFleet(stdout io.Writer, fleet *openapi_client.AdminRunnersFleet) error {
 	if fleet == nil {
 		return fmt.Errorf("server returned an empty fleet")
 	}

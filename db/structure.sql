@@ -4992,10 +4992,10 @@ CREATE UNIQUE INDEX runner_tasks_runner_id_key ON public.runner_tasks USING btre
 
 
 --
--- Name: runners_creation_idempotency_key; Type: INDEX; Schema: public; Owner: -
+-- Name: runners_fleet_creation_idempotency_key; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX runners_creation_idempotency_key ON public.runners USING btree (creation_idempotency_key) WHERE (creation_idempotency_key IS NOT NULL);
+CREATE UNIQUE INDEX runners_fleet_creation_idempotency_key ON public.runners USING btree (fleet_id, creation_idempotency_key) WHERE (creation_idempotency_key IS NOT NULL);
 
 
 --
@@ -6592,7 +6592,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261031212204	f
+20261031230416	f
 \.
 
 
