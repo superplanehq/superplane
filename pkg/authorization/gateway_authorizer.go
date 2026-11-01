@@ -140,6 +140,8 @@ func BlocksSuspendedOrganization(route HTTPRoute, rule AuthorizationRule) bool {
 		"/api/v1/organizations/{id}/runners/{runner_id}:provider-deleted",
 		"/api/v1/organizations/{id}/billing-portal-session":
 		return false
+	case "/api/v1/agents/canvases/{canvas_id}/chat":
+		return route.Method != "GET"
 	case "/api/v1/factories/{factory_id}/codex-connection":
 		return route.Method != "GET" && route.Method != "DELETE"
 	case "/api/v1/factories/{factory_id}/velocity/sync":

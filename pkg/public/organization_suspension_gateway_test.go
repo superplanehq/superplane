@@ -1,19 +1,104 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"github.com/superplanehq/superplane/test/support"
 )
+
+type suspensionChatProvider struct {
+	agents.Provider
+	createCalls int
+	interrupted []string
+}
+
+func (p *suspensionChatProvider) Name() string { return "anthropic" }
+
+func (p *suspensionChatProvider) ToolSchemaRevision() string { return "current" }
+
+func (p *suspensionChatProvider) CreateSession(context.Context, agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
+	p.createCalls++
+	return nil, errors.New("suspended lookup must not provision or refresh a provider session")
+}
+
+func (p *suspensionChatProvider) InterruptSession(_ context.Context, sessionID string) error {
+	p.interrupted = append(p.interrupted, sessionID)
+	return nil
+}
+
+func TestSuspendedCanvasAgentChatLookup(t *testing.T) {
+	server, resource, cookie := setupAdminTestServer(t)
+	server.InitRouter()
+	provider := &suspensionChatProvider{}
+	services := testGRPCServices(t, resource.AuthService, resource.Registry, resource.Encryptor, support.NewOIDCProvider())
+	services.Agents = grpc.NewAgentsService(agents.NewService(provider, resource.AuthService))
+	require.NoError(t, server.RegisterGRPCGateway(services))
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureClaudeManagedAgents))
+	canvas, _ := support.CreateCanvas(t, resource.Organization.ID, resource.User, nil, nil)
+	emptyCanvas, _ := support.CreateCanvas(t, resource.Organization.ID, resource.User, nil, nil)
+	session := &models.AgentSession{
+		OrganizationID: resource.Organization.ID, UserID: resource.User, CanvasID: canvas.ID,
+		Provider: "anthropic", ProviderSessionID: "existing-provider-session",
+		AgentToolSchemaRevision: "outdated", Status: models.AgentSessionStatusStreaming,
+	}
+	require.NoError(t, models.CreateAgentSessionInTransaction(db, session))
+	message := &models.AgentSessionMessage{SessionID: session.ID, Role: models.AgentMessageRoleUser, Content: "Prior conversation"}
+	require.NoError(t, models.AppendAgentSessionMessage(message))
+	require.NoError(t, resource.Organization.Suspend(db, resource.Account.ID, "Pause agent work"))
+	rawToken := uuid.NewString()
+	require.NoError(t, models.CreateUserAPIToken(db, models.NewUserAPIToken(resource.User, "Suspension chat test", crypto.HashToken(rawToken))))
+	for _, token := range []string{"", rawToken} {
+		request := func(method, path string) (int, string) {
+			response := execRequest(server, requestParams{
+				method: method, path: path, body: []byte(`{}`), contentType: "application/json",
+				authCookie: cookie, authToken: token, headers: map[string]string{"x-organization-id": resource.Organization.ID.String()},
+			})
+			return response.Code, response.Body.String()
+		}
+		code, body := request("GET", "/api/v1/agents/canvases/"+canvas.ID.String()+"/chat")
+		require.Equal(t, http.StatusOK, code, body)
+		var lookup struct {
+			Chat struct {
+				ID string `json:"id"`
+			} `json:"chat"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(body), &lookup))
+		require.Equal(t, session.ID.String(), lookup.Chat.ID)
+		chatPath := "/api/v1/agents/chats/" + lookup.Chat.ID
+		code, body = request("GET", chatPath+"/messages")
+		require.Equal(t, http.StatusOK, code, body)
+		require.Contains(t, body, message.Content)
+		code, body = request("POST", chatPath+"/interrupt")
+		require.Equal(t, http.StatusOK, code, body)
+		code, body = request("GET", "/api/v1/agents/canvases/"+emptyCanvas.ID.String()+"/chat")
+		require.Equal(t, http.StatusBadRequest, code, body)
+		require.NotContains(t, body, "support session")
+	}
+	require.Zero(t, provider.createCalls)
+	require.Equal(t, []string{session.ProviderSessionID, session.ProviderSessionID}, provider.interrupted)
+	stored, err := models.FindAgentSessionForUser(resource.Organization.ID, resource.User, session.ID)
+	require.NoError(t, err)
+	require.Equal(t, session.ProviderSessionID, stored.ProviderSessionID)
+	require.Equal(t, "outdated", stored.AgentToolSchemaRevision)
+	require.Equal(t, models.AgentSessionStatusIdle, stored.Status)
+	emptySession, err := agents.NewService(provider, resource.AuthService).FindCanvasSession(resource.Organization.ID, resource.User, emptyCanvas.ID)
+	require.NoError(t, err)
+	require.Nil(t, emptySession)
+}
 
 // The gateway owns transport authentication and privacy. Model lifecycle tests
 // cannot detect a route registered outside the admin authentication boundary.
