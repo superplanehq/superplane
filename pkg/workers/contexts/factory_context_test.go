@@ -547,7 +547,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 		assert.Equal(t, 2, countOrders(factoryModel))
 	})
 
-	t.Run("serializes concurrent creates for the same Jira issue", func(t *testing.T) {
+	t.Run("defers contested creates for the same Jira issue", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
@@ -582,7 +582,15 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 		close(start)
 		wg.Wait()
 
-		for _, createErr := range errs {
+		for i, createErr := range errs {
+			if errors.Is(createErr, jira.ErrIssueWorkOrderLocked) {
+				createErr = database.Conn().Transaction(func(tx *gorm.DB) error {
+					ctx := NewFactoryContext(tx, canvases[i], executions[i])
+					_, didCreate, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "New issue"})
+					created[i] = didCreate
+					return err
+				})
+			}
 			require.NoError(t, createErr)
 		}
 

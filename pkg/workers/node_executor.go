@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -348,6 +349,11 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
 		if processErr != nil {
+			if errors.Is(processErr, jira.ErrIssueWorkOrderLocked) {
+				metricOutcome = executorOutcomeSkipped
+				metricReason = executorReasonLocked
+				return processErr
+			}
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
 			return processErr
@@ -363,6 +369,10 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 
 	if err != nil {
 		contexts.ApplyFileBindCleanups(pendingFileBindCleanups, err)
+		if errors.Is(err, jira.ErrIssueWorkOrderLocked) {
+			// The transaction has rolled back. The pending scan can retry later.
+			return ErrRecordLocked
+		}
 		return err
 	}
 
@@ -585,6 +595,10 @@ func (w *NodeExecutor) executeActionNode(
 		}
 	}
 	if err := action.Execute(ctx); err != nil {
+		if errors.Is(err, jira.ErrIssueWorkOrderLocked) {
+			// Contention is not a duplicate or action failure. Undo the start.
+			return err
+		}
 		var busy *models.CodexConnectionBusyError
 		if errors.As(err, &busy) {
 			// Keep the execution pending while ChatGPT sign-in holds the subscription.

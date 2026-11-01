@@ -3,19 +3,29 @@ package jira
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
-// LockIssueWorkOrder serializes work-order creation for one Jira issue on
-// one site in this factory. The lock is held until the caller commits tx.
+var ErrIssueWorkOrderLocked = errors.New("Jira issue task creation is locked")
+
+// LockIssueWorkOrder attempts to serialize work-order creation for one Jira
+// issue on one site in this factory. The lock is held until tx ends.
 func LockIssueWorkOrder(tx *gorm.DB, factory *models.Factory, ref IssueRef) error {
 	if tx == nil || factory == nil || !ref.valid() {
 		return nil
 	}
-	return tx.Exec("SELECT pg_advisory_xact_lock(?)", jiraIssueLockKey(factory.ID, ref)).Error
+	var locked bool
+	if err := tx.Raw("SELECT pg_try_advisory_xact_lock(?)", jiraIssueLockKey(factory.ID, ref)).Scan(&locked).Error; err != nil {
+		return err
+	}
+	if !locked {
+		return ErrIssueWorkOrderLocked
+	}
+	return nil
 }
 
 func jiraIssueLockKey(factoryID uuid.UUID, ref IssueRef) int64 {
