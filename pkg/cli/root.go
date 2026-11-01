@@ -11,11 +11,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	automations "github.com/superplanehq/superplane/pkg/cli/commands/automations"
+	"github.com/superplanehq/superplane/pkg/cli/commands/fleets"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
 	members "github.com/superplanehq/superplane/pkg/cli/commands/members"
 	oidc "github.com/superplanehq/superplane/pkg/cli/commands/oidc"
 	organizations "github.com/superplanehq/superplane/pkg/cli/commands/organizations"
+	"github.com/superplanehq/superplane/pkg/cli/commands/runners"
 	runs "github.com/superplanehq/superplane/pkg/cli/commands/runs"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	tasks "github.com/superplanehq/superplane/pkg/cli/commands/tasks"
@@ -55,6 +57,8 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&OutputFormat, "output", "o", "", "output format: text|json|yaml (overrides config output)")
 
 	options := defaultBindOptions()
+	RootCmd.AddCommand(fleets.NewCommand(options))
+	RootCmd.AddCommand(runners.NewCommand(options))
 	RootCmd.AddCommand(automations.NewCommand(options))
 	RootCmd.AddCommand(runs.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))
@@ -102,6 +106,9 @@ func defaultBindOptions() core.BindOptions {
 		DefaultOutputFormat: GetOutputFormat,
 		NewConfigContext: func() core.ConfigContext {
 			if context, ok := GetEnvironmentContext(); ok {
+				if selected, ok := GetCurrentContext(); ok {
+					context.OrganizationID = selected.OrganizationID
+				}
 				return NewEnvironmentContext(context)
 			}
 

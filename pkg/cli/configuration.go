@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	EnvURL   = "SUPERPLANE_URL"
-	EnvToken = "SUPERPLANE_TOKEN"
+	EnvURL      = "SUPERPLANE_URL"
+	EnvToken    = "SUPERPLANE_TOKEN"
+	EnvAPIURL   = "SUPERPLANE_API_URL"
+	EnvAPIToken = "SUPERPLANE_API_TOKEN"
 )
 
 type ConfigContext struct {
@@ -105,8 +107,14 @@ func ValidateEnvironmentContext() error {
 }
 
 func environmentContext() (ConfigContext, bool, error) {
-	rawURL, urlSet := os.LookupEnv(EnvURL)
-	rawToken, tokenSet := os.LookupEnv(EnvToken)
+	urlName, tokenName := EnvURL, EnvToken
+	_, apiURLSet := os.LookupEnv(EnvAPIURL)
+	_, apiTokenSet := os.LookupEnv(EnvAPIToken)
+	if apiURLSet || apiTokenSet {
+		urlName, tokenName = EnvAPIURL, EnvAPIToken
+	}
+	rawURL, urlSet := os.LookupEnv(urlName)
+	rawToken, tokenSet := os.LookupEnv(tokenName)
 	if !urlSet && !tokenSet {
 		return ConfigContext{}, false, nil
 	}
@@ -114,7 +122,7 @@ func environmentContext() (ConfigContext, bool, error) {
 	url := normalizeBaseURL(rawURL)
 	token := strings.TrimSpace(rawToken)
 	if url == "" || token == "" {
-		return ConfigContext{}, false, fmt.Errorf("%s and %s must both be set to use environment CLI authentication", EnvURL, EnvToken)
+		return ConfigContext{}, false, fmt.Errorf("%s and %s must both be set to use environment CLI authentication", urlName, tokenName)
 	}
 
 	return ConfigContext{
@@ -393,4 +401,8 @@ func (c *CurrentContext) SetActiveWorkspace(workspaceID string) error {
 
 func (c *CurrentContext) GetURL() string {
 	return c.context.URL
+}
+
+func (c *CurrentContext) GetOrganizationID() string {
+	return c.context.OrganizationID
 }

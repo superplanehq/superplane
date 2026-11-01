@@ -10,10 +10,12 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Use:   "fleets",
 		Short: "Manage runner fleets",
 	}
+	root.PersistentFlags().Bool("installation", false, "use installation administration")
 
 	root.AddCommand(newListCommand(options))
 	root.AddCommand(newDescribeCommand(options))
 	root.AddCommand(newCreateCommand(options))
 	root.AddCommand(newUpdateCommand(options))
+	root.AddCommand(newListTasksCommand(options))
 	return root
 }
