@@ -35,7 +35,11 @@ apt_retry apt-get install --no-install-recommends -y ca-certificates curl gnupg
 
 . /etc/os-release
 echo "deb http://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-connrefused -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+pg_key=$(mktemp)
+trap 'rm -f "$pg_key"' EXIT
+# Retry transport errors and import the key only after the download completes.
+curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-all-errors -fsSL -o "$pg_key" https://apt.postgresql.org/pub/repos/apt/ACCC4CF8.asc
+gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg "$pg_key"
 
 apt_retry apt-get update -y
 apt_retry apt-get install --no-install-recommends -y "postgresql-client-17=${PG_CLIENT_VERSION}"
