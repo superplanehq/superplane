@@ -18,6 +18,7 @@ import (
 	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -356,6 +357,91 @@ func TestFactoryContext_CreateWorkOrderRejectsClaimedWorkspaceFile(t *testing.T)
 	fresh, err := models.FindFactory(db, f.OrganizationID, f.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), fresh.NextWorkOrderNumber)
+}
+
+func TestFactoryContext_CreateWorkOrderPreservesLinearLinkAttachments(t *testing.T) {
+	for _, scenario := range []string{"links_only", "mixed_attachments", "file_quota"} {
+		t.Run(scenario, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			store, err := filesystem.New(t.TempDir())
+			require.NoError(t, err)
+			blob.SetCurrent(store)
+			defer blob.SetCurrent(nil)
+			t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+			t.Setenv("BASE_URL", "http://files.test")
+			db := database.Conn()
+			f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			canvas, execution, _ := setupFactoryAppExecutionWithPayload(t, r, f.ID, map[string]any{
+				"type": linear.IssuePayloadType,
+				"data": map[string]any{
+					"url":  "https://linear.app/acme/issue/ENG-142/bug",
+					"data": map[string]any{"id": uuid.NewString(), "identifier": "ENG-142"},
+				},
+			})
+			listener, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+				NodeID: "on-work-order", Type: models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName}}),
+			}}, nil)
+			require.NoError(t, db.Model(listener).Update("factory_id", f.ID).Error)
+			if scenario == "file_quota" {
+				file, err := models.CreatePendingFile(db, models.CreateFileParams{
+					Scope: blob.ScopeWorkspace, OrganizationID: r.Organization.ID, FactoryID: f.ID,
+					Filename: "existing.png", ContentType: "image/png", CreatedByID: r.User,
+				})
+				require.NoError(t, err)
+				// Represent a full storage quota without uploading ten gigabytes.
+				require.NoError(t, db.Model(file).Updates(map[string]any{
+					"state": models.FileStateReady, "size_bytes": models.MaxOrganizationFileBytes,
+				}).Error)
+			}
+			inlineURL := "https://uploads.linear.app/image.png"
+			description := "Investigate the issue."
+			var issueFiles []linear.IssueFile
+			if scenario != "links_only" {
+				description += "\n![image](" + inlineURL + ")"
+				issueFiles = []linear.IssueFile{
+					{Name: "image.png", ContentType: "image/png", Body: []byte("image"), ReplaceURLs: []string{inlineURL}},
+					{Name: "notes.pdf", ContentType: "application/pdf", Body: []byte("notes")},
+				}
+			}
+			var cleanups []FileBindCleanup
+			ctx := NewFactoryContext(db, canvas, execution).
+				WithFileBindCleanup(func(job FileBindCleanup) { cleanups = append(cleanups, job) }).
+				WithLinearIssueFiles(func(context.Context, string, string) ([]linear.IssueFile, []linear.IssueLink, error) {
+					return issueFiles, []linear.IssueLink{{Title: "Design", URL: "https://example.com/design"}}, nil
+				})
+			created, inserted, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Linear attachments", Description: description})
+			require.NoError(t, err)
+			require.True(t, inserted)
+			ApplyFileBindCleanups(cleanups, nil)
+			order, err := f.FindWorkOrder(db, uuid.MustParse(created.ID))
+			require.NoError(t, err)
+			assert.Contains(t, order.Description, "- [Design](https://example.com/design)")
+			assert.Equal(t, order.Description, created.Description)
+			files, err := models.ListReadyTaskFiles(db, order.ID)
+			require.NoError(t, err)
+			if scenario == "mixed_attachments" {
+				require.Len(t, files, 2)
+				assert.NotContains(t, order.Description, inlineURL)
+				for _, file := range files {
+					assert.Contains(t, order.Description, blob.FileRef(file.ID))
+				}
+			} else {
+				assert.Empty(t, files)
+				assert.NotContains(t, order.Description, blob.FileRefScheme+"://")
+				if scenario == "file_quota" {
+					assert.Contains(t, order.Description, inlineURL)
+					assert.NotContains(t, order.Description, "notes.pdf")
+				}
+			}
+			events, err := models.ListCanvasEvents(db, listener.ID, "on-work-order", 10, nil)
+			require.NoError(t, err)
+			require.Len(t, events, 1)
+			assert.Equal(t, order.Description, onWorkOrderEventWorkOrder(t, events[0])["description"])
+		})
+	}
 }
 
 func TestFactoryContext_CreateWorkOrderKeepsRejectedRemoteLinks(t *testing.T) {

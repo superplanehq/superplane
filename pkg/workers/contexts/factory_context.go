@@ -271,7 +271,7 @@ func (c *FactoryContext) createWorkOrder(params core.WorkOrderParams) (_ *core.W
 				Result: preparation.BindResult(), BindErr: creationErr})
 		}
 	}()
-	c.prepareWorkOrderFiles(preparedOrder, preparation)
+	links := c.prepareWorkOrderFiles(preparedOrder, preparation)
 	err = preparation.PrepareBindings(context.Background(), c.tx, blob.Current(), f.OrganizationID, f.ID, preparedOrder.ID, preparedOrder.Description)
 	if err != nil {
 		return nil, false, err
@@ -284,7 +284,10 @@ func (c *FactoryContext) createWorkOrder(params core.WorkOrderParams) (_ *core.W
 	if err = preparation.Persist(c.tx); err != nil {
 		return nil, false, err
 	}
-	if description := preparation.RewriteMarkdown(params.Description); description != order.Description {
+	// Rebuild from the source description so rejected uploads keep their links.
+	// Linear link attachments are independent of upload acceptance.
+	description := linear.DescriptionWithLinks(params.Description, links)
+	if description := preparation.RewriteMarkdown(description); description != order.Description {
 		if err := order.UpdateContent(c.tx, nil, &description); err != nil {
 			return nil, false, err
 		}
@@ -612,11 +615,11 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 	return models.OriginFromIntakeRootEvent(event)
 }
 
-func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) {
+func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) []linear.IssueLink {
 	c.ingestGitHubImages(order, preparation)
 	c.ingestProductiveFiles(order, preparation)
 	c.ingestJiraFiles(order, preparation)
-	c.ingestLinearFiles(order, preparation)
+	return c.ingestLinearFiles(order, preparation)
 }
 
 func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) {

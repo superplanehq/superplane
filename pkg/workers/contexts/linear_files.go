@@ -49,29 +49,29 @@ func (c *FactoryContext) skipDuplicateLinearWorkOrder(factoryModel *models.Facto
 	return hasOrder, nil
 }
 
-func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) {
+func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) []linear.IssueLink {
 	if order == nil {
-		return
+		return nil
 	}
 	issueID, ok := c.linearIssueID(order)
 	if !ok {
-		return
+		return nil
 	}
 
 	issueFiles, links, err := c.readLinearFiles(context.Background(), issueID, order.Description)
 	if err != nil {
 		log.WithError(err).Warn("failed to read Linear issue files")
-		return
+		return nil
 	}
 
 	description := linear.DescriptionWithLinks(order.Description, links)
 
 	if len(issueFiles) == 0 {
 		if description == order.Description {
-			return
+			return links
 		}
 		order.Description = description
-		return
+		return links
 	}
 
 	next, err := storedfiles.AppendTaskFiles(
@@ -87,13 +87,14 @@ func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder, prepa
 		preparation,
 	)
 	if err != nil || (next.Markdown == order.Description && description == order.Description) {
-		return
+		return links
 	}
 	markdown := next.Markdown
 	if markdown == "" {
 		markdown = description
 	}
 	order.Description = markdown
+	return links
 }
 
 func (c *FactoryContext) readLinearFiles(ctx context.Context, issueID, description string) ([]linear.IssueFile, []linear.IssueLink, error) {
