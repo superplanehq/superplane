@@ -23,6 +23,7 @@ vi.mock("@/contexts/PermissionsProvider", () => ({
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     hasPermission: (resource: string) => resource !== access.deniedResource,
+    canAct: (resource: string) => resource !== access.deniedResource,
     isLoading: false,
   }),
 }));
@@ -30,7 +31,9 @@ vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganization: () => ({
     data: {
       metadata: { id: "org-123", slug: "org-123", name: "Demo" },
-      spec: { enabledExperimentalFeatures: access.factoriesEnabled ? ["factories"] : [] },
+      spec: {
+        enabledExperimentalFeatures: ["organization_runners", ...(access.factoriesEnabled ? ["factories"] : [])],
+      },
     },
     isLoading: false,
     isSuccess: true,
@@ -61,6 +64,13 @@ vi.mock("@/pages/home", () => ({ HomePage: () => <div>Organization home</div> })
 vi.mock("@/pages/auth/Login", () => ({ Login: () => <div>Login page</div> }));
 vi.mock("@/pages/organization/settings/General", () => ({ General: () => <div>General content</div> }));
 vi.mock("@/pages/organization/settings/Members", () => ({ Members: () => <div>Members content</div> }));
+vi.mock("@/hooks/useOrganizationFleetManagement", () => ({
+  useOrganizationFleetAccess: () => ({ showNavigation: true }),
+}));
+vi.mock("@/pages/organization/settings/fleets/OrganizationFleets", () => ({
+  OrganizationFleets: () => <div>Fleets content</div>,
+  OrganizationFleetDetails: () => <div>Fleet detail content</div>,
+}));
 vi.mock("@/pages/organization/settings/Groups", () => ({ Groups: () => <div>Groups content</div> }));
 vi.mock("@/pages/organization/settings/ApiKeys", () => ({ APIKeys: () => <div>API keys content</div> }));
 vi.mock("@/pages/organization/settings/APIKeyDetail", () => ({
@@ -90,6 +100,43 @@ const legacySettingsCases = [
 ] as const;
 
 describe("App legacy settings routes", () => {
+  for (const prefix of ["settings", "workspaces/demo/settings/organization"]) {
+    for (const factoriesEnabled of [true, false]) {
+      it(`blocks ${prefix} runner inspection without organization read permission with factories ${factoriesEnabled ? "on" : "off"}`, async () => {
+        access.factoriesEnabled = factoriesEnabled;
+        access.deniedResource = "org";
+        visit(`/org-123/${prefix}/fleets/own/runners/runner-1`);
+        expect(await screen.findByRole("heading", { name: "Permission denied" })).toBeInTheDocument();
+        expect(screen.queryByText("Fleet detail content")).not.toBeInTheDocument();
+      });
+    }
+  }
+  for (const [suffix, content] of [
+    ["fleets", "Fleets content"],
+    ["fleets/own", "Fleet detail content"],
+    ["fleets/own/runners/runner-1", "Fleet detail content"],
+  ]) {
+    for (const prefix of ["settings", "workspaces/demo/settings/organization"]) {
+      for (const factoriesEnabled of [true, false]) {
+        it(`opens ${prefix}/${suffix} with factories ${factoriesEnabled ? "on" : "off"}`, async () => {
+          access.factoriesEnabled = factoriesEnabled;
+          visit(`/org-123/${prefix}/${suffix}`);
+          expect(await screen.findByText(content)).toBeInTheDocument();
+        });
+      }
+    }
+  }
+  it("preserves fleet inspection after factories are disabled on an open workspace page", async () => {
+    access.factoriesEnabled = true;
+    const view = visit("/org-123/workspaces/demo/settings/organization/fleets/own?state=busy#runner");
+    await screen.findByText("Fleet detail content");
+    access.factoriesEnabled = false;
+    view.rerender(<App />);
+    expect(await screen.findByText("Fleet detail content")).toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe("/org-123/settings/fleets/own"));
+    expect(window.location.search).toBe("?state=busy");
+    expect(window.location.hash).toBe("#runner");
+  });
   beforeEach(() => {
     access.factoriesEnabled = false;
     access.registryLoading = false;
