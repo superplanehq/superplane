@@ -108,6 +108,18 @@ type NodeConfigurationValidator interface {
 	ValidateNodeConfiguration(config map[string]any) error
 }
 
+// ExecutionPreparer resolves slow inputs before the worker locks and starts an
+// execution. The worker supplies no execution writers, runner tasks, or requests.
+// Credential refreshes retain their own persistence and locking semantics.
+type ExecutionPreparer interface {
+	Prepare(ctx ExecutionContext) (PreparedExecution, error)
+}
+
+// PreparedExecution persists prepared inputs using the locked execution
+// context. It must not repeat external preparation. Errors roll back the
+// execution transaction, including any task and execution bookkeeping.
+type PreparedExecution func(ExecutionContext) error
+
 /*
  * QueueItemProcessor is implemented by actions that process their node's
  * queue items themselves (merge, loop) instead of the engine's default
