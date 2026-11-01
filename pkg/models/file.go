@@ -191,6 +191,18 @@ func IsInlineMediaContentType(contentType string) bool {
 }
 
 func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
+	file, err := NewPendingFile(tx, params)
+	if err != nil {
+		return nil, err
+	}
+	if err := file.Insert(tx, params); err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+// NewPendingFile prepares upload metadata without inserting a database row.
+func NewPendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
 	filename, err := sanitizeFileName(params.Filename)
 	if err != nil {
 		return nil, err
@@ -262,16 +274,25 @@ func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
 		file.CreatedByID = &createdBy
 	}
 
-	err = tx.Transaction(func(inner *gorm.DB) error {
+	return file, nil
+}
+
+// Insert persists prepared file metadata and enforces the current quotas.
+func (f *File) Insert(tx *gorm.DB, params CreateFileParams) error {
+	return tx.Transaction(func(inner *gorm.DB) error {
 		if err := ensureFileQuota(inner, params); err != nil {
 			return err
 		}
-		return inner.Create(file).Error
+		if f.State == FileStateReady {
+			if f.SizeBytes <= 0 || f.SizeBytes > f.MaxBytes() {
+				return fmt.Errorf("%w: invalid prepared file size", ErrFileInvalid)
+			}
+			if err := ensureReadyFileQuota(inner, f, f.SizeBytes, params.ReplacesFileID); err != nil {
+				return err
+			}
+		}
+		return inner.Create(f).Error
 	})
-	if err != nil {
-		return nil, err
-	}
-	return file, nil
 }
 
 func FindFile(tx *gorm.DB, id uuid.UUID) (*File, error) {

@@ -444,6 +444,7 @@ func AppendTaskFiles(
 	createdBy *uuid.UUID,
 	markdown string,
 	files []IncomingFile,
+	preparation ...*Preparation,
 ) (IngestResult, error) {
 	result := IngestResult{Markdown: markdown}
 	if len(files) == 0 {
@@ -451,7 +452,7 @@ func AppendTaskFiles(
 	}
 
 	next := markdown
-	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
+	openCount, err := openFileCount(tx, workOrderID, preparation)
 	if err != nil {
 		return result, err
 	}
@@ -469,6 +470,7 @@ func AppendTaskFiles(
 			workOrderID,
 			createdBy,
 			file,
+			preparation,
 		)
 		if err != nil {
 			log.WithError(err).Warn("failed to store task file")
@@ -507,6 +509,7 @@ func storeIncomingFile(
 	organizationID, factoryID, workOrderID uuid.UUID,
 	createdBy *uuid.UUID,
 	file IncomingFile,
+	preparation []*Preparation,
 ) (*models.File, bool, error) {
 	if provider == nil || file.Body == nil {
 		return nil, false, nil
@@ -524,7 +527,7 @@ func storeIncomingFile(
 	if filename == "" {
 		filename = "file"
 	}
-	stored, err := models.CreatePendingFile(tx, models.CreateFileParams{
+	params := models.CreateFileParams{
 		Scope:          blob.ScopeTask,
 		OrganizationID: organizationID,
 		FactoryID:      factoryID,
@@ -532,7 +535,14 @@ func storeIncomingFile(
 		Filename:       filename,
 		ContentType:    contentType,
 		CreatedByID:    createdByID,
-	})
+	}
+	if len(preparation) > 0 {
+		storeCtx, cancel := context.WithTimeout(ctx, ingestFetchTimeout)
+		defer cancel()
+		stored, err := preparation[0].store(storeCtx, tx, provider, params, file.Body)
+		return stored, err == nil, err
+	}
+	stored, err := models.CreatePendingFile(tx, params)
 	if err != nil {
 		return nil, false, err
 	}
@@ -570,6 +580,7 @@ func IngestRemoteImages(
 	organizationID, factoryID, workOrderID uuid.UUID,
 	createdBy *uuid.UUID,
 	markdown string,
+	preparation ...*Preparation,
 ) (IngestResult, error) {
 	result := IngestResult{Markdown: markdown}
 	if fetch == nil || strings.TrimSpace(markdown) == "" {
@@ -577,7 +588,7 @@ func IngestRemoteImages(
 	}
 
 	next := markdown
-	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
+	openCount, err := openFileCount(tx, workOrderID, preparation)
 	if err != nil {
 		return result, err
 	}
@@ -599,6 +610,7 @@ func IngestRemoteImages(
 			workOrderID,
 			createdBy,
 			rawURL,
+			preparation,
 		)
 		if err != nil || !ingested {
 			continue
@@ -619,6 +631,7 @@ func ingestOneImage(
 	organizationID, factoryID, workOrderID uuid.UUID,
 	createdBy *uuid.UUID,
 	rawURL string,
+	preparation []*Preparation,
 ) (*models.File, bool, error) {
 	if provider == nil {
 		return nil, false, blob.ErrProviderNotConfigured
@@ -649,7 +662,7 @@ func ingestOneImage(
 	if createdBy != nil {
 		createdByID = *createdBy
 	}
-	file, err := models.CreatePendingFile(tx, models.CreateFileParams{
+	params := models.CreateFileParams{
 		Scope:          blob.ScopeTask,
 		OrganizationID: organizationID,
 		FactoryID:      factoryID,
@@ -657,7 +670,12 @@ func ingestOneImage(
 		Filename:       filenameFromURL(rawURL, contentType),
 		ContentType:    contentType,
 		CreatedByID:    createdByID,
-	})
+	}
+	if len(preparation) > 0 {
+		file, err := preparation[0].store(fetchCtx, tx, provider, params, resp.Body)
+		return file, err == nil, err
+	}
+	file, err := models.CreatePendingFile(tx, params)
 	if err != nil {
 		return nil, false, nil
 	}

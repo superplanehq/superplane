@@ -88,6 +88,12 @@ type FactoryPlanning struct {
 	AutoStartLineID *uuid.UUID
 }
 
+// WorkOrderCreationOptions lets callers prepare file objects for the task ID
+// before allocating its transactional number.
+type WorkOrderCreationOptions struct {
+	ID uuid.UUID
+}
+
 func DefaultFactoryPlanning() FactoryPlanning {
 	return FactoryPlanning{Enabled: true, Clarity: false, Confidence: true, SetupCompleted: false}
 }
@@ -842,8 +848,8 @@ func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) erro
 	return nil
 }
 
-func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, nil)
+func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID, options ...WorkOrderCreationOptions) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, nil, options...)
 }
 
 func (f *Factory) CreateWorkOrderWithAutoStart(
@@ -931,8 +937,9 @@ func (f *Factory) CreateWorkOrderWithOrigin(
 	assignees []uuid.UUID,
 	sourceRunID *uuid.UUID,
 	origin WorkOrderOrigin,
+	options ...WorkOrderCreationOptions,
 ) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin, nil)
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin, nil, options...)
 }
 
 func (f *Factory) createWorkOrder(
@@ -943,6 +950,7 @@ func (f *Factory) createWorkOrder(
 	sourceRunID *uuid.UUID,
 	origin *WorkOrderOrigin,
 	autoStartLineID *uuid.UUID,
+	options ...WorkOrderCreationOptions,
 ) (*FactoryWorkOrder, error) {
 	if f.OnboardingConfigValue().CodexSubscription {
 		if len(assignees) > 1 {
@@ -958,7 +966,7 @@ func (f *Factory) createWorkOrder(
 			}
 		}
 	}
-	return f.insertWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, origin, autoStartLineID)
+	return f.insertWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, origin, autoStartLineID, options...)
 }
 
 func (f *Factory) insertWorkOrder(
@@ -969,6 +977,7 @@ func (f *Factory) insertWorkOrder(
 	sourceRunID *uuid.UUID,
 	origin *WorkOrderOrigin,
 	autoStartLineID *uuid.UUID,
+	options ...WorkOrderCreationOptions,
 ) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
@@ -1005,6 +1014,9 @@ func (f *Factory) insertWorkOrder(
 		AutoStartLineID: autoStartLineID,
 		CreatedAt:       now,
 		UpdatedAt:       now,
+	}
+	if len(options) > 0 && options[0].ID != uuid.Nil {
+		order.ID = options[0].ID
 	}
 	config := f.OnboardingConfigValue()
 	if config.AppRepository != "" && config.DefaultBranch != "" {

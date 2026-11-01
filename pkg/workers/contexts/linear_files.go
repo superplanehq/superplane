@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -50,7 +49,7 @@ func (c *FactoryContext) skipDuplicateLinearWorkOrder(factoryModel *models.Facto
 	return hasOrder, nil
 }
 
-func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder) {
+func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) {
 	if order == nil {
 		return
 	}
@@ -71,7 +70,7 @@ func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder) {
 		if description == order.Description {
 			return
 		}
-		_ = order.UpdateContent(c.tx, nil, &description)
+		order.Description = description
 		return
 	}
 
@@ -85,34 +84,16 @@ func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder) {
 		nil,
 		description,
 		incomingLinearFiles(issueFiles),
+		preparation,
 	)
 	if err != nil || (next.Markdown == order.Description && description == order.Description) {
-		if len(next.ObjectKeys) > 0 {
-			_ = storedfiles.SweepObjects(
-				context.Background(),
-				database.Conn(),
-				blob.Current(),
-				order.OrganizationID,
-				order.FactoryID,
-				next.ObjectKeys,
-			)
-		}
 		return
 	}
 	markdown := next.Markdown
 	if markdown == "" {
 		markdown = description
 	}
-	if err := order.UpdateContent(c.tx, nil, &markdown); err != nil {
-		_ = storedfiles.SweepObjects(
-			context.Background(),
-			database.Conn(),
-			blob.Current(),
-			order.OrganizationID,
-			order.FactoryID,
-			next.ObjectKeys,
-		)
-	}
+	order.Description = markdown
 }
 
 func (c *FactoryContext) readLinearFiles(ctx context.Context, issueID, description string) ([]linear.IssueFile, []linear.IssueLink, error) {
