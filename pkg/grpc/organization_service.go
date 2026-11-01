@@ -25,6 +25,7 @@ type OrganizationService struct {
 	baseURL              string
 	webhooksBaseURL      string
 	billing              enterprise.BillingOperations
+	runners              *organizations.RunnerService
 }
 
 func NewOrganizationService(
@@ -93,6 +94,46 @@ func (s *OrganizationService) ListOrganizationRunnerFleets(
 ) (*pb.ListOrganizationRunnerFleetsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.ListOrganizationRunnerFleets(ctx, orgID)
+}
+
+func (s *OrganizationService) ListManagedRunnerFleets(ctx context.Context, req *pb.ListManagedRunnerFleetsRequest) (*pb.ListManagedRunnerFleetsResponse, error) {
+	return s.runners.ListManagedRunnerFleets(ctx, req)
+}
+
+func (s *OrganizationService) CreateRunnerFleet(ctx context.Context, req *pb.CreateRunnerFleetRequest) (*pb.CreateRunnerFleetResponse, error) {
+	return s.runners.CreateRunnerFleet(ctx, req)
+}
+
+func (s *OrganizationService) DescribeRunnerFleet(ctx context.Context, req *pb.DescribeRunnerFleetRequest) (*pb.DescribeRunnerFleetResponse, error) {
+	return s.runners.DescribeRunnerFleet(ctx, req)
+}
+
+func (s *OrganizationService) UpdateRunnerFleet(ctx context.Context, req *pb.UpdateRunnerFleetRequest) (*pb.UpdateRunnerFleetResponse, error) {
+	return s.runners.UpdateRunnerFleet(ctx, req)
+}
+
+func (s *OrganizationService) GetRunnerFleetCapacity(ctx context.Context, req *pb.GetRunnerFleetCapacityRequest) (*pb.GetRunnerFleetCapacityResponse, error) {
+	return s.runners.GetRunnerFleetCapacity(ctx, req)
+}
+
+func (s *OrganizationService) CreateFleetRunner(ctx context.Context, req *pb.CreateFleetRunnerRequest) (*pb.CreateFleetRunnerResponse, error) {
+	return s.runners.CreateFleetRunner(ctx, req)
+}
+
+func (s *OrganizationService) ListFleetRunners(ctx context.Context, req *pb.ListFleetRunnersRequest) (*pb.ListFleetRunnersResponse, error) {
+	return s.runners.ListFleetRunners(ctx, req)
+}
+
+func (s *OrganizationService) DescribeFleetRunner(ctx context.Context, req *pb.DescribeFleetRunnerRequest) (*pb.DescribeFleetRunnerResponse, error) {
+	return s.runners.DescribeFleetRunner(ctx, req)
+}
+
+func (s *OrganizationService) TerminateFleetRunner(ctx context.Context, req *pb.TerminateFleetRunnerRequest) (*pb.TerminateFleetRunnerResponse, error) {
+	return s.runners.TerminateFleetRunner(ctx, req)
+}
+
+func (s *OrganizationService) MarkFleetRunnerProviderDeleted(ctx context.Context, req *pb.MarkFleetRunnerProviderDeletedRequest) (*pb.MarkFleetRunnerProviderDeletedResponse, error) {
+	return s.runners.MarkFleetRunnerProviderDeleted(ctx, req)
 }
 
 func (s *OrganizationService) ListHostedLLMModels(

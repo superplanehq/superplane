@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -24,7 +25,7 @@ func Test__ListOrganizationRunnerFleets(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
-	t.Run("returns enabled installation and organization fleets without explicit enablement", func(t *testing.T) {
+	t.Run("requires feature enablement for organization selection", func(t *testing.T) {
 		installationFleet := newOrganizationListTestFleet("aws-large-amd64", models.RunnerFleetScopeInstallation, nil)
 		require.NoError(t, installationFleet.Create(db))
 
@@ -53,6 +54,11 @@ func Test__ListOrganizationRunnerFleets(t *testing.T) {
 		require.NoError(t, disabledFleet.Create(db))
 
 		response, err := ListOrganizationRunnerFleets(t.Context(), r.Organization.ID.String())
+		require.NoError(t, err)
+		require.Len(t, response.Fleets, 1)
+		assert.Equal(t, installationFleet.Slug, response.Fleets[0].Id)
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationRunners))
+		response, err = ListOrganizationRunnerFleets(t.Context(), r.Organization.ID.String())
 		require.NoError(t, err)
 		require.Len(t, response.Fleets, 2)
 		assert.Equal(t, installationFleet.Slug, response.Fleets[0].Id)
