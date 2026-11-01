@@ -22,6 +22,20 @@ var (
 	ErrSuspensionCancellationPending = errors.New("suspension cancellation pending")
 )
 
+type OrganizationSuspensionEvent struct {
+	ID                      uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	OrganizationID          uuid.UUID
+	AccountID               uuid.UUID
+	Action                  string
+	Reason                  string
+	CreatedAt               time.Time
+	CancellationCompletedAt *time.Time
+}
+
+func (o *Organization) IsSuspended() bool {
+	return o.SuspendedAt != nil
+}
+
 // RequireActiveOrganization coordinates admission with suspension. Call it in
 // the admission transaction, before taking any run, execution, runner or task locks.
 func RequireActiveOrganization(tx *gorm.DB, organizationID uuid.UUID) error {
@@ -54,20 +68,6 @@ func OrganizationSuspendedAt(tx *gorm.DB, organizationID uuid.UUID, at time.Time
 			WHERE r.organization_id = s.organization_id AND r.action = 'reactivate'
 			AND r.created_at >= s.created_at AND r.created_at <= ?))`, organizationID, at, at).Scan(&suspended).Error
 	return suspended, err
-}
-
-type OrganizationSuspensionEvent struct {
-	ID                      uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-	OrganizationID          uuid.UUID
-	AccountID               uuid.UUID
-	Action                  string
-	Reason                  string
-	CreatedAt               time.Time
-	CancellationCompletedAt *time.Time
-}
-
-func (o *Organization) IsSuspended() bool {
-	return o.SuspendedAt != nil
 }
 
 // Suspend records state and history in one short transaction. It also accepts

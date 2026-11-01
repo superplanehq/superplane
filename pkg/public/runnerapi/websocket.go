@@ -433,7 +433,7 @@ func (s *Server) reconcileRunnerConnection(
 		if err := s.initializeTaskLogs(ctx, task.ID); err != nil {
 			return err
 		}
-		if err := s.startRunnerTask(ctx, runner, task.ID, connectionID); err != nil {
+		if err := s.startRunnerTask(ctx, runner, task.ID, connectionID, nil); err != nil {
 			if errors.Is(err, models.ErrOrganizationSuspended) {
 				return connection.write(taskControlMessage{Type: messageTypeCancel, TaskID: task.ID.String()})
 			}
@@ -473,16 +473,19 @@ func (s *Server) reconcileRunnerConnection(
 	if err != nil {
 		return err
 	}
-	if err := s.startRunnerTask(ctx, runner, task.ID, connectionID); err != nil {
+	deliver := func() error {
+		return connection.write(taskMessage{
+			Type: messageTypeTask,
+			Task: json.RawMessage(payload),
+		})
+	}
+	if err := s.startRunnerTask(ctx, runner, task.ID, connectionID, deliver); err != nil {
 		if errors.Is(err, models.ErrOrganizationSuspended) {
 			return nil
 		}
 		return err
 	}
-	return connection.write(taskMessage{
-		Type: messageTypeTask,
-		Task: json.RawMessage(payload),
-	})
+	return nil
 }
 
 func (s *Server) startRunnerTask(
@@ -490,8 +493,10 @@ func (s *Server) startRunnerTask(
 	runner *models.Runner,
 	taskID uuid.UUID,
 	connectionID uuid.UUID,
+	deliver func() error,
 ) error {
 	var startedTask *models.RunnerTask
+	var startedRunner *models.Runner
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		currentRunner, err := models.FindRunner(tx, runner.ID)
 		if err != nil {
@@ -508,13 +513,25 @@ func (s *Server) startRunnerTask(
 		if err := currentTask.Start(tx, currentRunner, s.activeLogStoreName, time.Now()); err != nil {
 			return err
 		}
+		if currentRunner.CurrentConnectionID == nil || *currentRunner.CurrentConnectionID != connectionID {
+			return models.ErrRunnerConnectionReplaced
+		}
+		// Keep admission locks through the bounded socket write. A failed write
+		// rolls back the start, so an idle reconnect can retry the reservation.
+		// Suspension cannot commit between the active check and delivery.
+		if deliver != nil {
+			if err := deliver(); err != nil {
+				return err
+			}
+		}
 		startedTask = currentTask
-		*runner = *currentRunner
+		startedRunner = currentRunner
 		return nil
 	})
 	if err != nil {
 		return err
 	}
+	*runner = *startedRunner
 	messages.PublishPlanningBoardStatusForTask(database.DB(ctx), startedTask)
 	return nil
 }

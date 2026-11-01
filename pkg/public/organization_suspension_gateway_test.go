@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"github.com/superplanehq/superplane/test/support"
@@ -21,6 +22,7 @@ func TestOrganizationSuspensionGateway(t *testing.T) {
 	server.InitRouter()
 	registerTestGRPCGateway(t, server, resource.AuthService, resource.Registry, resource.Encryptor, support.NewOIDCProvider())
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureClaudeManagedAgents))
 	rawToken := uuid.NewString()
 	require.NoError(t, models.CreateUserAPIToken(db, models.NewUserAPIToken(resource.User, "Suspension test", crypto.HashToken(rawToken))))
 	base := "/admin/api/organizations/" + resource.Organization.ID.String()
@@ -53,6 +55,21 @@ func TestOrganizationSuspensionGateway(t *testing.T) {
 		require.True(t, response.Organization.Suspended)
 		write := execRequest(server, requestParams{method: "PATCH", path: "/api/v1/organizations/" + resource.Organization.ID.String(), body: []byte(`{"organization":{"metadata":{"name":"Changed"}}}`), contentType: "application/json", authCookie: cookie, authToken: token, headers: map[string]string{"x-organization-id": resource.Organization.ID.String()}})
 		require.Equal(t, http.StatusForbidden, write.Code, write.Body.String())
+		for _, operation := range []struct {
+			method, path string
+			status       int
+		}{
+			{"POST", "/api/v1/agents/chats/" + uuid.NewString() + "/messages", http.StatusForbidden},
+			{"POST", "/api/v1/agents/canvases/" + uuid.NewString() + "/chat/reset", http.StatusForbidden},
+			{"POST", "/api/v1/agents/chats/" + uuid.NewString() + "/outcome", http.StatusForbidden},
+			// The test installation has no agent provider. Allowed operations reach
+			// its availability check instead of failing suspension authorization.
+			{"POST", "/api/v1/agents/chats/" + uuid.NewString() + "/interrupt", http.StatusServiceUnavailable},
+			{"GET", "/api/v1/agents/chats/" + uuid.NewString() + "/messages", http.StatusServiceUnavailable},
+		} {
+			response := execRequest(server, requestParams{method: operation.method, path: operation.path, body: []byte(`{}`), contentType: "application/json", authCookie: cookie, authToken: token, headers: map[string]string{"x-organization-id": resource.Organization.ID.String()}})
+			require.Equal(t, operation.status, response.Code, response.Body.String())
+		}
 	}
 	require.NoError(t, workers.NewOrganizationSuspensionWorker().Process(t.Context()))
 	require.Equal(t, http.StatusOK, request("POST", base+"/reactivate", `{}`, rawToken))

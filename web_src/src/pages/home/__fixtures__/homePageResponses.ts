@@ -60,6 +60,7 @@ export interface HomePageFixture {
   organizationName: string;
   /** Organization slug shown on the org General settings tabs. Defaults to a slugified organizationName. */
   organizationSlug?: string;
+  suspended?: boolean;
   canvases: CanvasesCanvasSummary[];
   enabledExperimentalFeatures?: string[];
   factories?: Array<{ id: string; name: string; description?: string }>;

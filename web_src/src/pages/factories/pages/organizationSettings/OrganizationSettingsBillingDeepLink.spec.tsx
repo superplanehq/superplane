@@ -23,7 +23,11 @@ vi.mock("@/api-client", () => ({
 }));
 vi.mock("@/contexts/useAccount", () => ({ useAccount: () => ({ account: {} }) }));
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => canManageBilling, isLoading: permissionsLoading }),
+  usePermissions: () => ({
+    canAct: () => canManageBilling,
+    hasPermission: () => canManageBilling,
+    isLoading: permissionsLoading,
+  }),
 }));
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({ has: () => false, isLoading: featuresLoading, organizationReady }),

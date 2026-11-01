@@ -135,6 +135,7 @@ func BlocksSuspendedOrganization(route HTTPRoute, rule AuthorizationRule) bool {
 		"/api/v1/canvases/{canvas_id}/executions/{execution_id}/hooks/{hook_name}",
 		"/api/v1/factories/{factory_id}/orders/{order_id}/close",
 		"/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end",
+		"/api/v1/agents/chats/{chat_id}/interrupt",
 		"/api/v1/organizations/{id}/runners/{runner_id}",
 		"/api/v1/organizations/{id}/runners/{runner_id}:provider-deleted",
 		"/api/v1/organizations/{id}/billing-portal-session":
@@ -144,7 +145,7 @@ func BlocksSuspendedOrganization(route HTTPRoute, rule AuthorizationRule) bool {
 	case "/api/v1/factories/{factory_id}/velocity/sync":
 		return true
 	}
-	return rule.Action != "read" && rule.Resource != "agents"
+	return rule.Action != "read"
 }
 
 func withAuthorizedContext(ctx context.Context, pathParams map[string]string, organizationID string) context.Context {
