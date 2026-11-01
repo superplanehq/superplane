@@ -106,7 +106,7 @@ func defaultBindOptions() core.BindOptions {
 		DefaultOutputFormat: GetOutputFormat,
 		NewConfigContext: func() core.ConfigContext {
 			if context, ok := GetEnvironmentContext(); ok {
-				if selected, ok := GetCurrentContext(); ok {
+				if selected, ok := GetCurrentContext(); ok && selected.URL == context.URL {
 					context.OrganizationID = selected.OrganizationID
 				}
 				return NewEnvironmentContext(context)

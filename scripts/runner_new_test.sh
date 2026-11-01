@@ -29,6 +29,11 @@ case " $* " in
     ;;
   *" stop fleet-manager "*) printf 'stop\n' >>"${STUB_LOG}" ;;
   *" up -d --no-build --no-deps fleet-manager "*) printf 'restore\n' >>"${STUB_LOG}" ;;
+  *" exec -T app node "*)
+    while [[ "$1" != app ]]; do shift; done
+    shift
+    exec "$@"
+    ;;
   *" run --rm "*)
     [[ " $* " == *" --url http://runner-network:8000 "* ]]
     [[ " $* " == *" --registration-token registration-token "* ]]
@@ -38,7 +43,12 @@ case " $* " in
     ;;
 esac
 STUB
-chmod +x "${temporary}/docker"
+cat >"${temporary}/jq" <<'STUB'
+#!/usr/bin/env bash
+printf 'runner-new must not require host jq\n' >&2
+exit 127
+STUB
+chmod +x "${temporary}/docker" "${temporary}/jq"
 
 for failure in none create malformed run; do
   export STUB_LOG="${temporary}/${failure}.log" STUB_FAILURE="${failure}"

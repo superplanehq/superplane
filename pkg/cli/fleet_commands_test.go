@@ -96,9 +96,9 @@ func TestFleetCommandsRouteExplicitScopes(t *testing.T) {
 				} else {
 					_, err := UpsertContext(ConfigContext{URL: server.URL, APIToken: "credential", OrganizationID: "selected"})
 					require.NoError(t, err)
-					// Environment credentials do not replace the selected organization.
+					// Environment credentials on the same server preserve the selected organization.
 					if tc.args[0] == "fleets" && tc.args[1] == "list" {
-						t.Setenv(EnvAPIURL, server.URL)
+						t.Setenv(EnvAPIURL, server.URL+"/")
 						t.Setenv(EnvAPIToken, "credential")
 					}
 				}
@@ -178,6 +178,45 @@ func TestRunnerReusableScopeAndPermissionErrors(t *testing.T) {
 			require.Equal(t, 2, requests)
 		})
 	}
+}
+
+func TestFleetCommandsResolveOrganizationOnEnvironmentServer(t *testing.T) {
+	setupViper(t)
+	_, err := UpsertContext(ConfigContext{
+		URL: "https://production.example.com", APIToken: "production-token", OrganizationID: "production-organization",
+	})
+	require.NoError(t, err)
+	before, err := os.ReadFile(viper.ConfigFileUsed())
+	require.NoError(t, err)
+
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		require.Equal(t, "Bearer local-token", r.Header.Get("Authorization"))
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/me":
+			_, _ = fmt.Fprint(w, `{"user":{"organizationId":"local-organization"}}`)
+		case "/api/v1/organizations/local-organization/fleets":
+			_, _ = fmt.Fprint(w, `{"fleets":[{"id":"local-fleet"}]}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	t.Setenv(EnvAPIURL, server.URL+"/")
+	t.Setenv(EnvAPIToken, "local-token")
+	root := fleetRoot(t)
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"fleets", "list"})
+	require.NoError(t, root.Execute())
+	require.JSONEq(t, `{"fleets":[{"id":"local-fleet"}]}`, out.String())
+	require.Equal(t, []string{"/api/v1/me", "/api/v1/organizations/local-organization/fleets"}, paths)
+	after, err := os.ReadFile(viper.ConfigFileUsed())
+	require.NoError(t, err)
+	require.Equal(t, before, after)
 }
 
 func TestFleetUpdateRejectsConflictingFileID(t *testing.T) {
