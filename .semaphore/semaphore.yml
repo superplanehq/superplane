@@ -80,6 +80,7 @@ blocks:
             - make check.grpc.actions.status
             - make check.ee.imports
             - make check.models.tx.debt
+            - make check.admin.routes
             - make check.generated.artifacts
 
       epilogue:

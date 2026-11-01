@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -26,7 +25,7 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 		return nil, grpcerrors.InvalidArgument(nil, "organization metadata is required")
 	}
 
-	tx := database.Conn()
+	tx := database.DB(ctx)
 	organization, err := models.FindOrganizationByIDOrSlug(tx, orgID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "organization not found")
@@ -47,9 +46,7 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 		return nil, err
 	}
 
-	now := time.Now()
-	organization.UpdatedAt = &now
-	err = tx.Save(organization).Error
+	err = organization.UpdateSettings(tx)
 	if err != nil {
 		if isTakenOrganizationIdentityError(err) {
 			// Names are not required to be unique; only the slug still has a

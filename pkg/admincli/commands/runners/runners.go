@@ -244,7 +244,7 @@ func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 	return renderRunner(ctx, response.Runner)
 }
 
-func renderRunner(ctx core.CommandContext, runner *openapi_client.RunnersRunner) error {
+func renderRunner(ctx core.CommandContext, runner *openapi_client.AdminRunnersRunner) error {
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(runner)
 	}

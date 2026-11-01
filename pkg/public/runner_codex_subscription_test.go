@@ -6,9 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -25,6 +29,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 func TestCodexCheckpointStoresQuotaWithoutBlockingCredentials(t *testing.T) {
@@ -269,29 +274,212 @@ func TestCodexRefreshIsSingleFlightAndHidesTheRefreshToken(t *testing.T) {
 	require.Equal(t, http.StatusOK, credentialResponse.Code, credentialResponse.Body.String())
 	assert.Contains(t, credentialResponse.Body.String(), secret)
 	assert.NotContains(t, credentialResponse.Body.String(), "openai-refresh-2")
+
+	assert.Equal(t, http.StatusUnauthorized, refresh("invalid-lease-secret").Code)
+	require.NoError(t, db.Model(&originalLease).Update("revoked_at", time.Now()).Error)
+	assert.Equal(t, http.StatusUnauthorized, refresh(secret).Code)
+	assert.Equal(t, int32(1), calls.Load(), "invalid and revoked leases must not reach the provider")
 }
 
+// The provider can rotate a token before the client disconnects. The stored
+// bundle and subsequent credential fetch must still use the rotated token.
+func TestCodexRefreshPersistsAfterRequestCancellation(t *testing.T) {
+	for _, replacement := range []string{"openai-refresh-2", ""} {
+		t.Run("replacement="+replacement, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			connection, factory, secret := readyCodexRun(t, r)
+			version := connection.CredentialVersion
+			nextAccess := codexTestAccessToken(time.Now().Add(time.Hour))
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			var exchangeDeadline time.Time
+			encryptor := &codexRefreshEncryptor{Encryptor: r.Encryptor, beforeEncrypt: func(ctx context.Context) error {
+				deadline, bounded := ctx.Deadline()
+				assert.True(t, bounded, "persistence must have an operation deadline")
+				assert.True(t, deadline.After(exchangeDeadline), "exchange must leave time to save credentials")
+				return ctx.Err()
+			}}
+			server := &Server{
+				encryptor: encryptor,
+				codexTokenRefresh: func(operation context.Context, refreshToken string) (runneraction.CodexTokenSet, error) {
+					assert.Equal(t, "openai-refresh", refreshToken)
+					var bounded bool
+					exchangeDeadline, bounded = operation.Deadline()
+					assert.True(t, bounded, "provider exchange must have a deadline")
+					cancel()
+					assert.NoError(t, operation.Err(), "request cancellation must not cancel the provider exchange")
+					return runneraction.CodexTokenSet{AccessToken: nextAccess, RefreshToken: replacement, IDToken: "id-token-2"}, nil
+				},
+			}
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", strings.NewReader(`{"refresh_token":"`+secret+`"}`)).WithContext(ctx)
+			response := httptest.NewRecorder()
+			server.handleRunnerCodexSubscriptionRefresh(response, request)
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+			require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+			assert.Equal(t, version+1, connection.CredentialVersion)
+			assert.Equal(t, models.CodexConnectionStatusReady, connection.Status)
+			plain, err := r.Encryptor.Decrypt(t.Context(), connection.BundleCiphertext, []byte(connection.ID.String()))
+			require.NoError(t, err)
+			assert.Equal(t, nextAccess, runneraction.CodexAuthToken(plain, "access_token"))
+			expectedRefresh := replacement
+			if expectedRefresh == "" {
+				expectedRefresh = "openai-refresh"
+			}
+			assert.Equal(t, expectedRefresh, runneraction.CodexAuthToken(plain, "refresh_token"))
+
+			var lease models.FactoryCodexLease
+			err = db.Where("connection_id = ? AND purpose = ?", connection.ID, models.CodexLeasePurposeRun).First(&lease).Error
+			require.NoError(t, err)
+			signer := jwt.NewSigner("test-codex-cancellation")
+			server.jwt = signer
+			token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
+				OrganizationID: connection.OrganizationID, FactoryID: factory.ID,
+				ConnectionID: connection.ID, TaskID: lease.TaskID, Generation: lease.Generation,
+			}, time.Hour)
+			require.NoError(t, err)
+			credentials := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
+			credentials.Header.Set("Authorization", "Bearer "+token)
+			fetched := httptest.NewRecorder()
+			server.handleRunnerCodexSubscriptionCredentials(fetched, credentials)
+			require.Equal(t, http.StatusOK, fetched.Code, fetched.Body.String())
+			assert.Contains(t, fetched.Body.String(), nextAccess)
+			assert.Contains(t, fetched.Body.String(), secret)
+			assert.NotContains(t, fetched.Body.String(), expectedRefresh)
+		})
+	}
+}
+
+type codexRefreshEncryptor struct {
+	crypto.Encryptor
+	beforeEncrypt func(context.Context) error
+}
+
+func (e *codexRefreshEncryptor) Encrypt(ctx context.Context, plain, associated []byte) ([]byte, error) {
+	if err := e.beforeEncrypt(ctx); err != nil {
+		return nil, err
+	}
+	return e.Encryptor.Encrypt(ctx, plain, associated)
+}
+
+// Provider response classification must reach durable connection state and the
+// update event used by the reconnect UI, rather than a preclassified mock error.
 func TestCodexRefreshFailureRequiresReconnect(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		status    int
+		body      string
+		permanent bool
+	}{
+		{"invalid grant", http.StatusBadRequest, `{"error":"invalid_grant"}`, true},
+		{"rate limit with token code", http.StatusTooManyRequests, `{"error":"refresh_token_reused"}`, false},
+		{"server error with token code", http.StatusServiceUnavailable, `{"code":"invalid_grant"}`, false},
+		{"quota exhausted", http.StatusBadRequest, `{"error":{"code":"insufficient_quota"}}`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			connection, factory, secret := readyCodexRun(t, r)
+			original := append([]byte(nil), connection.BundleCiphertext...)
+			version := connection.CredentialVersion
+			channel, queue := taskOwnerUpdateQueue(t)
+			provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(test.status)
+				_, _ = io.WriteString(w, test.body)
+			}))
+			defer provider.Close()
+			client := provider.Client()
+			client.Transport = codexProviderTransport{upstream: provider.URL, transport: http.DefaultTransport}
+			server := &Server{
+				encryptor: r.Encryptor,
+				codexTokenRefresh: func(ctx context.Context, token string) (runneraction.CodexTokenSet, error) {
+					return runneraction.RefreshCodexTokens(ctx, client, token)
+				},
+			}
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", strings.NewReader(`{"refresh_token":"`+secret+`"}`))
+			response := httptest.NewRecorder()
+			server.handleRunnerCodexSubscriptionRefresh(response, request)
+			require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+			assert.Equal(t, original, []byte(connection.BundleCiphertext))
+			assert.Equal(t, version, connection.CredentialVersion)
+			if !test.permanent {
+				assert.Equal(t, http.StatusServiceUnavailable, response.Code, response.Body.String())
+				assert.Equal(t, models.CodexConnectionStatusReady, connection.Status)
+				_, found, err := channel.Get(queue, true)
+				require.NoError(t, err)
+				assert.False(t, found, "retryable errors must not publish a reconnect transition")
+				return
+			}
+			require.Equal(t, http.StatusUnauthorized, response.Code, response.Body.String())
+			assert.Contains(t, response.Body.String(), "invalid_grant")
+			assert.Equal(t, models.CodexConnectionStatusReconnectRequired, connection.Status)
+			require.Eventually(t, func() bool {
+				delivery, found, err := channel.Get(queue, true)
+				require.NoError(t, err)
+				if !found {
+					return false
+				}
+				var update pb.FactoryWorkOrderUpdatedMessage
+				require.NoError(t, proto.Unmarshal(delivery.Body, &update))
+				return update.Reason == "codex_connection" && update.FactoryId == factory.ID.String()
+			}, 3*time.Second, 10*time.Millisecond)
+			_, err := models.ReserveFactoryCodexConnection(db, connection.OrganizationID, factory.ID, support.CreateCodexOwnedRun(t, db, connection), uuid.New(), time.Now(), r.Encryptor)
+			require.ErrorIs(t, err, models.ErrSubscriptionOwnerInvalid)
+		})
+	}
+}
+
+type codexProviderTransport struct {
+	upstream  string
+	transport http.RoundTripper
+}
+
+func (c codexProviderTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	forward := request.Clone(request.Context())
+	endpoint, err := url.Parse(c.upstream)
+	if err != nil {
+		return nil, err
+	}
+	forward.URL = endpoint
+	return c.transport.RoundTrip(forward)
+}
+
+func TestCodexRefreshDoesNotReportReconnectAfterCommitFailure(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	connection, _, secret := readyCodexRun(t, r)
+	channel, queue := taskOwnerUpdateQueue(t)
+	// A deferred foreign key fails at COMMIT, after the reconnect update has
+	// succeeded. The temporary table is removed when the transaction rolls back.
+	callback := "test:codex_refresh_commit_failure"
+	require.NoError(t, db.Callback().Update().After("gorm:update").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table != "factory_codex_connections" {
+			return
+		}
+		isolated := tx.Session(&gorm.Session{NewDB: true})
+		require.NoError(t, isolated.Exec(`CREATE TEMP TABLE codex_refresh_commit_failure (
+			id INT PRIMARY KEY,
+			parent INT REFERENCES codex_refresh_commit_failure(id) DEFERRABLE INITIALLY DEFERRED
+		) ON COMMIT DROP`).Error)
+		require.NoError(t, isolated.Exec("INSERT INTO codex_refresh_commit_failure VALUES (1, 2)").Error)
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Update().Remove(callback)) })
 	server := &Server{
 		encryptor: r.Encryptor,
 		codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
-			return runneraction.CodexTokenSet{}, &runneraction.CodexTokenRefreshError{Permanent: true, Code: "refresh_token_reused"}
+			return runneraction.CodexTokenSet{}, &runneraction.CodexTokenRefreshError{Permanent: true, Code: "invalid_grant"}
 		},
 	}
-	body, err := json.Marshal(map[string]string{"refresh_token": secret})
-	require.NoError(t, err)
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", bytes.NewReader(body))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", strings.NewReader(`{"refresh_token":"`+secret+`"}`))
 	response := httptest.NewRecorder()
 	server.handleRunnerCodexSubscriptionRefresh(response, request)
-	require.Equal(t, http.StatusUnauthorized, response.Code, response.Body.String())
-	assert.Contains(t, response.Body.String(), "refresh_token_reused")
+	assert.Equal(t, http.StatusInternalServerError, response.Code, response.Body.String())
+	assert.NotContains(t, response.Body.String(), "invalid_grant")
 	require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
-	assert.Equal(t, models.CodexConnectionStatusReconnectRequired, connection.Status)
-	_, err = models.ReserveFactoryCodexConnection(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), support.CreateCodexOwnedRun(t, db, connection), uuid.New(), time.Now(), r.Encryptor)
-	require.ErrorIs(t, err, models.ErrSubscriptionOwnerInvalid)
+	assert.Equal(t, models.CodexConnectionStatusReady, connection.Status)
+	_, found, err := channel.Get(queue, true)
+	require.NoError(t, err)
+	assert.False(t, found, "failed commits must not publish a reconnect transition")
 }
 
 func readyCodexRun(t *testing.T, r *support.ResourceRegistry) (*models.FactoryCodexConnection, *models.Factory, string) {

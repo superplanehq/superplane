@@ -28,6 +28,7 @@ func TestSubscriptionScriptSavesSetupFailuresWithoutSecrets(t *testing.T) {
 		command    string
 		status     int
 		bundle     map[string]any
+		rawBody    string
 		brokenHome bool
 		wantError  string
 	}{
@@ -44,6 +45,13 @@ func TestSubscriptionScriptSavesSetupFailuresWithoutSecrets(t *testing.T) {
 			wantError: "ChatGPT subscription credentials are missing",
 		},
 		{
+			name:      "restore malformed credentials",
+			command:   "restore",
+			status:    http.StatusOK,
+			rawBody:   "opaque-value-1234",
+			wantError: "ChatGPT subscription response is invalid",
+		},
+		{
 			name:       "restore filesystem error contains token",
 			command:    "restore",
 			status:     http.StatusOK,
@@ -57,6 +65,10 @@ func TestSubscriptionScriptSavesSetupFailuresWithoutSecrets(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/v1/runner/codex-subscription/credentials", r.URL.Path)
 				w.WriteHeader(tt.status)
+				if tt.rawBody != "" {
+					_, _ = w.Write([]byte(tt.rawBody))
+					return
+				}
 				_ = json.NewEncoder(w).Encode(map[string]any{"bundle": tt.bundle})
 			}))
 			t.Cleanup(server.Close)
@@ -90,6 +102,9 @@ func TestSubscriptionScriptSavesSetupFailuresWithoutSecrets(t *testing.T) {
 			assert.Contains(t, string(out), tt.wantError)
 			assert.NotContains(t, string(out), runnerToken)
 			assert.NotContains(t, string(contents), runnerToken)
+			if tt.rawBody != "" {
+				assert.NotContains(t, string(out)+string(contents), tt.rawBody)
+			}
 		})
 	}
 }
