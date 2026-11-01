@@ -24,6 +24,7 @@ import { OrganizationSettingsBillingPage } from "@/pages/factories/pages/organiz
 import { OrganizationSettingsUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsUsagePage";
 import {
   FactoryOrganizationApiKeyDetailPage,
+  FactoryOrganizationFleetsPage,
   FactoryOrganizationApiKeysPage,
   FactoryOrganizationLLMModelsPage,
   FactoryOrganizationMembersPage,
@@ -48,6 +49,23 @@ import { FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCo
 import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 
 export const factorySettingsSectionRoutes = [
+  ...(
+    [
+      ["organization/fleets", "catalog"],
+      ["organization/fleets/:fleetId", "fleet"],
+      ["organization/fleets/:fleetId/runners/:runnerId", "runner"],
+    ] as const
+  ).map(([path, detail]) => (
+    <Route
+      key={path}
+      path={path}
+      element={
+        <RequirePermission resource="org" action="read">
+          <FactoryOrganizationFleetsPage detail={detail} />
+        </RequirePermission>
+      }
+    />
+  )),
   <Route
     key="factory-settings-account-codex-usage"
     path="account/codex-usage"
