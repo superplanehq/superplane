@@ -75,26 +75,41 @@ func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy,
 	return organizations, total, err
 }
 
-func ListUnpinnedOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) (organizations []OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
-	if err = organizationsMatchingSearch(tx, search).Count(&matchTotal).Error; err != nil {
+func ListUnpinnedOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID, statuses ...string) (organizations []OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
+	if err = organizationsMatchingSearch(tx, search, statuses...).Count(&matchTotal).Error; err != nil {
 		return nil, 0, 0, err
 	}
 
 	if sortBy == OrganizationSortRemainingCreditCents {
-		organizations, unpinnedTotal, err = listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection, excludeIDs)
+		organizations, unpinnedTotal, err = listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection, excludeIDs, statuses...)
 		return organizations, unpinnedTotal, matchTotal, err
 	}
 	if sortBy == OrganizationSortPlanName {
-		organizations, unpinnedTotal, err = listOrganizationsByPlanName(tx, search, limit, offset, sortDirection, excludeIDs)
+		organizations, unpinnedTotal, err = listOrganizationsByPlanName(tx, search, limit, offset, sortDirection, excludeIDs, statuses...)
 		return organizations, unpinnedTotal, matchTotal, err
 	}
 
-	organizations, unpinnedTotal, err = listOrganizations(tx, search, limit, offset, sortBy, sortDirection, excludeIDs)
+	organizations, unpinnedTotal, err = listOrganizations(tx, search, limit, offset, sortBy, sortDirection, excludeIDs, statuses...)
 	return organizations, unpinnedTotal, matchTotal, err
 }
 
-func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
-	query := excludeOrganizationIDs(organizationsMatchingSearch(tx, search), excludeIDs)
+// FilterOrganizationStatus applies the status predicate before counts and pagination.
+func FilterOrganizationStatus(tx *gorm.DB, statuses ...string) *gorm.DB {
+	if len(statuses) == 0 {
+		return tx
+	}
+	status := statuses[0]
+	if status == "active" {
+		return tx.Where("organizations.suspended_at IS NULL")
+	}
+	if status == "suspended" {
+		return tx.Where("organizations.suspended_at IS NOT NULL")
+	}
+	return tx
+}
+
+func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID, statuses ...string) ([]OrganizationWithCounts, int64, error) {
+	query := excludeOrganizationIDs(organizationsMatchingSearch(tx, search, statuses...), excludeIDs)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -117,8 +132,8 @@ func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, so
 	return organizations, total, nil
 }
 
-func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offset int, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
-	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc", excludeIDs)
+func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offset int, sortDirection string, excludeIDs []uuid.UUID, statuses ...string) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc", excludeIDs, statuses...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -193,8 +208,8 @@ func ResolveOrganizationPlans(tx *gorm.DB, organizations []OrganizationWithCount
 	return nil
 }
 
-func listOrganizationsByPlanName(tx *gorm.DB, search string, limit, offset int, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
-	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc", excludeIDs)
+func listOrganizationsByPlanName(tx *gorm.DB, search string, limit, offset int, sortDirection string, excludeIDs []uuid.UUID, statuses ...string) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc", excludeIDs, statuses...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -683,10 +698,11 @@ func HasExperimentalFeature(orgID uuid.UUID, featureID string) (bool, error) {
 	return organization.HasExperimentalFeature(featureID), nil
 }
 
-func organizationsMatchingSearch(tx *gorm.DB, search string) *gorm.DB {
+func organizationsMatchingSearch(tx *gorm.DB, search string, statuses ...string) *gorm.DB {
 	query := tx.
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
+	query = FilterOrganizationStatus(query, statuses...)
 
 	search = strings.TrimSpace(search)
 	if search == "" {

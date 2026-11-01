@@ -176,7 +176,7 @@ func TestSuspensionStopsDeletedCanvasComponentBeforeReactivation(t *testing.T) {
 	require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
 }
 
-func TestSuspensionDoesNotFinishDispatchConcurrentlyAdmittedFromQueue(t *testing.T) {
+func TestSuspensionDiscardsQueueBeforeAdmission(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
@@ -205,22 +205,13 @@ func TestSuspensionDoesNotFinishDispatchConcurrentlyAdmittedFromQueue(t *testing
 	defer admission.Rollback()
 	admitted, err := models.AdmitQueuedForStep(admission, line.ID, 0)
 	require.NoError(t, err)
-	require.Len(t, admitted, 1)
-	done := make(chan error, 1)
-	go func() { done <- NewOrganizationSuspensionWorker().Process(t.Context()) }()
-	require.Eventually(t, func() bool {
-		var waiting bool
-		err := db.Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%factory_lines%')").Scan(&waiting).Error
-		return err == nil && waiting
-	}, 2*time.Second, 10*time.Millisecond)
+	require.Empty(t, admitted)
 	require.NoError(t, admission.Commit().Error)
-	require.NoError(t, <-done)
+	require.NoError(t, NewOrganizationSuspensionWorker().Process(t.Context()))
 	stored, err := models.FindWorkOrderLineDispatch(db, dispatch.ID)
 	require.NoError(t, err)
-	require.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, stored.State)
-	run, err := models.FindUnscopedCanvasRun(db, admitted[0].Run.ID)
-	require.NoError(t, err)
-	require.Equal(t, models.CanvasRunStateCancelling, run.State)
+	require.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, stored.State)
+	require.Equal(t, models.CanvasRunResultCancelled, stored.Result)
 }
 
 func TestSuspensionCancellationDoesNotBlockFactoryRunFinalization(t *testing.T) {

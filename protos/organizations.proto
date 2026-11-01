@@ -594,6 +594,7 @@ message Organization {
 
   Metadata metadata = 1;
   Spec spec = 2;
+  bool suspended = 3;
 }
 
 message DescribeOrganizationRequest {

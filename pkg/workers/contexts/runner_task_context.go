@@ -47,7 +47,14 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 	if err != nil {
 		return err
 	}
+	encrypted, err := c.encryptor.Encrypt(context.Background(), payload, []byte(id.String()))
+	if err != nil {
+		return fmt.Errorf("encrypt runner task payload: %w", err)
+	}
 	return c.tx.Transaction(func(tx *gorm.DB) error {
+		if err := models.RequireActiveOrganization(tx, c.organizationID); err != nil {
+			return err
+		}
 		fleet, err := models.FindEnabledRunnerFleetForOrganization(tx, c.organizationID, fleetID)
 		if err != nil {
 			return err
@@ -55,15 +62,6 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 		if err := fleet.RequireAdmission(tx); err != nil {
 			return err
 		}
-		encrypted, err := encryption.ForDB(tx, c.encryptor).Encrypt(
-			context.Background(),
-			payload,
-			[]byte(id.String()),
-		)
-		if err != nil {
-			return fmt.Errorf("encrypt runner task payload: %w", err)
-		}
-
 		now := time.Now()
 		task := &models.RunnerTask{
 			ID:                id,

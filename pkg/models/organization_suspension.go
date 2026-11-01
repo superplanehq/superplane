@@ -11,11 +11,13 @@ import (
 )
 
 const (
+	OrganizationSuspendedMessage           = "This organization is suspended. Existing data remains available. Configuration changes and new runs are blocked. Contact an installation admin."
 	OrganizationSuspensionActionSuspend    = "suspend"
 	OrganizationSuspensionActionReactivate = "reactivate"
 )
 
 var (
+	ErrOrganizationSuspended         = errors.New("organization is suspended")
 	ErrSuspensionReasonRequired      = errors.New("suspension reason must contain 1 to 2000 characters")
 	ErrSuspensionCancellationPending = errors.New("suspension cancellation pending")
 )
@@ -32,6 +34,40 @@ type OrganizationSuspensionEvent struct {
 
 func (o *Organization) IsSuspended() bool {
 	return o.SuspendedAt != nil
+}
+
+// RequireActiveOrganization coordinates admission with suspension. Call it in
+// the admission transaction, before taking any run, execution, runner or task locks.
+func RequireActiveOrganization(tx *gorm.DB, organizationID uuid.UUID) error {
+	organization, err := LockOrganization(tx, organizationID)
+	if err != nil {
+		return err
+	}
+	if organization.IsSuspended() {
+		return ErrOrganizationSuspended
+	}
+	return nil
+}
+
+func RequireActiveCanvasOrganization(tx *gorm.DB, canvasID uuid.UUID) error {
+	canvas, err := FindUnscopedCanvasInTransaction(tx, canvasID)
+	if err != nil {
+		return err
+	}
+	return RequireActiveOrganization(tx, canvas.OrganizationID)
+}
+
+// OrganizationSuspendedAt includes completed intervals, so a delayed timer
+// cannot replay an occurrence after reactivation.
+func OrganizationSuspendedAt(tx *gorm.DB, organizationID uuid.UUID, at time.Time) (bool, error) {
+	var suspended bool
+	err := tx.Raw(`SELECT EXISTS (
+		SELECT 1 FROM organization_suspension_events s
+		WHERE s.organization_id = ? AND s.action = 'suspend' AND s.created_at <= ?
+		AND NOT EXISTS (SELECT 1 FROM organization_suspension_events r
+			WHERE r.organization_id = s.organization_id AND r.action = 'reactivate'
+			AND r.created_at >= s.created_at AND r.created_at <= ?))`, organizationID, at, at).Scan(&suspended).Error
+	return suspended, err
 }
 
 // Suspend records state and history in one short transaction. It also accepts

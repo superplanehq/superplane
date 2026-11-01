@@ -61,6 +61,43 @@ func TestRunnerTaskStartCreatesLogLifecycle(t *testing.T) {
 	assert.WithinDuration(t, startedAt, lifecycle.UpdatedAt, time.Millisecond)
 }
 
+func TestSuspensionSharedFleetReservationAndStart(t *testing.T) {
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	active, err := models.CreateOrganization("Active fleet member", "")
+	require.NoError(t, err)
+	fleet := newTestRunnerFleet()
+	require.NoError(t, fleet.Create(db))
+	runner := &models.Runner{ID: uuid.New(), FleetID: fleet.ID, State: models.RunnerStateIdle, RunnerVersion: "test"}
+	require.NoError(t, db.Create(runner).Error)
+	now := time.Now()
+	blocked := models.RunnerTask{ID: uuid.New(), OrganizationID: resource.Organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued, PayloadCiphertext: []byte("ciphertext"), QueuedAt: now}
+	eligible := blocked
+	eligible.ID = uuid.New()
+	eligible.OrganizationID = active.ID
+	eligible.QueuedAt = now.Add(time.Second)
+	require.NoError(t, db.Create(&blocked).Error)
+	require.NoError(t, db.Create(&eligible).Error)
+	// An uncommitted suspension owns the organization row. Shared fleets must
+	// skip that row without blocking the next organization's task.
+	suspension := db.Begin()
+	defer suspension.Rollback()
+	require.NoError(t, resource.Organization.Suspend(suspension, resource.Account.ID, "Abuse"))
+	reservation, err := runner.ReserveNextTask(db)
+	require.NoError(t, err)
+	require.NotNil(t, reservation.Task)
+	require.Equal(t, eligible.ID, reservation.Task.ID)
+	require.NoError(t, suspension.Commit().Error)
+	require.ErrorIs(t, blocked.Reserve(db, runner.ID), models.ErrOrganizationSuspended)
+	require.NoError(t, active.Suspend(db, resource.Account.ID, "Stop before start"))
+	err = db.Transaction(func(tx *gorm.DB) error { return reservation.Task.Start(tx, runner, "test-store", time.Now()) })
+	require.ErrorIs(t, err, models.ErrOrganizationSuspended)
+	stored, err := models.FindRunnerTask(db, eligible.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.RunnerTaskStateReserved, stored.State)
+	require.Nil(t, stored.StartedAt)
+}
+
 func TestLostRunningTaskBecomesArchivable(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	resource := support.Setup(t)

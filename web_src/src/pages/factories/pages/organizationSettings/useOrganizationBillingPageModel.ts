@@ -59,6 +59,7 @@ export type OrganizationBillingPageModel = {
   seats?: BillingSeatSummary;
   organizationName: string;
   canManageBilling: boolean;
+  canAccessBillingPortal: boolean;
   billingEnabled: boolean;
   subscriptionCheckoutEnabled: boolean;
   creditPurchaseAllowed: boolean;
@@ -170,7 +171,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   const [searchParams] = useSearchParams();
   const creditAdded = searchParams.get("credit") === "added";
   const subscribed = searchParams.get("subscribed") === "1";
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { canAct, hasPermission, isLoading: permissionsLoading } = usePermissions();
   const canManageBilling = canAct("org", "update");
   const { data: organization } = useOrganization(organizationId);
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -223,6 +224,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   return {
     organizationName: organization?.metadata?.name || "Organization",
     canManageBilling,
+    canAccessBillingPortal: hasPermission("org", "update") && !account?.support_session?.active,
     billingEnabled,
     subscriptionCheckoutEnabled: flags.subscriptionCheckoutEnabled,
     creditPurchaseAllowed: flags.creditPurchaseAllowed,

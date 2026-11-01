@@ -771,6 +771,15 @@ func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope st
 	if err != nil || !allowed {
 		return ToolError("Not found")
 	}
+	if action != "read" {
+		organization, err := models.FindOrganizationSuspensionStatus(database.DB(ctx), claims.OrgID)
+		if err != nil {
+			return ToolError("Not found")
+		}
+		if organization.IsSuspended() {
+			return ToolError(models.OrganizationSuspendedMessage)
+		}
+	}
 	return nil
 }
 

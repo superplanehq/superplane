@@ -375,8 +375,14 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	var factoryOrderUpdates []factoryWorkOrderUpdate
 	var mergeabilityRefresh *factoryPullRequestMergeabilityRefresh
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		canvas, err := models.FindUnscopedCanvasInTransaction(tx, workflowID)
+		if err != nil {
+			return err
+		}
+		if _, err := models.LockOrganization(tx, canvas.OrganizationID); err != nil {
+			return err
+		}
 		var skipReason string
-		var err error
 		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger, eventCollector, executionCollector)
 		if skipReason != "" {
 			outcome = executorOutcomeSkipped
@@ -654,15 +660,22 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	if err := execution.MarkFinished(tx, run.Result); err != nil {
 		return nil, nil, err
 	}
+	organization, err := models.FindOrganizationSuspensionStatus(tx, execution.OrganizationID)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	//
 	// The finished run freed a slot at its step: admit queued work orders
 	// while slots are free. Failed and cancelled runs free their slot the
 	// same way passed runs do.
 	//
-	admitted, err := models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
-	if err != nil {
-		return nil, nil, err
+	var admitted []*models.FactoryLineStepResult
+	if !organization.IsSuspended() {
+		admitted, err = models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	pendingRuns, orderUpdates := factoryAdmissionOutcomes(admitted)
@@ -689,6 +702,9 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	}
 	if openWork {
 		return pendingRuns, orderUpdates, nil
+	}
+	if organization.IsSuspended() {
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
 	}
 
 	if run.Result != models.CanvasRunResultPassed {

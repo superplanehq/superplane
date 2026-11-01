@@ -52,6 +52,7 @@ export function OrganizationSettingsBillingPage() {
               billingContactMessage={model.billingContactMessage}
               billingEnabled={model.billingEnabled}
               canManageBilling={model.canManageBilling}
+              canAccessBillingPortal={model.canAccessBillingPortal}
               checkoutPending={model.billing.checkoutPending}
               creditPurchaseAllowed={model.creditPurchaseAllowed}
               creditRefreshStatus={model.creditRefreshStatus}
@@ -94,6 +95,7 @@ type BillingPageBodyProps = {
   billingContactMessage?: string;
   billingEnabled: boolean;
   canManageBilling: boolean;
+  canAccessBillingPortal: boolean;
   checkoutPending: boolean;
   creditPurchaseAllowed: boolean;
   creditRefreshStatus: HostedCreditRefreshStatus;
@@ -129,6 +131,7 @@ function BillingPageBody({
   billingContactMessage,
   billingEnabled,
   canManageBilling,
+  canAccessBillingPortal,
   checkoutPending,
   creditPurchaseAllowed,
   creditRefreshStatus,
@@ -168,13 +171,14 @@ function BillingPageBody({
     );
   }
 
-  const showInvoices = billingEnabled && canManageBilling && hasBillingCustomer;
+  const showInvoices = billingEnabled && canAccessBillingPortal && hasBillingCustomer;
 
   return (
     <>
       <BillingPaymentSettings
         organizationId={organizationId}
         canManageBilling={canManageBilling}
+        canAccessBillingPortal={canAccessBillingPortal}
         subscriptionPending={subscriptionPending}
         onCancelSubscription={onCancelSubscription}
         onKeepSubscription={onKeepSubscription}
