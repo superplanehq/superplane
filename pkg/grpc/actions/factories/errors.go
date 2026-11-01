@@ -39,6 +39,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	}
 
 	switch {
+	case errors.Is(err, models.ErrOrganizationSuspended):
+		return grpcerrors.PermissionDenied(err, models.OrganizationSuspendedMessage)
 	case errors.Is(err, errCodexConnectionRequired):
 		return grpcerrors.FailedPreconditionWithReason("Connect your Codex account to take ownership of this task.", "CODEX_CONNECTION_REQUIRED")
 	case errors.Is(err, billing.ErrPaymentMethodRequired):

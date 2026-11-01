@@ -243,6 +243,7 @@ function LoadedMobileTask({
 }) {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const model = useMobileTaskModel(order, orderId, lineId, lineName, onBack);
+  const { canCancel } = usePermissions();
   const { fixture, artifacts, pullRequests } = model;
   const draftStart = useMobileDraftStart(model, lineId || lineName || "");
   const refine = useMobileRefineChat({
@@ -264,9 +265,10 @@ function LoadedMobileTask({
       withModelSelect={withModelSelect}
     />
   );
-  const canStopRun = Boolean(model.canUpdate && organizationId && factoryId && orderId);
+  const canStopRun = Boolean((canCancel?.("canvases") ?? model.canUpdate) && organizationId && factoryId && orderId);
   const onStopRun = (run: { appId: string; runId: string }) => void model.footerActions.handleStopAutomation(run);
   const onRerunStep = (phase: { stepIndex?: number | null }) =>
+    model.canUpdate &&
     void model.footerActions.handleStop("rerun-step", {
       kind: "failed",
       lineName: fixture.lineName,

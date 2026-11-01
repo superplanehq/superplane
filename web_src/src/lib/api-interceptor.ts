@@ -18,12 +18,15 @@ let clientErrorInterceptorInstalled = false;
 export const setupApiInterceptor = (): void => {
   if (!clientErrorInterceptorInstalled) {
     client.interceptors.error.use((error, response) => {
+      const message = apiErrorMessage(error);
+      if (message.includes("organization is suspended")) {
+        window.dispatchEvent(new Event("organization-suspended"));
+      }
       if (error instanceof Error) {
         return error;
       }
 
       const fields = typeof error === "object" && error !== null ? error : {};
-      const message = "message" in fields && typeof fields.message === "string" ? fields.message : String(error);
       return Object.assign(new Error(message), fields, { status: response?.status });
     });
     clientErrorInterceptorInstalled = true;
@@ -71,6 +74,13 @@ export const setupApiInterceptor = (): void => {
   globalThis.fetch = nextFetch;
   interceptorFetch = nextFetch;
 };
+
+function apiErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string")
+    return error.message;
+  return String(error);
+}
 
 function requestURL(input: RequestInfo | URL): string {
   return typeof input === "string" ? input : input instanceof URL ? input.href : input.url;

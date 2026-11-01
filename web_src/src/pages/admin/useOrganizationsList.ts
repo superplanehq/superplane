@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SortDirection } from "./SortableHeader";
 
 export interface AdminOrganization {
+  suspended?: boolean;
   id: string;
   name: string;
   plan_key?: string;
@@ -81,11 +82,13 @@ async function requestOrganizationList(
   pageOffset: number,
   sort: OrganizationSortField,
   direction: SortDirection,
+  status: string,
 ): Promise<OrganizationListResponse | null> {
   const params = new URLSearchParams({ limit: String(ORGANIZATION_PAGE_SIZE), offset: String(pageOffset) });
   if (searchTerm) params.set("search", searchTerm);
   params.set("sort_by", sort);
   params.set("sort_direction", direction);
+  params.set("status", status);
   const response = await fetch(`/admin/api/organizations?${params}`, { credentials: "include" });
   if (!response.ok) {
     return null;
@@ -94,6 +97,7 @@ async function requestOrganizationList(
 }
 
 export function useOrganizationsList() {
+  const [status, setStatus] = useState("all");
   const [organizations, setOrganizations] = useState<AdminOrganization[]>([]);
   const [pinnedOrganizations, setPinnedOrganizations] = useState<AdminOrganization[]>([]);
   const [total, setTotal] = useState(0);
@@ -132,7 +136,7 @@ export function useOrganizationsList() {
       const requestID = ++listRequestID.current;
       setLoading(true);
       try {
-        const list = await requestOrganizationList(searchTerm, pageOffset, sort, direction);
+        const list = await requestOrganizationList(searchTerm, pageOffset, sort, direction, status);
         if (requestID !== listRequestID.current) {
           return "stale";
         }
@@ -160,7 +164,7 @@ export function useOrganizationsList() {
         }
       }
     },
-    [],
+    [status],
   );
 
   useEffect(() => {
@@ -189,6 +193,8 @@ export function useOrganizationsList() {
   };
 
   return {
+    status,
+    setStatus,
     organizations,
     pinnedOrganizations,
     total,

@@ -173,12 +173,19 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var runID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		admissionErr := models.RequireActiveCanvasOrganization(tx, event.WorkflowID)
+		if admissionErr != nil && admissionErr != models.ErrOrganizationSuspended {
+			return admissionErr
+		}
 		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
 			logger.Info("Event already being processed - skipping")
 			outcome = executorOutcomeSkipped
 			reason = executorReasonLocked
 			return nil
+		}
+		if admissionErr != nil {
+			return tx.Model(lockedEvent).Update("state", models.CanvasEventStateRouted).Error
 		}
 
 		createdQueueItems, runID, err = w.processEvent(tx, logger, lockedEvent)

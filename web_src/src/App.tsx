@@ -24,6 +24,7 @@ import { AccountProvider } from "./contexts/AccountProvider";
 import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
+import { OrganizationSuspensionBanner } from "./components/OrganizationSuspensionBanner";
 import { RequirePermission } from "./components/PermissionGate";
 import { agentSectionRoute } from "./pages/factories/pages/settings/agentSectionRoutes";
 import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
@@ -430,6 +431,7 @@ export function OrganizationScope() {
 
   return (
     <PermissionsProvider>
+      <OrganizationSuspensionBanner organizationId={resolvedId ?? ""} />
       <UserNotificationsListener organizationId={resolvedId} />
       <Outlet />
     </PermissionsProvider>

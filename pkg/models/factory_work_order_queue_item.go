@@ -239,6 +239,14 @@ func (o *FactoryWorkOrder) dropQueuedLineWork(tx *gorm.DB) error {
 // as cancelled) without using a slot. Returns one result per admitted
 // dispatch, oldest first; empty when nothing was admitted.
 func AdmitQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) ([]*FactoryLineStepResult, error) {
+	var owner FactoryLine
+	if err := tx.Select("id", "organization_id").First(&owner, "id = ?", lineID).Error; err != nil {
+		return nil, err
+	}
+	admissionErr := RequireActiveOrganization(tx, owner.OrganizationID)
+	if admissionErr != nil && !errors.Is(admissionErr, ErrOrganizationSuspended) {
+		return nil, admissionErr
+	}
 	line, err := lockFactoryLineForStepAdmission(tx, lineID)
 	if err != nil {
 		return nil, err
@@ -257,6 +265,15 @@ func AdmitQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) ([]*Factor
 		dispatch, err := FindWorkOrderLineDispatch(tx, item.LineDispatchID)
 		if err != nil {
 			return nil, err
+		}
+		if admissionErr != nil {
+			if err := item.Delete(tx); err != nil {
+				return nil, err
+			}
+			if err := dispatch.Finish(tx, CanvasRunResultCancelled); err != nil {
+				return nil, err
+			}
+			continue
 		}
 
 		step := admissionStep(line, dispatch, stepIndex)

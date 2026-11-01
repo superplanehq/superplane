@@ -51,6 +51,17 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	}
 
 	now := time.Now()
+	canvas, err := models.FindUnscopedCanvasInTransaction(s.tx, s.node.WorkflowID)
+	if err != nil {
+		return err
+	}
+	organization, err := models.FindOrganizationSuspensionStatus(s.tx, canvas.OrganizationID)
+	if err != nil {
+		return err
+	}
+	if organization.IsSuspended() {
+		return nil
+	}
 
 	//
 	// We use RawMessage here to avoid a second marshal when GORM persists the JSON value.
@@ -93,6 +104,9 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 		err = s.tx.Create(&event).Error
 	}
 	if err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			return nil
+		}
 		if s.run == nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			canvas, findErr := models.FindUnscopedCanvasInTransaction(s.tx, s.node.WorkflowID)
 			if findErr != nil {
