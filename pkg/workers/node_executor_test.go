@@ -8,8 +8,10 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -20,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testcontexts "github.com/superplanehq/superplane/test/support/contexts"
@@ -519,6 +522,151 @@ func TestNodeExecutorWaitsForCodexSubscriptionReservation(t *testing.T) {
 	finished, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionResultPassed, finished.Result)
+}
+
+func TestNodeExecutorDefersContestedJiraCreation(t *testing.T) {
+	for _, commitTask := range []bool{true, false} {
+		t.Run(fmt.Sprintf("holder commits task=%t", commitTask), func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			ref := jira.IssueRef{Host: "acme.atlassian.net", Key: "ENG-8"}
+			execution := createJiraIntakeExecution(t, r, factory, ref)
+			executor := newTestNodeExecutor(t, r)
+			logs := captureExecutorLogs(executor)
+
+			holder := db.Begin()
+			require.NoError(t, holder.Error)
+			require.NoError(t, jira.LockIssueWorkOrder(holder, factory, ref))
+			finished := make(chan struct{})
+			result := make(chan error, 1)
+			t.Cleanup(func() {
+				_ = holder.Rollback().Error
+				<-finished
+			})
+			go func() {
+				defer close(finished)
+				result <- executor.LockAndProcessNodeExecution(execution.ID)
+			}()
+			select {
+			case err := <-result:
+				require.ErrorIs(t, err, ErrRecordLocked)
+			case <-time.After(2 * time.Second):
+				t.Fatal("Jira creation waited for the issue lock instead of deferring")
+			}
+
+			pending, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.CanvasNodeExecutionStatePending, pending.State)
+			assert.Empty(t, pending.Result)
+			assert.Empty(t, pending.ResultReason)
+			assert.Empty(t, pending.ResultMessage)
+			assert.NotContains(t, logs.String(), `"level":"error"`)
+			orders, err := factory.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{Limit: 100})
+			require.NoError(t, err)
+			assert.Empty(t, orders)
+			var outputCount int64
+			require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ? AND node_id = ?", execution.WorkflowID, execution.NodeID).Count(&outputCount).Error)
+			assert.Zero(t, outputCount)
+			pendingExecutions, err := models.ListPendingNodeExecutions()
+			require.NoError(t, err)
+			assert.True(t, slices.ContainsFunc(pendingExecutions, func(candidate models.CanvasNodeExecution) bool { return candidate.ID == execution.ID }))
+
+			if commitTask {
+				_, err = factory.CreateWorkOrderWithOrigin(holder, "Existing Jira task", "", nil, nil, nil,
+					models.WorkOrderOrigin{URL: "https://acme.atlassian.net/browse/ENG-8", Label: ref.Key})
+				require.NoError(t, err)
+				require.NoError(t, holder.Commit().Error)
+			} else {
+				require.NoError(t, holder.Rollback().Error)
+			}
+			require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
+			completed, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.CanvasNodeExecutionStateFinished, completed.State)
+			assert.Equal(t, models.CanvasNodeExecutionResultPassed, completed.Result)
+			orders, err = factory.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{Limit: 100})
+			require.NoError(t, err)
+			require.Len(t, orders, 1)
+			require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ? AND node_id = ?", execution.WorkflowID, execution.NodeID).Count(&outputCount).Error)
+			if commitTask {
+				assert.Zero(t, outputCount, "duplicate skips must not emit creation output")
+			} else {
+				assert.Equal(t, int64(1), outputCount)
+				require.NotNil(t, orders[0].OriginURL)
+				assert.Equal(t, "https://acme.atlassian.net/browse/ENG-8", *orders[0].OriginURL)
+			}
+		})
+	}
+}
+
+func createJiraIntakeExecution(t *testing.T, r *support.ResourceRegistry, factory *models.Factory, ref jira.IssueRef) *models.CanvasNodeExecution {
+	t.Helper()
+	db := database.DB(t.Context())
+	configuration := map[string]any{"title": "New Jira task"}
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "jira", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "jira.onIssue"}})},
+		{NodeID: "create", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "createWorkOrder"}}), Configuration: datatypes.NewJSONType(configuration)},
+	}, []models.Edge{{SourceID: "jira", TargetID: "create", Channel: "default"}})
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	_, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceJiraIssues)
+	require.NoError(t, err)
+	event := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "jira", "default", nil, map[string]any{
+		"type": "jira.issue", "data": map[string]any{"action": "created", "url": "https://" + ref.Host + "/browse/" + ref.Key, "issue": map[string]any{"key": ref.Key}},
+	})
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, event)
+	require.NoError(t, err)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, "create", event.ID, event.ID, configuration)
+	execution.RunID = run.ID
+	require.NoError(t, db.Save(execution).Error)
+	return execution
+}
+
+func TestNodeExecutorJiraLockDoesNotBlockOtherIssueIdentities(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	lockedRef := jira.IssueRef{Host: "acme.atlassian.net", Key: "ENG-8"}
+	holder := db.Begin()
+	require.NoError(t, holder.Error)
+	defer holder.Rollback()
+	require.NoError(t, jira.LockIssueWorkOrder(holder, factory, lockedRef))
+	for _, tc := range []struct {
+		name    string
+		factory *models.Factory
+		ref     jira.IssueRef
+	}{
+		{name: "different issue", factory: factory, ref: jira.IssueRef{Host: lockedRef.Host, Key: "ENG-80"}},
+		{name: "different site", factory: factory, ref: jira.IssueRef{Host: "other.atlassian.net", Key: lockedRef.Key}},
+		{name: "different factory", factory: otherFactory, ref: lockedRef},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			execution := createJiraIntakeExecution(t, r, tc.factory, tc.ref)
+			executor := newTestNodeExecutor(t, r)
+			result := make(chan error, 1)
+			go func() { result <- executor.LockAndProcessNodeExecution(execution.ID) }()
+			select {
+			case err := <-result:
+				require.NoError(t, err)
+			case <-time.After(2 * time.Second):
+				_ = holder.Rollback().Error
+				<-result
+				t.Fatal("Jira issue lock blocked an unrelated identity")
+			}
+			completed, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.CanvasNodeExecutionResultPassed, completed.Result)
+			hasOrder, err := jira.IssueHasWorkOrder(db, tc.factory, tc.ref)
+			require.NoError(t, err)
+			assert.True(t, hasOrder)
+		})
+	}
 }
 
 // createFactoryStepNodeExecution creates a pending node execution that
