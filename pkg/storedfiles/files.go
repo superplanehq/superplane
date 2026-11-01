@@ -480,26 +480,32 @@ func AppendTaskFiles(
 			continue
 		}
 		result.ObjectKeys = append(result.ObjectKeys, stored.StorageKey)
-		ref := blob.FileRef(stored.ID)
-		replaced := false
-		replaceURLs := append([]string(nil), file.ReplaceURLs...)
-		slices.SortFunc(replaceURLs, func(a, b string) int {
-			return len(b) - len(a)
-		})
-		for _, rawURL := range replaceURLs {
-			if rawURL == "" || !strings.Contains(next, rawURL) {
-				continue
-			}
-			next = blob.ReplaceURL(next, rawURL, ref)
-			replaced = true
-		}
-		if !replaced {
-			next = appendFileRef(next, stored.Filename, stored.ContentType, ref)
+		next = replaceIncomingFileRefs(next, stored, file.ReplaceURLs)
+		if len(preparation) > 0 {
+			preparation[0].recordReplacement(stored.ID, file.ReplaceURLs)
 		}
 		openCount++
 	}
 	result.Markdown = next
 	return result, nil
+}
+
+func replaceIncomingFileRefs(markdown string, file *models.File, urls []string) string {
+	ref := blob.FileRef(file.ID)
+	replaced := false
+	replaceURLs := append([]string(nil), urls...)
+	slices.SortFunc(replaceURLs, func(a, b string) int { return len(b) - len(a) })
+	for _, rawURL := range replaceURLs {
+		if rawURL == "" || !strings.Contains(markdown, rawURL) {
+			continue
+		}
+		markdown = blob.ReplaceURL(markdown, rawURL, ref)
+		replaced = true
+	}
+	if !replaced {
+		return appendFileRef(markdown, file.Filename, file.ContentType, ref)
+	}
+	return markdown
 }
 
 func storeIncomingFile(
@@ -617,6 +623,9 @@ func IngestRemoteImages(
 		}
 		result.ObjectKeys = append(result.ObjectKeys, file.StorageKey)
 		next = blob.ReplaceURL(next, rawURL, blob.FileRef(file.ID))
+		if len(preparation) > 0 {
+			preparation[0].recordReplacement(file.ID, []string{rawURL})
+		}
 		openCount++
 	}
 	result.Markdown = next

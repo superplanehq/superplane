@@ -2,6 +2,7 @@ package storedfiles
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -79,8 +80,10 @@ func (p *Preparation) PrepareBindings(ctx context.Context, tx *gorm.DB, provider
 }
 
 type preparedFile struct {
-	file   *models.File
-	params models.CreateFileParams
+	file        *models.File
+	params      models.CreateFileParams
+	replaceURLs []string
+	rejected    bool
 }
 
 func (p *Preparation) store(ctx context.Context, tx *gorm.DB, provider blob.Provider, params models.CreateFileParams, body io.Reader) (*models.File, error) {
@@ -93,6 +96,10 @@ func (p *Preparation) store(ctx context.Context, tx *gorm.DB, provider blob.Prov
 		p.failedKeys = append(p.failedKeys, file.StorageKey)
 		return nil, err
 	}
+	if upload.SizeBytes <= 0 {
+		p.failedKeys = append(p.failedKeys, file.StorageKey)
+		return nil, models.ErrFileInvalid
+	}
 	file.State = models.FileStateReady
 	file.SizeBytes = upload.SizeBytes
 	file.Checksum = &upload.Checksum
@@ -101,8 +108,13 @@ func (p *Preparation) store(ctx context.Context, tx *gorm.DB, provider blob.Prov
 }
 
 func (p *Preparation) Persist(tx *gorm.DB) error {
-	for _, prepared := range p.files {
+	for i := range p.files {
+		prepared := &p.files[i]
 		if err := prepared.file.Insert(tx, prepared.params); err != nil {
+			if errors.Is(err, models.ErrFileQuotaExceeded) {
+				prepared.rejected = true
+				continue
+			}
 			return err
 		}
 	}
@@ -124,6 +136,26 @@ func (p *Preparation) Persist(tx *gorm.DB) error {
 	return nil
 }
 
+func (p *Preparation) recordReplacement(fileID uuid.UUID, urls []string) {
+	for i := range p.files {
+		if p.files[i].file.ID == fileID {
+			p.files[i].replaceURLs = append([]string(nil), urls...)
+			return
+		}
+	}
+}
+
+// RewriteMarkdown replays only accepted uploads, preserving the original links
+// and omitting appended references for files rejected by the current quota.
+func (p *Preparation) RewriteMarkdown(markdown string) string {
+	for _, prepared := range p.files {
+		if !prepared.rejected {
+			markdown = replaceIncomingFileRefs(markdown, prepared.file, prepared.replaceURLs)
+		}
+	}
+	return markdown
+}
+
 func (p *Preparation) ObjectKeys() []string {
 	keys := make([]string, 0, len(p.files))
 	for _, prepared := range p.files {
@@ -138,6 +170,11 @@ func (p *Preparation) ObjectKeys() []string {
 
 func (p *Preparation) BindResult() BindResult {
 	result := BindResult{CopiedKeys: p.ObjectKeys(), StaleKeys: append([]string(nil), p.failedKeys...)}
+	for _, prepared := range p.files {
+		if prepared.rejected {
+			result.StaleKeys = append(result.StaleKeys, prepared.file.StorageKey)
+		}
+	}
 	for _, binding := range p.bindings {
 		result.StaleKeys = append(result.StaleKeys, binding.file.StorageKey)
 	}

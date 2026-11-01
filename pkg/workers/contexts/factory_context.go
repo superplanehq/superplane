@@ -192,7 +192,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	return order, created, nil
 }
 
-func (c *FactoryContext) createWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+func (c *FactoryContext) createWorkOrder(params core.WorkOrderParams) (_ *core.WorkOrder, _ bool, creationErr error) {
 	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
 	if err == nil {
@@ -265,17 +265,17 @@ func (c *FactoryContext) createWorkOrder(params core.WorkOrderParams) (*core.Wor
 		Description: params.Description, SourceRunID: &sourceRunID,
 	}
 	preparation := &storedfiles.Preparation{}
+	defer func() {
+		if len(preparation.ObjectKeys()) > 0 {
+			c.onFileBindCleanup(FileBindCleanup{OrganizationID: f.OrganizationID, FactoryID: f.ID,
+				Result: preparation.BindResult(), BindErr: creationErr})
+		}
+	}()
 	c.prepareWorkOrderFiles(preparedOrder, preparation)
 	err = preparation.PrepareBindings(context.Background(), c.tx, blob.Current(), f.OrganizationID, f.ID, preparedOrder.ID, preparedOrder.Description)
-	if keys := preparation.ObjectKeys(); len(keys) > 0 {
-		job := FileBindCleanup{OrganizationID: f.OrganizationID, FactoryID: f.ID,
-			Result: preparation.BindResult(), BindErr: err}
-		c.onFileBindCleanup(job)
-	}
 	if err != nil {
 		return nil, false, err
 	}
-	params.Description = preparedOrder.Description
 	order, err := c.createFactoryWorkOrder(f, params, sourceRunID, models.WorkOrderCreationOptions{ID: preparedOrder.ID})
 	if err != nil {
 		return nil, false, err
@@ -283,6 +283,11 @@ func (c *FactoryContext) createWorkOrder(params core.WorkOrderParams) (*core.Wor
 
 	if err = preparation.Persist(c.tx); err != nil {
 		return nil, false, err
+	}
+	if description := preparation.RewriteMarkdown(params.Description); description != order.Description {
+		if err := order.UpdateContent(c.tx, nil, &description); err != nil {
+			return nil, false, err
+		}
 	}
 	c.recordSentryWebhookTask(order)
 	c.recordDatadogWebhookTask(order)
