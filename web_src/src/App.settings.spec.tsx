@@ -31,7 +31,9 @@ vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganization: () => ({
     data: {
       metadata: { id: "org-123", slug: "org-123", name: "Demo" },
-      spec: { enabledExperimentalFeatures: access.factoriesEnabled ? ["factories"] : [] },
+      spec: {
+        enabledExperimentalFeatures: ["organization_runners", ...(access.factoriesEnabled ? ["factories"] : [])],
+      },
     },
     isLoading: false,
     isSuccess: true,
@@ -99,26 +101,43 @@ const legacySettingsCases = [
 ] as const;
 
 describe("App legacy settings routes", () => {
-  it("blocks direct fleet inspection without organization read permission", async () => {
-    access.factoriesEnabled = true;
-    access.deniedResource = "org";
-    visit("/org-123/settings/fleets/own/runners/runner-1");
-    expect(await screen.findByRole("heading", { name: "Permission denied" })).toBeInTheDocument();
-    expect(screen.queryByText("Runner detail content")).not.toBeInTheDocument();
-  });
+  for (const prefix of ["settings", "workspaces/demo/settings/organization"]) {
+    for (const factoriesEnabled of [true, false]) {
+      it(`blocks ${prefix} runner inspection without organization read permission with factories ${factoriesEnabled ? "on" : "off"}`, async () => {
+        access.factoriesEnabled = factoriesEnabled;
+        access.deniedResource = "org";
+        visit(`/org-123/${prefix}/fleets/own/runners/runner-1`);
+        expect(await screen.findByRole("heading", { name: "Permission denied" })).toBeInTheDocument();
+        expect(screen.queryByText("Runner detail content")).not.toBeInTheDocument();
+      });
+    }
+  }
   for (const [suffix, content] of [
     ["fleets", "Fleets content"],
     ["fleets/own", "Fleet detail content"],
     ["fleets/own/runners/runner-1", "Runner detail content"],
   ]) {
     for (const prefix of ["settings", "workspaces/demo/settings/organization"]) {
-      it(`opens ${prefix}/${suffix} under organization read permission`, async () => {
-        access.factoriesEnabled = true;
-        visit(`/org-123/${prefix}/${suffix}`);
-        expect(await screen.findByText(content)).toBeInTheDocument();
-      });
+      for (const factoriesEnabled of [true, false]) {
+        it(`opens ${prefix}/${suffix} with factories ${factoriesEnabled ? "on" : "off"}`, async () => {
+          access.factoriesEnabled = factoriesEnabled;
+          visit(`/org-123/${prefix}/${suffix}`);
+          expect(await screen.findByText(content)).toBeInTheDocument();
+        });
+      }
     }
   }
+  it("preserves runner inspection after factories are disabled on an open workspace page", async () => {
+    access.factoriesEnabled = true;
+    const view = visit("/org-123/workspaces/demo/settings/organization/fleets/own/runners/runner-1?state=busy#runner");
+    await screen.findByText("Runner detail content");
+    access.factoriesEnabled = false;
+    view.rerender(<App />);
+    expect(await screen.findByText("Runner detail content")).toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe("/org-123/settings/fleets/own/runners/runner-1"));
+    expect(window.location.search).toBe("?state=busy");
+    expect(window.location.hash).toBe("#runner");
+  });
   beforeEach(() => {
     access.factoriesEnabled = false;
     access.registryLoading = false;

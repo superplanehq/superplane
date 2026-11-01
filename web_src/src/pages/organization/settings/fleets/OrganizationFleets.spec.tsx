@@ -8,14 +8,6 @@ import { PermissionsContext } from "@/contexts/permissionsContextState";
 import { OrganizationFleets, OrganizationFleetDetails, OrganizationRunnerDetails } from "./OrganizationFleets";
 import { useOrganizationFleetAccess } from "@/hooks/useOrganizationFleetManagement";
 
-vi.mock("@/hooks/useExperimentalFeatures", () => ({
-  useExperimentalFeaturesRegistry: () => ({
-    data: { features: [{ id: "organization_runners", released: false }] },
-    isLoading: false,
-    isError: false,
-  }),
-}));
-
 const fleet = {
   id: "self-hosted",
   enabled: true,
@@ -41,6 +33,7 @@ let expired: boolean;
 let createFailure: boolean;
 let terminateConflict: boolean;
 let capacityFailure: boolean;
+let registryFailure: boolean;
 let requests: Request[];
 let bodies: Record<string, unknown>[];
 let queryClient: QueryClient;
@@ -113,6 +106,11 @@ async function refresh() {
   });
 }
 
+async function generateRegistration() {
+  fireEvent.click(await screen.findByRole("button", { name: "Connect runner" }));
+  fireEvent.click(screen.getByRole("button", { name: "Generate registration" }));
+}
+
 beforeEach(() => {
   enabled = true;
   writable = true;
@@ -124,6 +122,12 @@ beforeEach(() => {
   createFailure = false;
   terminateConflict = false;
   capacityFailure = false;
+  registryFailure = false;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+    registryFailure
+      ? Response.json({}, { status: 503 })
+      : Response.json({ features: [{ id: "organization_runners", released: false }] }),
+  );
   requests = [];
   bodies = [];
   client.setConfig({
@@ -196,6 +200,16 @@ afterEach(() => {
 });
 
 describe("organization fleet management", () => {
+  it("restores configuration when Retry reloads a recovered feature registry", async () => {
+    registryFailure = true;
+    mount();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load fleet configuration access");
+    expect(screen.queryByRole("button", { name: "Create fleet" })).not.toBeInTheDocument();
+    registryFailure = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("button", { name: "Create fleet" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
   it("creates an enabled fleet and edits its full specification without changing its ID", async () => {
     const view = mount();
     fireEvent.click(await screen.findByRole("button", { name: "Create fleet" }));
@@ -293,8 +307,7 @@ describe("organization fleet management", () => {
       },
     });
     mount("/org-1/fleets/self-hosted");
-    fireEvent.click(await screen.findByRole("button", { name: "Connect runner" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate registration" }));
+    await generateRegistration();
     await waitFor(() => expect(signal).toBeDefined());
     fireEvent.click(screen.getByRole("button", { name: "Close setup" }));
     await act(async () => {
@@ -313,8 +326,7 @@ describe("organization fleet management", () => {
 
   it("stops catalog, capacity, runner, and registration polling after navigation", async () => {
     const page = mount("/org-1/fleets/self-hosted");
-    fireEvent.click(await screen.findByRole("button", { name: "Connect runner" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate registration" }));
+    await generateRegistration();
     await screen.findByText(/runner --url/);
     await waitFor(() => expect(requests.some((request) => request.url.includes("/runners/runner-1"))).toBe(true));
     page.unmount();
@@ -349,8 +361,7 @@ describe("organization fleet management", () => {
 
   it("removes configuration on open-page disablement and preserves inspection", async () => {
     mount("/org-1/fleets/self-hosted");
-    fireEvent.click(await screen.findByRole("button", { name: "Connect runner" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate registration" }));
+    await generateRegistration();
     await screen.findByText(/runner --url/);
     enabled = false;
     await refresh();
@@ -421,14 +432,8 @@ describe("organization fleet management", () => {
       });
       expect(bodies.at(-1)).not.toHaveProperty("taskId");
       expect(screen.getByText("Waiting for runner registration.")).toBeInTheDocument();
-      expect(
-        JSON.stringify(
-          queryClient
-            .getQueryCache()
-            .getAll()
-            .map((query) => query.state.data),
-        ),
-      ).not.toContain(syntheticToken);
+      const cachedQueries = queryClient.getQueryCache().getAll();
+      expect(JSON.stringify(cachedQueries.map((query) => query.state.data))).not.toContain(syntheticToken);
       expect(queryClient.getMutationCache().getAll()).toHaveLength(0);
       expect(storage.mock.calls.flat().join()).not.toContain(syntheticToken);
       expect(diagnostics.mock.calls.flat().join()).not.toContain(syntheticToken);
@@ -441,8 +446,7 @@ describe("organization fleet management", () => {
     expired = true;
     registered = true;
     mount("/org-1/fleets/self-hosted");
-    fireEvent.click(await screen.findByRole("button", { name: "Connect runner" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate registration" }));
+    await generateRegistration();
     expect(await screen.findByText(/Runner connected/)).toBeInTheDocument();
     expect(screen.queryByText(/runner --url/)).not.toBeInTheDocument();
   });
@@ -450,19 +454,33 @@ describe("organization fleet management", () => {
   it("expires pending registration and replaces its idempotency key", async () => {
     expired = true;
     mount("/org-1/fleets/self-hosted");
-    fireEvent.click(await screen.findByRole("button", { name: "Connect runner" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate registration" }));
+    await generateRegistration();
     fireEvent.click(await screen.findByRole("button", { name: "Create new registration" }));
     await waitFor(() => expect(bodies).toHaveLength(2));
     expect(bodies[0].idempotencyKey).not.toBe(bodies[1].idempotencyKey);
     expect(screen.queryByText(/runner --url/)).not.toBeInTheDocument();
   });
 
+  it("replaces a registered runner that terminated before the status check", async () => {
+    registered = true;
+    runnerState = "terminated";
+    mount("/org-1/fleets/self-hosted");
+    await generateRegistration();
+    const replacement = await screen.findByRole("button", { name: "Create new registration" });
+    expect(screen.queryByText(/Runner connected/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/runner --url/)).not.toBeInTheDocument();
+    runnerState = "pending";
+    registered = false;
+    fireEvent.click(replacement);
+    expect(await screen.findByText("Waiting for runner registration.")).toBeInTheDocument();
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].idempotencyKey).not.toBe(bodies[1].idempotencyKey);
+  });
+
   it("retries a failed registration without emitting server secrets or changing its key", async () => {
     createFailure = true;
     mount("/org-1/fleets/self-hosted");
-    fireEvent.click(await screen.findByRole("button", { name: "Connect runner" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate registration" }));
+    await generateRegistration();
     fireEvent.click(await screen.findByRole("button", { name: "Retry registration" }));
     await waitFor(() => expect(bodies).toHaveLength(2));
     expect(bodies[0].idempotencyKey).toBe(bodies[1].idempotencyKey);

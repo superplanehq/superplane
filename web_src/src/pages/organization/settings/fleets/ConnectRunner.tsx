@@ -63,9 +63,7 @@ export function ConnectRunner({
         {status === "expired" && (
           <p role="status">Registration expired. Create a new registration and use its command.</p>
         )}
-        {status === "terminated" && (
-          <p role="status">Runner terminated before registration. Create a new registration.</p>
-        )}
+        {status === "terminated" && <p role="status">Runner terminated. Create a new registration.</p>}
         {(status === "expired" || status === "terminated") && (
           <Button
             onClick={() => {

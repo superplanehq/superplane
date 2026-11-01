@@ -11,8 +11,8 @@ type RegistrationStatus = "ready" | "creating" | "waiting" | "connected" | "expi
 type RegistrationContext = { organizationId: string; fleetId: string; refresh: () => void };
 
 function registrationOutcome(runner: SuperplaneOrganizationsRunner | undefined, expiresAt: string): RegistrationStatus {
-  if (runner?.registeredAt) return "connected";
   if (runner?.state === "terminated") return "terminated";
+  if (runner?.registeredAt) return "connected";
   if (runner?.state === "pending" && Date.now() >= Date.parse(expiresAt)) return "expired";
   return "waiting";
 }
