@@ -126,6 +126,9 @@ func (s *CanvasNodeExecutionKVTestSteps) CreateCanvas() {
 		UpdatedAt:      &now,
 	}
 	require.NoError(s.t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&Organization{ID: wf.OrganizationID, Name: "Execution KV test"}).Error; err != nil {
+			return err
+		}
 		if err := tx.Create(wf).Error; err != nil {
 			return err
 		}

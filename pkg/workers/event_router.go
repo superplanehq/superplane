@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -174,6 +175,11 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	var runID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		admissionErr := models.RequireActiveCanvasOrganization(tx, event.WorkflowID)
+		if errors.Is(admissionErr, gorm.ErrRecordNotFound) {
+			outcome = executorOutcomeSkipped
+			reason = executorReasonNotFound
+			return nil
+		}
 		if admissionErr != nil && admissionErr != models.ErrOrganizationSuspended {
 			return admissionErr
 		}

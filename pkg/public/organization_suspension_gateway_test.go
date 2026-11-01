@@ -6,10 +6,13 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -17,12 +20,64 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
+	"gorm.io/datatypes"
 )
 
 type suspensionChatProvider struct {
 	agents.Provider
 	createCalls int
 	interrupted []string
+}
+
+func TestSuspendedExecutionCallbackFinishesWithoutStartingDownstreamWork(t *testing.T) {
+	server, resource, cookie := setupAdminTestServer(t)
+	server.InitRouter()
+	callbackCalls := 0
+	resource.Registry.Actions["suspensionCallback"] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  "suspensionCallback",
+		Hooks: []core.Hook{{Name: "complete", Type: core.HookTypeUser}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			callbackCalls++
+			return ctx.ExecutionState.Emit("passed", "completion", []any{map[string]any{"result": "done"}})
+		},
+	})
+	registerTestGRPCGateway(t, server, resource.AuthService, resource.Registry, resource.Encryptor, support.NewOIDCProvider())
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, resource.Organization.ID, resource.User, []models.CanvasNode{
+		{NodeID: "source", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "suspensionCallback"}})},
+		{NodeID: "downstream", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+	}, []models.Edge{{SourceID: "source", TargetID: "downstream", Channel: "passed"}})
+	root := support.EmitCanvasEventForNode(t, canvas.ID, "source", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "source", root.ID, root.ID)
+	require.NoError(t, db.Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+	require.NoError(t, resource.Organization.Suspend(db, resource.Account.ID, "Stop downstream work"))
+	rawToken := uuid.NewString()
+	require.NoError(t, models.CreateUserAPIToken(db, models.NewUserAPIToken(resource.User, "Callback test", crypto.HashToken(rawToken))))
+	for _, token := range []string{"", rawToken} {
+		response := execRequest(server, requestParams{
+			method: "POST", path: "/api/v1/canvases/" + canvas.ID.String() + "/executions/" + execution.ID.String() + "/hooks/complete",
+			body: []byte(`{"parameters":{}}`), contentType: "application/json", authCookie: cookie, authToken: token,
+			headers: map[string]string{"x-organization-id": resource.Organization.ID.String()},
+		})
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	}
+	require.Equal(t, 2, callbackCalls)
+	stored, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeExecutionStateFinished, stored.State)
+	require.Equal(t, models.CanvasNodeExecutionResultPassed, stored.Result)
+	outputs, err := models.FindCanvasEventsForExecutions(db, []string{execution.ID.String()})
+	require.NoError(t, err)
+	require.Len(t, outputs, 1)
+	router := workers.NewEventRouter("")
+	require.NoError(t, router.LockAndProcessEvent(log.NewEntry(log.StandardLogger()), outputs[0], time.Now()))
+	var queued int64
+	require.NoError(t, db.Model(&models.CanvasNodeQueueItem{}).Where("workflow_id = ?", canvas.ID).Count(&queued).Error)
+	require.Zero(t, queued)
+	var downstream int64
+	require.NoError(t, db.Model(&models.CanvasNodeExecution{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "downstream").Count(&downstream).Error)
+	require.Zero(t, downstream)
 }
 
 func (p *suspensionChatProvider) Name() string { return "anthropic" }

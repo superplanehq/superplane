@@ -177,6 +177,26 @@ describe("api-interceptor", () => {
     expect(globalThis.fetch).toBe(wrappedFetch);
   });
 
+  it("announces suspension from an SDK write rejection without redirecting readable pages", async () => {
+    const message = "This organization is suspended. Existing data remains available.";
+    globalThis.fetch = mock().mockResolvedValue(new Response(JSON.stringify({ message }), { status: 403 }));
+    const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+    setupApiInterceptor();
+    setupApiInterceptor();
+    const refresh = mock();
+    window.addEventListener("organization-suspended", refresh);
+    try {
+      await expect(client.post({ url: "http://localhost/api/v1/canvases" })).rejects.toMatchObject({
+        message,
+        status: 403,
+      });
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(locationHref).toBe("http://localhost/dashboard?tab=overview");
+    } finally {
+      window.removeEventListener("organization-suspended", refresh);
+    }
+  });
+
   it.each([
     ["Not Found", 404, "Not Found"],
     [JSON.stringify({ message: "Canvas not found", code: "NOT_FOUND" }), 404, "Canvas not found"],

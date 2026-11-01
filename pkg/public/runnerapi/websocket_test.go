@@ -36,9 +36,9 @@ import (
 )
 
 func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
-	for _, scenario := range []string{"complete", "cancel", "queued subscription", "failed delivery"} {
+	for _, scenario := range []string{"complete", "cancel", "queued subscription", "failed delivery", "suspended complete", "suspended cancel"} {
 		t.Run(scenario, func(t *testing.T) {
-			cancelOnHeartbeat := scenario == "cancel"
+			cancelOnHeartbeat := scenario == "cancel" || scenario == "suspended cancel"
 			resource := support.Setup(t)
 			signer := jwt.NewSigner("registration-secret")
 			runner, registration, fleet := createRegistrationFixture(t)
@@ -187,8 +187,16 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 				assert.GreaterOrEqual(t, int64(claims["exp"].(float64)), time.Now().Add(29*time.Second).Unix())
 			}
 
+			if strings.HasPrefix(scenario, "suspended") {
+				require.NoError(t, resource.Organization.Suspend(db, resource.Account.ID, "Stop runner work"))
+			}
 			if cancelOnHeartbeat {
-				require.NoError(t, task.RequestCancel(db, time.Now()))
+				if scenario == "suspended cancel" {
+					require.NoError(t, workers.NewOrganizationSuspensionWorker().Process(t.Context()))
+					require.ErrorIs(t, resource.Organization.Reactivate(db, resource.Account.ID), models.ErrSuspensionCancellationPending)
+				} else {
+					require.NoError(t, task.RequestCancel(db, time.Now()))
+				}
 				require.NoError(t, socket.WriteJSON(typedMessage{Type: messageTypePong}))
 				require.NoError(t, socket.SetReadDeadline(time.Now().Add(2*time.Second)))
 				var cancel taskControlMessage
@@ -234,6 +242,10 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 			assert.Equal(t, models.RunnerTerminationTaskCompleted, *reloadedRunner.TerminationReason)
 			_, err = models.FindRunnerByAccessTokenHash(db, crypto.HashToken(registered.AccessToken))
 			require.NoError(t, err, "credential must remain valid for completion acknowledgement retries")
+			if strings.HasPrefix(scenario, "suspended") {
+				require.NoError(t, workers.NewOrganizationSuspensionWorker().Process(t.Context()))
+				require.NoError(t, resource.Organization.Reactivate(db, resource.Account.ID))
+			}
 
 		})
 	}

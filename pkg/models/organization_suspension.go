@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -38,8 +39,10 @@ func (o *Organization) IsSuspended() bool {
 
 // RequireActiveOrganization coordinates admission with suspension. Call it in
 // the admission transaction, before taking any run, execution, runner or task locks.
+// Shared locks allow independent admissions to proceed together while blocking
+// suspension's exclusive lock. Capacity decisions use their own exclusive locks.
 func RequireActiveOrganization(tx *gorm.DB, organizationID uuid.UUID) error {
-	organization, err := LockOrganization(tx, organizationID)
+	organization, err := FindOrganizationSuspensionStatus(tx.Clauses(clause.Locking{Strength: "SHARE"}), organizationID)
 	if err != nil {
 		return err
 	}

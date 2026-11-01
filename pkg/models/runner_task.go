@@ -301,7 +301,7 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, erro
 		}
 		err := tx.Transaction(func(tx *gorm.DB) error {
 			if candidateErr == nil {
-				organization, err := FindOrganizationSuspensionStatus(tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}), candidate.OrganizationID)
+				organization, err := FindOrganizationSuspensionStatus(tx.Clauses(clause.Locking{Strength: "SHARE", Options: "SKIP LOCKED"}), candidate.OrganizationID)
 				if err != nil {
 					return err
 				}

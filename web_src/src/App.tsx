@@ -431,7 +431,7 @@ export function OrganizationScope() {
 
   return (
     <PermissionsProvider>
-      <OrganizationSuspensionBanner organizationId={resolvedId ?? ""} />
+      {resolvedId ? <OrganizationSuspensionBanner organizationId={resolvedId} /> : null}
       <UserNotificationsListener organizationId={resolvedId} />
       <Outlet />
     </PermissionsProvider>

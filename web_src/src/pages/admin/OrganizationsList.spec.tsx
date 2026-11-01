@@ -67,6 +67,37 @@ describe("OrganizationsList", () => {
     expect(screen.queryByRole("heading", { name: "Reset one automation" })).not.toBeInTheDocument();
   });
 
+  it("filters active and suspended organizations through the server and labels suspended rows", async () => {
+    const user = userEvent.setup();
+    const requestedStatuses: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const status = new URL(String(input), "http://localhost").searchParams.get("status") ?? "";
+        requestedStatuses.push(status);
+        const active = organization("active", "Active Customer");
+        const suspended = { ...organization("suspended", "Suspended Customer"), suspended: true };
+        const items = status === "active" ? [active] : status === "suspended" ? [suspended] : [active, suspended];
+        return jsonResponse({ items, total: items.length, match_total: items.length });
+      }),
+    );
+    render(
+      <MemoryRouter>
+        <OrganizationsList />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("link", { name: /Suspended Customer/ })).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /Suspended Customer/ })).getByText("Suspended")).toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Organization status" }));
+    await user.click(screen.getByRole("option", { name: "Active" }));
+    await waitFor(() => expect(screen.getAllByRole("link")).toHaveLength(1));
+    expect(screen.getByRole("link")).toHaveTextContent("Active Customer");
+    await user.click(screen.getByRole("combobox", { name: "Organization status" }));
+    await user.click(screen.getByRole("option", { name: "Suspended" }));
+    await waitFor(() => expect(screen.getByRole("link")).toHaveTextContent("Suspended Customer"));
+    expect(requestedStatuses).toEqual(["all", "active", "suspended"]);
+  });
+
   it("opens the organization when any cell in the row is clicked", async () => {
     const user = userEvent.setup();
 

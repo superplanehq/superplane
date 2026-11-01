@@ -262,6 +262,11 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		admissionErr := models.RequireActiveCanvasOrganization(tx, node.WorkflowID)
+		if errors.Is(admissionErr, gorm.ErrRecordNotFound) {
+			metricOutcome = executorOutcomeSkipped
+			metricReason = executorReasonNotFound
+			return nil
+		}
 		if admissionErr != nil && !errors.Is(admissionErr, models.ErrOrganizationSuspended) {
 			return admissionErr
 		}

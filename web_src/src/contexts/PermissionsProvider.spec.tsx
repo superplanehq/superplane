@@ -45,7 +45,7 @@ function PermissionProbe() {
 }
 
 function renderProbe() {
-  render(
+  return render(
     <PermissionsProvider>
       <PermissionProbe />
     </PermissionsProvider>,
@@ -73,6 +73,27 @@ describe("PermissionsProvider", () => {
     expect(screen.getByText("canAct update: false")).toBeInTheDocument();
     expect(screen.getByText("hasPermission update: true")).toBeInTheDocument();
     expect(screen.getByText("canCancel: true")).toBeInTheDocument();
+  });
+
+  it("updates write access when suspension changes without remounting", () => {
+    const view = renderProbe();
+    const rerender = () =>
+      view.rerender(
+        <PermissionsProvider>
+          <PermissionProbe />
+        </PermissionsProvider>,
+      );
+    organizationState.suspended = true;
+    rerender();
+    expect(screen.getByText("canAct update: false")).toBeInTheDocument();
+    expect(screen.getByText("canAct read: true")).toBeInTheDocument();
+    organizationState.suspended = false;
+    rerender();
+    expect(screen.getByText("canAct update: true")).toBeInTheDocument();
+    accountState.supportSession = true;
+    organizationState.suspended = true;
+    rerender();
+    expect(screen.getByText("canCancel: false")).toBeInTheDocument();
   });
 
   it("allows only read actions in a support session", () => {

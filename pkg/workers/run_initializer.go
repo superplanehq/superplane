@@ -173,6 +173,10 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 	var factoryOrderUpdates []factoryWorkOrderUpdate
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		admissionErr := models.RequireActiveCanvasOrganization(tx, workflowID)
+		if errors.Is(admissionErr, gorm.ErrRecordNotFound) {
+			logger.Infof("Canvas or organization not found - skipping")
+			return nil
+		}
 		if admissionErr != nil && !errors.Is(admissionErr, models.ErrOrganizationSuspended) {
 			return admissionErr
 		}

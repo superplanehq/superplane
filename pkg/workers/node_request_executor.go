@@ -68,10 +68,16 @@ func (e *NodeRequestExecutor) execute(
 	// Read before invoking provider hooks. Runnable admission rechecks inside
 	// its own transaction; completion hooks remain available.
 	canvas, err := models.FindUnscopedCanvasInTransaction(database.DB(context.Background()), request.WorkflowID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 	organization, err := models.FindOrganizationSuspensionStatus(database.DB(context.Background()), canvas.OrganizationID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
