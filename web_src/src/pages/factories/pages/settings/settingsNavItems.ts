@@ -33,6 +33,7 @@ export type FactorySettingsSection =
   | "usage"
   | "billing"
   | "members"
+  | "fleets"
   | "integrations"
   | "api-keys"
   | "secrets";
@@ -249,6 +250,15 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         section: "members",
         permission: { resource: "members", action: "read" },
         keywords: ["invite", "copy link", "people", "team", "role", "email", "name", "remove", "owner", "admin"],
+      },
+      {
+        id: "organization-fleets",
+        label: "Fleets",
+        Icon: Server,
+        scope: "organization",
+        section: "fleets",
+        permission: { resource: "org", action: "read" },
+        keywords: ["runners", "capacity", "self-hosted", "registration", "machines"],
       },
       {
         id: "organization-integrations",
