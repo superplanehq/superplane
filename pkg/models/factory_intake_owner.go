@@ -91,12 +91,12 @@ func RunUsesSupersededVersion(tx *gorm.DB, runID uuid.UUID) (bool, error) {
 
 // CreateIntakeWorkOrder preserves a configured active owner after their Codex
 // disconnects. Interactive creation continues to require a connected owner.
-func (f *Factory) CreateIntakeWorkOrder(tx *gorm.DB, title, description string, sourceRunID uuid.UUID, origin *WorkOrderOrigin) (*FactoryWorkOrder, error) {
+func (f *Factory) CreateIntakeWorkOrder(tx *gorm.DB, title, description string, sourceRunID uuid.UUID, origin *WorkOrderOrigin, options ...WorkOrderCreationOptions) (*FactoryWorkOrder, error) {
 	ownerID, err := FindSubscriptionIntakeOwnerForRun(tx, f.OrganizationID, f.ID, sourceRunID)
 	if err != nil {
 		return nil, err
 	}
-	return f.insertWorkOrder(tx, title, description, nil, []uuid.UUID{ownerID}, &sourceRunID, origin, nil)
+	return f.insertWorkOrder(tx, title, description, nil, []uuid.UUID{ownerID}, &sourceRunID, origin, nil, options...)
 }
 
 // ValidateSubscriptionIntakeOwners protects settings saved through the canvas

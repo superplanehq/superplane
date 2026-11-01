@@ -191,6 +191,18 @@ func IsInlineMediaContentType(contentType string) bool {
 }
 
 func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
+	file, err := NewPendingFile(tx, params)
+	if err != nil {
+		return nil, err
+	}
+	if err := file.Insert(tx, params); err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+// NewPendingFile prepares upload metadata without inserting a database row.
+func NewPendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
 	filename, err := sanitizeFileName(params.Filename)
 	if err != nil {
 		return nil, err
@@ -262,16 +274,25 @@ func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
 		file.CreatedByID = &createdBy
 	}
 
-	err = tx.Transaction(func(inner *gorm.DB) error {
+	return file, nil
+}
+
+// Insert persists prepared file metadata and enforces the current quotas.
+func (f *File) Insert(tx *gorm.DB, params CreateFileParams) error {
+	return tx.Transaction(func(inner *gorm.DB) error {
 		if err := ensureFileQuota(inner, params); err != nil {
 			return err
 		}
-		return inner.Create(file).Error
+		if f.State == FileStateReady {
+			if f.SizeBytes <= 0 || f.SizeBytes > f.MaxBytes() {
+				return fmt.Errorf("%w: invalid prepared file size", ErrFileInvalid)
+			}
+			if err := ensureReadyFileQuota(inner, f, f.SizeBytes, params.ReplacesFileID); err != nil {
+				return err
+			}
+		}
+		return inner.Create(f).Error
 	})
-	if err != nil {
-		return nil, err
-	}
-	return file, nil
 }
 
 func FindFile(tx *gorm.DB, id uuid.UUID) (*File, error) {
@@ -499,20 +520,32 @@ func (f *File) MarkFailed(tx *gorm.DB) error {
 }
 
 func (f *File) ReparentToTask(tx *gorm.DB, workOrderID uuid.UUID, storageKey string) error {
-	if f.FactoryID == nil {
-		return fmt.Errorf("%w: workspace file is missing a factory", ErrFileInvalid)
+	if f.FactoryID == nil || f.OrganizationID == nil {
+		return fmt.Errorf("%w: workspace file is missing its organization or factory", ErrFileInvalid)
 	}
 	now := time.Now()
+	// Claim only the ready workspace object that the caller copied. PostgreSQL
+	// rechecks these predicates after a concurrent update commits.
+	result := tx.Model(f).
+		Where("organization_id = ? AND factory_id = ? AND scope = ? AND work_order_id IS NULL AND state = ? AND purpose = ? AND storage_key = ?",
+			*f.OrganizationID, *f.FactoryID, blob.ScopeWorkspace, FileStateReady, FilePurposeAttachment, f.StorageKey).
+		Updates(map[string]any{
+			"scope":         blob.ScopeTask,
+			"work_order_id": workOrderID,
+			"storage_key":   storageKey,
+			"updated_at":    now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrFileForeignReference
+	}
 	f.Scope = blob.ScopeTask
 	f.WorkOrderID = &workOrderID
 	f.StorageKey = storageKey
 	f.UpdatedAt = now
-	return tx.Model(f).Updates(map[string]any{
-		"scope":         blob.ScopeTask,
-		"work_order_id": workOrderID,
-		"storage_key":   storageKey,
-		"updated_at":    now,
-	}).Error
+	return nil
 }
 
 func (f *File) Delete(tx *gorm.DB) error {
