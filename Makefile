@@ -195,6 +195,7 @@ ci.setup.unit:
 ci.setup.e2e:
 	$(MAKE) ci.setup.ui
 	$(MAKE) pb.gen.go
+	$(MAKE) openapi.client.gen
 	$(MAKE) ci.setup.modules
 	$(MAKE) ci.setup.test-db
 
