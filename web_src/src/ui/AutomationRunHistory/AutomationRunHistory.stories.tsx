@@ -117,6 +117,26 @@ export const AddressPRFeedback: Story = { args: { automation: "Address PR feedba
 export const FailedRun: Story = { args: { initialRun: implementationRuns[1] } };
 export const RunningRun: Story = { args: { initialRun: implementationRuns[0] } };
 export const PassedRun: Story = { args: { initialRun: implementationRuns[2] } };
+export const RecordedRunnerFleet: Story = {
+  args: {
+    initialRun: {
+      ...implementationRuns[0],
+      activities: implementationRuns[0].activities.map((activity) =>
+        activity.id === "implement" ? { ...activity, runnerFleet: "team-linux" } : activity,
+      ),
+    },
+  },
+};
+export const UnknownRunnerFleet: Story = {
+  args: {
+    initialRun: {
+      ...implementationRuns[0],
+      activities: implementationRuns[0].activities.map((activity) =>
+        activity.id === "implement" ? { ...activity, runnerFleet: "Unknown" } : activity,
+      ),
+    },
+  },
+};
 export const RunInstructions: Story = {
   args: {
     initialRun: {

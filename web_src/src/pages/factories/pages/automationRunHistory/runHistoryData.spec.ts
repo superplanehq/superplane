@@ -40,6 +40,7 @@ describe("Implement run history data", () => {
         result: "RESULT_PASSED" as const,
         outputs: { default: [{ result: "done" }] },
         configuration: { additionalInstructions: "Instructions captured for this run" },
+        runnerFleet: "recorded-retry-fleet",
       },
       {
         id: "first",
@@ -48,12 +49,14 @@ describe("Implement run history data", () => {
         createdAt: "2026-10-19T10:00:00Z",
         result: "RESULT_FAILED" as const,
         resultMessage: "Agent exited",
+        runnerFleet: "recorded-first-fleet",
       },
       { id: "other", nodeId: "agent", runId: "different-run" },
     ];
     const activities = toRunActivities({ id: "run", executions: [{ id: "first" }, { id: "retry" }] }, executions, [
       {
         id: "agent",
+        component: "runnerSuperPlane",
         name: "Original implementation step",
         configuration: { additionalInstructions: "Different current instructions" },
       },
@@ -64,6 +67,10 @@ describe("Implement run history data", () => {
     expect(activities[1].outputs).toEqual({ default: [{ result: "done" }] });
     expect(activities[1].additionalInstructions).toBe("Instructions captured for this run");
     expect(activities[0].additionalInstructions).toBeUndefined();
+    expect(activities.map((activity) => activity.runnerFleet)).toEqual([
+      "recorded-first-fleet",
+      "recorded-retry-fleet",
+    ]);
   });
   it("keeps logs available for historical runner steps before a broker task exists", () => {
     const activities = toRunActivities(
@@ -83,6 +90,8 @@ describe("Implement run history data", () => {
       ],
     );
     expect(activities.find((activity) => activity.id === "agent")?.logs).toBeDefined();
+    expect(activities.find((activity) => activity.id === "agent")?.runnerFleet).toBe("Unknown");
+    expect(activities.find((activity) => activity.id === "queue:queued-filter")?.runnerFleet).toBeUndefined();
     expect(activities.find((activity) => activity.id === "agent")?.defaultTab).toBe("logs");
     expect(activities.find((activity) => activity.id === "queue:queued")?.logs).toEqual({ state: "waiting" });
     expect(activities.find((activity) => activity.id === "queue:queued-filter")?.logs).toBeUndefined();

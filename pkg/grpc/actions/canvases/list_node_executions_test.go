@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,6 +120,35 @@ func Test__ListNodeExecutions(t *testing.T) {
 		require.NotNil(t, response.Executions[0].RootEvent)
 		assert.Equal(t, customName, response.Executions[0].RootEvent.CustomName)
 		assert.Equal(t, rootEvent.RunID.String(), response.Executions[0].RootEvent.RunId)
+		assert.Empty(t, response.Executions[0].RunnerFleet)
+	})
+
+	t.Run("returns each recorded fleet independently of configuration", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "agent", Name: "Agent", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})}}, []models.Edge{})
+		event := support.EmitCanvasEventForNode(t, canvas.ID, "agent", "default", nil)
+		db := database.DB(t.Context())
+		expected := map[string]string{}
+		for _, fleet := range []string{"team-linux", "historical-linux", ""} {
+			execution := support.CreateCanvasNodeExecution(t, canvas.ID, "agent", event.ID, event.ID)
+			require.NoError(t, db.Model(execution).Update("configuration", datatypes.NewJSONType(map[string]any{"machineType": "current-default"})).Error)
+			expected[execution.ID.String()] = fleet
+			if fleet == "" {
+				continue
+			}
+			require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, "agent", execution.ID, "machine_type", fleet))
+			if fleet == "team-linux" {
+				old := time.Now().Add(-time.Hour)
+				require.NoError(t, db.Create(&models.CanvasNodeExecutionKV{WorkflowID: canvas.ID, NodeID: "agent", ExecutionID: execution.ID, Key: "fleet_id", Value: "old-fleet", CreatedAt: &old}).Error)
+				require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, "agent", execution.ID, "fleet_id", fleet))
+				require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, "agent", execution.ID, "machine_type", "wrong-fallback"))
+			}
+		}
+		response, err := ListNodeExecutions(t.Context(), db, canvas, "agent", nil, nil, 0, nil)
+		require.NoError(t, err)
+		require.Len(t, response.Executions, len(expected))
+		for _, execution := range response.Executions {
+			assert.Equal(t, expected[execution.Id], execution.RunnerFleet)
+		}
 	})
 }
 

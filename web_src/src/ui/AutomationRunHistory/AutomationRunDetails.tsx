@@ -130,6 +130,12 @@ export function AutomationRunDetails({
                 {selected.error}
               </p>
             )}
+            {selected.runnerFleet !== undefined ? (
+              <dl className="text-sm">
+                <dt className="text-muted-foreground">Runner fleet</dt>
+                <dd>{selected.runnerFleet || "Unknown"}</dd>
+              </dl>
+            ) : null}
             <RunActivityTabs activity={selected} renderLogs={renderLogs} onRetryLogs={onRetryLogs} />
           </div>
         ) : (

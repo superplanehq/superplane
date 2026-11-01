@@ -130,7 +130,13 @@ function LoadedFactoryAutomationRunDetails({
       url: factoryKey && taskNumber ? workOrderDetailPath(organizationId, factoryKey, taskNumber, lineId) : undefined,
     },
     duration: runDuration(run, now),
-    activities: toRunActivities(run, executions, nodes),
+    activities: toRunActivities(run, executions, nodes).map((activity) => ({
+      ...activity,
+      runnerFleet:
+        activity.runnerFleet !== undefined && executionsQuery.isError
+          ? "Could not load runner fleet"
+          : activity.runnerFleet,
+    })),
   };
   return (
     <>

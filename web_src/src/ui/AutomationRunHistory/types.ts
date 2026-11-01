@@ -13,6 +13,7 @@ export interface RunActivity {
   status: RunStatus;
   recordedAt?: string;
   error?: string;
+  runnerFleet?: string;
   // Absent for steps that do not use a runner. Runner logs can still be empty or waiting.
   logs?: RunLogs;
   outputs?: Record<string, unknown>;

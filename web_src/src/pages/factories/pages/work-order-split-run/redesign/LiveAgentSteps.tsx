@@ -69,6 +69,18 @@ export function LiveAgentSteps({
   }
   return (
     <>
+      {run.runnerActivities?.map((activity) => (
+        <dl key={activity.id} className="text-sm">
+          <dt className="text-muted-foreground">Runner fleet · {activity.name}</dt>
+          <dd>
+            {run.fleetDetailsError
+              ? "Could not load runner fleet"
+              : run.fleetDetailsLoading
+                ? "Loading runner fleet..."
+                : activity.runnerFleet || "Unknown"}
+          </dd>
+        </dl>
+      ))}
       {run.runners.map((line) => (
         <RunnerNotes
           key={line.id}
@@ -154,6 +166,9 @@ function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefine
     hasLiveContent,
   });
   return {
+    runnerActivities: live.runnerActivities,
+    fleetDetailsLoading: live.fleetDetailsLoading,
+    fleetDetailsError: live.fleetDetailsError,
     runners,
     reportLive,
     running,

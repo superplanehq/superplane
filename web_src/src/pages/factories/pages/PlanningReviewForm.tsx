@@ -12,7 +12,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { factoryAgentSkillEditorPath } from "../lib/factoryPagePaths";
 import { isMergeConfidenceSteps, newMergeConfidenceStep } from "./mergeConfidenceSteps";
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
-import { planningReviewModelUsedField } from "./planningReviewRunnerFields";
+import { planningReviewModelUsedField, planningReviewRunnerFleetField } from "./planningReviewRunnerFields";
 import { disabledAgentResourceIds } from "./disabledAgentResourceIds";
 import { disabledAgentResourceTools, enabledAgentResourceTools } from "./PlanningReviewDisabledTools";
 import { PlanningReviewResourcesCard } from "./PlanningReviewResourcesCard";
@@ -181,6 +181,7 @@ function AgentPanel({
   };
   const { data: action } = useComponent(organizationId ?? "", component.component ?? "");
   const modelUsedField = planningReviewModelUsedField(component.component, action?.configuration);
+  const runnerFleetField = planningReviewRunnerFleetField(component.component, action?.configuration);
   const modelProvider = modelUsedField?.typeOptions?.hostedModel?.provider ?? "";
   const currentModel = typeof component.configuration.model === "string" ? component.configuration.model : "";
   const credentials = component.configuration.credentials as { source?: string } | undefined;
@@ -201,7 +202,7 @@ function AgentPanel({
   onChangeRef.current = onChange;
 
   useEffect(() => {
-    if (!byokModelDefault) {
+    if (!byokModelDefault || disabled) {
       return;
     }
     const current = componentRef.current;
@@ -209,7 +210,7 @@ function AgentPanel({
       ...current,
       configuration: { ...current.configuration, model: byokModelDefault },
     });
-  }, [byokModelDefault]);
+  }, [byokModelDefault, disabled]);
 
   const modelControl = modelUsedField ? (
     <ConfigurationFieldRenderer
@@ -316,6 +317,21 @@ function AgentPanel({
           <div className={appearance === "fields" ? "flex flex-col gap-2" : undefined}>
             {appearance === "fields" ? <h3 className="workspace-section-title">Model</h3> : null}
             {modelControl}
+          </div>
+        ) : null}
+        {runnerFleetField ? (
+          <div role="group" aria-label="Runner fleet">
+            <ConfigurationFieldRenderer
+              field={runnerFleetField}
+              value={component.configuration.machineType}
+              onChange={(value) => setConfigurationField("machineType", value)}
+              allValues={component.configuration}
+              organizationId={organizationId}
+              allowExpressions={view === "full"}
+              autocompleteExampleObj={EXPRESSION_CONTEXT}
+              fieldPath="machineType"
+              readOnly={disabled}
+            />
           </div>
         ) : null}
       </section>

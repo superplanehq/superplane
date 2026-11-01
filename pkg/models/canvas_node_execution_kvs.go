@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,6 +33,39 @@ type CanvasNodeExecutionKV struct {
 
 func (c *CanvasNodeExecutionKV) TableName() string {
 	return "workflow_node_execution_kvs"
+}
+
+// FindNodeExecutionRunnerFleets loads only recorded fleet identifiers. The newest
+// value for each key wins; fleet_id takes precedence over historical machine_type.
+func FindNodeExecutionRunnerFleets(db *gorm.DB, executionIDs []string) (map[string]string, error) {
+	fleets := make(map[string]string, len(executionIDs))
+	if len(executionIDs) == 0 {
+		return fleets, nil
+	}
+	var records []CanvasNodeExecutionKV
+	err := db.Where("execution_id IN ? AND key IN ?", executionIDs, []string{"fleet_id", "machine_type"}).
+		Order("created_at DESC, id DESC").Find(&records).Error
+	if err != nil {
+		return nil, err
+	}
+	latest := make(map[string]map[string]string)
+	for _, record := range records {
+		id := record.ExecutionID.String()
+		if latest[id] == nil {
+			latest[id] = make(map[string]string)
+		}
+		if _, present := latest[id][record.Key]; !present {
+			latest[id][record.Key] = strings.TrimSpace(record.Value)
+		}
+	}
+	for id, values := range latest {
+		fleet := values["fleet_id"]
+		if fleet == "" {
+			fleet = values["machine_type"]
+		}
+		fleets[id] = fleet
+	}
+	return fleets, nil
 }
 
 func CreateNodeExecutionKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string, executionID uuid.UUID, key, value string) error {

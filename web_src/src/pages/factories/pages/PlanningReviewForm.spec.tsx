@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { MemoryRouter } from "react-router";
@@ -8,6 +8,7 @@ import type { ConfigurationField } from "@/api-client";
 import { useComponent } from "@/hooks/useComponentData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
+import { useOrganizationRunnerFleets } from "@/hooks/useOrganizationRunnerFleets";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
@@ -16,6 +17,8 @@ import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 import { HEADER_MCP_RESOURCE, INLINE_SKILL } from "../__fixtures__/agentResourceFixtures";
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import { PlanningReviewForm } from "./PlanningReviewForm";
+import { AgentRunnerSettings } from "./AgentRunnerSettings";
+import type { SuperplaneComponentsNode } from "@/api-client";
 import { PLANNING_REVIEW_DRAFT, type PlanningReviewDraft } from "./planningReviewMockup";
 
 const useCanvasMock = vi.hoisted(() =>
@@ -28,6 +31,7 @@ const useCanvasMock = vi.hoisted(() =>
 vi.mock("@/hooks/useComponentData", () => ({
   useComponent: vi.fn(),
 }));
+vi.mock("@/hooks/useOrganizationRunnerFleets", () => ({ useOrganizationRunnerFleets: vi.fn() }));
 
 vi.mock("@/hooks/useSelectableLLMModels", () => ({
   useSelectableLLMModels: vi.fn(),
@@ -149,6 +153,16 @@ describe("PlanningReviewForm model options", () => {
   });
 
   beforeEach(() => {
+    vi.mocked(useOrganizationRunnerFleets).mockReturnValue({
+      data: {
+        fleets: [
+          { id: "team-linux", scope: "organization" },
+          { id: "e1-large-amd64", scope: "installation" },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useOrganizationRunnerFleets>);
     useCanvasMock.mockReset();
     useCanvasMock.mockReturnValue({ data: undefined, isPending: false });
     vi.mocked(useComponent).mockReturnValue({ data: undefined } as ReturnType<typeof useComponent>);
@@ -176,6 +190,52 @@ describe("PlanningReviewForm model options", () => {
       isLoading: false,
       isError: false,
     } as unknown as ReturnType<typeof useFactoryAgentResources>);
+  });
+
+  it("autosaves fleet edits, preserves unrelated settings, and reopens independent runner nodes", async () => {
+    const onSave = vi.fn();
+    const node: SuperplaneComponentsNode = {
+      id: "agent-one",
+      name: "Agent",
+      component: "runnerClaudeCode",
+      integration: { id: "integration" },
+      concurrency: { max: 2, key: "team" },
+      configuration: { machineType: "e1-large-amd64", model: "sonnet", steps: [], workingDirectory: "repo" },
+    };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const editor = (current: SuperplaneComponentsNode, disabled = false) => (
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <AgentRunnerSettings node={current} organizationId="org-1" onSave={onSave} disabled={disabled} />
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(editor(node));
+    expect(onSave).not.toHaveBeenCalled();
+    await userEvent.click(within(screen.getByRole("group", { name: "Runner fleet" })).getByRole("combobox"));
+    await userEvent.click(screen.getByRole("option", { name: "team-linux" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodeId: "agent-one",
+        configuration: { ...node.configuration, machineType: "team-linux" },
+        integration: node.integration,
+        concurrency: node.concurrency,
+      }),
+    );
+    const saved = { ...node, configuration: { ...node.configuration, machineType: "team-linux" } };
+    rerender(editor({ ...node, id: "agent-two" }));
+    expect(within(screen.getByRole("group", { name: "Runner fleet" })).getByRole("combobox")).toHaveTextContent(
+      "e1-large-amd64",
+    );
+    rerender(editor(saved, true));
+    expect(within(screen.getByRole("group", { name: "Runner fleet" })).getByRole("combobox")).toHaveTextContent(
+      "team-linux",
+    );
+    expect(within(screen.getByRole("group", { name: "Runner fleet" })).getByRole("combobox")).toBeDisabled();
+    expect(onSave).toHaveBeenCalledTimes(1);
   });
 
   it("shows the thinking word on the closed model control in agent settings", () => {
@@ -231,7 +291,7 @@ describe("PlanningReviewForm model options", () => {
     const user = userEvent.setup();
     renderForm(PLANNING_REVIEW_DRAFT);
 
-    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByTestId("field-model-select"));
     expect(screen.getByRole("option", { name: "Claude Sonnet" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Claude Opus" })).toBeInTheDocument();
     expect(screen.queryByTestId("field-model-hosted-model")).not.toBeInTheDocument();
