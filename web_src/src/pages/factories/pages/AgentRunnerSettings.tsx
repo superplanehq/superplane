@@ -71,6 +71,7 @@ export function AgentRunnerSettings({
       factoryKey={factoryKey}
       onSave={onSave}
       view={view}
+      disabled={disabled}
     />
   );
 }
@@ -118,6 +119,7 @@ function StepAgentRunnerSettings({
   factoryKey,
   onSave,
   view,
+  disabled,
 }: {
   node: SuperplaneComponentsNode;
   organizationId?: string;
@@ -125,6 +127,7 @@ function StepAgentRunnerSettings({
   factoryKey?: string;
   onSave: SaveAgent;
   view: "step" | "implementation";
+  disabled: boolean;
 }) {
   const initial = draftFromNode(node, view);
   const [draft, setDraft] = useState(initial);
@@ -168,10 +171,13 @@ function StepAgentRunnerSettings({
         showResources={view === "step" && showsImplementAgentControls(node)}
         showConcurrency={showsImplementAgentControls(node)}
         draft={draft}
-        onChange={(next) => applyDraft(saveState.current, next, setDraft)}
+        onChange={(next) => {
+          if (!disabled) applyDraft(saveState.current, next, setDraft);
+        }}
         organizationId={organizationId}
         factoryId={factoryId}
         factoryKey={factoryKey}
+        disabled={disabled}
       />
     </div>
   );

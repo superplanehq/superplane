@@ -22,5 +22,7 @@ export function useOrganizationRunnerFleets(organizationId: string) {
     },
     enabled: Boolean(organizationId),
     staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
+    refetchIntervalInBackground: false,
   });
 }

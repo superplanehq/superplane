@@ -1,15 +1,23 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
+import type { CanvasesCanvasRun, CanvasesCanvasNodeExecution } from "@/api-client";
 
 type DescribeRunQuery = {
-  data: { run?: { rootEvent?: { id?: string } } } | undefined;
+  data: { run?: CanvasesCanvasRun } | undefined;
   isError: boolean;
   isLoading: boolean;
 };
 
-const { useCanvasRuntimeWebsocketMock, useDescribeRunMock } = vi.hoisted(() => ({
+const { useCanvasRuntimeWebsocketMock, useDescribeRunMock, useEventExecutionsMock } = vi.hoisted(() => ({
   useCanvasRuntimeWebsocketMock: vi.fn(),
   useDescribeRunMock: vi.fn((): DescribeRunQuery => ({ data: undefined, isError: false, isLoading: false })),
+  useEventExecutionsMock: vi.fn(
+    (): { data?: { executions: CanvasesCanvasNodeExecution[] }; isError: boolean; isLoading: boolean } => ({
+      data: undefined,
+      isError: false,
+      isLoading: false,
+    }),
+  ),
 }));
 
 vi.mock("@/hooks/useCanvasWebsocket", () => ({
@@ -19,7 +27,7 @@ vi.mock("@/hooks/useCanvasWebsocket", () => ({
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: () => ({ data: undefined, isError: false, isLoading: false }),
   useDescribeRun: useDescribeRunMock,
-  useEventExecutions: () => ({ data: undefined, isError: false, isLoading: false }),
+  useEventExecutions: useEventExecutionsMock,
 }));
 
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
@@ -28,6 +36,7 @@ import type { SplitRunPhase } from "./splitRunMocks";
 afterEach(() => {
   vi.clearAllMocks();
   useDescribeRunMock.mockReturnValue({ data: undefined, isError: false, isLoading: false });
+  useEventExecutionsMock.mockReturnValue({ data: undefined, isError: false, isLoading: false });
 });
 
 const PHASE: SplitRunPhase = {
@@ -44,6 +53,44 @@ const PHASE: SplitRunPhase = {
 };
 
 describe("useSplitRunLiveCanvas", () => {
+  it.each(["running", "passed", "failed", "cancelled"] as const)(
+    "loads individual recorded fleets for %s runs and excludes executions from other runs",
+    (status) => {
+      useDescribeRunMock.mockReturnValue({
+        data: {
+          run: {
+            id: "run-1",
+            rootEvent: { id: "root" },
+            executions: [
+              { id: "one", componentName: "runnerClaudeCode" },
+              { id: "two", componentName: "runnerCodex" },
+              { id: "legacy", componentName: "runnerSuperPlane" },
+            ],
+          },
+        },
+        isError: false,
+        isLoading: false,
+      });
+      useEventExecutionsMock.mockReturnValue({
+        data: {
+          executions: [
+            { id: "one", runId: "run-1", runnerFleet: "team-one", configuration: { machineType: "current-fleet" } },
+            { id: "two", runId: "run-1", runnerFleet: "team-two" },
+            { id: "other", runId: "run-2", runnerFleet: "other-fleet" },
+          ],
+        },
+        isError: false,
+        isLoading: false,
+      });
+      const { result } = renderHook(() => useSplitRunLiveCanvas("org-1", { ...PHASE, status }));
+      expect(useEventExecutionsMock).toHaveBeenCalledWith(PHASE.appId, "root");
+      expect(result.current.runnerActivities?.map((activity) => activity.runnerFleet)).toEqual([
+        "team-one",
+        "team-two",
+        "Unknown",
+      ]);
+    },
+  );
   it("subscribes to the canvas websocket for the live app", () => {
     renderHook(() => useSplitRunLiveCanvas("org-1", PHASE));
 

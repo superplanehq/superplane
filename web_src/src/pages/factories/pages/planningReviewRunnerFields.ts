@@ -1,5 +1,6 @@
 import type { ConfigurationField } from "@/api-client";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
+import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
 
 const SUPERPLANE_AGENT_COMPONENT = "runnerSuperPlane";
 
@@ -75,7 +76,7 @@ const environmentVariableSchema: ConfigurationField[] = [
 export const PLANNING_REVIEW_RUNNER_FIELDS: ConfigurationField[] = [
   {
     name: "machineType",
-    label: "Environment",
+    label: "Runner fleet",
     type: "runner-fleet",
     required: true,
   },
@@ -154,6 +155,15 @@ export const PLANNING_REVIEW_RUNNER_FIELDS: ConfigurationField[] = [
 ];
 
 const CLAUDE_MODEL_FIELD = PLANNING_REVIEW_RUNNER_FIELDS.find((field) => field.name === "model");
+
+export function planningReviewRunnerFleetField(
+  componentName: string | undefined,
+  catalogFields?: ConfigurationField[],
+): ConfigurationField | undefined {
+  if (!isAgentHarnessComponent(componentName)) return undefined;
+  const field = catalogFields?.find((field) => field.name === "machineType") ?? PLANNING_REVIEW_RUNNER_FIELDS[0];
+  return { ...field, label: "Runner fleet", description: "" };
+}
 
 /** Same field Run SuperPlane Agent uses on the automation canvas. */
 const SUPERPLANE_AGENT_MODEL_FIELD: ConfigurationField = {

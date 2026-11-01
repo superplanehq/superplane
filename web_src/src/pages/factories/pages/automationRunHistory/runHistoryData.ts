@@ -136,6 +136,7 @@ function executionActivity(
     recordedAt: execution.createdAt,
     error: execution.result === "RESULT_FAILED" ? execution.resultMessage || undefined : undefined,
     logs: hasLogs ? { state: "empty" } : undefined,
+    runnerFleet: hasLogs ? execution.runnerFleet || "Unknown" : undefined,
     defaultTab: hasLogs ? "logs" : "outputs",
     outputs: execution.outputs && Object.keys(execution.outputs).length ? execution.outputs : undefined,
     additionalInstructions: typeof instructions === "string" && instructions.trim() ? instructions : undefined,

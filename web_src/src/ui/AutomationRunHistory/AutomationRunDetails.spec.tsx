@@ -5,6 +5,24 @@ import { implementationRuns } from "./fixtures";
 import type { RunActivity } from "./types";
 
 describe("AutomationRunDetails live activity", () => {
+  it("shows the selected execution fleet and an honest unknown state, but no source-event fleet", () => {
+    const run = {
+      ...implementationRuns[0],
+      activities: [
+        { id: "first", name: "First agent", status: "Passed" as const, runnerFleet: "removed-team-fleet" },
+        { id: "second", name: "Second agent", status: "Passed" as const, runnerFleet: "Unknown" },
+        { id: "source", name: "Source event", status: "Passed" as const },
+      ],
+    };
+    render(<AutomationRunDetails run={run} onBack={vi.fn()} onRetryLogs={vi.fn()} />);
+    expect(screen.getByText("Runner fleet")).toBeInTheDocument();
+    expect(screen.getByText("removed-team-fleet")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Second agent/ }));
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    expect(screen.queryByText("removed-team-fleet")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Source event/ }));
+    expect(screen.queryByText("Runner fleet")).not.toBeInTheDocument();
+  });
   it("opens event data for a source activity and keeps agent logs and outputs accessible", async () => {
     const original = implementationRuns[2];
     const run = {

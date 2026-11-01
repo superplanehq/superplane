@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { organizationKeys } from "./useOrganizationData";
+import { organizationRunnerFleetsQueryKey } from "./useOrganizationRunnerFleets";
 
 export interface ExperimentalFeature {
   id: string;
@@ -118,6 +119,7 @@ function useAdminExperimentalFeatureMutation<TVariables>(
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: organizationRunnerFleetsQueryKey(orgId) });
     },
   });
 }

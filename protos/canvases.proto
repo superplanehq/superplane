@@ -693,6 +693,8 @@ message CanvasNodeExecution {
   UserRef cancelled_by = 15;
   string run_id = 16;
   google.protobuf.Timestamp cancelled_at = 17;
+  // Recorded runner fleet slug. Empty when the execution has no fleet record.
+  string runner_fleet = 18;
 }
 
 message CanvasNodeQueueItem {

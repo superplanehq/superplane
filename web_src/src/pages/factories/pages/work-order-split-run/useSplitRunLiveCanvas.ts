@@ -2,13 +2,15 @@ import { useCanvas, useDescribeRun, useEventExecutions } from "@/hooks/useCanvas
 import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useMemo } from "react";
 
-import type { CanvasesCanvas, CanvasesCanvasRun } from "@/api-client";
+import type { CanvasesCanvas, CanvasesCanvasRun, CanvasesCanvasNodeExecution } from "@/api-client";
 
 import { agentRunnerQueue, type AgentRunnerQueue } from "./agentRunnerQueue";
 import { liveCanvasKeyForPhase, splitRunCanvasFromLive, streamFromLiveRun } from "./splitRunLiveCanvas";
 import type { SplitRunCanvasModel } from "./splitRunCanvases";
 import type { SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
 import { isRunnerComponent } from "./streamNotesFromLiveLog";
+import { toRunActivities } from "../automationRunHistory/runHistoryData";
+import type { RunActivity } from "@/ui/AutomationRunHistory/types";
 
 type SplitRunLiveCanvasResult = {
   enabled: boolean;
@@ -18,6 +20,9 @@ type SplitRunLiveCanvasResult = {
   stream: SplitRunStreamLine[];
   rootEventId: string | undefined;
   agentQueue?: AgentRunnerQueue;
+  runnerActivities?: RunActivity[];
+  fleetDetailsLoading?: boolean;
+  fleetDetailsError?: boolean;
 };
 
 function splitRunLiveQueryState(
@@ -56,15 +61,15 @@ export function useSplitRunLiveCanvas(
   organizationId: string | undefined,
   phase: SplitRunPhase | undefined,
 ): SplitRunLiveCanvasResult {
-  const appId = phase?.appId ?? "";
-  const runId = phase?.runId ?? null;
+  const { appId, runId } = liveCanvasIdentifiers(phase);
   const enabled = Boolean(organizationId && appId);
   useCanvasRuntimeWebsocket(appId, organizationId ?? "", enabled);
   const canvasQuery = useCanvas(organizationId ?? "", appId, { enabled });
   const runQuery = useDescribeRun(appId, runId, enabled && Boolean(runId));
   const run = runQuery.data?.run;
   const failedRootEventId = enabled ? failedRunnerRootEventId(phase, canvasQuery.data, run) : null;
-  const executionsQuery = useEventExecutions(appId, failedRootEventId);
+  const rootEventId = runnerExecutionRootEventId(enabled, runId, run);
+  const executionsQuery = useEventExecutions(appId, rootEventId);
   const { isError, isLoading } = splitRunLiveQueryState(enabled, runId, canvasQuery, runQuery);
 
   const canvas = useMemo(() => {
@@ -100,5 +105,28 @@ export function useSplitRunLiveCanvas(
     stream,
     rootEventId: run?.rootEvent?.id,
     agentQueue,
+    runnerActivities: recordedRunnerActivities(run, executionsQuery.data?.executions, canvasQuery.data),
+    fleetDetailsLoading: executionsQuery.isLoading,
+    fleetDetailsError: executionsQuery.isError,
   };
+}
+
+function liveCanvasIdentifiers(phase: SplitRunPhase | undefined) {
+  return { appId: phase?.appId ?? "", runId: phase?.runId ?? null };
+}
+
+function runnerExecutionRootEventId(enabled: boolean, runId: string | null, run: CanvasesCanvasRun | undefined) {
+  if (!enabled || !runId) return null;
+  return run?.rootEvent?.id ?? null;
+}
+
+function recordedRunnerActivities(
+  run: CanvasesCanvasRun | undefined,
+  executions: CanvasesCanvasNodeExecution[] | undefined,
+  canvas: CanvasesCanvas | undefined,
+) {
+  if (!run) return [];
+  return toRunActivities(run, executions ?? [], canvas?.spec?.nodes ?? []).filter(
+    (activity) => activity.runnerFleet !== undefined,
+  );
 }

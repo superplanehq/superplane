@@ -83,6 +83,30 @@ describe("LiveAgentSteps", () => {
     expect(screen.queryByText("<path>")).not.toBeInTheDocument();
   });
 
+  it("shows each execution fleet while logs load and distinguishes retrieval failure", () => {
+    const live = {
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      rootEventId: undefined,
+      stream: [RUNNING_RUNNER],
+      runnerActivities: [
+        { id: "one", name: "First agent", status: "Passed" as const, runnerFleet: "team-one" },
+        { id: "two", name: "Second agent", status: "Passed" as const, runnerFleet: "Unknown" },
+      ],
+    };
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue(live);
+    const view = render(<LiveAgentSteps stage={implementStage()} phase={implementPhase()} organizationId="org-1" />);
+    expect(screen.getByText("Runner fleet · First agent")).toBeInTheDocument();
+    expect(screen.getByText("team-one")).toBeInTheDocument();
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({ ...live, fleetDetailsError: true });
+    view.rerender(<LiveAgentSteps stage={implementStage()} phase={implementPhase()} organizationId="org-1" />);
+    expect(screen.getAllByText("Could not load runner fleet")).toHaveLength(2);
+    expect(screen.queryByText("Unknown")).not.toBeInTheDocument();
+  });
+
   it("keeps earlier recorded turns in the open running step", async () => {
     const prior: AgentActivity = {
       id: "activity-0",

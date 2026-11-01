@@ -76,12 +76,17 @@ func ListNodeExecutions(ctx context.Context, db *gorm.DB, canvas *models.Canvas,
 }
 
 type NodeExecutionResources struct {
+	runnerFleetsByExecutionID map[string]string
 	rootEventsByID            map[string]models.CanvasEvent
 	outputEventsByExecutionID map[string][]models.CanvasEvent
 	cancelledByUsersByID      map[uuid.UUID]models.User
 }
 
 func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecution) (*NodeExecutionResources, error) {
+	runnerFleets, err := models.FindNodeExecutionRunnerFleets(db, executionIDs(executions))
+	if err != nil {
+		return nil, fmt.Errorf("error finding recorded runner fleets: %w", err)
+	}
 	var rootEvents, outputEvents []models.CanvasEvent
 	var rootEventsErr, outputEventsErr error
 	var cancelledByUsers []models.User
@@ -137,6 +142,7 @@ func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecu
 	}
 
 	return &NodeExecutionResources{
+		runnerFleetsByExecutionID: runnerFleets,
 		rootEventsByID:            rootEventsByID,
 		outputEventsByExecutionID: outputEventsByExecutionID,
 		cancelledByUsersByID:      cancelledByUsersByID,
@@ -168,6 +174,7 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, resources 
 		}
 
 		result = append(result, &pb.CanvasNodeExecution{
+			RunnerFleet:         resources.runnerFleetsByExecutionID[execution.ID.String()],
 			Id:                  execution.ID.String(),
 			CanvasId:            execution.WorkflowID.String(),
 			NodeId:              execution.NodeID,

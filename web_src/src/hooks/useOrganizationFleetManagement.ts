@@ -12,6 +12,7 @@ import { FEATURE_ORGANIZATION_RUNNERS } from "@/lib/experimentalFeatures";
 import { useExperimentalFeature } from "./useExperimentalFeature";
 import { experimentalFeaturesKeys } from "./useExperimentalFeatures";
 import { organizationKeys, useOrganization } from "./useOrganizationData";
+import { organizationRunnerFleetsQueryKey } from "./useOrganizationRunnerFleets";
 
 export const organizationFleetKeys = {
   all: (organizationId: string) => ["organization-fleet-management", organizationId] as const,
@@ -105,6 +106,7 @@ export function useRefreshOrganizationFleets(organizationId: string) {
   const client = useQueryClient();
   return () => {
     void client.invalidateQueries({ queryKey: organizationFleetKeys.all(organizationId) });
+    void client.invalidateQueries({ queryKey: organizationRunnerFleetsQueryKey(organizationId) });
     void client.invalidateQueries({ queryKey: organizationKeys.details(organizationId) });
     void client.invalidateQueries({ queryKey: experimentalFeaturesKeys.registry() });
   };
