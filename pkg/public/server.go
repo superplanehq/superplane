@@ -436,6 +436,9 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	// Define all new admin organization endpoints in protos/admin/organizations.proto.
 	// Keep existing HTTP handlers until they migrate to the admin gRPC gateway.
 	s.adminRouter.Handle("/organizations/{id}", adminGatewayHandler).Methods("DELETE")
+	s.adminRouter.Handle("/organizations/{id}/suspend", adminGatewayHandler).Methods("POST")
+	s.adminRouter.Handle("/organizations/{id}/reactivate", adminGatewayHandler).Methods("POST")
+	s.adminRouter.Handle("/organizations/{id}/suspension-history", adminGatewayHandler).Methods("GET")
 
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
@@ -1701,6 +1704,7 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 	}
 
 	type Organization struct {
+		Suspended                bool   `json:"suspended"`
 		ID                       string `json:"id"`
 		Slug                     string `json:"slug"`
 		Name                     string `json:"name"`
@@ -1759,6 +1763,7 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 	for _, organization := range organizations {
 		orgID := organization.ID.String()
 		item := Organization{
+			Suspended:   organization.IsSuspended(),
 			ID:          organization.ID.String(),
 			Slug:        organization.Slug,
 			Name:        organization.Name,

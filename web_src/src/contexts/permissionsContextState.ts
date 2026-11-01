@@ -6,6 +6,7 @@ export interface PermissionsContextType {
   isLoading: boolean;
   /** False for every action except "read" during a read-only support session. */
   canAct: (resource: string, action: string) => boolean;
+  canCancel?: (resource: string) => boolean;
   /** The user's real permission. Use for page access, not for actions. */
   hasPermission: (resource: string, action: string) => boolean;
   currentUserId?: string;

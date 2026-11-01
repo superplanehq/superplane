@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
@@ -108,7 +110,41 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 		}
 	}
 
+	if BlocksSuspendedOrganization(route, rule) {
+		id, err := uuid.Parse(organizationID)
+		if err != nil {
+			return nil, status.Error(codes.NotFound, "Not found")
+		}
+		organization, err := models.FindOrganizationSuspensionStatus(database.DB(ctx), id)
+		if err != nil {
+			return nil, status.Error(codes.NotFound, "Not found")
+		}
+		if organization.IsSuspended() {
+			return nil, status.Error(codes.PermissionDenied, models.OrganizationSuspendedMessage)
+		}
+	}
 	return withAuthorizedContext(ctx, pathParams, organizationID), nil
+}
+
+// Operation policy is separate from permission actions: cancellation and
+// completion retain their existing update permission while suspension permits them.
+func BlocksSuspendedOrganization(route HTTPRoute, rule AuthorizationRule) bool {
+	switch route.Pattern {
+	case "/api/v1/canvases/{canvas_id}/runs/{run_id}/cancel",
+		"/api/v1/canvases/{canvas_id}/executions/{execution_id}/cancel",
+		"/api/v1/canvases/{canvas_id}/executions/{execution_id}/hooks/{hook_name}",
+		"/api/v1/factories/{factory_id}/orders/{order_id}/close",
+		"/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end",
+		"/api/v1/organizations/{id}/runners/{runner_id}",
+		"/api/v1/organizations/{id}/runners/{runner_id}:provider-deleted",
+		"/api/v1/organizations/{id}/billing-portal-session":
+		return false
+	case "/api/v1/factories/{factory_id}/codex-connection":
+		return route.Method != "GET" && route.Method != "DELETE"
+	case "/api/v1/factories/{factory_id}/velocity/sync":
+		return true
+	}
+	return rule.Action != "read" && rule.Resource != "agents"
 }
 
 func withAuthorizedContext(ctx context.Context, pathParams map[string]string, organizationID string) context.Context {

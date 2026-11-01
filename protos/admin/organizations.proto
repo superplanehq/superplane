@@ -3,10 +3,20 @@ syntax = "proto3";
 package Superplane.Admin.Organizations;
 
 import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/admin/organizations";
 
 service AdminOrganizations {
+  rpc SuspendOrganization(SuspendOrganizationRequest) returns (SuspensionResponse) {
+    option (google.api.http) = { post: "/admin/api/organizations/{id}/suspend" body: "*" };
+  }
+  rpc ReactivateOrganization(ReactivateOrganizationRequest) returns (SuspensionResponse) {
+    option (google.api.http) = { post: "/admin/api/organizations/{id}/reactivate" body: "*" };
+  }
+  rpc ListSuspensionHistory(ListSuspensionHistoryRequest) returns (SuspensionResponse) {
+    option (google.api.http) = { get: "/admin/api/organizations/{id}/suspension-history" };
+  }
   rpc DeleteOrganization(DeleteOrganizationRequest) returns (DeleteOrganizationResponse) {
     option (google.api.http) = {
       delete: "/admin/api/organizations/{id}"
@@ -19,3 +29,22 @@ message DeleteOrganizationRequest {
 }
 
 message DeleteOrganizationResponse {}
+
+message SuspendOrganizationRequest {
+  string id = 1;
+  string reason = 2;
+}
+message ReactivateOrganizationRequest { string id = 1; }
+message ListSuspensionHistoryRequest { string id = 1; }
+message SuspensionEvent {
+  string id = 1;
+  string action = 2;
+  string reason = 3;
+  string account_id = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp cancellation_completed_at = 6;
+}
+message SuspensionResponse {
+  bool suspended = 1;
+  repeated SuspensionEvent events = 2;
+}

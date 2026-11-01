@@ -326,6 +326,7 @@ func (s *Server) reconcileRunnerConnection(
 	var shouldCancel bool
 	var reservedTask *models.RunnerTask
 	var reservation models.RunnerTaskReservationResult
+	needsReservation := false
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		current, err := models.FindRunner(tx, runner.ID)
@@ -386,12 +387,7 @@ func (s *Server) reconcileRunnerConnection(
 			if runner.State != models.RunnerStateIdle {
 				return errRunnerStateMismatch
 			}
-			reservation, err = runner.ReserveNextTask(tx)
-			if err != nil {
-				return err
-			}
-			task = reservation.Task
-			reservedTask = task
+			needsReservation = true
 		default:
 			return activeErr
 		}
@@ -400,6 +396,15 @@ func (s *Server) reconcileRunnerConnection(
 	})
 	if err != nil {
 		return err
+	}
+	if needsReservation {
+		reservation, err = runner.ReserveNextTask(database.DB(ctx))
+		if err != nil {
+			return err
+		}
+		task = reservation.Task
+		reservedTask = task
+		shouldSendTask = task != nil
 	}
 	if reservedTask != nil {
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug, fleetScope)
@@ -429,6 +434,9 @@ func (s *Server) reconcileRunnerConnection(
 			return err
 		}
 		if err := s.startRunnerTask(ctx, runner, task.ID, connectionID); err != nil {
+			if errors.Is(err, models.ErrOrganizationSuspended) {
+				return connection.write(taskControlMessage{Type: messageTypeCancel, TaskID: task.ID.String()})
+			}
 			return err
 		}
 	}
@@ -440,6 +448,15 @@ func (s *Server) reconcileRunnerConnection(
 	}
 	if !shouldSendTask {
 		return nil
+	}
+	if task.State == models.RunnerTaskStateReserved {
+		organization, err := models.FindOrganizationSuspensionStatus(database.DB(ctx), task.OrganizationID)
+		if err != nil {
+			return err
+		}
+		if organization.IsSuspended() {
+			return nil
+		}
 	}
 
 	if err := s.initializeTaskLogs(ctx, task.ID); err != nil {
@@ -456,14 +473,16 @@ func (s *Server) reconcileRunnerConnection(
 	if err != nil {
 		return err
 	}
-	if err := connection.write(taskMessage{
-		Type: messageTypeTask,
-		Task: json.RawMessage(payload),
-	}); err != nil {
+	if err := s.startRunnerTask(ctx, runner, task.ID, connectionID); err != nil {
+		if errors.Is(err, models.ErrOrganizationSuspended) {
+			return nil
+		}
 		return err
 	}
-
-	return s.startRunnerTask(ctx, runner, task.ID, connectionID)
+	return connection.write(taskMessage{
+		Type: messageTypeTask,
+		Task: json.RawMessage(payload),
+	})
 }
 
 func (s *Server) startRunnerTask(

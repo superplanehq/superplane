@@ -27,6 +27,7 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 
 	response := &pb.DescribeOrganizationResponse{
 		Organization: &pb.Organization{
+			Suspended: organization.IsSuspended(),
 			Metadata: &pb.Organization_Metadata{
 				Id:          organization.ID.String(),
 				Name:        organization.Name,

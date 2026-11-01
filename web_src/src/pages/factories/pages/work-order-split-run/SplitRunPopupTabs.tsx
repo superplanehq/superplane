@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from "react";
 
 import type { FilesFile } from "@/api-client";
 import { useWorkOrder } from "@/hooks/useFactoryData";
+import { usePermissions } from "@/contexts/usePermissions";
 
 import type { ManualCustomAutomation } from "../../lib/customAutomation";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
@@ -127,6 +128,7 @@ export function SplitRunPopupTabs({
   panelReview,
   header,
 }: SplitRunPopupTabsProps) {
+  const { canCancel } = usePermissions();
   const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const files = liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined;
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
@@ -189,11 +191,12 @@ export function SplitRunPopupTabs({
           pullRequests={popupData.pullRequests}
           artifacts={popupData.artifacts}
           panelReview={panelReview}
-          canStopRun={Boolean(canUpdate && organizationId && factoryId && orderId)}
+          canStopRun={Boolean((canCancel?.("canvases") ?? canUpdate) && organizationId && factoryId && orderId)}
           manualCustomAutomations={manualCustomAutomations}
           actionBusy={footerActions.busy}
           onStopRun={(run) => void footerActions.handleStopAutomation(run)}
           onRerunStep={(phase) =>
+            canUpdate &&
             void footerActions.handleStop("rerun-step", {
               kind: "failed",
               lineName: fixture.lineName,
