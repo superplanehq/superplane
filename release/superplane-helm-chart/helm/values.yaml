@@ -12,6 +12,12 @@ image:
   pullPolicy: IfNotPresent
   pullSecrets: []
 
+# Existing managed-agent credentials, when this installation uses managed agents.
+# The Secret must contain ANTHROPIC_API_KEY, ANTHROPIC_AGENT_ID, and
+# ANTHROPIC_ENVIRONMENT_ID. Regular workers need these to stop active sessions.
+anthropic:
+  secretName: ""
+
 workers:
   replicas: 1
   dbPoolSize: 5
