@@ -223,6 +223,76 @@ func TestSuspensionDoesNotFinishDispatchConcurrentlyAdmittedFromQueue(t *testing
 	require.Equal(t, models.CanvasRunStateCancelling, run.State)
 }
 
+func TestSuspensionCancellationDoesNotBlockFactoryRunFinalization(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Finalization race", "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
+	limit := 1
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint, MaxParallelism: &limit}})
+	require.NoError(t, err)
+	var results []*models.FactoryLineStepResult
+	for _, title := range []string{"Running", "Waiting"} {
+		order, err := factory.CreateWorkOrder(db, title, "", &r.User, nil, nil)
+		require.NoError(t, err)
+		_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+		require.NoError(t, err)
+		_, result, err := line.Dispatch(db, order)
+		require.NoError(t, err)
+		results = append(results, result)
+	}
+	running, queued := results[0], results[1]
+	require.NotNil(t, running.Run)
+	require.NotNil(t, queued.QueueItem)
+	require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop factory work"))
+
+	finalization := db.Begin()
+	defer finalization.Rollback()
+	require.NoError(t, finalization.Error)
+	require.NoError(t, finalization.Exec("SET LOCAL lock_timeout = '200ms'").Error)
+	var finalizerPID int
+	require.NoError(t, finalization.Raw("SELECT pg_backend_pid()").Scan(&finalizerPID).Error)
+	_, err = running.Run.RequestCancellation(finalization, nil)
+	require.NoError(t, err)
+	finalizer := NewRunFinalizer("", r.Registry)
+	finalized, _, err := finalizer.maybeFinalizeRun(finalization, running.Run.ID, runFinalizerTriggerSweep, nil, nil)
+	require.NoError(t, err)
+	require.True(t, finalized)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- NewOrganizationSuspensionWorker().Process(ctx) }()
+	completed := false
+	defer func() {
+		cancel()
+		finalization.Rollback()
+		if !completed {
+			<-done
+		}
+	}()
+	// Cancellation must release its line lock before waiting for this run.
+	require.Eventually(t, func() bool {
+		var waiting bool
+		err := db.Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%workflow_runs%' AND ? = ANY(pg_blocking_pids(pid)))", finalizerPID).Scan(&waiting).Error
+		return err == nil && waiting
+	}, 2*time.Second, 10*time.Millisecond)
+	_, _, err = finalizer.executeNextFactoryLineStep(finalization, running.Run.ID)
+	require.NoError(t, err)
+	require.NoError(t, finalization.Commit().Error)
+	err = <-done
+	completed = true
+	require.NoError(t, err)
+
+	stored, err := models.FindWorkOrderLineDispatch(db, queued.QueueItem.LineDispatchID)
+	require.NoError(t, err)
+	require.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, stored.State)
+	require.Equal(t, models.CanvasRunResultCancelled, stored.Result)
+	require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
+}
+
 func TestSuspensionWorkAndEventBatchesEventuallyComplete(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

@@ -66,6 +66,11 @@ func (w *OrganizationSuspensionWorker) Process(ctx context.Context) error {
 func (w *OrganizationSuspensionWorker) process(parent context.Context, event models.OrganizationSuspensionEvent) error {
 	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
+	// Commit queue discard before taking run locks. Run finalization takes
+	// run locks before line locks, so retaining both would invert that order.
+	if err := event.WithCurrentSuspension(database.DB(ctx), event.DiscardQueuedWork); err != nil {
+		return err
+	}
 	cursor := w.cursors[event.ID]
 	notifier := &RunCancellationNotifier{}
 	var tasks []models.RunnerTask
@@ -73,9 +78,6 @@ func (w *OrganizationSuspensionWorker) process(parent context.Context, event mod
 	claimed := false
 	err := event.WithCurrentSuspension(database.DB(ctx), func(tx *gorm.DB) error {
 		claimed = true
-		if err := event.DiscardQueuedWork(tx); err != nil {
-			return err
-		}
 		runs, err := event.ListRuns(tx, cursor.runs)
 		if err != nil {
 			return err
