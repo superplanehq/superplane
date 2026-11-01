@@ -100,6 +100,10 @@ type Story = StoryObj<typeof meta>;
 
 export const PayAsYouGo: Story = { globals: { theme: "dark" } };
 export const Light: Story = { globals: { theme: "light" } };
+export const SuspendedOwner: Story = {
+  globals: { theme: "light" },
+  args: { suspended: true },
+};
 export const Starter: Story = {
   globals: { theme: "dark" },
   args: {

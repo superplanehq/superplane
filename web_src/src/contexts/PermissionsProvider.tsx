@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from "react";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useMe } from "@/hooks/useMe";
 import { useIsSupportSession } from "@/hooks/useSupportSession";
+import { useOrganization } from "@/hooks/useOrganizationData";
 
 import { PermissionsContext } from "./permissionsContextState";
 
@@ -15,6 +16,8 @@ export function PermissionsProvider({ children, organizationId: organizationIdOv
   const organizationId = organizationIdOverride ?? routeOrganizationId;
   const { data: me, isLoading: meLoading } = useMe(true, organizationId);
   const inSupportSession = useIsSupportSession();
+  const { data: organization } = useOrganization(organizationId ?? "");
+  const suspended = organization?.suspended ?? false;
 
   const permissions = useMemo(() => me?.permissions ?? [], [me?.permissions]);
   const browserNotificationPreferences = useMemo(
@@ -48,10 +51,10 @@ export function PermissionsProvider({ children, organizationId: organizationIdOv
 
   const canAct = useCallback(
     (resource: string, action: string) => {
-      if (inSupportSession && action.toLowerCase() !== "read") return false;
+      if ((inSupportSession || suspended) && action.toLowerCase() !== "read") return false;
       return hasPermission(resource, action);
     },
-    [hasPermission, inSupportSession],
+    [hasPermission, inSupportSession, suspended],
   );
 
   const isLoading = !organizationId || meLoading;
@@ -62,6 +65,7 @@ export function PermissionsProvider({ children, organizationId: organizationIdOv
         permissions,
         isLoading,
         canAct,
+        canCancel: (resource) => !inSupportSession && hasPermission(resource, "update"),
         hasPermission,
         currentUserId: me?.id,
         browserNotificationPreferences,

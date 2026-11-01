@@ -174,6 +174,11 @@ func ensureCanvasRunNodeID(tx *gorm.DB, run *CanvasRun, nodeID string) error {
 }
 
 func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, state, result string) (*CanvasRun, error) {
+	if state != CanvasRunStateFinished {
+		if err := RequireActiveCanvasOrganization(tx, workflowID); err != nil {
+			return nil, err
+		}
+	}
 	if nodeID == "" {
 		return nil, fmt.Errorf("node id is required")
 	}

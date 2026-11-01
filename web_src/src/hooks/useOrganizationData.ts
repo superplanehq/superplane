@@ -53,7 +53,11 @@ export const useOrganization = (organizationId: string, enabled = true, refreshI
       );
       return response.data?.organization || null;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0,
+    refetchOnWindowFocus: "always",
+    // Nested organization consumers must not remount a denied public line
+    // into another loading cycle. Focus and explicit refresh still retry.
+    retryOnMount: false,
     gcTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!organizationId && enabled,
     refetchInterval: refreshInterval || false,

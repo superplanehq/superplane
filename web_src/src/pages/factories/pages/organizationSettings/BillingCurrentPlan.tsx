@@ -20,6 +20,7 @@ type BillingCurrentPlanProps = {
   changePlanButtonRef: Ref<HTMLButtonElement>;
   billing: OrganizationsDescribeOrganizationBillingResponse;
   canManageBilling: boolean;
+  canAccessBillingPortal?: boolean;
   busy: boolean;
   onChangePlan: () => void;
   onManagePayment: () => void;
@@ -75,6 +76,7 @@ export function BillingCurrentPlan(props: BillingCurrentPlanProps) {
       <PaymentMethodRow
         billing={billing}
         canManageBilling={canManageBilling}
+        canAccessBillingPortal={props.canAccessBillingPortal ?? canManageBilling}
         busy={busy}
         onManagePayment={props.onManagePayment}
       />
@@ -143,9 +145,13 @@ function subscriptionStatusCopy(billing: OrganizationsDescribeOrganizationBillin
 function PaymentMethodRow({
   billing,
   canManageBilling,
+  canAccessBillingPortal,
   busy,
   onManagePayment,
-}: Pick<BillingCurrentPlanProps, "billing" | "canManageBilling" | "busy" | "onManagePayment">) {
+}: Pick<
+  BillingCurrentPlanProps,
+  "billing" | "canManageBilling" | "canAccessBillingPortal" | "busy" | "onManagePayment"
+>) {
   const hasPortal =
     billing.hasPaymentMethod ||
     billing.planSource === "polar" ||
@@ -163,16 +169,17 @@ function PaymentMethodRow({
           </p>
         </div>
       </div>
-      {canManageBilling && !billingIsPastDue(billing.polarSubscriptionStatus) && (
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onManagePayment}>
-          {hasPortal ? "Manage payment method" : "Add payment method"}
-          {hasPortal && <ExternalLink className="size-3.5" aria-hidden />}
-        </Button>
-      )}
+      {(hasPortal ? canAccessBillingPortal : canManageBilling) &&
+        !billingIsPastDue(billing.polarSubscriptionStatus) && (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onManagePayment}>
+            {hasPortal ? "Manage payment method" : "Add payment method"}
+            {hasPortal && <ExternalLink className="size-3.5" aria-hidden />}
+          </Button>
+        )}
       {billing.requirePaymentMethod && !billing.hasPaymentMethod && (
         <p className="w-full text-xs text-amber-700 dark:text-amber-400">Add a card to start hosted tasks.</p>
       )}
-      {!canManageBilling && (
+      {!canManageBilling && !canAccessBillingPortal && (
         <p className="w-full text-xs text-muted-foreground">Ask an organization admin to manage billing.</p>
       )}
     </div>

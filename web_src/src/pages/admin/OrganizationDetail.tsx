@@ -9,6 +9,7 @@ import { Link, useParams } from "react-router";
 
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { DeleteOrganizationControl } from "./DeleteOrganizationControl";
+import { OrganizationSuspensionControl } from "./OrganizationSuspensionControl";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
 import { OrgIntegrationsTable } from "./OrgIntegrationsTable";
 import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
@@ -257,6 +258,13 @@ const OrganizationDetail: React.FC = () => {
           <TabsTrigger value="credits">Credits</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-3">
+          {detail.organization ? (
+            <OrganizationSuspensionControl
+              key={detail.organization.id}
+              organization={detail.organization}
+              onUpdate={detail.retry}
+            />
+          ) : null}
           <OrgOverviewPanel
             organization={detail.organization}
             loading={detail.loading}

@@ -1,6 +1,7 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 import { Building, CircleCheck, ClipboardList, Factory, GitBranch, Palette, Pin, PinOff, User } from "lucide-react";
 import React from "react";
@@ -178,6 +179,7 @@ function OrganizationRow({
             className="flex min-w-0 flex-1 items-center gap-2 text-gray-800 hover:text-blue-600 transition-colors font-medium before:absolute before:inset-0 before:z-10 before:content-[''] dark:text-gray-100 dark:hover:text-blue-400"
           >
             <Building size={14} className="text-gray-400 shrink-0 dark:text-gray-500" />
+            {organization.suspended ? <span>Suspended</span> : null}
             {organization.name || (
               <span className="text-gray-400 italic dark:text-gray-500" title={organization.id}>
                 {organization.id.slice(0, 8)}...
@@ -364,6 +366,16 @@ const OrganizationsList: React.FC = () => {
         onSearchChange={list.setSearch}
         placeholder="Search by name or ID..."
       />
+      <Select value={list.status} onValueChange={list.setStatus}>
+        <SelectTrigger aria-label="Organization status" className="mb-3 w-48">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All statuses</SelectItem>
+          <SelectItem value="active">Active</SelectItem>
+          <SelectItem value="suspended">Suspended</SelectItem>
+        </SelectContent>
+      </Select>
       {list.pinError ? <Text className="mb-3 text-sm text-red-600 dark:text-red-400">{list.pinError}</Text> : null}
       {list.listError ? (
         <div className="mb-3 flex flex-col items-start gap-2" role="alert">

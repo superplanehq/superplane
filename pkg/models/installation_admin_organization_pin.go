@@ -56,13 +56,13 @@ func IsOrganizationPinnedForAccount(tx *gorm.DB, accountID, organizationID uuid.
 	return count > 0, nil
 }
 
-func ListPinnedOrganizationsForAccount(tx *gorm.DB, accountID uuid.UUID) ([]OrganizationWithCounts, error) {
-	query := withOrganizationCounts(tx, tx.Model(&Organization{}).
+func ListPinnedOrganizationsForAccount(tx *gorm.DB, accountID uuid.UUID, statuses ...string) ([]OrganizationWithCounts, error) {
+	query := withOrganizationCounts(tx, FilterOrganizationStatus(tx.Model(&Organization{}).
 		Joins(
 			"JOIN installation_admin_organization_pins ON installation_admin_organization_pins.organization_id = organizations.id AND installation_admin_organization_pins.account_id = ?",
 			accountID,
 		).
-		Where("organizations.deleted_at IS NULL"),
+		Where("organizations.deleted_at IS NULL"), statuses...),
 	)
 
 	var organizations []OrganizationWithCounts

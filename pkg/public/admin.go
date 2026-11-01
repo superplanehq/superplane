@@ -384,8 +384,13 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 	search, limit, offset := parsePagination(r)
 	sortBy, sortDirection := parseSorting(r)
 	db := database.DB(ctx)
+	status := r.URL.Query().Get("status")
+	if status != "" && status != "all" && status != "active" && status != "suspended" {
+		http.Error(w, "Invalid organization status.", http.StatusBadRequest)
+		return
+	}
 
-	pinnedOrganizations, err := models.ListPinnedOrganizationsForAccount(db, account.ID)
+	pinnedOrganizations, err := models.ListPinnedOrganizationsForAccount(db, account.ID, status)
 	if err != nil {
 		log.Errorf("admin: failed to list pinned organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
@@ -397,7 +402,7 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 		excludeIDs = append(excludeIDs, organization.ID)
 	}
 
-	organizations, total, matchTotal, err := listUnpinnedOrganizations(ctx, search, limit, offset, sortBy, sortDirection, excludeIDs)
+	organizations, total, matchTotal, err := models.ListUnpinnedOrganizations(db, search, limit, offset, sortBy, sortDirection, excludeIDs, status)
 	if err != nil {
 		log.Errorf("admin: failed to list organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
@@ -1051,6 +1056,7 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 }
 
 type adminOrgItem struct {
+	Suspended            bool    `json:"suspended"`
 	ID                   string  `json:"id"`
 	Name                 string  `json:"name"`
 	PlanKey              string  `json:"plan_key"`
@@ -1152,6 +1158,7 @@ func remainingCreditCentsByOrganization(ctx context.Context, organizationIDs []u
 
 func serializeAdminOrganization(org models.OrganizationWithCounts, remainingCreditCents int64) adminOrgItem {
 	item := adminOrgItem{
+		Suspended:            org.IsSuspended(),
 		ID:                   org.ID.String(),
 		Name:                 org.Name,
 		Slug:                 org.Slug,

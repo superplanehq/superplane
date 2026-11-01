@@ -4,6 +4,10 @@ import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { usePermissions } from "@/contexts/usePermissions";
 
 const accountState = { supportSession: false };
+const organizationState = { suspended: false };
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganization: () => ({ data: { suspended: organizationState.suspended } }),
+}));
 
 vi.mock("@/contexts/useAccount", () => ({
   useAccount: () => ({
@@ -29,18 +33,19 @@ vi.mock("@/hooks/useMe", () => ({
 }));
 
 function PermissionProbe() {
-  const { canAct, hasPermission } = usePermissions();
+  const { canAct, hasPermission, canCancel } = usePermissions();
   return (
     <ul>
       <li>canAct read: {String(canAct("canvases", "read"))}</li>
       <li>canAct update: {String(canAct("canvases", "update"))}</li>
       <li>hasPermission update: {String(hasPermission("canvases", "update"))}</li>
+      <li>canCancel: {String(canCancel?.("canvases"))}</li>
     </ul>
   );
 }
 
 function renderProbe() {
-  render(
+  return render(
     <PermissionsProvider>
       <PermissionProbe />
     </PermissionsProvider>,
@@ -50,6 +55,7 @@ function renderProbe() {
 describe("PermissionsProvider", () => {
   beforeEach(() => {
     accountState.supportSession = false;
+    organizationState.suspended = false;
   });
 
   it("grants the permissions the user has", () => {
@@ -58,6 +64,36 @@ describe("PermissionsProvider", () => {
     expect(screen.getByText("canAct read: true")).toBeInTheDocument();
     expect(screen.getByText("canAct update: true")).toBeInTheDocument();
     expect(screen.getByText("hasPermission update: true")).toBeInTheDocument();
+  });
+
+  it("keeps pages readable and cancellation available during suspension", () => {
+    organizationState.suspended = true;
+    renderProbe();
+    expect(screen.getByText("canAct read: true")).toBeInTheDocument();
+    expect(screen.getByText("canAct update: false")).toBeInTheDocument();
+    expect(screen.getByText("hasPermission update: true")).toBeInTheDocument();
+    expect(screen.getByText("canCancel: true")).toBeInTheDocument();
+  });
+
+  it("updates write access when suspension changes without remounting", () => {
+    const view = renderProbe();
+    const rerender = () =>
+      view.rerender(
+        <PermissionsProvider>
+          <PermissionProbe />
+        </PermissionsProvider>,
+      );
+    organizationState.suspended = true;
+    rerender();
+    expect(screen.getByText("canAct update: false")).toBeInTheDocument();
+    expect(screen.getByText("canAct read: true")).toBeInTheDocument();
+    organizationState.suspended = false;
+    rerender();
+    expect(screen.getByText("canAct update: true")).toBeInTheDocument();
+    accountState.supportSession = true;
+    organizationState.suspended = true;
+    rerender();
+    expect(screen.getByText("canCancel: false")).toBeInTheDocument();
   });
 
   it("allows only read actions in a support session", () => {

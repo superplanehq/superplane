@@ -37,6 +37,7 @@ vi.mock("@/hooks/useOrganizationData", () => ({
     },
     isLoading: false,
     isSuccess: true,
+    refetch: vi.fn(async () => undefined),
   }),
 }));
 vi.mock("@/hooks/useExperimentalFeatures", () => ({

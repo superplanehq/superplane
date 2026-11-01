@@ -36,9 +36,9 @@ import (
 )
 
 func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
-	for _, scenario := range []string{"complete", "cancel", "queued subscription"} {
+	for _, scenario := range []string{"complete", "cancel", "queued subscription", "failed delivery", "suspended complete", "suspended cancel"} {
 		t.Run(scenario, func(t *testing.T) {
-			cancelOnHeartbeat := scenario == "cancel"
+			cancelOnHeartbeat := scenario == "cancel" || scenario == "suspended cancel"
 			resource := support.Setup(t)
 			signer := jwt.NewSigner("registration-secret")
 			runner, registration, fleet := createRegistrationFixture(t)
@@ -117,6 +117,41 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 			require.Equal(t, http.StatusOK, registerResponse.Code, registerResponse.Body.String())
 			var registered registerRunnerResponse
 			require.NoError(t, json.Unmarshal(registerResponse.Body.Bytes(), &registered))
+			if scenario == "failed delivery" {
+				connectionID := uuid.New()
+				require.NoError(t, runner.OpenConnection(db, connectionID, time.Now()))
+				deliveryFailed := make(chan error, 1)
+				failedServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					socket, err := runnerUpgrader.Upgrade(w, r, nil)
+					if err != nil {
+						deliveryFailed <- err
+						return
+					}
+					_ = socket.Close()
+					// A closed transport deterministically fails payload delivery.
+					deliveryFailed <- server.reconcileRunnerConnection(t.Context(), &runnerConnection{socket: socket}, runner, connectionID, "", fleet.Slug, "")
+				}))
+				defer failedServer.Close()
+				failedSocket, response, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(failedServer.URL, "http"), nil)
+				require.NoError(t, err)
+				if response != nil {
+					defer response.Body.Close()
+				}
+				defer failedSocket.Close()
+				select {
+				case err := <-deliveryFailed:
+					require.Error(t, err)
+				case <-time.After(5 * time.Second):
+					t.Fatal("failed delivery did not return")
+				}
+				stored, err := models.FindRunnerTask(db, task.ID)
+				require.NoError(t, err)
+				require.Equal(t, models.RunnerTaskStateReserved, stored.State)
+				require.Nil(t, stored.StartedAt)
+				storedRunner, err := models.FindRunner(db, runner.ID)
+				require.NoError(t, err)
+				require.Equal(t, models.RunnerStateIdle, storedRunner.State)
+			}
 
 			headers := http.Header{"Authorization": []string{"Bearer " + registered.AccessToken}}
 			socketURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/runner/v1/connect"
@@ -152,8 +187,16 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 				assert.GreaterOrEqual(t, int64(claims["exp"].(float64)), time.Now().Add(29*time.Second).Unix())
 			}
 
+			if strings.HasPrefix(scenario, "suspended") {
+				require.NoError(t, resource.Organization.Suspend(db, resource.Account.ID, "Stop runner work"))
+			}
 			if cancelOnHeartbeat {
-				require.NoError(t, task.RequestCancel(db, time.Now()))
+				if scenario == "suspended cancel" {
+					require.NoError(t, workers.NewOrganizationSuspensionWorker().Process(t.Context()))
+					require.ErrorIs(t, resource.Organization.Reactivate(db, resource.Account.ID), models.ErrSuspensionCancellationPending)
+				} else {
+					require.NoError(t, task.RequestCancel(db, time.Now()))
+				}
 				require.NoError(t, socket.WriteJSON(typedMessage{Type: messageTypePong}))
 				require.NoError(t, socket.SetReadDeadline(time.Now().Add(2*time.Second)))
 				var cancel taskControlMessage
@@ -199,6 +242,10 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 			assert.Equal(t, models.RunnerTerminationTaskCompleted, *reloadedRunner.TerminationReason)
 			_, err = models.FindRunnerByAccessTokenHash(db, crypto.HashToken(registered.AccessToken))
 			require.NoError(t, err, "credential must remain valid for completion acknowledgement retries")
+			if strings.HasPrefix(scenario, "suspended") {
+				require.NoError(t, workers.NewOrganizationSuspensionWorker().Process(t.Context()))
+				require.NoError(t, resource.Organization.Reactivate(db, resource.Account.ID))
+			}
 
 		})
 	}

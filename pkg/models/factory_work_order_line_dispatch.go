@@ -93,6 +93,9 @@ func (l *FactoryLine) DispatchFrom(tx *gorm.DB, order *FactoryWorkOrder, startIn
 // DispatchFromWithModel is DispatchFrom with optional Start model and
 // thinking overrides. Empty model or thinking means Auto.
 func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder, startIndex int, model, thinkingLevel string) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
+	if err := RequireActiveOrganization(tx, l.OrganizationID); err != nil {
+		return nil, nil, err
+	}
 	if err := order.RequireExecutionOwner(tx, true); err != nil {
 		return nil, nil, err
 	}
@@ -215,6 +218,9 @@ func (l *FactoryLine) RecordPassedStageWithoutRun(
 // work). It takes the line's admission lock, so concurrent decisions for
 // the same line cannot both see the last free slot.
 func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
+	if err := RequireActiveOrganization(tx, l.OrganizationID); err != nil {
+		return nil, err
+	}
 	steps := []FactoryLineStep(l.Steps)
 	if stepIndex < 0 || stepIndex >= len(steps) {
 		return nil, fmt.Errorf("step index %d out of range", stepIndex)
@@ -284,6 +290,9 @@ func (l *FactoryWorkOrderLineDispatch) enqueueStep(tx *gorm.DB, order *FactoryWo
 // snapshot — not the line's live steps — so a line edited mid-traversal
 // can't change what runs next for an in-flight dispatch.
 func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
+	if err := RequireActiveOrganization(tx, l.OrganizationID); err != nil {
+		return nil, err
+	}
 	steps := []FactoryLineStep(l.Steps)
 	if stepIndex < 0 || stepIndex >= len(steps) {
 		return nil, fmt.Errorf("step index %d out of range", stepIndex)

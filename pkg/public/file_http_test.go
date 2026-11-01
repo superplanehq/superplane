@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -70,6 +71,16 @@ func TestFileContentUploadAndPublicDownload(t *testing.T) {
 	ready, err := models.FindFile(database.Conn(), file.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FileStateReady, ready.State)
+
+	require.NoError(t, r.Organization.Suspend(database.DB(t.Context()), r.Account.ID, "Private suspension reason"))
+	rawToken := "file-suspension-test-token"
+	require.NoError(t, models.CreateUserAPIToken(database.DB(t.Context()), models.NewUserAPIToken(r.User, "File test", crypto.HashToken(rawToken))))
+	for _, bearer := range []string{"", rawToken} {
+		response := execRequest(server, requestParams{method: "PUT", path: "/api/v1/files/" + file.ID.String() + "/content", authCookie: token, authToken: bearer, body: []byte("replacement"), headers: map[string]string{"x-organization-id": r.Organization.ID.String()}})
+		require.Equal(t, http.StatusForbidden, response.Code, response.Body.String())
+		require.Contains(t, response.Body.String(), "organization is suspended")
+		require.NotContains(t, response.Body.String(), "Private suspension reason")
+	}
 
 	downloadURL, err := blob.FileAccessURL(file.ID, time.Hour, []byte("test-signing-key"))
 	require.NoError(t, err)

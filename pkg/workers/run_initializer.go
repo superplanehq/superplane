@@ -172,6 +172,14 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 	var pendingFactoryRuns []factoryLinePendingRun
 	var factoryOrderUpdates []factoryWorkOrderUpdate
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		admissionErr := models.RequireActiveCanvasOrganization(tx, workflowID)
+		if errors.Is(admissionErr, gorm.ErrRecordNotFound) {
+			logger.Infof("Canvas or organization not found - skipping")
+			return nil
+		}
+		if admissionErr != nil && !errors.Is(admissionErr, models.ErrOrganizationSuspended) {
+			return admissionErr
+		}
 		locked, err := models.LockCanvasRunInTransaction(tx, runID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -190,6 +198,10 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 			logger.Infof("Run already initialized - skipping")
 			alreadyInitialized = true
 			return nil
+		}
+		if admissionErr != nil {
+			_, err := locked.DrainForCancellation(tx, nil)
+			return err
 		}
 
 		err = NewRunCallbackDispatcher(tx, w.registry, locked).

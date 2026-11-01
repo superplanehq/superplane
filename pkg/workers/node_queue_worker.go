@@ -261,11 +261,33 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 	messageCollector := NewMessageCollector(node.WorkflowID, logger)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		admissionErr := models.RequireActiveCanvasOrganization(tx, node.WorkflowID)
+		if errors.Is(admissionErr, gorm.ErrRecordNotFound) {
+			metricOutcome = executorOutcomeSkipped
+			metricReason = executorReasonNotFound
+			return nil
+		}
+		if admissionErr != nil && !errors.Is(admissionErr, models.ErrOrganizationSuspended) {
+			return admissionErr
+		}
 		n, err := models.LockCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
 			logger.Info("Node already being processed - skipping")
 			metricOutcome = executorOutcomeSkipped
 			metricReason = executorReasonLocked
+			return nil
+		}
+		if admissionErr != nil {
+			items, err := n.ListPendingQueueItems(tx, queueItemScanLimit)
+			if err != nil {
+				return err
+			}
+			for _, item := range items {
+				if err := item.Delete(tx); err != nil {
+					return err
+				}
+				messageCollector.AddQueueItemDeleted(&item)
+			}
 			return nil
 		}
 

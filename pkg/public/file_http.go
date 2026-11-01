@@ -72,6 +72,15 @@ func (s *Server) handleFileContentUpload(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Unauthorized", http.StatusForbidden)
 		return
 	}
+	organization, err := models.FindOrganizationSuspensionStatus(db, user.OrganizationID)
+	if err != nil {
+		http.Error(w, "Organization not found.", http.StatusNotFound)
+		return
+	}
+	if organization.IsSuspended() {
+		http.Error(w, models.OrganizationSuspendedMessage, http.StatusForbidden)
+		return
+	}
 
 	if r.ContentLength > models.MaxFileBytes {
 		http.Error(w, fmt.Sprintf("file exceeds %d bytes", models.MaxFileBytes), http.StatusRequestEntityTooLarge)

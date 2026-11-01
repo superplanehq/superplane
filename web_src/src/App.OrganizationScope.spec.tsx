@@ -144,6 +144,8 @@ describe("OrganizationScope", () => {
 
     expect(await screen.findByText("Org home: demo")).toBeInTheDocument();
     expect(screen.queryByText("Organization not found")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loading organization...")).not.toBeInTheDocument();
+    expect(organizationsDescribeOrganization.mock.calls.every(([options]) => options.path.id === "demo")).toBe(true);
   });
 
   it("renders the public guest line without waiting for an organization", () => {

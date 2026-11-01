@@ -51,6 +51,8 @@ interface FactoriesHarnessProps {
   previewFlags?: Partial<FactoryPreviewFlags>;
   /** When false, the account response turns product billing off. */
   billingEnabled?: boolean;
+  /** Show the organization suspension state with real permission checks. */
+  suspended?: boolean;
 }
 
 function DefaultWikiWireframe() {
@@ -84,6 +86,7 @@ export function FactoriesHarness({
   experimentalFeatures = [],
   previewFlags,
   billingEnabled,
+  suspended,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
@@ -100,6 +103,7 @@ export function FactoriesHarness({
       description: factory.description ?? "",
     })),
     billingEnabled,
+    suspended,
   };
 
   const harness = (
