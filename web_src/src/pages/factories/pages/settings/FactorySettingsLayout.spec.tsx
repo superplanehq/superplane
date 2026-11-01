@@ -14,6 +14,42 @@ import {
 } from "../../__fixtures__/factoryPageResponses";
 
 describe("FactorySettingsLayout sidebar", () => {
+  it("keeps Fleets active on runner detail routes after feature disablement", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/fleets/own/runners/runner-1`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationFleetManagement: {
+            fleets: [{ id: "own", enabled: false }],
+            runners: [{ id: "runner-1", fleetId: "own", state: "idle", ephemeral: true }],
+          },
+        }}
+      />,
+    );
+    expect(await screen.findByRole("heading", { name: "Runner runner-1" })).toBeInTheDocument();
+    const sidebar = await screen.findByTestId("factory-settings-sidebar");
+    expect(within(sidebar).getByRole("link", { name: "Fleets" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Terminate runner" })).toBeInTheDocument();
+  });
+
+  it("opens enabled fleet management with administrator actions in the settings harness", async () => {
+    render(
+      <FactoriesHarness
+        experimentalFeatures={["organization_runners"]}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/fleets/own`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationFleetManagement: {
+            fleets: [{ id: "own", enabled: true }],
+            runners: [],
+          },
+        }}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: "Connect runner" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit fleet" })).toBeInTheDocument();
+  });
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
     Element.prototype.scrollIntoView ??= vi.fn();

@@ -23,6 +23,7 @@ vi.mock("@/contexts/PermissionsProvider", () => ({
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     hasPermission: (resource: string) => resource !== access.deniedResource,
+    canAct: (resource: string) => resource !== access.deniedResource,
     isLoading: false,
   }),
 }));
@@ -61,6 +62,14 @@ vi.mock("@/pages/home", () => ({ HomePage: () => <div>Organization home</div> })
 vi.mock("@/pages/auth/Login", () => ({ Login: () => <div>Login page</div> }));
 vi.mock("@/pages/organization/settings/General", () => ({ General: () => <div>General content</div> }));
 vi.mock("@/pages/organization/settings/Members", () => ({ Members: () => <div>Members content</div> }));
+vi.mock("@/hooks/useOrganizationFleetManagement", () => ({
+  useOrganizationFleetAccess: () => ({ showNavigation: true }),
+}));
+vi.mock("@/pages/organization/settings/fleets/OrganizationFleets", () => ({
+  OrganizationFleets: () => <div>Fleets content</div>,
+  OrganizationFleetDetails: () => <div>Fleet detail content</div>,
+  OrganizationRunnerDetails: () => <div>Runner detail content</div>,
+}));
 vi.mock("@/pages/organization/settings/Groups", () => ({ Groups: () => <div>Groups content</div> }));
 vi.mock("@/pages/organization/settings/ApiKeys", () => ({ APIKeys: () => <div>API keys content</div> }));
 vi.mock("@/pages/organization/settings/APIKeyDetail", () => ({
@@ -90,6 +99,26 @@ const legacySettingsCases = [
 ] as const;
 
 describe("App legacy settings routes", () => {
+  it("blocks direct fleet inspection without organization read permission", async () => {
+    access.factoriesEnabled = true;
+    access.deniedResource = "org";
+    visit("/org-123/settings/fleets/own/runners/runner-1");
+    expect(await screen.findByRole("heading", { name: "Permission denied" })).toBeInTheDocument();
+    expect(screen.queryByText("Runner detail content")).not.toBeInTheDocument();
+  });
+  for (const [suffix, content] of [
+    ["fleets", "Fleets content"],
+    ["fleets/own", "Fleet detail content"],
+    ["fleets/own/runners/runner-1", "Runner detail content"],
+  ]) {
+    for (const prefix of ["settings", "workspaces/demo/settings/organization"]) {
+      it(`opens ${prefix}/${suffix} under organization read permission`, async () => {
+        access.factoriesEnabled = true;
+        visit(`/org-123/${prefix}/${suffix}`);
+        expect(await screen.findByText(content)).toBeInTheDocument();
+      });
+    }
+  }
   beforeEach(() => {
     access.factoriesEnabled = false;
     access.registryLoading = false;
