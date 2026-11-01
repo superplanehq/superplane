@@ -680,15 +680,8 @@ cli.build.binary:
 cli.build: cli.build.prepare
 	$(MAKE) cli.build.binary
 
-admincli.build:
-	$(MAKE) pb.gen
-	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/admin cmd/admin/main.go'
-
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
-
-admincli.build.m1:
-	$(MAKE) admincli.build OS=darwin ARCH=arm64
 
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)

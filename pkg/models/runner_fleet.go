@@ -434,6 +434,13 @@ func (f *RunnerFleet) ListRunners(tx *gorm.DB, page ListPage) (RunnerListPage, e
 }
 
 func (f *RunnerFleet) ListTasks(tx *gorm.DB, page ListPage) (TaskListPage, error) {
+	if f.ScopeType == RunnerFleetScopeOrganization {
+		if f.ScopeID == nil {
+			return TaskListPage{}, ErrRunnerFleetNotFound
+		}
+		// Clone the scoped statement for counts, cursors, and page queries.
+		tx = tx.Where("organization_id = ?", *f.ScopeID).Session(&gorm.Session{})
+	}
 	total, err := countFleetRecords(tx, &RunnerTask{}, f.ID, page.States)
 	if err != nil {
 		return TaskListPage{}, err

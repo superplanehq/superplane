@@ -1,4 +1,4 @@
-package tasks
+package fleets
 
 import (
 	"fmt"
@@ -10,29 +10,21 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/cli/fleetapi"
 )
 
 var taskStates = []string{"pending", "queued", "reserved", "running", "succeeded", "failed", "canceled", "lost"}
 
-func NewCommand(options core.BindOptions) *cobra.Command {
-	root := &cobra.Command{
-		Use:   "tasks",
-		Short: "Inspect runner tasks",
-	}
-	root.AddCommand(newListCommand(options))
-	return root
-}
-
-type listCommand struct {
+type listTasksCommand struct {
 	FleetID string
 	States  []string
 	Limit   int32
 	AfterID string
 }
 
-func newListCommand(options core.BindOptions) *cobra.Command {
-	handler := &listCommand{}
-	cmd := &cobra.Command{Use: "list", Short: "List tasks in a fleet", Args: cobra.NoArgs}
+func newListTasksCommand(options core.BindOptions) *cobra.Command {
+	handler := &listTasksCommand{}
+	cmd := &cobra.Command{Use: "list-tasks", Short: "List tasks in a fleet", Args: cobra.NoArgs}
 	cmd.Flags().StringVar(&handler.FleetID, "fleet", "", "fleet ID")
 	cmd.Flags().StringSliceVar(&handler.States, "state", nil, "task state filter (repeatable)")
 	cmd.Flags().Int32Var(&handler.Limit, "limit", 200, "maximum number of tasks (1-1000)")
@@ -42,7 +34,7 @@ func newListCommand(options core.BindOptions) *cobra.Command {
 	return cmd
 }
 
-func (c *listCommand) Execute(ctx core.CommandContext) error {
+func (c *listTasksCommand) Execute(ctx core.CommandContext) error {
 	if c.Limit < 1 || c.Limit > 1000 {
 		return fmt.Errorf("limit must be between 1 and 1000")
 	}
@@ -52,14 +44,11 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
-	request := ctx.API.RunnersAPI.RunnersListFleetTasks(ctx.Context, c.FleetID).Limit(c.Limit)
-	if len(c.States) > 0 {
-		request = request.States(c.States)
+	api, err := fleetapi.New(ctx)
+	if err != nil {
+		return err
 	}
-	if afterID := strings.TrimSpace(c.AfterID); afterID != "" {
-		request = request.AfterId(afterID)
-	}
-	response, _, err := request.Execute()
+	response, err := api.ListTasks(c.FleetID, c.States, c.Limit, strings.TrimSpace(c.AfterID))
 	if err != nil {
 		return core.FormatCommandError(err)
 	}
@@ -92,13 +81,6 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 		}
 		return writer.Flush()
 	})
-}
-
-func valueOrDash(value string) string {
-	if value == "" {
-		return "-"
-	}
-	return value
 }
 
 func formatTime(value *time.Time) string {

@@ -1,4 +1,4 @@
-package tasks
+package fleets
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	clitest "github.com/superplanehq/superplane/test/support/cli"
 )
 
 func TestListTasksPassesFleetAndFilters(t *testing.T) {
@@ -22,8 +21,8 @@ func TestListTasksPassesFleetAndFilters(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, stdout := clitest.NewCommandContext(t, server, "text")
-	err := (&listCommand{
+	ctx, stdout := installationContext(t, server, "text")
+	err := (&listTasksCommand{
 		FleetID: "aws-large-amd64",
 		States:  []string{"running", "failed"},
 		Limit:   50,
@@ -34,8 +33,8 @@ func TestListTasksPassesFleetAndFilters(t *testing.T) {
 }
 
 func TestListTasksRejectsInvalidState(t *testing.T) {
-	ctx, _ := clitest.NewCommandContext(t, nil, "text")
-	err := (&listCommand{FleetID: "fleet", States: []string{"unknown"}, Limit: 200}).Execute(ctx)
+	ctx, _ := installationContext(t, nil, "text")
+	err := (&listTasksCommand{FleetID: "fleet", States: []string{"unknown"}, Limit: 200}).Execute(ctx)
 	require.EqualError(t, err, `invalid task state "unknown"`)
 }
 
@@ -48,8 +47,8 @@ func TestListTasksPassesAfterID(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, _ := clitest.NewCommandContext(t, server, "text")
-	err := (&listCommand{
+	ctx, _ := installationContext(t, server, "text")
+	err := (&listTasksCommand{
 		FleetID: "aws-large-amd64",
 		Limit:   200,
 		AfterID: "task-9",
