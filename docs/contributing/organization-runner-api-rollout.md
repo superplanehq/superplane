@@ -39,6 +39,11 @@ New admission locks the organization, fleet, runner, and task in that order.
 Feature writes lock the organization row. Fleet configuration writes lock
 the fleet row. These locks remain until transaction commit.
 
+Registration and assignment take shared organization and fleet locks, so
+independent runners can proceed concurrently. Fleet updates acquire a write
+lock directly. The scheduler retains its stronger organization lock to
+serialize capacity allocation.
+
 If reservation commits first, the registered runner can finish that work.
 If disablement commits first, new registration and reservation fail.
 Unused registration tokens remain rejected even for previously reserved
@@ -58,6 +63,6 @@ not start a process. Set `RUNNER_REGISTRATION_TOKEN` and `RUNNER_API_URL`
 from that response, then start the runner binary. Provider ownership fields
 are optional and do not require a Fleet Manager process.
 
-The runner entrypoint accepts the returned `/runner/v1` URL and the existing
-server-root URL. Ephemeral runners exit after one acknowledged task.
+The API returns the server root URL that the runner entrypoint expects.
+Ephemeral runners exit after one acknowledged task.
 Reusable runners wait for successive tasks.

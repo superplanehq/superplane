@@ -45,7 +45,7 @@ func TestCreateRunnerIsIdempotentAndReservesTask(t *testing.T) {
 	assert.Equal(t, first.Runner.Id, second.Runner.Id)
 	assert.Equal(t, first.RegistrationToken, second.RegistrationToken)
 	assert.True(t, first.Runner.Ephemeral)
-	assert.Equal(t, "https://example.com/runner/v1", first.RunnerApiUrl)
+	assert.Equal(t, "https://example.com", first.RunnerApiUrl)
 	assert.Equal(t, "runner-"+first.Runner.Id, first.DisplayName)
 
 	var runnerCount int64
@@ -80,11 +80,11 @@ func TestCreateRunnerReplacesTerminatedIdempotentRunner(t *testing.T) {
 	require.NoError(t, err)
 	runner, err := models.FindRunner(db, uuid.MustParse(first.Runner.Id))
 	require.NoError(t, err)
+	requestHash := runner.CreationRequestHash
 	require.NoError(t, runner.Terminate(db, models.RunnerTerminationRegistrationExpired))
 
 	// Simulate a terminated row written before termination started releasing
 	// creation keys.
-	requestHash := createRunnerRequestHash(fleet.Slug, &task.ID, true)
 	require.NoError(t, db.Model(runner).Updates(map[string]any{
 		"creation_idempotency_key": request.IdempotencyKey,
 		"creation_request_hash":    requestHash,

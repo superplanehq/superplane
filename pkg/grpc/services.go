@@ -10,6 +10,7 @@ import (
 	adminRunnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/admin/runners"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	organizationActions "github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
+	runnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/runners"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -106,7 +107,7 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 
 	organizationService := NewOrganizationService(cfg.AuthService, cfg.Registry, cfg.OIDCProvider, cfg.BaseURL, cfg.WebhooksBaseURL, billingImplementation)
 	organizationService.invitations.Entitlements = entitlements
-	organizationService.runners = organizationActions.NewRunnerService(adminRunnerActions.NewService(cfg.JWTSigner, cfg.RunnerAPIBaseURL))
+	organizationService.runners = organizationActions.NewRunnerService(runnerActions.NewRunnerManager(cfg.JWTSigner, cfg.RunnerAPIBaseURL))
 	if cfg.EmailService != nil {
 		organizationService.invitations.EmailService = cfg.EmailService
 	}

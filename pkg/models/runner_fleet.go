@@ -327,7 +327,9 @@ func (f *RunnerFleet) LockAdmission(tx *gorm.DB) error {
 
 func RequireOrganizationRunnerFeature(tx *gorm.DB, organizationID uuid.UUID) error {
 	var organization Organization
-	if err := tx.Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).
+	// Feature checks can proceed together while feature updates wait for commit.
+	// Callers that also write the organization must acquire a write lock first.
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
 		First(&organization, "id = ?", organizationID).Error; err != nil {
 		return err
 	}

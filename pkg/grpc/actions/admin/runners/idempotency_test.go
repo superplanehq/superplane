@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	runneractions "github.com/superplanehq/superplane/pkg/grpc/actions/runners"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/runners"
@@ -23,41 +24,42 @@ func TestConcurrentRunnerRetriesRemainFleetLocal(t *testing.T) {
 			db := database.DB(t.Context())
 			fleets := []*models.RunnerFleet{createTestFleetWithSlug(t, "first"), createTestFleetWithSlug(t, "second")}
 			service := newTestRunnerService()
-			services := []*Service{service, service}
 			if scope == models.RunnerFleetScopeOrganization {
 				other, err := models.CreateOrganization("Other runner organization", "")
 				require.NoError(t, err)
 				for i, id := range []uuid.UUID{r.Organization.ID, other.ID} {
 					require.NoError(t, models.EnableExperimentalFeature(id, features.FeatureOrganizationRunners))
 					fleets[i] = createTestFleet(t, scope, &id)
-					services[i] = service.ForFleet(fleets[i])
 				}
 			}
-			requests := make([]*pb.CreateRunnerRequest, 2)
-			for i, fleet := range fleets {
-				requests[i] = &pb.CreateRunnerRequest{FleetId: fleet.Slug, Ephemeral: scope == models.RunnerFleetScopeInstallation,
-					IdempotencyKey: "arbitrary-shared-key", FleetManagerId: "manager", Provider: "test"}
+			requests := make([]runneractions.CreateRunnerOptions, 2)
+			for i := range fleets {
+				requests[i] = runneractions.CreateRunnerOptions{Ephemeral: scope == models.RunnerFleetScopeInstallation,
+					IdempotencyKey: "arbitrary-shared-key", FleetManagerID: "manager", Provider: "test"}
 			}
-			responses := make([]*pb.CreateRunnerResponse, 8)
+			responses := make([]*runneractions.CreatedRunner, 8)
 			errs := make([]error, len(responses))
 			start := make(chan struct{})
 			var group sync.WaitGroup
 			for i := range responses {
-				group.Go(func() { <-start; responses[i], errs[i] = services[i%2].CreateRunner(t.Context(), requests[i%2]) })
+				group.Go(func() {
+					<-start
+					responses[i], errs[i] = service.manager.CreateRunner(t.Context(), fleets[i%2], requests[i%2])
+				})
 			}
 			close(start)
 			group.Wait()
 			for i := range responses {
 				require.NoError(t, errs[i])
-				assert.Equal(t, responses[i%2].Runner.Id, responses[i].Runner.Id)
+				assert.Equal(t, responses[i%2].Runner.ID, responses[i].Runner.ID)
 				assert.Equal(t, responses[i%2].RegistrationToken, responses[i].RegistrationToken)
 			}
-			assert.NotEqual(t, responses[0].Runner.Id, responses[1].Runner.Id)
+			assert.NotEqual(t, responses[0].Runner.ID, responses[1].Runner.ID)
 			requests[0].Provider = "different"
-			_, err := services[0].CreateRunner(t.Context(), requests[0])
+			_, err := service.manager.CreateRunner(t.Context(), fleets[0], requests[0])
 			require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 			requests[0].Provider = "test"
-			runner, err := models.FindRunner(db, uuid.MustParse(responses[0].Runner.Id))
+			runner, err := models.FindRunner(db, responses[0].Runner.ID)
 			require.NoError(t, err)
 			historicalHash := runner.CreationRequestHash
 			require.NoError(t, runner.Terminate(db, models.RunnerTerminationRequested))
@@ -66,12 +68,12 @@ func TestConcurrentRunnerRetriesRemainFleetLocal(t *testing.T) {
 				"creation_idempotency_key": requests[0].IdempotencyKey,
 				"creation_request_hash":    historicalHash,
 			}).Error)
-			replacement, err := services[0].CreateRunner(t.Context(), requests[0])
+			replacement, err := service.manager.CreateRunner(t.Context(), fleets[0], requests[0])
 			require.NoError(t, err)
-			assert.NotEqual(t, responses[0].Runner.Id, replacement.Runner.Id)
-			unaffected, err := services[1].CreateRunner(t.Context(), requests[1])
+			assert.NotEqual(t, responses[0].Runner.ID, replacement.Runner.ID)
+			unaffected, err := service.manager.CreateRunner(t.Context(), fleets[1], requests[1])
 			require.NoError(t, err)
-			assert.Equal(t, responses[1].Runner.Id, unaffected.Runner.Id)
+			assert.Equal(t, responses[1].Runner.ID, unaffected.Runner.ID)
 			assert.Equal(t, responses[1].RegistrationToken, unaffected.RegistrationToken)
 		})
 	}

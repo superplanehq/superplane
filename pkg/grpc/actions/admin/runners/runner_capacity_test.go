@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/database"
+	runneractions "github.com/superplanehq/superplane/pkg/grpc/actions/runners"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/runners"
@@ -86,11 +87,11 @@ func TestFleetCapacityCountsOnlyTasksWithOrganizationSlots(t *testing.T) {
 		require.NoError(t, db.Model(task).Update("state", models.RunnerTaskStatePending).Error)
 	}
 	ready := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
-	capacity, err := loadFleetCapacity(t.Context(), fleet)
+	capacity, err := newTestRunnerService().manager.GetFleetCapacity(t.Context(), fleet, runneractions.CapacityOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), capacity.RunnableTasks)
 	require.NoError(t, ready.RequestCancel(db, time.Now()))
-	capacity, err = loadFleetCapacity(t.Context(), fleet)
+	capacity, err = newTestRunnerService().manager.GetFleetCapacity(t.Context(), fleet, runneractions.CapacityOptions{})
 	require.NoError(t, err)
 	assert.Zero(t, capacity.RunnableTasks)
 }

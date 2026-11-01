@@ -13,6 +13,43 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestOrganizationRunnerAssignmentsProceedConcurrently(t *testing.T) {
+	f := newRunnerCapacityTest(t, new(2))
+	require.NoError(t, models.EnableExperimentalFeature(f.organizationID, features.FeatureOrganizationRunners))
+	firstFleet := newOrganizationTestRunnerFleet(f.organizationID, "first")
+	secondFleet := newOrganizationTestRunnerFleet(f.organizationID, "second")
+	require.NoError(t, firstFleet.Create(f.db))
+	require.NoError(t, secondFleet.Create(f.db))
+	firstTask := f.task(f.organizationID, firstFleet.ID)
+	secondTask := f.task(f.organizationID, secondFleet.ID)
+	scheduled, err := models.ScheduleOrganizationRunnerTasks(f.db, f.organizationID, 2)
+	require.NoError(t, err)
+	require.Len(t, scheduled, 2)
+	firstRunner := f.runner(firstFleet.ID)
+	secondRunner := f.runner(secondFleet.ID)
+
+	holder := f.db.Begin()
+	require.NoError(t, holder.Error)
+	defer holder.Rollback()
+	require.NoError(t, firstTask.Reserve(holder, firstRunner.ID))
+
+	// The second assignment must finish before the first transaction commits.
+	err = f.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SET LOCAL lock_timeout = '1s'").Error; err != nil {
+			return err
+		}
+		return secondTask.Reserve(tx, secondRunner.ID)
+	})
+	require.NoError(t, err)
+	require.NoError(t, holder.Commit().Error)
+	for _, task := range []*models.RunnerTask{firstTask, secondTask} {
+		stored, err := models.FindRunnerTask(f.db, task.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.RunnerTaskStateReserved, stored.State)
+		assert.Equal(t, task.RunnerID, stored.RunnerID)
+	}
+}
+
 // Scheduling and reservation are separate admission boundaries. This test
 // protects queued work from flag bypass while preserving committed work.
 func TestOrganizationRunnerDisablementPreservesWork(t *testing.T) {

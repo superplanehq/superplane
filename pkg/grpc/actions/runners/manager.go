@@ -16,11 +16,9 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
 	runnerapi "github.com/superplanehq/superplane/pkg/runners/registration"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -37,123 +35,106 @@ const (
 
 var errRunnerStatePrecondition = errors.New("runner state does not match the requested states")
 
-type Service struct {
+// RunnerManager manages runner registration, capacity, and termination for resolved fleets.
+// Callers authorize the fleet before invoking these operations.
+type RunnerManager struct {
 	signer       *jwt.Signer
 	runnerAPIURL string
-	fleet        *models.RunnerFleet
 }
 
-// ForFleet binds lifecycle operations to a fleet resolved by the transport's
-// authorization boundary. Subsequent reads retain its internal ownership key.
-func (s *Service) ForFleet(fleet *models.RunnerFleet) *Service {
-	return &Service{signer: s.signer, runnerAPIURL: s.runnerAPIURL, fleet: fleet}
+func NewRunnerManager(signer *jwt.Signer, baseURL string) *RunnerManager {
+	return &RunnerManager{signer: signer, runnerAPIURL: strings.TrimRight(baseURL, "/")}
 }
 
-func NewService(signer *jwt.Signer, baseURL string) *Service {
-	return &Service{
-		signer:       signer,
-		runnerAPIURL: strings.TrimRight(baseURL, "/") + "/runner/v1",
-	}
+type CreateRunnerOptions struct {
+	TaskID         *string
+	Ephemeral      bool
+	IdempotencyKey string
+	FleetManagerID string
+	Provider       string
 }
 
-func (s *Service) ListFleets(ctx context.Context, _ *pb.ListFleetsRequest) (*pb.ListFleetsResponse, error) {
-	fleets, err := models.ListInstallationRunnerFleets(database.DB(ctx))
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list fleets")
-	}
-
-	out := make([]*pb.Fleet, 0, len(fleets))
-	for i := range fleets {
-		out = append(out, SerializeFleet(&fleets[i]))
-	}
-	return &pb.ListFleetsResponse{Fleets: out}, nil
+type CreatedRunner struct {
+	Runner                *models.Runner
+	RegistrationToken     string
+	RegistrationExpiresAt time.Time
+	RunnerAPIURL          string
+	DisplayName           string
 }
 
-func (s *Service) CreateFleet(
-	ctx context.Context,
-	req *pb.CreateFleetRequest,
-) (*pb.CreateFleetResponse, error) {
-	fleetID, err := parseFleetID(req.GetFleetId())
-	if err != nil {
-		return nil, err
-	}
-	runnerVersion := strings.TrimSpace(req.GetRunnerVersion())
-	if runnerVersion == "" {
-		return nil, grpcerrors.InvalidArgument(nil, "runner version is required")
-	}
-	if req.Spec == nil {
-		return nil, grpcerrors.InvalidArgument(nil, "fleet spec is required")
-	}
-
-	enabled := true
-	if req.Enabled != nil {
-		enabled = req.GetEnabled()
-	}
-	now := time.Now()
-	fleet := &models.RunnerFleet{
-		ID:            uuid.New(),
-		Slug:          fleetID,
-		ScopeType:     models.RunnerFleetScopeInstallation,
-		Enabled:       enabled,
-		Spec:          datatypes.NewJSONType(fleetSpecFromProto(req.Spec)),
-		RunnerVersion: runnerVersion,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}
-	err = fleet.Create(database.DB(ctx))
-	if errors.Is(err, models.ErrRunnerFleetIDConflict) {
-		return nil, grpcerrors.AlreadyExists(err, "fleet ID already exists")
-	}
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create fleet")
-	}
-	return &pb.CreateFleetResponse{Fleet: SerializeFleet(fleet)}, nil
+type UpdateFleetOptions struct {
+	RunnerVersion *string
+	Enabled       *bool
+	Spec          *models.RunnerFleetSpec
 }
 
-func (s *Service) DescribeFleet(ctx context.Context, req *pb.DescribeFleetRequest) (*pb.DescribeFleetResponse, error) {
-	fleet, err := s.findFleet(ctx, req.GetFleetId())
-	if err != nil {
-		return nil, err
-	}
-	return &pb.DescribeFleetResponse{Fleet: SerializeFleet(fleet)}, nil
+type CapacityOptions struct {
+	Generation  *string
+	WaitSeconds int32
 }
 
-func (s *Service) UpdateFleet(ctx context.Context, req *pb.UpdateFleetRequest) (*pb.UpdateFleetResponse, error) {
-	if req.RunnerVersion == nil && req.Enabled == nil && req.Spec == nil {
+type FleetCapacity struct {
+	RunnableTasks     int64
+	PendingRunners    int64
+	IdleRunners       int64
+	BusyRunners       int64
+	TerminatedRunners int64
+	Generation        string
+}
+
+type ListRunnersOptions struct {
+	States  []string
+	Limit   int32
+	AfterID string
+}
+
+type TerminateRunnerOptions struct {
+	RunnerID string
+	States   []string
+}
+
+type ProviderDeletionOptions struct {
+	RunnerID       string
+	FleetManagerID string
+	Provider       string
+}
+
+func (m *RunnerManager) UpdateFleet(ctx context.Context, fleet *models.RunnerFleet, options UpdateFleetOptions) (*models.RunnerFleet, error) {
+	if options.RunnerVersion == nil && options.Enabled == nil && options.Spec == nil {
 		return nil, grpcerrors.InvalidArgument(nil, "at least one fleet field is required")
 	}
-	if req.RunnerVersion != nil && strings.TrimSpace(req.GetRunnerVersion()) == "" {
+	if options.RunnerVersion != nil && strings.TrimSpace(*options.RunnerVersion) == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "runner version is required")
 	}
 
-	fleetID, err := parseFleetID(req.GetFleetId())
-	if err != nil {
-		return nil, err
-	}
-
-	var fleet *models.RunnerFleet
-	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		fleet, err = s.findFleetDB(tx, fleetID)
+	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if fleet.ScopeType == models.RunnerFleetScopeOrganization {
+			if fleet.ScopeID == nil {
+				return models.ErrRunnerFleetNotFound
+			}
+			if err := models.RequireOrganizationRunnerFeature(tx, *fleet.ScopeID); err != nil {
+				return err
+			}
+		}
+		// Take the write lock directly: concurrent writers must not upgrade
+		// shared fleet locks while holding each other off.
+		current, err := models.FindRunnerFleet(tx.Clauses(clause.Locking{Strength: "UPDATE"}), fleet.ID)
 		if err != nil {
 			return err
 		}
-		if fleet.ScopeType == models.RunnerFleetScopeOrganization {
-			if err := fleet.LockAdmission(tx); err != nil {
+		fleet = current
+		if options.RunnerVersion != nil {
+			if err := fleet.PinRunnerVersion(tx, *options.RunnerVersion); err != nil {
 				return err
 			}
 		}
-		if req.RunnerVersion != nil {
-			if err := fleet.PinRunnerVersion(tx, req.GetRunnerVersion()); err != nil {
+		if options.Enabled != nil {
+			if err := fleet.SetEnabled(tx, *options.Enabled); err != nil {
 				return err
 			}
 		}
-		if req.Enabled != nil {
-			if err := fleet.SetEnabled(tx, req.GetEnabled()); err != nil {
-				return err
-			}
-		}
-		if req.Spec != nil {
-			fleet.Spec = datatypes.NewJSONType(fleetSpecFromProto(req.Spec))
+		if options.Spec != nil {
+			fleet.Spec = datatypes.NewJSONType(*options.Spec)
 			fleet.UpdatedAt = time.Now()
 			if err := tx.Model(fleet).Updates(map[string]any{
 				"spec":       fleet.Spec,
@@ -174,19 +155,11 @@ func (s *Service) UpdateFleet(ctx context.Context, req *pb.UpdateFleetRequest) (
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to update fleet")
 	}
-	return &pb.UpdateFleetResponse{Fleet: SerializeFleet(fleet)}, nil
+	return fleet, nil
 }
 
-func (s *Service) GetFleetCapacity(
-	ctx context.Context,
-	req *pb.GetFleetCapacityRequest,
-) (*pb.GetFleetCapacityResponse, error) {
-	fleet, err := s.findFleet(ctx, req.GetFleetId())
-	if err != nil {
-		return nil, err
-	}
-
-	wait := time.Duration(req.GetWaitSeconds()) * time.Second
+func (m *RunnerManager) GetFleetCapacity(ctx context.Context, fleet *models.RunnerFleet, options CapacityOptions) (*FleetCapacity, error) {
+	wait := time.Duration(options.WaitSeconds) * time.Second
 	if wait < 0 {
 		return nil, grpcerrors.InvalidArgument(nil, "wait seconds must not be negative")
 	}
@@ -200,7 +173,7 @@ func (s *Service) GetFleetCapacity(
 		if capacityErr != nil {
 			return nil, capacityErr
 		}
-		if req.Generation == nil || req.GetGeneration() != capacity.Generation || wait == 0 {
+		if options.Generation == nil || *options.Generation != capacity.Generation || wait == 0 {
 			return capacity, nil
 		}
 
@@ -217,57 +190,14 @@ func (s *Service) GetFleetCapacity(
 	}
 }
 
-func (s *Service) ListFleetTasks(
-	ctx context.Context,
-	req *pb.ListFleetTasksRequest,
-) (*pb.ListFleetTasksResponse, error) {
-	fleet, err := s.findFleet(ctx, req.GetFleetId())
-	if err != nil {
-		return nil, err
-	}
-	if err := validateTaskStates(req.GetStates()); err != nil {
-		return nil, err
-	}
-	afterID, err := parseOptionalID(req.GetAfterId(), "after ID")
+func (m *RunnerManager) CreateRunner(ctx context.Context, fleet *models.RunnerFleet, options CreateRunnerOptions) (*CreatedRunner, error) {
+	fleetID := fleet.Slug
+	taskID, err := optionalID(options.TaskID, "task ID")
 	if err != nil {
 		return nil, err
 	}
 
-	page, err := fleet.ListTasks(database.DB(ctx), models.ListPage{
-		States:  req.GetStates(),
-		Limit:   listLimit(req.GetLimit()),
-		AfterID: afterID,
-	})
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list fleet tasks")
-	}
-
-	out := make([]*pb.Task, 0, len(page.Tasks))
-	for i := range page.Tasks {
-		out = append(out, serializeTask(&page.Tasks[i], fleet.Slug))
-	}
-	return &pb.ListFleetTasksResponse{
-		Tasks:       out,
-		TotalCount:  page.TotalCount,
-		HasNextPage: page.HasNextPage,
-	}, nil
-}
-
-func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest) (*pb.CreateRunnerResponse, error) {
-	fleetID, err := parseFleetID(req.GetFleetId())
-	if err != nil {
-		return nil, err
-	}
-	if s.fleet == nil && !req.GetEphemeral() {
-		return nil, grpcerrors.InvalidArgument(nil, "installation fleet runners must be ephemeral")
-	}
-
-	taskID, err := optionalID(req.TaskId, "task ID")
-	if err != nil {
-		return nil, err
-	}
-
-	idempotencyKey := strings.TrimSpace(req.GetIdempotencyKey())
+	idempotencyKey := strings.TrimSpace(options.IdempotencyKey)
 	// Generic capacity can tolerate creating another pending runner after a
 	// lost response. A task-specific request cannot: its reservation must be
 	// recoverable by retrying the same logical create request.
@@ -277,14 +207,14 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 	if len(idempotencyKey) > maxIdempotencyKeyLength {
 		return nil, grpcerrors.InvalidArgument(nil, "idempotency key is too long")
 	}
-	fleetManagerID := strings.TrimSpace(req.GetFleetManagerId())
-	providerName := strings.TrimSpace(req.GetProvider())
+	fleetManagerID := strings.TrimSpace(options.FleetManagerID)
+	providerName := strings.TrimSpace(options.Provider)
 	if (fleetManagerID == "") != (providerName == "") {
 		return nil, grpcerrors.InvalidArgument(nil, "fleet manager ID and provider must be supplied together")
 	}
 	requestHash := ""
 	if idempotencyKey != "" {
-		requestHash = createRunnerRequestHash(fleetID, taskID, req.GetEphemeral())
+		requestHash = createRunnerRequestHash(fleetID, taskID, options.Ephemeral)
 		if fleetManagerID != "" {
 			// Preserve hashes for older clients that did not supply ownership.
 			sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%q:%q", requestHash, fleetManagerID, providerName)))
@@ -297,11 +227,11 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 		tags[models.RunnerTagProvider] = providerName
 	}
 
-	runner, registration, err := s.createRunner(
+	runner, registration, err := m.createRunner(
 		ctx,
-		fleetID,
+		fleet,
 		taskID,
-		req.GetEphemeral(),
+		options.Ephemeral,
 		idempotencyKey,
 		requestHash,
 		tags,
@@ -310,77 +240,54 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 		return nil, err
 	}
 
-	token, err := runnerapi.MintRegistrationToken(s.signer, runner, registration, fleetID, taskID)
+	token, err := runnerapi.MintRegistrationToken(m.signer, runner, registration, fleetID, taskID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to create runner registration token")
 	}
 
-	return &pb.CreateRunnerResponse{
-		Runner:                serializeRunner(runner, fleetID),
+	return &CreatedRunner{
+		Runner:                runner,
 		RegistrationToken:     token,
-		RegistrationExpiresAt: timestamppb.New(registration.ExpiresAt),
-		RunnerApiUrl:          s.runnerAPIURL,
+		RegistrationExpiresAt: registration.ExpiresAt,
+		RunnerAPIURL:          m.runnerAPIURL,
 		DisplayName:           "runner-" + runner.ID.String(),
 	}, nil
 }
 
-func (s *Service) ListRunners(ctx context.Context, req *pb.ListRunnersRequest) (*pb.ListRunnersResponse, error) {
-	fleet, err := s.findFleet(ctx, req.GetFleetId())
-	if err != nil {
+func (m *RunnerManager) ListRunners(ctx context.Context, fleet *models.RunnerFleet, options ListRunnersOptions) (*models.RunnerListPage, error) {
+	if err := validateRunnerStates(options.States); err != nil {
 		return nil, err
 	}
-	if err := validateRunnerStates(req.GetStates()); err != nil {
-		return nil, err
-	}
-	afterID, err := parseOptionalID(req.GetAfterId(), "after ID")
+	afterID, err := parseOptionalID(options.AfterID, "after ID")
 	if err != nil {
 		return nil, err
 	}
 
 	page, err := fleet.ListRunners(database.DB(ctx), models.ListPage{
-		States:  req.GetStates(),
-		Limit:   listLimit(req.GetLimit()),
+		States:  options.States,
+		Limit:   listLimit(options.Limit),
 		AfterID: afterID,
 	})
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list runners")
 	}
 
-	out := make([]*pb.Runner, 0, len(page.Runners))
-	for i := range page.Runners {
-		out = append(out, serializeRunner(&page.Runners[i], fleet.Slug))
-	}
-	return &pb.ListRunnersResponse{
-		Runners:     out,
-		TotalCount:  page.TotalCount,
-		HasNextPage: page.HasNextPage,
-	}, nil
+	return &page, nil
 }
 
-func (s *Service) DescribeRunner(
-	ctx context.Context,
-	req *pb.DescribeRunnerRequest,
-) (*pb.DescribeRunnerResponse, error) {
-	fleet, err := s.findFleet(ctx, req.GetFleetId())
+func (m *RunnerManager) DescribeRunner(ctx context.Context, fleet *models.RunnerFleet, runnerID string) (*models.Runner, error) {
+	runner, err := findFleetRunner(ctx, fleet, runnerID)
 	if err != nil {
 		return nil, err
 	}
-	runner, err := findFleetRunner(ctx, fleet, req.GetRunnerId())
-	if err != nil {
-		return nil, err
-	}
-	return &pb.DescribeRunnerResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
+	return runner, nil
 }
 
-func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest) (*pb.DeleteRunnerResponse, error) {
-	if err := validateRunnerStates(req.GetStates()); err != nil {
+func (m *RunnerManager) TerminateRunner(ctx context.Context, fleet *models.RunnerFleet, options TerminateRunnerOptions) (*models.Runner, error) {
+	if err := validateRunnerStates(options.States); err != nil {
 		return nil, err
 	}
-	fleet, err := s.findFleet(ctx, req.GetFleetId())
-	if err != nil {
-		return nil, err
-	}
-	runnerID, err := parseID(req.GetRunnerId(), "runner ID")
+	runnerID, err := parseID(options.RunnerID, "runner ID")
 	if err != nil {
 		return nil, err
 	}
@@ -389,14 +296,14 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 	var releasedTask *models.RunnerTask
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		runnerQuery := tx
-		if len(req.GetStates()) > 0 {
+		if len(options.States) > 0 {
 			runnerQuery = runnerQuery.Clauses(clause.Locking{Strength: "UPDATE"})
 		}
 		runner, err = fleet.FindRunner(runnerQuery, runnerID)
 		if err != nil {
 			return err
 		}
-		if len(req.GetStates()) > 0 && !slices.Contains(req.GetStates(), runner.State) {
+		if len(options.States) > 0 && !slices.Contains(options.States, runner.State) {
 			return errRunnerStatePrecondition
 		}
 		if runner.State == models.RunnerStateBusy {
@@ -435,15 +342,11 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 		messages.PublishPlanningRunnerStatus(database.DB(ctx), releasedTask)
 	}
 	_ = runnercontrol.Publish(runnercontrol.Notification{RunnerID: runner.ID.String()})
-	return &pb.DeleteRunnerResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
+	return runner, nil
 }
 
-func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRunnerProviderDeletedRequest) (*pb.MarkRunnerProviderDeletedResponse, error) {
-	fleet, err := s.findFleet(ctx, req.GetFleetId())
-	if err != nil {
-		return nil, err
-	}
-	runnerID, err := parseID(req.GetRunnerId(), "runner ID")
+func (m *RunnerManager) MarkRunnerProviderDeleted(ctx context.Context, fleet *models.RunnerFleet, options ProviderDeletionOptions) (*models.Runner, error) {
+	runnerID, err := parseID(options.RunnerID, "runner ID")
 	if err != nil {
 		return nil, err
 	}
@@ -458,9 +361,9 @@ func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRun
 		tags := runner.Tags.Data()
 		directOrganizationRunner := fleet.ScopeType == models.RunnerFleetScopeOrganization &&
 			tags[models.RunnerTagFleetManagerID] == "" && tags[models.RunnerTagProvider] == ""
-		if (!directOrganizationRunner && (req.GetFleetManagerId() == "" || req.GetProvider() == "")) ||
-			tags[models.RunnerTagFleetManagerID] != req.GetFleetManagerId() ||
-			tags[models.RunnerTagProvider] != req.GetProvider() {
+		if (!directOrganizationRunner && (options.FleetManagerID == "" || options.Provider == "")) ||
+			tags[models.RunnerTagFleetManagerID] != options.FleetManagerID ||
+			tags[models.RunnerTagProvider] != options.Provider {
 			return fmt.Errorf("runner provider ownership does not match the confirming manager")
 		}
 		logins, err = models.ListCodexLoginConnections(tx)
@@ -476,12 +379,12 @@ func (s *Service) MarkRunnerProviderDeleted(ctx context.Context, req *pb.MarkRun
 		return nil, grpcerrors.FailedPrecondition(err, "runner VM is not confirmed deleted")
 	}
 	messages.PublishCodexConnectionChanges(database.DB(ctx), logins)
-	return &pb.MarkRunnerProviderDeletedResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
+	return runner, nil
 }
 
-func (s *Service) createRunner(
+func (m *RunnerManager) createRunner(
 	ctx context.Context,
-	fleetID string,
+	fleet *models.RunnerFleet,
 	taskID *uuid.UUID,
 	ephemeral bool,
 	idempotencyKey, requestHash string,
@@ -490,11 +393,11 @@ func (s *Service) createRunner(
 	var runner *models.Runner
 	var registration *models.RunnerRegistration
 	var reservedTask *models.RunnerTask
-	var fleet *models.RunnerFleet
+	fleetID := fleet.Slug
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		var findErr error
-		fleet, findErr = s.findFleetDB(tx, fleetID)
+		fleet, findErr = models.FindRunnerFleet(tx, fleet.ID)
 		if findErr != nil {
 			return findErr
 		}
@@ -635,7 +538,7 @@ func loadIdempotentRunner(
 	return runner, nil
 }
 
-func loadFleetCapacity(ctx context.Context, fleet *models.RunnerFleet) (*pb.GetFleetCapacityResponse, error) {
+func loadFleetCapacity(ctx context.Context, fleet *models.RunnerFleet) (*FleetCapacity, error) {
 	db := database.DB(ctx)
 	runnable, err := fleet.CountTasks(db, models.RunnerTaskStateQueued)
 	if err != nil {
@@ -657,7 +560,7 @@ func loadFleetCapacity(ctx context.Context, fleet *models.RunnerFleet) (*pb.GetF
 	)
 	generationBytes := sha256.Sum256([]byte(generationSource))
 
-	return &pb.GetFleetCapacityResponse{
+	return &FleetCapacity{
 		RunnableTasks:     runnable,
 		PendingRunners:    counts[models.RunnerStatePending],
 		IdleRunners:       counts[models.RunnerStateIdle],
@@ -665,31 +568,6 @@ func loadFleetCapacity(ctx context.Context, fleet *models.RunnerFleet) (*pb.GetF
 		TerminatedRunners: counts[models.RunnerStateTerminated],
 		Generation:        hex.EncodeToString(generationBytes[:]),
 	}, nil
-}
-
-func (s *Service) findFleetDB(tx *gorm.DB, slug string) (*models.RunnerFleet, error) {
-	if s.fleet == nil {
-		return models.FindInstallationRunnerFleet(tx, slug)
-	}
-	if slug != s.fleet.Slug {
-		return nil, models.ErrRunnerFleetNotFound
-	}
-	return models.FindRunnerFleet(tx, s.fleet.ID)
-}
-
-func (s *Service) findFleet(ctx context.Context, rawID string) (*models.RunnerFleet, error) {
-	id, err := parseFleetID(rawID)
-	if err != nil {
-		return nil, err
-	}
-	fleet, err := s.findFleetDB(database.DB(ctx), id)
-	if errors.Is(err, models.ErrRunnerFleetNotFound) {
-		return nil, grpcerrors.NotFound(err, "fleet not found")
-	}
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to find fleet")
-	}
-	return fleet, nil
 }
 
 func findFleetRunner(
@@ -709,14 +587,6 @@ func findFleetRunner(
 		return nil, grpcerrors.Internal(err, "failed to find runner")
 	}
 	return runner, nil
-}
-
-func parseFleetID(value string) (string, error) {
-	id := strings.TrimSpace(value)
-	if id == "" {
-		return "", grpcerrors.InvalidArgument(nil, "fleet ID is required")
-	}
-	return id, nil
 }
 
 func parseID(value, field string) (uuid.UUID, error) {
@@ -779,25 +649,6 @@ func validateRunnerStates(states []string) error {
 	for _, state := range states {
 		if !slices.Contains(valid, state) {
 			return grpcerrors.InvalidArgument(nil, "invalid runner state")
-		}
-	}
-	return nil
-}
-
-func validateTaskStates(states []string) error {
-	valid := []string{
-		models.RunnerTaskStatePending,
-		models.RunnerTaskStateQueued,
-		models.RunnerTaskStateReserved,
-		models.RunnerTaskStateRunning,
-		models.RunnerTaskStateSucceeded,
-		models.RunnerTaskStateFailed,
-		models.RunnerTaskStateCanceled,
-		models.RunnerTaskStateLost,
-	}
-	for _, state := range states {
-		if !slices.Contains(valid, state) {
-			return grpcerrors.InvalidArgument(nil, "invalid task state")
 		}
 	}
 	return nil
