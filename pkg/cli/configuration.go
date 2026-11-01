@@ -394,3 +394,7 @@ func (c *CurrentContext) SetActiveWorkspace(workspaceID string) error {
 func (c *CurrentContext) GetURL() string {
 	return c.context.URL
 }
+
+func (c *CurrentContext) GetOrganizationID() string {
+	return c.context.OrganizationID
+}
