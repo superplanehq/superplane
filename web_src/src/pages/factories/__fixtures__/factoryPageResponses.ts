@@ -1,4 +1,6 @@
 import type {
+  SuperplaneOrganizationsFleet,
+  SuperplaneOrganizationsRunner,
   FactoriesDescribeFactoryVelocityResponse,
   OrganizationsDescribeOrganizationBillingResponse,
   OrganizationsPreviewSeatPurchaseResponse,
@@ -319,6 +321,14 @@ export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
 ];
 
 export interface FactoriesFixture {
+  organizationFleetManagement?: {
+    fleets: SuperplaneOrganizationsFleet[];
+    runners: SuperplaneOrganizationsRunner[];
+    error?: boolean;
+    connection?: "waiting" | "connected" | "expired";
+    pendingTermination?: boolean;
+    readOnly?: boolean;
+  };
   organizationId: string;
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;

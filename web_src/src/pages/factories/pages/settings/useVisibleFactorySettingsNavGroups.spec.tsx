@@ -10,6 +10,9 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({ has: () => true, isLoading: false }),
 }));
 vi.mock("@/hooks/useBillingProductEnabled", () => ({ useBillingProductEnabled: () => true }));
+vi.mock("@/hooks/useOrganizationFleetManagement", () => ({
+  useOrganizationFleetAccess: () => ({ showNavigation: true }),
+}));
 
 function SettingsNavigation() {
   const groups = useVisibleFactorySettingsNavGroups("org-1");

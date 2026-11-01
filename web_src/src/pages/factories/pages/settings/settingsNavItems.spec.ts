@@ -55,6 +55,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Usage",
       "General",
       "Members",
+      "Fleets",
       "Integrations",
       "API keys",
       "Secrets",
@@ -139,6 +140,7 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
     ]);
     expect(filtered.find((group) => group.id === "organization")?.items.map((item) => item.id)).toEqual([
       "organization-general",
+      "organization-fleets",
       "organization-billing",
       "organization-spending",
     ]);
