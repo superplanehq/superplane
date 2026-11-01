@@ -155,7 +155,9 @@ func (e *NodeRequestExecutor) execute(
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			logger.Warnf("failed to publish canvas event %s: %v", event.ID, err)
+		}
 	}
 
 	for _, update := range pendingFactoryWorkOrderUpdates {
@@ -501,6 +503,7 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 		Secrets:        contexts.NewSecretsContext(tx, e.registry, workflow.OrganizationID, e.encryptor),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithNewEvents(onNewEvents).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
