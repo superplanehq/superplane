@@ -20,7 +20,7 @@ func (c *FactoryContext) WithProductiveTaskFiles(read productiveFileRead) *Facto
 	return c
 }
 
-func (c *FactoryContext) ingestProductiveFiles(order *models.FactoryWorkOrder) {
+func (c *FactoryContext) ingestProductiveFiles(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) {
 	if order == nil {
 		return
 	}
@@ -47,6 +47,7 @@ func (c *FactoryContext) ingestProductiveFiles(order *models.FactoryWorkOrder) {
 		nil,
 		order.Description,
 		incomingProductiveFiles(taskFiles),
+		preparation,
 	)
 	if err != nil {
 		log.WithError(err).Warn("failed to store Productive.io task files")
@@ -56,23 +57,7 @@ func (c *FactoryContext) ingestProductiveFiles(order *models.FactoryWorkOrder) {
 		return
 	}
 
-	uploadCleanup := FileBindCleanup{
-		OrganizationID: order.OrganizationID,
-		FactoryID:      order.FactoryID,
-		Result:         storedfiles.BindResult{CopiedKeys: next.ObjectKeys},
-	}
-	if c.onFileBindCleanup != nil {
-		c.onFileBindCleanup(uploadCleanup)
-	}
-
-	if next.Markdown == order.Description {
-		return
-	}
-	if err := order.UpdateContent(c.tx, nil, &next.Markdown); err != nil {
-		if c.onFileBindCleanup == nil {
-			ApplyFileBindCleanups([]FileBindCleanup{uploadCleanup}, err)
-		}
-	}
+	order.Description = next.Markdown
 }
 
 func (c *FactoryContext) readProductiveFiles(ctx context.Context, taskID, description string) ([]productive.TaskFile, error) {

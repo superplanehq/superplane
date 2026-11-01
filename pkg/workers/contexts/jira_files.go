@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -21,7 +20,7 @@ func (c *FactoryContext) WithJiraIssueFiles(read jiraFileRead) *FactoryContext {
 	return c
 }
 
-func (c *FactoryContext) ingestJiraFiles(order *models.FactoryWorkOrder) {
+func (c *FactoryContext) ingestJiraFiles(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) {
 	if order == nil {
 		return
 	}
@@ -48,30 +47,12 @@ func (c *FactoryContext) ingestJiraFiles(order *models.FactoryWorkOrder) {
 		nil,
 		order.Description,
 		incomingJiraFiles(issueFiles),
+		preparation,
 	)
 	if err != nil || next.Markdown == order.Description {
-		if len(next.ObjectKeys) > 0 {
-			_ = storedfiles.SweepObjects(
-				context.Background(),
-				database.Conn(),
-				blob.Current(),
-				order.OrganizationID,
-				order.FactoryID,
-				next.ObjectKeys,
-			)
-		}
 		return
 	}
-	if err := order.UpdateContent(c.tx, nil, &next.Markdown); err != nil {
-		_ = storedfiles.SweepObjects(
-			context.Background(),
-			database.Conn(),
-			blob.Current(),
-			order.OrganizationID,
-			order.FactoryID,
-			next.ObjectKeys,
-		)
-	}
+	order.Description = next.Markdown
 }
 
 func (c *FactoryContext) readJiraFiles(ctx context.Context, issueKey, description string) ([]jira.IssueFile, error) {

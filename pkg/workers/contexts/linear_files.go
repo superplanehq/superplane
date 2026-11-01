@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -50,29 +49,29 @@ func (c *FactoryContext) skipDuplicateLinearWorkOrder(factoryModel *models.Facto
 	return hasOrder, nil
 }
 
-func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder) {
+func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder, preparation *storedfiles.Preparation) []linear.IssueLink {
 	if order == nil {
-		return
+		return nil
 	}
 	issueID, ok := c.linearIssueID(order)
 	if !ok {
-		return
+		return nil
 	}
 
 	issueFiles, links, err := c.readLinearFiles(context.Background(), issueID, order.Description)
 	if err != nil {
 		log.WithError(err).Warn("failed to read Linear issue files")
-		return
+		return nil
 	}
 
 	description := linear.DescriptionWithLinks(order.Description, links)
 
 	if len(issueFiles) == 0 {
 		if description == order.Description {
-			return
+			return links
 		}
-		_ = order.UpdateContent(c.tx, nil, &description)
-		return
+		order.Description = description
+		return links
 	}
 
 	next, err := storedfiles.AppendTaskFiles(
@@ -85,34 +84,17 @@ func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder) {
 		nil,
 		description,
 		incomingLinearFiles(issueFiles),
+		preparation,
 	)
 	if err != nil || (next.Markdown == order.Description && description == order.Description) {
-		if len(next.ObjectKeys) > 0 {
-			_ = storedfiles.SweepObjects(
-				context.Background(),
-				database.Conn(),
-				blob.Current(),
-				order.OrganizationID,
-				order.FactoryID,
-				next.ObjectKeys,
-			)
-		}
-		return
+		return links
 	}
 	markdown := next.Markdown
 	if markdown == "" {
 		markdown = description
 	}
-	if err := order.UpdateContent(c.tx, nil, &markdown); err != nil {
-		_ = storedfiles.SweepObjects(
-			context.Background(),
-			database.Conn(),
-			blob.Current(),
-			order.OrganizationID,
-			order.FactoryID,
-			next.ObjectKeys,
-		)
-	}
+	order.Description = markdown
+	return links
 }
 
 func (c *FactoryContext) readLinearFiles(ctx context.Context, issueID, description string) ([]linear.IssueFile, []linear.IssueLink, error) {

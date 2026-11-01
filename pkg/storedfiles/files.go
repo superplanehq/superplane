@@ -444,6 +444,7 @@ func AppendTaskFiles(
 	createdBy *uuid.UUID,
 	markdown string,
 	files []IncomingFile,
+	preparation ...*Preparation,
 ) (IngestResult, error) {
 	result := IngestResult{Markdown: markdown}
 	if len(files) == 0 {
@@ -451,7 +452,7 @@ func AppendTaskFiles(
 	}
 
 	next := markdown
-	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
+	openCount, err := openFileCount(tx, workOrderID, preparation)
 	if err != nil {
 		return result, err
 	}
@@ -469,6 +470,7 @@ func AppendTaskFiles(
 			workOrderID,
 			createdBy,
 			file,
+			preparation,
 		)
 		if err != nil {
 			log.WithError(err).Warn("failed to store task file")
@@ -478,26 +480,32 @@ func AppendTaskFiles(
 			continue
 		}
 		result.ObjectKeys = append(result.ObjectKeys, stored.StorageKey)
-		ref := blob.FileRef(stored.ID)
-		replaced := false
-		replaceURLs := append([]string(nil), file.ReplaceURLs...)
-		slices.SortFunc(replaceURLs, func(a, b string) int {
-			return len(b) - len(a)
-		})
-		for _, rawURL := range replaceURLs {
-			if rawURL == "" || !strings.Contains(next, rawURL) {
-				continue
-			}
-			next = blob.ReplaceURL(next, rawURL, ref)
-			replaced = true
-		}
-		if !replaced {
-			next = appendFileRef(next, stored.Filename, stored.ContentType, ref)
+		next = replaceIncomingFileRefs(next, stored, file.ReplaceURLs)
+		if len(preparation) > 0 {
+			preparation[0].recordReplacement(stored.ID, file.ReplaceURLs)
 		}
 		openCount++
 	}
 	result.Markdown = next
 	return result, nil
+}
+
+func replaceIncomingFileRefs(markdown string, file *models.File, urls []string) string {
+	ref := blob.FileRef(file.ID)
+	replaced := false
+	replaceURLs := append([]string(nil), urls...)
+	slices.SortFunc(replaceURLs, func(a, b string) int { return len(b) - len(a) })
+	for _, rawURL := range replaceURLs {
+		if rawURL == "" || !strings.Contains(markdown, rawURL) {
+			continue
+		}
+		markdown = blob.ReplaceURL(markdown, rawURL, ref)
+		replaced = true
+	}
+	if !replaced {
+		return appendFileRef(markdown, file.Filename, file.ContentType, ref)
+	}
+	return markdown
 }
 
 func storeIncomingFile(
@@ -507,6 +515,7 @@ func storeIncomingFile(
 	organizationID, factoryID, workOrderID uuid.UUID,
 	createdBy *uuid.UUID,
 	file IncomingFile,
+	preparation []*Preparation,
 ) (*models.File, bool, error) {
 	if provider == nil || file.Body == nil {
 		return nil, false, nil
@@ -524,7 +533,7 @@ func storeIncomingFile(
 	if filename == "" {
 		filename = "file"
 	}
-	stored, err := models.CreatePendingFile(tx, models.CreateFileParams{
+	params := models.CreateFileParams{
 		Scope:          blob.ScopeTask,
 		OrganizationID: organizationID,
 		FactoryID:      factoryID,
@@ -532,7 +541,14 @@ func storeIncomingFile(
 		Filename:       filename,
 		ContentType:    contentType,
 		CreatedByID:    createdByID,
-	})
+	}
+	if len(preparation) > 0 {
+		storeCtx, cancel := context.WithTimeout(ctx, ingestFetchTimeout)
+		defer cancel()
+		stored, err := preparation[0].store(storeCtx, tx, provider, params, file.Body)
+		return stored, err == nil, err
+	}
+	stored, err := models.CreatePendingFile(tx, params)
 	if err != nil {
 		return nil, false, err
 	}
@@ -570,6 +586,7 @@ func IngestRemoteImages(
 	organizationID, factoryID, workOrderID uuid.UUID,
 	createdBy *uuid.UUID,
 	markdown string,
+	preparation ...*Preparation,
 ) (IngestResult, error) {
 	result := IngestResult{Markdown: markdown}
 	if fetch == nil || strings.TrimSpace(markdown) == "" {
@@ -577,7 +594,7 @@ func IngestRemoteImages(
 	}
 
 	next := markdown
-	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
+	openCount, err := openFileCount(tx, workOrderID, preparation)
 	if err != nil {
 		return result, err
 	}
@@ -599,12 +616,16 @@ func IngestRemoteImages(
 			workOrderID,
 			createdBy,
 			rawURL,
+			preparation,
 		)
 		if err != nil || !ingested {
 			continue
 		}
 		result.ObjectKeys = append(result.ObjectKeys, file.StorageKey)
 		next = blob.ReplaceURL(next, rawURL, blob.FileRef(file.ID))
+		if len(preparation) > 0 {
+			preparation[0].recordReplacement(file.ID, []string{rawURL})
+		}
 		openCount++
 	}
 	result.Markdown = next
@@ -619,6 +640,7 @@ func ingestOneImage(
 	organizationID, factoryID, workOrderID uuid.UUID,
 	createdBy *uuid.UUID,
 	rawURL string,
+	preparation []*Preparation,
 ) (*models.File, bool, error) {
 	if provider == nil {
 		return nil, false, blob.ErrProviderNotConfigured
@@ -649,7 +671,7 @@ func ingestOneImage(
 	if createdBy != nil {
 		createdByID = *createdBy
 	}
-	file, err := models.CreatePendingFile(tx, models.CreateFileParams{
+	params := models.CreateFileParams{
 		Scope:          blob.ScopeTask,
 		OrganizationID: organizationID,
 		FactoryID:      factoryID,
@@ -657,7 +679,12 @@ func ingestOneImage(
 		Filename:       filenameFromURL(rawURL, contentType),
 		ContentType:    contentType,
 		CreatedByID:    createdByID,
-	})
+	}
+	if len(preparation) > 0 {
+		file, err := preparation[0].store(fetchCtx, tx, provider, params, resp.Body)
+		return file, err == nil, err
+	}
+	file, err := models.CreatePendingFile(tx, params)
 	if err != nil {
 		return nil, false, nil
 	}
