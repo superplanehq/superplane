@@ -158,8 +158,7 @@ CREATE TABLE public.agent_sessions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     heartbeat_at timestamp with time zone,
     agent_tool_schema_revision text DEFAULT ''::text NOT NULL,
-    context_replayed_at timestamp with time zone,
-    suspension_stop_event_id uuid
+    context_replayed_at timestamp with time zone
 );
 
 
@@ -6593,7 +6592,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261031234803	f
+20261031212204	f
 \.
 
 

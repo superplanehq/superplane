@@ -80,7 +80,7 @@ func (s *Service) ensureCanvasSessionNotStreaming(organizationID, userID, canvas
 	if err != nil {
 		return err
 	}
-	if existing != nil && existing.IsBusy() {
+	if existing != nil && existing.Status == models.AgentSessionStatusStreaming {
 		return ErrSessionBusy
 	}
 	return nil
@@ -107,7 +107,7 @@ func (s *Service) swapCanvasSession(ctx context.Context, organizationID, userID,
 			return err
 		}
 		if locked != nil {
-			if locked.IsBusy() {
+			if locked.Status == models.AgentSessionStatusStreaming {
 				return ErrSessionBusy
 			}
 			oldProviderSession = locked.ProviderSessionID
@@ -289,7 +289,7 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 	if err := assertAgentRunsAllowed(ctx, organizationID); err != nil {
 		return err
 	}
-	if session.IsBusy() {
+	if session.Status == models.AgentSessionStatusStreaming {
 		return s.handleBusySession(sessionID, organizationID, userID)
 	}
 
@@ -489,7 +489,7 @@ func (s *Service) refreshStaleProviderSession(ctx context.Context, session *mode
 	if !s.needsToolSchemaRefresh(session) {
 		return session, nil
 	}
-	if session.IsBusy() {
+	if session.Status == models.AgentSessionStatusStreaming {
 		return session, nil
 	}
 
@@ -570,7 +570,7 @@ func (s *Service) providerSessionRecoveryTarget(stale *models.AgentSession, requ
 		if err != nil {
 			return err
 		}
-		if locked.IsBusy() {
+		if locked.Status == models.AgentSessionStatusStreaming {
 			return ErrSessionBusy
 		}
 		if locked.ProviderSessionID != stale.ProviderSessionID {
@@ -600,7 +600,7 @@ func (s *Service) installRecoveredProviderSession(stale *models.AgentSession, pr
 		if err != nil {
 			return err
 		}
-		if locked.IsBusy() {
+		if locked.Status == models.AgentSessionStatusStreaming {
 			return ErrSessionBusy
 		}
 		if locked.ProviderSessionID != stale.ProviderSessionID {

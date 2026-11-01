@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -36,7 +35,7 @@ func TestSuspensionCancelsRunnerTasksAndRecoversNotifications(t *testing.T) {
 		require.NoError(t, db.Create(&task).Error)
 		tasks = append(tasks, task)
 	}
-	w := NewOrganizationSuspensionWorker(nil)
+	w := NewOrganizationSuspensionWorker()
 	notified := 0
 	w.publishRunner = func(control.Notification) error { notified++; return errors.New("publication unavailable") }
 	require.NoError(t, w.Process(t.Context()))
@@ -68,7 +67,7 @@ func TestSuspensionCancelsRunnerTasksAndRecoversNotifications(t *testing.T) {
 	}
 	require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
 	// A new replica reconstructs notification delivery from committed requests.
-	w = NewOrganizationSuspensionWorker(nil)
+	w = NewOrganizationSuspensionWorker()
 	notified = 0
 	w.publishRunner = func(control.Notification) error { notified++; return nil }
 	require.NoError(t, w.Process(t.Context()))
@@ -98,143 +97,50 @@ func TestSuspensionReplicaOwnershipAndOrganizationFirstLocks(t *testing.T) {
 	require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop work"))
 	events, err := models.ListOrganizationSuspensionEvents(db, r.Organization.ID)
 	require.NoError(t, err)
-	unlock, acquired, err := tryOrganizationSuspensionLock(t.Context(), r.Organization.ID)
+	w := NewOrganizationSuspensionWorker()
+	other, err := models.CreateOrganization("Other suspended organization", "")
 	require.NoError(t, err)
-	require.True(t, acquired)
-	released := false
-	defer func() {
-		if !released {
-			unlock()
-		}
-	}()
-	w := NewOrganizationSuspensionWorker(nil)
-	require.NoError(t, w.Process(t.Context()))
-	history, err := models.ListOrganizationSuspensionEvents(db, r.Organization.ID)
-	require.NoError(t, err)
-	require.Nil(t, history[0].CancellationCompletedAt)
-	unlock()
-	released = true
+	require.NoError(t, other.Suspend(db, uuid.New(), "Independent cancellation"))
 	tx := db.Begin()
 	defer tx.Rollback()
 	_, err = models.LockOrganization(tx, r.Organization.ID)
 	require.NoError(t, err)
-	// The event row remains available while cancellation waits for organization.
-	blockedCtx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
+	// A replica must skip a busy organization instead of blocking its poll loop.
+	blockedCtx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
-	done := make(chan error, 1)
-	go func() {
-		done <- events[0].WithCurrentSuspension(database.DB(blockedCtx), events[0].CompleteCancellation)
-	}()
-	require.Eventually(t, func() bool {
-		var waiting bool
-		err := db.Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%organizations%')").Scan(&waiting).Error
-		return err == nil && waiting
-	}, 200*time.Millisecond, 10*time.Millisecond)
+	require.NoError(t, w.Process(blockedCtx))
+	require.NoError(t, other.Reactivate(db, uuid.New()))
 	probe := db.Begin()
 	defer probe.Rollback()
 	require.NoError(t, probe.Exec("SET LOCAL lock_timeout = '100ms'").Error)
 	require.NoError(t, probe.Exec("SELECT id FROM organization_suspension_events WHERE id = ? FOR UPDATE", events[0].ID).Error)
-	require.Error(t, <-done)
-}
-
-type suspensionProvider struct {
-	agents.Provider
-	started chan struct{}
-	release chan struct{}
-	stopped bool
-	failure error
-}
-
-func (p *suspensionProvider) Name() string { return "test" }
-
-func (p *suspensionProvider) InterruptSession(ctx context.Context, _ string) error {
-	if p.started != nil {
-		close(p.started)
-		select {
-		case <-p.release:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	return p.failure
-}
-func (p *suspensionProvider) SessionStopped(context.Context, string) (bool, error) {
-	return p.stopped, p.failure
-}
-
-func TestSuspensionAgentStopSurvivesFailureAndBlocksReactivationDuringProviderCall(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-	db := database.DB(t.Context())
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	session := models.AgentSession{OrganizationID: r.Organization.ID, UserID: r.User, CanvasID: canvas.ID, Provider: "test", ProviderSessionID: "session-1", Status: models.AgentSessionStatusStreaming}
-	require.NoError(t, db.Create(&session).Error)
-	require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop agent"))
-	p := &suspensionProvider{started: make(chan struct{}), release: make(chan struct{})}
-	w := NewOrganizationSuspensionWorker(agents.NewService(p, nil))
-	done := make(chan error, 1)
-	go func() { done <- w.Process(t.Context()) }()
-	<-p.started
-	require.NoError(t, NewOrganizationSuspensionWorker(agents.NewService(p, nil)).Process(t.Context()))
-	require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
-	require.ErrorIs(t, models.UpdateAgentSessionStatus(session.ID, models.AgentSessionStatusIdle), models.ErrAgentSessionStopping)
-	close(p.release)
-	require.NoError(t, <-done)
-	stored, err := models.FindAgentSession(session.ID)
+	require.NoError(t, tx.Rollback().Error)
+	// Another replica holding the event must also be skipped without waiting.
+	require.NoError(t, w.Process(blockedCtx))
+	history, err := models.ListOrganizationSuspensionEvents(db, r.Organization.ID)
 	require.NoError(t, err)
-	require.Equal(t, models.AgentSessionStatusStopping, stored.Status)
-	p.started = nil
-	p.failure = errors.New("temporary provider failure")
-	w = NewOrganizationSuspensionWorker(agents.NewService(p, nil))
-	require.Error(t, w.Process(t.Context()))
-	require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
-	p.failure = nil
-	p.stopped = true
-	streamUnlock, acquired, err := tryAgentStreamLock(t.Context(), session.ID)
-	require.NoError(t, err)
-	require.True(t, acquired)
-	require.NoError(t, w.Process(t.Context()))
-	require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
-	streamUnlock()
+	require.Nil(t, history[0].CancellationCompletedAt)
+	require.NoError(t, probe.Rollback().Error)
 	require.NoError(t, w.Process(t.Context()))
 	require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
 }
 
-func TestSuspensionConfirmsRemoteStopForLocallyInactiveAgents(t *testing.T) {
-	for _, status := range []string{models.AgentSessionStatusFailed, models.AgentSessionStatusIdle, models.AgentSessionStatusTerminated} {
-		t.Run(status, func(t *testing.T) {
-			r := support.Setup(t)
-			defer r.Close()
-			db := database.DB(t.Context())
-			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-			session := models.AgentSession{OrganizationID: r.Organization.ID, UserID: r.User, CanvasID: canvas.ID, Provider: "test", ProviderSessionID: "remote-turn", Status: status}
-			require.NoError(t, db.Create(&session).Error)
-			require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop remote turn"))
-			events, err := models.ListOrganizationSuspensionEvents(db, r.Organization.ID)
-			require.NoError(t, err)
-			require.NoError(t, events[0].WithCurrentSuspension(db, events[0].CompleteCancellation))
-			require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
-			p := &suspensionProvider{failure: errors.New("remote stop unavailable")}
-			w := NewOrganizationSuspensionWorker(agents.NewService(p, nil))
-			require.Error(t, w.Process(t.Context()))
-			require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
-			p.failure = nil
-			require.NoError(t, w.Process(t.Context()))
-			require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
-			p.stopped = true
-			require.NoError(t, w.Process(t.Context()))
-			require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
-			// Confirmation from a previous suspension cannot authorize reactivation.
-			require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Check a later generation"))
-			p.stopped = false
-			w = NewOrganizationSuspensionWorker(agents.NewService(p, nil))
-			require.NoError(t, w.Process(t.Context()))
-			require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
-			p.stopped = true
-			require.NoError(t, w.Process(t.Context()))
-			require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
-		})
+func TestSuspensionIgnoresBuiltInAgentSessions(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := models.AgentSession{
+		OrganizationID: r.Organization.ID, UserID: r.User, CanvasID: canvas.ID,
+		Provider: "unused", ProviderSessionID: "legacy-session", Status: models.AgentSessionStatusStreaming,
 	}
+	require.NoError(t, db.Create(&session).Error)
+	require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop workflow work"))
+	require.NoError(t, NewOrganizationSuspensionWorker().Process(t.Context()))
+	require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
+	stored, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.AgentSessionStatusStreaming, stored.Status)
 }
 
 func TestSuspensionStopsDeletedCanvasComponentBeforeReactivation(t *testing.T) {
@@ -255,7 +161,7 @@ func TestSuspensionStopsDeletedCanvasComponentBeforeReactivation(t *testing.T) {
 	require.NoError(t, db.Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
 	require.NoError(t, db.Delete(canvas).Error)
 	require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop deleted canvas"))
-	w := NewOrganizationSuspensionWorker(nil)
+	w := NewOrganizationSuspensionWorker()
 	require.NoError(t, w.Process(t.Context()))
 	require.ErrorIs(t, r.Organization.Reactivate(db, uuid.New()), models.ErrSuspensionCancellationPending)
 	terminator := NewExecutionTerminator("", r.AuthService, r.Encryptor, r.Registry)
@@ -301,7 +207,7 @@ func TestSuspensionDoesNotFinishDispatchConcurrentlyAdmittedFromQueue(t *testing
 	require.NoError(t, err)
 	require.Len(t, admitted, 1)
 	done := make(chan error, 1)
-	go func() { done <- NewOrganizationSuspensionWorker(nil).Process(t.Context()) }()
+	go func() { done <- NewOrganizationSuspensionWorker().Process(t.Context()) }()
 	require.Eventually(t, func() bool {
 		var waiting bool
 		err := db.Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%factory_lines%')").Scan(&waiting).Error
@@ -336,7 +242,7 @@ func TestSuspensionWorkAndEventBatchesEventuallyComplete(t *testing.T) {
 		task := models.RunnerTask{ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleets[0].ID, State: models.RunnerTaskStatePending, Backend: models.RunnerTaskBackendIntegrated, QueuedAt: time.Now(), PayloadCiphertext: []byte("encrypted")}
 		require.NoError(t, db.Create(&task).Error)
 	}
-	w := NewOrganizationSuspensionWorker(nil)
+	w := NewOrganizationSuspensionWorker()
 	for i := 0; i < 4; i++ {
 		require.NoError(t, w.Process(t.Context()))
 	}
@@ -380,7 +286,7 @@ func TestSuspensionDiscardsQueuesPreservesSchedulesAndWaitsForRunFinalization(t 
 	item := models.FactoryWorkOrderQueueItem{ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID, WorkOrderID: order.ID, LineID: line.ID, LineDispatchID: dispatch.ID, StepName: "Build", CreatedAt: time.Now()}
 	require.NoError(t, db.Create(&item).Error)
 	require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop queued work"))
-	w := NewOrganizationSuspensionWorker(nil)
+	w := NewOrganizationSuspensionWorker()
 	require.NoError(t, w.Process(t.Context()))
 	for _, run := range []*models.CanvasRun{parent, child} {
 		stored, err := models.FindUnscopedCanvasRun(db, run.ID)

@@ -1,48 +1,35 @@
 # Organization suspension cancellation
 
 The regular worker polls pending suspension events every five seconds.
-It uses the deployed organization suspension model. No batch coordination
-flag is required. Without pending events, it does not cancel work.
+Without pending events, it does not cancel work.
 
-Cancellation requests remain durable until workflow finalization, runner
-completion, and confirmed agent stopping finish. Reactivation remains blocked
-while cancellation is incomplete. Schedules retain their future configuration.
+Each processing pass uses one short transaction for a bounded batch.
+It locks the organization first, then the pending suspension event, with
+`FOR UPDATE SKIP LOCKED`. Other replicas skip busy rows and retry later.
+The worker checks that the event still matches the current suspension before
+it changes any work. All row locks are released when the transaction ends.
+No dedicated database connection, advisory lock, or processing status is needed.
 
-Agent cancellation checks every stored session, including locally idle, failed,
-and terminated sessions. Local status does not prove that remote work stopped.
-Each confirmed stop records the suspension event ID. A previous suspension's
-confirmation cannot release reactivation for a later suspension.
+The worker discards queued factory work and requests cancellation of workflow
+runs and runner tasks. It publishes notifications after the transaction commits.
+Pending work remains in the database, so later passes retry notification delivery
+and recover after process restarts. In-memory cursors let a pass reach later work
+while earlier work stops. A restart can safely repeat earlier batches.
+
+The existing execution terminator, run finalizer, and runner cancellation paths
+stop the work. The suspension event remains pending until that work stops.
+Then the worker sets `cancellation_completed_at`, which allows reactivation.
+Schedules retain their future configuration. Built-in agent sessions are outside
+the scope of suspension cancellation.
 
 ## Process configuration
 
-- Regular workers require the existing database configuration and `RABBITMQ_URL`.
-  Keep `START_RUN_FINALIZER=yes` and `START_EXECUTION_TERMINATOR=yes`.
-- Runner gateways require their existing database and `RABBITMQ_URL` configuration.
-  Control notifications wake gateways. Gateways read durable task cancellation
-  requests. Runner completion, log reporting, and cleanup use their existing paths.
-- Managed-agent cancellation requires `ANTHROPIC_API_KEY`, `ANTHROPIC_AGENT_ID`,
-  and `ANTHROPIC_ENVIRONMENT_ID` on regular workers. The provider uses
-  `https://api.anthropic.com/v1`. Missing configuration leaves agent cancellation
-  pending. Organizations without stored managed-agent sessions can still complete.
+Regular workers use their existing database and `RABBITMQ_URL` configuration.
+Keep `START_RUN_FINALIZER=yes` and `START_EXECUTION_TERMINATOR=yes`.
+Runner gateways use their existing database and RabbitMQ configuration.
+Control notifications wake gateways, which read durable task cancellation requests.
+Runner completion, log reporting, and cleanup use their existing paths.
 
-## Deployment source inspection
-
-Local `docker-compose.dev.yml` passes all three managed-agent keys to the app
-process. It also configures the cancellation workers and runner cleanup.
-
-The checked-in worker chart previously lacked a managed-agent Secret reference.
-The chart now accepts the existing `anthropic.secretName` configuration.
-For managed-agent installations, set this value to the Secret with all three
-keys. This prepares chart source. It does not publish a chart or verify a deployment.
-
-The `superplanehq/launchpad` staging and production values reference
-`superplane-anthropic` through `anthropic.secretName`. The separate hosted
-`superplanehq/helm-chart` repository returned HTTP 404 during inspection.
-Its worker Secret wiring remains unverified. Live Secret contents also remain
-unverified. Confirm the three keys reach regular workers in managed-agent
-installations before suspension events can target those sessions.
-
-Apply the agent-session confirmation migration before deploying this worker.
-Deploy this worker after the model foundation. Deploy the subsequent suspension
-API, UI, and admission enforcement after this worker. No companion source
-change is prepared in the unavailable hosted chart repository.
+This worker adds no configuration keys, Secret references, or rollout gate.
+Deploy it after the model foundation and before the suspension API, UI, and
+admission enforcement.

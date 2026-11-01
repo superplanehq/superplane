@@ -61,10 +61,6 @@ spec:
                 name: {{ include "secrets.feedback.name" . }}
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
-            {{- if .Values.anthropic.secretName }}
-            - secretRef:
-                name: {{ .Values.anthropic.secretName | quote }}
-            {{- end }}
             {{- if .Values.polar.enabled }}
             - secretRef:
                 name: {{ include "secrets.polar.name" . }}

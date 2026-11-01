@@ -1,8 +1,6 @@
 package models
 
 import (
-	"context"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -12,23 +10,6 @@ import (
 )
 
 const SuspensionWorkBatchSize = 100
-
-// Two-key locks use a separate namespace from single-key agent stream locks.
-const organizationSuspensionLockNamespace = 73421
-
-// TryLockOrganizationSuspension uses an explicit, dedicated SQL connection
-// because a session-scoped lock must outlive the worker's row transactions.
-// The caller must release the lock on the same connection before closing it.
-func TryLockOrganizationSuspension(ctx context.Context, conn *sql.Conn, organizationID uuid.UUID) (bool, error) {
-	var acquired bool
-	err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1, hashtext($2))", organizationSuspensionLockNamespace, organizationID.String()).Scan(&acquired)
-	return acquired, err
-}
-
-func UnlockOrganizationSuspension(ctx context.Context, conn *sql.Conn, organizationID uuid.UUID) error {
-	_, err := conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1, hashtext($2))", organizationSuspensionLockNamespace, organizationID.String())
-	return err
-}
 
 func ListPendingOrganizationSuspensions(tx *gorm.DB, after uuid.UUID) ([]OrganizationSuspensionEvent, error) {
 	var events []OrganizationSuspensionEvent
@@ -40,23 +21,28 @@ func ListPendingOrganizationSuspensions(tx *gorm.DB, after uuid.UUID) ([]Organiz
 	return events, err
 }
 
-// WithCurrentSuspension enforces the organization-first transition contract.
+// WithCurrentSuspension claims one cancellation batch. Organization-first row
+// locks coordinate with reactivation; busy rows are retried on a later pass.
 // A stale candidate never selects or mutates current work.
 func (e *OrganizationSuspensionEvent) WithCurrentSuspension(db *gorm.DB, mutate func(*gorm.DB) error) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		o, err := LockOrganization(tx, e.OrganizationID)
-		if err != nil {
-			return err
-		}
-		var current OrganizationSuspensionEvent
-		err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND organization_id = ? AND action = ? AND cancellation_completed_at IS NULL", e.ID, e.OrganizationID, OrganizationSuspensionActionSuspend).First(&current).Error
+		var organization Organization
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).First(&organization, "id = ?", e.OrganizationID).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		if o.SuspendedAt == nil || !o.SuspendedAt.Equal(current.CreatedAt) {
+		var current OrganizationSuspensionEvent
+		err = tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Where("id = ? AND organization_id = ? AND action = ? AND cancellation_completed_at IS NULL", e.ID, e.OrganizationID, OrganizationSuspensionActionSuspend).First(&current).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if organization.SuspendedAt == nil || !organization.SuspendedAt.Equal(current.CreatedAt) {
 			return nil
 		}
 		return mutate(tx)
@@ -153,44 +139,6 @@ func (e *OrganizationSuspensionEvent) DiscardQueuedWork(tx *gorm.DB) error {
 	return tx.Model(&CanvasEvent{}).Where("id IN (?)", ids).Update("state", CanvasEventStateRouted).Error
 }
 
-func (e *OrganizationSuspensionEvent) PrepareAgentStops(tx *gorm.DB, after uuid.UUID) ([]AgentSession, error) {
-	var sessions []AgentSession
-	query := e.unconfirmedAgentStops(tx)
-	if after != uuid.Nil {
-		query = query.Where("id > ?", after)
-	}
-	if err := query.Clauses(clause.Locking{Strength: "UPDATE"}).Order("id").Limit(SuspensionWorkBatchSize).Find(&sessions).Error; err != nil {
-		return nil, err
-	}
-	for i := range sessions {
-		if sessions[i].Status == AgentSessionStatusStopping {
-			continue
-		}
-		now := time.Now().UTC().Truncate(time.Microsecond)
-		if err := tx.Model(&sessions[i]).Updates(map[string]any{"status": AgentSessionStatusStopping, "updated_at": now, "heartbeat_at": nil}).Error; err != nil {
-			return nil, err
-		}
-		sessions[i].Status = AgentSessionStatusStopping
-		sessions[i].UpdatedAt = &now
-	}
-	return sessions, nil
-}
-
-func (s *AgentSession) CompleteSuspensionStop(tx *gorm.DB, eventID uuid.UUID) error {
-	return tx.Model(&AgentSession{}).Where("id = ? AND provider_session_id = ? AND status = ? AND updated_at = ?", s.ID, s.ProviderSessionID, AgentSessionStatusStopping, s.UpdatedAt).
-		Updates(map[string]any{"status": AgentSessionStatusIdle, "updated_at": time.Now(), "last_active_at": time.Now(), "suspension_stop_event_id": eventID}).Error
-}
-
-func (s *AgentSession) CloseSuspensionTools(tx *gorm.DB) (bool, error) {
-	ids := tx.Model(&AgentSessionMessage{}).Select("id").Where("session_id = ? AND role = ? AND tool_status = ?", s.ID, AgentMessageRoleTool, AgentToolStatusStarted).Order("id").Limit(SuspensionWorkBatchSize)
-	if err := tx.Model(&AgentSessionMessage{}).Where("id IN (?)", ids).Update("tool_status", AgentToolStatusFinished).Error; err != nil {
-		return false, err
-	}
-	var open int64
-	err := tx.Model(&AgentSessionMessage{}).Where("session_id = ? AND role = ? AND tool_status = ?", s.ID, AgentMessageRoleTool, AgentToolStatusStarted).Count(&open).Error
-	return open == 0, err
-}
-
 func (e *OrganizationSuspensionEvent) ListCancellingExecutions(tx *gorm.DB, after uuid.UUID) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
 	query := tx.Where("workflow_id IN (?) AND state = ?", suspensionCanvasIDs(tx, e.OrganizationID), CanvasNodeExecutionStateCancelling)
@@ -210,7 +158,6 @@ func (e *OrganizationSuspensionEvent) CompleteCancellation(tx *gorm.DB) error {
 		tx.Model(&CanvasNodeExecution{}).Where("workflow_id IN (?) AND state IN ?", suspensionCanvasIDs(tx, e.OrganizationID), []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted, CanvasNodeExecutionStateCancelling}),
 		tx.Model(&CanvasNodeQueueItem{}).Where("workflow_id IN (?)", suspensionCanvasIDs(tx, e.OrganizationID)),
 		tx.Model(&CanvasEvent{}).Where("workflow_id IN (?) AND state = ?", suspensionCanvasIDs(tx, e.OrganizationID), CanvasEventStatePending),
-		e.unconfirmedAgentStops(tx),
 		tx.Model(&RunnerTask{}).Joins("LEFT JOIN runners r ON r.id = runner_tasks.runner_id").Where("runner_tasks.organization_id = ?", e.OrganizationID).
 			Where("runner_tasks.state IN ? OR (runner_tasks.state = ? AND r.provider_deleted_at IS NULL AND r.id IS NOT NULL)", []string{RunnerTaskStatePending, RunnerTaskStateQueued, RunnerTaskStateReserved, RunnerTaskStateRunning}, RunnerTaskStateLost),
 	}
@@ -233,13 +180,6 @@ func (e *OrganizationSuspensionEvent) CompleteCancellation(tx *gorm.DB) error {
 
 func suspensionCanvasIDs(tx *gorm.DB, orgID uuid.UUID) *gorm.DB {
 	return tx.Unscoped().Model(&Canvas{}).Select("id").Where("organization_id = ?", orgID)
-}
-
-func (e *OrganizationSuspensionEvent) unconfirmedAgentStops(tx *gorm.DB) *gorm.DB {
-	// Local idle, failed, and terminated states do not prove remote work stopped.
-	// Only this suspension's provider confirmation can release reactivation.
-	return tx.Model(&AgentSession{}).Where("organization_id = ?", e.OrganizationID).
-		Where("suspension_stop_event_id IS DISTINCT FROM ? OR status <> ?", e.ID, AgentSessionStatusIdle)
 }
 
 func (e *OrganizationSuspensionEvent) pendingRequests(tx *gorm.DB) *gorm.DB {
