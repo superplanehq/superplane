@@ -225,6 +225,15 @@ func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
 		if err != nil {
 			return err
 		}
+		fleet, err := FindRunnerFleet(tx, current.FleetID)
+		if err != nil {
+			return err
+		}
+		if fleet.ScopeType == RunnerFleetScopeOrganization &&
+			(fleet.ScopeID == nil || current.OrganizationID != *fleet.ScopeID) {
+			return ErrRunnerTaskFleetMismatch
+		}
+		admissionErr := fleet.RequireAdmission(tx)
 		runner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runnerID)
 		if err != nil {
 			return err
@@ -237,6 +246,9 @@ func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
 			(current.State == RunnerTaskStateReserved || current.State == RunnerTaskStateRunning) {
 			*t = *current
 			return nil
+		}
+		if admissionErr != nil {
+			return admissionErr
 		}
 		if err := current.reserveLocked(tx, runner); err != nil {
 			return err
@@ -268,6 +280,15 @@ func (r *Runner) FindActiveTask(tx *gorm.DB) (*RunnerTask, error) {
 func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, error) {
 	var reservation RunnerTaskReservationResult
 	err := tx.Transaction(func(tx *gorm.DB) error {
+		fleet, err := FindRunnerFleet(tx, r.FleetID)
+		if err != nil {
+			return err
+		}
+		admissionErr := fleet.RequireAdmission(tx)
+		if admissionErr != nil && !errors.Is(admissionErr, ErrRunnerFleetDisabled) &&
+			!errors.Is(admissionErr, ErrOrganizationRunnersDisabled) {
+			return admissionErr
+		}
 		// Keep runner-before-task lock ordering across assignment and completion.
 		currentRunner, err := LockRunner(tx, r.ID)
 		if err != nil {
@@ -275,11 +296,18 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, erro
 		}
 		active, err := currentRunner.FindActiveTask(tx)
 		if err == nil {
+			if fleet.ScopeType == RunnerFleetScopeOrganization &&
+				(fleet.ScopeID == nil || active.OrganizationID != *fleet.ScopeID) {
+				return ErrRunnerTaskFleetMismatch
+			}
 			reservation.Task = active
 			return nil
 		}
 		if !errors.Is(err, ErrRunnerTaskNotFound) {
 			return err
+		}
+		if admissionErr != nil {
+			return nil
 		}
 		if currentRunner.State != RunnerStatePending && currentRunner.State != RunnerStateIdle {
 			return nil
@@ -289,6 +317,9 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, erro
 		for range runnerTaskReservationAttemptLimit {
 			query := tx.Where("fleet_id = ? AND backend = ? AND state = ? AND runner_id IS NULL AND cancel_requested_at IS NULL",
 				currentRunner.FleetID, RunnerTaskBackendIntegrated, RunnerTaskStateQueued)
+			if fleet.ScopeType == RunnerFleetScopeOrganization {
+				query = query.Where("organization_id = ?", fleet.ScopeID)
+			}
 			if len(skippedTasks) > 0 {
 				query = query.Where("id NOT IN ?", skippedTasks)
 			}
@@ -616,6 +647,14 @@ func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
 		return ErrRunnerTaskBackendMismatch
 	}
 	if t.FleetID != runner.FleetID {
+		return ErrRunnerTaskFleetMismatch
+	}
+	fleet, err := FindRunnerFleet(tx, t.FleetID)
+	if err != nil {
+		return err
+	}
+	if fleet.ScopeType == RunnerFleetScopeOrganization &&
+		(fleet.ScopeID == nil || t.OrganizationID != *fleet.ScopeID) {
 		return ErrRunnerTaskFleetMismatch
 	}
 	if runner.State != RunnerStatePending && runner.State != RunnerStateIdle {
