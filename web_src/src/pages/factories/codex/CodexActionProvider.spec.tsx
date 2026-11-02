@@ -146,6 +146,32 @@ describe("Codex assignment continuation", () => {
     expect(onConnected).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["This organization has no hosted credit. Add hosted credit to continue.", true, false],
+    ["internal error", false, true],
+  ])("shows the model catalog failure recovery: %s", async (message, offersBilling, offersRetry) => {
+    connection = { status: "ready", eligible: true, availableModels: [] };
+    vi.mocked(meStartCodexConnection).mockRejectedValue({ message });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <DismissibleCodexSetup onConnected={vi.fn()} />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("link", { name: "Open Billing" }) !== null).toBe(offersBilling);
+    const retry = screen.queryByRole("button", { name: "Try again" });
+    expect(retry !== null).toBe(offersRetry);
+    if (!retry) return;
+    const attempts = vi.mocked(meStartCodexConnection).mock.calls.length;
+    await userEvent.setup().click(retry);
+    await waitFor(() => expect(vi.mocked(meStartCodexConnection).mock.calls.length).toBe(attempts + 1));
+    expect(vi.mocked(meStartCodexConnection).mock.calls.at(-1)?.[0]).toMatchObject({ body: { refreshCatalog: true } });
+  });
+
   it("preserves the action input and resumes once after connection", async () => {
     const save = vi.fn().mockRejectedValueOnce(connectionRequired).mockResolvedValue(undefined);
     const client = mount(save);

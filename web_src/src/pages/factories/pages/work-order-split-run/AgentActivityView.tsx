@@ -9,6 +9,7 @@ import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { useOptionalFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { CodexActionContext } from "../../codex/codexActionContext";
 import { Button } from "@/components/ui/button";
+import { Link } from "@/components/Link/link";
 
 import type {
   AgentActivity,
@@ -217,9 +218,9 @@ function CodexErrorNotice({ notice }: { notice: AgentNoticeItem }) {
             </Button>
           </div>
         ) : notice.code === "chatgpt_reconnect_required" && connectionHref ? (
-          <a className="ml-1 underline" href={connectionHref}>
+          <Link className="ml-1 underline" href={connectionHref}>
             Reconnect ChatGPT
-          </a>
+          </Link>
         ) : null}
       </AlertDescription>
     </Alert>
@@ -342,13 +343,25 @@ function visibleActivityItems(items: AgentActivityItem[], live: boolean, keepAss
   const finalNotice = [...authenticationNotices]
     .reverse()
     .find((item) => item.code !== "chatgpt_refreshing" && !isLegacyRefreshProgress(item.text));
-  const lastNotice =
+  const candidate =
     finalNotice ||
     (authenticationNotices.at(-1)?.code !== "chatgpt_refreshing" || live ? authenticationNotices.at(-1) : undefined);
+  const lastNotice = candidate && refreshFinished(candidate, items) ? undefined : candidate;
   return items
     .filter((item, index) => isVisibleActivityItem(item, index, items, live, keepAssistant))
     .filter((item) => !isAuthenticationNotice(item) || item === lastNotice)
     .map((item) => (item === lastNotice ? normalizeAuthenticationNotice(item, live) : item));
+}
+
+// Agent output after refresh progress means that the refresh succeeded.
+function refreshFinished(notice: AgentNoticeItem, items: AgentActivityItem[]): boolean {
+  if (notice.code !== "chatgpt_refreshing" && !isLegacyRefreshProgress(notice.text)) return false;
+  return items.slice(items.indexOf(notice) + 1).some(isAgentWork);
+}
+
+function isAgentWork(item: AgentActivityItem): boolean {
+  if (item.type === "tool") return true;
+  return item.type === "content" && Boolean(item.text.trim()) && !isThinkingPlaceholder(item.text);
 }
 
 function isLegacyRefreshProgress(text: string): boolean {
