@@ -285,9 +285,28 @@ func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) 
 }
 
 func applyGitHubCatalogWebhook(tx *gorm.DB, event any, installationID int64) error {
+	if !githubCatalogWebhookWrites(event) {
+		return nil
+	}
 	return tx.Transaction(func(tx *gorm.DB) error {
 		return applyGitHubCatalogWebhookInTransaction(tx, event, installationID)
 	})
+}
+
+// githubCatalogWebhookWrites reports whether this event can change the catalog.
+// Ignored event types return before a database transaction starts.
+func githubCatalogWebhookWrites(event any) bool {
+	switch event := event.(type) {
+	case *gh.InstallationEvent, *gh.InstallationRepositoriesEvent, *gh.MemberEvent:
+		return true
+	case *gh.RepositoryEvent:
+		action := event.GetAction()
+		return action == "edited" || action == "renamed"
+	case *gh.CreateEvent:
+		return event.GetRefType() == "branch"
+	default:
+		return false
+	}
 }
 
 func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installationID int64) error {
@@ -371,9 +390,78 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 			time.Now().Add(10*time.Second),
 			models.VCSProviderRepositorySyncPriorityInteractive,
 		)
+
+	case *gh.RepositoryEvent:
+		action := event.GetAction()
+		if action != "edited" && action != "renamed" {
+			return nil
+		}
+		repo := event.GetRepo()
+		if repo == nil {
+			return nil
+		}
+		return refreshGitHubCatalogDefaultBranch(tx, installationID, repo.GetID(), repo.GetFullName(), repo.Private, repo.GetDefaultBranch())
+
+	case *gh.CreateEvent:
+		if event.GetRefType() != "branch" {
+			return nil
+		}
+		repo := event.GetRepo()
+		if repo == nil {
+			return nil
+		}
+		defaultBranch := strings.TrimSpace(repo.GetDefaultBranch())
+		if defaultBranch == "" {
+			defaultBranch = strings.TrimSpace(event.GetMasterBranch())
+		}
+		return refreshGitHubCatalogDefaultBranch(tx, installationID, repo.GetID(), repo.GetFullName(), repo.Private, defaultBranch)
 	}
 
 	return nil
+}
+
+// refreshGitHubCatalogDefaultBranch stores the branch GitHub reports after
+// an edit, a rename, or a new branch. A missing catalog row is reconciled
+// later instead of inserting a partial repository.
+func refreshGitHubCatalogDefaultBranch(
+	tx *gorm.DB,
+	installationID, repositoryID int64,
+	fullName string,
+	private *bool,
+	defaultBranch string,
+) error {
+	if repositoryID <= 0 {
+		return nil
+	}
+	existing, err := models.FindVCSProviderRepository(tx, models.ProviderGitHub, repositoryID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.EnqueueVCSProviderReconciliation(tx, models.ProviderGitHub, time.Now())
+	}
+	if err != nil {
+		return err
+	}
+	fullName = strings.TrimSpace(fullName)
+	if fullName == "" {
+		fullName = existing.FullName
+	}
+	defaultBranch = strings.TrimSpace(defaultBranch)
+	if defaultBranch == "" {
+		defaultBranch = existing.DefaultBranch
+	}
+	isPrivate := existing.Private
+	if private != nil {
+		isPrivate = *private
+	}
+	if installationID <= 0 {
+		installationID = existing.InstallationID
+	}
+	return models.UpsertVCSProviderRepositories(tx, models.ProviderGitHub, installationID, []models.VCSProviderRepository{{
+		RepositoryID:   repositoryID,
+		InstallationID: installationID,
+		FullName:       fullName,
+		Private:        isPrivate,
+		DefaultBranch:  defaultBranch,
+	}})
 }
 
 func enqueueWebhookRepositories(tx *gorm.DB, repositories []models.VCSProviderRepository) error {

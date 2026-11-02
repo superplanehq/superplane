@@ -111,6 +111,10 @@ function planningEnabled(env = process.env) {
   );
 }
 
+// The global runner MCP server lists only the tools that the run token
+// allows, and the backend checks the scope on every call.
+const GLOBAL_MCP_SERVER = "superplane_global";
+
 function workspaceMCPConfigPath(env = process.env) {
   const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
   const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
@@ -143,7 +147,7 @@ function workspaceMCPServers(env = process.env) {
     for (const server of servers) {
       const name = String((server && server.name) || "").trim();
       const url = String((server && server.url) || "").trim();
-      if (!name || name === "superplane" || !url) {
+      if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER || !url) {
         continue;
       }
       const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
@@ -200,20 +204,6 @@ function artifactEnabled(env = process.env) {
 function visualEvidenceEnabled(env = process.env) {
   if (envFlag(env, "SUPERPLANE_VISUAL_EVIDENCE")) return true;
   return artifactEnabled(env) && !envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
-}
-
-function mergeConfidenceEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
-}
-
-function superplaneMCPScript(taskDir, env = process.env, planning = planningEnabled(env)) {
-  if (planning) {
-    return path.join(taskDir, "planning_session_mcp.js");
-  }
-  if (mergeConfidenceEnabled(env)) {
-    return path.join(taskDir, "merge_confidence_mcp.js");
-  }
-  return path.join(taskDir, "task_artifact_mcp.js");
 }
 
 function planningSystemPrompt(env = process.env) {
@@ -513,17 +503,11 @@ function buildOpenCodeConfig({
       }
     }
   }
-  if (
-    (planning ||
-      artifactEnabled(env) ||
-      mergeConfidenceEnabled(env) ||
-      envFlag(env, "SUPERPLANE_OWNER_TOKEN")) &&
-    taskDir
-  ) {
+  if (envFlag(env, "SUPERPLANE_RUNNER_TOKEN") && taskDir) {
     config.mcp = {
-      superplane: {
+      [GLOBAL_MCP_SERVER]: {
         type: "local",
-        command: ["node", superplaneMCPScript(taskDir, env, planning)],
+        command: ["node", path.join(taskDir, "superplane_mcp", "server.js")],
         enabled: true,
       },
     };
@@ -735,7 +719,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const recordAgentMessage =
     helpers.recordAgentMessage ||
     ((text) =>
-      require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+      require(path.join(sp, "agent_message.js")).recordAgentMessage(
         text,
       ));
   const planning = planningEnabled(env);

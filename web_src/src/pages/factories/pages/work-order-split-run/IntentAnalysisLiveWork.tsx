@@ -18,14 +18,16 @@ type LiveStatus = {
 
 export function AnalysisLiveWork({
   machineStatus,
-  queueReason,
+  runnerState,
+  blockedByParallelismLimit,
   organizationId,
   canvasId,
   executionId,
   activities,
 }: {
   machineStatus: CreateWithAgentMachineStatus;
-  queueReason?: string;
+  runnerState?: string;
+  blockedByParallelismLimit?: boolean;
   organizationId?: string;
   canvasId?: string;
   executionId?: string;
@@ -42,8 +44,12 @@ export function AnalysisLiveWork({
         <div>
           <p className="font-medium text-foreground">Queued for planning</p>
           <p className="text-muted-foreground">
-            {queueReason === "parallelism_limit" ? "Parallelism limit reached." : "Waiting for a runner."} Planning
-            starts automatically when a slot is free.
+            {blockedByParallelismLimit
+              ? "Parallelism limit reached."
+              : runnerState === "pending"
+                ? "Waiting for scheduling."
+                : "Waiting for a runner."}{" "}
+            Planning starts automatically when a slot is free.
           </p>
         </div>
       </div>

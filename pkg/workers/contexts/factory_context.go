@@ -53,6 +53,7 @@ type FactoryContext struct {
 	onRunsCancelled         func([]*models.RunCancellationResult)
 	onFileBindCleanup       func(FileBindCleanup)
 	onProductAnalytics      func(productanalytics.Event)
+	onNewEvents             func([]models.CanvasEvent)
 
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
@@ -86,6 +87,12 @@ func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.Can
 		canvas:    canvas,
 		execution: execution,
 	}
+}
+
+// WithNewEvents collects events for publication after the transaction commits.
+func (c *FactoryContext) WithNewEvents(callback func([]models.CanvasEvent)) *FactoryContext {
+	c.onNewEvents = callback
+	return c
 }
 
 func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, reason string)) *FactoryContext {
@@ -241,7 +248,13 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	c.recordSentryWebhookTask(order)
 	c.recordDatadogWebhookTask(order)
 	c.recordLinearWebhookTask(order)
-	EmitWorkOrderCreated(c.tx, f, order)
+	events, err := emitWorkOrderCreated(c.tx, f, order, uuid.Nil, nil, false)
+	if err != nil {
+		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
+	}
+	if c.onNewEvents != nil {
+		c.onNewEvents(events)
+	}
 	c.captureProductAnalytics(productanalytics.Event{
 		Name:           productanalytics.EventFactoryTaskCreated,
 		EventID:        productanalytics.StableEventID(productanalytics.EventFactoryTaskCreated, order.ID.String()),
@@ -436,6 +449,21 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	params core.WorkOrderParams,
 	sourceRunID uuid.UUID,
 ) (*models.FactoryWorkOrder, error) {
+	if factoryModel.OnboardingConfigValue().CodexSubscription {
+		order, err := factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, c.originFromSourceRun(sourceRunID))
+		if !errors.Is(err, models.ErrSubscriptionOwnerRequired) {
+			return order, err
+		}
+		// A run that started before the switch to subscriptions has no saved
+		// default owner. Create its task as before the switch.
+		superseded, supersededErr := models.RunUsesSupersededVersion(c.tx, sourceRunID)
+		if supersededErr != nil {
+			return nil, supersededErr
+		}
+		if !superseded {
+			return nil, err
+		}
+	}
 	assigneeIDs := []uuid.UUID{}
 	if params.DefaultOwnerID != "" {
 		user, err := models.FindActiveUserByIDInTransaction(c.tx, factoryModel.OrganizationID.String(), params.DefaultOwnerID)

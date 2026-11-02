@@ -562,7 +562,6 @@ CREATE TABLE public.factory_agent_resources (
 CREATE TABLE public.factory_codex_connections (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
-    factory_id uuid NOT NULL,
     owner_user_id uuid NOT NULL,
     status character varying(32) NOT NULL,
     resume_status character varying(32) DEFAULT ''::character varying NOT NULL,
@@ -599,8 +598,10 @@ CREATE TABLE public.factory_codex_leases (
     started_version bigint DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     revoked_at timestamp with time zone,
+    factory_id uuid,
     CONSTRAINT factory_codex_leases_generation_check CHECK (((generation >= 1) AND (started_version >= 0))),
-    CONSTRAINT factory_codex_leases_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['login'::character varying, 'run'::character varying])::text[])))
+    CONSTRAINT factory_codex_leases_purpose_check CHECK (((purpose)::text = ANY ((ARRAY['login'::character varying, 'run'::character varying])::text[]))),
+    CONSTRAINT factory_codex_leases_scope_check CHECK (((((purpose)::text = 'login'::text) AND (factory_id IS NULL)) OR (((purpose)::text = 'run'::text) AND (factory_id IS NOT NULL))))
 );
 
 
@@ -650,8 +651,10 @@ CREATE TABLE public.factory_llm_model_allowlists (
     funding_source text NOT NULL,
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text]))),
-    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text])))
+    inherit_parent boolean,
+    CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text, 'subscription'::text]))),
+    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text]))),
+    CONSTRAINT factory_llm_model_allowlists_subscription_provider CHECK (((funding_source <> 'subscription'::text) OR (provider = 'openai'::text)))
 );
 
 
@@ -1565,6 +1568,22 @@ CREATE TABLE public.organization_seat_purchases (
 
 
 --
+-- Name: organization_suspension_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_suspension_events (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    account_id uuid NOT NULL,
+    action text NOT NULL,
+    reason text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    cancellation_completed_at timestamp with time zone,
+    CONSTRAINT organization_suspension_events_action_check CHECK ((action = ANY (ARRAY['suspend'::text, 'reactivate'::text])))
+);
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1579,7 +1598,10 @@ CREATE TABLE public.organizations (
     usage_retention_window_days integer DEFAULT 180,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
     slug text NOT NULL,
-    created_by_account_id uuid
+    created_by_account_id uuid,
+    suspended_at timestamp with time zone,
+    suspended_by_account_id uuid,
+    suspension_reason text DEFAULT ''::text NOT NULL
 );
 
 
@@ -1704,8 +1726,9 @@ CREATE TABLE public.runner_tasks (
     finished_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    ready_at timestamp with time zone,
     CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
-    CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
+    CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
 );
 
 
@@ -2654,11 +2677,11 @@ ALTER TABLE ONLY public.factory_agent_resources
 
 
 --
--- Name: factory_codex_connections factory_codex_connections_factory_owner_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: factory_codex_connections factory_codex_connections_organization_owner_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_codex_connections
-    ADD CONSTRAINT factory_codex_connections_factory_owner_key UNIQUE (factory_id, owner_user_id);
+    ADD CONSTRAINT factory_codex_connections_organization_owner_key UNIQUE (organization_id, owner_user_id);
 
 
 --
@@ -3171,6 +3194,14 @@ ALTER TABLE ONLY public.organization_seat_limit_overrides
 
 ALTER TABLE ONLY public.organization_seat_purchases
     ADD CONSTRAINT organization_seat_purchases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_suspension_events organization_suspension_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_suspension_events
+    ADD CONSTRAINT organization_suspension_events_pkey PRIMARY KEY (id);
 
 
 --
@@ -4870,6 +4901,20 @@ CREATE UNIQUE INDEX organization_invitations_pending_email_idx ON public.organiz
 
 
 --
+-- Name: organization_suspension_events_history_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_suspension_events_history_idx ON public.organization_suspension_events USING btree (organization_id, created_at DESC, id DESC);
+
+
+--
+-- Name: organization_suspension_events_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_suspension_events_pending_idx ON public.organization_suspension_events USING btree (created_at) WHERE ((action = 'suspend'::text) AND (cancellation_completed_at IS NULL));
+
+
+--
 -- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4922,7 +4967,7 @@ CREATE INDEX runner_tasks_fleet_state_idx ON public.runner_tasks USING btree (fl
 -- Name: runner_tasks_organization_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING btree (organization_id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = ANY ((ARRAY['reserved'::character varying, 'running'::character varying])::text[])));
+CREATE INDEX runner_tasks_organization_active_idx ON public.runner_tasks USING btree (organization_id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying])::text[])));
 
 
 --
@@ -4933,6 +4978,13 @@ CREATE INDEX runner_tasks_organization_idx ON public.runner_tasks USING btree (o
 
 
 --
+-- Name: runner_tasks_organization_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_organization_pending_idx ON public.runner_tasks USING btree (organization_id, queued_at, id) WHERE (((backend)::text = 'integrated'::text) AND ((state)::text = 'pending'::text));
+
+
+--
 -- Name: runner_tasks_runner_id_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4940,10 +4992,10 @@ CREATE UNIQUE INDEX runner_tasks_runner_id_key ON public.runner_tasks USING btre
 
 
 --
--- Name: runners_creation_idempotency_key; Type: INDEX; Schema: public; Owner: -
+-- Name: runners_fleet_creation_idempotency_key; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX runners_creation_idempotency_key ON public.runners USING btree (creation_idempotency_key) WHERE (creation_idempotency_key IS NOT NULL);
+CREATE UNIQUE INDEX runners_fleet_creation_idempotency_key ON public.runners USING btree (fleet_id, creation_idempotency_key) WHERE (creation_idempotency_key IS NOT NULL);
 
 
 --
@@ -5293,14 +5345,6 @@ ALTER TABLE ONLY public.factory_agent_resources
 
 
 --
--- Name: factory_codex_connections factory_codex_connections_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_codex_connections
-    ADD CONSTRAINT factory_codex_connections_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
-
-
---
 -- Name: factory_codex_connections factory_codex_connections_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5322,6 +5366,14 @@ ALTER TABLE ONLY public.factory_codex_connections
 
 ALTER TABLE ONLY public.factory_codex_leases
     ADD CONSTRAINT factory_codex_leases_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.factory_codex_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_codex_leases factory_codex_leases_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_leases
+    ADD CONSTRAINT factory_codex_leases_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
 
 
 --
@@ -6005,6 +6057,14 @@ ALTER TABLE ONLY public.organization_seat_purchases
 
 
 --
+-- Name: organization_suspension_events organization_suspension_events_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_suspension_events
+    ADD CONSTRAINT organization_suspension_events_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organizations organizations_created_by_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6532,7 +6592,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261029132752	f
+20261031230416	f
 \.
 
 

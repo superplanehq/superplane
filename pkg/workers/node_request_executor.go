@@ -501,6 +501,7 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 		Secrets:        contexts.NewSecretsContext(tx, e.registry, workflow.OrganizationID, e.encryptor),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithNewEvents(onNewEvents).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).

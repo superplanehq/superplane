@@ -35,6 +35,11 @@ case "$1 $2" in
     cp "${REMOTE_CHART}" "${destination}/fleet-manager-chart-1.2.3.tgz"
     ;;
   "push "*)
+    if [ "${PULL_MODE}" = "existing" ]; then
+      echo "helm push must not run when the chart exists" >&2
+      exit 1
+    fi
+    printf 'pushed\n' >>"${PUSH_LOG}"
     printf 'Pushed: test\nDigest: sha256:%064d\n' 1 >&2
     ;;
   *)
@@ -54,6 +59,10 @@ if [[ "$*" == *"/token?scope=repository:superplanehq/fleet-manager-chart:pull"* 
   exit 0
 fi
 if [[ "$*" == *"/v2/superplanehq/fleet-manager-chart/manifests/1.2.3"* ]]; then
+  if [ "${CURL_MODE:-}" = "invalid-digest" ]; then
+    printf 'HTTP/2 200\r\nDocker-Content-Digest: not-a-digest\r\n\r\n'
+    exit 0
+  fi
   printf 'HTTP/2 200\r\nDocker-Content-Digest: sha256:%064d\r\n\r\n' 1
   exit 0
 fi
@@ -64,31 +73,50 @@ chmod +x "${TMP_DIR}/curl"
 
 export PATH="${TMP_DIR}:${PATH}"
 export PULL_COUNT="${TMP_DIR}/pull-count"
+export PUSH_LOG="${TMP_DIR}/push.log"
 export REMOTE_CHART="${TMP_DIR}/remote.tgz"
+export FLEET_MANAGER_CHART_DIGEST_OUTPUT="${TMP_DIR}/digest"
 
 cp "${TMP_DIR}/fleet-manager-chart-1.2.3.tgz" "${REMOTE_CHART}"
 export PULL_MODE=existing
+bash "${SCRIPT_DIR}/publish-chart.sh" v1.2.3 "${TMP_DIR}/fleet-manager-chart-1.2.3.tgz" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"
+grep -Eq '^sha256:[0-9a-f]{64}$' "${TMP_DIR}/digest"
+cmp -s "${TMP_DIR}/stdout" "${TMP_DIR}/digest"
+test "$(cat "${PULL_COUNT}")" = 1
+test ! -e "${PUSH_LOG}"
+
+export CURL_MODE=invalid-digest
+: >"${PULL_COUNT}"
+rm -f "${TMP_DIR}/digest" "${PUSH_LOG}"
 if bash "${SCRIPT_DIR}/publish-chart.sh" v1.2.3 "${TMP_DIR}/fleet-manager-chart-1.2.3.tgz" \
   >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"; then
-  echo "An existing chart version must be refused" >&2
+  echo "An existing chart with an invalid registry digest must fail" >&2
   exit 1
 fi
-grep -q 'chart version 1.2.3 already exists' "${TMP_DIR}/stderr"
+grep -q 'registry did not return a valid chart digest' "${TMP_DIR}/stderr"
+test ! -e "${TMP_DIR}/digest"
+test ! -e "${PUSH_LOG}"
+unset CURL_MODE
 
 printf 'different chart' >"${REMOTE_CHART}"
 : >"${PULL_COUNT}"
+rm -f "${PUSH_LOG}" "${TMP_DIR}/digest"
 if bash "${SCRIPT_DIR}/publish-chart.sh" v1.2.3 "${TMP_DIR}/fleet-manager-chart-1.2.3.tgz" \
   >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"; then
   echo "A chart collision must fail" >&2
   exit 1
 fi
 grep -q 'already contains different content' "${TMP_DIR}/stderr"
+test ! -e "${PUSH_LOG}"
+test ! -e "${TMP_DIR}/digest"
 
 cp "${TMP_DIR}/fleet-manager-chart-1.2.3.tgz" "${REMOTE_CHART}"
 : >"${PULL_COUNT}"
+rm -f "${PUSH_LOG}" "${TMP_DIR}/digest"
 export PULL_MODE=missing-once
-export FLEET_MANAGER_CHART_DIGEST_OUTPUT="${TMP_DIR}/digest"
 bash "${SCRIPT_DIR}/publish-chart.sh" v1.2.3 "${TMP_DIR}/fleet-manager-chart-1.2.3.tgz" >/dev/null
 grep -Eq '^sha256:[0-9a-f]{64}$' "${TMP_DIR}/digest"
+test -s "${PUSH_LOG}"
 
 echo "Fleet Manager chart publication tests passed."

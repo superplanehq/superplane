@@ -24,6 +24,8 @@ function SentryIntakePreview() {
     <QueryClientProvider client={client}>
       <ComponentStoryShell className="h-screen bg-background">
         <IntakeSourceSettingsPopup
+          canEdit
+          accessLoading={false}
           sourceId="sentry-exceptions"
           organizationId={factoryHistoryStoryOrganization}
           factoryId={factoryHistoryStoryFactory}
@@ -58,6 +60,6 @@ export const General: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement.ownerDocument.body);
     await userEvent.click(await canvas.findByRole("tab", { name: "General" }));
-    await expect(await canvas.findByRole("button", { name: "Default task owner" })).toBeVisible();
+    await expect(canvas.queryByRole("combobox", { name: /Default task owner/ })).not.toBeInTheDocument();
   },
 };

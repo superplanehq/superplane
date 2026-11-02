@@ -71,32 +71,31 @@ describe("selectableLLMModelsForProvider", () => {
 describe("defaultByokRunnerModel", () => {
   const allowlist = ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"];
 
-  it("replaces a Claude alias with Opus 5.5 and keeps an allowlisted previous default", () => {
+  it("resolves a Claude alias within its permitted family and retains concrete IDs", () => {
     const withOpus55 = [...allowlist, "claude-opus-5-5"];
-    expect(defaultByokRunnerModel("sonnet", "anthropic", withOpus55)).toBe("claude-opus-5-5");
+    expect(defaultByokRunnerModel("sonnet", "anthropic", withOpus55)).toBe("claude-sonnet-4-6");
     expect(defaultByokRunnerModel("opus", "anthropic", withOpus55)).toBe("claude-opus-5-5");
     expect(defaultByokRunnerModel("claude-sonnet-4-6", "anthropic", withOpus55)).toBeUndefined();
     expect(defaultByokRunnerModel("claude-opus-4-6", "anthropic", withOpus55)).toBeUndefined();
   });
 
-  it("replaces a previous Claude default that the key no longer offers", () => {
-    expect(defaultByokRunnerModel("claude-sonnet-4-6", "anthropic", ["claude-opus-5-5"])).toBe("claude-opus-5-5");
-    expect(defaultByokRunnerModel("claude-opus-4-6", "anthropic", ["claude-opus-5-5"])).toBe("claude-opus-5-5");
+  it("retains an excluded explicit model until the user selects a replacement", () => {
+    expect(defaultByokRunnerModel("claude-sonnet-4-6", "anthropic", ["claude-opus-5-5"])).toBeUndefined();
+    expect(defaultByokRunnerModel("claude-opus-4-6", "anthropic", ["claude-opus-5-5"])).toBeUndefined();
   });
 
-  it("prefers Claude Opus 5.5 when no model is selected", () => {
-    expect(defaultByokRunnerModel("", "anthropic", [...allowlist, "claude-opus-5-5"])).toBe("claude-opus-5-5");
-  });
-
-  it("prefers a Sonnet id when the organization key has no Opus 5.5 model", () => {
-    expect(defaultByokRunnerModel("sonnet", "anthropic", allowlist)).toBe("claude-sonnet-4-6");
-    expect(defaultByokRunnerModel("", "anthropic", allowlist)).toBe("claude-sonnet-4-6");
-  });
-
-  it("uses the first allowlisted id when the key has no Sonnet model", () => {
-    expect(defaultByokRunnerModel("sonnet", "anthropic", ["claude-opus-4-6", "claude-haiku-4-5"])).toBe(
-      "claude-sonnet-4-6",
+  it("uses the first permitted concrete model in sorted order when blank", () => {
+    expect(defaultByokRunnerModel("", "anthropic", [...allowlist, "claude-opus-5-5", "sonnet"])).toBe(
+      "claude-haiku-4-5",
     );
+  });
+
+  it("resolves Sonnet only from available models", () => {
+    expect(defaultByokRunnerModel("sonnet", "anthropic", allowlist)).toBe("claude-sonnet-4-6");
+  });
+
+  it("does not invent a concrete model when the alias has no permitted match", () => {
+    expect(defaultByokRunnerModel("sonnet", "anthropic", ["claude-opus-4-6", "claude-haiku-4-5"])).toBeUndefined();
   });
 
   it("keeps an allowlisted id and any other explicit id", () => {
@@ -104,13 +103,13 @@ describe("defaultByokRunnerModel", () => {
     expect(defaultByokRunnerModel("claude-custom", "anthropic", allowlist)).toBeUndefined();
   });
 
-  it("uses Opus 5.5 when the organization key has no models", () => {
-    expect(defaultByokRunnerModel("sonnet", "anthropic", [])).toBe("claude-opus-5-5");
+  it("does not resolve a default when no models are permitted", () => {
+    expect(defaultByokRunnerModel("sonnet", "anthropic", [])).toBeUndefined();
   });
 });
 
 describe("byokRunnerModelOptions", () => {
-  it("stores the model id and keeps a value that is not on the list", () => {
+  it("stores only permitted model IDs", () => {
     const listed = [
       model({
         key: "byok::anthropic::claude-sonnet-4-6",
@@ -118,11 +117,7 @@ describe("byokRunnerModelOptions", () => {
         source: { id: "byok", name: "Your keys" },
       }),
     ];
-    expect(byokRunnerModelOptions(listed, "")).toEqual([
-      { value: "claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" },
-    ]);
-    expect(byokRunnerModelOptions(listed, "opus")).toEqual([
-      { value: "claude-opus-5-5", label: "claude-opus-5-5" },
+    expect(byokRunnerModelOptions(listed)).toEqual([
       { value: "claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" },
     ]);
   });

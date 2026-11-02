@@ -68,6 +68,7 @@ func SendWorkOrderToBacklog(
 	}
 
 	fromState := resolvedOrder.State
+	var backlogEvents []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -98,13 +99,14 @@ func SendWorkOrderToBacklog(
 			Actor:   &actor,
 		})
 		if err == nil {
-			contexts.EmitBacklogCustomAutomations(tx, factory, order)
+			backlogEvents = contexts.EmitBacklogCustomAutomations(tx, factory, order)
 		}
 		return err
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send work order to backlog")
 	}
+	contexts.PublishWorkOrderCreatedEvents(orgID, backlogEvents)
 
 	factory, err := models.FindFactory(db, orgID, factoryID)
 	if err != nil {

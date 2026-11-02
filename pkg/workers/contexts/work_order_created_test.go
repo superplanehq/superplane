@@ -113,6 +113,7 @@ func TestWorkOrderCreatedPayloadUsesFactoryProviderWithoutDefaultBranch(t *testi
 	workOrder, ok := workOrderCreatedPayload(db, order)["workOrder"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "https://bitbucket.org/acme/widgets.git", workOrder["repository_url"])
+	assert.Equal(t, "", workOrder["default_branch"])
 }
 
 func TestWorkOrderCreatedPayloadKeepsRepositoryHost(t *testing.T) {
@@ -219,7 +220,8 @@ func TestEmitWorkOrderCreatedSkipsBacklogWhenPlanningOff(t *testing.T) {
 
 	order, err := factoryModel.CreateWorkOrder(db, "Skip analysis", "A ticket", &r.User, nil, nil)
 	require.NoError(t, err)
-	require.NoError(t, emitWorkOrderCreated(db, factoryModel, order, uuid.Nil, nil, false))
+	_, err = emitWorkOrderCreated(db, factoryModel, order, uuid.Nil, nil, false)
+	require.NoError(t, err)
 
 	backlogEvents, err := models.ListCanvasEvents(db, backlog.ID, models.FactoryAppBacklogTriggerID, 10, nil)
 	require.NoError(t, err)
@@ -230,7 +232,7 @@ func TestEmitWorkOrderCreatedSkipsBacklogWhenPlanningOff(t *testing.T) {
 	require.Len(t, customEvents, 1)
 }
 
-func TestEmitWorkOrderCreatedOnCanvasStartsBacklogWhenPlanningOff(t *testing.T) {
+func TestCreateWorkOrderEventsOnCanvasStartsBacklogWhenPlanningOff(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -256,11 +258,14 @@ func TestEmitWorkOrderCreatedOnCanvasStartsBacklogWhenPlanningOff(t *testing.T) 
 
 	order, err := factoryModel.CreateWorkOrder(db, "Retry plan", "A ticket", &r.User, nil, nil)
 	require.NoError(t, err)
-	require.NoError(t, EmitWorkOrderCreatedOnCanvas(db, factoryModel, order, backlog.ID))
+	created, err := CreateWorkOrderEventsOnCanvas(db, factoryModel, order, backlog.ID)
+	require.NoError(t, err)
 
 	events, err := models.ListCanvasEvents(db, backlog.ID, models.FactoryAppBacklogTriggerID, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
+	require.Len(t, created, 1)
+	assert.Equal(t, events[0].ID, created[0].ID)
 }
 
 func TestEmitWorkOrderCreatedContinuesAfterCustomAutomationFailure(t *testing.T) {

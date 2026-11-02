@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
 
-import { FleetManagerCommandBlock } from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
+import {
+  FleetManagerCommandBlock,
+  FleetManagerHelmInstall,
+} from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
 import {
   FleetManagerFleetSection,
   FleetManagerProviderSection,
@@ -164,25 +167,39 @@ function ValuesStep({ setup, actions }: { setup: FleetManagerSetupState; actions
   );
 }
 
-function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
+function InstallStep({
+  setup,
+  onFinish,
+  onFinishLater,
+  kubeContext,
+  onKubeContextChange,
+}: WizardProps & {
+  kubeContext: string;
+  onKubeContextChange: (value: string) => void;
+}) {
   const verification = useFleetManagerVerification(true, setup.draft, setup.metadata);
   const helmCommand = useMemo(() => {
-    if (!setup.metadata || !setup.draft) return null;
-    return fleetManagerHelmCommand(setup.metadata, setup.draft.namespace);
-  }, [setup.draft, setup.metadata]);
+    const context = kubeContext.trim();
+    if (!setup.metadata || !setup.draft || context === "") return null;
+    return fleetManagerHelmCommand(setup.metadata, setup.draft.namespace, context);
+  }, [kubeContext, setup.draft, setup.metadata]);
 
   return (
     <div data-testid="fleet-manager-install-step">
       <FirstRunHeading headline="Install the chart" size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          Run this command in the same directory. It reads {FLEET_MANAGER_VALUES_FILE}.
-        </p>
+        {helmCommand ? (
+          <p className="text-[15px] leading-6 text-muted-foreground">
+            Run this command in the same directory. It reads {FLEET_MANAGER_VALUES_FILE}.
+          </p>
+        ) : null}
       </FirstRunHeading>
-      {helmCommand && (
-        <div className="mt-5">
-          <FleetManagerCommandBlock code={helmCommand} language="shell" copyLabel="Copy install command" />
-        </div>
-      )}
+      <div className="mt-5">
+        <FleetManagerHelmInstall
+          kubeContext={kubeContext}
+          onKubeContextChange={onKubeContextChange}
+          helmCommand={helmCommand}
+        />
+      </div>
       <div className="mt-5">
         <FleetManagerVerificationStatus status={verification.status} onRetry={verification.retry} />
       </div>
@@ -278,6 +295,7 @@ export function FleetManagerWizardScreen(props: WizardProps) {
 }
 
 function FleetManagerWizardSteps(props: WizardProps) {
+  const kubeContext = props.setup.draft?.kubeContext ?? "";
   const back = props.showBackButton ? props.onBack : undefined;
   const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
   const continueToNextStep = async () => {
@@ -316,5 +334,5 @@ function FleetManagerWizardSteps(props: WizardProps) {
     }
     return <ValuesStep setup={props.setup} actions={continueActions} />;
   }
-  return <InstallStep {...props} />;
+  return <InstallStep {...props} kubeContext={kubeContext} onKubeContextChange={props.setup.setKubeContext} />;
 }

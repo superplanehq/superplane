@@ -740,10 +740,17 @@ func TestSubscriptionHandOffWaitsForAssignmentAndExplicitStart(t *testing.T) {
 			artifact, err := order.FindArtifactByKey(db, models.PlanningSpecArtifactKey+":"+order.ID.String())
 			require.NoError(t, err)
 			assert.Equal(t, "The saved plan", planningSpecBody(t, artifact))
-			connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
+			if column == HandOffColumnVerify {
+				useGitHub(t, openHandOffPullRequest("acme/app", 42, "feature"))
+			}
+			_, err = ResumeHandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ResumeHandOffWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
+			requireCodexConnectionRequired(t, err)
+			connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 			require.NoError(t, err)
 			require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
-			require.NoError(t, order.UpdateAssignees(db, []uuid.UUID{r.User}, r.User))
+			if scenario.reopen {
+				require.NoError(t, order.UpdateAssignees(db, []uuid.UUID{r.User}, r.User))
+			}
 			assigned, err := f.FindWorkOrder(db, order.ID)
 			require.NoError(t, err)
 			assert.Equal(t, models.FactoryWorkOrderStateDraft, assigned.State)
@@ -776,6 +783,8 @@ func TestSubscriptionHandOffWaitsForAssignmentAndExplicitStart(t *testing.T) {
 			resumed, err := ResumeHandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ResumeHandOffWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
 			require.NoError(t, err)
 			assert.Equal(t, pb.WorkOrder_STATE_OPEN, resumed.Order.State)
+			require.Len(t, resumed.Order.Assignees, 1)
+			assert.Equal(t, r.User.String(), resumed.Order.Assignees[0].Id)
 			assert.Nil(t, resumed.Order.PendingHandoff)
 			require.Len(t, resumed.Order.LineDispatches, 1)
 			_, err = ResumeHandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ResumeHandOffWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
@@ -804,7 +813,7 @@ func seedPendingVerifyHandOff(t *testing.T) (context.Context, *support.ResourceR
 	require.NotNil(t, result.Order.PendingHandoff)
 	order, err := f.FindWorkOrder(db, uuid.MustParse(result.Order.Id))
 	require.NoError(t, err)
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	require.NoError(t, order.UpdateAssignees(db, []uuid.UUID{r.User}, r.User))

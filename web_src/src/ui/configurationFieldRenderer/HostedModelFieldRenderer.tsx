@@ -13,11 +13,13 @@ import {
   normalizeSuperPlaneModelValue,
   SELECTABLE_LLM_SOURCE_BYOK,
   SELECTABLE_LLM_SOURCE_HOSTED,
+  SELECTABLE_LLM_SOURCE_SUBSCRIPTION,
+  selectableLLMModelLabelFromKey,
   selectableLLMModelsForProvider,
+  type SelectableLLMModel,
   type SelectableLLMSourceID,
 } from "@/lib/selectableLLMModels";
 import { toTestId } from "@/lib/testID";
-import { useFactoryCodexConnection } from "@/pages/factories/pages/onboarding/useFactoryCodexConnection";
 import {
   CODEX_THINKING_LEVELS,
   THINKING_LEVEL_KEY,
@@ -69,10 +71,11 @@ function SuperPlaneModelField({
   if (status) {
     return status;
   }
-  if (selection.models.length === 0) {
+  if (selection.models.length === 0 && !value) {
     return (
       <Text className="text-sm text-gray-500 dark:text-gray-400">
-        No SuperPlane-hosted models are allowlisted. Ask an installation admin to add a key and select models.
+        No SuperPlane models are available. Select models in Workspace Models or ask an administrator to configure a
+        provider.
       </Text>
     );
   }
@@ -104,7 +107,7 @@ function SuperPlaneModelField({
 }
 
 function superPlanePickerValue(current: string, defaultKey: string, models: Array<{ value: string }>): string {
-  if (current !== "" && models.some((model) => model.value === current)) {
+  if (current !== "") {
     return current;
   }
   if (models.some((model) => model.value === defaultKey)) {
@@ -114,21 +117,21 @@ function superPlanePickerValue(current: string, defaultKey: string, models: Arra
 }
 
 function SubscriptionModelField(props: FieldRendererProps) {
-  const canvasScope = useCanvasFactoryScope(props.organizationId);
-  const { factoryId, waitingForCanvas } = preferredFactoryScope(props.factoryId, canvasScope);
-  const { query } = useFactoryCodexConnection(props.organizationId ?? "", factoryId ?? "", !waitingForCanvas);
-  const status = modelFieldStatus(props.organizationId, waitingForCanvas || query.isLoading, query.isError);
+  const selection = useSelectablePickerModels(
+    props.organizationId,
+    [SELECTABLE_LLM_SOURCE_SUBSCRIPTION],
+    props.factoryId,
+  );
+  const status = modelFieldStatus(props.organizationId, selection.isLoading, selection.isError);
   if (status) return status;
-  const connection = query.data;
-  const models = connection?.status === "ready" ? (connection.availableModels ?? []) : [];
-  if (models.length === 0) {
+  const current = typeof props.value === "string" ? props.value : "";
+  if (selection.models.length === 0 && current === "") {
     return (
       <Text className="text-sm text-gray-500 dark:text-gray-400">
-        No ChatGPT models are available. Connect ChatGPT in workspace setup to load models.
+        No ChatGPT models are available. Connect ChatGPT and select models in Workspace Models.
       </Text>
     );
   }
-  const current = typeof props.value === "string" ? props.value : "";
   return (
     <ModelThinkingSelect
       fieldName={props.field.name}
@@ -137,7 +140,7 @@ function SubscriptionModelField(props: FieldRendererProps) {
       thinkingLevel={normalizeThinkingLevel(props.allValues?.[THINKING_LEVEL_KEY])}
       placeholder="Default"
       readOnly={props.readOnly}
-      options={models.map((model) => ({ value: model, label: model }))}
+      options={selection.models.map((model) => ({ value: model.model.id, label: model.model.name }))}
       modelOnly={props.modelOnly ?? false}
       thinkingOptions={CODEX_THINKING_LEVELS}
       triggerClassName={props.triggerClassName}
@@ -166,23 +169,11 @@ function ProviderBYOKModelField({
     return status;
   }
 
-  const provider = byokModelProvider(field.typeOptions?.hostedModel?.provider ?? "", allValues?.llmProvider);
-  const providerModels = selectableLLMModelsForProvider(selection.models, provider);
-  const current = typeof value === "string" ? value : "";
-  const resolved = defaultByokRunnerModel(
-    current,
-    provider,
-    providerModels.map((model) => model.model.id),
-  );
-  const shown = resolved ?? current;
-  const options = byokRunnerModelOptions(providerModels, shown).map((option) => ({
-    value: option.value,
-    label: shortClaudeModelLabel(option.value) ?? option.label,
-  }));
-  if (options.length === 0) {
+  const { provider, current, shown, options } = byokFieldSelection({ field, value, allValues }, selection.models);
+  if (options.length === 0 && current === "") {
     return (
       <Text className="text-sm text-gray-500 dark:text-gray-400">
-        No models are selected for this provider. Select models on Organization LLM Models, or connect a provider on
+        No models are available for this provider. Select models in Workspace Models or connect a provider in
         Integrations.
       </Text>
     );
@@ -205,6 +196,25 @@ function ProviderBYOKModelField({
       }
     />
   );
+}
+
+function byokFieldSelection(
+  { field, value, allValues }: Pick<FieldRendererProps, "field" | "value" | "allValues">,
+  models: SelectableLLMModel[],
+) {
+  const provider = byokModelProvider(field.typeOptions?.hostedModel?.provider ?? "", allValues?.llmProvider);
+  const providerModels = selectableLLMModelsForProvider(models, provider);
+  const current = typeof value === "string" ? value : "";
+  const resolved = defaultByokRunnerModel(
+    current,
+    provider,
+    providerModels.map((model) => model.model.id),
+  );
+  const options = byokRunnerModelOptions(providerModels).map((option) => ({
+    value: option.value,
+    label: shortClaudeModelLabel(option.value) ?? option.label,
+  }));
+  return { provider, current, shown: resolved ?? current, options };
 }
 
 function commitModelAndThinking(
@@ -248,60 +258,81 @@ function ModelThinkingSelect({
   triggerClassName?: string;
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
-  const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
+  const { unavailable, label: selectedLabel } = modelSelectionLabel(model, options, placeholder);
   const thinkingLabel = thinkingOptions.find((level) => level.value === thinkingLevel)?.label ?? "Default";
-  const modelListTestId = fieldName ? toTestId(`field-${fieldName}-hosted-model-list`) : undefined;
-  const thinkingTestId = fieldName ? toTestId(`field-${fieldName}-hosted-thinking`) : undefined;
+  const modelListTestId = modelFieldTestId(fieldName, "model-list");
+  const thinkingTestId = modelFieldTestId(fieldName, "thinking");
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={readOnly}
-          data-testid={fieldName ? toTestId(`field-${fieldName}-hosted-model`) : undefined}
-          className={cn(
-            "h-8 w-full justify-between !rounded-md border-gray-300 bg-white px-2.5 font-normal shadow-xs dark:border-gray-600/70 dark:bg-gray-800",
-            triggerClassName,
-          )}
-        >
-          <span className="min-w-0 truncate">{selectedLabel}</span>
-          {modelOnly ? null : (
-            <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{thinkingLabel}</span>
-          )}
-          <ChevronDown className="size-4 opacity-50" aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-44" data-testid={modelOnly ? modelListTestId : undefined}>
-        {modelOnly
-          ? options.map((option) => (
-              <DropdownMenuItem key={option.value} onSelect={() => onCommit(option.value, thinkingLevel)}>
-                {option.label}
-                {option.value === model ? <Check className="ml-auto size-4" aria-hidden /> : null}
-              </DropdownMenuItem>
-            ))
-          : [
-              <DropdownMenuValueSub
-                key="model"
-                label="Model"
-                testId={modelListTestId}
-                value={model}
-                options={options}
-                onValueChange={(nextModel) => onCommit(nextModel, thinkingLevel)}
-              />,
-              <DropdownMenuValueSub
-                key="thinking"
-                label="Thinking"
-                testId={thinkingTestId}
-                value={thinkingLevel}
-                options={[...thinkingOptions]}
-                onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
-              />,
-            ]}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={readOnly || options.length === 0}
+            aria-invalid={unavailable || undefined}
+            data-testid={modelFieldTestId(fieldName, "model")}
+            className={cn(
+              "h-8 w-full justify-between !rounded-md border-gray-300 bg-white px-2.5 font-normal shadow-xs dark:border-gray-600/70 dark:bg-gray-800",
+              triggerClassName,
+            )}
+          >
+            <span className="min-w-0 truncate">{selectedLabel}</span>
+            {modelOnly ? null : (
+              <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{thinkingLabel}</span>
+            )}
+            <ChevronDown className="size-4 opacity-50" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-44" data-testid={modelOnly ? modelListTestId : undefined}>
+          {modelOnly
+            ? options.map((option) => (
+                <DropdownMenuItem key={option.value} onSelect={() => onCommit(option.value, thinkingLevel)}>
+                  {option.label}
+                  {option.value === model ? <Check className="ml-auto size-4" aria-hidden /> : null}
+                </DropdownMenuItem>
+              ))
+            : [
+                <DropdownMenuValueSub
+                  key="model"
+                  label="Model"
+                  testId={modelListTestId}
+                  value={model}
+                  options={options}
+                  onValueChange={(nextModel) => onCommit(nextModel, thinkingLevel)}
+                />,
+                <DropdownMenuValueSub
+                  key="thinking"
+                  label="Thinking"
+                  testId={thinkingTestId}
+                  value={thinkingLevel}
+                  options={[...thinkingOptions]}
+                  disabled={unavailable}
+                  onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
+                />,
+              ]}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {unavailable ? (
+        <Text role="alert" className="text-sm text-content-error">
+          Select an available model to replace the saved model.
+        </Text>
+      ) : null}
+    </>
   );
+}
+
+function modelSelectionLabel(model: string, options: Array<{ value: string; label: string }>, placeholder: string) {
+  const selected = options.find((option) => option.value === model);
+  if (selected) return { unavailable: false, label: selected.label };
+  if (model === "") return { unavailable: false, label: placeholder };
+  const savedLabel = shortClaudeModelLabel(model) ?? selectableLLMModelLabelFromKey(model);
+  return { unavailable: true, label: `${savedLabel} (unavailable)` };
+}
+
+function modelFieldTestId(fieldName: string | undefined, control: string) {
+  return fieldName ? toTestId(`field-${fieldName}-hosted-${control}`) : undefined;
 }
 
 /** OpenCode agents store llmProvider "custom" while the component field still says openrouter. */

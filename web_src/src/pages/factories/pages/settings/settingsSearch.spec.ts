@@ -25,9 +25,13 @@ describe("searchFactorySettings", () => {
     expect(results[0]?.section).toBe("integrations");
   });
 
-  it("returns LLM Models under Organization for your keys", () => {
+  it("returns Models under Workspace for your keys", () => {
     const results = searchFactorySettings(index, "your keys");
-    expect(results.some((result) => result.title === "LLM Models" && result.section === "models")).toBe(true);
+    expect(
+      results.some(
+        (result) => result.title === "Models" && result.scope === "workspace" && result.section === "models",
+      ),
+    ).toBe(true);
   });
 
   it("returns Billing and not Spending for a billing query", () => {

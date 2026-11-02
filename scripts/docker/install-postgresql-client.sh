@@ -16,20 +16,32 @@ PG_CLIENT_VERSION="17.11-1.pgdg22.04+2"
 
 echo "Installing PostgreSQL Client ${PG_CLIENT_VERSION}"
 
-apt-get update -y
-apt-get install --no-install-recommends -y ca-certificates curl gnupg
+# Retry apt steps. Transient mirror or network errors otherwise fail the image build.
+apt_retry() {
+  attempt=1
+  while [ "$attempt" -lt 5 ]; do
+    if "$@"; then
+      return 0
+    fi
+    echo "Retrying after failure (attempt ${attempt}): $*"
+    attempt=$((attempt + 1))
+    sleep 5
+  done
+  "$@"
+}
+
+apt_retry apt-get update -y
+apt_retry apt-get install --no-install-recommends -y ca-certificates curl gnupg
 
 . /etc/os-release
 echo "deb http://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-# Download the complete key before parsing it. A retried partial response must
-# not append bytes to the stream that GPG reads.
-key_file="$(mktemp)"
-trap 'rm -f "${key_file}"' EXIT
-curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-all-errors -fsSL \
-  https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "${key_file}"
-gpg --batch --yes --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg "${key_file}"
+pg_key=$(mktemp)
+trap 'rm -f "$pg_key"' EXIT
+# Retry transport errors and import the key only after the download completes.
+curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-all-errors -fsSL -o "$pg_key" https://apt.postgresql.org/pub/repos/apt/ACCC4CF8.asc
+gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg "$pg_key"
 
-apt-get update -y
-apt-get install --no-install-recommends -y "postgresql-client-17=${PG_CLIENT_VERSION}"
+apt_retry apt-get update -y
+apt_retry apt-get install --no-install-recommends -y "postgresql-client-17=${PG_CLIENT_VERSION}"
 apt-get clean
 rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*

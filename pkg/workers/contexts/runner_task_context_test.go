@@ -39,6 +39,8 @@ func TestRunnerTaskContextAddsDefaultLogUploadPolicy(t *testing.T) {
 
 	task, err := models.FindRunnerTask(db, taskID)
 	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStatePending, task.State)
+	assert.Nil(t, task.ReadyAt)
 	var stored runnerapi.TaskPayload
 	require.NoError(t, json.Unmarshal(task.PayloadCiphertext, &stored))
 	require.NotNil(t, stored.LogUploadPolicy)

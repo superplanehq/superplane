@@ -1,11 +1,18 @@
 import { useState } from "react";
 
 import { agentToolDisplayText, isCommandTool } from "@/lib/agentToolLabels";
+import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronRight } from "lucide-react";
 
-import type { AgentActivity, AgentActivityItem, AgentContentItem, AgentToolItem } from "./agentActivity";
+import type {
+  AgentActivity,
+  AgentActivityItem,
+  AgentContentItem,
+  AgentNoticeItem,
+  AgentToolItem,
+} from "./agentActivity";
 import { CommandLine } from "./AgentCommandLine";
 import { AnimatedThinkingState } from "./AnimatedThinkingState";
 import {
@@ -87,6 +94,8 @@ function CompletedActivity({
 }) {
   const [open, setOpen] = useState(false);
   const label = completedActivitySummaryLabel(tools);
+  const errors = entries.filter(isCodexErrorNotice);
+  const details = entries.filter((item) => !isCodexErrorNotice(item));
 
   return (
     <div className="space-y-0 px-2" data-testid={`agent-activity-${activity.id}`}>
@@ -99,7 +108,7 @@ function CompletedActivity({
       {open ? (
         <div className="space-y-0.5" data-testid={`agent-activity-details-${activity.id}`}>
           <ActivityEntries
-            entries={entries}
+            entries={details}
             truncated={activity.truncated}
             tone={tone}
             collapseReasoning={collapseReasoning}
@@ -107,6 +116,9 @@ function CompletedActivity({
           />
         </div>
       ) : null}
+      {errors.map((error) => (
+        <CodexErrorNotice key={error.id} notice={error} />
+      ))}
     </div>
   );
 }
@@ -145,6 +157,9 @@ function ActivityEntries({
           }
           return <ReasoningContent key={item.id} item={item} collapseReasoning={collapseReasoning} live={live} />;
         }
+        if (isCodexErrorNotice(item)) {
+          return <CodexErrorNotice key={item.id} notice={item} />;
+        }
         return (
           <p
             key={item.id}
@@ -161,6 +176,19 @@ function ActivityEntries({
         <p className="px-2 text-[11px] leading-4 text-muted-foreground">Some activity details were omitted.</p>
       ) : null}
     </>
+  );
+}
+
+function isCodexErrorNotice(item: AgentActivityItem): item is AgentNoticeItem & { code: "codex_error" } {
+  return item.type === "notice" && item.code === "codex_error";
+}
+
+function CodexErrorNotice({ notice }: { notice: AgentNoticeItem }) {
+  return (
+    <Alert variant="destructive" className="my-2">
+      <AlertTitle>Codex error</AlertTitle>
+      <AlertDescription className="whitespace-pre-wrap break-words">{notice.text}</AlertDescription>
+    </Alert>
   );
 }
 

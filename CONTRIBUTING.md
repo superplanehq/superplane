@@ -11,7 +11,8 @@ the core maintainers first.
 For features, larger bug fixes, or architectural changes:
 
 1. Find or open an issue that describes the change.
-2. Discuss the approach with us on the issue or on [Discord](https://discord.gg/KC78eCNsnw).
+2. Discuss the approach with us on the issue or on
+   [Discord](https://discord.superplane.com).
 3. Wait until a maintainer assigns the issue to you before you start implementation.
 
 This helps us avoid duplicate work. It also makes sure we agree on the
@@ -74,13 +75,23 @@ After the first setup, run `make dev.up` when the stack is not running, then
 `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you
 need a fresh `npm install`, codegen, or migrations.
 
+Billing stays enabled in local development. With `APP_ENV=development`,
+owner setup gives the Demo organization a manual Business plan and $1,000
+in development credit. This uses local billing records and does not create
+a Polar subscription. Other organizations keep normal billing defaults.
+The seed runs only when owner setup creates Demo. It does not reset balances
+when you restart the server or run `make dev.setup` again.
+
+To disable billing enforcement, set `SUPERPLANE_BILLING_ENABLED=no` in `.env`.
+Run `make dev.up`, then run `make dev.server` to apply changed container
+environment values.
+
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
-After owner setup, create the required installation fleets through the admin
-API or admin CLI. Create a personal API token for the installation
-administrator and set `INSTALLATION_ADMIN_TOKEN` in `.env`. The Docker Fleet
-Manager then creates an ephemeral runner for each integrated task. The
-`new_runners` feature is enabled for every organization.
+`make dev.setup` creates the local installation fleet. After owner setup, the
+Docker Fleet Manager generates its credentials and creates ephemeral runners
+for integrated tasks. Set `INSTALLATION_ADMIN_TOKEN` in `.env` only to override
+the generated credentials. The `new_runners` feature is enabled for every organization.
 
 A local dump lets you create a new environment without owner setup or GitHub
 connection. This is the intended path when a script or agent creates local
@@ -103,6 +114,35 @@ Agent.
 Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
 in `.env` only when you need the SuperPlane-hosted provider. See
 [Connecting to third-party services](docs/contributing/connecting-to-3rdparty-services-from-development.md).
+
+## Fleet and runner CLI migration
+
+Use the main `superplane` CLI for organization and installation fleets.
+Organization commands use the selected context. Add `--installation` to use
+installation administration without an organization context. Permission errors
+do not change the scope.
+
+The separate `admin` binary and `.superplane-admin.yaml` configuration are removed.
+Use `.superplane.yaml` contexts or set both `SUPERPLANE_URL` and
+`SUPERPLANE_TOKEN`. If either variable is present, both must be nonempty.
+Without environment credentials, the selected saved context supplies credentials.
+
+Replace these commands:
+
+| Previous command | Main CLI command |
+| --- | --- |
+| `admin fleets list` | `superplane fleets list --installation` |
+| `admin fleets create --file fleet.yaml` | `superplane fleets create --installation --file fleet.yaml` |
+| `admin fleets describe my-fleet` | `superplane fleets describe my-fleet --installation` |
+| `admin fleets update --file fleet.yaml` | `superplane fleets update my-fleet --installation --file fleet.yaml` |
+| `admin tasks list --fleet my-fleet` | `superplane fleets list-tasks --fleet my-fleet --installation` |
+| `admin runners <command> --fleet my-fleet` | `superplane runners <command> --fleet my-fleet --installation` |
+
+Fleet updates require the positional fleet ID. The file can omit `fleetId`.
+If the file includes `fleetId`, it must match the positional ID.
+Use `make cli.build` instead of the removed admin build targets.
+
+For direct runner setup in either scope, see [Runner setup](pkg/runners/README.md#direct-runner-setup).
 
 ## Pull requests
 
@@ -127,7 +167,7 @@ sign-off, and the review process.
 
 ### Contributing
 
-- **[Discord](https://discord.gg/KC78eCNsnw)** - Join our Discord community for discussions, questions, and collaboration
+- **[Discord](https://discord.superplane.com)** - Join our Discord community for discussions, questions, and collaboration
 - **[Issue Tracking](docs/contributing/issue-tracking.md)** - How to report bugs, use the SuperPlane Board, and understand issue types
 - **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits

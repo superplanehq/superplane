@@ -120,7 +120,7 @@ func TestFactoryWorkOrder_AssignOwner(t *testing.T) {
 		require.NoError(t, err)
 		eventsBefore, err := order.ListEvents(db, 0, nil)
 		require.NoError(t, err)
-		assigned, err = order.AssignOwner(db, TaskOwnerAssignment{UserID: userID, Source: TaskOwnerSourceAgent, Reason: "Same owner."})
+		assigned, err = order.AssignOwner(db, TaskOwnerAssignment{UserID: userID, Source: TaskOwnerSourceAgent})
 		require.NoError(t, err)
 		assert.False(t, assigned)
 		after, err := factoryModel.FindWorkOrder(db, order.ID)
@@ -129,6 +129,25 @@ func TestFactoryWorkOrder_AssignOwner(t *testing.T) {
 		eventsAfter, err := order.ListEvents(db, 0, nil)
 		require.NoError(t, err)
 		assert.Equal(t, eventsBefore, eventsAfter)
+
+		runID := uuid.New()
+		assigned, err = order.AssignOwner(db, TaskOwnerAssignment{
+			UserID: userID,
+			Source: TaskOwnerSourceAgent,
+			Reason: "Same owner.",
+			Run:    &factory.RunRef{ID: runID},
+		})
+		require.NoError(t, err)
+		assert.True(t, assigned)
+		after, err = factoryModel.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, before.UpdatedAt, after.UpdatedAt)
+		assert.Equal(t, []uuid.UUID{userID}, after.AssigneeIDs())
+		payload = latestAssigneesUpdated(t, order)
+		assert.Equal(t, "Same owner.", payload.Reason)
+		assert.Equal(t, []factory.UserRef{{ID: userID}}, payload.Assigned)
+		require.NotNil(t, payload.Run)
+		assert.Equal(t, runID, payload.Run.ID)
 	})
 
 	t.Run("rolls assignment and history back with the transaction", func(t *testing.T) {
@@ -151,6 +170,44 @@ func TestFactoryWorkOrder_AssignOwner(t *testing.T) {
 		eventsAfter, err := order.ListEvents(db, 0, nil)
 		require.NoError(t, err)
 		assert.Equal(t, eventsBefore, eventsAfter)
+	})
+
+	t.Run("keeps an existing owner when the assignment must not replace one", func(t *testing.T) {
+		other := createTaskOwnerMember(t, factoryModel.OrganizationID, "Other Person")
+		order, err := factoryModel.CreateWorkOrder(db, "Owned task", "", nil, []uuid.UUID{userID}, nil)
+		require.NoError(t, err)
+		eventsBefore, err := order.ListEvents(db, 0, nil)
+		require.NoError(t, err)
+
+		assigned, err := order.AssignOwner(db, TaskOwnerAssignment{
+			UserID:           other.ID,
+			Source:           TaskOwnerSourceAgent,
+			Reason:           "Issue assignee.",
+			OnlyIfUnassigned: true,
+		})
+		require.ErrorIs(t, err, ErrTaskOwnerAlreadyAssigned)
+		assert.False(t, assigned)
+
+		persisted, err := factoryModel.FindWorkOrder(db, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []uuid.UUID{userID}, persisted.AssigneeIDs())
+		eventsAfter, err := order.ListEvents(db, 0, nil)
+		require.NoError(t, err)
+		assert.Equal(t, eventsBefore, eventsAfter)
+
+		empty, err := factoryModel.CreateWorkOrder(db, "Unowned task", "", nil, nil, nil)
+		require.NoError(t, err)
+		assigned, err = empty.AssignOwner(db, TaskOwnerAssignment{
+			UserID:           other.ID,
+			Source:           TaskOwnerSourceAgent,
+			Reason:           "No owner yet.",
+			OnlyIfUnassigned: true,
+		})
+		require.NoError(t, err)
+		assert.True(t, assigned)
+		persisted, err = factoryModel.FindWorkOrder(db, empty.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []uuid.UUID{other.ID}, persisted.AssigneeIDs())
 	})
 }
 

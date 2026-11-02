@@ -132,6 +132,8 @@ export function ConsoleAutomationCard({
               phase={shownPhase}
               phases={phases.map((entry) => (entry.id === latest.id && shownPhase ? shownPhase : entry))}
               organizationId={organizationId}
+              factoryId={factoryId}
+              orderId={orderId}
               factoryKey={factoryKey}
               orderNumber={orderNumber}
               onStop={stopRun}

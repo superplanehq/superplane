@@ -5,7 +5,28 @@ import { ScheduledIntakeSetupDialog } from "./ScheduledIntakeSetupDialog";
 import { addIntakeTemplatesForOrg } from "./addIntakeTemplates";
 import { FEATURE_FACTORY_SCHEDULED_INTAKE } from "@/lib/experimentalFeatures";
 
-const mocks = vi.hoisted(() => ({ enabled: true, create: vi.fn(), previewError: null as Error | null }));
+const mocks = vi.hoisted(() => ({
+  subscription: false,
+  enabled: true,
+  create: vi.fn(),
+  previewError: null as Error | null,
+}));
+vi.mock("../layout/factoriesLayoutContext", () => ({
+  useOptionalFactoriesLayout: () => ({ factory: { onboarding: { codexSubscription: mocks.subscription } } }),
+}));
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganizationUsers: () => ({
+    data: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
+    isLoading: false,
+  }),
+}));
+vi.mock("@/hooks/useFactoryOwnerEligibility", () => ({
+  useFactoryOwnerEligibility: () => ({
+    data: { members: [{ userId: "alice", eligible: true }] },
+    isPending: false,
+    isError: false,
+  }),
+}));
 vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => mocks.enabled }) }));
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateFactoryAutomation: () => ({ mutateAsync: mocks.create, isPending: false }),
@@ -21,6 +42,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
 }));
 
 beforeEach(() => {
+  mocks.subscription = false;
   mocks.enabled = true;
   mocks.previewError = null;
   mocks.create.mockReset();
@@ -43,6 +65,22 @@ describe("Scheduled intake", () => {
       <ScheduledIntakeSetupDialog organizationId="org" factoryId="factory" onClose={vi.fn()} onCreated={vi.fn()} />,
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  it("passes the required subscription owner through install parameters", async () => {
+    mocks.subscription = true;
+    const user = userEvent.setup();
+    render(
+      <ScheduledIntakeSetupDialog organizationId="org" factoryId="factory" onClose={vi.fn()} onCreated={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: "Create intake" })).toBeDisabled();
+    await user.click(screen.getByRole("combobox", { name: /Default task owner/ }));
+    await user.click(await screen.findByRole("option", { name: "Alice" }));
+    await user.click(screen.getByRole("button", { name: "Create intake" }));
+    await waitFor(() =>
+      expect(mocks.create).toHaveBeenCalledWith(
+        expect.objectContaining({ installParams: expect.objectContaining({ defaultOwnerId: "alice" }) }),
+      ),
+    );
   });
   it("submits schedule and prompt settings and reports the created automation", async () => {
     vi.spyOn(Date.prototype, "getTimezoneOffset").mockReturnValue(-330);

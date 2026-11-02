@@ -5,8 +5,9 @@ import { describe, expect, it, vi } from "bun:test";
 
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { SetupSections } from "./SetupSections";
-import { VcsStep } from "./onboardingSteps";
-import { useOnboardingSetupState } from "./useOnboardingSetupState";
+import { RepositoryStep, VcsStep } from "./onboardingSteps";
+import type { RepositoryBranchPrompt } from "./repositoryBranchPrompt";
+import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 
 function githubConnection(id: string, name: string): OrganizationsIntegration {
   return {
@@ -74,6 +75,52 @@ describe("VcsStep", () => {
     await user.click(screen.getByRole("button", { name: "Connect GitHub" }));
 
     expect(onCreateConnection).toHaveBeenCalledOnce();
+  });
+});
+
+describe("RepositoryStep", () => {
+  it("asks for a default branch when none is known", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const prompt: RepositoryBranchPrompt = {
+      branch: "",
+      choices: ["develop", "master"],
+      hasListedBranches: true,
+      onChange,
+    };
+
+    render(
+      <RepositoryStep
+        setup={{ vcsHost: "github", connected: new Set(["github"]) } as OnboardingSetupApi}
+        repos={["acme/api"]}
+        onSelect={vi.fn()}
+        onEditConnection={vi.fn()}
+        branchPrompt={prompt}
+      />,
+    );
+
+    expect(screen.getByText("Choose the default branch for this repository.")).toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Default branch" }));
+    await user.click(screen.getByRole("option", { name: "master" }));
+    expect(onChange).toHaveBeenCalledWith("master");
+  });
+
+  it("lets the user type a branch when the branch list is empty", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <RepositoryStep
+        setup={{ vcsHost: "github", connected: new Set(["github"]) } as OnboardingSetupApi}
+        repos={["acme/api"]}
+        onSelect={vi.fn()}
+        onEditConnection={vi.fn()}
+        branchPrompt={{ branch: "", choices: [], hasListedBranches: false, onChange }}
+      />,
+    );
+
+    await user.type(screen.getByTestId("onboarding-default-branch"), "trunk");
+    expect(onChange).toHaveBeenCalled();
   });
 });
 

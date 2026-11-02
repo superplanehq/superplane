@@ -1,6 +1,7 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
+import { useOrganizationFleetAccess } from "@/hooks/useOrganizationFleetManagement";
 import { FEATURE_CODEX_SUBSCRIPTIONS, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 
 import {
@@ -14,7 +15,7 @@ import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
 const WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID = "workspace-superplane-mcp-server";
 
 /**
- * Drops nav items whose experimental features are off, and skips any group
+ * Drops nav items whose experimental features are absent, and skips any group
  * left with no items. The source groups stay static so other consumers
  * (e.g. route lookups) keep seeing the full, approved list.
  */
@@ -43,15 +44,24 @@ function visibleFactorySettingsNavGroups(
 
 /**
  * Settings nav groups the current user can open: permission-gated items are
- * removed, then items behind experimental features that are off.
+ * removed, then items with unavailable experimental features.
  */
 export function useVisibleFactorySettingsNavGroups(organizationId: string): FactorySettingsNavGroup[] {
   const settingsNavGroups = useFactorySettingsNavGroups();
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const billingProductEnabled = useBillingProductEnabled();
+  const fleetAccess = useOrganizationFleetAccess(organizationId);
   const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, hasPermission, permissionsLoading);
-  const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
+  const featureVisible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
+  const visible = fleetAccess.showNavigation
+    ? featureVisible
+    : featureVisible
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) => item.id !== "organization-fleets"),
+        }))
+        .filter((group) => group.items.length > 0);
   if (billingProductEnabled) {
     return visible;
   }

@@ -77,6 +77,7 @@ func TestStartWorkersDoesNotRequireRegularWorkerDependenciesWhenDisabled(t *test
 	t.Setenv("START_REGULAR_WORKERS", "no")
 	t.Setenv("START_RUNNER_LOG_COMPACTOR", "")
 	t.Setenv("START_RUNNER_CLEANUP_WORKER", "")
+	t.Setenv("START_RUNNER_TASK_SCHEDULER", "")
 	t.Setenv("RABBITMQ_URL", "")
 
 	startWorkers(nil, nil, nil, "", nil, nil, nil)
@@ -87,6 +88,7 @@ func TestNewRunnerActiveLogStoreUsesConfiguredPath(t *testing.T) {
 	t.Setenv("START_RUNNER_API", "")
 	t.Setenv("START_RUNNER_LOG_COMPACTOR", "")
 	t.Setenv("START_RUNNER_CLEANUP_WORKER", "")
+	t.Setenv("START_RUNNER_TASK_SCHEDULER", "")
 
 	store, err := newRunnerActiveLogStore()
 	if err != nil {

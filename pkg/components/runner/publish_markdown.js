@@ -12,8 +12,8 @@ async function publishMarkdown(input, env = process.env, fetchImpl = fetch) {
   const title = String((input && input.title) || "").trim();
   const key = String((input && input.key) || "").trim();
   const baseURL = requiredEnv("SUPERPLANE_BASE_URL", env).replace(/\/$/, "");
-  const token = requiredEnv("SUPERPLANE_ARTIFACT_TOKEN", env);
-  const response = await fetchImpl(`${baseURL}/api/v1/runner/artifacts/markdown`, {
+  const token = requiredEnv("SUPERPLANE_RUNNER_TOKEN", env);
+  const response = await fetchImpl(`${baseURL}/api/v1/runner/task/markdown`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

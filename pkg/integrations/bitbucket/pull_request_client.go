@@ -79,6 +79,26 @@ func (c *Client) GetMainBranch(repository string) (string, error) {
 	return response.MainBranch.Name, nil
 }
 
+// RepositoryHasBranches reports whether the repository has at least one branch.
+// An empty repository returns false.
+func (c *Client) RepositoryHasBranches(repository string) (bool, error) {
+	path, err := repositoryPath(repository)
+	if err != nil {
+		return false, err
+	}
+
+	var response struct {
+		Values []struct {
+			Name string `json:"name"`
+		} `json:"values"`
+	}
+	endpoint := fmt.Sprintf("%s/repositories/%s/refs/branches?pagelen=1", baseURL, path)
+	if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &response); err != nil {
+		return false, err
+	}
+	return len(response.Values) > 0, nil
+}
+
 // GetBranchHead returns the head commit SHA of a branch.
 func (c *Client) GetBranchHead(repository, branch string) (string, error) {
 	path, err := repositoryPath(repository)

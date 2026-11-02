@@ -299,8 +299,8 @@ func workspaceSlugFromGrants(grants map[string]permissionRecord, fallback string
 }
 
 func defaultBranch(branch *Branch) string {
-	if branch == nil || strings.TrimSpace(branch.Name) == "" {
-		return "main"
+	if branch == nil {
+		return ""
 	}
 	return strings.TrimSpace(branch.Name)
 }

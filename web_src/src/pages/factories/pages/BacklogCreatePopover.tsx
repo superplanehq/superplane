@@ -9,6 +9,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { FilePlus, Loader2, Plus } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
+import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { useBacklogCreateConnection } from "./useBacklogCreateConnection";
+
 import {
   BACKLOG_CREATE_COPY,
   searchPlaceholderForIntake,
@@ -371,7 +374,30 @@ type BacklogCreatePopoverProps = {
   errorMessage?: string;
 };
 
-export function BacklogCreatePopover({
+export function BacklogCreatePopover(props: BacklogCreatePopoverProps) {
+  const layout = useOptionalFactoriesLayout();
+  if (layout?.factory?.onboarding?.codexSubscription) {
+    return (
+      <SubscriptionBacklogCreatePopover
+        {...props}
+        organizationId={layout.organizationId}
+        factoryId={layout.factoryId}
+      />
+    );
+  }
+  return <BacklogCreateMenu {...props} />;
+}
+
+function SubscriptionBacklogCreatePopover({
+  organizationId,
+  factoryId,
+  ...props
+}: BacklogCreatePopoverProps & { organizationId: string; factoryId: string }) {
+  const prepareOpen = useBacklogCreateConnection(organizationId, factoryId);
+  return <BacklogCreateMenu {...props} onBeforeOpen={prepareOpen} />;
+}
+
+function BacklogCreateMenu({
   canAdd,
   atCapacity = false,
   variant = "icon",
@@ -389,8 +415,10 @@ export function BacklogCreatePopover({
   hasMore = false,
   onLoadMore,
   errorMessage,
-}: BacklogCreatePopoverProps) {
+  onBeforeOpen,
+}: BacklogCreatePopoverProps & { onBeforeOpen?: () => Promise<boolean> }) {
   const [open, setOpen] = useState(false);
+  const opening = useRef(false);
   const resultsRef = useRef<HTMLDivElement>(null);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore,
@@ -408,14 +436,20 @@ export function BacklogCreatePopover({
     onQueryChange("");
   };
 
-  const openMenu = () => {
-    if (!canAdd) {
+  const openMenu = async () => {
+    if (!canAdd || opening.current) {
       return;
     }
-    setOpen(true);
-    const firstIntakeId = sources[0]?.intakeId;
-    if (firstIntakeId) {
-      onFocusedIntakeChange(firstIntakeId);
+    opening.current = true;
+    try {
+      if (onBeforeOpen && !(await onBeforeOpen())) return;
+      setOpen(true);
+      const firstIntakeId = sources[0]?.intakeId;
+      if (firstIntakeId) {
+        onFocusedIntakeChange(firstIntakeId);
+      }
+    } finally {
+      opening.current = false;
     }
   };
 
@@ -445,7 +479,7 @@ export function BacklogCreatePopover({
           return;
         }
         if (nextOpen) {
-          openMenu();
+          void openMenu();
           return;
         }
         close();

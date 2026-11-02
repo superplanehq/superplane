@@ -117,5 +117,4 @@ var defaultRunTitleExpressions = map[string]string{
 	"slack.onAppMention":                  "{{ root().data.event.text }}",
 	"teams.onMention":                     "{{ root().data.text }}",
 	"teams.onMessage":                     "{{ root().data.text }}",
-	"telegram.onMention":                  "{{ root().data.text }}",
 }

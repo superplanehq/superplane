@@ -1,5 +1,7 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
 
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { FLEET_MANAGER_VALUES_FILE } from "@/lib/fleetManagerSetup";
 import { CopyButton } from "@/ui/CopyButton";
 
@@ -110,12 +112,56 @@ export function FleetManagerCommandBlock({
   return <SetupCodeBlock code={code} language={language} copyLabel={copyLabel} />;
 }
 
+function FleetManagerKubeContextField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="fleet-manager-kube-context">Kubernetes context</Label>
+      <Input
+        id="fleet-manager-kube-context"
+        value={value}
+        onChange={(event) => onChange(event.target.value.replace(/[\r\n]/g, ""))}
+        autoComplete="off"
+        spellCheck={false}
+        aria-describedby="fleet-manager-kube-context-help"
+      />
+      <p id="fleet-manager-kube-context-help" className="text-xs leading-5 text-muted-foreground">
+        Run kubectl config current-context. The install command uses this context.
+      </p>
+    </div>
+  );
+}
+
+export function FleetManagerHelmInstall({
+  kubeContext,
+  onKubeContextChange,
+  helmCommand,
+}: {
+  kubeContext: string;
+  onKubeContextChange: (value: string) => void;
+  helmCommand: string | null;
+}) {
+  return (
+    <div className="space-y-3">
+      <FleetManagerKubeContextField value={kubeContext} onChange={onKubeContextChange} />
+      {helmCommand ? (
+        <FleetManagerCommandBlock code={helmCommand} language="shell" copyLabel="Copy install command" />
+      ) : (
+        <p className="text-sm text-muted-foreground">Enter the Kubernetes context to build the install command.</p>
+      )}
+    </div>
+  );
+}
+
 export function FleetManagerInstallCommands({
   valuesCommand,
   helmCommand,
+  kubeContext,
+  onKubeContextChange,
 }: {
   valuesCommand: string;
-  helmCommand: string;
+  helmCommand: string | null;
+  kubeContext: string;
+  onKubeContextChange: (value: string) => void;
 }) {
   return (
     <div className="space-y-5" data-testid="fleet-manager-install-command">
@@ -132,10 +178,16 @@ export function FleetManagerInstallCommands({
         <h3 id="fleet-install-command" className="text-sm font-medium">
           2. Install the chart
         </h3>
-        <p className="text-xs leading-5 text-muted-foreground">
-          Run this command in the same directory. It reads {FLEET_MANAGER_VALUES_FILE}.
-        </p>
-        <FleetManagerCommandBlock code={helmCommand} language="shell" copyLabel="Copy install command" />
+        {helmCommand ? (
+          <p className="text-xs leading-5 text-muted-foreground">
+            Run this command in the same directory. It reads {FLEET_MANAGER_VALUES_FILE}.
+          </p>
+        ) : null}
+        <FleetManagerHelmInstall
+          kubeContext={kubeContext}
+          onKubeContextChange={onKubeContextChange}
+          helmCommand={helmCommand}
+        />
       </section>
     </div>
   );

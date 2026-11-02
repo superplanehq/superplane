@@ -295,32 +295,15 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
   });
 
-  it("reveals subscription sign-in with own-key choices and switches back to hosted models", async () => {
+  it("offers hosted and provider keys without subscription setup", async () => {
     const user = userEvent.setup();
-    const startCodexConnection = vi.fn();
-    renderStatefulSetup({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      bringYourOwnKey: true,
-      codexSubscriptionOffered: true,
-      startCodexConnection,
-    });
+    renderStatefulSetup({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKey: true });
 
-    expect(screen.queryByRole("button", { name: /Use your ChatGPT subscription/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Use your own key or subscription" }));
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.agent.ownKey }));
     expect(screen.getByTestId("agent-step")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Connect ChatGPT" }));
-
-    expect(startCodexConnection).toHaveBeenCalledOnce();
-    expect(screen.queryByTestId("agent-step")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
-
+    expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Use your ChatGPT subscription")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) }));
-    expect(screen.queryByTestId("first-run-codex-subscription")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-finish-setup")).toBeEnabled();
   });
 
@@ -347,16 +330,15 @@ describe("FirstRunSetup chrome", () => {
     await act(async () => complete());
   });
 
-  it.each(["own-key", "subscription"] as const)(
+  it.each(["own-key", "hosted"] as const)(
     "requires a provider model only for own-key credentials (%s)",
     (agentCredentialChoice) => {
       renderSetup(
         pageModel({
           hostedModelsAvailable: true,
+          hostedAgentReady: true,
           bringYourOwnKey: true,
           agentCredentialChoice,
-          codexSubscriptionOffered: true,
-          codexSubscriptionReady: true,
           agentModelPicker: {
             models: [],
             value: "",
@@ -399,23 +381,6 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await waitFor(() => expect(model.finish).toHaveBeenCalled());
     expect(screen.queryByTestId("first-run-model-source")).not.toBeInTheDocument();
-  });
-
-  it("offers ChatGPT after intake without offering unavailable provider keys", async () => {
-    const user = userEvent.setup();
-    const model = pageModel({
-      hostedAgentReady: true,
-      hostedModelsAvailable: true,
-      codexSubscriptionOffered: true,
-    });
-    renderSetup(model);
-    await user.click(screen.getByTestId("first-run-analyze-tickets"));
-
-    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
-    expect(model.finish).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: FIRST_RUN_COPY.agent.ownKey })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agent-step")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.agent.subscription })).toBeInTheDocument();
   });
 
   it("hides the model source when only a provider key can run the agent", () => {
@@ -557,7 +522,7 @@ describe("FirstRunSetup chrome", () => {
     "returns unpaid agent setup to billing when starter plans are missing (%j)",
     async ({ availablePlans }) => {
       Object.assign(billingState, { enabled: true, availablePlans });
-      const model = hostedVcsModel({ codexSubscriptionOffered: true, codexSubscriptionReady: true });
+      const model = hostedVcsModel();
       renderSetup(model, "/org-1/workspaces/PAY/setup?step=agent");
 
       expect(await screen.findByTestId("first-run-card")).toBeInTheDocument();

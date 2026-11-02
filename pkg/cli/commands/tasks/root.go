@@ -197,6 +197,70 @@ Example:
 		assignees: &taskAssignAssignees,
 	}, options)
 
+	var (
+		taskSuggestWorkspace string
+		taskSuggestTaskID    string
+		taskSuggestPaths     []string
+	)
+
+	taskSuggestCmd := &cobra.Command{
+		Use:   "suggest-owners",
+		Short: "List people who can own a task",
+		Long: `List the people who can own a task.
+
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
+
+--path is a repository path. Repeat it for each path the change touches.
+SuperPlane uses the first 10 paths and ranks members who changed them.
+Without --path, the command lists members only.
+
+Example:
+  superplane tasks suggest-owners --workspace super --task 1823 --path pkg/payments`,
+		Args: cobra.NoArgs,
+	}
+	taskSuggestCmd.Flags().StringVar(&taskSuggestWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	bindTaskIDFlag(taskSuggestCmd, &taskSuggestTaskID)
+	taskSuggestCmd.Flags().StringArrayVar(&taskSuggestPaths, "path", nil, "repository path (repeatable, at most 10)")
+	core.Bind(taskSuggestCmd, &taskSuggestOwnersCommand{
+		workspace: &taskSuggestWorkspace,
+		taskID:    &taskSuggestTaskID,
+		paths:     &taskSuggestPaths,
+	}, options)
+
+	var (
+		taskCloseWorkspace string
+		taskCloseTaskID    string
+		taskCloseResult    string
+	)
+
+	taskCloseCmd := &cobra.Command{
+		Use:   "close",
+		Short: "Close a task",
+		Long: `Close a task.
+
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
+
+--result is completed, rejected, or failed. The default is completed.
+A draft task can be rejected. An open task can be completed, rejected, or failed.
+
+Example:
+  superplane tasks close --workspace super --task 1823 --result rejected`,
+		Args: cobra.NoArgs,
+	}
+	taskCloseCmd.Flags().StringVar(&taskCloseWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	bindTaskIDFlag(taskCloseCmd, &taskCloseTaskID)
+	taskCloseCmd.Flags().StringVar(&taskCloseResult, "result", "completed", "completed, rejected, or failed")
+	_ = taskCloseCmd.MarkFlagRequired("task")
+	core.Bind(taskCloseCmd, &taskCloseCommand{
+		workspace: &taskCloseWorkspace,
+		taskID:    &taskCloseTaskID,
+		result:    &taskCloseResult,
+	}, options)
+
 	artifactCmd := &cobra.Command{
 		Use:     "artifacts",
 		Short:   "Manage task artifacts",
@@ -297,14 +361,51 @@ Example:
 		taskID:    &artifactListTaskID,
 	}, options)
 
+	var (
+		artifactRemoveWorkspace string
+		artifactRemoveTaskID    string
+		artifactRemoveKey       string
+		artifactRemoveTitle     string
+	)
+	artifactRemoveCmd := &cobra.Command{
+		Use:   "remove",
+		Short: "Remove one artifact from a task",
+		Long: `Remove one artifact from a task.
+
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
+
+Pass --key or --title. --key selects that artifact. --title selects the newest
+artifact with that title and no key.
+
+Example:
+  superplane tasks artifacts remove --workspace super --task 1823 --title PLAN.md`,
+		Args: cobra.NoArgs,
+	}
+	artifactRemoveCmd.Flags().StringVar(&artifactRemoveWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	artifactRemoveCmd.Flags().StringVar(&artifactRemoveTaskID, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
+	artifactRemoveCmd.Flags().StringVar(&artifactRemoveKey, "key", "", "artifact key")
+	artifactRemoveCmd.Flags().StringVar(&artifactRemoveTitle, "title", "", "artifact title, when the artifact has no key")
+	_ = artifactRemoveCmd.MarkFlagRequired("task")
+	core.Bind(artifactRemoveCmd, &artifactRemoveCommand{
+		workspace: &artifactRemoveWorkspace,
+		taskID:    &artifactRemoveTaskID,
+		key:       &artifactRemoveKey,
+		title:     &artifactRemoveTitle,
+	}, options)
+
 	artifactCmd.AddCommand(artifactAddCmd)
 	artifactCmd.AddCommand(artifactListCmd)
+	artifactCmd.AddCommand(artifactRemoveCmd)
 
 	root.AddCommand(taskListCmd)
 	root.AddCommand(taskDescribeCmd)
 	root.AddCommand(taskCreateCmd)
 	root.AddCommand(taskDispatchCmd)
 	root.AddCommand(taskAssignCmd)
+	root.AddCommand(taskSuggestCmd)
+	root.AddCommand(taskCloseCmd)
 	root.AddCommand(artifactCmd)
 
 	return root

@@ -1,3 +1,4 @@
+import { useCodexActionGuard } from "@/pages/factories/codex/codexActionContext";
 import {
   factoriesAddWorkOrderComment,
   factoriesCloseWorkOrder,
@@ -594,6 +595,7 @@ export function useDeleteFactory(organizationId: string) {
 
 export function useCreateWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
+  const guardCodexAction = useCodexActionGuard(organizationId, factoryId);
 
   return useMutation({
     mutationFn: async (input: {
@@ -603,23 +605,25 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
       unassigned?: boolean;
       model?: string;
     }) => {
-      const response = await factoriesCreateWorkOrder(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-          body: {
-            title: input.title,
-            description: input.description,
-            assigneeIds: input.assigneeIds,
-            ...(input.unassigned ? { unassigned: true } : {}),
-            ...(input.model ? { model: input.model } : {}),
-          },
-        }),
-      );
-      if (!response.data?.order) {
-        throw new Error("Failed to create task");
-      }
-      return response.data.order;
+      return guardCodexAction(async () => {
+        const response = await factoriesCreateWorkOrder(
+          withOrganizationHeader({
+            organizationId,
+            path: { factoryId },
+            body: {
+              title: input.title,
+              description: input.description,
+              assigneeIds: input.assigneeIds,
+              ...(input.unassigned ? { unassigned: true } : {}),
+              ...(input.model ? { model: input.model } : {}),
+            },
+          }),
+        );
+        if (!response.data?.order) {
+          throw new Error("Failed to create task");
+        }
+        return response.data.order;
+      });
     },
     onSuccess: (order) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
@@ -680,22 +684,25 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
 
 export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
+  const guardCodexAction = useCodexActionGuard(organizationId, factoryId);
 
   return useMutation({
     mutationFn: async (input: { orderId: string; assigneeIds: string[] }) => {
-      const response = await factoriesUpdateWorkOrderAssignees(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId, orderId: input.orderId },
-          body: {
-            assigneeIds: input.assigneeIds,
-          },
-        }),
-      );
-      if (!response.data?.order) {
-        throw new Error("Failed to update task assignees");
-      }
-      return response.data.order;
+      return guardCodexAction(async () => {
+        const response = await factoriesUpdateWorkOrderAssignees(
+          withOrganizationHeader({
+            organizationId,
+            path: { factoryId, orderId: input.orderId },
+            body: {
+              assigneeIds: input.assigneeIds,
+            },
+          }),
+        );
+        if (!response.data?.order) {
+          throw new Error("Failed to update task assignees");
+        }
+        return response.data.order;
+      });
     },
     onSuccess: (order, variables) => {
       void queryClient.invalidateQueries({ queryKey: ["factories", organizationId, factoryId, "owner-eligibility"] });
@@ -717,6 +724,7 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
 
 export function useDispatchWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
+  const guardCodexAction = useCodexActionGuard(organizationId, factoryId);
 
   return useMutation({
     mutationFn: async (input: {
@@ -727,37 +735,39 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       model?: string;
       thinkingLevel?: string;
     }) => {
-      const current =
-        queryClient.getQueryData<FactoriesWorkOrder>(workOrderDetailKey(organizationId, factoryId, input.orderId)) ??
-        cachedWorkOrderFromLists(queryClient, organizationId, factoryId, input.orderId);
-      if (current?.pendingHandoff) {
-        const response = await factoriesResumeHandOffWorkOrder(
+      return guardCodexAction(async () => {
+        const current =
+          queryClient.getQueryData<FactoriesWorkOrder>(workOrderDetailKey(organizationId, factoryId, input.orderId)) ??
+          cachedWorkOrderFromLists(queryClient, organizationId, factoryId, input.orderId);
+        if (current?.pendingHandoff) {
+          const response = await factoriesResumeHandOffWorkOrder(
+            withOrganizationHeader({
+              organizationId,
+              path: { factoryId, orderId: input.orderId },
+              body: { model: input.model, thinkingLevel: input.thinkingLevel },
+            }),
+          );
+          if (!response.data?.order) throw new Error("Could not start the pending handoff.");
+          return response.data.order;
+        }
+        const response = await factoriesDispatchWorkOrder(
           withOrganizationHeader({
             organizationId,
             path: { factoryId, orderId: input.orderId },
-            body: { model: input.model, thinkingLevel: input.thinkingLevel },
+            body: {
+              lineName: input.lineName,
+              startStepIndex: input.startStepIndex,
+              replaceActive: input.replaceActive,
+              model: input.model,
+              thinkingLevel: input.thinkingLevel,
+            },
           }),
         );
-        if (!response.data?.order) throw new Error("Could not start the pending handoff.");
+        if (!response.data?.order) {
+          throw new Error("Failed to dispatch task");
+        }
         return response.data.order;
-      }
-      const response = await factoriesDispatchWorkOrder(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId, orderId: input.orderId },
-          body: {
-            lineName: input.lineName,
-            startStepIndex: input.startStepIndex,
-            replaceActive: input.replaceActive,
-            model: input.model,
-            thinkingLevel: input.thinkingLevel,
-          },
-        }),
-      );
-      if (!response.data?.order) {
-        throw new Error("Failed to dispatch task");
-      }
-      return response.data.order;
+      });
     },
     // Dispatch is synchronous on the server, but the UI would otherwise wait
     // for the whole-factory ListWorkOrders refetch triggered by onSuccess
