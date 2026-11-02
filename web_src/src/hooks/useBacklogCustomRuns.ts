@@ -46,7 +46,9 @@ async function refreshHistory(
   const { recentRuns, latestRunId } = await loadRecentRuns(organizationId, canvasId, signal, cached?.latestRunId);
   // Older completed runs are immutable. Only task-linked active runs need details.
   const activeRuns = (cached?.runs ?? []).filter(
-    (entry) => isActiveCanvasRun(entry.run) && !recentRuns.some((run) => run.id === entry.run.id),
+    (entry) =>
+      (isActiveCanvasRun(entry.run) || entry.run.state === "STATE_CANCELLING") &&
+      !recentRuns.some((run) => run.id === entry.run.id),
   );
   const updatedRuns = await Promise.all(
     activeRuns.map(async (entry) => {
