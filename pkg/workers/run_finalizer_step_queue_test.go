@@ -532,7 +532,7 @@ func Test__StepQueue_InvalidNextStagePreservesCompletionAndAllowsCorrection(t *t
 	notes, err := stored.StatusNotes()
 	require.NoError(t, err)
 	require.Len(t, notes, 1)
-	assert.Equal(t, models.ErrSubscriptionModelUnavailable.Error(), notes[0].Body)
+	assert.Equal(t, models.SubscriptionModelUnavailableError("stage-model").Error(), notes[0].Body)
 
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "stage-model"}}, time.Now()))
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {

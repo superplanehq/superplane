@@ -71,6 +71,16 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 	if err := order.RequireExecutionOwner(tx, true); err != nil {
 		return nil, err
 	}
+	existing, err := FindPlanningSessionByRun(tx, params.CanvasRunID)
+	if err == nil && !analysisSessionMatchesWorkOrder(existing, params.WorkOrderID) {
+		return nil, ErrFactoryPlanningSessionInvalid
+	}
+	if err != nil && !errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return nil, err
+	}
+	if err := order.RecordRefinementRun(tx, params.CanvasRunID); err != nil {
+		return nil, err
+	}
 	override := ""
 	if order.RefinementModel != nil {
 		override = *order.RefinementModel
@@ -78,18 +88,8 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 	if err := order.ValidateSubscriptionCanvasModels(tx, params.CanvasID, override); err != nil {
 		return nil, err
 	}
-	existing, err := FindPlanningSessionByRun(tx, params.CanvasRunID)
-	if err == nil {
-		if !analysisSessionMatchesWorkOrder(existing, params.WorkOrderID) {
-			return nil, ErrFactoryPlanningSessionInvalid
-		}
-		if err := order.RecordRefinementRun(tx, params.CanvasRunID); err != nil {
-			return nil, err
-		}
+	if existing != nil {
 		return existing, nil
-	}
-	if !errors.Is(err, ErrFactoryPlanningSessionNotFound) {
-		return nil, err
 	}
 
 	existing, err = FindPlanningSessionByDraftWorkOrder(tx, f.OrganizationID, f.ID, params.WorkOrderID)
@@ -104,9 +104,6 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 			return nil, err
 		}
 		if err := existing.AttachAgentRun(tx, params.CanvasRunID, existing.SelectableModelKey); err != nil {
-			return nil, err
-		}
-		if err := order.RecordRefinementRun(tx, params.CanvasRunID); err != nil {
 			return nil, err
 		}
 		return existing, nil
@@ -141,9 +138,6 @@ func (f *Factory) AttachAnalysisSession(tx *gorm.DB, params AttachAnalysisSessio
 		return FindPlanningSessionByDraftWorkOrder(tx, f.OrganizationID, f.ID, params.WorkOrderID)
 	}
 	if err := session.attachRefineDraft(tx, order); err != nil {
-		return nil, err
-	}
-	if err := order.RecordRefinementRun(tx, params.CanvasRunID); err != nil {
 		return nil, err
 	}
 	return session, nil

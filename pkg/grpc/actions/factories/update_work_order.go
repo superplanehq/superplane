@@ -2,8 +2,11 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/google/uuid"
 
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -12,6 +15,7 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
+	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
 
 	log "github.com/sirupsen/logrus"
@@ -50,6 +54,7 @@ func UpdateWorkOrder(
 	}
 	orderID := resolvedOrder.ID
 	var bound storedfiles.BindResult
+	var planningEvents []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -72,6 +77,12 @@ func UpdateWorkOrder(
 		if err := order.UpdateContent(tx, title, description); err != nil {
 			return err
 		}
+		if req.RefinementModel != nil {
+			planningEvents, err = restartFailedPlanningAfterModelSave(tx, factory, order)
+			if err != nil {
+				return err
+			}
+		}
 		if description == nil {
 			return nil
 		}
@@ -92,6 +103,12 @@ func UpdateWorkOrder(
 	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order")
+	}
+	for i := range planningEvents {
+		event := &planningEvents[i]
+		if err := messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), orgID.String(), event).Publish(); err != nil {
+			log.WithError(err).Warnf("Failed to publish planning event %s", event.ID)
+		}
 	}
 
 	if err := messages.PublishFactoryWorkOrderUpdated(
@@ -118,6 +135,47 @@ func UpdateWorkOrder(
 	}
 
 	return &pb.UpdateWorkOrderResponse{Order: serialized}, nil
+}
+
+func restartFailedPlanningAfterModelSave(tx *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder) ([]models.CanvasEvent, error) {
+	if order.State != models.FactoryWorkOrderStateDraft || !factory.PlanningEnabled {
+		return nil, nil
+	}
+	_, err := models.FindPlanningSessionByDraftWorkOrder(tx, factory.OrganizationID, factory.ID, order.ID)
+	if err == nil {
+		return nil, nil
+	}
+	if !errors.Is(err, models.ErrFactoryPlanningSessionNotFound) {
+		return nil, err
+	}
+	canvases, err := factory.ListCanvases(tx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, 0, len(canvases))
+	for i := range canvases {
+		if canvases[i].LiveVersionID != nil {
+			ids = append(ids, canvases[i].ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	backlogIDs := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if spec, ok := specs[id]; ok && models.IsBacklogFactoryApp(spec.Nodes, spec.Edges) {
+			backlogIDs = append(backlogIDs, id)
+		}
+	}
+	run, err := order.LatestBacklogRefinementRun(tx, backlogIDs)
+	if err != nil || run == nil || run.Result != models.CanvasRunResultFailed {
+		return nil, err
+	}
+	return workersctx.CreateWorkOrderEventsOnCanvas(tx, factory, order, run.WorkflowID)
 }
 
 func workOrderContentFromRequest(req *pb.UpdateWorkOrderRequest) (*string, *string, error) {
