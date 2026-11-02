@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -187,7 +188,7 @@ func UpdateFactoryCustomAutomation(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
-	if err := preserveCustomAutomationRunnerIdentity(db, canvas, doc); err != nil {
+	if err := preserveCustomAutomationNodeIdentities(db, canvas, doc); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update custom automation")
 	}
 	nodes, edges, err := doc.ParseInTransaction(deps.Registry, orgID.String(), db)
@@ -233,6 +234,7 @@ type customAutomationSettings struct {
 	Steps                   []runner.AgentStep
 	Icon                    string
 	ExecutionTimeoutSeconds int
+	Schedule                *pb.FactoryCustomAutomation_Schedule
 }
 
 func parseCustomAutomationSettings(
@@ -244,8 +246,25 @@ func parseCustomAutomationSettings(
 		return nil, invalidArgument("settings are required")
 	}
 	if input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_MANUAL &&
-		input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
-		return nil, invalidArgument("start mode must be manual or automatic")
+		input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC &&
+		input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		return nil, invalidArgument("Choose Manual, Automatic, or Schedule.")
+	}
+	var scheduleSettings *pb.FactoryCustomAutomation_Schedule
+	if input.GetStartMode() == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		if input.GetSchedule() == nil {
+			return nil, invalidArgument("Enter a cron expression and UTC offset.")
+		}
+		config, err := scheduledIntakeSchedule(map[string]string{
+			"type": "cron", "cronExpression": input.GetSchedule().GetCronExpression(),
+			"timezone": strconv.FormatFloat(input.GetSchedule().GetUtcOffset(), 'f', -1, 64),
+		})
+		if err != nil {
+			return nil, err
+		}
+		scheduleSettings = &pb.FactoryCustomAutomation_Schedule{
+			CronExpression: *config.CronExpression, UtcOffset: input.GetSchedule().GetUtcOffset(),
+		}
 	}
 
 	agent, err := customAutomationAgent(tx, factory, input.GetAgent())
@@ -285,6 +304,7 @@ func parseCustomAutomationSettings(
 	}
 	return &customAutomationSettings{
 		StartMode:               input.GetStartMode(),
+		Schedule:                scheduleSettings,
 		Agent:                   agent,
 		Steps:                   steps,
 		Icon:                    strings.TrimSpace(input.GetIcon()),
@@ -376,6 +396,20 @@ func buildCustomAutomationCanvas(
 	if provider == models.ProviderGitHub {
 		triggerConfiguration["ignoreDrafts"] = true
 	}
+	triggerID := customAutomationTriggerID
+	triggerName := "On Pull Request"
+	triggerComponent := prFeedbackTriggerComponent(provider)
+	triggerIntegration := &yaml.IntegrationRef{ID: integrationID}
+	if settings.StartMode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		// A new identity retires the old scheduling chain through canvas publication.
+		// Never reuse a deleted identity: its pending requests can still exist.
+		triggerID = "schedule-" + uuid.NewString()
+		triggerName, triggerComponent, triggerIntegration = "Schedule", "schedule", nil
+		triggerConfiguration = map[string]any{
+			"type": "cron", "cronExpression": settings.Schedule.GetCronExpression(),
+			"timezone": strconv.FormatFloat(settings.Schedule.GetUtcOffset(), 'f', -1, 64),
+		}
+	}
 	environmentFrom := []any{
 		map[string]any{
 			"source":      runner.CredentialsSourceIntegration,
@@ -393,7 +427,7 @@ func buildCustomAutomationCanvas(
 		"executionTimeoutSeconds": settings.ExecutionTimeoutSeconds,
 		"steps":                   customAutomationStepConfiguration(settings.Steps),
 		"environmentFrom":         environmentFrom,
-		"environment":             customAutomationCheckoutEnvironment(factory),
+		"environment":             customAutomationCheckoutEnvironment(factory, settings.StartMode),
 	}
 	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
 		runnerConfiguration["credentials"] = credentials
@@ -408,17 +442,17 @@ func buildCustomAutomationCanvas(
 		Kind:       yaml.KindCanvas,
 		Metadata: &yaml.CanvasMetadata{
 			Name:        name,
-			Description: "Run a focused prompt and Bash automation for a task pull request.",
+			Description: "Run ordered prompt and Bash automation steps.",
 		},
 		Spec: &yaml.CanvasSpec{
 			Nodes: []yaml.Node{
 				{
-					ID:            customAutomationTriggerID,
-					Name:          "On Pull Request",
+					ID:            triggerID,
+					Name:          triggerName,
 					Type:          yaml.NodeTypeTrigger,
-					Component:     prFeedbackTriggerComponent(provider),
+					Component:     triggerComponent,
 					Configuration: triggerConfiguration,
-					Integration:   &yaml.IntegrationRef{ID: integrationID},
+					Integration:   triggerIntegration,
 					Metadata:      metadata,
 					Position:      yaml.Position{X: 120, Y: 240},
 				},
@@ -432,11 +466,14 @@ func buildCustomAutomationCanvas(
 				},
 			},
 			Edges: []yaml.Edge{
-				{SourceID: customAutomationTriggerID, TargetID: customAutomationRunnerID, Channel: "default"},
+				{SourceID: triggerID, TargetID: customAutomationRunnerID, Channel: "default"},
 			},
 		},
 	}
 	if settings.ColumnKey == models.CanvasColumnKeyBacklog {
+		if settings.StartMode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+			return nil, invalidArgument("Use Schedule only on a Verify automation.")
+		}
 		trigger := &doc.Spec.Nodes[0]
 		trigger.ID = customAutomationTaskTriggerID
 		trigger.Name = "On Task"
@@ -455,7 +492,7 @@ func buildCustomAutomationCanvas(
 	return doc, nil
 }
 
-func customAutomationCheckoutEnvironment(factory *models.Factory) []any {
+func customAutomationCheckoutEnvironment(factory *models.Factory, mode pb.FactoryCustomAutomation_StartMode) []any {
 	config := factory.OnboardingConfigValue()
 	repository := strings.TrimSpace(config.AppRepository)
 	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository)
@@ -463,8 +500,10 @@ func customAutomationCheckoutEnvironment(factory *models.Factory) []any {
 		checkoutEnvironmentVar("REPO", repository),
 		checkoutEnvironmentVar("REPO_URL", url),
 		checkoutEnvironmentVar("SOURCE_REPO", repository),
-		checkoutEnvironmentVar("PR_NUMBER", prFeedbackPRNumberExpression()),
-		checkoutEnvironmentVar("PR_HEAD", prFeedbackPRHeadExpression()),
+	}
+	if mode != pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		env = append(env, checkoutEnvironmentVar("PR_NUMBER", prFeedbackPRNumberExpression()),
+			checkoutEnvironmentVar("PR_HEAD", prFeedbackPRHeadExpression()))
 	}
 	if branch := strings.TrimSpace(config.DefaultBranch); branch != "" {
 		env = append(env, checkoutEnvironmentVar("BASE", branch))
@@ -544,16 +583,19 @@ func findCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, rawID stri
 	return canvas, nil
 }
 
-func preserveCustomAutomationRunnerIdentity(tx *gorm.DB, canvas *models.Canvas, doc *yaml.Canvas) error {
+func preserveCustomAutomationNodeIdentities(tx *gorm.DB, canvas *models.Canvas, doc *yaml.Canvas) error {
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if err != nil {
 		return err
 	}
 	var current *models.Node
 	for i := range version.Nodes {
+		previous := &version.Nodes[i]
+		if previous.Type == models.NodeTypeTrigger {
+			preserveCustomAutomationPRTriggerIdentity(previous, doc)
+		}
 		if isFactoryAgentHarness(version.Nodes[i].ComponentName()) {
 			current = &version.Nodes[i]
-			break
 		}
 	}
 	if current == nil {
@@ -579,6 +621,25 @@ func preserveCustomAutomationRunnerIdentity(tx *gorm.DB, canvas *models.Canvas, 
 	return errors.New("custom automation agent is missing")
 }
 
+func preserveCustomAutomationPRTriggerIdentity(previous *models.Node, doc *yaml.Canvas) {
+	for i := range doc.Spec.Nodes {
+		trigger := &doc.Spec.Nodes[i]
+		if trigger.ID != customAutomationTriggerID {
+			continue
+		}
+		trigger.ID = previous.ID
+		if previous.ComponentName() != trigger.Component {
+			trigger.ID = customAutomationTriggerID + "-" + uuid.NewString()
+		}
+		for j := range doc.Spec.Edges {
+			if doc.Spec.Edges[j].SourceID == customAutomationTriggerID {
+				doc.Spec.Edges[j].SourceID = trigger.ID
+			}
+		}
+		return
+	}
+}
+
 func serializeCustomAutomation(
 	tx *gorm.DB,
 	factory *models.Factory,
@@ -592,7 +653,7 @@ func serializeCustomAutomation(
 	var agent *models.Node
 	for i := range version.Nodes {
 		node := &version.Nodes[i]
-		if node.ID == customAutomationTriggerID || node.ID == customAutomationTaskTriggerID {
+		if node.Type == models.NodeTypeTrigger {
 			trigger = node
 		}
 		if isFactoryAgentHarness(node.ComponentName()) {
@@ -618,6 +679,15 @@ func serializeCustomAutomation(
 		Steps:                   steps,
 		Icon:                    configString(template, "icon"),
 		ExecutionTimeoutSeconds: int32(configInt(agent.Configuration, "executionTimeoutSeconds")),
+	}
+	if settings.StartMode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		offset, err := strconv.ParseFloat(configString(trigger.Configuration, "timezone"), 64)
+		if err != nil {
+			return nil, fmt.Errorf("decode schedule UTC offset: %w", err)
+		}
+		settings.Schedule = &pb.FactoryCustomAutomation_Schedule{
+			CronExpression: configString(trigger.Configuration, "cronExpression"), UtcOffset: offset,
+		}
 	}
 	if credentials, ok := agent.Configuration["credentials"].(map[string]any); ok {
 		settings.Agent.CredentialSource = configString(credentials, "source")
@@ -678,6 +748,9 @@ func configInt(configuration map[string]any, key string) int {
 }
 
 func customAutomationStartModeName(mode pb.FactoryCustomAutomation_StartMode) string {
+	if mode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		return "scheduled"
+	}
 	if mode == pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
 		return "automatic"
 	}
@@ -685,6 +758,9 @@ func customAutomationStartModeName(mode pb.FactoryCustomAutomation_StartMode) st
 }
 
 func customAutomationStartMode(mode string) pb.FactoryCustomAutomation_StartMode {
+	if strings.TrimSpace(mode) == "scheduled" {
+		return pb.FactoryCustomAutomation_START_MODE_SCHEDULED
+	}
 	if strings.TrimSpace(mode) == "automatic" {
 		return pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
 	}
