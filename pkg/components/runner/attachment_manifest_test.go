@@ -49,7 +49,7 @@ func TestApplyAttachmentInstructionsPrependsFragment(t *testing.T) {
 	assert.Equal(t, "do the work", ApplyAttachmentInstructions("do the work", nil))
 	assert.Equal(t, AttachmentAgentInstructions, ApplyAttachmentInstructions("", files))
 	assert.True(t, strings.HasPrefix(ApplyAttachmentInstructions("do the work", files), AttachmentAgentInstructions))
-	assert.NotContains(t, AttachmentAgentInstructions, "inspect_attachment")
+	assert.NotContains(t, AttachmentAgentInstructions, "get_artifact")
 }
 
 func TestRewritePromptLocalAttachmentPathsNamesInspectAttachment(t *testing.T) {
@@ -62,7 +62,7 @@ func TestRewritePromptLocalAttachmentPathsNamesInspectAttachment(t *testing.T) {
 		ContentType: "image/png",
 	}})
 	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
-	assert.Contains(t, prompt, "inspect_attachment")
+	assert.Contains(t, prompt, "get_artifact")
 	assert.NotContains(t, prompt, signed)
 }
 
@@ -78,11 +78,11 @@ func TestFormatAgentPromptKeepsLineImageURLs(t *testing.T) {
 	line := FormatAgentPrompt("See ![bug]("+signed+")", "", files, false)
 	assert.Contains(t, line, signed)
 	assert.Contains(t, line, AttachmentAgentInstructions)
-	assert.NotContains(t, line, "inspect_attachment")
+	assert.NotContains(t, line, "get_artifact")
 
 	planning := FormatAgentPrompt("See ![bug]("+signed+")", "", files, true)
 	assert.Contains(t, planning, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
-	assert.Contains(t, planning, "inspect_attachment")
+	assert.Contains(t, planning, "get_artifact")
 	assert.NotContains(t, planning, signed)
 }
 

@@ -1828,13 +1828,22 @@ function checksForLineExecution(
   demoArtifacts = true,
 ): WorkOrderCheckPresentation[] | undefined {
   if (!(execution.step ?? "").toLowerCase().includes("verify")) {
-    return undefined;
+    return checksReportedByRun(execution.run?.id, apiChecks);
   }
   const source = demoArtifacts ? (apiChecks ?? VERIFY_STEP_CHECKS) : (apiChecks ?? []);
   const verifyChecks = demoArtifacts
     ? source.filter((check) => VERIFY_STEP_KEYS.has(check.key ?? ""))
     : source.filter((check) => !isScoreCheckName(check.name));
   return presentWorkOrderChecks(verifyChecks);
+}
+
+/** Checks that the agent of a step reported with add_checks carry its run id. */
+function checksReportedByRun(
+  runId: string | undefined,
+  apiChecks?: FactoriesWorkOrderCheck[],
+): WorkOrderCheckPresentation[] | undefined {
+  const reported = runId ? (apiChecks ?? []).filter((check) => check.runId === runId) : [];
+  return reported.length > 0 ? presentWorkOrderChecks(reported) : undefined;
 }
 
 function artifactsForLineExecution(

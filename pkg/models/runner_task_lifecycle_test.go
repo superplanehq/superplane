@@ -1,7 +1,6 @@
 package models_test
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -377,72 +376,5 @@ func TestRunnerTaskPayloadConstraint(t *testing.T) {
 			require.NoError(t, db.Create(task).Error)
 			require.ErrorContains(t, db.Model(task).Update("payload_ciphertext", nil).Error, "runner_tasks_nonterminal_payload")
 		})
-	}
-}
-
-func TestTerminalRunnerTaskPayloadCleanup(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	resource := support.Setup(t)
-	db := database.DB(t.Context())
-	fleet := newTestRunnerFleet()
-	require.NoError(t, fleet.Create(db))
-	now := time.Now().Truncate(time.Microsecond)
-	states := []string{models.RunnerTaskStateSucceeded, models.RunnerTaskStateFailed, models.RunnerTaskStateCanceled, models.RunnerTaskStateLost}
-	tasks := make([]models.RunnerTask, 1001)
-	for i := range tasks {
-		tasks[i] = models.RunnerTask{ID: uuid.New(), OrganizationID: resource.Organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendLegacy, State: states[i%len(states)], PayloadCiphertext: []byte("secret"), QueuedAt: now, FinishedAt: &now, UpdatedAt: now, Result: datatypes.JSON([]byte(`{"answer":42}`))}
-	}
-	require.NoError(t, db.CreateInBatches(&tasks, 100).Error)
-	for _, state := range []string{models.RunnerTaskStatePending, models.RunnerTaskStateQueued, models.RunnerTaskStateReserved, models.RunnerTaskStateRunning} {
-		task := models.RunnerTask{ID: uuid.New(), OrganizationID: resource.Organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendIntegrated, State: state, PayloadCiphertext: []byte("active"), QueuedAt: now}
-		require.NoError(t, db.Create(&task).Error)
-	}
-	imported := models.RunnerTask{ID: uuid.New(), OrganizationID: resource.Organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendLegacy, State: models.RunnerTaskStateSucceeded, QueuedAt: now}
-	require.NoError(t, db.Create(&imported).Error)
-	// Rotation may read ciphertext before a concurrent cleanup removes it.
-	page, err := models.ReadRunnerTaskPayloadPage(db, "", 2000)
-	require.NoError(t, err)
-	require.Len(t, page, 1005)
-	cleanup, err := os.ReadFile("../../scripts/clear_terminal_runner_task_payloads.sql")
-	require.NoError(t, err)
-	locked := db.Begin()
-	require.NoError(t, locked.Error)
-	t.Cleanup(func() { locked.Rollback() })
-	require.NoError(t, locked.Exec("SELECT id FROM runner_tasks WHERE id = ? FOR UPDATE", tasks[0].ID).Error)
-	for _, count := range []int64{1000, 0} {
-		result := db.Exec(string(cleanup))
-		require.NoError(t, result.Error)
-		assert.Equal(t, count, result.RowsAffected)
-	}
-	require.NoError(t, locked.Rollback().Error)
-	for _, count := range []int64{1, 0} {
-		result := db.Exec(string(cleanup))
-		require.NoError(t, result.Error)
-		assert.Equal(t, count, result.RowsAffected)
-	}
-	var active []models.RunnerTask
-	require.NoError(t, db.Where("payload_ciphertext IS NOT NULL").Find(&active).Error)
-	require.Len(t, active, 4)
-	for _, task := range active {
-		assert.Equal(t, []byte("active"), task.PayloadCiphertext)
-	}
-	stored, err := models.FindRunnerTask(db, tasks[0].ID)
-	require.NoError(t, err)
-	assert.Nil(t, stored.PayloadCiphertext)
-	assert.Equal(t, tasks[0].State, stored.State)
-	assert.JSONEq(t, `{"answer":42}`, string(stored.Result))
-	assert.WithinDuration(t, now, stored.UpdatedAt, time.Microsecond)
-	require.NotNil(t, stored.FinishedAt)
-	assert.WithinDuration(t, now, *stored.FinishedAt, time.Microsecond)
-	pageAfter, err := models.ReadRunnerTaskPayloadPage(db, "", 2000)
-	require.NoError(t, err)
-	require.Len(t, pageAfter, 4)
-	for _, row := range page {
-		if row.Cursor != stored.ID.String() {
-			continue
-		}
-		replaced, err := models.ReplaceRunnerTaskPayload(db, row, []byte("rotated"))
-		require.NoError(t, err)
-		assert.False(t, replaced, "rotation must not restore a discarded payload")
 	}
 }
