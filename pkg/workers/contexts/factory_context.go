@@ -248,7 +248,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	c.recordSentryWebhookTask(order)
 	c.recordDatadogWebhookTask(order)
 	c.recordLinearWebhookTask(order)
-	events, err := emitWorkOrderCreated(c.tx, f, order, uuid.Nil, nil)
+	events, err := emitWorkOrderCreated(c.tx, f, order, uuid.Nil, nil, false)
 	if err != nil {
 		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
 	}
