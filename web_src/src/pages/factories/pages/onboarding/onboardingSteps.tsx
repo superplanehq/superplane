@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,8 +38,8 @@ function ComingSoonRibbon() {
   );
 }
 
-function connectOptionRowTone(soon: boolean, selected: boolean): string {
-  if (soon) {
+function connectOptionRowTone(soon: boolean, selected: boolean, disabled: boolean): string {
+  if (soon || disabled) {
     return "overflow-hidden border-border/70 bg-muted/20 opacity-70";
   }
   if (selected) {
@@ -61,6 +62,7 @@ export function ConnectOptionRow({
   connected,
   soon,
   disabled,
+  badge,
   onSelect,
   onConnect,
 }: {
@@ -74,11 +76,12 @@ export function ConnectOptionRow({
   connected?: boolean;
   soon?: boolean;
   disabled?: boolean;
+  badge?: string;
   onSelect: () => void;
   onConnect?: () => void;
 }) {
   const needsConnect = needsConnection(connectLabel, connected, soon);
-  const rowToneClass = connectOptionRowTone(Boolean(soon), Boolean(selected));
+  const rowToneClass = connectOptionRowTone(Boolean(soon), Boolean(selected), Boolean(disabled));
   const unavailable = Boolean(soon || disabled);
 
   const select = () => {
@@ -104,13 +107,12 @@ export function ConnectOptionRow({
         >
           <span className="mt-0.5 shrink-0">{icon}</span>
           <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="text-[13px] font-medium tracking-[-0.01em]">{title}</span>
-              {meta && !soon ? <span className="text-[11px] text-muted-foreground">{meta}</span> : null}
-              {selected && !needsConnect && !soon ? (
-                <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden />
-              ) : null}
-            </span>
+            <ConnectOptionTitle
+              title={title}
+              badge={badge}
+              meta={soon ? undefined : meta}
+              selected={Boolean(selected && !needsConnect && !soon)}
+            />
             {detail ? <span className="mt-0.5 block text-[12px] text-muted-foreground">{detail}</span> : null}
           </span>
         </button>
@@ -138,6 +140,31 @@ export function ConnectOptionRow({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ConnectOptionTitle({
+  title,
+  badge,
+  meta,
+  selected,
+}: {
+  title: string;
+  badge?: string;
+  meta?: string;
+  selected: boolean;
+}) {
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span className="text-[13px] font-medium tracking-[-0.01em]">{title}</span>
+      {badge ? (
+        <Badge variant="secondary" data-testid="connect-option-badge">
+          {badge}
+        </Badge>
+      ) : null}
+      {meta ? <span className="text-[11px] text-muted-foreground">{meta}</span> : null}
+      {selected ? <Check className="size-3.5 text-foreground" strokeWidth={2.5} aria-hidden /> : null}
+    </span>
   );
 }
 

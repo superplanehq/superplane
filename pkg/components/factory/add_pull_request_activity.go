@@ -67,11 +67,11 @@ func (c *AddPullRequestActivity) ExampleOutput() map[string]any {
 		"type":      addPullRequestActivityEventType,
 		"data": map[string]any{
 			"title":       "Waiting for checks",
-			"description": "Waiting for checks on [`d1209da`](https://github.com/acme/app/commit/d1209da).",
+			"description": "Waiting for checks on [`d1209da`](" + exampleGitHubHost().RepoURL("acme/app") + "/commit/d1209da).",
 			"pullRequest": map[string]any{
 				"id":     "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4",
 				"number": 42,
-				"url":    "https://github.com/acme/app/pull/42",
+				"url":    exampleGitHubHost().RepoURL("acme/app") + "/pull/42",
 			},
 			"workOrder": map[string]any{
 				"id":     "9ac921bc-68e4-46dc-a78b-60b955f3bbf2",

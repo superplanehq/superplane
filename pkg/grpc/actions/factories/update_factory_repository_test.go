@@ -317,8 +317,8 @@ func TestReplaceLegacyCheckoutBaseToken(t *testing.T) {
 }
 
 func TestReplaceWorkspaceCheckoutTargetKeepsRepositoryAndBranchTogether(t *testing.T) {
-	previousURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/api")
-	nextURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/web")
+	previousURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/api", "")
+	nextURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/web", "")
 	nodes := []models.Node{
 		{
 			ID: "scheduled-agent",
@@ -344,7 +344,7 @@ func TestReplaceWorkspaceCheckoutTargetKeepsRepositoryAndBranchTogether(t *testi
 		},
 	}
 
-	assert.True(t, replaceWorkspaceCheckoutTarget(nodes, models.ProviderGitHub, "acme/api", "acme/web", "main", "develop"))
+	assert.True(t, replaceWorkspaceCheckoutTarget(nodes, models.ProviderGitHub, "acme/api", "acme/web", "main", "develop", "", ""))
 	environment := nodes[0].Configuration["environment"].([]any)
 	assert.Equal(t, "acme/web", environment[0].(map[string]any)["value"])
 	assert.Equal(t, "acme/web", environment[1].(map[string]any)["value"])
@@ -355,9 +355,143 @@ func TestReplaceWorkspaceCheckoutTargetKeepsRepositoryAndBranchTogether(t *testi
 	assert.Equal(t, "acme/other", nodes[1].Configuration["repository"])
 	assert.Equal(t, "release", nodes[1].Configuration["environment"].([]any)[0].(map[string]any)["value"])
 
-	assert.True(t, replaceWorkspaceCheckoutTarget(nodes, models.ProviderGitHub, "acme/web", "acme/web", "develop", "trunk"))
+	assert.True(t, replaceWorkspaceCheckoutTarget(nodes, models.ProviderGitHub, "acme/web", "acme/web", "develop", "trunk", "", ""))
 	assert.Equal(t, nextURL, nodes[0].Configuration["environment"].([]any)[2].(map[string]any)["value"])
 	assert.Equal(t, "trunk", nodes[0].Configuration["environment"].([]any)[3].(map[string]any)["value"])
+}
+
+func TestReplaceWorkspaceCheckoutTargetRewritesGitHubEnterpriseHost(t *testing.T) {
+	gheHost := "acme.ghe.com"
+	otherHost := "other.ghe.com"
+	previousURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/api", gheHost)
+	nextGHEURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/web", gheHost)
+	nextDotComURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/web", "")
+	otherGHEURL := runner.WorkspaceContextRepoURL(models.ProviderGitHub, "acme/web", otherHost)
+
+	t.Run("rewrites a repository on the same GitHub Enterprise host", func(t *testing.T) {
+		nodes := checkoutTargetNodes(previousURL, "main")
+		assert.True(t, replaceWorkspaceCheckoutTarget(nodes, models.ProviderGitHub, "acme/api", "acme/web", "main", "develop", gheHost, gheHost))
+		assert.Equal(t, "acme/web", checkoutEnvironmentValue(t, nodes[0], "REPO"))
+		assert.Equal(t, nextGHEURL, checkoutEnvironmentValue(t, nodes[0], "REPO_URL"))
+		assert.Equal(t, "develop", checkoutEnvironmentValue(t, nodes[0], "BASE"))
+		assert.NotEqual(t, nextDotComURL, checkoutEnvironmentValue(t, nodes[0], "REPO_URL"))
+	})
+
+	t.Run("rewrites a GitHub Enterprise clone URL onto github.com", func(t *testing.T) {
+		nodes := checkoutTargetNodes(previousURL, "main")
+		assert.True(t, replaceWorkspaceCheckoutTarget(nodes, models.ProviderGitHub, "acme/api", "acme/web", "main", "develop", gheHost, ""))
+		assert.Equal(t, nextDotComURL, checkoutEnvironmentValue(t, nodes[0], "REPO_URL"))
+		assert.NotEqual(t, otherGHEURL, checkoutEnvironmentValue(t, nodes[0], "REPO_URL"))
+	})
+
+	t.Run("rewrites only BASE when the repository is unchanged", func(t *testing.T) {
+		nodes := checkoutTargetNodes(previousURL, "main")
+		assert.True(t, replaceWorkspaceCheckoutTarget(nodes, models.ProviderGitHub, "acme/api", "acme/api", "main", "develop", gheHost, gheHost))
+		assert.Equal(t, "acme/api", checkoutEnvironmentValue(t, nodes[0], "REPO"))
+		assert.Equal(t, previousURL, checkoutEnvironmentValue(t, nodes[0], "REPO_URL"))
+		assert.Equal(t, "develop", checkoutEnvironmentValue(t, nodes[0], "BASE"))
+	})
+}
+
+func TestReconcileFactoryRepositoryRewritesGitHubEnterpriseCheckoutURLs(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	integrationID := createReadyGitHubEnterpriseIntegration(t, r.Organization.ID, "acme.ghe.com")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	provider, previousRepo, nextRepo, branch := models.ProviderGitHub, "acme/old", "acme/new", "main"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider: &provider, VCSIntegrationID: &integrationID,
+		AppRepository: &nextRepo, BacklogRepository: &nextRepo, DefaultBranch: &branch,
+	}))
+	previousURL := runner.WorkspaceContextRepoURL(provider, previousRepo, "acme.ghe.com")
+	nextURL := runner.WorkspaceContextRepoURL(provider, nextRepo, "acme.ghe.com")
+	deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+
+	scheduledCanvas := support.CreateFactoryCanvas(t, r, factory.ID, "Scheduled intake")
+	customCanvas := support.CreateFactoryCanvas(t, r, factory.ID, "Custom automation")
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		if err := canvases.PublishGeneratedCanvasNodes(t.Context(), tx, scheduledCanvas, r.User, "Install scheduled intake", []models.Node{
+			checkoutTemplateNode("scheduled-agent", scheduledIntakeTemplateID, previousRepo, previousURL, branch),
+		}, nil, changesets.CanvasPublisherOptions{
+			Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
+			AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
+		}); err != nil {
+			return err
+		}
+		return canvases.PublishGeneratedCanvasNodes(t.Context(), tx, customCanvas, r.User, "Install custom automation", []models.Node{
+			checkoutTemplateNode(customAutomationRunnerID, models.FactoryAppTemplateCustomAutomationID, previousRepo, previousURL, branch),
+		}, nil, changesets.CanvasPublisherOptions{
+			Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
+			AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
+		})
+	}))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
+			integrationID, integrationID, previousRepo, previousRepo, branch, nextRepo, true)
+	}))
+
+	for _, canvas := range []*models.Canvas{scheduledCanvas, customCanvas} {
+		reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
+		require.NoError(t, err)
+		require.Len(t, version.Nodes, 1)
+		assert.Equal(t, nextRepo, checkoutEnvironmentValue(t, version.Nodes[0], "REPO"))
+		assert.Equal(t, nextURL, checkoutEnvironmentValue(t, version.Nodes[0], "REPO_URL"))
+		assert.NotContains(t, checkoutEnvironmentValue(t, version.Nodes[0], "REPO_URL"), "github.com")
+	}
+}
+
+func checkoutTargetNodes(repoURL, branch string) []models.Node {
+	return []models.Node{
+		{
+			ID: "scheduled-agent",
+			Configuration: map[string]any{
+				"environment": []any{
+					map[string]any{"name": "REPO", "value": "acme/api"},
+					map[string]any{"name": "SOURCE_REPO", "value": "acme/api"},
+					map[string]any{"name": "REPO_URL", "value": repoURL},
+					map[string]any{"name": "BASE", "value": branch},
+				},
+			},
+		},
+	}
+}
+
+func checkoutTemplateNode(id, templateID, repository, repoURL, branch string) models.Node {
+	return models.Node{
+		ID:   id,
+		Name: id,
+		Type: models.NodeTypeComponent,
+		Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}},
+		Configuration: map[string]any{
+			"environment": []any{
+				map[string]any{"name": "REPO", "value": repository},
+				map[string]any{"name": "SOURCE_REPO", "value": repository},
+				map[string]any{"name": "REPO_URL", "value": repoURL},
+				map[string]any{"name": "BASE", "value": branch},
+			},
+		},
+		Metadata: models.FactoryAppTemplateMetadataFor(templateID, 1, models.ProviderGitHub),
+	}
+}
+
+func checkoutEnvironmentValue(t *testing.T, node models.Node, name string) string {
+	t.Helper()
+	environment, ok := node.Configuration["environment"].([]any)
+	require.True(t, ok)
+	for _, item := range environment {
+		entry, ok := item.(map[string]any)
+		if !ok || entry["name"] != name {
+			continue
+		}
+		value, _ := entry["value"].(string)
+		return value
+	}
+	t.Fatalf("environment %s not found", name)
+	return ""
 }
 
 func TestReplaceTriggerRepository(t *testing.T) {
