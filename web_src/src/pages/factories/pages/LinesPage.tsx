@@ -28,6 +28,8 @@ import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/us
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
@@ -950,8 +952,20 @@ function LineDetailHeader({
         data-testid="lines-detail-header"
         title={factory?.name?.trim() || "Workspace"}
         leading={
-          nextStepsRestore || hostedCreditHeaderKicker ? (
+          factory?.onboarding?.codexSubscription || nextStepsRestore || hostedCreditHeaderKicker ? (
             <>
+              {factory?.onboarding?.codexSubscription ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" tabIndex={0} className="font-normal">
+                      ChatGPT Subscription
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    This workspace uses ChatGPT subscriptions as a model source.
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
               {hostedCreditHeaderKicker}
               {nextStepsRestore}
             </>
