@@ -5,6 +5,7 @@ import type { FilesFile } from "@/api-client";
 import { SkillSlashFieldOverlay } from "@/components/AgentSidebar/SkillSlashFieldOverlay";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert";
 import { Kbd } from "@/components/ui/kbd";
 import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
 import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
@@ -84,6 +85,7 @@ function analysisRequestChatState(analysis: IntentAnalysisChat) {
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
     showSurvey: hasPendingPlanningQuestions(analysis.view),
+    progressLabel: analysis.canTogglePlan ? undefined : "Creating the first plan…",
     placeholder:
       !analysis.canSend && stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder,
   };
@@ -102,6 +104,7 @@ function AnalysisRequestChat({
     resumeOnBottom: true,
   });
   const chipsWorking =
+    !analysis.planningFailure &&
     !analysis.creditVerdict &&
     composerChipsWorking({
       isAnalyzing: analysis.isAnalyzing,
@@ -145,9 +148,10 @@ function AnalysisRequestChat({
                 canvasId={analysis.view.canvasId}
                 executionId={analysis.view.executionId}
                 activities={analysis.view.activities}
-                progressLabel={analysis.canTogglePlan ? undefined : "Creating the first plan…"}
+                progressLabel={state.progressLabel}
               />
             ) : null}
+            <PlanningFailureAlert failure={analysis.planningFailure} />
             <AnalysisPlanControls analysis={analysis} chipsWorking={chipsWorking} position="conversation" />
             {state.showSurvey && analysis.view.survey ? (
               <WorkOrderIntentSurvey
@@ -187,6 +191,21 @@ function AnalysisRequestChat({
         actions={analysis.closedDecision}
       />
     </div>
+  );
+}
+
+function PlanningFailureAlert({ failure }: { failure?: string }) {
+  if (!failure) {
+    return null;
+  }
+  return (
+    <Alert variant="destructive" aria-label="Planning failed" className="mt-3">
+      <AlertTitle>Planning failed</AlertTitle>
+      <AlertDescription className="whitespace-pre-wrap break-words">
+        <p>{failure}</p>
+        <p>Check the model and task owner, then start planning again.</p>
+      </AlertDescription>
+    </Alert>
   );
 }
 

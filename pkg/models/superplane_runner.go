@@ -358,6 +358,72 @@ func isSuperPlaneReadinessMessage(message string) bool {
 	}
 }
 
+// RefreshHostedBillingReadiness clears a hosted runner node's billing error
+// when an organization can run agents again. Other node errors need a publish
+// to validate their configuration.
+func (c *CanvasNode) RefreshHostedBillingReadiness(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) error {
+	if c.State != CanvasNodeStateError || c.ComponentName() != SuperPlaneRunnerComponent || c.StateReason == nil || !isHostedBillingReadinessMessage(*c.StateReason) {
+		return nil
+	}
+
+	readiness := billing.AssertHostedRunAllowed(tx, orgID, factoryID)
+	if readiness != nil && !isHostedBillingReadinessError(readiness) {
+		return readiness
+	}
+
+	nextState := CanvasNodeStateReady
+	var nextReason *string
+	if readiness != nil {
+		nextState = CanvasNodeStateError
+		message := SuperPlaneRunnerReadinessMessage(readiness)
+		nextReason = &message
+	}
+	if nextReason != nil && *nextReason == *c.StateReason {
+		return nil
+	}
+
+	result := tx.Model(&CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ? AND state = ? AND state_reason = ?", c.WorkflowID, c.NodeID, c.State, *c.StateReason).
+		Updates(map[string]any{"state": nextState, "state_reason": nextReason})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		current, err := FindCanvasNode(tx, c.WorkflowID, c.NodeID)
+		if err != nil {
+			return err
+		}
+		*c = *current
+		return nil
+	}
+
+	c.State = nextState
+	c.StateReason = nextReason
+	return nil
+}
+
+func isHostedBillingReadinessMessage(message string) bool {
+	switch strings.TrimSpace(message) {
+	case SuperPlaneRunnerNoCreditMessage,
+		SuperPlaneRunnerNoFactoryBudgetMessage,
+		SuperPlaneRunnerSubscribeMessage,
+		SuperPlaneRunnerPaymentPastDueMessage,
+		SuperPlaneRunnerSubscriptionPausedMessage,
+		legacySuperPlaneRunnerSubscribeMessage:
+		return true
+	default:
+		return false
+	}
+}
+
+func isHostedBillingReadinessError(err error) bool {
+	return errors.Is(err, billing.ErrHostedCreditEmpty) ||
+		errors.Is(err, billing.ErrFactoryHostedBudgetEmpty) ||
+		errors.Is(err, billing.ErrHostedSubscriptionRequired) ||
+		errors.Is(err, billing.ErrHostedPaymentPastDue) ||
+		errors.Is(err, billing.ErrHostedSubscriptionPaused)
+}
+
 func isHostedProviderRunnerComponent(name string) bool {
 	return slices.Contains(hostedProviderRunnerComponents, name)
 }
