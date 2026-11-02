@@ -26,15 +26,38 @@ func NewEventContext(tx *gorm.DB, node *models.CanvasNode, run *models.CanvasRun
 	return &EventContext{tx: tx, node: node, run: run, maxPayloadSize: config.MaxPayloadSize(), onNewEvents: onNewEvents}
 }
 
+// EmitResult tells a caller what happened to one emitted payload.
+type EmitResult string
+
+const (
+	// EmitResultCreated means a new event was stored.
+	EmitResultCreated EmitResult = "created"
+	// EmitResultDeduplicated means an event with the same key already exists.
+	EmitResultDeduplicated EmitResult = "deduplicated"
+	// EmitResultSuppressed means a node policy dropped the payload.
+	EmitResultSuppressed EmitResult = "suppressed"
+	// EmitResultCanvasUnavailable means the canvas cannot start a run.
+	EmitResultCanvasUnavailable EmitResult = "canvas_unavailable"
+)
+
 func (s *EventContext) Emit(payloadType string, payload any) error {
-	return s.emit(payloadType, payload, "")
+	_, err := s.emit(payloadType, payload, "")
+	return err
 }
 
 func (s *EventContext) EmitDeduplicated(payloadType string, payload any, dedupKey string) error {
+	_, err := s.emit(payloadType, payload, dedupKey)
+	return err
+}
+
+// EmitWithResult emits like EmitDeduplicated and also reports the result.
+// Durable callers use it so that a skipped event is not mistaken for a
+// delivered one.
+func (s *EventContext) EmitWithResult(payloadType string, payload any, dedupKey string) (EmitResult, error) {
 	return s.emit(payloadType, payload, dedupKey)
 }
 
-func (s *EventContext) emit(payloadType string, payload any, dedupKey string) error {
+func (s *EventContext) emit(payloadType string, payload any, dedupKey string) (EmitResult, error) {
 	structuredPayload := map[string]any{
 		"type":      payloadType,
 		"timestamp": time.Now(),
@@ -43,11 +66,11 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 
 	data, err := json.Marshal(structuredPayload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal event payload: %w", err)
+		return "", fmt.Errorf("failed to marshal event payload: %w", err)
 	}
 
 	if len(data) > s.maxPayloadSize {
-		return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
+		return "", fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
 	}
 
 	now := time.Now()
@@ -82,7 +105,7 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 		var suppress bool
 		dedupKey, suppress = customAutomationWebhookPolicy(s.tx, s.node, payloadType, payload)
 		if suppress {
-			return nil
+			return EmitResultSuppressed, nil
 		}
 	}
 	if dedupKey != "" && s.run == nil {
@@ -100,21 +123,21 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 			}
 			logging.WithCanvasWorkspace(logging.ForNode(*s.node), canvas).
 				Warnf("skipping event %s: canvas %s cannot start a run", payloadType, s.node.WorkflowID)
-			return nil
+			return EmitResultCanvasUnavailable, nil
 		}
 
-		return err
+		return "", err
 	}
 
 	if !created {
-		return nil
+		return EmitResultDeduplicated, nil
 	}
 
 	if s.onNewEvents != nil {
 		s.onNewEvents([]models.CanvasEvent{event})
 	}
 
-	return nil
+	return EmitResultCreated, nil
 }
 
 func customAutomationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (string, bool) {

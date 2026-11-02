@@ -182,6 +182,90 @@ type WebhookMessage struct {
 	Data         map[string]any      `json:"data" mapstructure:"data"`
 	Actor        map[string]any      `json:"actor,omitempty" mapstructure:"actor,omitempty"`
 	ReceiptID    string              `json:"superplaneReceiptId,omitempty" mapstructure:"superplaneReceiptId"`
+	// DeliveryID is the durable inbox entry of this message. A trigger uses
+	// it as the deduplication key, so a worker retry cannot start a second
+	// run for the same target.
+	DeliveryID string `json:"superplaneDeliveryId,omitempty" mapstructure:"superplaneDeliveryId"`
+}
+
+// ErrWebhookNotAuthenticated means the request does not carry a valid
+// signature for the connection. SuperPlane must not store it.
+var ErrWebhookNotAuthenticated = errors.New("sentry webhook is not authenticated")
+
+// ErrUnsupportedWebhook means a verified delivery has a format that
+// SuperPlane cannot read. The durable inbox keeps it as blocked work.
+var ErrUnsupportedWebhook = errors.New("unsupported sentry webhook payload")
+
+// IsWebhookPath reports whether a connection path receives Sentry webhooks.
+// Browser setup and install paths are separate.
+func IsWebhookPath(path string) bool {
+	return strings.HasSuffix(path, "/events") || strings.HasSuffix(path, "/webhook")
+}
+
+// AuthenticateIntegrationWebhook checks a webhook sent to one connection.
+// It verifies the signature with the secret of that connection, and for a
+// public app connection it requires the installation of that connection.
+func AuthenticateIntegrationWebhook(integration core.IntegrationContext, signature string, body []byte) error {
+	config, err := (&Sentry{}).loadConfiguration(integration)
+	if err != nil {
+		return fmt.Errorf("load sentry configuration: %w", err)
+	}
+
+	secret := webhookSecretFor(integration, config)
+	if strings.TrimSpace(secret) == "" {
+		return fmt.Errorf("%w: missing client secret", ErrWebhookNotAuthenticated)
+	}
+	if err := verifyWebhookSignature(signature, body, []byte(secret)); err != nil {
+		return fmt.Errorf("%w: %v", ErrWebhookNotAuthenticated, err)
+	}
+
+	var payload struct {
+		Installation WebhookInstallation `json:"installation"`
+	}
+	_ = json.Unmarshal(body, &payload)
+	if !hostedWebhookInstallationAllowed(integration, payload.Installation.UUID) {
+		return fmt.Errorf("%w: installation does not match this connection", ErrWebhookNotAuthenticated)
+	}
+	return nil
+}
+
+// ParseWebhookMessage reads a verified webhook body. It returns
+// ErrUnsupportedWebhook when the resource or the JSON shape is unknown.
+func ParseWebhookMessage(resource string, body []byte) (WebhookMessage, error) {
+	resource = strings.TrimSpace(resource)
+	if resource == "" {
+		return WebhookMessage{}, fmt.Errorf("%w: missing Sentry-Hook-Resource", ErrUnsupportedWebhook)
+	}
+
+	var payload struct {
+		Action       string              `json:"action"`
+		Timestamp    string              `json:"timestamp"`
+		Installation WebhookInstallation `json:"installation"`
+		Data         map[string]any      `json:"data"`
+		Actor        map[string]any      `json:"actor"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return WebhookMessage{}, fmt.Errorf("%w: %v", ErrUnsupportedWebhook, err)
+	}
+
+	return WebhookMessage{
+		Resource:     resource,
+		Action:       payload.Action,
+		Timestamp:    payload.Timestamp,
+		Installation: payload.Installation,
+		Data:         payload.Data,
+		Actor:        payload.Actor,
+	}, nil
+}
+
+// SubscriptionWantsResource reports whether a trigger subscription listens
+// to a webhook resource. An empty resource list listens to every resource.
+func SubscriptionWantsResource(configuration any, resource string) (bool, error) {
+	config := SubscriptionConfiguration{}
+	if err := mapstructure.Decode(configuration, &config); err != nil {
+		return false, fmt.Errorf("decode sentry subscription configuration: %w", err)
+	}
+	return len(config.Resources) == 0 || slices.Contains(config.Resources, resource), nil
 }
 
 func (s *Sentry) Name() string {
@@ -696,7 +780,7 @@ func (s *Sentry) HandleRequest(ctx core.HTTPRequestContext) {
 		s.afterHostedAppSetup(ctx)
 	case strings.HasSuffix(ctx.Request.URL.Path, "/install"):
 		s.redirectHostedAppInstall(ctx)
-	case strings.HasSuffix(ctx.Request.URL.Path, "/events"), strings.HasSuffix(ctx.Request.URL.Path, "/webhook"):
+	case IsWebhookPath(ctx.Request.URL.Path):
 		s.handleWebhook(ctx)
 	default:
 		ctx.Response.WriteHeader(http.StatusNotFound)
@@ -731,26 +815,13 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	resource := strings.TrimSpace(ctx.Request.Header.Get("Sentry-Hook-Resource"))
-	if resource == "" {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	var payload struct {
-		Action       string              `json:"action"`
-		Timestamp    string              `json:"timestamp"`
-		Installation WebhookInstallation `json:"installation"`
-		Data         map[string]any      `json:"data"`
-		Actor        map[string]any      `json:"actor"`
-	}
-	if err := json.Unmarshal(body, &payload); err != nil {
+	parsed, err := ParseWebhookMessage(ctx.Request.Header.Get("Sentry-Hook-Resource"), body)
+	if err != nil {
 		ctx.Logger.Errorf("failed to decode sentry webhook: %v", err)
 		ctx.Response.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
-	if !hostedWebhookInstallationAllowed(ctx.Integration, payload.Installation.UUID) {
+	if !hostedWebhookInstallationAllowed(ctx.Integration, parsed.Installation.UUID) {
 		ctx.Logger.Warn("sentry webhook installation does not match this connection")
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
@@ -760,21 +831,14 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 	// A receipt header on a direct webhook is not that call.
 	if !hostedSentryWebhookLogged(ctx.Request.Context()) {
 		logging.LogSentryWebhookInfo("Sentry webhook received", logging.WithWebhookPayload(logrus.Fields{
-			"hook_resource":     resource,
-			"action":            payload.Action,
-			"installation_uuid": payload.Installation.UUID,
+			"hook_resource":     parsed.Resource,
+			"action":            parsed.Action,
+			"installation_uuid": parsed.Installation.UUID,
 		}, body))
 	}
 
-	message := WebhookMessage{
-		Resource:     resource,
-		Action:       payload.Action,
-		Timestamp:    payload.Timestamp,
-		Installation: payload.Installation,
-		Data:         payload.Data,
-		Actor:        payload.Actor,
-		ReceiptID:    strings.TrimSpace(ctx.Request.Header.Get(HeaderWebhookReceipt)),
-	}
+	message := parsed
+	message.ReceiptID = strings.TrimSpace(ctx.Request.Header.Get(HeaderWebhookReceipt))
 
 	if err := s.dispatchWebhookMessage(ctx, message); err != nil {
 		ctx.Logger.Errorf("failed to dispatch sentry webhook: %v", err)
@@ -793,13 +857,12 @@ func (s *Sentry) dispatchWebhookMessage(ctx core.HTTPRequestContext, message Web
 
 	sendErrors := []error{}
 	for _, subscription := range subscriptions {
-		config := SubscriptionConfiguration{}
-		if err := mapstructure.Decode(subscription.Configuration(), &config); err != nil {
+		wanted, err := SubscriptionWantsResource(subscription.Configuration(), message.Resource)
+		if err != nil {
 			ctx.Logger.Warnf("failed to decode sentry subscription config: %v", err)
 			continue
 		}
-
-		if len(config.Resources) > 0 && !slices.Contains(config.Resources, message.Resource) {
+		if !wanted {
 			continue
 		}
 

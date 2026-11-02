@@ -131,6 +131,13 @@ type EventContext interface {
 	Emit(payloadType string, payload any) error
 }
 
+// DeduplicatedEventContext is an optional EventContext capability. It emits
+// at most one root event per node for each deduplication key, so a retried
+// delivery does not start a second run.
+type DeduplicatedEventContext interface {
+	EmitDeduplicated(payloadType string, payload any, dedupKey string) error
+}
+
 type WebhookRequestContext struct {
 	Body          []byte
 	Headers       http.Header

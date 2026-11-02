@@ -126,6 +126,11 @@ sentry:
   dsn: ""
   environment: ""
 
+sentryWebhooks:
+  # Store verified Sentry webhooks in PostgreSQL and answer before processing.
+  # Deploy workers with the Sentry webhook worker first, then enable this.
+  durableAcceptance: false
+
 dash0Web:
   secretName: ""
   enabled: false

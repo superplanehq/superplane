@@ -5,6 +5,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 // fakeHostedInstallGrants replaces the database store, so the hosted setup
@@ -14,6 +16,7 @@ type fakeHostedInstallGrants struct {
 	mu        sync.Mutex
 	grants    map[string]hostedSentryInstall
 	claimedBy map[string]string
+	deleted   map[string]bool
 }
 
 func useFakeHostedInstallGrants(t *testing.T) *fakeHostedInstallGrants {
@@ -22,11 +25,16 @@ func useFakeHostedInstallGrants(t *testing.T) *fakeHostedInstallGrants {
 	fake := &fakeHostedInstallGrants{
 		grants:    map[string]hostedSentryInstall{},
 		claimedBy: map[string]string{},
+		deleted:   map[string]bool{},
 	}
 	previous := hostedInstallGrants
+	previousWait := hostedInstallGrantWait
 	hostedInstallGrants = fake
+	hostedInstallGrantWait.Timeout = 20 * time.Millisecond
+	hostedInstallGrantWait.Interval = time.Millisecond
 	t.Cleanup(func() {
 		hostedInstallGrants = previous
+		hostedInstallGrantWait = previousWait
 	})
 	return fake
 }
@@ -43,9 +51,48 @@ func (f *fakeHostedInstallGrants) Remember(install hostedSentryInstall) error {
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.deleted[install.InstallationUUID] {
+		return models.ErrSentryAppInstallationDeleted
+	}
+	previous, exists := f.grants[install.InstallationUUID]
+	sameGrant := exists && previous.Code == install.Code
+	if sameGrant && install.AccessToken == "" {
+		install.AccessToken = previous.AccessToken
+		install.RefreshToken = previous.RefreshToken
+		install.TokenExpiresAt = previous.TokenExpiresAt
+	}
 	f.grants[install.InstallationUUID] = install
-	delete(f.claimedBy, install.InstallationUUID)
+	if !sameGrant {
+		delete(f.claimedBy, install.InstallationUUID)
+	}
 	return nil
+}
+
+func (f *fakeHostedInstallGrants) Find(installationUUID, code string) (*hostedSentryInstall, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	install, ok := f.grants[strings.TrimSpace(installationUUID)]
+	if !ok || install.Code != strings.TrimSpace(code) || !install.ExpiresAt.After(time.Now()) {
+		return nil, nil
+	}
+	copied := install
+	return &copied, nil
+}
+
+func (f *fakeHostedInstallGrants) Uninstall(installationUUID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	installationUUID = strings.TrimSpace(installationUUID)
+	f.deleted[installationUUID] = true
+	delete(f.grants, installationUUID)
+	delete(f.claimedBy, installationUUID)
+	return nil
+}
+
+func (f *fakeHostedInstallGrants) Deleted(installationUUID string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.deleted[strings.TrimSpace(installationUUID)], nil
 }
 
 func (f *fakeHostedInstallGrants) Take(installationUUID, code, integrationID string) (*hostedSentryInstall, error) {
