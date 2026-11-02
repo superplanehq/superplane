@@ -46,6 +46,7 @@ export function WorkOrderSplitRunOverview({
   descriptionBusy = false,
   onDescriptionSave,
   sidebarNote,
+  automationRuns,
 }: {
   title: string;
   description: string;
@@ -72,6 +73,7 @@ export function WorkOrderSplitRunOverview({
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
   sidebarNote?: ReactNode;
+  automationRuns?: ReactNode;
 }) {
   if (sourceOnly) {
     return (
@@ -132,6 +134,9 @@ export function WorkOrderSplitRunOverview({
           sidebarNote,
         })}
       />
+      {automationRuns ? (
+        <div className="max-h-[45%] shrink-0 overflow-y-auto border-t px-5">{automationRuns}</div>
+      ) : null}
     </div>
   );
 }

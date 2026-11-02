@@ -8,8 +8,10 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
   FactoryAutomation,
+  CanvasesListRunsResponse,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import * as apiClient from "@/api-client";
 import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
@@ -377,6 +379,134 @@ async function resetLinesBoardMocks() {
   canvasStagingRefetch.mockReset().mockResolvedValue({ data: { hasStaging: false, stale: false } });
   discardCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
 }
+
+describe("LinesPage custom Backlog runs", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  it("shows task-entry custom runs without checks, including older pages and updated results", async () => {
+    const [order] = REVIEW_CANDIDATE_WORK_ORDERS;
+    const createdAt = new Date(Date.now() - 60_000).toISOString();
+    const customRun = {
+      id: "inspect-run",
+      state: "STATE_STARTED" as const,
+      createdAt,
+      rootEvent: { data: { workOrder: { id: order.id } } },
+    };
+    const response = (data: CanvasesListRunsResponse) => ({
+      data,
+      request: new Request("http://localhost/runs"),
+      response: new Response(),
+    });
+    const listRuns = vi.spyOn(apiClient, "canvasesListRuns").mockImplementation(async (options) => {
+      if (options?.path.canvasId !== "inspect-task") return response({ runs: [] });
+      if (!options.query?.before) {
+        return response({
+          runs: [{ ...customRun, id: "other-task-run", rootEvent: { data: { workOrder: { id: "other-task" } } } }],
+          hasNextPage: true,
+          lastTimestamp: createdAt,
+        });
+      }
+      return response({ runs: [customRun], hasNextPage: false });
+    });
+    const describeRun = vi.spyOn(apiClient, "canvasesDescribeRun").mockResolvedValue({
+      ...response({}),
+      data: { run: { ...customRun, state: "STATE_FINISHED", result: "RESULT_PASSED" } },
+    });
+    try {
+      useFactoryWorkOrders.mockReturnValue({ data: [order] });
+      useWorkOrder.mockReturnValue({ data: { ...order, checks: [] } });
+      useFactoryAutomations.mockReturnValue({
+        data: [{ id: "inspect-task", name: "Inspect task", columnKey: "backlog", templateId: "custom-verification" }],
+      });
+      renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/842`);
+      await waitFor(() =>
+        expect(
+          listRuns.mock.calls.some(([options]) => options.path.canvasId === "inspect-task" && options.query?.before),
+        ).toBe(true),
+      );
+      const stage = await screen.findByTestId("redesign-console-automation-inspect-task-inspect-task");
+      expect(stage).toHaveTextContent("Inspect task");
+      expect(within(stage).getByRole("button", { name: "Stop" })).toBeInTheDocument();
+      expect(stage).toHaveTextContent("1 agent run");
+      expect(screen.getByTestId("split-run-intent-document")).toBeInTheDocument();
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Toggle Inspect task details" })).toHaveAttribute(
+          "aria-expanded",
+          "false",
+        ),
+      );
+      expect(listRuns.mock.calls.filter(([options]) => options.query?.before)).toHaveLength(1);
+      expect(describeRun.mock.calls.some(([options]) => options.path.runId === customRun.id)).toBe(true);
+      listRuns.mockImplementation(async () =>
+        response({
+          runs: [
+            { ...customRun, id: "new-inspect-run", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { ...customRun, id: "other-task-run", rootEvent: { data: { workOrder: { id: "other-task" } } } },
+          ],
+          hasNextPage: true,
+          lastTimestamp: createdAt,
+        }),
+      );
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("redesign-console-automation-inspect-task-inspect-task")).toHaveTextContent(
+          "2 agent runs",
+        ),
+      );
+      expect(listRuns.mock.calls.filter(([options]) => options.query?.before)).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+    } finally {
+      listRuns.mockRestore();
+      describeRun.mockRestore();
+    }
+  });
+
+  it("explains unavailable custom history and retries without hiding cached runs", async () => {
+    const [order] = REVIEW_CANDIDATE_WORK_ORDERS;
+    const listRuns = vi.spyOn(apiClient, "canvasesListRuns").mockRejectedValue(new Error("History unavailable"));
+    try {
+      useFactoryWorkOrders.mockReturnValue({ data: [order] });
+      useWorkOrder.mockReturnValue({ data: { ...order, checks: [] } });
+      useFactoryAutomations.mockReturnValue({
+        data: [{ id: "inspect-task", name: "Inspect task", columnKey: "backlog", templateId: "custom-verification" }],
+      });
+      renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/842`);
+      expect(await screen.findByRole("alert")).toHaveTextContent("Could not load Backlog automation runs.");
+      listRuns.mockResolvedValue({
+        data: {
+          runs: [
+            {
+              id: "inspect-run",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              rootEvent: { data: { workOrder: { id: order.id } } },
+            },
+          ],
+        },
+        request: new Request("http://localhost/runs"),
+        response: new Response(),
+      });
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+      expect(await screen.findByRole("button", { name: "Toggle Inspect task details" })).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      listRuns.mockRejectedValue(new Error("Refresh unavailable"));
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Could not load Backlog automation runs.");
+      expect(screen.getByRole("button", { name: "Toggle Inspect task details" })).toBeInTheDocument();
+    } finally {
+      listRuns.mockRestore();
+    }
+  });
+});
 
 describe("LinesPage board", () => {
   beforeEach(async () => {
@@ -1165,6 +1295,21 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryCustomAutomationSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
+  });
+
+  it("opens reused custom setup with Backlog triggers from Add intake", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    const user = userEvent.setup();
+    renderLinesBoard();
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+    await user.click(screen.getByTestId("add-intake-template-custom-verification"));
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=backlog");
+    const trigger = screen.getByRole("combobox", { name: "Trigger" });
+    expect(trigger).toHaveTextContent("Manual");
+    await user.click(trigger);
+    expect(screen.getByRole("option", { name: /When a task enters Backlog/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Every pull request commit/ })).not.toBeInTheDocument();
   });
 
   it("opens the created scheduled intake in the board automation view", async () => {
