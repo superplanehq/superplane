@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// Synchronous delivery outcomes. Durable deliveries use the
+// SentryWebhookState values instead.
 const (
 	SentryWebhookOutcomeAccepted     = "accepted"
 	SentryWebhookOutcomeNoConnection = "no_connection"
@@ -38,6 +40,9 @@ type SentryWebhookReceipt struct {
 	IntegrationCount int
 	// TaskIDs lists SuperPlane tasks this webhook created. IDs are comma-separated.
 	TaskIDs string
+	// ProcessingError explains why a durable delivery is retrying, blocked,
+	// or filtered. HTTPStatus stays the answer that Sentry received.
+	ProcessingError string
 }
 
 func (SentryWebhookReceipt) TableName() string {
@@ -63,6 +68,7 @@ func CreateSentryWebhookReceipt(tx *gorm.DB, receipt SentryWebhookReceipt) (uuid
 	receipt.IssueID = clipWebhookField(receipt.IssueID)
 	receipt.IssueShortID = clipWebhookField(receipt.IssueShortID)
 	receipt.Outcome = clipWebhookField(receipt.Outcome)
+	receipt.ProcessingError = clipSentryWebhookError(receipt.ProcessingError)
 
 	if err := tx.Create(&receipt).Error; err != nil {
 		return uuid.Nil, err
@@ -72,8 +78,13 @@ func CreateSentryWebhookReceipt(tx *gorm.DB, receipt SentryWebhookReceipt) (uuid
 
 // DeleteExpiredSentryWebhookReceipts removes receipts older than olderThan.
 // It deletes at most limit rows so one pass cannot scan the whole table.
+// A receipt of an unfinished durable delivery stays until that delivery ends.
 func DeleteExpiredSentryWebhookReceipts(tx *gorm.DB, olderThan time.Time, limit int) (int64, error) {
-	return deleteRowsLimited(tx, &SentryWebhookReceipt{}, limit, "received_at < ?", olderThan)
+	return deleteRowsLimited(tx, &SentryWebhookReceipt{}, limit, `received_at < ? AND NOT EXISTS (
+		SELECT 1 FROM sentry_webhook_inbox
+		WHERE sentry_webhook_inbox.receipt_id = sentry_webhook_receipts.id
+		  AND sentry_webhook_inbox.completed_at IS NULL
+	)`, olderThan)
 }
 
 func UpdateSentryWebhookReceiptResult(tx *gorm.DB, id uuid.UUID, status int, outcome string, integrationCount int) error {

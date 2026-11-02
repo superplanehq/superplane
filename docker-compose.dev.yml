@@ -71,6 +71,10 @@ services:
       START_SEAT_RENEWAL_SYNC_WORKER: "yes"
       START_PLANNING_SESSION_CLEANUP_WORKER: "yes"
       START_EVENT_RETENTION_WORKER: "yes"
+      START_SENTRY_WEBHOOK_WORKER: "yes"
+      # Store verified Sentry webhooks durably and answer before processing.
+      # Start the Sentry webhook worker before you set this to yes.
+      SENTRY_WEBHOOK_DURABLE_ACCEPTANCE: ${SENTRY_WEBHOOK_DURABLE_ACCEPTANCE:-no}
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}

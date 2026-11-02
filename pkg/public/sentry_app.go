@@ -8,16 +8,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	sentryintegration "github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/sentryinbox"
 )
 
 // HandleSentryAppInstall starts a public SuperPlane Sentry app install. The
@@ -87,10 +90,12 @@ func (s *Server) HandleSentryAppSetup(w http.ResponseWriter, r *http.Request) {
 	s.dispatchIntegrationRequest(w, r, integration)
 }
 
-// HandleSentryAppWebhook receives issue events for the public SuperPlane
-// Sentry app. One Sentry install can map to more than one SuperPlane
-// connection.
+// HandleSentryAppWebhook receives events for the public SuperPlane Sentry
+// app. One Sentry install can map to more than one SuperPlane connection.
+// With durable acceptance on, it verifies the signature with the app secret,
+// commits the delivery, and answers. The Sentry webhook worker does the rest.
 func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) {
+	started := time.Now()
 	app, ok := sentryintegration.HostedAppFromEnv()
 	if !ok {
 		http.Error(w, "not found", http.StatusNotFound)
@@ -109,6 +114,15 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 			"status":        http.StatusBadRequest,
 		})
 		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
+		return
+	}
+
+	if config.SentryWebhookDurableAcceptance() {
+		s.acceptSentryWebhook(w, r, sentryinbox.Delivery{
+			Source:   models.SentryWebhookSourceHostedApp,
+			Resource: r.Header.Get("Sentry-Hook-Resource"),
+			Body:     body,
+		}, started)
 		return
 	}
 

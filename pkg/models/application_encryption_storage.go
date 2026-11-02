@@ -128,6 +128,12 @@ func ApplicationEncryptedStorage() []EncryptedStorageLocation {
 			ReadPage: ReadSentryAppInstallGrantRefreshTokenPage,
 			Replace:  ReplaceSentryAppInstallGrantRefreshToken,
 		},
+		{
+			Name:     "sentry_webhook_inbox.payload_ciphertext",
+			Format:   EncryptedStorageBytes,
+			ReadPage: ReadSentryWebhookInboxPayloadPage,
+			Replace:  ReplaceSentryWebhookInboxPayload,
+		},
 	}
 }
 
