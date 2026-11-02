@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -495,6 +497,9 @@ func (m *RunnerManager) createRunner(
 			registration, err = models.FindRunnerRegistration(database.DB(ctx), runner.ID)
 		}
 	}
+	if taskID != nil && errors.Is(err, billing.ErrHostedCreditEmpty) {
+		rejectTaskWithoutComputeCredit(ctx, *taskID)
+	}
 
 	switch {
 	case errors.Is(err, models.ErrRunnerFleetNotFound):
@@ -510,7 +515,8 @@ func (m *RunnerManager) createRunner(
 		errors.Is(err, models.ErrSubscriptionModelUnavailable),
 		errors.Is(err, models.ErrRunnerTaskNotReservable),
 		errors.Is(err, models.ErrRunnerTaskFleetMismatch),
-		errors.Is(err, models.ErrRunnerTaskBackendMismatch):
+		errors.Is(err, models.ErrRunnerTaskBackendMismatch),
+		errors.Is(err, billing.ErrHostedCreditEmpty):
 		return nil, nil, grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, models.ErrRunnerIdempotencyConflict):
 		return nil, nil, grpcerrors.AlreadyExists(err, err.Error())
@@ -521,6 +527,19 @@ func (m *RunnerManager) createRunner(
 	default:
 		return runner, registration, nil
 	}
+}
+
+// rejectTaskWithoutComputeCredit ends a task-bound job that lost credit while
+// queued. The runner creation transaction rolled back, so the task would
+// otherwise stay queued and keep its organization slot.
+func rejectTaskWithoutComputeCredit(ctx context.Context, taskID uuid.UUID) {
+	db := database.DB(ctx)
+	result, err := models.RejectRunnerTaskWithoutComputeCredit(db, taskID)
+	if err != nil {
+		log.WithError(err).WithField("task_id", taskID).Warn("Failed to reject runner task without credit")
+		return
+	}
+	messages.PublishRunnerTaskRejections(db, result)
 }
 
 func loadIdempotentRunner(
