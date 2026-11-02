@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -797,7 +796,6 @@ func TestFactory_MaybeAttachAnalysisSessionLinksRejectedModelRun(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-model-rejected")
 	db := database.DB(t.Context())
-	require.NoError(t, EnableExperimentalFeature(org.ID, features.FeatureCodexSubscriptions))
 	connection, err := CreateCodexConnection(db, org.ID, userID, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, connection.StoreUsage(db, nil, []CodexModel{{Model: "gpt-5.4"}}, time.Now()))
