@@ -95,7 +95,10 @@ func TestValidateSubscriptionCanvasModelsChecksLiteralChoicesOnly(t *testing.T) 
 			}
 			require.ErrorIs(t, err, tc.expected)
 			assert.True(t, models.IsPermanentSubscriptionAdmissionError(err))
-			assert.Contains(t, err.Error(), tc.model)
+			assert.Equal(t, `Model "gpt-4.1" is not available for the current task owner.`, err.Error())
 		})
 	}
+	generic := models.SubscriptionModelUnavailableError("  ")
+	assert.ErrorIs(t, generic, models.ErrSubscriptionModelUnavailable)
+	assert.Equal(t, models.ErrSubscriptionModelUnavailable.Error(), generic.Error())
 }

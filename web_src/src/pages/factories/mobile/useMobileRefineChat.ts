@@ -3,8 +3,10 @@ import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import type { ReactNode } from "react";
 
 import { analysisFirstResultDelivered } from "../lib/analysisOutcome";
+import { latestBacklogAnalysisRun, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import { factoryPlanningEnabled } from "../pages/planningSettingsModel";
 import { draftStripAnalysis } from "../pages/work-order-split-run/draftStripAnalysis";
+import { useBacklogPlanningRunRefresh } from "../pages/work-order-split-run/useBacklogPlanningRunRefresh";
 import type { IntentAnalysisChat } from "../pages/work-order-split-run/intentAnalysisChat";
 import type { SplitRunFixture } from "../pages/work-order-split-run/splitRunMocks";
 import { useAnalysisPlanningSession } from "../pages/work-order-split-run/useAnalysisPlanningSession";
@@ -30,6 +32,7 @@ export function useMobileRefineChat({
   orderId,
   fixture,
   artifacts,
+  analysisRuns,
   canUpdate,
   modelSelect,
 }: {
@@ -40,6 +43,7 @@ export function useMobileRefineChat({
   orderId: string;
   fixture: SplitRunFixture;
   artifacts: FactoriesWorkOrderArtifact[];
+  analysisRuns: BacklogAnalysisRun[];
   canUpdate: boolean;
   modelSelect?: ReactNode;
 }): MobileRefineChat {
@@ -56,6 +60,14 @@ export function useMobileRefineChat({
     uploadFiles: fileUpload.uploadFiles,
     analysisDelivered: analysisFirstResultDelivered({ checks: fixture.checks, artifacts }),
   });
+  useBacklogPlanningRunRefresh({
+    organizationId,
+    factoryId,
+    orderId,
+    isDraft: refines,
+    hasSession: Boolean(analysis.session),
+    latestRun: latestBacklogAnalysisRun(analysisRuns)?.run,
+  });
   if (!refines) {
     return { loadFailed: false, sessionMissing: false };
   }
@@ -63,7 +75,7 @@ export function useMobileRefineChat({
     return { loadFailed: false, sessionMissing: !analysis.isLoading };
   }
   return {
-    chat: draftStripAnalysis({ factory, organizationId, factoryKey, fixture, analysis }, modelSelect),
+    chat: draftStripAnalysis({ factory, organizationId, factoryKey, fixture, analysis, canUpdate }, modelSelect),
     loadFailed: Boolean(analysis.queryError),
     sessionMissing: false,
   };

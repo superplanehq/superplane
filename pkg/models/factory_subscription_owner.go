@@ -26,7 +26,19 @@ func SubscriptionModelUnavailableError(model string) error {
 	if model == "" {
 		return ErrSubscriptionModelUnavailable
 	}
-	return fmt.Errorf("model %q: %w", model, ErrSubscriptionModelUnavailable)
+	return subscriptionModelUnavailableError{model: model}
+}
+
+type subscriptionModelUnavailableError struct {
+	model string
+}
+
+func (e subscriptionModelUnavailableError) Error() string {
+	return fmt.Sprintf("Model %q is not available for the current task owner.", e.model)
+}
+
+func (e subscriptionModelUnavailableError) Unwrap() error {
+	return ErrSubscriptionModelUnavailable
 }
 
 func (o *FactoryWorkOrder) UsesCodexSubscription(tx *gorm.DB) (bool, error) {

@@ -25,6 +25,7 @@ import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession, planningSessionCanStart } from "./useAnalysisPlanningSession";
+import { useBacklogPlanningRunRefresh } from "./useBacklogPlanningRunRefresh";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
@@ -86,6 +87,14 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
     }),
   });
   const planningFailure = popupPlanningFailure(analysis, analysisRuns);
+  useBacklogPlanningRunRefresh({
+    organizationId,
+    factoryId,
+    orderId,
+    isDraft: refinementEnabled && fixture.footer.kind === "draft",
+    hasSession: Boolean(analysis.session),
+    latestRun: latestBacklogAnalysisRun(analysisRuns ?? [])?.run,
+  });
   const mode = workOrderPopupMode({
     hasPlanningSession: Boolean(analysis.session),
     hasAnalysisResult: popupHasAnalysisResult(fixture, popupData, planningFailure),
@@ -194,6 +203,7 @@ function AnalysisWorkOrderPopup({
     fixture: viewFixture,
     analysis,
     planningFailure,
+    canUpdate,
     draftModel,
     draftThinking,
     onDraftStartChange: ({ model, thinkingLevel }) => {
@@ -421,6 +431,7 @@ type AnalysisDraftChromeArgs = {
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   planningFailure?: string;
+  canUpdate: boolean;
   draftModel: string;
   draftThinking: string;
   onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;

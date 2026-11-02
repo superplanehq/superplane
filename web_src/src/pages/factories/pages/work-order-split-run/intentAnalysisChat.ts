@@ -16,6 +16,8 @@ export type IntentAnalysisChat = {
   composer: string;
   composerError?: string;
   planningFailure?: string;
+  canEditPlanningModel?: boolean;
+  planningSessionExists?: boolean;
   canSend: boolean;
   isUploading?: boolean;
   onComposerChange: (value: string) => void;

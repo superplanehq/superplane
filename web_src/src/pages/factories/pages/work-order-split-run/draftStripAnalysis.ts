@@ -15,6 +15,7 @@ export type DraftStripAnalysisArgs = {
   fixture: SplitRunFixture;
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   planningFailure?: string;
+  canUpdate?: boolean;
 };
 
 /**
@@ -32,6 +33,8 @@ export function draftStripAnalysis(args: DraftStripAnalysisArgs, modelSelect: Re
     ...args.analysis,
     view: planningFailure ? { ...args.analysis.view, machineStatus: "failed" as const } : args.analysis.view,
     planningFailure,
+    canEditPlanningModel: args.canUpdate,
+    planningSessionExists: Boolean(args.analysis.session),
     requestCreatedAt: args.fixture.phases.find((phase) => phase.id === "backlog")?.startedAt,
     modelSelect,
     showClarity: factoryShowsClarity(args.factory),

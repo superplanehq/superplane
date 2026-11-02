@@ -5,7 +5,6 @@ import type { FilesFile } from "@/api-client";
 import { SkillSlashFieldOverlay } from "@/components/AgentSidebar/SkillSlashFieldOverlay";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert";
 import { Kbd } from "@/components/ui/kbd";
 import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
 import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
@@ -23,6 +22,7 @@ import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOver
 import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
 import { AnalysisPlanControls } from "./AnalysisPlanControls";
 import { PlanningImplementationControls } from "./PlanningImplementationControls";
+import { PlanningFailureAlert } from "./PlanningFailureAlert";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import { JumpToLatestPill } from "./JumpToLatestPill";
@@ -151,7 +151,12 @@ function AnalysisRequestChat({
                 progressLabel={state.progressLabel}
               />
             ) : null}
-            <PlanningFailureAlert failure={analysis.planningFailure} />
+            <PlanningFailureAlert
+              failure={analysis.planningFailure}
+              organizationId={analysis.organizationId}
+              canEditModel={analysis.canEditPlanningModel}
+              hasSession={analysis.planningSessionExists}
+            />
             <AnalysisPlanControls analysis={analysis} chipsWorking={chipsWorking} position="conversation" />
             {state.showSurvey && analysis.view.survey ? (
               <WorkOrderIntentSurvey
@@ -191,21 +196,6 @@ function AnalysisRequestChat({
         actions={analysis.closedDecision}
       />
     </div>
-  );
-}
-
-function PlanningFailureAlert({ failure }: { failure?: string }) {
-  if (!failure) {
-    return null;
-  }
-  return (
-    <Alert variant="destructive" aria-label="Planning failed" className="mt-3">
-      <AlertTitle>Planning failed</AlertTitle>
-      <AlertDescription className="whitespace-pre-wrap break-words">
-        <p>{failure}</p>
-        <p>Check the model and task owner, then start planning again.</p>
-      </AlertDescription>
-    </Alert>
   );
 }
 
