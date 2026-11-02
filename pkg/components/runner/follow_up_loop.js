@@ -504,7 +504,7 @@ async function materializeFollowUpAttachments(taskDir, text, fetchImpl, env = pr
   }
   if (saved.length > 0) {
     const paths = saved.map((file) => file.path).join(", ");
-    parts.push(`Call inspect_attachment on ${paths} and review the returned image.`);
+    parts.push(`Call get_artifact with each of these paths and review the returned images: ${paths}.`);
   }
   return parts.join("\n\n");
 }

@@ -1,16 +1,10 @@
 package public
 
 import (
-	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -46,7 +40,7 @@ func TestRunnerGlobalPlanUpdate(t *testing.T) {
 	db := database.DB(t.Context())
 	token := mustPlanningGlobalRunnerToken(t, r, session, planningToken)
 
-	assert.Equal(t, append(append([]string{}, everyGlobalRunnerTool...), "propose_update", "inspect_attachment"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, globalRunnerToolsWith("propose_plan"), listRunnerTools(t, server, token))
 
 	rec := runnerRequest(t, server, http.MethodPut, token, "/api/v1/runner/task/plan", `{
 		"scores": {
@@ -162,7 +156,7 @@ func TestRunnerGlobalMergeCheck(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStateStarted, active.State)
 
-	assert.Equal(t, append(append([]string{}, everyGlobalRunnerTool...), "report_merge_check"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, globalRunnerToolsWith("report_merge_check"), listRunnerTools(t, server, token))
 
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/merge-checks", `{"check":"risk","score":4,"summary":"Risk is not enabled."}`)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
@@ -205,48 +199,10 @@ func TestRunnerGlobalMergeCheck(t *testing.T) {
 
 func reportMergeCheckOverStdio(t *testing.T, server *Server, token string, files []runner.TaskFile) {
 	t.Helper()
-	api := httptest.NewServer(server.Router)
-	defer api.Close()
-	taskDir := t.TempDir()
-	for _, file := range files {
-		if !strings.HasPrefix(file.Path, "superplane_mcp/") {
-			continue
-		}
-		path := filepath.Join(taskDir, file.Path)
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-		require.NoError(t, os.WriteFile(path, []byte(file.Content), 0600))
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	command := exec.CommandContext(ctx, "node", filepath.Join(taskDir, "superplane_mcp/server.js"))
-	command.Env = append(os.Environ(), "SUPERPLANE_BASE_URL="+api.URL, "SUPERPLANE_RUNNER_TOKEN="+token, "SUPERPLANE_TASK_DIR="+taskDir)
-	stdin, err := command.StdinPipe()
-	require.NoError(t, err)
-	stdout, err := command.StdoutPipe()
-	require.NoError(t, err)
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	require.NoError(t, command.Start())
-	t.Cleanup(func() { _ = command.Process.Kill(); _ = command.Wait() })
-	scanner := bufio.NewScanner(stdout)
-	request := func(id int, method string, params any) map[string]any {
-		require.NoError(t, json.NewEncoder(stdin).Encode(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params}))
-		require.True(t, scanner.Scan(), stderr.String())
-		var response map[string]any
-		require.NoError(t, json.Unmarshal(scanner.Bytes(), &response))
-		require.Nil(t, response["error"])
-		return response["result"].(map[string]any)
-	}
-	request(1, "initialize", map[string]any{})
-	list := request(2, "tools/list", map[string]any{})
-	names := []string{}
-	for _, tool := range list["tools"].([]any) {
-		names = append(names, tool.(map[string]any)["name"].(string))
-	}
-	require.Contains(t, names, "report_merge_check")
-	result := request(3, "tools/call", map[string]any{"name": "report_merge_check", "arguments": map[string]any{"check": "api-latency", "score": 2, "summary": "The change adds one query per request."}})
-	require.NotEqual(t, true, result["isError"], result)
-	assert.Equal(t, "reported", result["structuredContent"].(map[string]any)["status"])
+	mcp := startGlobalMCP(t, server, token, files)
+	require.Contains(t, mcp.toolNames(), "report_merge_check")
+	result := mcp.call("report_merge_check", map[string]any{"check": "api-latency", "score": 2, "summary": "The change adds one query per request."})
+	assert.Equal(t, "reported", result["status"])
 }
 
 func TestRunnerGlobalArtifactUpload(t *testing.T) {
@@ -264,8 +220,7 @@ func TestRunnerGlobalArtifactUpload(t *testing.T) {
 	require.True(t, runner.HasVisualEvidence(env))
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60, nil))
 	require.NotEmpty(t, token)
-	assert.Equal(t, append(append([]string{}, everyGlobalRunnerTool...),
-		"inspect_screenshot", "upload_artifact", "report_visual_evidence_unavailable"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, globalRunnerToolsWith("report_visual_evidence_unavailable"), listRunnerTools(t, server, token))
 
 	png := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0}, 16)...)
 	rec := postRunnerArtifactFile(t, server, token, png)
@@ -285,8 +240,12 @@ func TestRunnerGlobalArtifactUpload(t *testing.T) {
 	rec = postRunnerArtifactFile(t, server, links, png)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 
-	withoutEvidence := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
-	rec = postRunnerArtifactFile(t, server, withoutEvidence, png)
+	shared := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	rec = postRunnerArtifactFile(t, server, shared, png)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
+	withoutArtifacts := runnerTokenWithScopes(t, shared, runner.ScopeArtifactsRead)
+	rec = postRunnerArtifactFile(t, server, withoutArtifacts, png)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 }
 
@@ -301,7 +260,7 @@ func TestRunnerGlobalArtifactLink(t *testing.T) {
 		{Name: runner.EnvSuperplanePublishLinks, Value: "yes"},
 	}, 60, nil))
 	require.NotEmpty(t, token)
-	assert.Equal(t, append(append([]string{}, everyGlobalRunnerTool...), "publish_link"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, everyGlobalRunnerTool, listRunnerTools(t, server, token))
 
 	body := `{"url":"https://staging.example.com/pr-42","title":"Staging","key":"staging"}`
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/links", body)
@@ -317,7 +276,7 @@ func TestRunnerGlobalArtifactLink(t *testing.T) {
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/markdown", markdown)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 
-	withoutLinks := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	withoutLinks := runnerTokenWithScopes(t, token, runner.ScopeArtifactsRead)
 	rec = runnerRequest(t, server, http.MethodPost, withoutLinks, "/api/v1/runner/task/links", body)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	rec = runnerRequest(t, server, http.MethodPost, withoutLinks, "/api/v1/runner/task/markdown", markdown)

@@ -875,7 +875,7 @@ test("materializeFollowUpAttachments downloads signed images and rewrites the pr
     pngFetch(signed),
   );
   assert.doesNotMatch(rewritten, /sp_file=1/);
-  assert.match(rewritten, /inspect_attachment/);
+  assert.match(rewritten, /get_artifact/);
   const saved = fs.readdirSync(path.join(taskDir, "attachments"));
   assert.equal(saved.length, 1);
   assert.match(saved[0], /^01-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\.png$/);
@@ -913,7 +913,7 @@ test("materializeFollowUpAttachments notes failed downloads and strips signed UR
     async () => ({ ok: false, status: 500 }),
   );
   assert.doesNotMatch(rewritten, /sp_file=1/);
-  assert.doesNotMatch(rewritten, /inspect_attachment/);
+  assert.doesNotMatch(rewritten, /get_artifact/);
   assert.match(rewritten, /SuperPlane could not download 1 user image/);
   assert.equal(fs.existsSync(path.join(taskDir, "attachments")), true);
   assert.deepEqual(fs.readdirSync(path.join(taskDir, "attachments")), []);
@@ -997,7 +997,7 @@ test("materializeFollowUpAttachments reuses indexed files without downloading", 
   );
   assert.equal(calls, 0);
   assert.doesNotMatch(rewritten, /sp_file=1/);
-  assert.match(rewritten, /inspect_attachment/);
+  assert.match(rewritten, /get_artifact/);
   assert.match(rewritten, new RegExp(dest.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.deepEqual(fs.readdirSync(attachments).sort(), ["01-shot.png", "manifest.json"]);
 });
@@ -1018,7 +1018,7 @@ test("materializeFollowUpAttachments allows an image at the size limit", async (
     }),
   );
   assert.doesNotMatch(rewritten, /could not download/);
-  assert.match(rewritten, /inspect_attachment/);
+  assert.match(rewritten, /get_artifact/);
   const saved = fs.readdirSync(path.join(taskDir, "attachments"));
   assert.equal(saved.length, 1);
   assert.equal(fs.statSync(path.join(taskDir, "attachments", saved[0])).size, MAX_ATTACHMENT_BYTES);
@@ -1069,7 +1069,7 @@ test("runLoop downloads follow-up images before the prompt", async () => {
   assert.equal(code, 0);
   assert.equal(prompts.length, 1);
   assert.doesNotMatch(prompts[0], /sp_file=1/);
-  assert.match(prompts[0], /inspect_attachment/);
+  assert.match(prompts[0], /get_artifact/);
   const saved = fs.readdirSync(path.join(taskDir, "attachments"));
   assert.equal(saved.length, 1);
   assert.match(prompts[0], new RegExp(saved[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

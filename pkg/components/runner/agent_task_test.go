@@ -115,7 +115,7 @@ func TestAppendPublishLinkProtocolAddsCommandToFirstPromptOnly(t *testing.T) {
 	assert.Contains(t, *got[1].Prompt, "superplane task artifact add-link")
 	assert.Contains(t, *got[1].Prompt, "superplane task artifact add-markdown")
 	assert.Contains(t, *got[1].Prompt, "superplane task artifact add-file")
-	assert.Contains(t, *got[1].Prompt, "publish_link")
+	assert.Contains(t, *got[1].Prompt, "add_artifact")
 	assert.Equal(t, secondPrompt, *got[2].Prompt)
 	assert.Equal(t, command, *got[0].Command)
 	twice := AppendPublishLinkProtocol(got, true)
@@ -338,7 +338,7 @@ func TestBuildAgentTaskFetchesSignedAttachments(t *testing.T) {
 	promptFile := requireBrokerFile(t, files, "prompts/01-implement.txt").Content
 	assert.Contains(t, promptFile, AttachmentAgentInstructions)
 	assert.Contains(t, promptFile, "sp_file=1")
-	assert.NotContains(t, promptFile, "inspect_attachment")
+	assert.NotContains(t, promptFile, "get_artifact")
 	assert.Equal(t, "Implement", commands[3].Name)
 }
 
@@ -414,7 +414,7 @@ func TestBuildAgentTaskMintsFileRefsInPromptFiles(t *testing.T) {
 	assert.Contains(t, prompt, signed)
 	assert.Contains(t, prompt, AttachmentAgentInstructions)
 	assert.NotContains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
-	assert.NotContains(t, prompt, "inspect_attachment")
+	assert.NotContains(t, prompt, "get_artifact")
 	assert.NotContains(t, prompt, "sp-file://")
 	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, "sp_file=1")
 	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, "01-bug.png")
@@ -463,7 +463,7 @@ func TestBuildAgentTaskRewritesPlanningImagePaths(t *testing.T) {
 
 	prompt := requireBrokerFile(t, files, "prompts/01-implement.txt").Content
 	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
-	assert.Contains(t, prompt, "inspect_attachment")
+	assert.Contains(t, prompt, "get_artifact")
 	assert.Contains(t, prompt, AttachmentAgentInstructions)
 	assert.NotContains(t, prompt, signed)
 	assert.NotContains(t, prompt, "sp-file://")
