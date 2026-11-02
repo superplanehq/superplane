@@ -1,5 +1,9 @@
 import { agentRunNewTokenCount } from "@/lib/agentRunTelemetryChart";
-import type { AgentPromptUsageSeries } from "@/lib/agentRunTelemetry";
+import {
+  combinedMeasurementState,
+  type UsageMeasurementState,
+  type AgentPromptUsageSeries,
+} from "@/lib/agentRunTelemetry";
 import { EMPTY_LIVE_HEADER_SPEND, type LiveHeaderSpend } from "@/lib/overlayHeaderSpend";
 
 import type { CreateWithAgentView } from "../createWithAgentTypes";
@@ -21,8 +25,10 @@ export function headerSpendFromUsageSeries(series: AgentPromptUsageSeries[]): Li
   let tokens = 0;
   let usd = 0;
   let hasHostedUsage = false;
+  const states: Array<UsageMeasurementState | undefined> = [];
   for (const prompt of series) {
     tokens += agentRunNewTokenCount(prompt.telemetry);
+    states.push(prompt.telemetry.usage_state);
     hasHostedUsage ||= prompt.telemetry.usage.hosted_cost_usd != null;
     const promptUsd = prompt.telemetry.usage.hosted_cost_usd ?? prompt.telemetry.usage.total_cost_usd;
     if (promptUsd != null && Number.isFinite(promptUsd)) {
@@ -31,7 +37,8 @@ export function headerSpendFromUsageSeries(series: AgentPromptUsageSeries[]): Li
   }
   // Hosted totals use the same whole-cent truncation as the usage ledger.
   const cents = hasHostedUsage ? Math.floor(Math.round(usd * 1_000_000) / 10_000) : Math.round(usd * 100);
-  return { tokens, cents };
+  const state = combinedMeasurementState(states).usage_state;
+  return { tokens, cents, ...(state ? { usageState: state } : {}) };
 }
 
 export type PlanningHeaderSpendMemory = {
@@ -112,5 +119,10 @@ function currentRunWasSaved(memory: PlanningHeaderSpendMemory, saved: LiveHeader
 }
 
 function addSpend(left: LiveHeaderSpend, right: LiveHeaderSpend): LiveHeaderSpend {
-  return { tokens: left.tokens + right.tokens, cents: left.cents + right.cents };
+  const state = combinedMeasurementState([left.usageState, right.usageState]).usage_state;
+  return {
+    tokens: left.tokens + right.tokens,
+    cents: left.cents + right.cents,
+    ...(state ? { usageState: state } : {}),
+  };
 }

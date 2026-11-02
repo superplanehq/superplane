@@ -93,6 +93,7 @@ export function analysisFinishedStatus<T extends string>(status: T, delivered: b
 type AnalysisCanvasRun = {
   result?: string;
   state?: string;
+  subscriptionFailure?: { reason?: string };
   cancelledBy?: { id?: string } | null;
 };
 
@@ -101,7 +102,10 @@ export function statusForAnalysisRun<T extends string>(
   run: AnalysisCanvasRun,
   status: T,
   delivered: boolean,
-): T | "passed" | "running" {
+): T | "passed" | "running" | "failed" {
+  if (run.subscriptionFailure?.reason === "chatgpt_quota_exhausted") {
+    return "failed";
+  }
   if (delivered) {
     return analysisFinishedStatus(status, delivered);
   }

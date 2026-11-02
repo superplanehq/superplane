@@ -44,6 +44,8 @@ type WorkspaceUsageEvent struct {
 	WorkOrderExecutionID *uuid.UUID
 	CanvasRunID          uuid.UUID
 	NodeExecutionID      uuid.UUID
+	RunnerTaskID         *uuid.UUID
+	SetupPurpose         string
 	NodeID               string
 	Provider             string
 	Model                string
@@ -234,10 +236,16 @@ func RecordComputeUsage(tx *gorm.DB, in ComputeUsageEventInput) error {
 }
 
 func persistUsageEvent(tx *gorm.DB, event WorkspaceUsageEvent, execution *FactoryWorkOrderExecution) error {
-	err := tx.Clauses(clause.OnConflict{
+	query := tx.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "idempotency_key"}},
 		DoNothing: true,
-	}).Create(&event).Error
+	})
+	if event.SetupPurpose != "" {
+		// Setup has no workflow identity. Omit the legacy UUID value fields so
+		// PostgreSQL stores NULL instead of the UUID zero value.
+		query = query.Omit("CanvasRunID", "NodeExecutionID")
+	}
+	err := query.Create(&event).Error
 	if err != nil {
 		return err
 	}

@@ -271,3 +271,32 @@ func readJSONFile(t *testing.T, path string) map[string]any {
 	require.NoError(t, json.Unmarshal(body, &parsed))
 	return parsed
 }
+
+func TestCodexSnapshotsReplaceAttemptsAndPreservePromptHistory(t *testing.T) {
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+	command := exec.Command("node", "-e", `
+const fs=require("fs"),path=require("path");
+const {snapshotAttempt,mergeResult}=require(process.argv[1]);
+const dir=process.env.SUPERPLANE_TASK_DIR;
+const record=(id,total,state)=>snapshotAttempt(dir,{attempt_id:id,usage:{input_tokens:total,output_tokens:0,cache_read_input_tokens:0,cache_creation_input_tokens:0,reasoning_tokens:0,total_tokens:total},usage_state:state});
+record("first",0,"measured");
+record("first",10,"measured");
+record("first",10,"measured");
+record("second",0,"pending");
+record("second",5,"partial");
+// An artifact writer must not erase the measurements from failed prompts.
+fs.writeFileSync(process.env.SUPERPLANE_RESULT_FILE,JSON.stringify({plan:"saved-plan"}));
+mergeResult(process.env.SUPERPLANE_RESULT_FILE,dir);
+`, filepath.Join(taskDir, "llm_usage.js"))
+	command.Env = append(os.Environ(), "SUPERPLANE_TASK_DIR="+taskDir, "SUPERPLANE_RESULT_FILE="+resultFile)
+	out, err := command.CombinedOutput()
+	require.NoError(t, err, string(out))
+	result := readJSONFile(t, resultFile)
+	assert.Equal(t, "saved-plan", result["plan"])
+	assert.Equal(t, "partial", result["usage_state"])
+	usage := result["usage"].(map[string]any)
+	assert.Equal(t, float64(15), usage["total_tokens"])
+	assert.Equal(t, float64(15), usage["input_tokens"])
+}

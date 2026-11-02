@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -839,17 +840,19 @@ func serializeWorkOrderExecutions(
 
 func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord, models []string) *pb.WorkOrderExecution {
 	item := &pb.WorkOrderExecution{
-		Id:              execution.ID.String(),
-		Step:            execution.StepName,
-		StepIndex:       int32(execution.StepIndex),
-		State:           serializeWorkOrderExecutionState(execution.Status, execution.RunState),
-		Result:          serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
-		CreatedAt:       timestamppb.New(execution.CreatedAt),
-		UpdatedAt:       timestamppb.New(execution.UpdatedAt),
-		TotalTokens:     execution.TotalTokens,
-		CostCents:       execution.CostCents,
-		DurationSeconds: execution.DurationSeconds,
-		Models:          models,
+		Id:                  execution.ID.String(),
+		Step:                execution.StepName,
+		StepIndex:           int32(execution.StepIndex),
+		State:               serializeWorkOrderExecutionState(execution.Status, execution.RunState),
+		Result:              serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
+		CreatedAt:           timestamppb.New(execution.CreatedAt),
+		UpdatedAt:           timestamppb.New(execution.UpdatedAt),
+		TotalTokens:         execution.TotalTokens,
+		CostCents:           execution.CostCents,
+		DurationSeconds:     execution.DurationSeconds,
+		Models:              models,
+		SubscriptionFailure: actions.SerializeSubscriptionFailure(execution.SubscriptionFailure),
+		UsageState:          execution.UsageState,
 	}
 	if execution.RunID != nil {
 		runRef := &pb.WorkOrderExecution_RunRef{

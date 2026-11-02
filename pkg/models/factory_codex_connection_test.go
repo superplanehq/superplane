@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -682,6 +683,7 @@ func clearProviderDeletion(db *gorm.DB, runner *models.Runner) error {
 
 func newDisconnectedCodexLogin(t *testing.T) (*gorm.DB, *models.FactoryCodexConnection, *models.RunnerTask, *models.Runner) {
 	t.Helper()
+	t.Setenv(billing.BillingEnabledEnv, "no")
 	require.NoError(t, database.TruncateTables())
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
@@ -728,6 +730,7 @@ func newReservedCodexLogin(t *testing.T) (*gorm.DB, *models.FactoryCodexConnecti
 
 func newReadyCodexConnection(t *testing.T) (*gorm.DB, *models.FactoryCodexConnection, *models.RunnerTask, *models.Runner) {
 	t.Helper()
+	t.Setenv(billing.BillingEnabledEnv, "no")
 	require.NoError(t, database.TruncateTables())
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
