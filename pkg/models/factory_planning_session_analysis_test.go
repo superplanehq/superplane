@@ -838,6 +838,35 @@ func TestFactory_MaybeAttachAnalysisSessionLinksRejectedModelRun(t *testing.T) {
 	assert.Equal(t, run.ID, runs[0].ID)
 }
 
+func TestFactory_AttachAnalysisSessionDoesNotLinkAnotherTasksRun(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-run-owner")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	first, err := factoryModel.CreateWorkOrder(db, "First task", "", &userID, nil, nil)
+	require.NoError(t, err)
+	second, err := factoryModel.CreateWorkOrder(db, "Second task", "", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	_, err = factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		CanvasID: canvas.ID, CanvasRunID: run.ID, WorkOrderID: first.ID,
+	})
+	require.NoError(t, err)
+	// Older sessions can exist without a refinement-run link.
+	require.NoError(t, db.Where("run_id = ?", run.ID).Delete(&FactoryWorkOrderRefinementRun{}).Error)
+	var links []FactoryWorkOrderRefinementRun
+	require.NoError(t, db.Where("run_id = ?", run.ID).Find(&links).Error)
+	require.Empty(t, links)
+
+	_, err = factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		CanvasID: canvas.ID, CanvasRunID: run.ID, WorkOrderID: second.ID,
+	})
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	require.NoError(t, db.Where("run_id = ?", run.ID).Find(&links).Error)
+	assert.Empty(t, links)
+}
+
 func TestFactory_MaybeAttachAnalysisSessionRequiresFeatureAtCreation(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-flag-off")
