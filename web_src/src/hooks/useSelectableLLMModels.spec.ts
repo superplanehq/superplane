@@ -38,6 +38,7 @@ describe("useSelectableLLMModels", () => {
             model: { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
             key: "hosted::anthropic::claude-sonnet-4-6",
             label: "anthropic/claude-sonnet-4-6",
+            thinkingLevels: ["low", "high"],
           },
           {
             source: { id: "byok", name: "Your keys" },
@@ -63,6 +64,7 @@ describe("useSelectableLLMModels", () => {
         model: { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
         key: "hosted::anthropic::claude-sonnet-4-6",
         label: "anthropic/claude-sonnet-4-6",
+        thinkingLevels: ["low", "high"],
       },
     ]);
     expect(organizationsListSelectableLlmModels).toHaveBeenCalledWith(
