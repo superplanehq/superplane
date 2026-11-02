@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -606,8 +607,8 @@ func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTas
 			return err
 		}
 		if err := task.reserveLocked(tx, r); err != nil {
-			if IsPermanentSubscriptionAdmissionError(err) || errors.Is(err, ErrSelectableLLMModelNotAllowed) {
-				reservation, err = task.rejectSubscriptionAdmission(tx, err)
+			if IsPermanentSubscriptionAdmissionError(err) || errors.Is(err, ErrSelectableLLMModelNotAllowed) || errors.Is(err, billing.ErrHostedCreditEmpty) {
+				reservation, err = task.rejectQueuedAdmission(tx, err)
 			}
 			return err
 		}
@@ -617,7 +618,7 @@ func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTas
 	return reservation, err
 }
 
-func (t *RunnerTask) rejectSubscriptionAdmission(tx *gorm.DB, admissionError error) (RunnerTaskReservationResult, error) {
+func (t *RunnerTask) rejectQueuedAdmission(tx *gorm.DB, admissionError error) (RunnerTaskReservationResult, error) {
 	var result RunnerTaskReservationResult
 	lease, err := FindCodexLeaseByTask(tx, t.ID)
 	if err != nil {
@@ -665,6 +666,9 @@ func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
 			return err
 		}
 		return ErrRunnerTaskAlreadyAssigned
+	}
+	if err := fleet.RequireComputeCredit(tx, t.OrganizationID); err != nil {
+		return err
 	}
 	if err := t.RequireSubscriptionLeaseAdmission(tx); err != nil {
 		return err
