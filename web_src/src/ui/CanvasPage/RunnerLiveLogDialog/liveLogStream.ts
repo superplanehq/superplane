@@ -46,8 +46,6 @@ export type LiveLogRecordEnvelope = {
 type LiveLogSessionResponse = {
   backend?: "legacy" | "integrated";
   stream_url?: string;
-  token?: string;
-  expires_at?: string;
   hosted_pricing?: HostedUsagePricing | null;
 };
 
@@ -105,32 +103,21 @@ async function fetchRunnerLiveLogResponse(
   cursor?: string,
 ): Promise<Response> {
   const streamUrl =
-    session.backend === "integrated" && cursor !== undefined
+    cursor !== undefined
       ? `${session.streamUrl}${session.streamUrl.includes("?") ? "&" : "?"}after=${encodeURIComponent(cursor)}`
       : session.streamUrl;
-  const init =
-    session.backend === "integrated"
-      ? withOrganizationHeader({
-          organizationId,
-          method: "GET",
-          credentials: "include" as const,
-          signal,
-          headers: { Accept: "application/x-ndjson" },
-        })
-      : {
-          method: "GET",
-          credentials: "omit" as const,
-          signal,
-          headers: {
-            Accept: "application/x-ndjson",
-            Authorization: `Bearer ${session.token}`,
-            "Accept-Encoding": "identity",
-          },
-        };
-  const res = await fetch(streamUrl, init);
-  const isIntegratedReset =
-    session.backend === "integrated" && res.status === 409 && res.headers.get(LOG_RESET_HEADER) === "true";
-  if (!res.ok && !isIntegratedReset) {
+  const res = await fetch(
+    streamUrl,
+    withOrganizationHeader({
+      organizationId,
+      method: "GET",
+      credentials: "include",
+      signal,
+      headers: { Accept: "application/x-ndjson" },
+    }),
+  );
+  const isReset = res.status === 409 && res.headers.get(LOG_RESET_HEADER) === "true";
+  if (!res.ok && !isReset) {
     throw liveLogRequestErrorFromResponse(res, await res.text());
   }
 
@@ -335,11 +322,7 @@ function processCompleteLines(buffer: string, handlers: LiveLogStreamHandlers): 
   return remainder;
 }
 
-async function pumpIntegratedLogResponse(
-  res: Response,
-  handlers: LiveLogStreamHandlers,
-  signal: AbortSignal,
-): Promise<void> {
+async function pumpLogResponse(res: Response, handlers: LiveLogStreamHandlers, signal: AbortSignal): Promise<void> {
   const signedURL = res.headers.get(LOG_URL_HEADER)?.trim();
   if (signedURL) {
     await pumpSignedLog(signedURL, handlers, signal);
@@ -383,23 +366,19 @@ async function pumpReaderNdjson(
 }
 
 type RequiredLiveLogSession = {
-  backend: "legacy" | "integrated";
   streamUrl: string;
-  token?: string;
 };
 
 function requireLiveLogSession(session: LiveLogSessionResponse): RequiredLiveLogSession {
   const streamUrl = session.stream_url?.trim();
-  const token = session.token?.trim();
-  const backend = session.backend === "integrated" ? "integrated" : "legacy";
-  if (!streamUrl || (backend === "legacy" && !token)) {
+  if (!streamUrl) {
     throw new Error("Live log session response is incomplete");
   }
-  return { backend, streamUrl, token };
+  return { streamUrl };
 }
 
 /**
- * Resolves the execution's log backend through SuperPlane, then consumes its
+ * Authorizes access through SuperPlane, then consumes the execution's
  * NDJSON stream until the stream ends or aborts.
  */
 export class LiveLogStream {
@@ -435,22 +414,10 @@ export class LiveLogStream {
         onTurn: (turn, usage, message) => onTurn?.(turn, withHostedUsageCost(usage, pricing), message),
       };
     }
-    if (required.backend === "integrated") {
-      return this.pollIntegrated(required, handlers);
-    }
-
-    const res = await fetchRunnerLiveLogResponse(required, this.organizationId, this.abortController.signal);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(body.trim() || res.statusText || `Request failed (${res.status})`);
-    }
-    const reader = requireBodyReader(res);
-    handlers.onOpen?.();
-    await pumpReaderNdjson(reader, handlers);
-    return false;
+    return this.pollLogs(required, handlers);
   }
 
-  private async pollIntegrated(session: RequiredLiveLogSession, handlers: LiveLogStreamHandlers): Promise<boolean> {
+  private async pollLogs(session: RequiredLiveLogSession, handlers: LiveLogStreamHandlers): Promise<boolean> {
     let cursor: string | undefined;
     let opened = false;
 
@@ -469,7 +436,7 @@ export class LiveLogStream {
         handlers.onOpen?.();
         opened = true;
       }
-      await pumpIntegratedLogResponse(res, handlers, this.abortController.signal);
+      await pumpLogResponse(res, handlers, this.abortController.signal);
 
       const nextCursor = res.headers.get(LOG_CURSOR_HEADER);
       if (nextCursor !== null) {

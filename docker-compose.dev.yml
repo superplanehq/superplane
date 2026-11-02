@@ -100,12 +100,6 @@ services:
       # Default reaches this app from containers on the Compose network.
       # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL in .env (no trailing slash).
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://app:8000}
-      # Legacy broker settings remain available for old executions during the
-      # hosted rollout. The default local stack uses integrated runners.
-      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
-      TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-}
-      TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
-      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       SUPERPLANE_GITHUB_APP_ID: ${SUPERPLANE_GITHUB_APP_ID:-}
       SUPERPLANE_GITHUB_APP_SLUG: ${SUPERPLANE_GITHUB_APP_SLUG:-}
