@@ -20,6 +20,7 @@ import (
 	"gorm.io/gorm"
 
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -138,6 +139,7 @@ func submitStep(
 			Properties:      contexts.NewIntegrationPropertyStorage(integration),
 			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Capabilities:    capabilityCtx,
+			Configuration:   integration.Configuration.Data(),
 		})
 
 		if err != nil {
@@ -175,6 +177,9 @@ func submitStep(
 	})
 
 	if err != nil {
+		if grpcerrors.Code(err) == codes.PermissionDenied {
+			return nil, err
+		}
 		logrus.WithError(err).Error("failed to submit integration setup step")
 		return nil, grpcerrors.Internal(err, "failed to submit integration setup step")
 	}

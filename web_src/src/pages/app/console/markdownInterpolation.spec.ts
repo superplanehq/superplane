@@ -56,6 +56,31 @@ describe("interpolateMarkdownTemplate", () => {
     expect(out).toBe("Deployed to https://example.com");
   });
 
+  it("renders a tenant avatar for a GitHub push author when given the repository host", () => {
+    const out = interpolateMarkdownTemplate(
+      "{{ githubAvatarOrInitial(prod.payload.data.head_commit.author, prod.payload.data.head_commit.committer, prod.payload.data.repository) }}",
+      {
+        prod: {
+          payload: {
+            data: {
+              head_commit: {
+                author: {
+                  date: "2026-10-21T12:00:00Z",
+                  email: "alex@acme.com",
+                  name: "Alex Rivera",
+                  username: "alex",
+                },
+                committer: { name: "Alex Rivera" },
+              },
+              repository: { html_url: "https://acme.ghe.com/acme/app" },
+            },
+          },
+        },
+      },
+    );
+    expect(out).toContain('src="https://acme.ghe.com/alex.png"');
+  });
+
   it("renders deployer avatar fallback html for bot commits without a github username", () => {
     const out = interpolateMarkdownTemplate(
       "{{ githubAvatarOrInitial(prod.payload.data.head_commit.author, prod.payload.data.head_commit.committer) }}",

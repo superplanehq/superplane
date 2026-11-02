@@ -490,6 +490,23 @@ describe("celExpr", () => {
         expect(out).toContain('src="https://github.com/forestileao.png"');
       });
 
+      it("renders the tenant avatar URL when GitHub sends avatar_url", () => {
+        const compiled = compileExpr("githubAvatarOrInitial(author, committer)");
+        const out = evalExpr(
+          compiled,
+          {
+            author: {
+              name: "Alex Rivera",
+              username: "alex",
+              avatar_url: "https://avatars.acme.ghe.com/u/12?v=4",
+            },
+            committer: { name: "Alex Rivera" },
+          },
+          buildEnv(),
+        );
+        expect(out).toContain('src="https://avatars.acme.ghe.com/u/12?v=4"');
+      });
+
       it("renders an initial badge when author.username is missing", () => {
         const compiled = compileExpr("githubAvatarOrInitial(author, committer)");
         const out = evalExpr(

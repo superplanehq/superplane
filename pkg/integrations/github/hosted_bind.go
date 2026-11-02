@@ -18,10 +18,11 @@ var (
 )
 
 func (g *GitHub) bindLegacyInstallation(ctx core.HTTPRequestContext, metadata common.Metadata, installationID string) error {
-	return g.bindLegacyInstallationWith(ctx.Integration, ctx.Logger, metadata, installationID)
+	return g.bindLegacyInstallationWith(ctx.HTTP, ctx.Integration, ctx.Logger, metadata, installationID)
 }
 
 func (g *GitHub) bindLegacyInstallationWith(
+	httpCtx core.HTTPContext,
 	integration core.IntegrationContext,
 	logger *logrus.Entry,
 	metadata common.Metadata,
@@ -33,7 +34,7 @@ func (g *GitHub) bindLegacyInstallationWith(
 		metadata.Owner = ""
 	}
 	metadata.InstallationID = installationID
-	client, err := newInstallationClient(integration, metadata.GitHubApp.ID, installationID)
+	client, err := newInstallationClient(httpCtx, integration, metadata.GitHubApp.ID, installationID)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -53,7 +54,7 @@ func (g *GitHub) bindLegacyInstallationWith(
 	}
 
 	if metadata.Owner == "" {
-		appClient, err := newAppJWTClient(integration, metadata.GitHubApp.ID)
+		appClient, err := newAppJWTClient(httpCtx, integration, metadata.GitHubApp.ID)
 		if err != nil {
 			logger.Errorf("failed to create app client: %v", err)
 		}

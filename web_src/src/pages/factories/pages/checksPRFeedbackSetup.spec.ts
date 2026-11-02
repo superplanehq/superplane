@@ -31,6 +31,8 @@ describe("checksPRFeedbackSetup helpers", () => {
     expect(isGitHubActionsCheckURL("https://github.com/acme/api/actions/runs/99")).toBe(true);
     expect(isGitHubActionsCheckURL("https://github.com/acme/api/actions/runs/99/job/12")).toBe(true);
     expect(isGitHubActionsCheckURL("https://api.github.com/repos/acme/api/actions/runs/99")).toBe(true);
+    expect(isGitHubActionsCheckURL("https://acme.ghe.com/acme/api/actions/runs/99")).toBe(true);
+    expect(isGitHubActionsCheckURL("https://api.acme.ghe.com/repos/acme/api/actions/runs/99")).toBe(true);
     expect(isGitHubActionsCheckURL("https://github.com/acme/api/pull/12")).toBe(false);
     expect(isGitHubActionsCheckURL("https://app.circleci.com/pipelines/1")).toBe(false);
     expect(isGitHubActionsCheckURL("")).toBe(false);

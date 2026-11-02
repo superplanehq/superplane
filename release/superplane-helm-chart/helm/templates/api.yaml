@@ -213,6 +213,7 @@ spec:
 {{- end }}
             - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
               value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
+            {{- include "superplane.githubEnterpriseEnv" . | nindent 12 }}
             {{- if $mountRunnerLogs }}
             - name: RUNNER_ACTIVE_LOG_FS_PATH
               value: {{ .Values.runner.activeLogs.path | quote }}
@@ -222,6 +223,7 @@ spec:
             - name: oidc-keys
               mountPath: /app/oidc-keys
               readOnly: true
+            {{- include "superplane.githubEnterpriseVolumeMount" . | nindent 12 }}
 {{- if .Values.license.secretName }}
             - name: license
               mountPath: /app/license
@@ -277,6 +279,7 @@ spec:
         - name: oidc-keys
           secret:
             secretName: {{ include "secrets.oidc.name" . }}
+        {{- include "superplane.githubEnterpriseVolume" . | nindent 8 }}
 {{- if .Values.license.secretName }}
         - name: license
           secret:
