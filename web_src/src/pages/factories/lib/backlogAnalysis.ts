@@ -153,10 +153,43 @@ export function backlogAnalysisCreditLabels(
   return labels;
 }
 
-function latestBacklogAnalysisRun(runs: BacklogAnalysisRun[]): BacklogAnalysisRun | undefined {
+export function latestBacklogAnalysisRun(runs: BacklogAnalysisRun[]): BacklogAnalysisRun | undefined {
   return [...runs]
     .sort((left, right) => (Date.parse(left.run.createdAt ?? "") || 0) - (Date.parse(right.run.createdAt ?? "") || 0))
     .at(-1);
+}
+
+/** The latest failed run's recorded reason. An active run clears older failures. */
+export function planningRunFailure(run: CanvasesCanvasRun | null | undefined): string | undefined {
+  if (run?.result !== "RESULT_FAILED") {
+    return undefined;
+  }
+  const reason =
+    [...(run.errors ?? [])].reverse().find((error) => error.trim()) ??
+    run.executions?.find((execution) => execution.result === "RESULT_FAILED" && execution.resultMessage?.trim())
+      ?.resultMessage;
+  return reason?.trim() || "The planning run failed. Review the run details and try again.";
+}
+
+/**
+ * Failure of the newest planning run. A retry can detach the session run
+ * and fail before it attaches a new one, so the latest Backlog run can be
+ * newer than the session run.
+ */
+export function currentPlanningRunFailure(
+  sessionRun: CanvasesCanvasRun | null | undefined,
+  runs: BacklogAnalysisRun[] = [],
+): string | undefined {
+  const latestBacklogRun = latestBacklogAnalysisRun(runs)?.run;
+  if (!sessionRun || !latestBacklogRun) {
+    return planningRunFailure(sessionRun ?? latestBacklogRun);
+  }
+  if (sessionRun.id === latestBacklogRun.id) {
+    return planningRunFailure(mergeCanvasRunUpdate(latestBacklogRun, sessionRun));
+  }
+  const sessionStartedAt = Date.parse(sessionRun.createdAt ?? "") || 0;
+  const backlogStartedAt = Date.parse(latestBacklogRun.createdAt ?? "") || 0;
+  return planningRunFailure(sessionStartedAt > backlogStartedAt ? sessionRun : latestBacklogRun);
 }
 
 export function analyzedWorkOrderId(run: CanvasesCanvasRun): string | undefined {

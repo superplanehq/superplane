@@ -8,11 +8,14 @@ export function usePlanningSessionLiveRun(
   organizationId: string | undefined,
   view: CreateWithAgentView,
   analysisDelivered = false,
-): CreateWithAgentView {
+) {
   const canvasId = view.canvasId;
   const runId = view.canvasRunId || null;
   const enabled = Boolean(organizationId && canvasId && runId);
   useCanvasRuntimeWebsocket(canvasId, organizationId ?? "", enabled);
   const runQuery = useDescribeRun(canvasId, runId, enabled);
-  return applyPlanningSessionLiveRun(view, runQuery.data?.run, analysisDelivered);
+  return {
+    view: applyPlanningSessionLiveRun(view, runQuery.data?.run, analysisDelivered),
+    run: runQuery.data?.run,
+  };
 }
