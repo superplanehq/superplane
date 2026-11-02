@@ -7,15 +7,67 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 )
+
+func TestStartCodexConnectionWithoutCreditReportsRecovery(t *testing.T) {
+	for _, refreshCatalog := range []bool{false, true} {
+		name := "sign in"
+		if refreshCatalog {
+			name = "refresh catalog"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Setenv(billing.BillingEnabledEnv, "yes")
+			r := support.Setup(t)
+			defer r.Close()
+			db := database.DB(t.Context())
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+			require.NoError(t, db.Model(&billingmodels.OrganizationLLMCreditGrant{}).
+				Where("organization_id = ?", r.Organization.ID).
+				Update("expires_at", time.Now().Add(-time.Minute)).Error)
+			fleet := models.DefaultInstallationRunnerFleets(models.DefaultRunnerVersion)[0]
+			require.NoError(t, fleet.Create(db))
+			if refreshCatalog {
+				connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+				require.NoError(t, err)
+				require.NoError(t, db.Model(connection).Updates(map[string]any{
+					"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("saved-bundle"),
+				}).Error)
+			}
+			t.Setenv("JWT_SECRET", "codex-credit-test")
+			t.Setenv("RUNNER_API_BASE_URL", "https://superplane.example")
+
+			_, err := StartFactoryCodexConnection(onboardingContext(r), r.Encryptor, r.Organization.ID.String(), &pb.StartFactoryCodexConnectionRequest{RefreshCatalog: refreshCatalog})
+
+			require.ErrorIs(t, err, billing.ErrHostedCreditEmpty)
+			assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+			assert.Equal(t, "This organization has no hosted credit. Add hosted credit to continue.", grpcerrors.StatusMessage(err))
+			var tasks, leases int64
+			require.NoError(t, db.Model(&models.RunnerTask{}).Where("organization_id = ?", r.Organization.ID).Count(&tasks).Error)
+			require.NoError(t, db.Model(&models.FactoryCodexLease{}).Count(&leases).Error)
+			assert.Zero(t, tasks)
+			assert.Zero(t, leases)
+			connection, connectionErr := models.FindCodexConnection(db, r.Organization.ID, r.User)
+			if refreshCatalog {
+				require.NoError(t, connectionErr)
+				assert.Equal(t, models.CodexConnectionStatusReady, connection.Status)
+				return
+			}
+			require.ErrorIs(t, connectionErr, models.ErrCodexConnectionNotFound)
+		})
+	}
+}
 
 func TestPersonalCodexConnectionDoesNotActivateWorkspace(t *testing.T) {
 	r := support.Setup(t)

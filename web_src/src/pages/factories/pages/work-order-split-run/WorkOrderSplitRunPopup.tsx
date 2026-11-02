@@ -115,6 +115,7 @@ function AnalysisWorkOrderPopup({
   canDispatch = false,
   canUpdate = true,
   manualCustomAutomations,
+  backlogCustomRunsStatus,
   analysis,
   popupData,
   titlePrefix,
@@ -206,6 +207,7 @@ function AnalysisWorkOrderPopup({
           lineId={lineId}
           canUpdate={canUpdate}
           manualCustomAutomations={manualCustomAutomations}
+          backlogCustomRunsStatus={backlogCustomRunsStatus}
           footerActions={footerActions}
           resultFooter={descriptionReview}
           sidebarNote={!unified && showSidebarNote ? review : undefined}

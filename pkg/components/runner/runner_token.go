@@ -31,7 +31,7 @@ type RunnerScope struct {
 	NodeID            string
 	Flow              RunnerFlow
 	Scopes            []RunnerToolScope
-	// MergeChecks and MergeCheckLabels come from the merge confidence token.
+	// MergeChecks and MergeCheckLabels come from the merge confidence scope.
 	// The backend reports a merge check only when its id is in MergeChecks.
 	MergeChecks      []string
 	MergeCheckLabels map[string]string
