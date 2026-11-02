@@ -20,6 +20,9 @@ func TestThinkingArgsMapsEffortFlags(t *testing.T) {
 	assert.Equal(t, []string{"--effort", "low"}, thinkingArgsFromScript(t, "low"))
 	assert.Equal(t, []string{"--effort", "medium"}, thinkingArgsFromScript(t, "MEDIUM"))
 	assert.Equal(t, []string{"--effort", "high"}, thinkingArgsFromScript(t, "high"))
+	assert.Equal(t, []string{"--effort", "xhigh"}, thinkingArgsFromScript(t, "xhigh"))
+	assert.Equal(t, []string{"--effort", "max"}, thinkingArgsFromScript(t, "max"))
+	assert.Empty(t, thinkingArgsFromScript(t, "minimal"))
 }
 
 func thinkingArgsFromScript(t *testing.T, thinking string) []string {

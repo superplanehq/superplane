@@ -10,6 +10,20 @@ export function draftStartModelPayload(selected: string): string | undefined {
   return trimmed;
 }
 
+/**
+ * Thinking levels for the Start model. Auto keeps the model of each agent,
+ * so it has no single set of levels and Start sends no thinking override.
+ */
+export function draftStartThinkingLevels(
+  models: ReadonlyArray<{ id?: string; thinkingLevels?: string[] }> | undefined,
+  selected: string,
+): string[] {
+  if (selected === DRAFT_START_MODEL_AUTO) {
+    return [];
+  }
+  return models?.find((model) => model.id === selected)?.thinkingLevels ?? [];
+}
+
 /** Short label for a stored runner model id. Aliases use a versioned id from modelIds. */
 export function displayRunnerModel(id: string, modelIds: readonly string[] = []): string {
   const trimmed = id.trim();
