@@ -191,14 +191,15 @@ func (o *FactoryWorkOrder) CompletePlanningForStart(tx *gorm.DB, actor *uuid.UUI
 		Joins("JOIN workflow_node_execution_kvs kv ON kv.key = 'task_id' AND kv.value = runner_tasks.id::text").
 		Joins("JOIN workflow_node_executions e ON e.id = kv.execution_id AND e.workflow_id = kv.workflow_id AND e.node_id = kv.node_id").
 		Where("e.run_id IN ? AND runner_tasks.organization_id = ?", runIDs, o.OrganizationID).
+		Order("runner_tasks.id").
 		Find(&tasks).Error
 	if err != nil {
 		return nil, err
 	}
-	for i := range tasks {
-		if err := tasks[i].RequestCancel(tx, time.Now()); err != nil {
-			return nil, err
-		}
+	// A planning task can finish after the read above. Lock and reload each
+	// task so a finished task does not fail and roll back Start.
+	if _, err := RequestCancelRunnerTasks(tx, tasks, time.Now()); err != nil {
+		return nil, err
 	}
 	return completion, nil
 }
