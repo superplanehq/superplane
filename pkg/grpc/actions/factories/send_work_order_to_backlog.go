@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
 )
 
@@ -67,6 +68,7 @@ func SendWorkOrderToBacklog(
 	}
 
 	fromState := resolvedOrder.State
+	var backlogEvents []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -96,11 +98,15 @@ func SendWorkOrderToBacklog(
 			ToState: models.FactoryWorkOrderStateDraft,
 			Actor:   &actor,
 		})
+		if err == nil {
+			backlogEvents = contexts.EmitBacklogCustomAutomations(tx, factory, order)
+		}
 		return err
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send work order to backlog")
 	}
+	contexts.PublishWorkOrderCreatedEvents(orgID, backlogEvents)
 
 	factory, err := models.FindFactory(db, orgID, factoryID)
 	if err != nil {
