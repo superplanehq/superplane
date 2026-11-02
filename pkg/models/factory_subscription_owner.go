@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -17,6 +18,16 @@ var (
 	ErrSubscriptionOwnerBusy        = errors.New("Stop this task and wait for its runners to stop before you change its owner")
 	ErrSubscriptionTaskAssociation  = newSubscriptionAdmissionError("The run must belong to one task in this workspace")
 )
+
+// SubscriptionModelUnavailableError keeps model validation permanent while
+// naming the selected model when one was supplied.
+func SubscriptionModelUnavailableError(model string) error {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return ErrSubscriptionModelUnavailable
+	}
+	return fmt.Errorf("model %q: %w", model, ErrSubscriptionModelUnavailable)
+}
 
 func (o *FactoryWorkOrder) UsesCodexSubscription(tx *gorm.DB) (bool, error) {
 	f, err := FindFactory(tx.Unscoped(), o.OrganizationID, o.FactoryID)
