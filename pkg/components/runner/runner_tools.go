@@ -13,11 +13,15 @@ const (
 	RunnerFlowTask            RunnerFlow = "task"
 	RunnerFlowMergeConfidence RunnerFlow = "merge_confidence"
 
+	ScopeMembersRead      RunnerToolScope = "members:read"
 	ScopeOwnerRead        RunnerToolScope = "owner:read"
 	ScopeOwnerWrite       RunnerToolScope = "owner:write"
 	ScopeTasksRead        RunnerToolScope = "tasks:read"
 	ScopeTasksCreate      RunnerToolScope = "tasks:create"
 	ScopeTasksClose       RunnerToolScope = "tasks:close"
+	ScopeChecksRead       RunnerToolScope = "checks:read"
+	ScopeChecksWrite      RunnerToolScope = "checks:write"
+	ScopeArtifactsRead    RunnerToolScope = "artifacts:read"
 	ScopeArtifactsWrite   RunnerToolScope = "artifacts:write"
 	ScopePlanWrite        RunnerToolScope = "plan:write"
 	ScopeAttachmentsRead  RunnerToolScope = "attachments:read"
@@ -27,35 +31,53 @@ const (
 )
 
 // RunnerTool is one tool of the global runner MCP server and the scope that
-// the backend requires on every call.
+// the backend requires on every call. AliasOf names the current tool when
+// Name is a previous name. An alias keeps the scope of its previous tool, so
+// a run that started before a rename keeps its tools.
 type RunnerTool struct {
-	Name  string
-	Scope RunnerToolScope
+	Name    string
+	Scope   RunnerToolScope
+	AliasOf string
 }
 
 var runnerTools = []RunnerTool{
-	{Name: "suggest_owners", Scope: ScopeOwnerRead},
-	{Name: "assign_owner", Scope: ScopeOwnerWrite},
+	{Name: "list_members", Scope: ScopeMembersRead},
+	{Name: "assign_task_owner", Scope: ScopeOwnerWrite},
+	{Name: "suggest_task_owner", Scope: ScopeOwnerRead},
 	{Name: "list_tasks", Scope: ScopeTasksRead},
 	{Name: "create_task", Scope: ScopeTasksCreate},
 	{Name: "close_task", Scope: ScopeTasksClose},
+	{Name: "list_checks", Scope: ScopeChecksRead},
+	{Name: "add_checks", Scope: ScopeChecksWrite},
+	{Name: "remove_checks", Scope: ScopeChecksWrite},
+	{Name: "list_artifacts", Scope: ScopeArtifactsRead},
+	{Name: "get_artifact", Scope: ScopeArtifactsRead},
+	{Name: "add_artifact", Scope: ScopeArtifactsWrite},
 	{Name: "remove_artifact", Scope: ScopeArtifactsWrite},
-	{Name: "propose_update", Scope: ScopePlanWrite},
-	{Name: "inspect_attachment", Scope: ScopeAttachmentsRead},
-	{Name: "inspect_screenshot", Scope: ScopeEvidenceWrite},
-	{Name: "upload_artifact", Scope: ScopeEvidenceWrite},
+	{Name: "propose_plan", Scope: ScopePlanWrite},
 	{Name: "report_visual_evidence_unavailable", Scope: ScopeEvidenceWrite},
-	{Name: "publish_link", Scope: ScopeLinksWrite},
 	{Name: "report_merge_check", Scope: ScopeMergeChecksWrite},
+
+	{Name: "suggest_owners", Scope: ScopeOwnerRead, AliasOf: "suggest_task_owner"},
+	{Name: "assign_owner", Scope: ScopeOwnerWrite, AliasOf: "assign_task_owner"},
+	{Name: "propose_update", Scope: ScopePlanWrite, AliasOf: "propose_plan"},
+	{Name: "inspect_attachment", Scope: ScopeAttachmentsRead, AliasOf: "get_artifact"},
+	{Name: "inspect_screenshot", Scope: ScopeEvidenceWrite, AliasOf: "get_artifact"},
+	{Name: "upload_artifact", Scope: ScopeEvidenceWrite, AliasOf: "add_artifact"},
+	{Name: "publish_link", Scope: ScopeLinksWrite, AliasOf: "add_artifact"},
 }
 
 // Every flow receives these tools for now. Narrow the list here later.
 var sharedRunnerScopes = []RunnerToolScope{
+	ScopeMembersRead,
 	ScopeOwnerRead,
 	ScopeOwnerWrite,
 	ScopeTasksRead,
 	ScopeTasksCreate,
 	ScopeTasksClose,
+	ScopeChecksRead,
+	ScopeChecksWrite,
+	ScopeArtifactsRead,
 	ScopeArtifactsWrite,
 }
 
@@ -82,8 +104,7 @@ func ScopesForFlow(flow RunnerFlow) []RunnerToolScope {
 }
 
 // TaskCapabilityScopes returns the evidence and link scopes that the artifact
-// attach call turned on for this run. The rule matches the legacy task
-// artifact MCP server, so both servers list the same tools.
+// attach call turned on for this run.
 func TaskCapabilityScopes(environment []TaskEnvironmentVariable) []RunnerToolScope {
 	scopes := []RunnerToolScope{}
 	publishLinks := HasPublishLinks(environment)
@@ -97,7 +118,8 @@ func TaskCapabilityScopes(environment []TaskEnvironmentVariable) []RunnerToolSco
 }
 
 // AllowedRunnerTools returns the tool names that the scopes allow, in catalog
-// order.
+// order. The list includes previous names, because a run that started before
+// a rename asks for its tools by those names.
 func AllowedRunnerTools(scopes []RunnerToolScope) []string {
 	names := []string{}
 	for _, tool := range runnerTools {

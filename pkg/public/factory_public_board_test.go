@@ -302,6 +302,23 @@ func TestPublicBoardDependabotIntakeUsesDependabotIcon(t *testing.T) {
 	}, automationsNamed(board, "backlog"))
 }
 
+func TestPublicCardShowsPlanScoresFromSuperPlaneChecksOnly(t *testing.T) {
+	order := &models.FactoryWorkOrder{Title: "Fix login", State: models.FactoryWorkOrderStateDraft}
+	checks := []models.FactoryWorkOrderCheck{
+		{Key: "agent-confidence", Name: models.PlanningConfidenceCheckName, Score: 1, Source: models.FactoryWorkOrderCheckSourceAgent},
+		{Key: "agent-clarity", Name: models.PlanningClarityCheckName, Score: 1, Source: models.FactoryWorkOrderCheckSourceAgent},
+		{Key: models.PlanningConfidenceCheckKey, Name: models.PlanningConfidenceCheckName, Score: 4},
+		{Key: models.PlanningClarityCheckKey, Name: models.PlanningClarityCheckName, Score: 3},
+	}
+
+	card := publicCardFromOrder(order, models.FactoryPlanning{Clarity: true, Confidence: true}, checks, nil, nil, nil, nil)
+
+	require.NotNil(t, card.Confidence)
+	require.NotNil(t, card.Clarity)
+	assert.Equal(t, 4, *card.Confidence)
+	assert.Equal(t, 3, *card.Clarity)
+}
+
 func automationsNamed(board *publicBoard, key string) []publicAutomation {
 	for _, column := range board.Columns {
 		if column.Key == key {
