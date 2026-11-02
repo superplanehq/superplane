@@ -5,7 +5,15 @@ import { useFactoryTaskIdentity } from "./factoryTaskContext";
 import { useWorkOrderRefinementModels } from "./useWorkOrderRefinementModels";
 import { WorkOrderRefinementModelSelect } from "./WorkOrderRefinementModelSelect";
 
-export function TaskRefinementModelSelect({ organizationId, canEdit }: { organizationId?: string; canEdit: boolean }) {
+type TaskRefinementModelSelectProps = {
+  organizationId?: string;
+  canEdit: boolean;
+  allowReselect?: boolean;
+  onSaveStart?: () => void;
+  onError?: (message: string) => void;
+};
+
+export function TaskRefinementModelSelect({ organizationId, ...props }: TaskRefinementModelSelectProps) {
   const identity = useFactoryTaskIdentity();
   if (!organizationId || !identity.factoryId || !identity.orderId) return null;
   return (
@@ -13,7 +21,7 @@ export function TaskRefinementModelSelect({ organizationId, canEdit }: { organiz
       organizationId={organizationId}
       factoryId={identity.factoryId}
       orderId={identity.orderId}
-      canEdit={canEdit}
+      {...props}
     />
   );
 }
@@ -23,12 +31,14 @@ function SavedRefinementModel({
   factoryId,
   orderId,
   canEdit,
+  allowReselect = false,
+  onSaveStart,
+  onError,
 }: {
   organizationId: string;
   factoryId: string;
   orderId: string;
-  canEdit: boolean;
-}) {
+} & Omit<TaskRefinementModelSelectProps, "organizationId">) {
   const order = useWorkOrder(organizationId, factoryId, orderId);
   const selection = useWorkOrderRefinementModels(organizationId, factoryId, orderId);
   const update = useUpdateWorkOrder(organizationId, factoryId);
@@ -42,12 +52,20 @@ function SavedRefinementModel({
       model={model}
       selection={{ ...selection, options }}
       disabled={!canEdit || update.isPending}
-      onChange={(refinementModel) =>
+      onChange={(refinementModel) => {
+        if (refinementModel === model && !allowReselect) return;
+        onSaveStart?.();
         update.mutate(
           { orderId, refinementModel },
-          { onError: (error) => showErrorToast(getApiErrorMessage(error, "Could not update the refinement model.")) },
-        )
-      }
+          {
+            onError: (error) => {
+              const message = getApiErrorMessage(error, "Could not update the refinement model.");
+              if (onError) onError(message);
+              else showErrorToast(message);
+            },
+          },
+        );
+      }}
     />
   );
 }

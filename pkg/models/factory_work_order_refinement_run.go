@@ -30,3 +30,25 @@ func (o *FactoryWorkOrder) RecordRefinementRun(tx *gorm.DB, runID uuid.UUID) err
 		CreatedAt:   time.Now(),
 	}).Error
 }
+
+// LatestBacklogRefinementRun also finds runs rejected before a planning session
+// or durable task-run link exists.
+func (o *FactoryWorkOrder) LatestBacklogRefinementRun(tx *gorm.DB, canvasIDs []uuid.UUID) (*CanvasRun, error) {
+	if len(canvasIDs) == 0 {
+		return nil, nil
+	}
+	var run CanvasRun
+	result := tx.Raw(`
+		SELECT r.* FROM workflow_runs r
+		JOIN workflow_events e ON e.run_id = r.id
+		WHERE r.workflow_id IN ? AND r.node_id = ?
+		  AND e.execution_id IS NULL
+		  AND e.data->>'type' = ?
+		  AND e.data->'data'->'workOrder'->>'id' = ?
+		ORDER BY r.created_at DESC, r.id DESC LIMIT 1
+	`, canvasIDs, FactoryAppBacklogTriggerID, workOrderCreatedPayloadType, o.ID.String()).Scan(&run)
+	if result.Error != nil || result.RowsAffected == 0 {
+		return nil, result.Error
+	}
+	return &run, nil
+}
