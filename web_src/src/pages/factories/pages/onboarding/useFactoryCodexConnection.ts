@@ -8,6 +8,7 @@ import {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { usePermissions } from "@/contexts/usePermissions";
 import { showErrorToast } from "@/lib/toast";
+import { getApiErrorMessage } from "@/lib/errors";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { invalidateWorkspaceModelQueries } from "@/hooks/workspaceModelQueries";
@@ -88,7 +89,8 @@ export function useFactoryCodexConnection(
       return response.data?.connection;
     },
     onSettled: refresh,
-    onError: () => showErrorToast("SuperPlane could not start ChatGPT sign-in. Try again."),
+    onError: (error) =>
+      showErrorToast(getApiErrorMessage(error, "SuperPlane could not start ChatGPT sign-in. Try again.")),
   });
 
   const refreshCatalog = useMutation({
@@ -104,7 +106,10 @@ export function useFactoryCodexConnection(
     },
     onSettled: refresh,
     retry: 2,
-    onError: () => showErrorToast("SuperPlane could not load your ChatGPT models. Reload the page to try again."),
+    onError: (error) =>
+      showErrorToast(
+        getApiErrorMessage(error, "SuperPlane could not load your ChatGPT models. Reload the page to try again."),
+      ),
   });
 
   const cancel = useMutation({
