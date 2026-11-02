@@ -1,3 +1,16 @@
+import { getApiErrorMessage } from "@/lib/errors";
+
+export function codexModelLoadError(error: unknown, connectionStatus?: string): string {
+  const detail = getApiErrorMessage(error, "");
+  if (connectionStatus === "reconnect_required" || /connect chatgpt before|reconnect required/i.test(detail)) {
+    return "SuperPlane could not refresh your ChatGPT connection. Reconnect ChatGPT to continue.";
+  }
+  if (/subscription is in use|connection is busy/i.test(detail)) {
+    return "Your ChatGPT connection is busy. Try again.";
+  }
+  return "SuperPlane could not load your ChatGPT models. Try again.";
+}
+
 export const CODEX_CONNECTION_COPY = {
   subscriptionDevice: "Open ChatGPT and enter this code.",
   subscriptionCopyCode: "Copy sign-in code",
