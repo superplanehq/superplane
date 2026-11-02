@@ -19,9 +19,6 @@ vi.mock("@/api-client", () => ({
   meDescribeCodexConnection: vi.fn(),
   meStartCodexConnection: vi.fn(),
 }));
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ has: () => true, isLoading: false }),
-}));
 beforeEach(() => {
   vi.mocked(meDescribeCodexConnection).mockResolvedValue({
     data: { connection: { status: "disconnected", eligible: true } },

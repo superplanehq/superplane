@@ -74,7 +74,6 @@ func Test__Build__OverlaysLineDispatchModelOnMatchingRunner(t *testing.T) {
 func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())

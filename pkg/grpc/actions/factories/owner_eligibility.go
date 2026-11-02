@@ -117,7 +117,7 @@ func ListFactoryOwnerEligibility(ctx context.Context, organizationID string, req
 		member := &pb.FactoryOwnerEligibility{UserId: user.ID.String(), Eligible: true}
 		if response.Subscription {
 			member.Eligible, err = models.SubscriptionOwnerEligible(db, orgID, factory.ID, user.ID)
-			if err != nil && !errors.Is(err, models.ErrCodexConnectionUnavailable) {
+			if err != nil {
 				return nil, factoryErrorToStatus(err, "failed to load owner eligibility")
 			}
 			if !member.Eligible {

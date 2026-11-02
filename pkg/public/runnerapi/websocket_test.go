@@ -19,7 +19,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -53,7 +52,6 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 				"execution_mode": "host",
 			}
 			if scenario == "queued subscription" {
-				require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
 				factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
 				require.NoError(t, err)
 				subscription, err = models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now().Add(-time.Hour))
@@ -682,7 +680,6 @@ func TestCompleteRunnerTaskPublishesReleasedCodexConnection(t *testing.T) {
 	defer resource.Close()
 	db := database.DB(t.Context())
 	runner, task, fleet, socketID := createRunningRunnerTask(t, resource)
-	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now())
