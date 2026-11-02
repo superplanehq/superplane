@@ -63,6 +63,38 @@ describe("useFactoryCodexConnection", () => {
     expect(meStartCodexConnection).not.toHaveBeenCalled();
   });
 
+  it("polls catalog activity without duplicate refresh and invalidates models and usage after cleanup", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const modelsKey = factoryLineRunnerModelsQueryKey("org-1", "factory-1", "ship");
+    const usageKey = ["me", "org-1", "codex-usage", "member-1"];
+    let connection = {
+      status: "ready",
+      reservationHeld: false,
+      catalogRefreshTaskId: "catalog-1",
+      availableModels: [],
+    };
+    vi.mocked(meDescribeCodexConnection).mockImplementation(async () => ({ data: { connection } }) as never);
+    const result = renderHook(() => useFactoryCodexConnection("org-1", "factory-1", true), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    try {
+      await waitFor(() => expect(result.result.current.query.data?.catalogRefreshTaskId).toBe("catalog-1"));
+      expect(meStartCodexConnection).not.toHaveBeenCalled();
+      client.setQueryData(modelsKey, { models: [] });
+      client.setQueryData(usageKey, []);
+      connection = { ...connection, catalogRefreshTaskId: "" };
+      await waitFor(() => expect(result.result.current.query.data?.catalogRefreshTaskId).toBe(""), { timeout: 5000 });
+      await waitFor(() => expect(client.getQueryState(modelsKey)?.isInvalidated).toBe(true));
+      expect(client.getQueryState(usageKey)?.isInvalidated).toBe(true);
+      expect(meStartCodexConnection).not.toHaveBeenCalled();
+    } finally {
+      result.unmount();
+      client.clear();
+    }
+  });
+
   it("refreshes cached ownership and line models after sign-in completes", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
     const eligibilityKey = factoryOwnerEligibilityKey("org-1", "factory-1");

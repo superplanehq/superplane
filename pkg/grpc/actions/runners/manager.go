@@ -366,7 +366,7 @@ func (m *RunnerManager) MarkRunnerProviderDeleted(ctx context.Context, fleet *mo
 			tags[models.RunnerTagProvider] != options.Provider {
 			return fmt.Errorf("runner provider ownership does not match the confirming manager")
 		}
-		logins, err = models.ListCodexLoginConnections(tx)
+		logins, err = models.ListCodexSetupConnections(tx)
 		if err != nil {
 			return err
 		}
