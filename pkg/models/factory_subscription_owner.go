@@ -28,7 +28,7 @@ func (o *FactoryWorkOrder) UsesCodexSubscription(tx *gorm.DB) (bool, error) {
 
 func SubscriptionOwnerEligible(tx *gorm.DB, organizationID, factoryID, userID uuid.UUID) (bool, error) {
 	if _, err := ActiveCodexMember(tx, organizationID, userID); err != nil {
-		if errors.Is(err, ErrCodexConnectionNotEligible) || errors.Is(err, ErrCodexConnectionUnavailable) {
+		if errors.Is(err, ErrCodexConnectionNotEligible) {
 			return false, nil
 		}
 		return false, err
@@ -71,7 +71,7 @@ func (o *FactoryWorkOrder) RequireSubscriptionOwner(tx *gorm.DB, nonblocking boo
 	}
 	if !eligible {
 		if _, err := ActiveCodexMember(tx, o.OrganizationID, owners[0].UserID); err != nil {
-			if errors.Is(err, ErrCodexConnectionNotEligible) || errors.Is(err, ErrCodexConnectionUnavailable) {
+			if errors.Is(err, ErrCodexConnectionNotEligible) {
 				return uuid.Nil, ErrSubscriptionOwnerInvalid
 			}
 			return uuid.Nil, err

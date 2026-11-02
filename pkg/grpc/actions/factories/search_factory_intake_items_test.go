@@ -15,7 +15,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -349,7 +348,6 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		factory := newFactory(t)
 		intake := createIntake(t, factory)
 		db := database.DB(t.Context())
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 		subscription := true
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
 		req := &pb.ImportFactoryIntakeItemRequest{FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), ItemId: item.ID}

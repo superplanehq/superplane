@@ -182,6 +182,12 @@ func TestCodexConnectionAllowsParallelRunLeases(t *testing.T) {
 		assert.Equal(t, models.CodexLeasePurposeRun, lease.Purpose)
 		assert.NotEmpty(t, lease.SecretHash)
 	}
+
+	runID := support.CreateCodexOwnedRun(t, db, connection)
+	require.NoError(t, models.DisableExperimentalFeature(connection.OrganizationID, features.FeatureFactories))
+	_, err = models.ReserveFactoryCodexConnection(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), runID, uuid.New(), now, crypto.NewNoOpEncryptor())
+	require.ErrorIs(t, err, models.ErrCodexConnectionUnavailable)
+	assert.Len(t, codexLeases(t, db, connection.ID), 3, "disabled factories must not admit another run")
 }
 
 func TestCodexConnectionIsSharedAcrossOrganizationWorkspaces(t *testing.T) {
@@ -584,7 +590,6 @@ func newDisconnectedCodexLogin(t *testing.T) (*gorm.DB, *models.FactoryCodexConn
 	require.NoError(t, database.TruncateTables())
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
 	_, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	fleet := newTestRunnerFleet()
@@ -630,7 +635,6 @@ func newReadyCodexConnection(t *testing.T) (*gorm.DB, *models.FactoryCodexConnec
 	require.NoError(t, database.TruncateTables())
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
 
 	_, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

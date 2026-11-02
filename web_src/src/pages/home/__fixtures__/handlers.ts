@@ -171,11 +171,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Add a custom model provider with a URL, token, and API type",
             },
             {
-              id: "codex_subscriptions",
-              label: "ChatGPT subscriptions",
-              description: "Use personal ChatGPT subscriptions for workspace tasks",
-            },
-            {
               id: "workspace_skills",
               label: "Workspace Skills",
               description: "Add skills for workspace agents",

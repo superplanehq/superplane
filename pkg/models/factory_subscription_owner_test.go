@@ -8,14 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
 
 func TestSubscriptionOwnerAdmissionDistinguishesLoginContention(t *testing.T) {
-	for _, scenario := range []string{"ongoing login", "revoked login", "stale connection", "subscription unavailable", "removed member"} {
+	for _, scenario := range []string{"ongoing login", "revoked login", "stale connection", "removed member"} {
 		t.Run(scenario, func(t *testing.T) {
 			db, connection, loginTask, _ := newDisconnectedCodexLogin(t)
 			factory, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
@@ -29,8 +28,6 @@ func TestSubscriptionOwnerAdmissionDistinguishesLoginContention(t *testing.T) {
 				require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", loginTask.ID).Update("revoked_at", time.Now()).Error)
 			case "stale connection":
 				require.NoError(t, models.MarkCodexConnectionUncertain(db, loginTask.ID, time.Now()))
-			case "subscription unavailable":
-				require.NoError(t, models.DisableExperimentalFeature(connection.OrganizationID, features.FeatureCodexSubscriptions))
 			case "removed member":
 				member, err := models.FindActiveUserByIDInTransaction(db, connection.OrganizationID.String(), connection.OwnerUserID.String())
 				require.NoError(t, err)
@@ -55,7 +52,6 @@ func TestSubscriptionOwnerAdmissionDistinguishesLoginContention(t *testing.T) {
 func TestValidateSubscriptionCanvasModelsChecksLiteralChoicesOnly(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	subscription := true
