@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { formatVersionLabel, type CanvasVersionListItem } from "@/pages/app/lib/canvas-versions";
 import { useCallback } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
+import { RUNS_SIDEBAR_ROW_CLASS } from "@/lib/runsSidebarRowLayout";
 
 export function VersionRow({
   version,

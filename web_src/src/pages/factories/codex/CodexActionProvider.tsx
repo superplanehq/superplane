@@ -24,13 +24,13 @@ export function CodexActionProvider({ children }: { children: ReactNode }) {
   const pendingRef = useRef(pending);
   pendingRef.current = pending;
   const requestConnection = useCallback(
-    (organizationId: string, factoryId: string) =>
+    (organizationId: string, factoryId: string, stage: PendingConnection["stage"] = "prompt") =>
       new Promise<boolean>((resolve) => {
         if (pendingRef.current) {
           resolve(false);
           return;
         }
-        const next: PendingConnection = { organizationId, factoryId, stage: "prompt", resolve };
+        const next: PendingConnection = { organizationId, factoryId, stage, resolve };
         pendingRef.current = next;
         setPending(next);
       }),

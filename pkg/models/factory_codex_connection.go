@@ -761,17 +761,25 @@ func (c *FactoryCodexConnection) StoreRefreshedBundle(tx *gorm.DB, ciphertext []
 }
 
 // MarkReconnectRequired records that the stored refresh token can no longer be used.
+// An active login or catalog lease must not restore its saved status later.
 func (c *FactoryCodexConnection) MarkReconnectRequired(tx *gorm.DB, now time.Time) error {
+	updates := map[string]any{
+		"status":     CodexConnectionStatusReconnectRequired,
+		"updated_at": now,
+	}
+	if c.ResumeStatus != "" {
+		updates["resume_status"] = CodexConnectionStatusReconnectRequired
+	}
 	result := tx.Model(c).
 		Where("id = ?", c.ID).
-		Updates(map[string]any{
-			"status":     CodexConnectionStatusReconnectRequired,
-			"updated_at": now,
-		})
+		Updates(updates)
 	if result.Error != nil {
 		return result.Error
 	}
 	c.Status = CodexConnectionStatusReconnectRequired
+	if c.ResumeStatus != "" {
+		c.ResumeStatus = CodexConnectionStatusReconnectRequired
+	}
 	c.UpdatedAt = now
 	return nil
 }

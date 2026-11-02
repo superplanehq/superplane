@@ -4,8 +4,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateCanvas } from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { PLACEHOLDER_NODE_CONTEXT_KEY, setAgentBootContext } from "@/lib/agentBootContext";
-import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import { PLACEHOLDER_NODE_CONTEXT_KEY } from "@/lib/canvasPlaceholderBoot";
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { appPath } from "@/lib/appPaths";
 
@@ -14,10 +13,8 @@ interface UseCreateAppOptions {
 }
 
 function applyBlankAppBootContext(canvasId: string) {
-  writeCanvasAgentSidebarOpen(canvasId, true);
   writeCanvasRunsSidebarOpen(canvasId, false);
   localStorage.setItem("canvasSidebarOpen", "false");
-  setAgentBootContext(canvasId, "blank");
   sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
 }
 

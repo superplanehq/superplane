@@ -511,6 +511,30 @@ func TestCodexCatalogRefreshFailureBeforeCheckpointKeepsConnectionReady(t *testi
 	}
 }
 
+func TestCodexCatalogRefreshRejectedCredentialsStayReconnectRequired(t *testing.T) {
+	for _, state := range []string{models.RunnerTaskStateFailed, models.RunnerTaskStateCanceled} {
+		t.Run(state, func(t *testing.T) {
+			db, connection, previousTask, _ := newReadyCodexConnection(t)
+			now := time.Now()
+			task := &models.RunnerTask{
+				ID: uuid.New(), OrganizationID: connection.OrganizationID, FleetID: previousTask.FleetID,
+				Backend: models.RunnerTaskBackendIntegrated, State: state,
+				PayloadCiphertext: []byte("ciphertext"), QueuedAt: now,
+				CreatedAt: now, UpdatedAt: now, FinishedAt: &now,
+			}
+			require.NoError(t, db.Create(task).Error)
+			require.NoError(t, connection.BeginCatalogRefresh(db, task.ID, now))
+			require.NoError(t, connection.MarkReconnectRequired(db, now))
+			require.NoError(t, models.ReleaseConfirmedCodexReservations(db, now))
+			released := reloadCodexConnection(t, db, connection.ID)
+			assert.Equal(t, models.CodexConnectionStatusReconnectRequired, released.Status)
+			assert.Empty(t, codexLeases(t, db, connection.ID))
+			_, err := reserveCodexRun(t, db, released, uuid.New(), now)
+			require.Error(t, err, "a rejected connection must not accept new runs")
+		})
+	}
+}
+
 func TestCodexConnectionCancelBeforeCheckpointRestoresPreviousStatus(t *testing.T) {
 	db, connection, task, _ := newDisconnectedCodexLogin(t)
 	now := time.Now()

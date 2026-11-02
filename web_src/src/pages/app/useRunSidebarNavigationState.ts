@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { getRunSidebarNavigation } from "@/components/CanvasToolSidebar/runsSidebarNavigation";
-import { useRunFilters } from "@/components/CanvasToolSidebar/useRunFilters";
+import { getRunSidebarNavigation } from "@/lib/runsSidebarNavigation";
+import { useRunFilters } from "@/hooks/useRunFilters";
 import type { CanvasRunsFilters } from "@/hooks/useCanvasData";
 
 interface UseRunSidebarNavigationStateParams {
