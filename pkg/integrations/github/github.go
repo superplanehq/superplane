@@ -31,7 +31,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/metadata"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/statuses"
-	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -577,8 +576,8 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 }
 
 func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
-	if err := authorizeGitHubEnterpriseHost(common.HostFromIntegration(ctx.Integration)); err != nil {
-		http.Error(ctx.Response, licensing.ErrNotLicensed.Error(), http.StatusForbidden)
+	if err := authorizeGitHubEnterpriseOrg(ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
+		writeGitHubEnterpriseAuthorizationError(ctx.Response, err)
 		return
 	}
 
@@ -750,8 +749,8 @@ func (g *GitHub) afterAppCreationLegacy(ctx core.HTTPRequestContext, appData *Gi
 
 func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	if !gitHubAppAlreadyCreated(ctx) {
-		if err := authorizeGitHubEnterpriseHost(common.HostFromIntegration(ctx.Integration)); err != nil {
-			http.Error(ctx.Response, licensing.ErrNotLicensed.Error(), http.StatusForbidden)
+		if err := authorizeGitHubEnterpriseOrg(ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
+			writeGitHubEnterpriseAuthorizationError(ctx.Response, err)
 			return
 		}
 	}

@@ -19,7 +19,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
+	"google.golang.org/grpc/codes"
 )
+
+const gitHubEnterpriseUnavailable = "GitHub Enterprise is not available"
 
 type gitHubMetaResponse struct {
 	InstalledVersion string `json:"installed_version"`
@@ -27,6 +30,7 @@ type gitHubMetaResponse struct {
 
 var (
 	gitHubEnterprise             enterprise.GitHubEnterprise
+	orgHasGitHubEnterprise       = githubEnterpriseEnabled
 	orgHasGitHubEnterpriseServer = githubEnterpriseServerEnabled
 	probeGitHubHost              = ProbeGitHubHost
 )
@@ -38,15 +42,61 @@ func SetGitHubEnterprise(impl enterprise.GitHubEnterprise) {
 	gitHubEnterprise = impl
 }
 
-func authorizeGitHubEnterpriseHost(host common.Host) error {
+func githubEnterpriseEnabled(orgID uuid.UUID) bool {
+	ok, err := models.HasExperimentalFeature(orgID, features.FeatureGitHubEnterprise)
+	return err == nil && ok
+}
+
+func githubEnterpriseEnabledForOrg(orgID string) bool {
+	id, err := uuid.Parse(orgID)
+	if err != nil {
+		return false
+	}
+	return orgHasGitHubEnterprise(id)
+}
+
+func authorizeGitHubEnterpriseHost(orgID uuid.UUID, host common.Host) error {
 	if host.IsDotCom() {
 		return nil
+	}
+	if host.IsGHES() {
+		if !orgHasGitHubEnterpriseServer(orgID) {
+			return grpcerrors.FailedPrecondition(errors.New("GitHub Enterprise Server is not available"), "GitHub Enterprise Server is not available")
+		}
+	} else if !orgHasGitHubEnterprise(orgID) {
+		return grpcerrors.FailedPrecondition(errors.New(gitHubEnterpriseUnavailable), gitHubEnterpriseUnavailable)
 	}
 	impl := gitHubEnterprise
 	if impl == nil {
 		return grpcerrors.PermissionDenied(licensing.ErrNotLicensed, licensing.ErrNotLicensed.Error())
 	}
 	return impl.AuthorizeHost(host.WebHostname())
+}
+
+func authorizeGitHubEnterpriseOrg(orgID string, host common.Host) error {
+	if host.IsDotCom() {
+		return nil
+	}
+	id, err := uuid.Parse(orgID)
+	if err != nil {
+		if host.IsGHES() {
+			return grpcerrors.FailedPrecondition(errors.New("GitHub Enterprise Server is not available"), "GitHub Enterprise Server is not available")
+		}
+		return grpcerrors.FailedPrecondition(errors.New(gitHubEnterpriseUnavailable), gitHubEnterpriseUnavailable)
+	}
+	return authorizeGitHubEnterpriseHost(id, host)
+}
+
+func writeGitHubEnterpriseAuthorizationError(w http.ResponseWriter, err error) {
+	message := grpcerrors.StatusMessage(err)
+	if message == "" {
+		message = err.Error()
+	}
+	status := http.StatusBadRequest
+	if grpcerrors.Code(err) == codes.PermissionDenied {
+		status = http.StatusForbidden
+	}
+	http.Error(w, message, status)
 }
 
 func gitHubEnterpriseLicensed() bool {
@@ -71,6 +121,12 @@ func withGitHubEnterpriseForTest(impl enterprise.GitHubEnterprise) func() {
 // WithGitHubEnterpriseForTest replaces the GitHub Enterprise capability.
 func WithGitHubEnterpriseForTest(impl enterprise.GitHubEnterprise) func() {
 	return withGitHubEnterpriseForTest(impl)
+}
+
+func withGitHubEnterpriseFlagForTest(fn func(uuid.UUID) bool) func() {
+	previous := orgHasGitHubEnterprise
+	orgHasGitHubEnterprise = fn
+	return func() { orgHasGitHubEnterprise = previous }
 }
 
 func withGitHubEnterpriseServerForTest(fn func(uuid.UUID) bool) func() {

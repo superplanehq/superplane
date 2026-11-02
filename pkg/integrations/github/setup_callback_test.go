@@ -144,15 +144,37 @@ func TestAfterAppInstallationHonorsSetupReturnPath(t *testing.T) {
 	assert.NotContains(t, response.Header().Get("Location"), "/settings/integrations/")
 }
 
+func TestAfterAppCreationGitHubEnterpriseRequiresFlag(t *testing.T) {
+	withLicensedGitHubEnterprise(t)
+	request := httptest.NewRequest(http.MethodGet, "/redirect?code=abc&state=s", nil)
+	response := httptest.NewRecorder()
+
+	(&GitHub{}).afterAppCreation(core.HTTPRequestContext{
+		Logger:         log.New().WithField("test", t.Name()),
+		Request:        request,
+		Response:       response,
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		Integration: &contexts.IntegrationContext{
+			CurrentProperties: map[string]any{common.PropertyHost: "acme.ghe.com"},
+		},
+	})
+
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.Contains(t, response.Body.String(), gitHubEnterpriseUnavailable)
+	assert.NotContains(t, response.Body.String(), licensing.ErrNotLicensed.Error())
+}
+
 func TestAfterAppCreationGitHubEnterpriseRequiresLicense(t *testing.T) {
+	enableGitHubEnterpriseFlag(t)
 	t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
 	request := httptest.NewRequest(http.MethodGet, "/redirect?code=abc&state=s", nil)
 	response := httptest.NewRecorder()
 
 	(&GitHub{}).afterAppCreation(core.HTTPRequestContext{
-		Logger:   log.New().WithField("test", t.Name()),
-		Request:  request,
-		Response: response,
+		Logger:         log.New().WithField("test", t.Name()),
+		Request:        request,
+		Response:       response,
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
 		Integration: &contexts.IntegrationContext{
 			CurrentProperties: map[string]any{common.PropertyHost: "acme.ghe.com"},
 		},
@@ -204,7 +226,32 @@ func TestAfterAppInstallationExistingGitHubEnterpriseAppWithoutLicense(t *testin
 	assert.Equal(t, http.StatusSeeOther, response.Code)
 }
 
+func TestAfterAppInstallationNewGitHubEnterpriseAppRequiresFlag(t *testing.T) {
+	withLicensedGitHubEnterprise(t)
+	request := httptest.NewRequest(http.MethodGet, "/setup?installation_id=139366&setup_action=install&state=abc", nil)
+	response := httptest.NewRecorder()
+
+	(&GitHub{}).afterAppInstallation(core.HTTPRequestContext{
+		Logger:         log.New().WithField("test", t.Name()),
+		Request:        request,
+		Response:       response,
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration: &contexts.IntegrationContext{
+			NewSetupFlow: true,
+			CurrentProperties: map[string]any{
+				common.PropertyHost: "acme.ghe.com",
+			},
+		},
+	})
+
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.Contains(t, response.Body.String(), gitHubEnterpriseUnavailable)
+	assert.NotContains(t, response.Body.String(), licensing.ErrNotLicensed.Error())
+}
+
 func TestAfterAppInstallationNewGitHubEnterpriseAppRequiresLicense(t *testing.T) {
+	enableGitHubEnterpriseFlag(t)
 	t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
 	request := httptest.NewRequest(http.MethodGet, "/setup?installation_id=139366&setup_action=install&state=abc", nil)
 	response := httptest.NewRecorder()
@@ -213,7 +260,7 @@ func TestAfterAppInstallationNewGitHubEnterpriseAppRequiresLicense(t *testing.T)
 		Logger:         log.New().WithField("test", t.Name()),
 		Request:        request,
 		Response:       response,
-		OrganizationID: "org-1",
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
 		BaseURL:        "https://app.example",
 		Integration: &contexts.IntegrationContext{
 			NewSetupFlow: true,
