@@ -1,3 +1,4 @@
+import { CodexSetupFailure } from "./CodexSetupFailure";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import {
@@ -35,11 +36,7 @@ function CodexConnectionNotices({
       ) : null}
       {!featuresLoading && !offered ? <p role="alert">Codex subscriptions are unavailable in this workspace.</p> : null}
       {connection?.eligible === false ? <p role="alert">Your account cannot connect Codex in this workspace.</p> : null}
-      {codex.start.isError ? <p role="alert">Could not start Codex sign-in. Try again.</p> : null}
       {codex.cancel.isError ? <p role="alert">Could not cancel Codex sign-in. Try again.</p> : null}
-      {codex.refreshCatalog.isError ? (
-        <p role="alert">Could not load your Codex models. Close this dialog and try again.</p>
-      ) : null}
     </>
   );
 }
@@ -49,8 +46,12 @@ export function CodexConnectionSetupContent({ setup }: { setup: ReturnType<typeo
   return (
     <>
       <CodexConnectionNotices codex={codex} featuresLoading={setup.featuresLoading} offered={setup.offered} />
+      <CodexSetupFailure
+        error={codex.start.error ?? codex.refreshCatalog.error}
+        organizationId={setup.organizationId}
+      />
       <CodexDeviceSignIn
-        disabled={setup.disabled}
+        disabled={setup.disabled && codex.query.data?.status !== "pending"}
         connection={codex.query.data}
         starting={codex.start.isPending}
         canceling={codex.cancel.isPending}

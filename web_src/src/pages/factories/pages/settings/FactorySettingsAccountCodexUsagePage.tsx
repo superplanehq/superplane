@@ -15,8 +15,8 @@ export function FactorySettingsAccountCodexUsagePage() {
   const { organizationId, factoryId } = useFactorySettingsLayout();
   const features = useExperimentalFeature(organizationId);
   const enabled = !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
-  const query = useCodexUsage(organizationId, enabled);
+  const codex = useFactoryCodexConnection(organizationId, factoryId, true, enabled);
+  const query = useCodexUsage(organizationId);
 
   return (
     <FactorySettingsPageFrame title="Codex">

@@ -10,17 +10,26 @@ describe("live analysis popup dollars", () => {
     {
       name: "hosted dollars increase before agent completion",
       hosted: true,
+      codex: false,
       costs: [undefined, undefined],
       dollars: ["0.18", "0.20"],
     },
-    { name: "BYOK uses reported dollars", hosted: false, costs: [0.44, 0.55], dollars: ["0.44", "0.55"] },
+    { name: "BYOK uses reported dollars", hosted: false, codex: false, costs: [0.44, 0.55], dollars: ["0.44", "0.55"] },
     {
       name: "BYOK without reported dollars gets no estimate",
+      codex: false,
       hosted: false,
       costs: [undefined, undefined],
       dollars: ["0.00", "0.00"],
     },
-  ])("$name", async ({ hosted, costs, dollars }) => {
+    {
+      name: "Codex includes measured cached tokens while the process remains active",
+      hosted: false,
+      codex: true,
+      costs: [undefined, undefined],
+      dollars: ["0.00", "0.00"],
+    },
+  ])("$name", async ({ hosted, codex, costs, dollars }) => {
     let writer!: ReadableStreamDefaultController<Uint8Array>;
     const body = new ReadableStream<Uint8Array>({
       start: (controller) => {
@@ -63,7 +72,13 @@ describe("live analysis popup dollars", () => {
           JSON.stringify({
             type: "turn",
             turn: 1,
-            usage: { input_tokens: tokens, output_tokens: 0, ...(cost === undefined ? {} : { total_cost_usd: cost }) },
+            ...(codex ? { usage_state: tokens > 50600 ? "partial" : "measured" } : {}),
+            usage: {
+              input_tokens: tokens,
+              output_tokens: 0,
+              ...(codex ? { cache_read_input_tokens: 50000, total_tokens: tokens + 50000 } : {}),
+              ...(cost === undefined ? {} : { total_cost_usd: cost }),
+            },
           }) + "\n",
         ),
       );
@@ -71,11 +86,15 @@ describe("live analysis popup dollars", () => {
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
       await act(async () => sendTokens(50600, costs[0]));
       await waitFor(() =>
-        expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent(`$${dollars[0]} · 50.6k tokens`),
+        expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent(
+          `$${dollars[0]} · ${codex ? "100.6k" : "50.6k"} tokens`,
+        ),
       );
       await act(async () => sendTokens(57200, costs[1]));
       await waitFor(() =>
-        expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent(`$${dollars[1]} · 57.2k tokens`),
+        expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent(
+          `$${dollars[1]} · ${codex ? "107.2k tokens (partial)" : "57.2k tokens"}`,
+        ),
       );
     } finally {
       popup.unmount();

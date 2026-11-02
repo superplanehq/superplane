@@ -66,6 +66,7 @@ spec:
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
           env:
+            {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
             {{- include "runner.processEnv" (dict "enabled" (list "START_RUNNER_LOG_COMPACTOR" "START_RUNNER_CLEANUP_WORKER" "START_RUNNER_TASK_SCHEDULER")) | nindent 12 }}
             - name: PUBLIC_API_BASE_PATH
               value: "/api/v1"

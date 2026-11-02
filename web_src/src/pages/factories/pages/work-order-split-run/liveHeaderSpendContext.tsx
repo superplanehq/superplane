@@ -1,3 +1,4 @@
+import type { UsageMeasurementState } from "@/lib/agentRunTelemetry";
 /* eslint-disable react-refresh/only-export-components -- provider and hooks share one context module */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -23,8 +24,14 @@ export function LiveHeaderSpendProvider({ children }: { children: ReactNode }) {
       const next: LiveHeaderSpend = {
         tokens: Math.max(current?.tokens ?? 0, spend.tokens),
         cents: Math.max(current?.cents ?? 0, spend.cents),
+        ...(spend.usageState ? { usageState: spend.usageState } : {}),
       };
-      if (current && current.tokens === next.tokens && current.cents === next.cents) {
+      if (
+        current &&
+        current.tokens === next.tokens &&
+        current.cents === next.cents &&
+        current.usageState === next.usageState
+      ) {
         return prev;
       }
       return { ...prev, [phaseId]: next };
@@ -36,11 +43,16 @@ export function LiveHeaderSpendProvider({ children }: { children: ReactNode }) {
   return <LiveHeaderSpendContext.Provider value={value}>{children}</LiveHeaderSpendContext.Provider>;
 }
 
-export function useReportLiveHeaderSpend(phaseId: string, tokens: number, cents: number) {
+export function useReportLiveHeaderSpend(
+  phaseId: string,
+  tokens: number,
+  cents: number,
+  usageState?: UsageMeasurementState,
+) {
   const { report } = useContext(LiveHeaderSpendContext);
   useEffect(() => {
-    report(phaseId, { tokens, cents });
-  }, [cents, phaseId, report, tokens]);
+    report(phaseId, { tokens, cents, ...(usageState ? { usageState } : {}) });
+  }, [cents, phaseId, report, tokens, usageState]);
 }
 
 export function useLiveHeaderSpendOverlay(): LiveHeaderSpend {

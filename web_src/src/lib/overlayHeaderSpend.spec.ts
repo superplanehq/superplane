@@ -24,3 +24,14 @@ describe("overlayHeaderSpend", () => {
     });
   });
 });
+
+it.each([
+  { state: "measured" as const, tokens: 0, expected: "0 tokens" },
+  { state: "pending" as const, tokens: 0, expected: "Waiting for token usage" },
+  { state: "unavailable" as const, tokens: 0, expected: "Tokens unavailable" },
+  { state: "partial" as const, tokens: 40, expected: "40 tokens (partial)" },
+])("shows $state measurement honestly after reloading saved usage", ({ state, tokens, expected }) => {
+  expect(overlayHeaderSpend("$0.00", `${tokens} tokens`, { tokens: 0, cents: 0, usageState: state }).tokensLabel).toBe(
+    expected,
+  );
+});

@@ -313,7 +313,7 @@ function SplitRunPhaseLogItem({
   onToggle: () => void;
   files?: FilesFile[];
 }) {
-  const loadLive = inlineRunDetails && expanded;
+  const loadLive = inlineRunDetails && (expanded || entry.status === "running" || entry.status === "pending");
   const live = useSplitRunLiveCanvas(organizationId, loadLive ? entry : undefined);
   const visual = useMemo(() => resolveSplitRunVisual(entry, live, { demoArtifacts }), [demoArtifacts, entry, live]);
   const stream = useMemo(
@@ -337,6 +337,7 @@ function SplitRunPhaseLogItem({
       selectedNodeId={selectedNodeId}
       onSelectNode={onSelectNode}
       organizationId={organizationId}
+      factoryKey={factoryKey}
       canvasId={entry.appId}
       onStop={onStop}
       onRerun={onRerun}

@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from "@/lib/errors";
 import {
   meCancelCodexConnection,
   meDisconnectCodexConnection,
@@ -80,7 +81,8 @@ export function useFactoryCodexConnection(
       return response.data?.connection;
     },
     onSettled: refresh,
-    onError: () => showErrorToast("SuperPlane could not start ChatGPT sign-in. Try again."),
+    onError: (error) =>
+      showErrorToast(getApiErrorMessage(error, "SuperPlane could not start ChatGPT sign-in. Try again.")),
   });
 
   const refreshCatalog = useMutation({
@@ -97,7 +99,10 @@ export function useFactoryCodexConnection(
     onSuccess: saveConnection,
     onSettled: refresh,
     retry: 2,
-    onError: () => showErrorToast("SuperPlane could not load your ChatGPT models. Reload the page to try again."),
+    onError: (error) =>
+      showErrorToast(
+        getApiErrorMessage(error, "SuperPlane could not load your ChatGPT models. Reload the page to try again."),
+      ),
   });
 
   const cancel = useMutation({
