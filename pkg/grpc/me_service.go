@@ -131,7 +131,7 @@ func (s *MeService) StartCodexConnection(ctx context.Context, req *pb.StartCodex
 
 func (s *MeService) CancelCodexConnection(ctx context.Context, req *pb.CancelCodexConnectionRequest) (*pb.CancelCodexConnectionResponse, error) {
 	organizationID, _ := authentication.GetOrganizationIdFromMetadata(ctx)
-	result, err := factories.CancelFactoryCodexConnection(ctx, s.encryptor, organizationID, &factorypb.CancelFactoryCodexConnectionRequest{})
+	result, err := factories.CancelFactoryCodexConnection(ctx, s.encryptor, organizationID, &factorypb.CancelFactoryCodexConnectionRequest{CatalogRefreshTaskId: req.GetCatalogRefreshTaskId()})
 	if err != nil {
 		return nil, err
 	}

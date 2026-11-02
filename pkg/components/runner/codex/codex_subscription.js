@@ -301,7 +301,10 @@ function readUsage(env) {
     let settled = false;
     let limits;
     let models;
+    let limitsComplete = false;
+    let modelsComplete = false;
     const modelCatalog = [];
+    const modelCursors = new Set();
     function finish(error, usage) {
       if (settled) return;
       settled = true;
@@ -331,7 +334,7 @@ function readUsage(env) {
       child.stdin.write(`${JSON.stringify(message)}\n`);
     }
     function finishSnapshot() {
-      if (limits !== undefined && models !== undefined) {
+      if (limitsComplete && modelsComplete) {
         finish(null, { limits, models: models ?? undefined });
       }
     }
@@ -346,8 +349,8 @@ function readUsage(env) {
         if (message.id !== 1 && message.id !== 2 && message.id !== 3) return;
         if (message.error) {
           if (message.id === 1) return finish(new Error("Codex usage request failed"));
-          if (message.id === 2) limits = [];
-          if (message.id === 3) models = null;
+          if (message.id === 2) limitsComplete = true;
+          if (message.id === 3) modelsComplete = true;
           finishSnapshot();
           return;
         }
@@ -358,41 +361,38 @@ function readUsage(env) {
           return;
         }
         if (message.id === 3) {
-          const result = message.result || {};
-          const page = Array.isArray(result.data)
-            ? result.data.map((model) => ({
-                id: model.id,
-                model: model.model,
-                displayName: model.displayName,
-                defaultReasoningEffort: model.defaultReasoningEffort,
-                supportedReasoningEfforts: model.supportedReasoningEfforts,
-                isDefault: model.isDefault,
-              }))
-            : [];
-          modelCatalog.push(...page);
+          const result = message.result;
+          if (
+            !result ||
+            !Array.isArray(result.data) ||
+            result.data.some((model) => !validCatalogModel(model)) ||
+            (result.nextCursor != null && typeof result.nextCursor !== "string") ||
+            (result.nextCursor && modelCursors.has(result.nextCursor))
+          ) {
+            modelsComplete = true;
+            finishSnapshot();
+            return;
+          }
+          modelCatalog.push(...result.data.map((model) => ({
+            id: model.id,
+            model: model.model,
+            displayName: model.displayName,
+            defaultReasoningEffort: model.defaultReasoningEffort,
+            supportedReasoningEfforts: model.supportedReasoningEfforts,
+            isDefault: model.isDefault,
+          })));
           if (result.nextCursor) {
+            modelCursors.add(result.nextCursor);
             send({ id: 3, method: "model/list", params: { cursor: result.nextCursor, limit: 100 } });
             return;
           }
+          modelsComplete = true;
           models = modelCatalog;
           finishSnapshot();
           return;
         }
-        const result = message.result || {};
-        const buckets = Object.entries(result.rateLimitsByLimitId || {});
-        limits = buckets.length
-          ? buckets.map(([id, limit]) => ({
-              ...limit,
-              limitId: limit.limitId || id,
-            }))
-          : result.rateLimits
-            ? [
-                {
-                  ...result.rateLimits,
-                  limitId: result.rateLimits.limitId || "codex",
-                },
-              ]
-            : [];
+        limitsComplete = true;
+        limits = readQuotaLimits(message.result);
         finishSnapshot();
       } catch (_err) {
         finish(new Error("Codex usage response is invalid"));
@@ -410,6 +410,37 @@ function readUsage(env) {
       },
     });
   });
+}
+
+function readQuotaLimits(result) {
+  if (result == null) return [];
+  if (typeof result !== "object" || Array.isArray(result)) return undefined;
+  const byLimitId = result.rateLimitsByLimitId;
+  if (byLimitId != null && (typeof byLimitId !== "object" || Array.isArray(byLimitId))) return undefined;
+  const buckets = Object.entries(byLimitId || {});
+  if (buckets.length) {
+    if (buckets.some(([, limit]) => !limit || typeof limit !== "object" || Array.isArray(limit))) return undefined;
+    return buckets.map(([id, limit]) => ({ ...limit, limitId: limit.limitId || id }));
+  }
+  const limit = result.rateLimits;
+  if (limit == null) return [];
+  if (typeof limit !== "object" || Array.isArray(limit)) return undefined;
+  return [{ ...limit, limitId: limit.limitId || "codex" }];
+}
+
+function validCatalogModel(model) {
+  if (!model || typeof model.model !== "string" || !model.model.trim()) return false;
+  const optionalStrings = [model.id, model.displayName, model.defaultReasoningEffort];
+  if (optionalStrings.some((value) => value != null && typeof value !== "string")) return false;
+  if (model.isDefault != null && typeof model.isDefault !== "boolean") return false;
+  const efforts = model.supportedReasoningEfforts;
+  if (efforts == null) return true;
+  return Array.isArray(efforts) && efforts.every((effort) =>
+    effort &&
+    typeof effort === "object" &&
+    !Array.isArray(effort) &&
+    [effort.reasoningEffort, effort.description].every((value) => value == null || typeof value === "string"),
+  );
 }
 
 function parseDeviceAuth(text) {
@@ -483,6 +514,10 @@ async function login(env = process.env) {
 
 async function finishSetup(env = process.env) {
   await checkpoint({ env, final: true });
+  completeSetup(env);
+}
+
+function completeSetup(env) {
   fs.rmSync(codexHome(env), { recursive: true, force: true });
   if (env.SUPERPLANE_RESULT_FILE) {
     fs.writeFileSync(
@@ -490,6 +525,19 @@ async function finishSetup(env = process.env) {
       `${JSON.stringify({ type: "result", is_error: false, codexSubscriptionSetupCleaned: true })}\n`,
     );
   }
+}
+
+async function refreshCatalog(env = process.env) {
+  await restore(env);
+  const usage = await readUsage(env);
+  if (!Array.isArray(usage.models)) {
+    throw new Error("ChatGPT models could not be loaded");
+  }
+  const payload = await requestJSON(env, "POST", "/api/v1/runner/codex-subscription/checkpoint", { usage });
+  if (payload?.accepted !== true) {
+    throw new Error("ChatGPT models were not saved");
+  }
+  completeSetup(env);
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -500,8 +548,7 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
   if (command === "refresh") {
-    await restore();
-    await finishSetup();
+    await refreshCatalog();
     process.stdout.write("ChatGPT model catalog refreshed\n");
     return;
   }

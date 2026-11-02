@@ -3369,6 +3369,8 @@ message FactoryCodexConnection {
   // Models available to this ChatGPT subscription.
   repeated string available_models = 9;
   bool revocation_pending = 10;
+  string catalog_refresh_task_id = 11;
+  bool catalog_refresh_canceling = 12;
 }
 
 message DescribeFactoryCodexConnectionRequest {
@@ -3391,6 +3393,7 @@ message StartFactoryCodexConnectionResponse {
 
 message CancelFactoryCodexConnectionRequest {
   string factory_id = 1;
+  string catalog_refresh_task_id = 2;
 }
 
 message CancelFactoryCodexConnectionResponse {
