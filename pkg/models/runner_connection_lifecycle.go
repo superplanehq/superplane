@@ -24,9 +24,10 @@ func (r *Runner) MarkLost(tx *gorm.DB, lastSeenBefore, now time.Time) (*RunnerTa
 	if taskErr == nil {
 		wasRunning := task.State == RunnerTaskStateRunning
 		if err := tx.Model(task).Updates(map[string]any{
-			"state":       RunnerTaskStateLost,
-			"finished_at": now,
-			"updated_at":  now,
+			"state":              RunnerTaskStateLost,
+			"payload_ciphertext": nil,
+			"finished_at":        now,
+			"updated_at":         now,
 		}).Error; err != nil {
 			return nil, err
 		}

@@ -618,8 +618,9 @@ func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) e
 			"runner_id": nil,
 			"state": gorm.Expr("CASE WHEN cancel_requested_at IS NULL THEN ? ELSE ? END",
 				RunnerTaskStateQueued, RunnerTaskStateCanceled),
-			"finished_at": gorm.Expr("CASE WHEN cancel_requested_at IS NOT NULL THEN ? ELSE finished_at END", now),
-			"reserved_at": nil,
-			"updated_at":  now,
+			"finished_at":        gorm.Expr("CASE WHEN cancel_requested_at IS NOT NULL THEN ? ELSE finished_at END", now),
+			"payload_ciphertext": gorm.Expr("CASE WHEN cancel_requested_at IS NOT NULL THEN NULL ELSE payload_ciphertext END"),
+			"reserved_at":        nil,
+			"updated_at":         now,
 		}).Error
 }
