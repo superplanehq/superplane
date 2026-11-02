@@ -136,6 +136,60 @@ func TestLostRunningTaskBecomesArchivable(t *testing.T) {
 	assert.Equal(t, models.RunnerTaskLogStateArchivable, lifecycle.State)
 }
 
+func TestRequestCancelRunnerTasksUsesCurrentTaskState(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+
+	fleet := newTestRunnerFleet()
+	require.NoError(t, fleet.Create(db))
+
+	now := time.Now()
+	runner := &models.Runner{
+		ID:            uuid.New(),
+		FleetID:       fleet.ID,
+		State:         models.RunnerStateIdle,
+		RunnerVersion: "0.1.0",
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	require.NoError(t, db.Create(runner).Error)
+	newTask := func() *models.RunnerTask {
+		return &models.RunnerTask{
+			ID:                uuid.New(),
+			OrganizationID:    resource.Organization.ID,
+			FleetID:           fleet.ID,
+			Backend:           models.RunnerTaskBackendIntegrated,
+			State:             models.RunnerTaskStateQueued,
+			PayloadCiphertext: []byte("ciphertext"),
+			QueuedAt:          now,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		}
+	}
+	finished := newTask()
+	queued := newTask()
+	require.NoError(t, db.Create(finished).Error)
+	require.NoError(t, db.Create(queued).Error)
+	require.NoError(t, finished.Reserve(db, runner.ID))
+	require.NoError(t, finished.Start(db, runner, "test-store", now))
+
+	stale := []models.RunnerTask{*finished, *queued}
+	completed, err := finished.Complete(db, runner, "done", datatypes.JSON([]byte(`{}`)), 0, "", false, now)
+	require.NoError(t, err)
+	require.True(t, completed)
+
+	current, err := models.RequestCancelRunnerTasks(db, stale, now)
+	require.NoError(t, err)
+	require.Len(t, current, 2)
+	assert.Equal(t, models.RunnerTaskStateSucceeded, current[0].State)
+	assert.Nil(t, current[0].CancelRequestedAt)
+	assert.Equal(t, models.RunnerTaskStateCanceled, current[1].State)
+	reloaded, err := models.FindRunnerTask(db, finished.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStateSucceeded, reloaded.State)
+}
+
 func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	resource := support.Setup(t)

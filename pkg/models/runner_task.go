@@ -188,6 +188,38 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 	return nil
 }
 
+// RequestCancelRunnerTasks requests cancellation of tasks that the caller
+// read without a lock. It locks runners before tasks, like reservation and
+// completion, and reloads each task so a task that finished or changed state
+// after the read is cancelled from its current state. It returns the reloaded
+// tasks in the input order.
+func RequestCancelRunnerTasks(tx *gorm.DB, tasks []RunnerTask, now time.Time) ([]RunnerTask, error) {
+	var runnerIDs []uuid.UUID
+	for _, task := range tasks {
+		if task.RunnerID != nil {
+			runnerIDs = append(runnerIDs, *task.RunnerID)
+		}
+	}
+	if len(runnerIDs) > 0 {
+		var runners []Runner
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id IN ?", runnerIDs).Order("id").Find(&runners).Error; err != nil {
+			return nil, err
+		}
+	}
+	current := make([]RunnerTask, 0, len(tasks))
+	for _, task := range tasks {
+		locked, err := FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE"}), task.ID)
+		if err != nil {
+			return nil, err
+		}
+		if err := locked.RequestCancel(tx, now); err != nil {
+			return nil, err
+		}
+		current = append(current, *locked)
+	}
+	return current, nil
+}
+
 // FailUnassigned rejects a pending or queued attempt that no runner has
 // observed. Failure and lease release commit together, including when called
 // without an outer transaction.
