@@ -53,7 +53,7 @@ admission again before another allocation.
 ## Migration and process configuration
 
 Apply the Phase 2 migration first. Apply the generated Phase 3 migration
-`20261031165847_add-codex-setup-compute-usage` before the matching application
+`20261102135335_add-codex-setup-compute-usage` before the matching application
 versions. Do not reinterpret older tasks without the new setup purpose marker.
 Do not backfill charges.
 
@@ -137,66 +137,23 @@ UI build and formatting check passed on the final source. The affected
 database-backed test packages compile successfully with `-run=^$`. This compile
 check ran zero tests and does not verify database behavior.
 
-Database behavior, migration application, and the live provider acceptance
-remain pending as described below.
+Database behavior and migration application passed in local development
+and test databases. The live provider acceptance remains pending as described
+below.
 
-## Remaining approval and acceptance
+## Remaining acceptance
 
-Automatic approval review rejected filling the Make-generated migration. It
-interpreted the repository migration rule as prohibiting edits after generation.
-Both generated migration files remain empty, and no Phase 3 schema change has
-been applied. The draft PR excludes those empty files. The SQL proposal below
-is for review only. It is not an executable migration in this branch.
-Explicit user approval is pending.
-
-After approval, fill the generated up migration with the reviewed SQL. Leave
-the down migration empty. Apply it to development and test databases through
-`make db.migrate DB_NAME=<name>`, without dropping either database. Record the
-result, then run affected model, public API, runner API, factory action, billing,
-and worker tests, followed by the required full backend suite.
+The migration `20261102135335_add-codex-setup-compute-usage` adds the setup
+purpose and billing columns to `runner_tasks`. It also adds the runner task
+reference and setup purpose to `workspace_usage_events`, with constraints that
+keep setup rows organization-only. The down migration is empty.
 
 A live ChatGPT test account/workspace is also needed for the required provider
 acceptance run. Verify both planning and execution displays during that run,
 with logs closed and after reload. No live provider run has been claimed.
-Keep the implementation PR in draft until the migration and validation complete.
+Keep the implementation PR in draft until the live acceptance run completes.
 
 GitHub still reports #9134 open at the required starting commit. Issue #9138
 contains the complete plan, assignee, and label. GitHub reports that issue as
 closed since shortly after creation. This implementation did not change its
 status after that verification.
-
-## Proposed schema for review
-
-The following SQL is the proposed content for the Make-generated up migration.
-It has not been applied. Leave the generated down migration empty.
-
-```sql
-ALTER TABLE runner_tasks
-  ADD COLUMN setup_purpose text NOT NULL DEFAULT '',
-  ADD COLUMN setup_billable boolean NOT NULL DEFAULT false,
-  ADD CONSTRAINT runner_tasks_setup_purpose_known
-    CHECK (setup_purpose IN ('', 'codex_login', 'codex_catalog')),
-  ADD CONSTRAINT runner_tasks_setup_billable_shape
-    CHECK (NOT setup_billable OR setup_purpose <> '');
-
-ALTER TABLE workspace_usage_events
-  ALTER COLUMN canvas_run_id DROP NOT NULL,
-  ALTER COLUMN node_execution_id DROP NOT NULL,
-  ADD COLUMN runner_task_id uuid REFERENCES runner_tasks(id),
-  ADD COLUMN setup_purpose text NOT NULL DEFAULT '',
-  ADD CONSTRAINT workspace_usage_events_scope_shape CHECK (
-    (setup_purpose = '' AND runner_task_id IS NULL
-      AND canvas_run_id IS NOT NULL AND node_execution_id IS NOT NULL)
-    OR
-    (setup_purpose IN ('codex_login', 'codex_catalog') AND runner_task_id IS NOT NULL
-      AND factory_id IS NULL AND work_order_id IS NULL AND line_id IS NULL
-      AND line_dispatch_id IS NULL AND work_order_execution_id IS NULL
-      AND canvas_run_id IS NULL AND node_execution_id IS NULL AND node_id = ''
-      AND usage_kind = 'compute' AND provider = 'runner' AND funding_source = 'hosted'
-      AND input_tokens = 0 AND output_tokens = 0 AND cache_read_tokens = 0
-      AND cache_write_tokens = 0 AND reasoning_tokens = 0 AND total_tokens = 0)
-  );
-
-CREATE INDEX workspace_usage_events_runner_task_id
-  ON workspace_usage_events (runner_task_id) WHERE runner_task_id IS NOT NULL;
-```

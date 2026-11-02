@@ -1727,7 +1727,11 @@ CREATE TABLE public.runner_tasks (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     ready_at timestamp with time zone,
+    setup_purpose text DEFAULT ''::text NOT NULL,
+    setup_billable boolean DEFAULT false NOT NULL,
     CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
+    CONSTRAINT runner_tasks_setup_billable_shape CHECK (((NOT setup_billable) OR (setup_purpose <> ''::text))),
+    CONSTRAINT runner_tasks_setup_purpose_known CHECK ((setup_purpose = ANY (ARRAY[''::text, 'codex_login'::text, 'codex_catalog'::text]))),
     CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
 );
 
@@ -2345,8 +2349,8 @@ CREATE TABLE public.workspace_usage_events (
     line_id uuid,
     line_dispatch_id uuid,
     work_order_execution_id uuid,
-    canvas_run_id uuid NOT NULL,
-    node_execution_id uuid NOT NULL,
+    canvas_run_id uuid,
+    node_execution_id uuid,
     node_id text NOT NULL,
     provider text NOT NULL,
     model text NOT NULL,
@@ -2368,7 +2372,10 @@ CREATE TABLE public.workspace_usage_events (
     duration_seconds bigint DEFAULT 0 NOT NULL,
     machine_type text DEFAULT ''::text NOT NULL,
     fleet_id text DEFAULT ''::text NOT NULL,
+    runner_task_id uuid,
+    setup_purpose text DEFAULT ''::text NOT NULL,
     CONSTRAINT workspace_usage_events_compute_shape CHECK (((usage_kind <> 'compute'::text) OR ((machine_type <> ''::text) AND (duration_seconds >= 0)))),
+    CONSTRAINT workspace_usage_events_scope_shape CHECK ((((setup_purpose = ''::text) AND (runner_task_id IS NULL) AND (canvas_run_id IS NOT NULL) AND (node_execution_id IS NOT NULL)) OR ((setup_purpose = ANY (ARRAY['codex_login'::text, 'codex_catalog'::text])) AND (runner_task_id IS NOT NULL) AND (factory_id IS NULL) AND (work_order_id IS NULL) AND (line_id IS NULL) AND (line_dispatch_id IS NULL) AND (work_order_execution_id IS NULL) AND (canvas_run_id IS NULL) AND (node_execution_id IS NULL) AND (node_id = ''::text) AND (usage_kind = 'compute'::text) AND (provider = 'runner'::text) AND (funding_source = 'hosted'::text) AND (input_tokens = 0) AND (output_tokens = 0) AND (cache_read_tokens = 0) AND (cache_write_tokens = 0) AND (reasoning_tokens = 0) AND (total_tokens = 0)))),
     CONSTRAINT workspace_usage_events_usage_kind_known CHECK ((usage_kind = ANY (ARRAY['model'::text, 'compute'::text])))
 );
 
@@ -5160,6 +5167,13 @@ CREATE UNIQUE INDEX workflows_organization_id_name_active_key ON public.workflow
 
 
 --
+-- Name: workspace_usage_events_runner_task_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX workspace_usage_events_runner_task_id ON public.workspace_usage_events USING btree (runner_task_id) WHERE (runner_task_id IS NOT NULL);
+
+
+--
 -- Name: account_linked_accounts account_linked_accounts_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6568,6 +6582,14 @@ ALTER TABLE ONLY public.workflows
 
 
 --
+-- Name: workspace_usage_events workspace_usage_events_runner_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_usage_events
+    ADD CONSTRAINT workspace_usage_events_runner_task_id_fkey FOREIGN KEY (runner_task_id) REFERENCES public.runner_tasks(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
@@ -6599,7 +6621,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261102120509	f
+20261102135335	f
 \.
 
 

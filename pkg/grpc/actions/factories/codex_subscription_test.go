@@ -63,6 +63,7 @@ func TestPersonalCodexConnectionDoesNotActivateWorkspace(t *testing.T) {
 	assert.Equal(t, models.RunnerTaskSetupPurposeCodexLogin, task.SetupPurpose)
 	runnerModel := &models.Runner{ID: uuid.New(), FleetID: task.FleetID, State: models.RunnerStateIdle, RunnerVersion: "test"}
 	require.NoError(t, db.Create(runnerModel).Error)
+	require.NoError(t, db.Model(task).Update("state", models.RunnerTaskStateQueued).Error)
 	require.NoError(t, task.Reserve(db, runnerModel.ID))
 	require.NoError(t, task.Start(db, runnerModel, "test-store", time.Now()))
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"verification_url": "https://auth.openai.com/codex/device", "verification_code": "LOGIN-CODE"}).Error)
