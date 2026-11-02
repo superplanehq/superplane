@@ -33,11 +33,15 @@ function writeManifest(manifest, env) {
 
 // recordArtifacts adds uploaded files to the evidence manifest. The visual
 // evidence app reads the manifest after the run. A partial manifest stays
-// partial unless the upload completes a video and its poster.
+// partial unless the upload completes a video and its poster. A keyed upload
+// keeps its artifact_id and gets a new file_id, so match on both.
 function recordArtifacts(results, env, { partialReason = "", complete = false } = {}) {
   const manifest = readManifest(env);
-  const ids = new Set(results.map((item) => item.file_id));
-  const artifacts = manifest.artifacts.filter((item) => !ids.has(item.file_id));
+  const fileIDs = new Set(results.map((item) => item.file_id));
+  const artifactIDs = new Set(results.map((item) => item.artifact_id).filter(Boolean));
+  const artifacts = manifest.artifacts.filter(
+    (item) => !fileIDs.has(item.file_id) && !artifactIDs.has(item.artifact_id),
+  );
   artifacts.push(...results);
   if (partialReason) {
     writeManifest({ status: "partial", reason: partialReason, artifacts }, env);

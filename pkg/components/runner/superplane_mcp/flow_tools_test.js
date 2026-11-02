@@ -85,6 +85,20 @@ test("upload_artifact keeps the poster when the video upload fails", async () =>
   });
 });
 
+test("add_artifact keeps only the latest file of a keyed artifact in the evidence manifest", async () => {
+  let uploads = 0;
+  const value = taskFixture(async () => {
+    uploads += 1;
+    return { artifact_id: "artifact-1", file_id: `file-${uploads}` };
+  });
+  call("get_artifact", { path: value.screenshot }, value.client);
+
+  await call("add_artifact", { type: "file", path: value.screenshot, key: "checkout" }, value.client);
+  await call("add_artifact", { type: "file", path: value.screenshot, key: "checkout" }, value.client);
+
+  assert.deepEqual(readManifest(value.client.env).artifacts, [{ artifact_id: "artifact-1", file_id: "file-2" }]);
+});
+
 test("add_artifact rejects a video key with no space for the poster key", async () => {
   const value = taskFixture();
   call("get_artifact", { path: value.screenshot }, value.client);

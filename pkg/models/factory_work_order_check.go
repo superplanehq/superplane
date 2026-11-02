@@ -69,6 +69,13 @@ func IsReservedWorkOrderCheckKey(key string) bool {
 	return slices.Contains(planningReviewCheckKeys, key) || strings.HasSuffix(key, mergeConfidenceCheckKeySuffix)
 }
 
+// isPlanningScoreCheckName reports whether a name is a plan score name. The
+// UI finds plan scores by name, so an agent check cannot use these names.
+func isPlanningScoreCheckName(name string) bool {
+	name = strings.TrimSpace(name)
+	return strings.EqualFold(name, PlanningClarityCheckName) || strings.EqualFold(name, PlanningConfidenceCheckName)
+}
+
 var planningReviewCheckKeys = []string{
 	PlanningClarityCheckKey,
 	PlanningConfidenceCheckKey,
@@ -188,6 +195,9 @@ func (o *FactoryWorkOrder) ReportAgentChecks(
 		for _, param := range params {
 			if IsReservedWorkOrderCheckKey(param.Key) {
 				return fmt.Errorf("%w: %s", ErrFactoryWorkOrderCheckOwned, strings.TrimSpace(param.Key))
+			}
+			if isPlanningScoreCheckName(param.Name) {
+				return fmt.Errorf("%w: name %q belongs to SuperPlane; use another name", ErrFactoryWorkOrderCheckInvalid, strings.TrimSpace(param.Name))
 			}
 			param.Source = FactoryWorkOrderCheckSourceAgent
 			check, err := o.ReportCheck(tx, param)
