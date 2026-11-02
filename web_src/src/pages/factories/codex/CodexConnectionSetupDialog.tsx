@@ -14,24 +14,15 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { CodexDeviceSignIn } from "./CodexDeviceSignIn";
 import { useCodexConnectionSetup } from "./useCodexConnectionSetup";
+import { codexModelLoadError, codexModelLoadRetryable, codexNeedsHostedCredit } from "./codexConnectionCopy";
 
 type CodexConnection = ReturnType<typeof useFactoryCodexConnection>;
 
-function CodexConnectionErrorNotice({
-  error,
-  fallback,
-  billingHref,
-}: {
-  error: unknown;
-  fallback: string;
-  billingHref: string;
-}) {
-  const message = getApiErrorMessage(error, fallback);
-  const needsHostedCredit = message.startsWith("This organization has no hosted credit.");
+function CodexConnectionErrorNotice({ message, billingHref }: { message: string; billingHref: string }) {
   return (
     <p role="alert">
       {message}
-      {needsHostedCredit ? (
+      {codexNeedsHostedCredit(message) ? (
         <>
           {" "}
           <Link href={billingHref} className="font-medium underline underline-offset-2 hover:no-underline">
@@ -40,6 +31,27 @@ function CodexConnectionErrorNotice({
         </>
       ) : null}
     </p>
+  );
+}
+
+function CodexCatalogErrorNotice({ codex, billingHref }: { codex: CodexConnection; billingHref: string }) {
+  const status = codex.query.data?.status;
+  const message = codexModelLoadError(codex.refreshCatalog.error, status);
+  return (
+    <div>
+      <CodexConnectionErrorNotice message={message} billingHref={billingHref} />
+      {codexModelLoadRetryable(message, status) ? (
+        <LoadingButton
+          type="button"
+          variant="outline"
+          size="sm"
+          loading={codex.refreshCatalog.isPending}
+          onClick={() => codex.refreshCatalog.mutate()}
+        >
+          Try again
+        </LoadingButton>
+      ) : null}
+    </div>
   );
 }
 
@@ -57,19 +69,12 @@ function CodexConnectionNotices({ codex, billingHref }: { codex: CodexConnection
       {connection?.eligible === false ? <p role="alert">Your account cannot connect Codex in this workspace.</p> : null}
       {codex.start.isError ? (
         <CodexConnectionErrorNotice
-          error={codex.start.error}
-          fallback="SuperPlane could not start ChatGPT sign-in. Try again."
+          message={getApiErrorMessage(codex.start.error, "SuperPlane could not start ChatGPT sign-in. Try again.")}
           billingHref={billingHref}
         />
       ) : null}
       {codex.cancel.isError ? <p role="alert">Could not cancel Codex sign-in. Try again.</p> : null}
-      {codex.refreshCatalog.isError ? (
-        <CodexConnectionErrorNotice
-          error={codex.refreshCatalog.error}
-          fallback="Could not load your Codex models. Close this dialog and try again."
-          billingHref={billingHref}
-        />
-      ) : null}
+      {codex.refreshCatalog.isError ? <CodexCatalogErrorNotice codex={codex} billingHref={billingHref} /> : null}
     </>
   );
 }
