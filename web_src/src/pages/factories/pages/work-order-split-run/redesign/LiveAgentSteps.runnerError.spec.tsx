@@ -19,6 +19,7 @@ vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: vi.fn(
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({ useLiveLogStream: vi.fn() }));
 
 const FAILURE_MESSAGE = "Your ChatGPT session has expired. Sign in again to continue.";
+const PLANNING_FAILURE_MESSAGE = "The model request failed. Try again.";
 const RUN_HREF = "/org/workspaces/example/automations/app/runs/run-1";
 
 beforeEach(() => {
@@ -113,13 +114,13 @@ it("keeps a stored planning error visible when completed tool activity is collap
             status: "passed",
             truncated: false,
           },
-          { type: "notice", id: "error", code: "codex_error", text: FAILURE_MESSAGE },
+          { type: "notice", id: "error", code: "codex_error", text: PLANNING_FAILURE_MESSAGE },
         ],
       }}
     />,
   );
 
-  expect(screen.getByRole("alert")).toHaveTextContent(FAILURE_MESSAGE);
+  expect(screen.getByRole("alert")).toHaveTextContent(PLANNING_FAILURE_MESSAGE);
   expect(screen.queryByText("cat README.md")).not.toBeInTheDocument();
 });
 
