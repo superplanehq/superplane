@@ -479,7 +479,7 @@ func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) 
 		query = query.Where("provider = ? AND external_id = ?", strings.TrimSpace(filter.Provider), strings.TrimSpace(filter.ExternalID))
 	case strings.TrimSpace(filter.Provider) != "" && strings.TrimSpace(filter.Repository) != "" && filter.Number > 0:
 		query = query.Where(
-			"provider = ? AND repository = ? AND number = ?",
+			"provider = ? AND lower(repository) = lower(?) AND number = ?",
 			strings.TrimSpace(filter.Provider),
 			strings.TrimSpace(filter.Repository),
 			filter.Number,

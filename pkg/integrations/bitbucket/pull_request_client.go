@@ -20,6 +20,7 @@ const (
 )
 
 type PullRequestListOptions struct {
+	TitleContains     string
 	SourceBranch      string
 	DestinationBranch string
 	States            []string
@@ -130,6 +131,10 @@ func (c *Client) ListPullRequests(repository string, opts PullRequestListOptions
 
 	query := url.Values{}
 	filters := []string{}
+	if opts.TitleContains != "" {
+		encoded, _ := json.Marshal(opts.TitleContains)
+		filters = append(filters, "title ~ "+string(encoded))
+	}
 	if opts.SourceBranch != "" {
 		filters = append(filters, fmt.Sprintf("source.branch.name=%q", opts.SourceBranch))
 	}
@@ -276,6 +281,7 @@ func PullRequestMergeStrategy(method string) string {
 
 // BitbucketPullRequest is the merge-relevant subset of a pull request.
 type BitbucketPullRequest struct {
+	Description         string
 	ID                  int64  `json:"id"`
 	State               string `json:"state"`
 	Draft               bool   `json:"draft"`
@@ -297,11 +303,12 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 	}
 
 	var response struct {
-		ID    int64  `json:"id"`
-		State string `json:"state"`
-		Draft bool   `json:"draft"`
-		Title string `json:"title"`
-		Links struct {
+		ID          int64  `json:"id"`
+		State       string `json:"state"`
+		Draft       bool   `json:"draft"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Links       struct {
 			HTML struct {
 				Href string `json:"href"`
 			} `json:"html"`
@@ -339,6 +346,7 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 		State:               response.State,
 		Draft:               response.Draft,
 		Title:               response.Title,
+		Description:         response.Description,
 		HTMLURL:             response.Links.HTML.Href,
 		SourceRepository:    response.Source.Repository.FullName,
 		SourceHash:          response.Source.Commit.Hash,
