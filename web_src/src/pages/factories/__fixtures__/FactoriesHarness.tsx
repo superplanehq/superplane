@@ -2,7 +2,7 @@ import type { CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import { OrgWorkspaceHarness, type OrgWorkspacePageOverrides } from "@/pages/__fixtures__/OrgWorkspaceHarness";
 import type { HomePageFixture, StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
-import { FEATURE_CLAUDE_MANAGED_AGENTS, FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 
 import { FactoryPreviewFlagsContext, type FactoryPreviewFlags } from "../pages/factoryPreviewFlagsContext";
 import { OnboardingStorybookProvider } from "../pages/onboarding/OnboardingStorybookContext";
@@ -41,11 +41,9 @@ interface FactoriesHarnessProps {
   onboardingSeed?: OnboardingStorybookSeed;
   /** When false, skip setup provider/routes (app-like create → overview). */
   enableOnboarding?: boolean;
-  /** Open the canvas agent sidebar on mount (factory canvas agent story). */
-  openAgentSidebar?: boolean;
   /** Organization connections the story starts with. Defaults to none. */
   orgIntegrations?: StorybookOrgIntegration[];
-  /** Extra organization experimental features to enable on top of the defaults (factories, managed agents). */
+  /** Extra organization experimental features to enable on top of factories. */
   experimentalFeatures?: string[];
   /** Override Storybook preview flags. Defaults turn the design-review surfaces on. */
   previewFlags?: Partial<FactoryPreviewFlags>;
@@ -79,7 +77,6 @@ export function FactoriesHarness({
   pageOverrides,
   onboardingSeed,
   enableOnboarding = true,
-  openAgentSidebar = false,
   orgIntegrations,
   experimentalFeatures = [],
   previewFlags,
@@ -91,7 +88,6 @@ export function FactoriesHarness({
     enabledExperimentalFeatures: [
       ...(defaultHomePageFixture.enabledExperimentalFeatures ?? []),
       FEATURE_FACTORIES,
-      FEATURE_CLAUDE_MANAGED_AGENTS,
       ...experimentalFeatures,
     ],
     factories: factoriesFixture.factories.map((factory) => ({
@@ -109,7 +105,6 @@ export function FactoriesHarness({
       homeFixture={homeFixture}
       factoriesFixture={factoriesFixture}
       appFixture={appFixture}
-      openAgentSidebar={openAgentSidebar}
       orgIntegrations={orgIntegrations}
       pageOverrides={
         mode === "app"

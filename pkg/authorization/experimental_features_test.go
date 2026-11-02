@@ -19,7 +19,7 @@ func TestOrgHasExperimentalFeature(t *testing.T) {
 	t.Run("released feature short-circuits without cache or database", func(t *testing.T) {
 		t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
 
-		enabled, err := orgHasExperimentalFeature(uuid.New(), features.FeatureClaudeManagedAgents)
+		enabled, err := orgHasExperimentalFeature(uuid.New(), features.FeatureSuperPlaneMCPServer)
 		require.NoError(t, err)
 		assert.True(t, enabled)
 	})
@@ -95,7 +95,7 @@ func TestOrgHasExperimentalFeature(t *testing.T) {
 func TestCheckRequiredExperimentalFeatures(t *testing.T) {
 	t.Run("released feature passes without organization lookup", func(t *testing.T) {
 		err := checkRequiredExperimentalFeatures(context.Background(), uuid.NewString(), AuthorizationRule{
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+			RequiredExperimentalFeatures: []string{features.FeatureSuperPlaneMCPServer},
 		})
 		require.NoError(t, err)
 	})

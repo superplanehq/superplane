@@ -1,6 +1,5 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
-import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 
@@ -33,7 +32,6 @@ describe("SecondaryHeaderActions", () => {
         hasUnpublishedConsoleDraftChanges
         draftConsoleDiff={{ diffCounts: { added: 1, updated: 0, removed: 0 } }}
         onShowConsoleDiff={vi.fn()}
-        toolSidebarState={{} as CanvasToolSidebarState}
         runsSidebarState={runsSidebarState}
         versionsSidebarState={versionsSidebarState}
       />,
@@ -59,7 +57,6 @@ describe("SecondaryHeaderActions", () => {
           },
         }}
         onShowDiff={vi.fn()}
-        toolSidebarState={{} as CanvasToolSidebarState}
         runsSidebarState={runsSidebarState}
         versionsSidebarState={versionsSidebarState}
       />,
@@ -79,7 +76,6 @@ describe("SecondaryHeaderActions", () => {
         onCommitStaging={vi.fn()}
         onResetStaging={vi.fn()}
         onPublishVersion={vi.fn()}
-        toolSidebarState={{} as CanvasToolSidebarState}
         runsSidebarState={runsSidebarState}
         versionsSidebarState={versionsSidebarState}
       />,
@@ -101,7 +97,6 @@ describe("SecondaryHeaderActions", () => {
         onCommitStaging={vi.fn()}
         onResetStaging={vi.fn()}
         onPublishVersion={vi.fn()}
-        toolSidebarState={{} as CanvasToolSidebarState}
         runsSidebarState={runsSidebarState}
         versionsSidebarState={versionsSidebarState}
       />,
@@ -122,7 +117,6 @@ describe("SecondaryHeaderActions", () => {
         commitStagingPending={false}
         onCommitStaging={vi.fn()}
         onResetStaging={vi.fn()}
-        toolSidebarState={{} as CanvasToolSidebarState}
         runsSidebarState={runsSidebarState}
         versionsSidebarState={versionsSidebarState}
       />,
@@ -141,7 +135,6 @@ describe("SecondaryHeaderActions", () => {
         isEditing
         hasStagingChanges
         onResetStaging={vi.fn()}
-        toolSidebarState={{} as CanvasToolSidebarState}
         runsSidebarState={runsSidebarState}
         versionsSidebarState={versionsSidebarState}
       />,
@@ -164,7 +157,6 @@ describe("SecondaryHeaderActions", () => {
         onResetStaging={vi.fn()}
         onDiscardVersion={vi.fn()}
         onPublishVersion={vi.fn()}
-        toolSidebarState={{} as CanvasToolSidebarState}
         runsSidebarState={runsSidebarState}
         versionsSidebarState={versionsSidebarState}
       />,
