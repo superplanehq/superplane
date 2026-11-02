@@ -21,7 +21,8 @@ import (
 
 const pullRequestChecksStartLease = 2 * time.Minute
 
-// StartPullRequestChecks processes durable requests after attachment commits.
+// StartPullRequestChecks starts PR checks and merge confidence from durable
+// requests after attachment commits.
 // The node request worker recovers requests if this prompt attempt fails.
 func StartPullRequestChecks(ctx context.Context, deps IntakeDependencies, pullRequestID uuid.UUID) {
 	requests, err := models.ListPullRequestChecksStartRequests(database.DB(ctx), pullRequestID)
@@ -106,7 +107,7 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 	if err != nil {
 		return nil, err
 	}
-	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
+	if pullRequest.SupersededAt != nil || pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
 		return nil, request.Complete(db)
 	}
 	node, err := checksStartupTrigger(db, request, factory, pullRequest)
@@ -163,14 +164,17 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 }
 
 func checksStartupTrigger(tx *gorm.DB, request *models.CanvasNodeRequest, factory *models.Factory, pullRequest *models.FactoryPullRequest) (*models.CanvasNode, error) {
-	handler, err := models.FindPRFeedbackHandlerByCanvasID(tx, request.WorkflowID)
-	if err != nil || handler == nil {
-		return nil, err
-	}
-	if handler.FactoryID != factory.ID || handler.OrganizationID != factory.OrganizationID {
+	canvas, err := models.FindCanvasInTransaction(tx, factory.OrganizationID, request.WorkflowID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
-	node, err := handler.GitHubChecksTrigger(tx, pullRequest.Repository)
+	if err != nil {
+		return nil, err
+	}
+	if canvas.FactoryID == nil || *canvas.FactoryID != factory.ID {
+		return nil, nil
+	}
+	node, err := canvas.GitHubVerificationTrigger(tx, pullRequest.Repository)
 	if err != nil || node == nil {
 		return nil, err
 	}
