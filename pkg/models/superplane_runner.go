@@ -358,11 +358,13 @@ func isSuperPlaneReadinessMessage(message string) bool {
 	}
 }
 
-// RefreshHostedBillingReadiness clears a hosted runner node's billing error
-// when an organization can run agents again. Other node errors need a publish
-// to validate their configuration.
+// RefreshHostedBillingReadiness rechecks a hosted runner node's billing or
+// model readiness error and clears it when an organization can run agents
+// again. A billing error can change into a model error, so model errors are
+// rechecked too. Other node errors need a publish to validate their
+// configuration.
 func (c *CanvasNode) RefreshHostedBillingReadiness(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) error {
-	if c.State != CanvasNodeStateError || c.ComponentName() != SuperPlaneRunnerComponent || c.StateReason == nil || !isHostedBillingReadinessMessage(*c.StateReason) {
+	if c.State != CanvasNodeStateError || c.ComponentName() != SuperPlaneRunnerComponent || c.StateReason == nil || !isSuperPlaneReadinessMessage(*c.StateReason) {
 		return nil
 	}
 
@@ -400,20 +402,6 @@ func (c *CanvasNode) RefreshHostedBillingReadiness(tx *gorm.DB, orgID uuid.UUID,
 	c.State = nextState
 	c.StateReason = nextReason
 	return nil
-}
-
-func isHostedBillingReadinessMessage(message string) bool {
-	switch strings.TrimSpace(message) {
-	case SuperPlaneRunnerNoCreditMessage,
-		SuperPlaneRunnerNoFactoryBudgetMessage,
-		SuperPlaneRunnerSubscribeMessage,
-		SuperPlaneRunnerPaymentPastDueMessage,
-		SuperPlaneRunnerSubscriptionPausedMessage,
-		legacySuperPlaneRunnerSubscribeMessage:
-		return true
-	default:
-		return false
-	}
 }
 
 func isHostedBillingReadinessError(err error) bool {
