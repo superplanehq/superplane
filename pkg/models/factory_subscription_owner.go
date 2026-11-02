@@ -129,6 +129,37 @@ func (o *FactoryWorkOrder) RequireExecutionOwner(tx *gorm.DB, nonblocking bool) 
 // SubscriptionOwnershipBlocked includes pending and queued tasks, associated runs,
 // and runners whose cancellation or provider termination is incomplete.
 func (o *FactoryWorkOrder) SubscriptionOwnershipBlocked(tx *gorm.DB) (bool, error) {
+	return o.subscriptionOwnershipBlocked(tx, nil)
+}
+
+// SubscriptionOwnershipBlockedForStart permits only the draft's planning run
+// to finish after Start changes the owner. Other task work still blocks Start.
+func (o *FactoryWorkOrder) SubscriptionOwnershipBlockedForStart(tx *gorm.DB) (bool, error) {
+	if o.State != FactoryWorkOrderStateDraft {
+		return o.SubscriptionOwnershipBlocked(tx)
+	}
+	session, err := FindPlanningSessionByDraftWorkOrder(tx, o.OrganizationID, o.FactoryID, o.ID)
+	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return o.SubscriptionOwnershipBlocked(tx)
+	}
+	if err != nil {
+		return false, err
+	}
+	if session.CanvasRunID == nil {
+		return o.SubscriptionOwnershipBlocked(tx)
+	}
+	ignored := map[uuid.UUID]bool{*session.CanvasRunID: true}
+	descendants, err := listDescendantRuns(tx, *session.CanvasRunID)
+	if err != nil {
+		return false, err
+	}
+	for _, run := range descendants {
+		ignored[run.ID] = true
+	}
+	return o.subscriptionOwnershipBlocked(tx, ignored)
+}
+
+func (o *FactoryWorkOrder) subscriptionOwnershipBlocked(tx *gorm.DB, ignoredRuns map[uuid.UUID]bool) (bool, error) {
 	var queued int64
 	if err := tx.Model(&FactoryWorkOrderQueueItem{}).Where("work_order_id = ?", o.ID).Count(&queued).Error; err != nil {
 		return false, err
@@ -148,13 +179,15 @@ func (o *FactoryWorkOrder) SubscriptionOwnershipBlocked(tx *gorm.DB) (bool, erro
 		return false, err
 	}
 	for _, run := range runs {
-		if run.State != CanvasRunStateFinished {
+		if !ignoredRuns[run.ID] && run.State != CanvasRunStateFinished {
 			return true, nil
 		}
 	}
 	ids := make([]uuid.UUID, 0, len(runs))
 	for _, run := range runs {
-		ids = append(ids, run.ID)
+		if !ignoredRuns[run.ID] {
+			ids = append(ids, run.ID)
+		}
 	}
 	if len(ids) == 0 {
 		return false, nil
@@ -317,6 +350,10 @@ func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasI
 }
 
 func (o *FactoryWorkOrder) validateSubscriptionAssignment(tx *gorm.DB, ids []uuid.UUID) error {
+	return o.validateSubscriptionAssignmentWithStart(tx, ids, false)
+}
+
+func (o *FactoryWorkOrder) validateSubscriptionAssignmentWithStart(tx *gorm.DB, ids []uuid.UUID, start bool) error {
 	subscription, err := o.UsesCodexSubscription(tx)
 	if err != nil || !subscription {
 		return err
@@ -338,7 +375,12 @@ func (o *FactoryWorkOrder) validateSubscriptionAssignment(tx *gorm.DB, ids []uui
 	if len(ids) > 1 {
 		return ErrSubscriptionOwnerRequired
 	}
-	blocked, err := o.SubscriptionOwnershipBlocked(tx)
+	var blocked bool
+	if start {
+		blocked, err = o.SubscriptionOwnershipBlockedForStart(tx)
+	} else {
+		blocked, err = o.SubscriptionOwnershipBlocked(tx)
+	}
 	if err != nil {
 		return err
 	}

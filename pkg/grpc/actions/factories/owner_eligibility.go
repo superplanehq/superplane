@@ -62,7 +62,14 @@ func assignWorkOrderStarter(tx *gorm.DB, factory *models.Factory, order *models.
 	if len(owners) == 1 && owners[0].UserID == *actor {
 		return requireCallerCodexConnection(tx, factory, *actor)
 	}
-	return updateInteractiveWorkOrderAssignees(tx, factory, order, []uuid.UUID{*actor}, *actor)
+	err = order.AssignStarter(tx, *actor)
+	if err != nil && !errors.Is(err, models.ErrSubscriptionOwnerInvalid) {
+		return err
+	}
+	if connectionErr := requireCallerCodexConnection(tx, factory, *actor); connectionErr != nil {
+		return connectionErr
+	}
+	return err
 }
 
 func resolveModelCatalogOwner(ctx context.Context, tx *gorm.DB, f *models.Factory, orderRef string) (uuid.UUID, error) {
