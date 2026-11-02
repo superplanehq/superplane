@@ -6,6 +6,7 @@ import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
+import { latestBacklogAnalysisRun, planningRunFailure, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
@@ -46,6 +47,7 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
     orderNumber,
     orderId,
     fixture,
+    analysisRuns,
     fixed = false,
     onClose,
     canUpdate = true,
@@ -82,9 +84,10 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
       artifacts: popupData.artifacts,
     }),
   });
+  const planningFailure = popupPlanningFailure(analysis, analysisRuns);
   const mode = workOrderPopupMode({
     hasPlanningSession: Boolean(analysis.session),
-    hasAnalysisResult: hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts),
+    hasAnalysisResult: popupHasAnalysisResult(fixture, popupData, planningFailure),
     refinementEnabled,
     refinementLoading: refinementFeature.isLoading,
     sessionLoading: analysis.isLoading,
@@ -98,7 +101,33 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
   if (mode === "loading") {
     return <LoadingWorkOrderPopup title={fixture.title} titlePrefix={titlePrefix} fixed={fixed} onClose={onClose} />;
   }
-  return <AnalysisWorkOrderPopup {...props} titlePrefix={titlePrefix} analysis={analysis} popupData={popupData} />;
+  return (
+    <AnalysisWorkOrderPopup
+      {...props}
+      titlePrefix={titlePrefix}
+      analysis={analysis}
+      popupData={popupData}
+      planningFailure={planningFailure}
+    />
+  );
+}
+
+function popupPlanningFailure(
+  analysis: ReturnType<typeof useAnalysisPlanningSession>,
+  runs?: BacklogAnalysisRun[],
+): string | undefined {
+  if (analysis.session) {
+    return analysis.runFailure;
+  }
+  return planningRunFailure(latestBacklogAnalysisRun(runs ?? [])?.run);
+}
+
+function popupHasAnalysisResult(
+  fixture: WorkOrderSplitRunPopupProps["fixture"],
+  popupData: ReturnType<typeof useSplitRunPopupData>,
+  planningFailure?: string,
+): boolean {
+  return Boolean(planningFailure) || hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts);
 }
 
 function AnalysisWorkOrderPopup({
@@ -119,10 +148,12 @@ function AnalysisWorkOrderPopup({
   analysis,
   popupData,
   titlePrefix,
+  planningFailure,
 }: WorkOrderSplitRunPopupProps & {
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
   titlePrefix?: string;
+  planningFailure?: string;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
@@ -154,6 +185,7 @@ function AnalysisWorkOrderPopup({
     lineId,
     fixture: viewFixture,
     analysis,
+    planningFailure,
     draftModel,
     draftThinking,
     onDraftStartChange: ({ model, thinkingLevel }) => {
@@ -380,6 +412,7 @@ type AnalysisDraftChromeArgs = {
   lineId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  planningFailure?: string;
   draftModel: string;
   draftThinking: string;
   onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;

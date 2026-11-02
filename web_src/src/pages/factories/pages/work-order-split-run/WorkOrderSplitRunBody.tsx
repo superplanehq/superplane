@@ -2,6 +2,7 @@ import { Activity } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { FilesFile } from "@/api-client";
+import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import { formatWorkOrderDateTime } from "../../lib/workOrderDateTime";
 import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
 import type { ManualCustomAutomation } from "../../lib/customAutomation";
@@ -35,6 +36,7 @@ type WorkOrderSplitRunBodyProps = {
 };
 
 export type WorkOrderSplitRunPopupProps = Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
+  analysisRuns?: BacklogAnalysisRun[];
   onClose?: () => void;
   fixed?: boolean;
   onDispatch?: (model?: string, thinkingLevel?: string) => Promise<void>;
