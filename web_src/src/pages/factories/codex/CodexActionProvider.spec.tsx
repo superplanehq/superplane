@@ -3,6 +3,7 @@ import { act, render, renderHook, screen, waitFor } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { useState } from "react";
+import { MemoryRouter } from "react-router";
 
 import {
   meCancelCodexConnection,
@@ -102,16 +103,19 @@ describe("Codex assignment continuation", () => {
     [
       "This organization has no hosted credit. Add hosted credit to continue.",
       "This organization has no hosted credit. Add hosted credit to continue.",
+      true,
     ],
-    ["internal error", "SuperPlane could not start ChatGPT sign-in. Try again."],
-  ])("shows the sign-in failure and keeps setup available: %s", async (message, expected) => {
+    ["internal error", "SuperPlane could not start ChatGPT sign-in. Try again.", false],
+  ])("shows the sign-in failure and keeps setup available: %s", async (message, expected, offersBilling) => {
     vi.mocked(meStartCodexConnection).mockRejectedValue({ message });
     const onConnected = vi.fn();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <QueryClientProvider client={client}>
-        <DismissibleCodexSetup onConnected={onConnected} />
-      </QueryClientProvider>,
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <DismissibleCodexSetup onConnected={onConnected} />
+        </QueryClientProvider>
+      </MemoryRouter>,
     );
 
     const button = await screen.findByRole("button", { name: "Connect ChatGPT" });
@@ -120,6 +124,7 @@ describe("Codex assignment continuation", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(expected);
     expect(showErrorToast).toHaveBeenCalledWith(expected);
+    expect(screen.queryByRole("link", { name: "Open Billing" }) !== null).toBe(offersBilling);
     expect(button).toBeEnabled();
     expect(onConnected).not.toHaveBeenCalled();
   });
