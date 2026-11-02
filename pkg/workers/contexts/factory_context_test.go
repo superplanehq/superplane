@@ -20,7 +20,6 @@ import (
 	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -2437,7 +2436,6 @@ func TestFactoryContextDefaultOwner(t *testing.T) {
 	member, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
 	require.NoError(t, err)
 	require.NoError(t, database.Conn().Delete(member).Error)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
@@ -2528,7 +2526,6 @@ func TestFactoryContextCreateWorkOrderKeepsRunStartedBeforeSubscriptionSwitch(t 
 	db := database.DB(t.Context())
 	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 
 	for _, tc := range []struct {
 		name       string
