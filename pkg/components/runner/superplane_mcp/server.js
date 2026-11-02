@@ -3,7 +3,8 @@
 
 /**
  * Global runner MCP server. It lists only the tools that the run token allows.
- * The backend checks the token scope again on every call.
+ * Aliases stay callable but are not listed. The backend checks the token
+ * scope again on every call.
  */
 
 const { createClient } = require("./client");
@@ -40,18 +41,18 @@ function createHandler({
 
   async function allowedTools() {
     const names = await allowedNames();
-    return tools.filter((tool) => names.has(tool.definition.name));
+    return tools.filter((tool) => registry.isAllowed(tool, names));
   }
 
   async function callTool(id, params, transport) {
     const name = params && params.name;
-    const tool = (await allowedTools()).find((candidate) => candidate.definition.name === name);
-    if (!tool) {
+    const resolved = registry.resolve(name, await allowedTools());
+    if (!resolved) {
       transport.sendError(id, -32601, `Unknown tool: ${name}`);
       return;
     }
     try {
-      const result = await tool.handler((params && params.arguments) || {}, client);
+      const result = await resolved.handler((params && params.arguments) || {}, client);
       transport.sendResult(id, toolResult(result));
     } catch (err) {
       transport.sendResult(id, {

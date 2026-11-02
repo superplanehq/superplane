@@ -159,7 +159,7 @@ func TestProcessVideoAttachmentsScriptIndexesImagesWithoutMediaTools(t *testing.
 	index := readIndex(t, attachments)
 	assert.Contains(t, index, "image:")
 	assert.Contains(t, index, "$SUPERPLANE_TASK_DIR/attachments/01-shot.png")
-	assert.NotContains(t, index, "inspect_attachment")
+	assert.NotContains(t, index, "get_artifact")
 	assert.Equal(t, "ready", manifestFile(t, attachments, "01-shot.png")["status"])
 }
 
