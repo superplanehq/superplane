@@ -48,7 +48,7 @@ import {
   type CustomAutomationMode,
   type ManualCustomAutomation,
 } from "../lib/customAutomation";
-import { customAutomationIdFromSearch } from "../lib/customAutomationPaths";
+import { customAutomationIdFromSearch, factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
@@ -564,7 +564,16 @@ export function LinesPage() {
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
-    if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
+    if (
+      isAddIntakeSoon(template, hasExperimentalFeature) ||
+      (template.id !== CUSTOM_AUTOMATION_TEMPLATE_ID && takenIntakeSourceIds.includes(template.id))
+    ) {
+      return;
+    }
+    if (template.id === CUSTOM_AUTOMATION_TEMPLATE_ID) {
+      if (selectedLine.id) {
+        navigate(factoryCustomAutomationSetupPath(organizationId, routeSegment, selectedLine.id, undefined, "backlog"));
+      }
       return;
     }
     if (template.id === "scheduled-intake") {
@@ -747,6 +756,7 @@ export function LinesPage() {
         <CustomAutomationSetupModal
           lineId={selectedLine.id}
           automationId={customAutomationAutomationId ?? undefined}
+          columnKey={new URLSearchParams(search).get("automationColumn") === "backlog" ? "backlog" : "verify"}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
@@ -1081,10 +1091,7 @@ function LineDetail({
     [backlogAnalysis.runsByWorkOrder],
   );
   const customAutomationIds = useMemo(
-    () =>
-      apps.flatMap((app) =>
-        app.id && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID && app.columnKey === "verify" ? [app.id] : [],
-      ),
+    () => apps.flatMap((app) => (app.id && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID ? [app.id] : [])),
     [apps],
   );
   const customAutomationDetails = useFactoryCustomAutomations(organizationId, factoryId, customAutomationIds);
@@ -1126,6 +1133,7 @@ function LineDetail({
                 id: automationId,
                 name: automation.automation?.name?.trim() || "Custom automation",
                 icon: automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON,
+                columnKey: automation.automation?.columnKey === "backlog" ? ("backlog" as const) : ("verify" as const),
               },
             ]
           : [],
