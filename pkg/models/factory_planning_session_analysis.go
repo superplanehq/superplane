@@ -147,6 +147,63 @@ func analysisSessionMatchesWorkOrder(session *FactoryPlanningSession, workOrderI
 	return session.IsAnalysisSession() && session.DraftWorkOrderID != nil && *session.DraftWorkOrderID == workOrderID
 }
 
+// CompletePlanningForStart stops the draft's planning run and requests
+// cancellation of its runner tasks in the caller's dispatch transaction.
+func (o *FactoryWorkOrder) CompletePlanningForStart(tx *gorm.DB, actor *uuid.UUID) (*RunCancellationResult, error) {
+	if o.State != FactoryWorkOrderStateDraft {
+		return nil, nil
+	}
+	session, err := FindPlanningSessionByDraftWorkOrder(tx, o.OrganizationID, o.FactoryID, o.ID)
+	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := session.End(tx); err != nil {
+		return nil, err
+	}
+	if session.CanvasRunID == nil {
+		return nil, nil
+	}
+	run, err := FindUnscopedCanvasRun(tx, *session.CanvasRunID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	completion, err := run.RequestCompletion(tx, actor)
+	if err != nil {
+		return nil, err
+	}
+	descendants, err := listDescendantRuns(tx, run.ID)
+	if err != nil {
+		return nil, err
+	}
+	runIDs := []uuid.UUID{run.ID}
+	for _, child := range descendants {
+		runIDs = append(runIDs, child.ID)
+	}
+	var tasks []RunnerTask
+	err = tx.Model(&RunnerTask{}).
+		Select("DISTINCT runner_tasks.*").
+		Joins("JOIN workflow_node_execution_kvs kv ON kv.key = 'task_id' AND kv.value = runner_tasks.id::text").
+		Joins("JOIN workflow_node_executions e ON e.id = kv.execution_id AND e.workflow_id = kv.workflow_id AND e.node_id = kv.node_id").
+		Where("e.run_id IN ? AND runner_tasks.organization_id = ?", runIDs, o.OrganizationID).
+		Order("runner_tasks.id").
+		Find(&tasks).Error
+	if err != nil {
+		return nil, err
+	}
+	// A planning task can finish after the read above. Lock and reload each
+	// task so a finished task does not fail and roll back Start.
+	if _, err := RequestCancelRunnerTasks(tx, tasks, time.Now()); err != nil {
+		return nil, err
+	}
+	return completion, nil
+}
+
 func (s *FactoryPlanningSession) ProposeSpec(tx *gorm.DB, body string) error {
 	markdown := unwrapPlanningMarkdown(body)
 	if markdown == "" {
