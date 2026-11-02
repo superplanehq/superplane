@@ -26,13 +26,14 @@ export function draftStripAnalysis(args: DraftStripAnalysisArgs, modelSelect: Re
     return undefined;
   }
   const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
+  const planningFailure = args.planningFailure ?? args.analysis.runFailure;
   return {
     ...args.analysis,
     view:
-      args.planningFailure && !args.analysis.session
+      planningFailure && !args.analysis.session
         ? { ...args.analysis.view, machineStatus: "failed" as const }
         : args.analysis.view,
-    planningFailure: args.planningFailure,
+    planningFailure,
     requestCreatedAt: args.fixture.phases.find((phase) => phase.id === "backlog")?.startedAt,
     modelSelect,
     showClarity: factoryShowsClarity(args.factory),

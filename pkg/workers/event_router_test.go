@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -395,4 +396,95 @@ func Test__EventRouter_RechecksHostedCreditBeforeRoutingPlanningAgent(t *testing
 	require.NoError(t, err)
 	require.Equal(t, models.CanvasNodeStateReady, agent.State)
 	require.Nil(t, agent.StateReason)
+}
+
+func Test__EventRouter_RoutesEventWhenBlockedNodeErrorsAreFull(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	triggerID := "trigger"
+	sourceID := "source"
+	blockedID := "blocked"
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: triggerID, Type: models.NodeTypeTrigger},
+		{NodeID: sourceID, Type: models.NodeTypeComponent},
+		{NodeID: blockedID, Name: "Blocked", Type: models.NodeTypeComponent},
+	}, []models.Edge{
+		{SourceID: triggerID, TargetID: sourceID, Channel: "default"},
+		{SourceID: sourceID, TargetID: blockedID, Channel: "default"},
+	})
+	require.NoError(t, db.Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, blockedID).
+		Updates(map[string]any{"state": models.CanvasNodeStateError, "state_reason": "node is broken"}).Error)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerID, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
+	require.NoError(t, err)
+	require.NoError(t, rootEvent.Routed())
+	for i := 0; i < models.MaxRunErrorsCount; i++ {
+		require.NoError(t, run.AddError(db, fmt.Sprintf("error %d", i), config.MaxPayloadSize()))
+	}
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, sourceID, rootEvent.ID, rootEvent.ID)
+	execution.RunID = run.ID
+	require.NoError(t, db.Save(execution).Error)
+	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
+	require.NoError(t, err)
+
+	events, err := models.ListCanvasEvents(db, canvas.ID, sourceID, 1, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+
+	require.NoError(t, NewEventRouter("").LockAndProcessEvent(log.NewEntry(log.New()), events[0], time.Now()))
+
+	var routed models.CanvasEvent
+	require.NoError(t, db.Where("id = ?", events[0].ID).First(&routed).Error)
+	assert.Equal(t, models.CanvasEventStateRouted, routed.State)
+	updatedRun, err := models.FindCanvasRunInTransaction(db, canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Len(t, updatedRun.Errors, models.MaxRunErrorsCount)
+}
+
+func Test__EventRouter_RecordsBlockedNodeErrorOnce(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	triggerID := "trigger"
+	sourceID := "source"
+	blockedID := "blocked"
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: triggerID, Type: models.NodeTypeTrigger},
+		{NodeID: sourceID, Type: models.NodeTypeComponent},
+		{NodeID: blockedID, Name: "Blocked", Type: models.NodeTypeComponent},
+	}, []models.Edge{
+		{SourceID: triggerID, TargetID: sourceID, Channel: "default"},
+		{SourceID: sourceID, TargetID: blockedID, Channel: "default"},
+	})
+	require.NoError(t, db.Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, blockedID).
+		Updates(map[string]any{"state": models.CanvasNodeStateError, "state_reason": "node is broken"}).Error)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerID, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
+	require.NoError(t, err)
+	require.NoError(t, rootEvent.Routed())
+
+	router := NewEventRouter("")
+	logger := log.NewEntry(log.New())
+	for i := 0; i < 2; i++ {
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, sourceID, rootEvent.ID, rootEvent.ID)
+		execution.RunID = run.ID
+		require.NoError(t, db.Save(execution).Error)
+		_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
+		require.NoError(t, err)
+
+		var pending []models.CanvasEvent
+		require.NoError(t, db.Where("workflow_id = ? AND node_id = ? AND state = ?", canvas.ID, sourceID, models.CanvasEventStatePending).Find(&pending).Error)
+		require.Len(t, pending, 1)
+		require.NoError(t, router.LockAndProcessEvent(logger, pending[0], time.Now()))
+	}
+
+	updatedRun, err := models.FindCanvasRunInTransaction(db, canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"node is broken"}, updatedRun.ErrorMessages())
 }

@@ -2,7 +2,9 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -467,8 +469,22 @@ func prepareTargetNodeForRouting(tx *gorm.DB, canvas *models.Canvas, run *models
 	if node.StateReason != nil && *node.StateReason != "" {
 		reason = *node.StateReason
 	}
-	if err := run.AddError(tx, reason, config.MaxPayloadSize()); err != nil {
+	if err := recordBlockedNodeError(tx, run, reason); err != nil {
 		return false, fmt.Errorf("record error for node %s: %w", node.NodeID, err)
 	}
 	return false, nil
+}
+
+// recordBlockedNodeError adds the reason to the run errors once. A full error
+// list must not block routing: the event must still be marked as routed so
+// the run can finish.
+func recordBlockedNodeError(tx *gorm.DB, run *models.CanvasRun, reason string) error {
+	if slices.ContainsFunc(run.Errors, func(e models.RunError) bool { return e.Message == reason }) {
+		return nil
+	}
+	err := run.AddError(tx, reason, config.MaxPayloadSize())
+	if errors.Is(err, models.ErrRunErrorsTooMany) || errors.Is(err, models.ErrRunErrorsTooLarge) {
+		return nil
+	}
+	return err
 }
