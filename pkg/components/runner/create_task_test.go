@@ -12,8 +12,6 @@ import (
 )
 
 func TestCreateTaskBuildsRunnerPayload(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "unused")
 	tasks := &contexts.RunnerTaskContext{}
 
 	id, err := CreateTask(tasks, CreateTaskParams{
@@ -56,8 +54,6 @@ func TestMissingExecutionBackendDefaultsToLegacy(t *testing.T) {
 }
 
 func TestCreateTaskRequiresRunnerContext(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "unused")
 	if _, err := CreateTask(nil, CreateTaskParams{}); err == nil {
 		t.Fatal("must not fall back to the legacy broker")
 	}

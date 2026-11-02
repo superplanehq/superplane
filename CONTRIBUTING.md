@@ -99,8 +99,8 @@ environments.
 See [Local database snapshot](docs/contributing/local-database-snapshot.md).
 
 `make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
-runner API and Docker Fleet Manager. Set `TASK_BROKER_*` in `.env` only while
-you test legacy or remote broker routing (see `.env.example`).
+runner API and Docker Fleet Manager. Historical tasks use SuperPlane task
+records and archived logs in platform blob storage.
 
 The local worker image includes Claude Code, Codex, OpenCode, git, `gh`, and
 `jq` so factory line apps can run locally. Do not install those CLIs on the

@@ -164,7 +164,7 @@ describe("consumeLiveLogNdjsonLine", () => {
   });
 });
 
-describe("LiveLogStream integrated polling", () => {
+describe("LiveLogStream polling", () => {
   it("preserves the opaque cursor and stops at the archived state", async () => {
     const fetchMock = vi
       .fn()
@@ -255,12 +255,10 @@ describe("LiveLogStream integrated polling", () => {
     }
   });
 
-  it("downloads an archived log from the signed URL", async () => {
+  it.each(["integrated", "legacy"])("downloads an archived %s log from the signed URL", async (backend) => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ backend: "integrated", stream_url: "/runner-logs" }), { status: 200 }),
-      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ backend, stream_url: "/runner-logs" }), { status: 200 }))
       .mockResolvedValueOnce(
         new Response(null, {
           status: 204,
@@ -281,7 +279,12 @@ describe("LiveLogStream integrated polling", () => {
       );
 
       expect(final).toBe(true);
+      expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+        credentials: "include",
+        headers: { "x-organization-id": "organization-1" },
+      });
       expect(fetchMock.mock.calls[2]?.[0]).toBe("https://storage.example/logs");
+      expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ credentials: "omit" });
       expect(onLogLine).toHaveBeenCalledWith("from-blob");
     } finally {
       vi.unstubAllGlobals();
@@ -299,8 +302,12 @@ describe("LiveLogStream session errors", () => {
       "fetch",
       vi
         .fn()
-        .mockResolvedValueOnce(Response.json({ stream_url: "https://broker.example/live-logs", token: "test-token" }))
-        .mockResolvedValueOnce(new Response('{"type":"ping"}\n{"type":"line","text":"done"}\n')),
+        .mockResolvedValueOnce(Response.json({ backend: "legacy", stream_url: "/runner-logs" }))
+        .mockResolvedValueOnce(
+          new Response('{"type":"ping"}\n{"type":"line","text":"done"}\n', {
+            headers: { "X-SuperPlane-Log-State": "archived" },
+          }),
+        ),
     );
     const next = handlers();
     await new LiveLogStream("organization-1", "canvas-1", "execution-1").pump(next);
@@ -316,7 +323,7 @@ describe("LiveLogStream session errors", () => {
       "fetch",
       vi
         .fn()
-        .mockResolvedValueOnce(Response.json({ stream_url: "https://broker.example/live-logs", token: "test-token" }))
+        .mockResolvedValueOnce(Response.json({ backend: "legacy", stream_url: "/runner-logs" }))
         .mockResolvedValueOnce(new Response(new ReadableStream({ start: (controller) => controller.error(failure) }))),
     );
 
