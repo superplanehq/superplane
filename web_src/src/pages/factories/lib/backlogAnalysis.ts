@@ -153,10 +153,22 @@ export function backlogAnalysisCreditLabels(
   return labels;
 }
 
-function latestBacklogAnalysisRun(runs: BacklogAnalysisRun[]): BacklogAnalysisRun | undefined {
+export function latestBacklogAnalysisRun(runs: BacklogAnalysisRun[]): BacklogAnalysisRun | undefined {
   return [...runs]
     .sort((left, right) => (Date.parse(left.run.createdAt ?? "") || 0) - (Date.parse(right.run.createdAt ?? "") || 0))
     .at(-1);
+}
+
+/** The latest failed run's recorded reason. An active run clears older failures. */
+export function planningRunFailure(run: CanvasesCanvasRun | null | undefined): string | undefined {
+  if (run?.result !== "RESULT_FAILED") {
+    return undefined;
+  }
+  const reason =
+    [...(run.errors ?? [])].reverse().find((error) => error.trim()) ??
+    run.executions?.find((execution) => execution.result === "RESULT_FAILED" && execution.resultMessage?.trim())
+      ?.resultMessage;
+  return reason?.trim() || "The planning run failed. Review the run details and try again.";
 }
 
 export function analyzedWorkOrderId(run: CanvasesCanvasRun): string | undefined {
