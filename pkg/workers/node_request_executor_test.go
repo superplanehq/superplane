@@ -27,6 +27,7 @@ import (
 
 func Test__NodeRequestExecutor_CustomScheduleLifecycle(t *testing.T) {
 	r := support.Setup(t)
+	defer r.Close()
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("scheduled"), "", "")
 	require.NoError(t, err)
@@ -37,6 +38,11 @@ func Test__NodeRequestExecutor_CustomScheduleLifecycle(t *testing.T) {
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository, DefaultBranch: &branch, VCSIntegrationID: &integrationID}))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	claudeIntegration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "claude", support.RandomName("claude"), map[string]any{})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(claudeIntegration).Update("state", models.IntegrationStateReady).Error)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
+	require.NoError(t, err)
 	llmSettings, err := models.GetInstallationLLMSettings(db)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -54,7 +60,7 @@ func Test__NodeRequestExecutor_CustomScheduleLifecycle(t *testing.T) {
 	settings := &factorypb.FactoryCustomAutomation_Settings{
 		StartMode: factorypb.FactoryCustomAutomation_START_MODE_SCHEDULED,
 		Schedule:  &factorypb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *"},
-		Agent:     &factorypb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", CredentialSource: "integration", CredentialIntegrationName: integration.InstallationName},
+		Agent:     &factorypb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6", CredentialSource: "integration", CredentialIntegrationName: claudeIntegration.InstallationName},
 		Steps:     []*factorypb.FactoryCustomAutomation_Step{{Name: "Test", Type: factorypb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make test", WorkingDirectory: "repo"}},
 	}
 	created, err := factoryactions.CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &factorypb.CreateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), Name: "Scheduled tests", Settings: settings})
