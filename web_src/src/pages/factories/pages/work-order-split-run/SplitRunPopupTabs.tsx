@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 
 import type { FilesFile } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { useWorkOrder } from "@/hooks/useFactoryData";
 
 import type { ManualCustomAutomation } from "../../lib/customAutomation";
@@ -30,6 +31,7 @@ type SplitRunPopupTabsProps = {
   lineId?: string;
   canUpdate: boolean;
   manualCustomAutomations?: readonly ManualCustomAutomation[];
+  backlogCustomRunsStatus?: { isError: boolean; isFetching: boolean; retry: () => void };
   footerActions: SplitRunFooterActions;
   resultFooter?: ReactNode;
   sidebarNote?: ReactNode;
@@ -121,6 +123,7 @@ export function SplitRunPopupTabs({
   lineId,
   canUpdate,
   manualCustomAutomations,
+  backlogCustomRunsStatus,
   footerActions,
   resultFooter,
   sidebarNote,
@@ -139,12 +142,14 @@ export function SplitRunPopupTabs({
   }, [artifactIndex, fixture]);
   const showAutomations = refinePopupShowsAutomations({ footerKind: fixture.footer.kind, sourceOnly });
   const lookupErrorNote = sessionLookupErrorNote(sessionLookupError);
+  const historyErrorNote = backlogHistoryErrorNote(backlogCustomRunsStatus);
   if (!showAutomations) {
     return (
       <>
         {header(null)}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {lookupErrorNote}
+          {historyErrorNote}
           <SplitRunPopupOverview
             fixture={fixture}
             edits={edits}
@@ -185,6 +190,7 @@ export function SplitRunPopupTabs({
       {header(null)}
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-4">
         {lookupErrorNote}
+        {historyErrorNote}
         <AutomationsConsoleVariant
           fixture={consoleFixture}
           organizationId={organizationId}
@@ -232,5 +238,17 @@ function sessionLookupErrorNote(error?: string) {
     <p className="shrink-0 px-8 pt-4 text-[13px] text-destructive" role="alert">
       {ANALYSIS_PLANNING_COPY.failedLoadRefinement}
     </p>
+  );
+}
+
+function backlogHistoryErrorNote(status: SplitRunPopupTabsProps["backlogCustomRunsStatus"]) {
+  if (!status?.isError) return null;
+  return (
+    <div role="alert" className="flex shrink-0 items-center justify-between gap-3 px-5 py-3 text-sm text-destructive">
+      <span>Could not load Backlog automation runs. Retry to update the run history.</span>
+      <Button variant="outline" size="sm" disabled={status.isFetching} onClick={status.retry}>
+        {status.isFetching ? "Retrying…" : "Retry"}
+      </Button>
+    </div>
   );
 }

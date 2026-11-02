@@ -1351,7 +1351,7 @@ function LineBoardSplitRunPopup({
           demoArtifacts: false,
           prFeedbackRuns,
           analysisRuns,
-          backlogCustomRuns,
+          backlogCustomRuns: backlogCustomRuns.runs,
           columnApps,
           isAnalyzing,
           stoppedBy: closer.actor,
@@ -1369,6 +1369,7 @@ function LineBoardSplitRunPopup({
         }
         onClose={onClose}
         manualCustomAutomations={manualCustomAutomations}
+        backlogCustomRunsStatus={backlogCustomRuns}
         fixed
       />
     </>

@@ -410,6 +410,10 @@ describe("LinesPage custom Backlog runs", () => {
       }
       return response({ runs: [customRun], hasNextPage: false });
     });
+    const describeRun = vi.spyOn(apiClient, "canvasesDescribeRun").mockResolvedValue({
+      ...response({}),
+      data: { run: { ...customRun, state: "STATE_FINISHED", result: "RESULT_PASSED" } },
+    });
     try {
       useFactoryWorkOrders.mockReturnValue({ data: [order] });
       useWorkOrder.mockReturnValue({ data: { ...order, checks: [] } });
@@ -428,13 +432,6 @@ describe("LinesPage custom Backlog runs", () => {
       expect(stage).toHaveTextContent("1 agent run");
       expect(screen.getByTestId("split-run-intent-document")).toBeInTheDocument();
 
-      listRuns.mockImplementation(async () =>
-        response({
-          runs: [
-            { ...customRun, state: "STATE_FINISHED", result: "RESULT_PASSED", finishedAt: new Date().toISOString() },
-          ],
-        }),
-      );
       const user = userEvent.setup();
       await user.click(screen.getByRole("button", { name: "Close" }));
       await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
@@ -444,6 +441,67 @@ describe("LinesPage custom Backlog runs", () => {
           "false",
         ),
       );
+      expect(listRuns.mock.calls.filter(([options]) => options.query?.before)).toHaveLength(1);
+      expect(describeRun.mock.calls.some(([options]) => options.path.runId === customRun.id)).toBe(true);
+      listRuns.mockImplementation(async () =>
+        response({
+          runs: [
+            { ...customRun, id: "new-inspect-run", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { ...customRun, id: "other-task-run", rootEvent: { data: { workOrder: { id: "other-task" } } } },
+          ],
+          hasNextPage: true,
+          lastTimestamp: createdAt,
+        }),
+      );
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("redesign-console-automation-inspect-task-inspect-task")).toHaveTextContent(
+          "2 agent runs",
+        ),
+      );
+      expect(listRuns.mock.calls.filter(([options]) => options.query?.before)).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+    } finally {
+      listRuns.mockRestore();
+      describeRun.mockRestore();
+    }
+  });
+
+  it("explains unavailable custom history and retries without hiding cached runs", async () => {
+    const [order] = REVIEW_CANDIDATE_WORK_ORDERS;
+    const listRuns = vi.spyOn(apiClient, "canvasesListRuns").mockRejectedValue(new Error("History unavailable"));
+    try {
+      useFactoryWorkOrders.mockReturnValue({ data: [order] });
+      useWorkOrder.mockReturnValue({ data: { ...order, checks: [] } });
+      useFactoryAutomations.mockReturnValue({
+        data: [{ id: "inspect-task", name: "Inspect task", columnKey: "backlog", templateId: "custom-verification" }],
+      });
+      renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/842`);
+      expect(await screen.findByRole("alert")).toHaveTextContent("Could not load Backlog automation runs.");
+      listRuns.mockResolvedValue({
+        data: {
+          runs: [
+            {
+              id: "inspect-run",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              rootEvent: { data: { workOrder: { id: order.id } } },
+            },
+          ],
+        },
+        request: new Request("http://localhost/runs"),
+        response: new Response(),
+      });
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+      expect(await screen.findByRole("button", { name: "Toggle Inspect task details" })).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      listRuns.mockRejectedValue(new Error("Refresh unavailable"));
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Could not load Backlog automation runs.");
+      expect(screen.getByRole("button", { name: "Toggle Inspect task details" })).toBeInTheDocument();
     } finally {
       listRuns.mockRestore();
     }
