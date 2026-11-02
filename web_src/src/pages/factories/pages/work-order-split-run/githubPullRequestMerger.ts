@@ -1,21 +1,16 @@
 import type { FactoriesFactoryPullRequest } from "@/api-client";
+import { githubApiOrigin, githubProfileUrl, githubWebHostFromUrl, isGitHubWebHostname } from "@/lib/githubHost";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 
 import { pullRequestState } from "../../lib/workOrderPullRequest";
 import type { SplitRunFooterCloser } from "./splitRunFooterActor";
 
-const GITHUB_PULL = /^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:[/?#]|$)/i;
-
 export function githubPullRequestApiHref(url: string | undefined): string | undefined {
-  const safe = safeExternalUrl(url);
-  if (!safe) {
+  const parts = githubPullRequestParts(url);
+  if (!parts) {
     return undefined;
   }
-  const match = GITHUB_PULL.exec(safe);
-  if (!match) {
-    return undefined;
-  }
-  return `https://api.github.com/repos/${match[1]}/${match[2]}/pulls/${match[3]}`;
+  return `${githubApiOrigin(parts.host)}/repos/${parts.owner}/${parts.repo}/pulls/${parts.number}`;
 }
 
 export function latestMergedGitHubPullRequest(
@@ -34,12 +29,36 @@ export function closerFromGitHubMergedBy(
     name?: string;
     html_url?: string;
   } | null,
+  host?: string | null,
 ): SplitRunFooterCloser {
   const login = user?.login?.trim();
   if (!login) {
     return {};
   }
   const name = user?.name?.trim() || login;
-  const href = safeExternalUrl(user?.html_url) ?? `https://github.com/${login}`;
+  const href = safeExternalUrl(user?.html_url) ?? githubProfileUrl(login, host);
   return { automationName: name, automationHref: href };
+}
+
+function githubPullRequestParts(
+  url: string | undefined,
+): { host: string; owner: string; repo: string; number: string } | undefined {
+  const safe = safeExternalUrl(url);
+  if (!safe) {
+    return undefined;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(safe);
+  } catch {
+    return undefined;
+  }
+  if (!isGitHubWebHostname(parsed.hostname)) {
+    return undefined;
+  }
+  const [, owner, repo, kind, number] = parsed.pathname.split("/");
+  if (!owner || !repo || kind !== "pull" || !/^\d+$/.test(number ?? "")) {
+    return undefined;
+  }
+  return { host: githubWebHostFromUrl(safe), owner, repo, number };
 }

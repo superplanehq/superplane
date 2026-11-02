@@ -556,6 +556,20 @@ func createReadyOnboardingIntegration(t *testing.T, organizationID uuid.UUID, ap
 	return integration.ID.String()
 }
 
+func createReadyGitHubEnterpriseIntegration(t *testing.T, organizationID uuid.UUID, host string) string {
+	t.Helper()
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		organizationID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{"host": host},
+	)
+	require.NoError(t, err)
+	require.NoError(t, database.DB(t.Context()).Model(integration).Update("state", models.IntegrationStateReady).Error)
+	return integration.ID.String()
+}
+
 func upsertHostedOnboardingProvider(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	settings, err := models.GetInstallationLLMSettings(db)
