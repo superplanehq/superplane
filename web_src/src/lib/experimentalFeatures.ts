@@ -38,3 +38,5 @@ export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
 
 /** Organization experimental feature: Actions timeline on a step card. Off until the organization enables it. */
 export const FEATURE_FACTORY_STEP_ACTIONS = "factory_step_actions";
+
+export const FEATURE_FACTORY_PULL_REQUEST_IMPORT = "factory_pull_request_import";
