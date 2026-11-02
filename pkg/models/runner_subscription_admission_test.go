@@ -164,7 +164,11 @@ func TestRunnerAdmissionRejectsInvalidSubscriptionAndContinuesFleetScan(t *testi
 				assert.Contains(t, *stored.ErrorMessage, "No ChatGPT models are enabled")
 				assert.Contains(t, *stored.ErrorMessage, "Update Models in workspace settings")
 			}
-			assert.Contains(t, *stored.ErrorMessage, expectedError.Error())
+			if reason == "unavailable model" {
+				assert.Equal(t, "Model \"removed-model\" is not available for the current task owner.", *stored.ErrorMessage)
+			} else {
+				assert.Contains(t, *stored.ErrorMessage, expectedError.Error())
+			}
 			assert.NotNil(t, stored.FinishedAt)
 			assert.Nil(t, stored.RunnerID)
 			assert.Empty(t, codexLeases(t, db, connection.ID))

@@ -2,10 +2,12 @@ import { FactoryTaskScope } from "../../FactoryTaskScope";
 import { useState, type ReactNode } from "react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
+import { mergeCanvasRunUpdate } from "@/hooks/canvasInfiniteCache";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
+import { latestBacklogAnalysisRun, planningRunFailure, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
@@ -23,6 +25,7 @@ import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession, planningSessionCanStart } from "./useAnalysisPlanningSession";
+import { useBacklogPlanningRunRefresh } from "./useBacklogPlanningRunRefresh";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
@@ -46,6 +49,7 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
     orderNumber,
     orderId,
     fixture,
+    analysisRuns,
     fixed = false,
     onClose,
     canUpdate = true,
@@ -82,9 +86,18 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
       artifacts: popupData.artifacts,
     }),
   });
+  const planningFailure = popupPlanningFailure(analysis, analysisRuns);
+  useBacklogPlanningRunRefresh({
+    organizationId,
+    factoryId,
+    orderId,
+    isDraft: refinementEnabled && fixture.footer.kind === "draft",
+    hasSession: Boolean(analysis.session),
+    latestRun: latestBacklogAnalysisRun(analysisRuns ?? [])?.run,
+  });
   const mode = workOrderPopupMode({
     hasPlanningSession: Boolean(analysis.session),
-    hasAnalysisResult: hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts),
+    hasAnalysisResult: popupHasAnalysisResult(fixture, popupData, planningFailure),
     refinementEnabled,
     refinementLoading: refinementFeature.isLoading,
     sessionLoading: analysis.isLoading,
@@ -98,7 +111,40 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
   if (mode === "loading") {
     return <LoadingWorkOrderPopup title={fixture.title} titlePrefix={titlePrefix} fixed={fixed} onClose={onClose} />;
   }
-  return <AnalysisWorkOrderPopup {...props} titlePrefix={titlePrefix} analysis={analysis} popupData={popupData} />;
+  return (
+    <AnalysisWorkOrderPopup
+      {...props}
+      titlePrefix={titlePrefix}
+      analysis={analysis}
+      popupData={popupData}
+      planningFailure={planningFailure}
+    />
+  );
+}
+
+function popupPlanningFailure(
+  analysis: ReturnType<typeof useAnalysisPlanningSession>,
+  runs?: BacklogAnalysisRun[],
+): string | undefined {
+  const latestBacklogRun = latestBacklogAnalysisRun(runs ?? [])?.run;
+  const sessionRun = analysis.run;
+  if (!sessionRun || !latestBacklogRun) {
+    return planningRunFailure(sessionRun ?? latestBacklogRun);
+  }
+  if (sessionRun.id === latestBacklogRun.id) {
+    return planningRunFailure(mergeCanvasRunUpdate(latestBacklogRun, sessionRun));
+  }
+  const sessionStartedAt = Date.parse(sessionRun.createdAt ?? "") || 0;
+  const backlogStartedAt = Date.parse(latestBacklogRun.createdAt ?? "") || 0;
+  return planningRunFailure(sessionStartedAt > backlogStartedAt ? sessionRun : latestBacklogRun);
+}
+
+function popupHasAnalysisResult(
+  fixture: WorkOrderSplitRunPopupProps["fixture"],
+  popupData: ReturnType<typeof useSplitRunPopupData>,
+  planningFailure?: string,
+): boolean {
+  return Boolean(planningFailure) || hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts);
 }
 
 function AnalysisWorkOrderPopup({
@@ -120,10 +166,12 @@ function AnalysisWorkOrderPopup({
   analysis,
   popupData,
   titlePrefix,
+  planningFailure,
 }: WorkOrderSplitRunPopupProps & {
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
   titlePrefix?: string;
+  planningFailure?: string;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
@@ -155,6 +203,8 @@ function AnalysisWorkOrderPopup({
     lineId,
     fixture: viewFixture,
     analysis,
+    planningFailure,
+    canUpdate,
     draftModel,
     draftThinking,
     onDraftStartChange: ({ model, thinkingLevel }) => {
@@ -382,6 +432,8 @@ type AnalysisDraftChromeArgs = {
   lineId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  planningFailure?: string;
+  canUpdate: boolean;
   draftModel: string;
   draftThinking: string;
   onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
