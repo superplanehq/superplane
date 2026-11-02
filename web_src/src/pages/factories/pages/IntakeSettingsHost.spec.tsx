@@ -234,8 +234,9 @@ describe("IntakeSettingsHost", () => {
     renderHost({ intake: LINEAR_INTAKE });
 
     expect(screen.getByTestId("linear-team-team-1")).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("radio", { name: "Only issues in selected projects" }));
     await user.click(screen.getByTestId("linear-project-ENG"));
-    await user.click(screen.getByRole("checkbox", { name: "Include tickets without a project" }));
+    await user.click(screen.getByRole("checkbox", { name: "Include issues without a project" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     expect(updateIntake).toHaveBeenCalledWith({
