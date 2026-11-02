@@ -124,6 +124,8 @@ spec:
               value: "yes"
             - name: START_RBAC_POLICY_RELOAD_CONSUMER
               value: "yes"
+            - name: SENTRY_WEBHOOK_DURABLE_ACCEPTANCE
+              value: {{ ternary "yes" "no" .Values.sentryWebhooks.durableAcceptance | quote }}
             - name: PUBLIC_API_BASE_PATH
               value: "/api/v1"
             - name: WEB_BASE_PATH

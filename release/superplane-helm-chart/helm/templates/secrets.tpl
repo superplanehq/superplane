@@ -147,6 +147,7 @@ affinity:
   "START_PLANNING_SESSION_CLEANUP_WORKER"
   "START_EVENT_RETENTION_WORKER"
   "START_NODE_REQUEST_CLEANUP_WORKER"
+  "START_SENTRY_WEBHOOK_WORKER"
 }}
 - name: {{ $flag }}
   value: {{ ternary "yes" "no" (has $flag $enabled) | quote }}
