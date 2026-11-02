@@ -95,6 +95,45 @@ func TestRunnerReservationRejectsQueuedPaidTaskAfterCreditExpires(t *testing.T) 
 	assert.Equal(t, models.RunnerTaskStateFailed, stored.State)
 }
 
+func TestRunnerSchedulingFailsPaidTasksWithoutCredit(t *testing.T) {
+	f := newRunnerCapacityTest(t, new(2))
+	paid := f.fleet(models.RunnerFleetE1LargeAMD64)
+	unbilled := f.fleet("unbilled-amd64")
+	queued := f.task(f.organizationID, paid.ID)
+	_, err := models.ScheduleOrganizationRunnerTasks(f.db, f.organizationID, 1)
+	require.NoError(t, err)
+	pending := f.task(f.organizationID, paid.ID)
+	free := f.task(f.organizationID, unbilled.ID)
+	withCredit, err := models.FailRunnerTasksWithoutComputeCredit(f.db, f.organizationID, 100)
+	require.NoError(t, err)
+	assert.Empty(t, withCredit.FailedTasks)
+	require.NoError(t, f.db.Model(&billingmodels.OrganizationLLMCreditGrant{}).
+		Where("organization_id = ?", f.organizationID).
+		Update("expires_at", time.Now().Add(-time.Minute)).Error)
+
+	organizations, err := models.ListRunnerTaskSchedulingOrganizations(f.db, uuid.Nil, 100)
+	require.NoError(t, err)
+	assert.Contains(t, organizations, f.organizationID)
+	result, err := models.FailRunnerTasksWithoutComputeCredit(f.db, f.organizationID, 100)
+	require.NoError(t, err)
+	failed := make([]uuid.UUID, 0, len(result.FailedTasks))
+	for _, task := range result.FailedTasks {
+		failed = append(failed, task.ID)
+	}
+	assert.ElementsMatch(t, []uuid.UUID{queued.ID, pending.ID}, failed)
+	for _, task := range []*models.RunnerTask{queued, pending} {
+		stored, err := models.FindRunnerTask(f.db, task.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.RunnerTaskStateFailed, stored.State)
+	}
+
+	// The released slot goes to work on the unbilled fleet.
+	scheduled, err := models.ScheduleOrganizationRunnerTasks(f.db, f.organizationID, 100)
+	require.NoError(t, err)
+	require.Len(t, scheduled, 1)
+	assert.Equal(t, free.ID, scheduled[0].ID)
+}
+
 func TestRunnerReservationSkipsLockedQueuedTask(t *testing.T) {
 	f := newRunnerCapacityTest(t, new(2))
 	fleet := f.fleet("locked-task-amd64")

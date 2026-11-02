@@ -352,8 +352,11 @@ func (f *RunnerFleet) RequireAdmission(tx *gorm.DB) error {
 
 // RequireComputeCredit checks the wallet only when this fleet bills VM time.
 func (f *RunnerFleet) RequireComputeCredit(tx *gorm.DB, organizationID uuid.UUID) error {
+	if !billing.Enabled() {
+		return nil
+	}
 	price, err := billing.PriceCompute(billing.ComputeUsage{MachineType: f.Slug, FleetID: f.Slug, DurationSeconds: 1})
-	if err != nil || price.CostMicros <= 0 || !billing.Enabled() {
+	if err != nil || price.CostMicros <= 0 {
 		return err
 	}
 	credit, err := billing.DescribeCredit(tx, organizationID)
