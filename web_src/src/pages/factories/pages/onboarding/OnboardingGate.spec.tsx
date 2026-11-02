@@ -17,6 +17,8 @@ const BARE_BOARD_PATH = `/org-1/workspaces/${FACTORY_KEY}/lines/line-plan`;
 const SETUP_PATH = `/org-1/workspaces/${ROUTE_SEGMENT}/setup`;
 const OVERVIEW_PATH = `/org-1/workspaces/${ROUTE_SEGMENT}/overview`;
 const BOARD_PATH = `/org-1/workspaces/${ROUTE_SEGMENT}/lines/line-plan`;
+const GITHUB_SETUP_PATH = `/org-1/workspaces/${FACTORY_KEY}/settings/organization/integrations/github/setup`;
+const GITHUB_DETAIL_PATH = `/org-1/workspaces/${FACTORY_KEY}/settings/organization/integrations/int-ghe`;
 
 let factory: FactoriesFactory;
 let factoryId: string;
@@ -127,6 +129,8 @@ function renderRoute(path: string) {
             <Route path="setup" element={<CurrentPath />} />
             <Route path="lines" element={<CurrentPath />} />
             <Route path="lines/:lineId" element={<CurrentPath />} />
+            <Route path="settings/organization/integrations/:integrationName/setup" element={<CurrentPath />} />
+            <Route path="settings/organization/integrations/:integrationId" element={<CurrentPath />} />
           </Route>
         </Route>
       </Routes>
@@ -237,6 +241,37 @@ describe("OnboardingGate", () => {
     await user.click(screen.getByRole("button", { name: "open first workspace setup" }));
 
     expect(await screen.findByText(BOARD_PATH)).toBeInTheDocument();
+  });
+
+  it("does not treat the GitHub App setup page as workspace onboarding", async () => {
+    renderRoute(GITHUB_SETUP_PATH);
+
+    expect(await screen.findByText(GITHUB_SETUP_PATH)).toBeInTheDocument();
+    expect(screen.queryByText(SETUP_PATH)).not.toBeInTheDocument();
+    expect(screen.queryByText(BARE_SETUP_PATH)).not.toBeInTheDocument();
+  });
+
+  it("keeps an initial workspace on GitHub App setup", async () => {
+    factory = { id: "factory-1", onboarding: { initial: true } };
+    renderRoute(GITHUB_SETUP_PATH);
+
+    expect(await screen.findByText(GITHUB_SETUP_PATH)).toBeInTheDocument();
+    expect(screen.queryByText("/onboarding")).not.toBeInTheDocument();
+  });
+
+  it("does not send a completed workspace away from GitHub App setup", async () => {
+    factory = { id: "factory-1", onboarding: { completedAt: "2026-08-17T12:00:00Z" } };
+    renderRoute(GITHUB_SETUP_PATH);
+
+    expect(await screen.findByText(GITHUB_SETUP_PATH)).toBeInTheDocument();
+    expect(screen.queryByText(BOARD_PATH)).not.toBeInTheDocument();
+  });
+
+  it("does not treat the GitHub App details page as workspace onboarding", async () => {
+    renderRoute(GITHUB_DETAIL_PATH);
+
+    expect(await screen.findByText(GITHUB_DETAIL_PATH)).toBeInTheDocument();
+    expect(screen.queryByText(SETUP_PATH)).not.toBeInTheDocument();
   });
 
   it("opens the line board when a completed workspace leaves setup", async () => {

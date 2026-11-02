@@ -32,7 +32,39 @@ type Client struct {
 	authMethod string
 	ownerType  string
 	owner      string
+	host       Host
 	underlying *github.Client
+}
+
+func (c *Client) Host() Host {
+	if c == nil {
+		return DotCom()
+	}
+	if c.host.Kind == "" && c.host.Hostname == "" {
+		return DotCom()
+	}
+	return c.host
+}
+
+func ApplyHostToGitHubClient(client *github.Client, h Host) (*github.Client, error) {
+	if h.IsDotCom() {
+		return client, nil
+	}
+	return client.WithEnterpriseURLs(h.APIURL(), h.UploadURL())
+}
+
+func ApplyHostToInstallationTransport(itr *ghinstallation.Transport, h Host) {
+	if itr == nil || h.IsDotCom() {
+		return
+	}
+	itr.BaseURL = strings.TrimSuffix(h.APIURL(), "/")
+}
+
+func ApplyHostToAppsTransport(itr *ghinstallation.AppsTransport, h Host) {
+	if itr == nil || h.IsDotCom() {
+		return
+	}
+	itr.BaseURL = strings.TrimSuffix(h.APIURL(), "/")
 }
 
 func IsNotFoundError(err error) bool {
@@ -656,7 +688,7 @@ type graphQLResponse struct {
 // A query that reads data passes a target for the `data` object; a mutation
 // passes nil.
 func (c *Client) doGraphQL(ctx context.Context, query string, variables map[string]any, data any) error {
-	request, err := c.underlying.NewRequest(http.MethodPost, "graphql", graphQLRequest{
+	request, err := c.underlying.NewRequest(http.MethodPost, c.Host().GraphQLURL(), graphQLRequest{
 		Query:     query,
 		Variables: variables,
 	})
@@ -712,7 +744,7 @@ func (c *Client) HTTPDo(req *http.Request) (*http.Response, error) {
 
 func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, error) {
 	if !ctx.LegacySetup() {
-		return newClientFromStorageContexts(httpCtx, ctx.Properties(), ctx.Secrets())
+		return newClientFromStorageContexts(httpCtx, ctx.Properties(), ctx.Secrets(), HostFromIntegration(ctx))
 	}
 
 	var metadata Metadata
@@ -764,11 +796,19 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 		}
 	}
 
+	host := HostFromIntegration(ctx)
+	ApplyHostToInstallationTransport(itr, host)
+	underlying, err := ApplyHostToGitHubClient(github.NewClient(&http.Client{Transport: itr}), host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure GitHub API host: %v", err)
+	}
+
 	return &Client{
 		authMethod: AuthMethodApp,
 		ownerType:  determineLegacyOwnerType(ctx),
 		owner:      owner,
-		underlying: github.NewClient(&http.Client{Transport: itr}),
+		host:       host,
+		underlying: underlying,
 	}, nil
 }
 
@@ -781,7 +821,7 @@ func determineLegacyOwnerType(ctx core.IntegrationContext) string {
 	return OwnerTypeOrganization
 }
 
-func newClientFromStorageContexts(httpCtx core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+func newClientFromStorageContexts(httpCtx core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader, host Host) (*Client, error) {
 	authMethod, err := properties.GetString(PropertyAuthMethod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get authentication method: %v", err)
@@ -799,41 +839,55 @@ func newClientFromStorageContexts(httpCtx core.HTTPContext, properties core.Inte
 
 	switch authMethod {
 	case AuthMethodPAT:
-		return newPATClient(owner, ownerType, httpCtx, secrets)
+		return newPATClient(owner, ownerType, httpCtx, secrets, host)
 	case AuthMethodApp:
-		return newGitHubAppClient(owner, ownerType, httpCtx, properties, secrets)
+		return newGitHubAppClient(owner, ownerType, httpCtx, properties, secrets, host)
 	default:
 		return nil, fmt.Errorf("invalid authentication method: %s", authMethod)
 	}
 }
 
-func newPATClient(owner string, ownerType string, httpCtx core.HTTPContext, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+// NewTokenGitHubClient builds a go-github client that sends PAT requests
+// through SuperPlane HTTP checks (private-address and redirect policy).
+func NewTokenGitHubClient(httpCtx core.HTTPContext, token string, host Host) (*github.Client, error) {
+	if httpCtx == nil {
+		return nil, fmt.Errorf("HTTP context is required")
+	}
+
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil, fmt.Errorf("PAT is required")
+	}
+
+	return ApplyHostToGitHubClient(github.NewClient(&http.Client{
+		Transport: &oauth2.Transport{
+			Base:   &transport{http: httpCtx},
+			Source: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}),
+		},
+	}), host)
+}
+
+func newPATClient(owner string, ownerType string, httpCtx core.HTTPContext, secrets core.IntegrationSecretStorageReader, host Host) (*Client, error) {
 	pat, err := secrets.Get(SecretPAT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PAT: %v", err)
 	}
 
-	pat = strings.TrimSpace(string(pat))
-	if pat == "" {
-		return nil, fmt.Errorf("PAT is required")
+	underlying, err := NewTokenGitHubClient(httpCtx, string(pat), host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure GitHub API host: %v", err)
 	}
 
 	return &Client{
 		authMethod: AuthMethodPAT,
 		ownerType:  ownerType,
 		owner:      owner,
-		underlying: github.NewClient(&http.Client{
-			Transport: &oauth2.Transport{
-				Base: &transport{http: httpCtx},
-				Source: oauth2.StaticTokenSource(&oauth2.Token{
-					AccessToken: strings.TrimSpace(pat),
-				}),
-			},
-		}),
+		host:       host,
+		underlying: underlying,
 	}, nil
 }
 
-func newGitHubAppClient(owner string, ownerType string, httpCtx core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+func newGitHubAppClient(owner string, ownerType string, httpCtx core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader, host Host) (*Client, error) {
 	appID, err := properties.GetString(PropertyAppID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub app ID: %v", err)
@@ -870,11 +924,18 @@ func newGitHubAppClient(owner string, ownerType string, httpCtx core.HTTPContext
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
 	}
 
+	ApplyHostToInstallationTransport(itr, host)
+	underlying, err := ApplyHostToGitHubClient(github.NewClient(&http.Client{Transport: itr}), host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure GitHub API host: %v", err)
+	}
+
 	return &Client{
 		authMethod: AuthMethodApp,
 		ownerType:  ownerType,
 		owner:      owner,
-		underlying: github.NewClient(&http.Client{Transport: itr}),
+		host:       host,
+		underlying: underlying,
 	}, nil
 }
 

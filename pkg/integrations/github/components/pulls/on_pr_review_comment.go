@@ -65,10 +65,10 @@ The Example Data below shows the pull_request_review_comment shape. A pull_reque
     "id": 987654321,
     "body": "LGTM! Nice cleanup on the title rename.",
     "state": "approved",
-    "html_url": "https://github.com/acme-labs/snaketoy/pull/42#pullrequestreview-987654321",
+    "html_url": "` + common.DotCom().RepoURL("acme-labs/snaketoy") + `/pull/42#pullrequestreview-987654321",
     "user": { "login": "jules-ramirez" }
   },
-  "pull_request": { "number": 42, "html_url": "https://github.com/acme-labs/snaketoy/pull/42" }
+  "pull_request": { "number": 42, "html_url": "` + common.DotCom().RepoURL("acme-labs/snaketoy") + `/pull/42" }
 }
 ` + "```" + `
 

@@ -1,7 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, vi } from "bun:test";
 
 import { WorkOrderArtifactsList } from "./WorkOrderArtifactsList";
+
+vi.mock("@/hooks/useFactoryGitHubHost", () => ({
+  useFactoryGitHubHost: () => "",
+}));
 
 describe("WorkOrderArtifactsList", () => {
   it("left-aligns linked and markdown artifacts to the same row width", () => {

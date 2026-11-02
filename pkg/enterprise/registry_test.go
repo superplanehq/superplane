@@ -19,6 +19,14 @@ func TestNewRegistryReturnsCommunityRbac(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNewRegistryReturnsCommunityGitHubEnterprise(t *testing.T) {
+	registry := NewRegistry()
+
+	githubEnterprise, err := Get[GitHubEnterprise](registry, GitHubEnterpriseCapability)
+	require.NoError(t, err)
+	require.Error(t, githubEnterprise.AuthorizeHost("acme.ghe.com"))
+}
+
 func TestGetRejectsAMissingOrWrongCapability(t *testing.T) {
 	registry := NewRegistry()
 

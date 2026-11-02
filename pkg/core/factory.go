@@ -57,6 +57,9 @@ type FactoryContext interface {
 	// An empty value means GitHub. A caller that has no factory gets an
 	// empty value and keeps GitHub branch links.
 	VCSProvider() (string, error)
+	// GitHubHost returns the workspace GitHub hostname from the saved
+	// GitHub integration. Empty means github.com, or a Bitbucket workspace.
+	GitHubHost() (string, error)
 }
 
 type WorkOrderParams struct {
