@@ -163,11 +163,12 @@ func (h *attachedChecksSnapshotHTTP) Do(request *http.Request) (*http.Response, 
 }
 
 func TestPullRequestChecksStartupOverlap(t *testing.T) {
-	for _, webhookFirst := range []bool{true, false} {
-		t.Run(fmt.Sprintf("webhook first %t", webhookFirst), func(t *testing.T) {
+	for _, scenario := range []struct{ mergeConfidence, webhookFirst bool }{{false, true}, {false, false}, {true, true}, {true, false}} {
+		t.Run(fmt.Sprintf("merge confidence %t webhook first %t", scenario.mergeConfidence, scenario.webhookFirst), func(t *testing.T) {
+			webhookFirst := scenario.webhookFirst
 			r := support.Setup(t)
 			db := database.DB(t.Context())
-			_, order, pullRequest, canvas, request := checksStartupFixture(t, r)
+			_, order, pullRequest, canvas, request := pullRequestStartupFixture(t, r, scenario.mergeConfidence)
 			current := checksStartupGitHubPullRequest()
 			current.Head.Repo.FullName = github.Ptr("contributor/app")
 			useGitHub(t, current)
@@ -213,11 +214,15 @@ func TestPullRequestChecksStartupOverlap(t *testing.T) {
 }
 
 func TestPullRequestChecksStartupRecovery(t *testing.T) {
-	for _, failure := range []string{"GitHub unavailable", "missing head branch"} {
-		t.Run(failure, func(t *testing.T) {
+	for _, scenario := range []struct {
+		mergeConfidence bool
+		failure         string
+	}{{false, "GitHub unavailable"}, {false, "missing head branch"}, {true, "GitHub unavailable"}, {true, "missing head branch"}} {
+		t.Run(fmt.Sprintf("merge confidence %t %s", scenario.mergeConfidence, scenario.failure), func(t *testing.T) {
+			failure := scenario.failure
 			r := support.Setup(t)
 			db := database.DB(t.Context())
-			_, _, _, canvas, request := checksStartupFixture(t, r)
+			_, _, _, canvas, request := pullRequestStartupFixture(t, r, scenario.mergeConfidence)
 			api := &fakeFactoryGitHub{pullRequest: checksStartupGitHubPullRequest()}
 			if failure == "GitHub unavailable" {
 				api.getPullErr = errors.New(failure)
@@ -320,6 +325,42 @@ func TestPullRequestChecksStartupEligibility(t *testing.T) {
 	}
 }
 
+func TestMergeConfidenceStartupEligibility(t *testing.T) {
+	for _, condition := range []string{"other repository", "draft", "closed", "canvas deleted", "template removed", "trigger error"} {
+		t.Run(condition, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			_, _, _, canvas, request := pullRequestStartupFixture(t, r, true)
+			current := checksStartupGitHubPullRequest()
+			switch condition {
+			case "other repository":
+				version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+				require.NoError(t, err)
+				version.Nodes[0].Configuration["repository"] = "other/app"
+				require.NoError(t, db.Save(version).Error)
+			case "draft":
+				current.Draft = github.Ptr(true)
+			case "closed":
+				current.State = github.Ptr("closed")
+			case "canvas deleted":
+				require.NoError(t, canvas.SoftDeleteInTransaction(db))
+			case "template removed":
+				require.NoError(t, canvas.StampFactoryAppTemplate(db, "renamed-pr-trigger", "custom-verification", 1))
+			case "trigger error":
+				require.NoError(t, db.Model(&models.CanvasNode{}).Where("workflow_id = ?", canvas.ID).Update("state", models.CanvasNodeStateError).Error)
+			}
+			useGitHub(t, current)
+			events, err := ProcessPullRequestChecksStartRequest(t.Context(), IntakeDependencies{}, request.ID)
+			require.NoError(t, err)
+			assert.Empty(t, events)
+			assert.Zero(t, countCanvasEvents(t, canvas.ID))
+			saved, err := models.FindCanvasNodeRequest(db, request.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.NodeExecutionRequestStateCompleted, saved.State)
+		})
+	}
+}
+
 func TestPullRequestChecksStartupRollsBackWithAttachment(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
@@ -356,9 +397,18 @@ func checksStartupGitHubPullRequest() *github.PullRequest {
 
 func checksStartupFixture(t *testing.T, r *support.ResourceRegistry) (*models.Factory, *models.FactoryWorkOrder, *models.FactoryPullRequest, *models.Canvas, *models.CanvasNodeRequest) {
 	t.Helper()
+	return pullRequestStartupFixture(t, r, false)
+}
+
+func pullRequestStartupFixture(t *testing.T, r *support.ResourceRegistry, mergeConfidence bool) (*models.Factory, *models.FactoryWorkOrder, *models.FactoryPullRequest, *models.Canvas, *models.CanvasNodeRequest) {
+	t.Helper()
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	canvas := createChecksStartupCanvas(t, r, factory, "acme/app")
+	createCanvas := createChecksStartupCanvas
+	if mergeConfidence {
+		createCanvas = createMergeConfidenceStartupCanvas
+	}
+	canvas := createCanvas(t, r, factory, "acme/app")
 	order, err := factory.CreateWorkOrder(db, "Review", "Fix refunds", &r.User, nil, nil)
 	require.NoError(t, err)
 	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/42"})
@@ -367,6 +417,21 @@ func checksStartupFixture(t *testing.T, r *support.ResourceRegistry) (*models.Fa
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	return factory, order, pullRequest, canvas, &requests[0]
+}
+
+// Merge confidence uses the same PR snapshot and recovery contract as checks,
+// but is identified by template metadata rather than a feedback handler.
+func createMergeConfidenceStartupCanvas(t *testing.T, r *support.ResourceRegistry, factory *models.Factory, repository string) *models.Canvas {
+	t.Helper()
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "renamed-pr-trigger", Type: models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{"repository": repository, "ignoreDrafts": true, "onlyFactoryPullRequests": true}),
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	require.NoError(t, canvas.StampFactoryAppTemplate(db, "renamed-pr-trigger", "risk-score", 1))
+	return canvas
 }
 
 func emitChecksStartupWebhook(t *testing.T, node *models.CanvasNode, payload map[string]any) {

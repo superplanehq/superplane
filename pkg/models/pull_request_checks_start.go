@@ -35,6 +35,46 @@ func (h *FactoryPRFeedbackHandler) GitHubChecksTrigger(tx *gorm.DB, repository s
 	if canvas.FactoryID == nil || *canvas.FactoryID != h.FactoryID {
 		return nil, nil
 	}
+	return liveGitHubPullRequestTrigger(tx, canvas, repository)
+}
+
+// GitHubVerificationTrigger identifies PR checks and merge confidence. Both
+// need an initial snapshot after attachment because the open webhook may have
+// arrived before the PR belonged to this factory.
+func (c *Canvas) GitHubVerificationTrigger(tx *gorm.DB, repository string) (*CanvasNode, error) {
+	if c.FactoryID == nil || c.DeletedAt.Valid {
+		return nil, nil
+	}
+	handler, err := FindPRFeedbackHandlerByCanvasID(tx, c.ID)
+	if err != nil {
+		return nil, err
+	}
+	if handler != nil {
+		return handler.GitHubChecksTrigger(tx, repository)
+	}
+	mergeConfidence, err := CanvasHasFactoryAppTemplate(tx, c.ID, "risk-score")
+	if err != nil || !mergeConfidence {
+		return nil, err
+	}
+	if _, err := FindOrganizationByIDInTransaction(tx, c.OrganizationID.String()); errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	version, err := FindLiveCanvasVersionByCanvasInTransaction(tx, c)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if FactoryAppTemplateID(version.Nodes) != "risk-score" {
+		return nil, nil
+	}
+	return liveGitHubPullRequestTrigger(tx, c, repository)
+}
+
+func liveGitHubPullRequestTrigger(tx *gorm.DB, canvas *Canvas, repository string) (*CanvasNode, error) {
 	version, err := FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -50,7 +90,7 @@ func (h *FactoryPRFeedbackHandler) GitHubChecksTrigger(tx *gorm.DB, repository s
 		if !strings.EqualFold(strings.TrimSpace(configured), repository) {
 			continue
 		}
-		node, err := FindCanvasNode(tx, h.CanvasID, candidate.ID)
+		node, err := FindCanvasNode(tx, canvas.ID, candidate.ID)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -92,20 +132,18 @@ func ClaimDuePullRequestChecksStartRequest(tx *gorm.DB, id uuid.UUID, leaseUntil
 	return &request, nil
 }
 
-// CreateGitHubChecksEvent serializes startup and webhook delivery for one
-// handler revision. The same delivery stays a duplicate after the run finishes.
+// CreateGitHubChecksEvent serializes startup and webhook delivery for PR
+// checks and merge confidence. The same delivery stays a duplicate after the
+// run finishes.
 // A later reopen, ready-for-review, or new push starts again only when its
 // pull request time is newer than the stored snapshot.
 func (n *CanvasNode) CreateGitHubChecksEvent(tx *gorm.DB, event *CanvasEvent) (bool, error) {
-	handler, err := FindPRFeedbackHandlerByCanvasID(tx, n.WorkflowID)
+	canvas, err := FindUnscopedCanvasInTransaction(tx, n.WorkflowID)
 	if err != nil {
 		return false, err
 	}
-	if handler == nil || handler.Source != FactoryPRFeedbackHandlerSourcePullRequestChecks || handler.Subject != FactoryPRFeedbackHandlerSubjectGitHubPullRequest {
-		return true, tx.Create(event).Error
-	}
 	configuredRepository, _ := n.Configuration.Data()["repository"].(string)
-	trigger, err := handler.GitHubChecksTrigger(tx, configuredRepository)
+	trigger, err := canvas.GitHubVerificationTrigger(tx, configuredRepository)
 	if err != nil {
 		return false, err
 	}
@@ -158,12 +196,12 @@ func (p *FactoryPullRequest) enqueueChecksStart(tx *gorm.DB) error {
 		return nil
 	}
 	factory := &Factory{ID: p.FactoryID, OrganizationID: p.OrganizationID}
-	handlers, err := factory.ListPRFeedbackHandlers(tx)
+	canvases, err := factory.ListCanvases(tx)
 	if err != nil {
 		return err
 	}
-	for i := range handlers {
-		node, err := handlers[i].GitHubChecksTrigger(tx, p.Repository)
+	for i := range canvases {
+		node, err := canvases[i].GitHubVerificationTrigger(tx, p.Repository)
 		if err != nil {
 			return err
 		}

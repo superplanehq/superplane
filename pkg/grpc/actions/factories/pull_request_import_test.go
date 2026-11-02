@@ -43,6 +43,7 @@ func TestImportFactoryPullRequest(t *testing.T) {
 	pr.Base.Ref = github.Ptr("main")
 	pr.CreatedAt = &github.Timestamp{Time: time.Now().Add(-20 * time.Minute)}
 	checks := createChecksStartupCanvas(t, r, factory, "acme/app")
+	mergeConfidence := createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
 	useGitHub(t, pr)
 	req := &pb.ImportFactoryPullRequestRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), PullRequestUrl: pr.GetHTMLURL()}
 	result, err := ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), req)
@@ -72,6 +73,7 @@ func TestImportFactoryPullRequest(t *testing.T) {
 	assert.Equal(t, result.Order.GetId(), again.Order.GetId())
 	assert.Equal(t, "Ready", again.Order.GetTitle())
 	assert.EqualValues(t, 1, countCanvasEvents(t, checks.ID), "only a new import starts checks")
+	assert.EqualValues(t, 1, countCanvasEvents(t, mergeConfidence.ID), "only a new import starts merge confidence")
 	owners, err := order.ListAssignees(db)
 	require.NoError(t, err)
 	require.Len(t, owners, 1)

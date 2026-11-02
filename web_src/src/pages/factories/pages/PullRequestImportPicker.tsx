@@ -190,7 +190,9 @@ export function PullRequestImportResults(props: PullRequestImportResultsProps) {
         <Input
           id={searchId}
           placeholder={
-            factoryVCSProvider(props.vcsProvider) === "bitbucket" ? "Import PR from Bitbucket" : "Import PR from GitHub"
+            factoryVCSProvider(props.vcsProvider) === "bitbucket"
+              ? "Import a PR from Bitbucket"
+              : "Import a PR from GitHub"
           }
           value={props.query}
           onChange={(event) => props.onQueryChange(event.target.value)}
