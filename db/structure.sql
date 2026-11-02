@@ -1675,7 +1675,7 @@ CREATE TABLE public.runner_tasks (
     runner_id uuid,
     backend character varying(32) NOT NULL,
     state character varying(32) DEFAULT 'queued'::character varying NOT NULL,
-    payload_ciphertext bytea NOT NULL,
+    payload_ciphertext bytea,
     result jsonb,
     exit_code integer,
     error_message text,
@@ -1689,6 +1689,7 @@ CREATE TABLE public.runner_tasks (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     ready_at timestamp with time zone,
     CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
+    CONSTRAINT runner_tasks_nonterminal_payload CHECK ((((state)::text = ANY ((ARRAY['succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])) OR (payload_ciphertext IS NOT NULL))),
     CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
 );
 
@@ -6500,7 +6501,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261102162713	f
+20261102214733	f
 \.
 
 
