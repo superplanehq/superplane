@@ -20,7 +20,6 @@ import (
 	"gorm.io/gorm"
 
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -177,7 +176,7 @@ func submitStep(
 	})
 
 	if err != nil {
-		if grpcerrors.Code(err) == codes.PermissionDenied {
+		if isGitHubEnterpriseClientError(err) {
 			return nil, err
 		}
 		logrus.WithError(err).Error("failed to submit integration setup step")
