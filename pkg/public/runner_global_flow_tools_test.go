@@ -1,16 +1,10 @@
 package public
 
 import (
-	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -205,48 +199,10 @@ func TestRunnerGlobalMergeCheck(t *testing.T) {
 
 func reportMergeCheckOverStdio(t *testing.T, server *Server, token string, files []runner.TaskFile) {
 	t.Helper()
-	api := httptest.NewServer(server.Router)
-	defer api.Close()
-	taskDir := t.TempDir()
-	for _, file := range files {
-		if !strings.HasPrefix(file.Path, "superplane_mcp/") {
-			continue
-		}
-		path := filepath.Join(taskDir, file.Path)
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-		require.NoError(t, os.WriteFile(path, []byte(file.Content), 0600))
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	command := exec.CommandContext(ctx, "node", filepath.Join(taskDir, "superplane_mcp/server.js"))
-	command.Env = append(os.Environ(), "SUPERPLANE_BASE_URL="+api.URL, "SUPERPLANE_RUNNER_TOKEN="+token, "SUPERPLANE_TASK_DIR="+taskDir)
-	stdin, err := command.StdinPipe()
-	require.NoError(t, err)
-	stdout, err := command.StdoutPipe()
-	require.NoError(t, err)
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	require.NoError(t, command.Start())
-	t.Cleanup(func() { _ = command.Process.Kill(); _ = command.Wait() })
-	scanner := bufio.NewScanner(stdout)
-	request := func(id int, method string, params any) map[string]any {
-		require.NoError(t, json.NewEncoder(stdin).Encode(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params}))
-		require.True(t, scanner.Scan(), stderr.String())
-		var response map[string]any
-		require.NoError(t, json.Unmarshal(scanner.Bytes(), &response))
-		require.Nil(t, response["error"])
-		return response["result"].(map[string]any)
-	}
-	request(1, "initialize", map[string]any{})
-	list := request(2, "tools/list", map[string]any{})
-	names := []string{}
-	for _, tool := range list["tools"].([]any) {
-		names = append(names, tool.(map[string]any)["name"].(string))
-	}
-	require.Contains(t, names, "report_merge_check")
-	result := request(3, "tools/call", map[string]any{"name": "report_merge_check", "arguments": map[string]any{"check": "api-latency", "score": 2, "summary": "The change adds one query per request."}})
-	require.NotEqual(t, true, result["isError"], result)
-	assert.Equal(t, "reported", result["structuredContent"].(map[string]any)["status"])
+	mcp := startGlobalMCP(t, server, token, files)
+	require.Contains(t, mcp.toolNames(), "report_merge_check")
+	result := mcp.call("report_merge_check", map[string]any{"check": "api-latency", "score": 2, "summary": "The change adds one query per request."})
+	assert.Equal(t, "reported", result["status"])
 }
 
 func TestRunnerGlobalArtifactUpload(t *testing.T) {
