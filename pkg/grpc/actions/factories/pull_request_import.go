@@ -33,17 +33,8 @@ func SearchFactoryPullRequestImportItems(ctx context.Context, deps IntakeDepende
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to search pull requests")
 	}
-	for _, item := range items {
-		order, err := existingPullRequestImport(db, factory, item.GetUrl())
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to find imported task")
-		}
-		if order != nil {
-			item.ExistingTask, err = loadAndSerializeWorkOrder(ctx, factory, order)
-			if err != nil {
-				return nil, factoryErrorToStatus(err, "failed to load imported task")
-			}
-		}
+	if err := attachExistingPullRequestImportTasks(ctx, factory, items); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to load imported tasks")
 	}
 	return &pb.SearchFactoryPullRequestImportItemsResponse{Items: items}, nil
 }

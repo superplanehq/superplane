@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -15,6 +17,41 @@ import (
 type pullRequestImportGitHubSearch interface {
 	ListPullRequests(context.Context, string, *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
 	SearchIssues(context.Context, string, *github.SearchOptions) (*github.IssuesSearchResult, *github.Response, error)
+}
+
+func attachExistingPullRequestImportTasks(ctx context.Context, factory *models.Factory, items []*pb.FactoryPullRequestImportItem) error {
+	numbers := make([]int64, len(items))
+	for i, item := range items {
+		numbers[i] = item.GetNumber()
+	}
+	config := factory.OnboardingConfigValue()
+	ordersByNumber, err := factory.ListWorkOrdersByPullRequestNumbers(database.DB(ctx), config.EffectiveVCSProvider(), config.AppRepository, numbers)
+	if err != nil {
+		return err
+	}
+	orders := make([]models.FactoryWorkOrder, 0, len(ordersByNumber))
+	seen := make(map[uuid.UUID]bool, len(ordersByNumber))
+	for _, order := range ordersByNumber {
+		if seen[order.ID] {
+			continue
+		}
+		seen[order.ID] = true
+		orders = append(orders, order)
+	}
+	summaries, err := loadAndSerializeWorkOrders(ctx, factory, orders)
+	if err != nil {
+		return err
+	}
+	summariesByID := make(map[string]*pb.WorkOrderSummary, len(summaries))
+	for _, summary := range summaries {
+		summariesByID[summary.GetId()] = summary
+	}
+	for _, item := range items {
+		if order, ok := ordersByNumber[item.GetNumber()]; ok {
+			item.ExistingTask = summariesByID[order.ID.String()]
+		}
+	}
+	return nil
 }
 
 func searchPullRequestImportItems(ctx context.Context, db *gorm.DB, deps IntakeDependencies, factory *models.Factory, query string, limit int) ([]*pb.FactoryPullRequestImportItem, error) {

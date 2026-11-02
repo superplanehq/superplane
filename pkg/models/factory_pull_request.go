@@ -473,6 +473,33 @@ func ListGitHubFactoryPullRequestsForWebhook(
 	return pullRequests, nil
 }
 
+// ListWorkOrdersByPullRequestNumbers resolves current, non-archived imports in
+// one query. Numbers are scoped to this factory, provider, and repository.
+func (f *Factory) ListWorkOrdersByPullRequestNumbers(tx *gorm.DB, provider, repository string, numbers []int64) (map[int64]FactoryWorkOrder, error) {
+	ordersByNumber := make(map[int64]FactoryWorkOrder, len(numbers))
+	if len(numbers) == 0 {
+		return ordersByNumber, nil
+	}
+	var matches []struct {
+		FactoryWorkOrder  `gorm:"embedded"`
+		PullRequestNumber int64
+	}
+	err := f.workOrdersQuery(tx, ListFactoryWorkOrdersFilters{ExcludeArchived: true}).
+		Select("factory_work_orders.*, factory_pull_requests.number AS pull_request_number").
+		Joins("JOIN factory_pull_requests ON factory_pull_requests.work_order_id = factory_work_orders.id").
+		Where("factory_pull_requests.organization_id = ? AND factory_pull_requests.factory_id = ?", f.OrganizationID, f.ID).
+		Where("factory_pull_requests.provider = ? AND lower(factory_pull_requests.repository) = lower(?)", strings.TrimSpace(provider), strings.TrimSpace(repository)).
+		Where("factory_pull_requests.number IN ? AND factory_pull_requests.superseded_at IS NULL", numbers).
+		Find(&matches).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, match := range matches {
+		ordersByNumber[match.PullRequestNumber] = match.FactoryWorkOrder
+	}
+	return ordersByNumber, nil
+}
+
 func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) (*FactoryPullRequest, error) {
 	query := tx.Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID)
 

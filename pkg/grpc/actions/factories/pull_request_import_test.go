@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -139,14 +140,18 @@ func TestImportFactoryPullRequest(t *testing.T) {
 // cannot protect repository isolation when the provider query is unscoped.
 type importSearchGitHub struct {
 	*fakeFactoryGitHub
-	t     *testing.T
-	query string
+	t            *testing.T
+	query        string
+	pullRequests []*github.PullRequest
 }
 
 func (f *importSearchGitHub) ListPullRequests(_ context.Context, repository string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
 	assert.Equal(f.t, "acme/app", repository)
 	assert.Equal(f.t, "open", opts.State)
 	assert.Equal(f.t, 5, opts.PerPage)
+	if f.pullRequests != nil {
+		return f.pullRequests, nil, nil
+	}
 	return []*github.PullRequest{f.pullRequest, openHandOffPullRequest("other/app", 43, "branch")}, nil, nil
 }
 func (f *importSearchGitHub) SearchIssues(_ context.Context, query string, opts *github.SearchOptions) (*github.IssuesSearchResult, *github.Response, error) {
@@ -184,6 +189,78 @@ func TestSearchFactoryPullRequestImportItemsGitHub(t *testing.T) {
 	}
 	_, err := SearchFactoryPullRequestImportItems(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String(), Query: "https://github.com/other/app/pull/42"})
 	require.Error(t, err)
+}
+
+func TestSearchFactoryPullRequestImportItemsBatchesExistingTasks(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
+	orders := make([]*models.FactoryWorkOrder, 5)
+	prs := make([]*github.PullRequest, len(orders))
+	for i := range orders {
+		order, err := factory.CreateWorkOrder(db, fmt.Sprintf("Imported task %d", i), "", &r.User, nil, nil)
+		require.NoError(t, err)
+		orders[i] = order
+		prs[i] = openHandOffPullRequest("acme/app", 100+i, "branch")
+		_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: prs[i].GetHTMLURL()})
+		require.NoError(t, err)
+	}
+	// Provider identities must match even when repository casing differs.
+	require.NoError(t, db.Model(&models.FactoryPullRequest{}).Where("factory_id = ?", factory.ID).Update("repository", "ACME/App").Error)
+	fake := &importSearchGitHub{fakeFactoryGitHub: &fakeFactoryGitHub{}, t: t}
+	original := newFactoryGitHubAPI
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) { return fake, nil }
+	t.Cleanup(func() { newFactoryGitHubAPI = original })
+
+	// Count only SQL in this request, including queries in serialization goroutines.
+	type queryCountKey struct{}
+	const callback = "test:pull_request_import_query_count"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if count, ok := tx.Statement.Context.Value(queryCountKey{}).(*atomic.Int64); ok {
+			count.Add(1)
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+	search := func(prs []*github.PullRequest) (*pb.SearchFactoryPullRequestImportItemsResponse, int64) {
+		t.Helper()
+		fake.pullRequests = prs
+		var count atomic.Int64
+		ctx := context.WithValue(t.Context(), queryCountKey{}, &count)
+		result, err := SearchFactoryPullRequestImportItems(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, result.Items, len(prs))
+		return result, count.Load()
+	}
+	_, singleQueries := search(prs[:1])
+	result, batchQueries := search(prs)
+	t.Logf("Database queries: one task = %d, five tasks = %d", singleQueries, batchQueries)
+	require.Positive(t, singleQueries)
+	assert.Equal(t, singleQueries, batchQueries, "database queries must not grow with matching imported tasks")
+	for i, item := range result.Items {
+		assert.Equal(t, orders[i].ID.String(), item.GetExistingTask().GetId())
+		assert.Equal(t, factory.WorkOrderKey(orders[i].Number), item.GetExistingTask().GetKey())
+	}
+	otherFactory := seedHandOffFactory(t, r, db)
+	for i, scenario := range []struct {
+		name     string
+		factory  *models.Factory
+		provider string
+		url      string
+	}{
+		{"another factory", otherFactory, models.ProviderGitHub, "https://github.com/acme/app/pull/200"},
+		{"another repository", factory, models.ProviderGitHub, "https://github.com/other/app/pull/201"},
+		{"another provider", factory, models.ProviderBitbucket, "https://bitbucket.org/acme/app/pull-requests/202"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			order, err := scenario.factory.CreateWorkOrder(db, "Unrelated task", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{Provider: scenario.provider, URL: scenario.url})
+			require.NoError(t, err)
+			result, _ := search([]*github.PullRequest{openHandOffPullRequest("acme/app", 200+i, "branch")})
+			assert.Nil(t, result.Items[0].ExistingTask)
+		})
+	}
 }
 
 func TestImportFactoryPullRequestConcurrent(t *testing.T) {

@@ -3550,7 +3550,7 @@ message FactoryPullRequestImportItem {
   bool draft = 5;
   string repository = 6;
   string provider = 7;
-  WorkOrder existing_task = 8;
+  WorkOrderSummary existing_task = 8;
 }
 
 message SearchFactoryPullRequestImportItemsResponse {
