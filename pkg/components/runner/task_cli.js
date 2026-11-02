@@ -61,21 +61,6 @@ const COMMANDS = [
     prepare: planInput,
   },
   {
-    words: ["task", "attachment", "inspect"],
-    usage: "superplane task attachment inspect --path PATH",
-    flags: ["path"],
-    required: ["path"],
-    tool: "inspect_attachment",
-  },
-  {
-    words: ["task", "evidence", "inspect"],
-    usage: "superplane task evidence inspect --file PATH",
-    flags: ["file"],
-    alias: { file: "path" },
-    required: ["path"],
-    tool: "inspect_screenshot",
-  },
-  {
     words: ["task", "evidence", "unavailable"],
     usage: "superplane task evidence unavailable --reason TEXT --attempts PATH",
     flags: ["reason", "attempts"],
@@ -275,13 +260,13 @@ function render(result) {
 }
 
 async function callTool(name, input, env, fetchImpl) {
-  const resolved = registry.resolve(name, registry.allTools());
-  if (!resolved) throw new Error(`unknown tool: ${name}`);
+  const tool = registry.findTool(name);
+  if (!tool) throw new Error(`unknown tool: ${name}`);
   const client = createClient(env, fetchImpl);
   // A shell cannot return an image content block. Do not record an
   // inspection here. get_artifact records it when the model sees the image.
-  if (resolved.tool.definition.name === "get_artifact") client.recordInspection = false;
-  return resolved.handler(input, client);
+  if (name === "get_artifact") client.recordInspection = false;
+  return tool.handler(input, client);
 }
 
 async function main(argv, env = process.env, fetchImpl = fetch, stdout = process.stdout, stderr = process.stderr) {

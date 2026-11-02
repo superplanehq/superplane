@@ -24,20 +24,15 @@ const (
 	ScopeArtifactsRead    RunnerToolScope = "artifacts:read"
 	ScopeArtifactsWrite   RunnerToolScope = "artifacts:write"
 	ScopePlanWrite        RunnerToolScope = "plan:write"
-	ScopeAttachmentsRead  RunnerToolScope = "attachments:read"
 	ScopeEvidenceWrite    RunnerToolScope = "evidence:write"
-	ScopeLinksWrite       RunnerToolScope = "links:write"
 	ScopeMergeChecksWrite RunnerToolScope = "merge_checks:write"
 )
 
 // RunnerTool is one tool of the global runner MCP server and the scope that
-// the backend requires on every call. AliasOf names the current tool when
-// Name is a previous name. An alias keeps the scope of its previous tool, so
-// a run that started before a rename keeps its tools.
+// the backend requires on every call.
 type RunnerTool struct {
-	Name    string
-	Scope   RunnerToolScope
-	AliasOf string
+	Name  string
+	Scope RunnerToolScope
 }
 
 var runnerTools = []RunnerTool{
@@ -57,14 +52,6 @@ var runnerTools = []RunnerTool{
 	{Name: "propose_plan", Scope: ScopePlanWrite},
 	{Name: "report_visual_evidence_unavailable", Scope: ScopeEvidenceWrite},
 	{Name: "report_merge_check", Scope: ScopeMergeChecksWrite},
-
-	{Name: "suggest_owners", Scope: ScopeOwnerRead, AliasOf: "suggest_task_owner"},
-	{Name: "assign_owner", Scope: ScopeOwnerWrite, AliasOf: "assign_task_owner"},
-	{Name: "propose_update", Scope: ScopePlanWrite, AliasOf: "propose_plan"},
-	{Name: "inspect_attachment", Scope: ScopeAttachmentsRead, AliasOf: "get_artifact"},
-	{Name: "inspect_screenshot", Scope: ScopeEvidenceWrite, AliasOf: "get_artifact"},
-	{Name: "upload_artifact", Scope: ScopeEvidenceWrite, AliasOf: "add_artifact"},
-	{Name: "publish_link", Scope: ScopeLinksWrite, AliasOf: "add_artifact"},
 }
 
 // Every flow receives these tools for now. Narrow the list here later.
@@ -81,10 +68,10 @@ var sharedRunnerScopes = []RunnerToolScope{
 	ScopeArtifactsWrite,
 }
 
-// Flow tools work only in their flow. Task runs get the evidence and link
-// scopes from the run settings, see TaskCapabilityScopes.
+// Flow tools work only in their flow. Task runs get the evidence scope from
+// the run settings, see TaskCapabilityScopes.
 var runnerFlowScopes = map[RunnerFlow][]RunnerToolScope{
-	RunnerFlowPlanning:        withScopes(ScopePlanWrite, ScopeAttachmentsRead),
+	RunnerFlowPlanning:        withScopes(ScopePlanWrite),
 	RunnerFlowTask:            withScopes(),
 	RunnerFlowMergeConfidence: withScopes(ScopeMergeChecksWrite),
 }
@@ -103,23 +90,17 @@ func ScopesForFlow(flow RunnerFlow) []RunnerToolScope {
 	return slices.Clone(runnerFlowScopes[flow])
 }
 
-// TaskCapabilityScopes returns the evidence and link scopes that the artifact
-// attach call turned on for this run.
+// TaskCapabilityScopes returns the evidence scope when the artifact attach
+// call turned it on for this run.
 func TaskCapabilityScopes(environment []TaskEnvironmentVariable) []RunnerToolScope {
-	scopes := []RunnerToolScope{}
-	publishLinks := HasPublishLinks(environment)
-	if HasVisualEvidence(environment) || (HasArtifactUploadToken(environment) && !publishLinks) {
-		scopes = append(scopes, ScopeEvidenceWrite)
+	if HasVisualEvidence(environment) || (HasArtifactUploadToken(environment) && !HasPublishLinks(environment)) {
+		return []RunnerToolScope{ScopeEvidenceWrite}
 	}
-	if publishLinks {
-		scopes = append(scopes, ScopeLinksWrite)
-	}
-	return scopes
+	return []RunnerToolScope{}
 }
 
 // AllowedRunnerTools returns the tool names that the scopes allow, in catalog
-// order. The list includes previous names, because a run that started before
-// a rename asks for its tools by those names.
+// order.
 func AllowedRunnerTools(scopes []RunnerToolScope) []string {
 	names := []string{}
 	for _, tool := range runnerTools {

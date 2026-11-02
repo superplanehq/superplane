@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 const registry = require("./registry");
 
 function call(name, input, client) {
-  return registry.resolve(name, registry.allTools()).handler(input, client);
+  return registry.findTool(name).handler(input, client);
 }
 
 function recordingClient() {

@@ -12,7 +12,7 @@ const registry = require("./superplane_mcp/registry");
 const { main } = require("./task_cli");
 
 async function recordScreenshot(file, taskEnv) {
-  await registry.resolve("get_artifact", registry.allTools()).handler(
+  await registry.findTool("get_artifact").handler(
     { path: file },
     createClient(taskEnv, async () => {
       throw new Error("fetch must not run");
@@ -139,7 +139,7 @@ test("superplane task artifact add-file uploads an image from the evidence direc
 
   let inspected = "";
   const inspectCode = await main(
-    ["task", "evidence", "inspect", "--file", file],
+    ["task", "artifact", "get", "--path", file],
     taskEnv,
     async () => {
       throw new Error("fetch must not run");
@@ -314,8 +314,6 @@ test("task help lists a command for every global tool", async () => {
     "superplane task create",
     "superplane task close",
     "superplane task plan",
-    "superplane task attachment inspect",
-    "superplane task evidence inspect",
     "superplane task evidence unavailable",
     "superplane task artifact list",
     "superplane task artifact get",
@@ -498,7 +496,7 @@ test("each global tool command calls that tool", async () => {
 
   local = "";
   const attachmentCode = await main(
-    ["task", "attachment", "inspect", "--path", attachment],
+    ["task", "artifact", "get", "--path", attachment],
     taskEnv,
     fetchImpl,
     { write: (chunk) => { local += chunk; } },

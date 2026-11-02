@@ -38,6 +38,7 @@ function artifactType(input, { required }) {
 function titleAndKey(input) {
   const title = text(input, "title");
   const key = text(input, "key");
+  if (exceedsCodePoints(title, MAX_ARTIFACT_TITLE_LENGTH)) throw new Error("title must be at most 1024 characters");
   if (Buffer.byteLength(key) > MAX_RUNNER_ARTIFACT_KEY_BYTES) {
     throw new Error(`key must be at most ${MAX_RUNNER_ARTIFACT_KEY_BYTES} bytes`);
   }
@@ -59,46 +60,16 @@ function linkTarget(value) {
   return url;
 }
 
-// Path rules for each tool name. get_artifact and add_artifact accept any
-// file in the task directory. The previous names keep their directories.
-const TASK_DIRECTORY_RULES = {};
-
-function attachmentRules(env) {
-  const attachments = path.join(files.taskDirectory(env), "attachments");
-  return {
-    root: attachments,
-    base: attachments,
-    rootLabel: "task attachments directory",
-    rootError: "attachment path must be inside the task attachments directory",
-    fileError: "attachment path must be a regular file",
-    emptyError: "attachment file is empty",
-  };
-}
-
-function evidenceRules(env) {
-  return {
-    root: path.join(files.taskDirectory(env), "evidence"),
-    base: process.cwd(),
-    rootLabel: "task evidence directory",
-    rootError: "artifact path must be inside the task evidence directory",
-    fileError: "artifact path must be a regular file",
-    emptyError: "artifact file is empty",
-  };
-}
-
 /**
  * readTaskFile returns one task file. An image returns as an MCP image, and
  * SuperPlane records its size and hash for add_artifact.
- * - sniffOnly: detect an image by its bytes only.
- * - imageError: reject a file that is not an image.
  */
-function readTaskFile(rawPath, client, rules, { sniffOnly = false, imageError = "" } = {}) {
+function readTaskFile(rawPath, client) {
   const env = client.env;
-  const file = files.resolveTaskFile(rawPath, env, rules);
+  const file = files.resolveTaskFile(rawPath, env);
   const byExtension = files.uploadContentType(file.filename);
   let mimeType = files.sniffImageMime(files.readHead(file.absolute, 16));
-  if (!mimeType && !sniffOnly && files.SCREENSHOT_CONTENT_TYPES.has(byExtension)) mimeType = byExtension;
-  if (!mimeType && imageError) throw new Error(imageError);
+  if (!mimeType && files.SCREENSHOT_CONTENT_TYPES.has(byExtension)) mimeType = byExtension;
 
   const metadata = { path: path.relative(file.root, file.absolute), filename: file.filename, mimeType, sizeBytes: file.sizeBytes };
   if (!mimeType) {
@@ -112,8 +83,8 @@ function readTaskFile(rawPath, client, rules, { sniffOnly = false, imageError = 
   return files.imageResult(bytes, mimeType, metadata);
 }
 
-function uploadableFile(rawPath, env, rules) {
-  const file = files.resolveTaskFile(rawPath, env, rules);
+function uploadableFile(rawPath, env) {
+  const file = files.resolveTaskFile(rawPath, env);
   if (file.sizeBytes > files.MAX_ARTIFACT_BYTES) throw new Error(`artifact exceeds ${files.MAX_ARTIFACT_BYTES} bytes`);
   const contentType = files.uploadContentType(file.filename);
   if (!contentType) throw new Error("artifact file type is not supported; use PNG, JPEG, WebP, WebM, or MP4");
@@ -174,9 +145,9 @@ async function uploadVideoWithPoster(file, poster, title, key, client) {
   return linkedVideo;
 }
 
-async function addFile(input, client, rules) {
+async function addFile(input, client) {
   const env = client.env;
-  const file = uploadableFile(input && input.path, env, rules);
+  const file = uploadableFile(input && input.path, env);
   const { title, key } = titleAndKey(input);
   const posterPath = text(input, "posterPath");
   if (posterPath && !file.contentType.startsWith("video/")) {
@@ -187,7 +158,7 @@ async function addFile(input, client, rules) {
   }
   files.requireInspectedScreenshot(file, file.contentType, env);
   if (posterPath) {
-    return uploadVideoWithPoster(file, uploadableFile(posterPath, env, rules), title, key, client);
+    return uploadVideoWithPoster(file, uploadableFile(posterPath, env), title, key, client);
   }
   const result = await uploadFile(file, title, key, client);
   recordArtifacts([result], env);
@@ -208,17 +179,13 @@ async function addMarkdown(input, client) {
 }
 
 async function addArtifact(input, client) {
-  const type = artifactType(input, { required: true });
-  if (exceedsCodePoints(text(input, "title"), MAX_ARTIFACT_TITLE_LENGTH)) {
-    throw new Error("title must be at most 1024 characters");
-  }
-  switch (type) {
+  switch (artifactType(input, { required: true })) {
     case "markdown":
       return addMarkdown(input, client);
     case "link":
       return addLink(input, client);
     default:
-      return addFile(input, client, TASK_DIRECTORY_RULES);
+      return addFile(input, client);
   }
 }
 
@@ -233,7 +200,7 @@ async function getArtifact(input, client) {
   const key = text(input, "key");
   const filePath = text(input, "path");
   if ([id, key, filePath].filter(Boolean).length !== 1) throw new Error("give one of id, key, or path");
-  if (filePath) return readTaskFile(filePath, client, TASK_DIRECTORY_RULES);
+  if (filePath) return readTaskFile(filePath, client);
   const params = new URLSearchParams(id ? { id } : { key });
   return client.request("GET", `/api/v1/runner/task/artifact?${params.toString()}`);
 }
@@ -248,30 +215,6 @@ async function removeArtifact(input, client) {
   if (key) body.key = key;
   if (title) body.title = title;
   return client.request("DELETE", "/api/v1/runner/task/artifacts", body);
-}
-
-function inspectAttachment(input, client) {
-  return readTaskFile(input && input.path, client, attachmentRules(client.env), {
-    sniffOnly: true,
-    imageError: "attachment must be a PNG, JPEG, GIF, or WebP file",
-  });
-}
-
-function inspectScreenshot(input, client) {
-  const rules = evidenceRules(client.env);
-  const file = uploadableFile(input && input.path, client.env, rules);
-  if (!files.SCREENSHOT_CONTENT_TYPES.has(file.contentType)) {
-    throw new Error("screenshot must be a PNG, JPEG, or WebP file");
-  }
-  return readTaskFile(input.path, client, rules);
-}
-
-async function uploadArtifact(input, client) {
-  return addFile({ ...input, key: "" }, client, evidenceRules(client.env));
-}
-
-async function publishLink(input, client) {
-  return addLink(input, client);
 }
 
 const LIST_ARTIFACTS = {
@@ -307,10 +250,6 @@ const GET_ARTIFACT = {
     },
   },
   handler: getArtifact,
-  aliases: [
-    { name: "inspect_attachment", handler: inspectAttachment },
-    { name: "inspect_screenshot", handler: inspectScreenshot },
-  ],
 };
 
 const ADD_ARTIFACT = {
@@ -333,10 +272,6 @@ const ADD_ARTIFACT = {
     },
   },
   handler: addArtifact,
-  aliases: [
-    { name: "upload_artifact", handler: uploadArtifact },
-    { name: "publish_link", handler: publishLink },
-  ],
 };
 
 const REMOVE_ARTIFACT = {

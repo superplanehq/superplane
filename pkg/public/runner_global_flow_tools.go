@@ -40,7 +40,7 @@ func (s *Server) handleRunnerGlobalMergeCheck(w http.ResponseWriter, r *http.Req
 }
 
 func (s *Server) handleRunnerGlobalArtifactUpload(w http.ResponseWriter, r *http.Request) {
-	target, ok := s.runnerGlobalArtifactTarget(w, r, runneraction.ScopeArtifactsWrite, runneraction.ScopeEvidenceWrite, runneraction.ScopeLinksWrite)
+	target, ok := s.runnerGlobalArtifactTarget(w, r)
 	if !ok {
 		return
 	}
@@ -48,7 +48,7 @@ func (s *Server) handleRunnerGlobalArtifactUpload(w http.ResponseWriter, r *http
 }
 
 func (s *Server) handleRunnerGlobalArtifactLink(w http.ResponseWriter, r *http.Request) {
-	target, ok := s.runnerGlobalArtifactTarget(w, r, runneraction.ScopeArtifactsWrite, runneraction.ScopeLinksWrite)
+	target, ok := s.runnerGlobalArtifactTarget(w, r)
 	if !ok {
 		return
 	}
@@ -56,7 +56,7 @@ func (s *Server) handleRunnerGlobalArtifactLink(w http.ResponseWriter, r *http.R
 }
 
 func (s *Server) handleRunnerGlobalArtifactMarkdown(w http.ResponseWriter, r *http.Request) {
-	target, ok := s.runnerGlobalArtifactTarget(w, r, runneraction.ScopeArtifactsWrite, runneraction.ScopeLinksWrite)
+	target, ok := s.runnerGlobalArtifactTarget(w, r)
 	if !ok {
 		return
 	}
@@ -66,12 +66,8 @@ func (s *Server) handleRunnerGlobalArtifactMarkdown(w http.ResponseWriter, r *ht
 // runnerGlobalArtifactTarget resolves the task of a runner token for an
 // artifact. A task run keeps the node execution checks of the artifact
 // token. A planning run attaches to the session draft.
-func (s *Server) runnerGlobalArtifactTarget(
-	w http.ResponseWriter,
-	r *http.Request,
-	required ...runneraction.RunnerToolScope,
-) (*runnerArtifactTarget, bool) {
-	scope, ok := s.authenticateRunnerAny(w, r, required...)
+func (s *Server) runnerGlobalArtifactTarget(w http.ResponseWriter, r *http.Request) (*runnerArtifactTarget, bool) {
+	scope, ok := s.authenticateRunner(w, r, runneraction.ScopeArtifactsWrite)
 	if !ok {
 		return nil, false
 	}

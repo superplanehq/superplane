@@ -59,22 +59,18 @@ test("remove_artifact requires a key or a title", async () => {
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 function call(name, input, client) {
-  return registry.resolve(name, registry.allTools()).handler(input, client);
+  return registry.findTool(name).handler(input, client);
 }
 
-test("add_artifact limits the title, and publish_link keeps its previous input", async () => {
+test("add_artifact limits the title", async () => {
   const calls = [];
   const client = createClient(env, recordingFetch(calls));
-  const title = "a".repeat(1025);
 
   await assert.rejects(
-    () => call("add_artifact", { type: "link", url: "https://example.com", title }, client),
+    () => call("add_artifact", { type: "link", url: "https://example.com", title: "a".repeat(1025) }, client),
     /title must be at most 1024 characters/,
   );
-  await call("publish_link", { url: "https://example.com", title }, client);
-
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].body.title, title);
+  assert.equal(calls.length, 0);
 });
 
 function taskClient() {

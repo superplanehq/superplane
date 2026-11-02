@@ -46,7 +46,7 @@ func TestRunnerGlobalPlanUpdate(t *testing.T) {
 	db := database.DB(t.Context())
 	token := mustPlanningGlobalRunnerToken(t, r, session, planningToken)
 
-	assert.ElementsMatch(t, globalRunnerToolsWith("propose_plan", "propose_update", "inspect_attachment"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, globalRunnerToolsWith("propose_plan"), listRunnerTools(t, server, token))
 
 	rec := runnerRequest(t, server, http.MethodPut, token, "/api/v1/runner/task/plan", `{
 		"scores": {
@@ -264,8 +264,7 @@ func TestRunnerGlobalArtifactUpload(t *testing.T) {
 	require.True(t, runner.HasVisualEvidence(env))
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60, nil))
 	require.NotEmpty(t, token)
-	assert.ElementsMatch(t, globalRunnerToolsWith(
-		"inspect_screenshot", "upload_artifact", "report_visual_evidence_unavailable"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, globalRunnerToolsWith("report_visual_evidence_unavailable"), listRunnerTools(t, server, token))
 
 	png := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0}, 16)...)
 	rec := postRunnerArtifactFile(t, server, token, png)
@@ -305,7 +304,7 @@ func TestRunnerGlobalArtifactLink(t *testing.T) {
 		{Name: runner.EnvSuperplanePublishLinks, Value: "yes"},
 	}, 60, nil))
 	require.NotEmpty(t, token)
-	assert.ElementsMatch(t, globalRunnerToolsWith("publish_link"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, everyGlobalRunnerTool, listRunnerTools(t, server, token))
 
 	body := `{"url":"https://staging.example.com/pr-42","title":"Staging","key":"staging"}`
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/links", body)

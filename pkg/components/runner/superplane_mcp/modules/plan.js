@@ -118,7 +118,6 @@ const PROPOSE_PLAN = {
     },
   },
   handler: proposePlan,
-  aliases: [{ name: "propose_update" }],
 };
 
 module.exports = {

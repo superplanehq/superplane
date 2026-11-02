@@ -39,18 +39,6 @@ test("tools/list shows only the tools that the backend allows", async () => {
   );
 });
 
-test("tools/list shows the current name when the backend allows only a previous name", async () => {
-  const transport = recorder();
-  const handle = createHandler({ client: fakeClient(["suggest_owners", "publish_link", "propose_update"]) });
-
-  await handle({ id: 1, method: "tools/list" }, transport);
-
-  assert.deepEqual(
-    transport.replies[0].result.tools.map((tool) => tool.name),
-    ["suggest_task_owner", "add_artifact", "propose_plan"],
-  );
-});
-
 test("tools/list fails on a failed lookup and retries on the next request", async () => {
   const lookups = [new Error("Service Unavailable"), ["suggest_task_owner"]];
   const client = {
@@ -72,7 +60,7 @@ test("tools/list fails on a failed lookup and retries on the next request", asyn
   );
 });
 
-test("tools/call rejects a hidden tool and runs an allowed tool by its current or previous name", async () => {
+test("tools/call rejects a hidden tool and runs an allowed tool", async () => {
   const calls = [];
   const transport = recorder();
   const handle = createHandler({ client: fakeClient(["suggest_task_owner"], calls) });
@@ -81,16 +69,12 @@ test("tools/call rejects a hidden tool and runs an allowed tool by its current o
     { id: 1, method: "tools/call", params: { name: "assign_task_owner", arguments: { user: "u", reason: "r" } } },
     transport,
   );
-  await handle({ id: 2, method: "tools/call", params: { name: "assign_owner", arguments: { user: "u" } } }, transport);
-  await handle({ id: 3, method: "tools/call", params: { name: "suggest_task_owner", arguments: {} } }, transport);
-  await handle({ id: 4, method: "tools/call", params: { name: "suggest_owners", arguments: {} } }, transport);
-  await handle({ id: 5, method: "tools/call", params: { name: "drop_database", arguments: {} } }, transport);
+  await handle({ id: 2, method: "tools/call", params: { name: "suggest_task_owner", arguments: {} } }, transport);
+  await handle({ id: 3, method: "tools/call", params: { name: "drop_database", arguments: {} } }, transport);
 
   assert.equal(transport.replies[0].error.code, -32601);
-  assert.equal(transport.replies[1].error.code, -32601);
-  assert.equal(transport.replies[2].result.structuredContent.path, "/api/v1/runner/task/suggest-owners");
-  assert.equal(transport.replies[3].result.structuredContent.path, "/api/v1/runner/task/suggest-owners");
-  assert.equal(transport.replies[4].error.code, -32601);
+  assert.equal(transport.replies[1].result.structuredContent.path, "/api/v1/runner/task/suggest-owners");
+  assert.equal(transport.replies[2].error.code, -32601);
   assert.equal(calls.filter((call) => call.path === "/api/v1/runner/task/owner").length, 0);
   assert.equal(calls.filter((call) => call.path === "/api/v1/runner/tools").length, 1);
 });

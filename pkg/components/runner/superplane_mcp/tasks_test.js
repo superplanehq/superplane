@@ -19,7 +19,7 @@ const env = {
 };
 
 function call(name, input, client) {
-  return registry.resolve(name, registry.allTools()).handler(input, client);
+  return registry.findTool(name).handler(input, client);
 }
 
 function ownerFetch(calls) {
@@ -172,23 +172,6 @@ test("the client returns the backend message on an HTTP error", async () => {
     () => call("suggest_task_owner", {}, client),
     (error) => error.status === 403 && error.message === "This run cannot use this tool",
   );
-});
-
-test("the previous owner tool names send the same requests", async () => {
-  const calls = [];
-  const client = createClient(ownerEnv, ownerFetch(calls));
-  const pairs = [
-    ["suggest_owners", "suggest_task_owner", { paths: ["pkg/payments"] }],
-    ["assign_owner", "assign_task_owner", { user: "mijat", reason: "Owns pkg.", only_if_unassigned: true }],
-  ];
-
-  for (const [previous, current, input] of pairs) {
-    await call(previous, input, client);
-    await call(current, input, client);
-  }
-
-  assert.deepEqual(calls[0], calls[1]);
-  assert.deepEqual(calls[2], calls[3]);
 });
 
 test("list_members reads the organization members", async () => {

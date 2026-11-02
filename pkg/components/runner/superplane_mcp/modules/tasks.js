@@ -116,7 +116,6 @@ const ASSIGN_TASK_OWNER = {
     },
   },
   handler: assignTaskOwner,
-  aliases: [{ name: "assign_owner" }],
 };
 
 const SUGGEST_TASK_OWNER = {
@@ -138,7 +137,6 @@ const SUGGEST_TASK_OWNER = {
     },
   },
   handler: suggestTaskOwner,
-  aliases: [{ name: "suggest_owners" }],
 };
 
 const LIST_TASKS = {

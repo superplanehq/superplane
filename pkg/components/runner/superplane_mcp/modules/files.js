@@ -44,22 +44,17 @@ function isInside(file, root) {
   return file === root || file.startsWith(`${root}${path.sep}`);
 }
 
-/**
- * resolveTaskFile finds a file for a tool call.
- * - base: the directory for a relative path. The default is the task directory.
- * - root: the directory that must hold the file. The default is the task directory.
- * - rootError: the error when the file is outside root.
- */
-function resolveTaskFile(inputPath, env, options = {}) {
+// resolveTaskFile finds a file in the task directory for a tool call. A
+// relative path starts at the task directory.
+function resolveTaskFile(inputPath, env) {
   const candidate = String(inputPath || "").trim();
   if (!candidate) throw new Error("path is required");
   const taskDir = taskDirectory(env);
-  const root = regularDirectory(options.root || taskDir, options.rootLabel || "task directory");
+  const root = regularDirectory(taskDir, "task directory");
   const expanded = candidate
     .replace(/\$\{SUPERPLANE_TASK_DIR\}/g, taskDir)
     .replace(/\$SUPERPLANE_TASK_DIR/g, taskDir);
-  const base = options.base === undefined ? taskDir : options.base;
-  const absolute = path.isAbsolute(expanded) ? path.resolve(expanded) : path.resolve(base, expanded);
+  const absolute = path.isAbsolute(expanded) ? path.resolve(expanded) : path.resolve(taskDir, expanded);
   let info;
   try {
     info = fs.lstatSync(absolute);
@@ -67,13 +62,13 @@ function resolveTaskFile(inputPath, env, options = {}) {
     throw new Error(`file not found: ${candidate}`);
   }
   if (info.isSymbolicLink() || !info.isFile()) {
-    throw new Error(options.fileError || "path must be a regular file");
+    throw new Error("path must be a regular file");
   }
   const resolved = fs.realpathSync(absolute);
   if (!isInside(resolved, root)) {
-    throw new Error(options.rootError || "path must be inside the task directory");
+    throw new Error("path must be inside the task directory");
   }
-  if (info.size <= 0) throw new Error(options.emptyError || "file is empty");
+  if (info.size <= 0) throw new Error("file is empty");
   const realTaskDir = fs.realpathSync(taskDir);
   return {
     absolute: resolved,

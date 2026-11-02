@@ -151,59 +151,48 @@ function flowTaskDir() {
   fs.mkdirSync(path.join(taskDir, "attachments"));
   fs.mkdirSync(path.join(taskDir, "evidence"));
   fs.writeFileSync(path.join(taskDir, "attachments", "mock.png"), PNG);
-  const screenshot = path.join(taskDir, "evidence", "checkout.png");
-  fs.writeFileSync(screenshot, PNG);
-  return { taskDir, screenshot, specFile: path.join(taskDir, "spec.md") };
+  fs.writeFileSync(path.join(taskDir, "evidence", "checkout.png"), PNG);
+  return { taskDir, specFile: path.join(taskDir, "spec.md") };
 }
 
-// A run that started before the rename holds a token with the previous tool
-// names. Those names must keep the previous input and requests.
-test("server.js serves the previous flow tool names with the runner token", async (t) => {
-  const previousTools = [
-    "propose_update",
-    "inspect_attachment",
-    "inspect_screenshot",
-    "upload_artifact",
-    "report_visual_evidence_unavailable",
-    "publish_link",
-    "report_merge_check",
-  ];
-  const api = await fakeRunnerAPI(t, previousTools);
-  const { taskDir, screenshot, specFile } = flowTaskDir();
+test("server.js serves the flow tools with the runner token", async (t) => {
+  const tools = ["get_artifact", "add_artifact", "propose_plan", "report_visual_evidence_unavailable", "report_merge_check"];
+  const api = await fakeRunnerAPI(t, tools);
+  const { taskDir, specFile } = flowTaskDir();
   const request = startServer(t, api.baseURL, framings.ndjson, {
     SUPERPLANE_TASK_DIR: taskDir,
     SUPERPLANE_ANALYSIS_SPEC_FILE: specFile,
   });
 
   const list = await request("tools/list", {});
-  assert.deepEqual(list.result.tools.map((tool) => tool.name), [
-    "get_artifact",
-    "add_artifact",
-    "propose_plan",
-    "report_visual_evidence_unavailable",
-    "report_merge_check",
-  ]);
+  assert.deepEqual(list.result.tools.map((tool) => tool.name), tools);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(taskDir, "visual-evidence.json"), "utf8")), {
     status: "not_applicable",
     reason: "",
     artifacts: [],
   });
 
-  const attachment = await request("tools/call", { name: "inspect_attachment", arguments: { path: "mock.png" } });
+  const attachment = await request("tools/call", { name: "get_artifact", arguments: { path: "attachments/mock.png" } });
   assert.equal(attachment.result.content[1].type, "image");
   assert.equal(attachment.result.content[1].data, PNG.toString("base64"));
   assert.equal(attachment.result.structuredContent.mimeType, "image/png");
 
-  const plan = await request("tools/call", { name: "propose_update", arguments: { spec: "# Plan" } });
+  const plan = await request("tools/call", { name: "propose_plan", arguments: { spec: "# Plan" } });
   assert.equal(plan.result.isError, undefined);
   assert.equal(fs.readFileSync(specFile, "utf8"), "# Plan");
 
-  await request("tools/call", { name: "inspect_screenshot", arguments: { path: screenshot } });
-  const upload = await request("tools/call", { name: "upload_artifact", arguments: { path: screenshot, title: "Checkout" } });
+  await request("tools/call", { name: "get_artifact", arguments: { path: "evidence/checkout.png" } });
+  const upload = await request("tools/call", {
+    name: "add_artifact",
+    arguments: { type: "file", path: "evidence/checkout.png", title: "Checkout", key: "checkout" },
+  });
   assert.equal(upload.result.isError, undefined, JSON.stringify(upload.result));
   assert.equal(JSON.parse(fs.readFileSync(path.join(taskDir, "visual-evidence.json"), "utf8")).status, "captured");
 
-  await request("tools/call", { name: "publish_link", arguments: { url: "https://staging.example.com", title: "Staging" } });
+  await request("tools/call", {
+    name: "add_artifact",
+    arguments: { type: "link", url: "https://staging.example.com", title: "Staging" },
+  });
   await request("tools/call", { name: "report_merge_check", arguments: { check: "Risk", score: 2, summary: "Small change." } });
 
   const calls = api.requests.filter((req) => req.url !== "/api/v1/runner/tools");
@@ -220,36 +209,4 @@ test("server.js serves the previous flow tool names with the runner token", asyn
   assert.deepEqual(calls[1].raw, PNG);
   assert.deepEqual(JSON.parse(calls[2].body), { url: "https://staging.example.com", title: "Staging", key: "" });
   assert.deepEqual(JSON.parse(calls[3].body), { check: "risk", score: 2, summary: "Small change." });
-});
-
-test("server.js serves the current flow tool names with the runner token", async (t) => {
-  const api = await fakeRunnerAPI(t, ["get_artifact", "add_artifact", "propose_plan"]);
-  const { taskDir, specFile } = flowTaskDir();
-  const request = startServer(t, api.baseURL, framings.ndjson, {
-    SUPERPLANE_TASK_DIR: taskDir,
-    SUPERPLANE_ANALYSIS_SPEC_FILE: specFile,
-  });
-
-  const attachment = await request("tools/call", { name: "get_artifact", arguments: { path: "attachments/mock.png" } });
-  assert.equal(attachment.result.content[1].data, PNG.toString("base64"));
-
-  await request("tools/call", { name: "get_artifact", arguments: { path: "evidence/checkout.png" } });
-  const upload = await request("tools/call", {
-    name: "add_artifact",
-    arguments: { type: "file", path: "evidence/checkout.png", title: "Checkout", key: "checkout" },
-  });
-  assert.equal(upload.result.isError, undefined, JSON.stringify(upload.result));
-
-  const plan = await request("tools/call", { name: "propose_plan", arguments: { spec: "# Plan" } });
-  assert.equal(plan.result.isError, undefined);
-
-  const calls = api.requests.filter((req) => req.url !== "/api/v1/runner/tools");
-  assert.deepEqual(
-    calls.map((req) => [req.method, req.url]),
-    [
-      ["POST", "/api/v1/runner/task/artifacts"],
-      ["PUT", "/api/v1/runner/task/plan"],
-    ],
-  );
-  assert.deepEqual(calls[0].raw, PNG);
 });

@@ -195,7 +195,6 @@ func TestCodexExecArgsStartsOnlyTheGlobalMCPWithARunnerToken(t *testing.T) {
 			assert.Contains(t, args, `mcp_servers.superplane_global.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ANALYSIS_SPEC_FILE"]`)
 			for _, tool := range []string{
 				"list_members", "assign_task_owner", "add_checks", "get_artifact", "add_artifact", "propose_plan", "report_merge_check",
-				"assign_owner", "propose_update", "inspect_attachment", "upload_artifact", "publish_link",
 			} {
 				assert.Contains(t, args, fmt.Sprintf(`mcp_servers.superplane_global.tools.%s.approval_mode="approve"`, tool))
 			}
@@ -952,7 +951,7 @@ func TestFormatCodexJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"reasoning-1","type":"reasoning","text":%q}}`, token),
 		fmt.Sprintf(`{"type":"item.started","item":{"id":"item-1","type":"command_execution","command":%q}}`, "git clone https://x-access-token:"+token+"@github.com/acme/app.git"),
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"item-1","type":"command_execution","command":"true","aggregated_output":%q,"exit_code":0}}`, imageResult),
-		fmt.Sprintf(`{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_update","status":"failed","error":{"message":%q}}}`, token),
+		fmt.Sprintf(`{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_plan","status":"failed","error":{"message":%q}}}`, token),
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"answer-1","type":"agent_message","text":%q}}`, token),
 	})
 
@@ -984,7 +983,7 @@ func TestCodexFormatterReportsPlanningToolFailures(t *testing.T) {
 			t.Run(fmt.Sprintf("%s/activity=%t", status, withActivity), func(t *testing.T) {
 				item := map[string]any{
 					"id": "publish-1", "type": "mcp_tool_call", "server": "superplane",
-					"tool": "propose_update", "status": status,
+					"tool": "propose_plan", "status": status,
 				}
 				failed := status != "completed"
 				if failed {
@@ -999,7 +998,7 @@ func TestCodexFormatterReportsPlanningToolFailures(t *testing.T) {
 				output := format(t, []string{string(event)})
 				records := liveLogRecords(t, output)
 				require.Len(t, records, 2)
-				assert.Contains(t, records[0]["text"], "propose_update")
+				assert.Contains(t, records[0]["text"], "propose_plan")
 				expectedStatus := "passed"
 				if failed {
 					expectedStatus = "failed"
@@ -1032,7 +1031,7 @@ func TestCodexFormatterReportsPlanningToolFailures(t *testing.T) {
 }
 
 func TestCodexFormatterShowsFailedMCPToolResultText(t *testing.T) {
-	event := `{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_update","status":"failed","error":null,"result":{"content":[{"type":"text","text":"SUPERPLANE_BASE_URL is required"}],"structured_content":null}}}`
+	event := `{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_plan","status":"failed","error":null,"result":{"content":[{"type":"text","text":"SUPERPLANE_BASE_URL is required"}],"structured_content":null}}}`
 	output := runCodexFormatterWithActivity(t, []string{event})
 
 	var errorOutput string
