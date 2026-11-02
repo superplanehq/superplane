@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -18,6 +19,28 @@ var (
 	ErrSubscriptionTaskAssociation  = newSubscriptionAdmissionError("The run must belong to one task in this workspace")
 )
 
+// SubscriptionModelUnavailableError keeps model validation permanent while
+// naming the selected model when one was supplied.
+func SubscriptionModelUnavailableError(model string) error {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return ErrSubscriptionModelUnavailable
+	}
+	return subscriptionModelUnavailableError{model: model}
+}
+
+type subscriptionModelUnavailableError struct {
+	model string
+}
+
+func (e subscriptionModelUnavailableError) Error() string {
+	return fmt.Sprintf("Model %q is not available for the current task owner.", e.model)
+}
+
+func (e subscriptionModelUnavailableError) Unwrap() error {
+	return ErrSubscriptionModelUnavailable
+}
+
 func (o *FactoryWorkOrder) UsesCodexSubscription(tx *gorm.DB) (bool, error) {
 	f, err := FindFactory(tx.Unscoped(), o.OrganizationID, o.FactoryID)
 	if err != nil {
@@ -28,12 +51,12 @@ func (o *FactoryWorkOrder) UsesCodexSubscription(tx *gorm.DB) (bool, error) {
 
 func SubscriptionOwnerEligible(tx *gorm.DB, organizationID, factoryID, userID uuid.UUID) (bool, error) {
 	if _, err := ActiveCodexMember(tx, organizationID, userID); err != nil {
-		if errors.Is(err, ErrCodexConnectionNotEligible) || errors.Is(err, ErrCodexConnectionUnavailable) {
+		if errors.Is(err, ErrCodexConnectionNotEligible) {
 			return false, nil
 		}
 		return false, err
 	}
-	c, err := FindFactoryCodexConnection(tx, organizationID, factoryID, userID)
+	c, err := FindCodexConnection(tx, organizationID, userID)
 	if errors.Is(err, ErrCodexConnectionNotFound) {
 		return false, nil
 	}
@@ -71,12 +94,12 @@ func (o *FactoryWorkOrder) RequireSubscriptionOwner(tx *gorm.DB, nonblocking boo
 	}
 	if !eligible {
 		if _, err := ActiveCodexMember(tx, o.OrganizationID, owners[0].UserID); err != nil {
-			if errors.Is(err, ErrCodexConnectionNotEligible) || errors.Is(err, ErrCodexConnectionUnavailable) {
+			if errors.Is(err, ErrCodexConnectionNotEligible) {
 				return uuid.Nil, ErrSubscriptionOwnerInvalid
 			}
 			return uuid.Nil, err
 		}
-		c, lookupErr := FindFactoryCodexConnection(tx, o.OrganizationID, o.FactoryID, owners[0].UserID)
+		c, lookupErr := FindCodexConnection(tx, o.OrganizationID, owners[0].UserID)
 		if lookupErr != nil && !errors.Is(lookupErr, ErrCodexConnectionNotFound) {
 			return uuid.Nil, lookupErr
 		}
@@ -106,6 +129,37 @@ func (o *FactoryWorkOrder) RequireExecutionOwner(tx *gorm.DB, nonblocking bool) 
 // SubscriptionOwnershipBlocked includes pending and queued tasks, associated runs,
 // and runners whose cancellation or provider termination is incomplete.
 func (o *FactoryWorkOrder) SubscriptionOwnershipBlocked(tx *gorm.DB) (bool, error) {
+	return o.subscriptionOwnershipBlocked(tx, nil)
+}
+
+// SubscriptionOwnershipBlockedForStart permits only the draft's planning run
+// to finish after Start changes the owner. Other task work still blocks Start.
+func (o *FactoryWorkOrder) SubscriptionOwnershipBlockedForStart(tx *gorm.DB) (bool, error) {
+	if o.State != FactoryWorkOrderStateDraft {
+		return o.SubscriptionOwnershipBlocked(tx)
+	}
+	session, err := FindPlanningSessionByDraftWorkOrder(tx, o.OrganizationID, o.FactoryID, o.ID)
+	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return o.SubscriptionOwnershipBlocked(tx)
+	}
+	if err != nil {
+		return false, err
+	}
+	if session.CanvasRunID == nil {
+		return o.SubscriptionOwnershipBlocked(tx)
+	}
+	ignored := map[uuid.UUID]bool{*session.CanvasRunID: true}
+	descendants, err := listDescendantRuns(tx, *session.CanvasRunID)
+	if err != nil {
+		return false, err
+	}
+	for _, run := range descendants {
+		ignored[run.ID] = true
+	}
+	return o.subscriptionOwnershipBlocked(tx, ignored)
+}
+
+func (o *FactoryWorkOrder) subscriptionOwnershipBlocked(tx *gorm.DB, ignoredRuns map[uuid.UUID]bool) (bool, error) {
 	var queued int64
 	if err := tx.Model(&FactoryWorkOrderQueueItem{}).Where("work_order_id = ?", o.ID).Count(&queued).Error; err != nil {
 		return false, err
@@ -125,13 +179,15 @@ func (o *FactoryWorkOrder) SubscriptionOwnershipBlocked(tx *gorm.DB) (bool, erro
 		return false, err
 	}
 	for _, run := range runs {
-		if run.State != CanvasRunStateFinished {
+		if !ignoredRuns[run.ID] && run.State != CanvasRunStateFinished {
 			return true, nil
 		}
 	}
 	ids := make([]uuid.UUID, 0, len(runs))
 	for _, run := range runs {
-		ids = append(ids, run.ID)
+		if !ignoredRuns[run.ID] {
+			ids = append(ids, run.ID)
+		}
 	}
 	if len(ids) == 0 {
 		return false, nil
@@ -164,17 +220,70 @@ func (f *Factory) DefaultSubscriptionAssignees(tx *gorm.DB, userID *uuid.UUID) (
 // FindSubscriptionWorkOrderForRun uses persisted associations and ancestors.
 // Event payloads and agent-supplied task IDs are never authority for routing.
 func FindSubscriptionWorkOrderForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (*FactoryWorkOrder, error) {
-	var orders []FactoryWorkOrder
-	err := tx.Raw(factoryTaskRunAssociationsCTE+`
- SELECT DISTINCT o.* FROM factory_work_orders o
- JOIN associated_task_runs a ON a.work_order_id = o.id WHERE a.id = ?`, orgID, factoryID, runID).Scan(&orders).Error
+	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
 	if err != nil {
 		return nil, err
 	}
-	if len(orders) != 1 || orders[0].OrganizationID != orgID || orders[0].FactoryID != factoryID {
+	if len(orders) != 1 {
 		return nil, ErrSubscriptionTaskAssociation
 	}
 	return &orders[0], nil
+}
+
+// RequireSubscriptionRunOwner admits either an associated task or the trusted
+// scheduled proposal that runs before its task exists. Ambiguous task links
+// never fall back to an intake default.
+func RequireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (uuid.UUID, error) {
+	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if len(orders) > 1 {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	if len(orders) == 1 {
+		return orders[0].RequireSubscriptionOwner(tx, true)
+	}
+	ownerID, err := FindSubscriptionIntakeOwnerForRun(tx, orgID, factoryID, runID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	connected, err := SubscriptionOwnerEligible(tx, orgID, factoryID, ownerID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if !connected {
+		return uuid.Nil, ErrSubscriptionOwnerInvalid
+	}
+	return ownerID, nil
+}
+
+func subscriptionWorkOrdersForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) ([]FactoryWorkOrder, error) {
+	var orders []FactoryWorkOrder
+	// History excludes shared creator runs, but admission must see every
+	// creator link so an ambiguous run cannot fall back to an intake owner.
+	err := tx.Raw(factoryTaskRunAssociationsCTE+`
+ , source_ancestors AS (
+  SELECT id, parent_run_id FROM scoped_runs WHERE id = ?
+  UNION
+  SELECT r.id, r.parent_run_id FROM scoped_runs r
+  JOIN source_ancestors a ON r.id = a.parent_run_id
+ )
+ SELECT DISTINCT o.* FROM factory_work_orders o
+ WHERE o.id IN (SELECT work_order_id FROM associated_task_runs WHERE id = ?)
+    OR o.source_run_id IN (SELECT id FROM source_ancestors)`, orgID, factoryID, runID, runID).Scan(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, order := range orders {
+		if order.OrganizationID != orgID || order.FactoryID != factoryID {
+			return nil, ErrSubscriptionTaskAssociation
+		}
+	}
+	return orders, nil
 }
 
 // ResolveSubscriptionCatalogOwner never substitutes another member's catalog.
@@ -229,21 +338,22 @@ func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasI
 			model = strings.TrimSpace(model)
 		}
 		// Expressions resolve later. Dispatch checks the resolved value.
-		if model == "" || strings.Contains(model, "{{") {
+		if strings.Contains(model, "{{") {
 			continue
 		}
-		allowed, err := RunnerAcceptsModel(tx, o.OrganizationID, &o.FactoryID, node.ComponentName(), node.Configuration, model, ownerID)
+		_, err := ResolveFactoryCodexSubscriptionModel(tx, o.OrganizationID, o.FactoryID, ownerID, model)
 		if err != nil {
 			return err
-		}
-		if !allowed {
-			return ErrSubscriptionModelUnavailable
 		}
 	}
 	return nil
 }
 
 func (o *FactoryWorkOrder) validateSubscriptionAssignment(tx *gorm.DB, ids []uuid.UUID) error {
+	return o.validateSubscriptionAssignmentWithStart(tx, ids, false)
+}
+
+func (o *FactoryWorkOrder) validateSubscriptionAssignmentWithStart(tx *gorm.DB, ids []uuid.UUID, start bool) error {
 	subscription, err := o.UsesCodexSubscription(tx)
 	if err != nil || !subscription {
 		return err
@@ -265,7 +375,12 @@ func (o *FactoryWorkOrder) validateSubscriptionAssignment(tx *gorm.DB, ids []uui
 	if len(ids) > 1 {
 		return ErrSubscriptionOwnerRequired
 	}
-	blocked, err := o.SubscriptionOwnershipBlocked(tx)
+	var blocked bool
+	if start {
+		blocked, err = o.SubscriptionOwnershipBlockedForStart(tx)
+	} else {
+		blocked, err = o.SubscriptionOwnershipBlocked(tx)
+	}
 	if err != nil {
 		return err
 	}

@@ -11,6 +11,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/triggers/schedule"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
@@ -52,13 +53,20 @@ func scheduledIntakeCanvas(db *gorm.DB, factory *models.Factory, name string, pa
 	if agent == nil {
 		return nil, invalidArgument("Connect an agent or configure SuperPlane-hosted models before you add scheduled intake.")
 	}
+	owner := strings.TrimSpace(params["defaultOwnerId"])
+	if _, explicit := params["defaultOwnerId"]; !explicit && config.CodexSubscription {
+		owner = config.CodexDefaultOwnerID
+	}
+	if err := validateIntakeDefaultOwner(db, factory, models.FactoryIntakeSourceGitHubIssues, "", &pb.FactoryIntake_Settings{DefaultOwnerId: &owner}); err != nil {
+		return nil, err
+	}
 	// Repository and credentials are workspace settings, not client install parameters.
 	input := factoryTemplateInput{
 		appName: name,
 		installParams: map[string]string{
 			"appRepository": config.AppRepository, "defaultBranch": config.DefaultBranch,
 			"hour": params["hour"], "minute": params["minute"], "timezone": params["timezone"], "prompt": params["prompt"],
-			"type": params["type"], "cronExpression": params["cronExpression"],
+			"type": params["type"], "cronExpression": params["cronExpression"], "defaultOwnerId": owner,
 			"githubHost": githubHostForFactory(db, factory),
 		},
 		integrations: map[string]factoryTemplateIntegration{provider: {name: resolveVCSInstallationName(db, factory)}},
@@ -94,6 +102,9 @@ func configureScheduledIntake(canvas *yaml.Canvas, provider string, params map[s
 			} else {
 				node.Configuration["daysInterval"], node.Configuration["hour"], node.Configuration["minute"] = 1, *config.Hour, *config.Minute
 			}
+		}
+		if node.ID == "create-task" {
+			node.Configuration["defaultOwnerId"] = params["defaultOwnerId"]
 		}
 		if node.ID != "scheduled-agent" {
 			continue

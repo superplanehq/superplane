@@ -1,6 +1,8 @@
+import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
+import { Toaster } from "sonner";
 import { vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -16,6 +18,7 @@ import {
   useEventExecutions,
   useInfiniteCanvasRuns,
   useIntegrationResources,
+  permissions,
   useTriggers,
 } from "./intakeSettingsHostSpecMocks";
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
@@ -160,6 +163,9 @@ export function connectedJiraIntake(overrides: Partial<ConfiguredLineIntakeSourc
 }
 
 export function resetHostMocks() {
+  permissions.canUpdate = true;
+  permissions.canReadIntegrations = true;
+  permissions.isLoading = false;
   resetIntakeSettingsHostMocks({
     useCanvas,
     useTriggers,
@@ -174,7 +180,7 @@ export function resetHostMocks() {
   });
 }
 
-export { deleteIntake, updateIntake, useCanvas, useInfiniteCanvasRuns };
+export { deleteIntake, permissions, updateIntake, useCanvas, useInfiniteCanvasRuns };
 
 export function resetIntakeSettingsHostMocks(mocks: {
   useCanvas: ReturnType<typeof vi.fn>;
@@ -308,6 +314,7 @@ export function renderHost(
     initialTab?: IntakeSettingsTab;
     onClose?: () => void;
     path?: string;
+    subscription?: boolean;
   } = {},
 ) {
   return render(
@@ -315,17 +322,33 @@ export function renderHost(
       <MemoryRouter initialEntries={[props.path ?? "/org-1/workspaces/rf/lines/line-plan"]}>
         <ThemeProvider>
           <TooltipProvider>
-            <IntakeSettingsHost
-              organizationId="org-1"
-              factoryId="factory-1"
-              factoryKey="RF"
-              lineId="line-plan"
-              intake={props.intake ?? GITHUB_INTAKE}
-              repository={props.repository}
-              vcsIntegrationId={props.vcsIntegrationId}
-              initialTab={props.initialTab}
-              onClose={props.onClose ?? vi.fn()}
-            />
+            <FactoriesLayoutContext.Provider
+              value={
+                props.subscription
+                  ? {
+                      organizationId: "org-1",
+                      factoryId: "factory-1",
+                      factoryKey: "RF",
+                      factory: { onboarding: { codexSubscription: true } },
+                      factories: [],
+                      openCreateWorkOrder: () => {},
+                    }
+                  : null
+              }
+            >
+              <IntakeSettingsHost
+                organizationId="org-1"
+                factoryId="factory-1"
+                factoryKey="RF"
+                lineId="line-plan"
+                intake={props.intake ?? GITHUB_INTAKE}
+                repository={props.repository}
+                vcsIntegrationId={props.vcsIntegrationId}
+                initialTab={props.initialTab}
+                onClose={props.onClose ?? vi.fn()}
+              />
+            </FactoriesLayoutContext.Provider>
+            <Toaster />
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>

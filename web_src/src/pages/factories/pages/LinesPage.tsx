@@ -1,3 +1,5 @@
+import { IntakeOwnerCreationDialog } from "./IntakeOwnerCreationDialog";
+import { SubscriptionIntakeOwnerRecovery } from "./SubscriptionIntakeOwnerRecovery";
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
@@ -8,6 +10,7 @@ import type {
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
+import { useBacklogCustomRuns } from "@/hooks/useBacklogCustomRuns";
 import {
   useDeleteFactoryAutomation,
   useFactoryAutomations,
@@ -27,6 +30,8 @@ import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/us
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
@@ -47,7 +52,7 @@ import {
   type CustomAutomationMode,
   type ManualCustomAutomation,
 } from "../lib/customAutomation";
-import { customAutomationIdFromSearch } from "../lib/customAutomationPaths";
+import { customAutomationIdFromSearch, factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
@@ -390,6 +395,7 @@ export function LinesPage() {
   );
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
+  const [ownerIntakeTemplate, setOwnerIntakeTemplate] = useState<AddIntakeTemplate>();
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -568,7 +574,16 @@ export function LinesPage() {
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
-    if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
+    if (
+      isAddIntakeSoon(template, hasExperimentalFeature) ||
+      (template.id !== CUSTOM_AUTOMATION_TEMPLATE_ID && takenIntakeSourceIds.includes(template.id))
+    ) {
+      return;
+    }
+    if (template.id === CUSTOM_AUTOMATION_TEMPLATE_ID) {
+      if (selectedLine.id) {
+        navigate(factoryCustomAutomationSetupPath(organizationId, routeSegment, selectedLine.id, undefined, "backlog"));
+      }
       return;
     }
     if (template.id === "scheduled-intake") {
@@ -621,22 +636,27 @@ export function LinesPage() {
       showErrorToast("This intake template is not available yet.");
       return;
     }
-    createIntake
-      .mutateAsync({ source: apiIntakeSource(template.id) })
-      .then((intake) => {
-        if (!intake.canvasId) {
-          return;
-        }
-        navigate(
-          factoryAppConfigurePath(organizationId, routeSegment, intake.canvasId, {
-            from: "lines",
-            lineId: selectedLine.id,
-          }),
-        );
-      })
-      .catch((error) => {
-        showErrorToast(getApiErrorMessage(error, "Failed to create intake automation"));
-      });
+    if (factory?.onboarding?.codexSubscription) {
+      setOwnerIntakeTemplate(template);
+      return;
+    }
+    void createDefaultIntake(template.id).catch((error) => {
+      showErrorToast(getApiErrorMessage(error, "Failed to create intake automation"));
+    });
+  };
+
+  const createDefaultIntake = async (sourceId: Parameters<typeof apiIntakeSource>[0], defaultOwnerId?: string) => {
+    const intake = await createIntake.mutateAsync({
+      source: apiIntakeSource(sourceId),
+      ...(defaultOwnerId ? { settings: { defaultOwnerId } } : {}),
+    });
+    if (intake.canvasId)
+      navigate(
+        factoryAppConfigurePath(organizationId, routeSegment, intake.canvasId, {
+          from: "lines",
+          lineId: selectedLine.id,
+        }),
+      );
   };
 
   const openWorkOrder = (orderId: string, order?: FactoriesWorkOrder) => {
@@ -693,6 +713,16 @@ export function LinesPage() {
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
+      {ownerIntakeTemplate && isLineIntakeSourceId(ownerIntakeTemplate.id) ? (
+        <IntakeOwnerCreationDialog
+          organizationId={organizationId}
+          factoryId={factoryId}
+          onClose={() => setOwnerIntakeTemplate(undefined)}
+          onCreate={(ownerId) =>
+            createDefaultIntake(ownerIntakeTemplate.id as Parameters<typeof apiIntakeSource>[0], ownerId)
+          }
+        />
+      ) : null}
       {scheduledIntakeOpen ? (
         <ScheduledIntakeSetupDialog
           organizationId={organizationId}
@@ -736,6 +766,7 @@ export function LinesPage() {
         <CustomAutomationSetupModal
           lineId={selectedLine.id}
           automationId={customAutomationAutomationId ?? undefined}
+          columnKey={new URLSearchParams(search).get("automationColumn") === "backlog" ? "backlog" : "verify"}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
@@ -783,6 +814,7 @@ export function LinesPage() {
             colorView={columnColorView}
             onColorViewChange={setColumnColorView}
           />
+          <SubscriptionIntakeOwnerRecovery />
           {configuredIntakes
             .filter((intake) => intake.source.id === "github-issues" && intake.health === "HEALTH_WEBHOOK_FAILED")
             .map((intake) => (
@@ -939,8 +971,20 @@ function LineDetailHeader({
         data-testid="lines-detail-header"
         title={factory?.name?.trim() || "Workspace"}
         leading={
-          nextStepsRestore || hostedCreditHeaderKicker ? (
+          factory?.onboarding?.codexSubscription || nextStepsRestore || hostedCreditHeaderKicker ? (
             <>
+              {factory?.onboarding?.codexSubscription ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" tabIndex={0} className="font-normal">
+                      ChatGPT Subscription
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    This workspace uses ChatGPT subscriptions as a model source.
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
               {hostedCreditHeaderKicker}
               {nextStepsRestore}
             </>
@@ -1070,10 +1114,7 @@ function LineDetail({
     [backlogAnalysis.runsByWorkOrder],
   );
   const customAutomationIds = useMemo(
-    () =>
-      apps.flatMap((app) =>
-        app.id && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID && app.columnKey === "verify" ? [app.id] : [],
-      ),
+    () => apps.flatMap((app) => (app.id && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID ? [app.id] : [])),
     [apps],
   );
   const customAutomationDetails = useFactoryCustomAutomations(organizationId, factoryId, customAutomationIds);
@@ -1115,6 +1156,7 @@ function LineDetail({
                 id: automationId,
                 name: automation.automation?.name?.trim() || "Custom automation",
                 icon: automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON,
+                columnKey: automation.automation?.columnKey === "backlog" ? ("backlog" as const) : ("verify" as const),
               },
             ]
           : [],
@@ -1296,11 +1338,12 @@ function LineBoardSplitRunPopup({
   onDispatch: (orderId: string, input: { lineName: string; model?: string; thinkingLevel?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
-  factoryApps: Array<{ id?: string; name?: string; columnKey?: string }>;
+  factoryApps: Array<{ id?: string; name?: string; columnKey?: string; templateId?: string }>;
   manualCustomAutomations: readonly ManualCustomAutomation[];
   onClose: () => void;
 }) {
   const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
+  const backlogCustomRuns = useBacklogCustomRuns(organizationId, peekOrderId, factoryApps);
   const { data: peekArtifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, peekOrderId);
   const peekPullRequests = describedOrder?.pullRequests ?? peekOrder.pullRequests ?? [];
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
@@ -1330,6 +1373,7 @@ function LineBoardSplitRunPopup({
           demoArtifacts: false,
           prFeedbackRuns,
           analysisRuns,
+          backlogCustomRuns: backlogCustomRuns.runs,
           columnApps,
           isAnalyzing,
           stoppedBy: closer.actor,
@@ -1337,6 +1381,7 @@ function LineBoardSplitRunPopup({
           resolveUser,
           columnAppRuns: columnAppCheckRuns.lookup,
         })}
+        analysisRuns={analysisRuns}
         canDispatch={canDispatch && Boolean(resolvedLineName)}
         canUpdate={canUpdate}
         isDispatching={isDispatching}
@@ -1347,6 +1392,7 @@ function LineBoardSplitRunPopup({
         }
         onClose={onClose}
         manualCustomAutomations={manualCustomAutomations}
+        backlogCustomRunsStatus={backlogCustomRuns}
         fixed
       />
     </>

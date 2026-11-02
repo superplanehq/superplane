@@ -352,6 +352,12 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 	return tx.Transaction(func(tx *gorm.DB) error { return o.updateAssignees(tx, assigneeIDs, updatedBy) })
 }
 
+// AssignStarter applies the draft Start exception without changing manual
+// owner edits or handoffs.
+func (o *FactoryWorkOrder) AssignStarter(tx *gorm.DB, userID uuid.UUID) error {
+	return o.updateAssigneesWithStart(tx, []uuid.UUID{userID}, userID, true)
+}
+
 // UpdateStatus is the single writer for the work order lifecycle: it
 // validates the transition, updates the row, and records an
 // `order.status.updated` event enriched with the caller's attribution
@@ -770,6 +776,20 @@ func (o *FactoryWorkOrder) CountEvents(tx *gorm.DB) (int64, error) {
 	return count, nil
 }
 
+// BacklogEntryID identifies the latest transition into Backlog, not later edits.
+func (o *FactoryWorkOrder) BacklogEntryID(tx *gorm.DB) (string, error) {
+	var event FactoryWorkOrderEvent
+	err := tx.Where("work_order_id = ? AND type = ? AND data->>'toState' = ?", o.ID, factory.EventTypeOrderStatusUpdated, FactoryWorkOrderStateDraft).
+		Order("created_at DESC, id DESC").First(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return o.ID.String(), nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return event.ID.String(), nil
+}
+
 func (o *FactoryWorkOrder) Ref() *factory.WorkOrderRef {
 	return &factory.WorkOrderRef{
 		ID:    o.ID,
@@ -899,7 +919,11 @@ func (o *FactoryWorkOrder) AssigneeIDs() []uuid.UUID {
 }
 
 func (o *FactoryWorkOrder) updateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
-	if err := o.validateSubscriptionAssignment(tx, assigneeIDs); err != nil {
+	return o.updateAssigneesWithStart(tx, assigneeIDs, updatedBy, false)
+}
+
+func (o *FactoryWorkOrder) updateAssigneesWithStart(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID, start bool) error {
+	if err := o.validateSubscriptionAssignmentWithStart(tx, assigneeIDs, start); err != nil {
 		return err
 	}
 	previous, err := o.ListAssignees(tx)

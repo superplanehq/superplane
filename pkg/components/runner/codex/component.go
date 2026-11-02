@@ -75,7 +75,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: One or more ordered bash commands or agent prompts.
 - **Credentials**: SuperPlane secret or OpenAI integration used as ` + "`OPENAI_API_KEY`" + `.
-- **Model**: Select a model from Organization LLM Models.
+- **Model**: Select a model from Workspace Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -144,7 +144,8 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
-	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
+	var merge *runner.MergeConfidenceScope
+	environment, merge, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps)
 	if err != nil {
 		return err
 	}
@@ -160,14 +161,13 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasVisualEvidence(environment))
 	dispatched.Steps = runner.AppendPublishLinkProtocol(dispatched.Steps, runner.HasPublishLinks(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
-	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds, merge)
 	task := buildCodexTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = runner.AppendPlanningSessionMCPFiles(task.Files)
 	}
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
-	task.Files = runner.AppendMergeConfidenceMCP(environment, task.Files)
 	task.Files = runner.AppendGlobalMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)

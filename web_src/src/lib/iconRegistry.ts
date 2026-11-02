@@ -337,7 +337,6 @@ const ICON_ALIASES: Record<string, keyof typeof ICONS> = {
   schedule: "calendar-clock",
   smtp: "mail",
   teams: "users",
-  telegram: "send",
   warning: "triangle-alert",
   "x-mark": "x",
   xmark: "x",

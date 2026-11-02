@@ -6,6 +6,7 @@ import { DependabotIntakeSetupDialog } from "./DependabotIntakeSetupDialog";
 
 const mocks = vi.hoisted(() => ({
   createIntake: vi.fn(),
+  updateIntake: vi.fn(),
   importItem: vi.fn(),
   searchSetupItems: vi.fn(),
   refetch: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("@/hooks/useFactoryGitHubHost", () => ({
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useCreateFactoryIntake: () => ({ mutateAsync: mocks.createIntake, isPending: false }),
+  useUpdateFactoryIntake: () => ({ mutateAsync: mocks.updateIntake, isPending: false }),
   useImportFactoryIntakeItem: () => ({ mutateAsync: mocks.importItem, isPending: false }),
   useSearchDependabotIntakeSetupItems: (input: unknown) => mocks.searchSetupItems(input),
 }));
@@ -61,6 +63,8 @@ describe("DependabotIntakeSetupDialog", () => {
   beforeEach(() => {
     mocks.createIntake.mockReset();
     mocks.createIntake.mockResolvedValue({ id: "intake-1" });
+    mocks.updateIntake.mockReset();
+    mocks.updateIntake.mockResolvedValue({ id: "intake-1" });
     mocks.importItem.mockReset();
     mocks.importItem.mockResolvedValue({ id: "order-1" });
     mocks.searchSetupItems.mockReset();
@@ -148,6 +152,32 @@ describe("DependabotIntakeSetupDialog", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("permission denied");
     expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  it("saves changed filters to the created intake before it retries the import", async () => {
+    mocks.importItem.mockRejectedValueOnce({ response: { data: { message: "import failed" } } });
+    const user = userEvent.setup();
+    const { onCreated } = renderDialog();
+    await openPicker(user);
+
+    await user.click(screen.getByRole("checkbox", { name: /astro/ }));
+    await user.click(screen.getByTestId("dependabot-import-selected"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("import failed");
+    expect(mocks.createIntake).toHaveBeenCalledTimes(1);
+    expect(mocks.updateIntake).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("first-run-back"));
+    await user.click(screen.getByRole("checkbox", { name: "Low" }));
+    await openPicker(user);
+    await user.click(screen.getByRole("checkbox", { name: /astro/ }));
+    await user.click(screen.getByTestId("dependabot-import-selected"));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(mocks.createIntake).toHaveBeenCalledTimes(1);
+    expect(mocks.updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-1",
+      settings: { dependabotSeverities: ["critical", "high", "medium"] },
+    });
   });
 
   it("shows why GitHub refused the open alerts", async () => {

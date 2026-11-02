@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -53,6 +54,7 @@ func TestEnabledRunnerFleetsForOrganization(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	firstOrganization, err := models.CreateOrganization("First Visible Fleet Organization", "")
 	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(firstOrganization.ID, features.FeatureOrganizationRunners))
 	secondOrganization, err := models.CreateOrganization("Second Visible Fleet Organization", "")
 	require.NoError(t, err)
 	db := database.DB(t.Context())

@@ -958,6 +958,18 @@ func (f *Factory) createWorkOrder(
 			}
 		}
 	}
+	return f.insertWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, origin, autoStartLineID)
+}
+
+func (f *Factory) insertWorkOrder(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	origin *WorkOrderOrigin,
+	autoStartLineID *uuid.UUID,
+) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired

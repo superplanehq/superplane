@@ -202,15 +202,14 @@ export async function provisionWorkspace(args: {
       save: (name) => args.updateFactory({ name }),
     });
   }
-  const subscription = args.agentPlan.credentialsSource === "subscription";
   await args.updateOnboarding({
     vcsIntegrationId: args.vcs.id,
-    agentIntegrationId: subscription ? "" : (args.agentIntegrationId ?? ""),
+    agentIntegrationId: args.agentIntegrationId ?? "",
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
     issuesSource: apiIssuesSource(args.issuesChoice),
-    agentHarness: subscription ? "AGENT_HARNESS_CODEX" : args.agentPlan.harness,
-    codexSubscription: subscription,
+    agentHarness: args.agentPlan.harness,
+    codexSubscription: false,
   });
   const updated = await args.updateOnboarding({ defaultBranch });
   const provisionBranch = branchFromOnboardingUpdate(updated) || defaultBranch;
@@ -318,7 +317,6 @@ async function verifyOnboardingPlan(
   usage: ReturnType<typeof useOrganizationWorkspaceUsage>,
   savedPlan: OnboardingAgentPlan | undefined,
 ) {
-  if (savedPlan?.credentialsSource === "subscription") return { plan: savedPlan, bypassAnalysis: false };
   try {
     const byokAllowed = await access.verify();
     if (byokAllowed) return { plan: savedPlan, bypassAnalysis: false };

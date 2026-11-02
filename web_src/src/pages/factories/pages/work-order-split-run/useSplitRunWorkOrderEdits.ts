@@ -1,3 +1,4 @@
+import { isCodexActionCancelled } from "@/pages/factories/codex/codexActionContext";
 import { useUpdateWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
@@ -183,6 +184,7 @@ export function useSplitRunWorkOrderEdits(args: {
       } catch (error) {
         setAssigneeIds(previousIds);
         setOwner(previousOwner);
+        if (isCodexActionCancelled(error)) return;
         showErrorToast(getApiErrorMessage(error, "Failed to update the owner"));
         throw error;
       }

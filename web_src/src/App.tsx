@@ -1,7 +1,17 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  matchPath,
+  useLocation,
+  useParams,
+  useSearchParams,
+} from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
@@ -11,6 +21,7 @@ import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
 import { useOrganization } from "./hooks/useOrganizationData";
+import { useExperimentalFeature } from "./hooks/useExperimentalFeature";
 import { useRedirectIntegrationSetupReturn } from "./hooks/useRedirectIntegrationSetupReturn";
 import { Toaster } from "sonner";
 import "./App.css";
@@ -220,10 +231,7 @@ function organizationScopedRouteTree() {
           </Route>
         </Route>
         <Route path=":factoryKey/lines/:lineId" element={<FactoryLineAccessGate />} />
-        <Route
-          path=":factoryKey/settings"
-          element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
-        >
+        <Route path=":factoryKey/settings" element={withAuthOnly(WorkspaceSettingsGate)}>
           {factorySettingsSectionRoutes}
         </Route>
         <Route
@@ -242,10 +250,12 @@ function organizationScopedRouteTree() {
       <Route
         path="settings/llm-spend"
         element={withAuthOnly(() => (
-          <LegacyOrganizationSettingsRedirect destination="llm-spend" />
+          <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+            <LegacyOrganizationSettingsRedirect destination="llm-spend" />
+          </RequireExperimentalFeature>
         ))}
       />
-      <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
+      <Route path="settings/*" element={withAuthOnly(OrganizationSettingsGate)} />
     </Route>
   );
 }
@@ -335,6 +345,30 @@ function OrganizationOnboardingRoute() {
 function PageObservabilityScope() {
   usePageObservability();
   return null;
+}
+
+function OrganizationSettingsGate() {
+  const { pathname } = useLocation();
+  if (matchPath("/:organizationId/settings/fleets/*", pathname)) {
+    return <OrganizationSettings />;
+  }
+  return (
+    <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+      <OrganizationSettings />
+    </RequireExperimentalFeature>
+  );
+}
+
+function WorkspaceSettingsGate() {
+  const { organizationId } = useParams();
+  const { pathname, search, hash } = useLocation();
+  const feature = useExperimentalFeature(organizationId);
+  const fleetRoute = matchPath("/:organizationId/workspaces/:factoryKey/settings/organization/fleets/*", pathname);
+  if (fleetRoute && !feature.isLoading && !feature.has(FEATURE_FACTORIES)) {
+    const suffix = fleetRoute.params["*"];
+    return <Navigate to={`/${organizationId}/settings/fleets${suffix ? `/${suffix}` : ""}${search}${hash}`} replace />;
+  }
+  return withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read");
 }
 
 function organizationScopeQueryEnabled(segment: string | undefined, isReserved: boolean, guestLine: boolean): boolean {

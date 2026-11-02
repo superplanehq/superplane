@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, describe, expect, it } from "bun:test";
+import { beforeEach, afterEach, describe, expect, it, spyOn } from "bun:test";
 import { initGoogleTagManager, trackGoogleSignup, trackGooglePurchase, confirmedPurchase } from "./googleTagManager";
 
 const invoice = {
@@ -12,11 +12,23 @@ const invoice = {
 };
 
 describe("Google Tag Manager", () => {
+  let originalHostname: PropertyDescriptor | undefined;
+  let originalContainerID: string | undefined;
+  let originalDataLayer: Window["dataLayer"];
+
   afterEach(() => {
-    delete window.SUPERPLANE_GTM_CONTAINER_ID;
-    Reflect.deleteProperty(window.location, "hostname");
+    document.getElementById("superplane-gtm")?.remove();
+    if (originalContainerID === undefined) delete window.SUPERPLANE_GTM_CONTAINER_ID;
+    else window.SUPERPLANE_GTM_CONTAINER_ID = originalContainerID;
+    if (originalDataLayer === undefined) delete window.dataLayer;
+    else window.dataLayer = originalDataLayer;
+    if (originalHostname) Object.defineProperty(window.location, "hostname", originalHostname);
+    else Reflect.deleteProperty(window.location, "hostname");
   });
   beforeEach(() => {
+    originalHostname = Object.getOwnPropertyDescriptor(window.location, "hostname");
+    originalContainerID = window.SUPERPLANE_GTM_CONTAINER_ID;
+    originalDataLayer = window.dataLayer;
     Object.defineProperty(window.location, "hostname", { configurable: true, value: "app.superplane.com" });
     window.SUPERPLANE_GTM_CONTAINER_ID = "GTM-TEST123";
     delete window.dataLayer;
@@ -25,14 +37,29 @@ describe("Google Tag Manager", () => {
   });
 
   it("preserves queued data and initializes the shared container once", () => {
-    window.dataLayer = [{ event: "queued" }];
-    initGoogleTagManager();
-    initGoogleTagManager();
-    expect(window.dataLayer.map((event) => event.event)).toEqual(["queued", "gtm.js"]);
-    expect(document.querySelectorAll("#superplane-gtm")).toHaveLength(1);
-    expect((document.getElementById("superplane-gtm") as HTMLScriptElement).src).toBe(
-      "https://www.googletagmanager.com/gtm.js?id=GTM-TEST123",
-    );
+    const appendChild = document.head.appendChild.bind(document.head);
+    const insertion = spyOn(document.head, "appendChild").mockImplementation(<T extends Node>(node: T): T => {
+      expect(node).toBeInstanceOf(HTMLScriptElement);
+      if (node instanceof HTMLScriptElement) {
+        expect(node.id).toBe("superplane-gtm");
+        expect(node.async).toBe(true);
+        expect(node.src).toBe("https://www.googletagmanager.com/gtm.js?id=GTM-TEST123");
+        // Inspect the real output, then keep the attached script inert in Happy DOM.
+        node.type = "text/plain";
+      }
+      return appendChild(node);
+    });
+
+    try {
+      window.dataLayer = [{ event: "queued" }];
+      initGoogleTagManager();
+      initGoogleTagManager();
+      expect(window.dataLayer.map((event) => event.event)).toEqual(["queued", "gtm.js"]);
+      expect(insertion).toHaveBeenCalledTimes(1);
+      expect(document.querySelectorAll("#superplane-gtm")).toHaveLength(1);
+    } finally {
+      insertion.mockRestore();
+    }
   });
 
   it.each(["localhost", "preview.superplane.com", "self-hosted.example", "app.superplane.com.example.com"])(

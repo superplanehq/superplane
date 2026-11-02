@@ -6,6 +6,7 @@ import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
+import { currentPlanningRunFailure, latestBacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
@@ -23,6 +24,7 @@ import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession, planningSessionCanStart } from "./useAnalysisPlanningSession";
+import { useBacklogPlanningRunRefresh } from "./useBacklogPlanningRunRefresh";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
@@ -46,6 +48,7 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
     orderNumber,
     orderId,
     fixture,
+    analysisRuns,
     fixed = false,
     onClose,
     canUpdate = true,
@@ -82,9 +85,18 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
       artifacts: popupData.artifacts,
     }),
   });
+  const planningFailure = currentPlanningRunFailure(analysis.run, analysisRuns);
+  useBacklogPlanningRunRefresh({
+    organizationId,
+    factoryId,
+    orderId,
+    isDraft: refinementEnabled && fixture.footer.kind === "draft",
+    hasSession: Boolean(analysis.session),
+    latestRun: latestBacklogAnalysisRun(analysisRuns ?? [])?.run,
+  });
   const mode = workOrderPopupMode({
     hasPlanningSession: Boolean(analysis.session),
-    hasAnalysisResult: hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts),
+    hasAnalysisResult: popupHasAnalysisResult(fixture, popupData, planningFailure),
     refinementEnabled,
     refinementLoading: refinementFeature.isLoading,
     sessionLoading: analysis.isLoading,
@@ -98,7 +110,23 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
   if (mode === "loading") {
     return <LoadingWorkOrderPopup title={fixture.title} titlePrefix={titlePrefix} fixed={fixed} onClose={onClose} />;
   }
-  return <AnalysisWorkOrderPopup {...props} titlePrefix={titlePrefix} analysis={analysis} popupData={popupData} />;
+  return (
+    <AnalysisWorkOrderPopup
+      {...props}
+      titlePrefix={titlePrefix}
+      analysis={analysis}
+      popupData={popupData}
+      planningFailure={planningFailure}
+    />
+  );
+}
+
+function popupHasAnalysisResult(
+  fixture: WorkOrderSplitRunPopupProps["fixture"],
+  popupData: ReturnType<typeof useSplitRunPopupData>,
+  planningFailure?: string,
+): boolean {
+  return Boolean(planningFailure) || hasAnalysisScore(fixture.checks) || hasAnalysisPlan(popupData.artifacts);
 }
 
 function AnalysisWorkOrderPopup({
@@ -116,13 +144,16 @@ function AnalysisWorkOrderPopup({
   canDispatch = false,
   canUpdate = true,
   manualCustomAutomations,
+  backlogCustomRunsStatus,
   analysis,
   popupData,
   titlePrefix,
+  planningFailure,
 }: WorkOrderSplitRunPopupProps & {
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
   titlePrefix?: string;
+  planningFailure?: string;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
@@ -154,6 +185,8 @@ function AnalysisWorkOrderPopup({
     lineId,
     fixture: viewFixture,
     analysis,
+    planningFailure,
+    canUpdate,
     draftModel,
     draftThinking,
     onDraftStartChange: ({ model, thinkingLevel }) => {
@@ -207,6 +240,7 @@ function AnalysisWorkOrderPopup({
           lineId={lineId}
           canUpdate={canUpdate}
           manualCustomAutomations={manualCustomAutomations}
+          backlogCustomRunsStatus={backlogCustomRunsStatus}
           footerActions={footerActions}
           resultFooter={descriptionReview}
           sidebarNote={!unified && showSidebarNote ? review : undefined}
@@ -380,6 +414,8 @@ type AnalysisDraftChromeArgs = {
   lineId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  planningFailure?: string;
+  canUpdate: boolean;
   draftModel: string;
   draftThinking: string;
   onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
@@ -393,7 +429,6 @@ function analysisDraftChrome(args: AnalysisDraftChromeArgs) {
   const modelSelects = draftModelSelects({
     organizationId: args.organizationId,
     factoryId: args.factoryId,
-    orderId: args.orderId,
     fixture: args.fixture,
     model: args.draftModel,
     thinkingLevel: args.draftThinking,
@@ -445,7 +480,6 @@ function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], fact
 function draftModelSelects(args: {
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   model: string;
   thinkingLevel: string;

@@ -25,3 +25,17 @@ func (s *Server) authenticateRunner(w http.ResponseWriter, r *http.Request, requ
 	}
 	return scope, true
 }
+
+func (s *Server) authenticateRunnerAny(w http.ResponseWriter, r *http.Request, required ...runneraction.RunnerToolScope) (*runneraction.RunnerScope, bool) {
+	scope, ok := s.authenticateRunner(w, r, "")
+	if !ok {
+		return nil, false
+	}
+	for _, name := range required {
+		if scope.HasScope(name) {
+			return scope, true
+		}
+	}
+	http.Error(w, "This run cannot use this tool", http.StatusForbidden)
+	return nil, false
+}

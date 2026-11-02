@@ -72,7 +72,7 @@ function firstNameOf(name: string | undefined): string | undefined {
 }
 
 function modelSourceOffered(model: OnboardingPageModel): boolean {
-  return (model.bringYourOwnKey || model.codexSubscriptionOffered) && model.hostedModelsAvailable;
+  return model.bringYourOwnKey && model.hostedModelsAvailable;
 }
 
 function signOut() {
@@ -322,15 +322,6 @@ function AgentScreenHost({
         offered: modelSourceOffered(model),
         choice: flow.credentialChoice,
         onSelect: flow.selectCredentialChoice,
-      }}
-      codex={{
-        offered: Boolean(model.codexSubscriptionOffered),
-        connection: model.codexConnection,
-        ready: Boolean(model.codexSubscriptionReady),
-        starting: Boolean(model.codexStarting),
-        canceling: Boolean(model.codexCanceling),
-        onStart: model.startCodexConnection,
-        onCancel: model.cancelCodexConnection,
       }}
       onRequestConnect={model.requestConnect}
       modelPicker={model.agentModelPicker}

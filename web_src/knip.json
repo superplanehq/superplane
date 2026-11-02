@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["scripts/serve-storybook-check.mjs"],
   "project": ["src/**/*.{ts,tsx}", ".storybook/**/*.{ts,tsx}", "scripts/**/*.mjs"],
   "ignoreDependencies": ["tippy.js", "@happy-dom/global-registrator"],
   "ignoreBinaries": ["bun"],

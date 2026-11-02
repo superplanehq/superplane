@@ -1,3 +1,4 @@
+import { isCodexActionCancelled } from "@/pages/factories/codex/codexActionContext";
 import type { FactoriesWorkOrder } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateWorkOrder } from "@/hooks/useFactoryData";
@@ -85,6 +86,7 @@ export function useCreateWorkOrderComposer({
       });
       goToOrder(order);
     } catch (error) {
+      if (isCodexActionCancelled(error)) return;
       showErrorToast(getApiErrorMessage(error, "Failed to create task"));
     } finally {
       setIsCreating(false);

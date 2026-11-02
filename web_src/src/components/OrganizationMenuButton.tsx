@@ -88,7 +88,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   const logoHref = !organizationId ? "/" : factoriesEnabled ? factoryListPath(organizationId) : `/${organizationId}`;
 
   const sidebarUserLinks = [
-    ...(organizationId
+    ...(organizationId && factoriesEnabled
       ? [
           {
             label: "Profile",
@@ -114,50 +114,50 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
             Icon: Factory,
             permission: { resource: "factories", action: "read" },
           },
+          {
+            label: "Settings",
+            href: organizationId ? `/${organizationId}/settings/general` : "#",
+            Icon: Settings,
+            permission: { resource: "org", action: "read" },
+          },
+          {
+            label: "Members",
+            href: organizationId ? `/${organizationId}/settings/members` : "#",
+            Icon: UserIcon,
+            permission: { resource: "members", action: "read" },
+          },
+          {
+            label: "API Keys",
+            href: organizationId ? `/${organizationId}/settings/api-keys` : "#",
+            Icon: KeyRound,
+            permission: { resource: "api_keys", action: "read" },
+          },
+          {
+            label: "Groups",
+            href: organizationId ? `/${organizationId}/settings/groups` : "#",
+            Icon: Users,
+            permission: { resource: "groups", action: "read" },
+          },
+          {
+            label: "Roles",
+            href: organizationId ? `/${organizationId}/settings/roles` : "#",
+            Icon: Shield,
+            permission: { resource: "roles", action: "read" },
+          },
+          {
+            label: "Integrations",
+            href: organizationId ? `/${organizationId}/settings/integrations` : "#",
+            Icon: Plug,
+            permission: { resource: "integrations", action: "read" },
+          },
+          {
+            label: "Secrets",
+            href: organizationId ? `/${organizationId}/settings/secrets` : "#",
+            Icon: Key,
+            permission: { resource: "secrets", action: "read" },
+          },
         ]
       : []),
-    {
-      label: "Settings",
-      href: organizationId ? `/${organizationId}/settings/general` : "#",
-      Icon: Settings,
-      permission: { resource: "org", action: "read" },
-    },
-    {
-      label: "Members",
-      href: organizationId ? `/${organizationId}/settings/members` : "#",
-      Icon: UserIcon,
-      permission: { resource: "members", action: "read" },
-    },
-    {
-      label: "API Keys",
-      href: organizationId ? `/${organizationId}/settings/api-keys` : "#",
-      Icon: KeyRound,
-      permission: { resource: "api_keys", action: "read" },
-    },
-    {
-      label: "Groups",
-      href: organizationId ? `/${organizationId}/settings/groups` : "#",
-      Icon: Users,
-      permission: { resource: "groups", action: "read" },
-    },
-    {
-      label: "Roles",
-      href: organizationId ? `/${organizationId}/settings/roles` : "#",
-      Icon: Shield,
-      permission: { resource: "roles", action: "read" },
-    },
-    {
-      label: "Integrations",
-      href: organizationId ? `/${organizationId}/settings/integrations` : "#",
-      Icon: Plug,
-      permission: { resource: "integrations", action: "read" },
-    },
-    {
-      label: "Secrets",
-      href: organizationId ? `/${organizationId}/settings/secrets` : "#",
-      Icon: Key,
-      permission: { resource: "secrets", action: "read" },
-    },
   ];
 
   const handleSignOut = () => {

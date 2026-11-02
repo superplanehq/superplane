@@ -1,3 +1,4 @@
+import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import type { IntegrationsIntegrationDefinition } from "@/api-client";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import {
@@ -30,6 +31,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     useLinearConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const owner = useIntakeOwnerDraft(organizationId, factoryId);
   const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
     enabled: Boolean(integrationId),
   });
@@ -84,6 +86,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
         source: "SOURCE_LINEAR_ISSUES",
         integrationId,
         settings: {
+          ...owner.settings(),
           linearProjectIds: projectIds,
           linearLabels: [],
         },
@@ -97,6 +100,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
   };
 
   return {
+    owner,
     organizationId,
     step,
     setStep,

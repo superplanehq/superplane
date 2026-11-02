@@ -79,7 +79,7 @@ The development environment is **entirely Docker-based**: build, lint, test, and
 run commands execute inside containers via `docker compose`. You do not need Go
 or Node installed on the host, only Docker.
 
-- Go `1.26.10` (pinned in `go.mod`; provided by the dev container).
+- Go `1.27.3` (pinned in `go.mod`; provided by the dev container).
 - Node.js, npm, and Bun (provided by the dev container; used by Vite/frontend).
 - Docker with a working `docker compose`.
 
@@ -181,10 +181,16 @@ Cross-cutting rules when extending the backend:
   constants in `pkg/models`. Check the `Proto*` and `*ToProto` functions in
   `pkg/grpc/actions/common.go`.
 - When adding a new worker in `pkg/workers`, add its startup to
-  `cmd/server/main.go` and update the docker compose files with any new
-  environment variables.
+  `pkg/server/server.go` and update the docker compose files with any new
+  environment variables. `cmd/server/main.go` calls `server.Start()`.
 - After adding new API endpoints, ensure they are covered in
   `pkg/authorization/interceptor.go`.
+- Define all new admin API endpoints in `protos/admin/`. Register them with
+  the admin gRPC gateway behind the existing admin authentication middleware.
+  Do not add manual admin HTTP handlers in core or `ee/`. Existing handlers
+  remain until they migrate. Run `make check.admin.routes` to check this rule.
+  Remove migrated routes from `.admin-http-routes-baseline.txt`. Do not add
+  new routes to the baseline.
 
 Further reading:
 
@@ -230,14 +236,19 @@ from published charts and verified deployed configuration.
   [pkg/grpc/actions/factories/AGENTS.md](pkg/grpc/actions/factories/AGENTS.md).
 - Before adding a test, identify the observable behavior and a credible
   regression that existing coverage does not catch.
-- Do not pin cosmetic CSS classes, wrapper structure, or copied display
-  constants without an explicit product contract. Preserve checks for
-  visibility, accessibility, theme behavior, and other functional requirements.
+- Test observable behavior, not incidental presentation. Prefer accessible
+  roles and stable test IDs. Assert exact UI text only when its wording is the
+  behavior under test. Avoid repeated assertions about copy, CSS classes,
+  layout, or DOM structure. Preserve checks for visibility, accessibility,
+  theme behavior, and other functional requirements.
 - Prefer tests that execute the real behavior over duplicate private-helper
   or generated-source assertions. Before removing overlapping coverage,
   confirm that the retained test exercises the same regression and runs in CI.
 - Tests end with `_test.go`.
 - Always prefer early returns over else blocks when possible.
+- Name non-obvious UI state rules. If a condition combines several states or
+  exceptions, extract it into a function that names the decision. Add a short
+  comment when the product reason is not clear from the code.
 - Go: prefer `any` over `interface{}`.
 - Go: to check membership in a slice, use `slices.Contains` or `slices.ContainsFunc`.
 - Avoid variable names like `*Str` or `*UUID`; Go is typed, so types don't belong

@@ -12,15 +12,25 @@ const stdio = require("./stdio");
 
 const SERVER_NAME = "superplane_global";
 
-function createHandler({ client = createClient(), tools = registry.allTools() } = {}) {
+function createHandler({
+  client = createClient(),
+  tools = registry.allTools(),
+  prepare = (names) => registry.prepare(names, client),
+} = {}) {
   let allowed;
 
   // A failed lookup is not cached, so the next request can retry it.
   function allowedNames() {
     if (!allowed) {
-      allowed = client
-        .request("GET", "/api/v1/runner/tools")
-        .then((result) => new Set(Array.isArray(result.tools) ? result.tools : []));
+      allowed = client.request("GET", "/api/v1/runner/tools").then((result) => {
+        const names = new Set(Array.isArray(result.tools) ? result.tools : []);
+        try {
+          prepare(names);
+        } catch (err) {
+          process.stderr.write(`prepare global runner tools: ${stdio.errorMessage(err)}\n`);
+        }
+        return names;
+      });
       allowed.catch(() => {
         allowed = undefined;
       });
@@ -42,10 +52,7 @@ function createHandler({ client = createClient(), tools = registry.allTools() } 
     }
     try {
       const result = await tool.handler((params && params.arguments) || {}, client);
-      transport.sendResult(id, {
-        content: [{ type: "text", text: JSON.stringify(result) }],
-        structuredContent: result,
-      });
+      transport.sendResult(id, toolResult(result));
     } catch (err) {
       transport.sendResult(id, {
         content: [{ type: "text", text: stdio.errorMessage(err) }],
@@ -80,6 +87,15 @@ function createHandler({ client = createClient(), tools = registry.allTools() } 
         if (id != null) transport.sendError(id, -32601, `Unknown method: ${method}`);
     }
   };
+}
+
+// Image tools return their own content blocks, so the base64 image stays out
+// of structuredContent.
+function toolResult(result) {
+  if (result && Array.isArray(result.content)) {
+    return { content: result.content, structuredContent: result.structuredContent };
+  }
+  return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
 }
 
 if (require.main === module) {

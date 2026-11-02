@@ -93,7 +93,7 @@ export function AddIntakePicker({
             </li>
           ) : (
             templates.map((template) => {
-              const taken = takenSourceIds.includes(template.id);
+              const taken = template.id !== "custom-verification" && takenSourceIds.includes(template.id);
               const unavailable = Boolean(template.soon) || taken;
               return (
                 <li key={template.id}>

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
@@ -440,8 +439,7 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 func readyStepQueueOwner(t *testing.T, fixture *stepQueueFixture, ownerID uuid.UUID) *models.FactoryCodexConnection {
 	t.Helper()
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(fixture.factory.OrganizationID, features.FeatureCodexSubscriptions))
-	connection, err := models.CreateFactoryCodexConnection(db, fixture.factory.OrganizationID, fixture.factory.ID, ownerID, time.Now())
+	connection, err := models.CreateCodexConnection(db, fixture.factory.OrganizationID, ownerID, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{
 		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle"),
@@ -532,7 +530,7 @@ func Test__StepQueue_InvalidNextStagePreservesCompletionAndAllowsCorrection(t *t
 	notes, err := stored.StatusNotes()
 	require.NoError(t, err)
 	require.Len(t, notes, 1)
-	assert.Equal(t, models.ErrSubscriptionModelUnavailable.Error(), notes[0].Body)
+	assert.Equal(t, models.SubscriptionModelUnavailableError("stage-model").Error(), notes[0].Body)
 
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "stage-model"}}, time.Now()))
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {

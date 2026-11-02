@@ -150,11 +150,12 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
-	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
+	var merge *runner.MergeConfidenceScope
+	environment, merge, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps)
 	if err != nil {
 		return err
 	}
-	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds, merge)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
@@ -172,7 +173,6 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	commands = runner.ApplyFactoryCheckout(files, commands, spec.Steps)
 	environment, files = runner.AttachFactoryCommitIdentity(ctx, environment, files)
 	files = runner.AppendTaskArtifactMCP(environment, files)
-	files = runner.AppendMergeConfidenceMCP(environment, files)
 	files = runner.AppendGlobalMCP(environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {

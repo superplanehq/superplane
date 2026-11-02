@@ -66,5 +66,6 @@ endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 prefix="releases/${GIT_SHA}/"
 
 echo "Uploading static assets to s3://${R2_BUCKET}/${prefix}"
-aws s3 sync "${DIST_DIR}" "s3://${R2_BUCKET}/${prefix}" \
+# Replace this shell so the caller can cancel a background upload by PID.
+exec aws s3 sync "${DIST_DIR}" "s3://${R2_BUCKET}/${prefix}" \
   --endpoint-url "${endpoint}"

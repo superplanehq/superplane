@@ -10,15 +10,16 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// ListRunnerTaskSchedulingOrganizations includes pending work and queued work
-// that must release its slot because its fleet is unavailable. ID pagination
-// prevents a full organization from hiding later work in a bounded scan.
+// ListRunnerTaskSchedulingOrganizations includes pending work and all queued
+// work. Queued work must release its slot when its fleet is unavailable, and
+// it must fail when its paid fleet has no credit. ID pagination prevents a
+// full organization from hiding later work in a bounded scan.
 func ListRunnerTaskSchedulingOrganizations(tx *gorm.DB, after uuid.UUID, limit int) ([]uuid.UUID, error) {
 	var ids []uuid.UUID
 	err := unassignedIntegratedRunnerTasks(tx).
 		Where(`(runner_tasks.state = ? AND runner_tasks.cancel_requested_at IS NULL
-			AND runner_fleets.enabled AND runner_fleets.deleted_at IS NULL)
-			OR (runner_tasks.state = ? AND (NOT runner_fleets.enabled OR runner_fleets.deleted_at IS NOT NULL))`,
+			AND `+runnerTaskFleetAvailable+`)
+			OR runner_tasks.state = ?`,
 			RunnerTaskStatePending, RunnerTaskStateQueued).
 		Where("runner_tasks.organization_id > ?", after).
 		Distinct("runner_tasks.organization_id").
@@ -37,6 +38,9 @@ func ScheduleOrganizationRunnerTasks(tx *gorm.DB, organizationID uuid.UUID, batc
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil
 			}
+			return err
+		}
+		if err := lockOrganizationTaskFleets(tx, organizationID); err != nil {
 			return err
 		}
 		slots, err := availableOrganizationRunnerSlots(tx, organizationID)
@@ -84,9 +88,18 @@ func ScheduleOrganizationRunnerTasks(tx *gorm.DB, organizationID uuid.UUID, batc
 func RequeueUnavailableFleetRunnerTasks(tx *gorm.DB, organizationID uuid.UUID, batchSize int) ([]RunnerTask, error) {
 	var tasks []RunnerTask
 	err := tx.Transaction(func(tx *gorm.DB) error {
+		if err := lockRunnerTaskOrganization(tx, organizationID, "SKIP LOCKED"); err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+		if err := lockOrganizationTaskFleets(tx, organizationID); err != nil {
+			return err
+		}
 		if err := unassignedIntegratedRunnerTasks(tx).
 			Where("runner_tasks.organization_id = ? AND runner_tasks.state = ?", organizationID, RunnerTaskStateQueued).
-			Where("NOT runner_fleets.enabled OR runner_fleets.deleted_at IS NOT NULL").
+			Where("NOT (" + runnerTaskFleetAvailable + ")").
 			Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "runner_tasks"}, Options: "SKIP LOCKED"}).
 			Select("runner_tasks.*").Order("runner_tasks.queued_at ASC, runner_tasks.id ASC").
 			Limit(batchSize).Find(&tasks).Error; err != nil {
@@ -112,10 +125,82 @@ func RequeueUnavailableFleetRunnerTasks(tx *gorm.DB, organizationID uuid.UUID, b
 	return tasks, nil
 }
 
+// FailRunnerTasksWithoutComputeCredit fails unassigned tasks on paid fleets
+// when the organization has no hosted credit. The scheduler calls it before it
+// queues work, so Fleet Manager does not see these tasks as runnable demand
+// and does not start paid VMs for them. Unbilled fleets keep their tasks.
+func FailRunnerTasksWithoutComputeCredit(tx *gorm.DB, organizationID uuid.UUID, batchSize int) (RunnerTaskReservationResult, error) {
+	var result RunnerTaskReservationResult
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		if err := lockRunnerTaskOrganization(tx, organizationID, "SKIP LOCKED"); err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+		if err := lockOrganizationTaskFleets(tx, organizationID); err != nil {
+			return err
+		}
+		var tasks []RunnerTask
+		if err := unassignedIntegratedRunnerTasks(tx).
+			Where("runner_tasks.organization_id = ? AND runner_tasks.state IN ? AND runner_tasks.cancel_requested_at IS NULL",
+				organizationID, []string{RunnerTaskStatePending, RunnerTaskStateQueued}).
+			Where(runnerTaskFleetAvailable).
+			Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "runner_tasks"}, Options: "SKIP LOCKED"}).
+			Select("runner_tasks.*").Order("runner_tasks.queued_at ASC, runner_tasks.id ASC").
+			Limit(batchSize).Find(&tasks).Error; err != nil {
+			return err
+		}
+		creditErrors := map[uuid.UUID]error{}
+		for i := range tasks {
+			task := &tasks[i]
+			creditErr, checked := creditErrors[task.FleetID]
+			if !checked {
+				fleet, err := FindRunnerFleet(tx, task.FleetID)
+				if err != nil {
+					return err
+				}
+				creditErr = fleet.RequireComputeCredit(tx, organizationID)
+				creditErrors[task.FleetID] = creditErr
+			}
+			if creditErr == nil {
+				continue
+			}
+			if !errors.Is(creditErr, billing.ErrHostedCreditEmpty) {
+				return creditErr
+			}
+			rejected, err := task.rejectAdmission(tx, creditErr)
+			if err != nil {
+				return err
+			}
+			result.FailedTasks = append(result.FailedTasks, rejected.FailedTasks...)
+			result.LoginConnections = append(result.LoginConnections, rejected.LoginConnections...)
+		}
+		return nil
+	})
+	if err != nil {
+		return RunnerTaskReservationResult{}, err
+	}
+	return result, nil
+}
+
 func pendingRunnerTasks(tx *gorm.DB) *gorm.DB {
 	return unassignedIntegratedRunnerTasks(tx).
 		Where("runner_tasks.state = ? AND runner_tasks.cancel_requested_at IS NULL", RunnerTaskStatePending).
-		Where("runner_fleets.enabled = ? AND runner_fleets.deleted_at IS NULL", true)
+		Where(runnerTaskFleetAvailable)
+}
+
+const runnerTaskFleetAvailable = `runner_fleets.enabled AND runner_fleets.deleted_at IS NULL
+ AND (runner_fleets.scope_type = 'installation' OR runner_fleets.scope_id = runner_tasks.organization_id)
+ AND ` + organizationFleetFeatureAvailable
+
+func lockOrganizationTaskFleets(tx *gorm.DB, organizationID uuid.UUID) error {
+	var fleets []RunnerFleet
+	return tx.Unscoped().Clauses(clause.Locking{Strength: "SHARE"}).
+		Where("id IN (?)", tx.Model(&RunnerTask{}).Select("fleet_id").
+			Where("organization_id = ? AND runner_id IS NULL AND state IN ?", organizationID,
+				[]string{RunnerTaskStatePending, RunnerTaskStateQueued})).
+		Order("id ASC").Find(&fleets).Error
 }
 
 func unassignedIntegratedRunnerTasks(tx *gorm.DB) *gorm.DB {

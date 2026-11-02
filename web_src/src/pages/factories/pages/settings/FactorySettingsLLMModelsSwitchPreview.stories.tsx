@@ -12,7 +12,7 @@ import {
 } from "./FactorySettingsLLMModelsSwitchPreview";
 
 const meta = {
-  title: "Factories/Pages/Settings/LLM Models switch",
+  title: "Factories/Pages/Settings/Models switch",
   parameters: { layout: "fullscreen" },
 } satisfies Meta;
 
@@ -20,7 +20,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const modelsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/models`;
+const modelsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`;
 
 function SwitchFlow({
   initialSource = "hosted",

@@ -220,7 +220,8 @@ func TestEmitWorkOrderCreatedSkipsBacklogWhenPlanningOff(t *testing.T) {
 
 	order, err := factoryModel.CreateWorkOrder(db, "Skip analysis", "A ticket", &r.User, nil, nil)
 	require.NoError(t, err)
-	require.NoError(t, emitWorkOrderCreated(db, factoryModel, order, uuid.Nil, nil))
+	_, err = emitWorkOrderCreated(db, factoryModel, order, uuid.Nil, nil, false)
+	require.NoError(t, err)
 
 	backlogEvents, err := models.ListCanvasEvents(db, backlog.ID, models.FactoryAppBacklogTriggerID, 10, nil)
 	require.NoError(t, err)
@@ -231,7 +232,7 @@ func TestEmitWorkOrderCreatedSkipsBacklogWhenPlanningOff(t *testing.T) {
 	require.Len(t, customEvents, 1)
 }
 
-func TestEmitWorkOrderCreatedOnCanvasStartsBacklogWhenPlanningOff(t *testing.T) {
+func TestCreateWorkOrderEventsOnCanvasStartsBacklogWhenPlanningOff(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -257,11 +258,56 @@ func TestEmitWorkOrderCreatedOnCanvasStartsBacklogWhenPlanningOff(t *testing.T) 
 
 	order, err := factoryModel.CreateWorkOrder(db, "Retry plan", "A ticket", &r.User, nil, nil)
 	require.NoError(t, err)
-	require.NoError(t, EmitWorkOrderCreatedOnCanvas(db, factoryModel, order, backlog.ID))
+	created, err := CreateWorkOrderEventsOnCanvas(db, factoryModel, order, backlog.ID)
+	require.NoError(t, err)
 
 	events, err := models.ListCanvasEvents(db, backlog.ID, models.FactoryAppBacklogTriggerID, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
+	require.Len(t, created, 1)
+	assert.Equal(t, events[0].ID, created[0].ID)
+}
+
+func TestEmitWorkOrderCreatedContinuesAfterCustomAutomationFailure(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvases := make([]*models.Canvas, 0, 3)
+	for i, name := range []string{"A broken automation", "B healthy automation", "C task analysis"} {
+		nodeID := "on-task"
+		metadata := models.FactoryAppTemplateMetadata(models.FactoryAppTemplateCustomAutomationID, 1)
+		metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)["startMode"] = "automatic"
+		if i == 0 {
+			nodeID = "missing-on-task"
+		}
+		if i == 2 {
+			metadata = models.FactoryAppTemplateMetadata(models.FactoryAppTemplateBacklogID, 3)
+		}
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+			NodeID: nodeID, Type: models.NodeTypeTrigger,
+			Ref:      datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: factorycomp.OnWorkOrderTriggerName}}),
+			Metadata: datatypes.NewJSONType(metadata),
+		}}, nil)
+		require.NoError(t, db.Model(canvas).Updates(map[string]any{"name": name, "factory_id": factoryModel.ID, "column_key": models.CanvasColumnKeyBacklog}).Error)
+		canvases = append(canvases, canvas)
+	}
+	order, err := factoryModel.CreateWorkOrder(db, "Run every subscriber", "Task context", &r.User, nil, nil)
+	require.NoError(t, err)
+	EmitWorkOrderCreated(db, factoryModel, order)
+	for i, canvas := range canvases {
+		nodeID := "on-task"
+		if i == 0 {
+			nodeID = "missing-on-task"
+		}
+		events, err := models.ListCanvasEvents(db, canvas.ID, nodeID, 10, nil)
+		require.NoError(t, err)
+		if i == 0 {
+			assert.Empty(t, events)
+			continue
+		}
+		assert.Len(t, events, 1, "a broken custom automation must not block %s", canvas.Name)
+	}
 }
 
 func TestWorkOrderCreatedPayloadKeepsRawDescriptionWhenMintFails(t *testing.T) {

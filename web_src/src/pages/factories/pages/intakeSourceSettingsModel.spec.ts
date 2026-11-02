@@ -17,14 +17,23 @@ import {
 } from "./intakeSourceSettingsModel";
 
 describe("intakeSourceSettingsModel", () => {
-  it("round trips the default owner for GitHub and Sentry and omits it for other intakes", () => {
+  it("round trips the default owner for every external intake", () => {
     const selected = intakeSettingsFromApi("GitHub issues", { defaultOwnerId: "alice" });
     expect(intakeSettingsToApi(selected, "github-issues").defaultOwnerId).toBe("alice");
     expect(intakeSettingsToApi(selected, "sentry-exceptions").defaultOwnerId).toBe("alice");
     const cleared = { ...selected, defaultOwnerId: "" };
     expect(intakeSettingsToApi(cleared, "github-issues").defaultOwnerId).toBe("");
     expect(intakeSettingsToApi(cleared, "sentry-exceptions").defaultOwnerId).toBe("");
-    expect(intakeSettingsToApi(selected, "jira-issues").defaultOwnerId).toBeUndefined();
+    for (const source of [
+      "jira-issues",
+      "dependabot-alerts",
+      "pagerduty-incidents",
+      "productive-tasks",
+      "datadog",
+      "linear-issues",
+    ] as const) {
+      expect(intakeSettingsToApi(selected, source).defaultOwnerId).toBe("alice");
+    }
     expect(intakeSettingsFromApi("GitHub issues", {}).defaultOwnerId).toBe("");
   });
   it("adds and removes a label", () => {

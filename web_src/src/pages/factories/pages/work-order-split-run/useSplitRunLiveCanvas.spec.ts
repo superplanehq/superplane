@@ -19,6 +19,7 @@ vi.mock("@/hooks/useCanvasWebsocket", () => ({
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: () => ({ data: undefined, isError: false, isLoading: false }),
   useDescribeRun: useDescribeRunMock,
+  useEventExecutions: () => ({ data: undefined, isError: false, isLoading: false }),
 }));
 
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
