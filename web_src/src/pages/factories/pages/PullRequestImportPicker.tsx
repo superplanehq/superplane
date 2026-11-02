@@ -24,6 +24,13 @@ type PullRequestImportPickerProps = {
   onOpenTask: (id: string, order?: FactoriesWorkOrder) => void;
 };
 
+function existingImportTask(item: FactoriesFactoryPullRequestImportItem) {
+  const task = item.existingTask;
+  if (task?.state === "STATE_CLOSED" && (task.result === "RESULT_ARCHIVED" || task.result === "RESULT_REJECTED"))
+    return undefined;
+  return task;
+}
+
 export function PullRequestImportPicker(props: PullRequestImportPickerProps) {
   const { has } = useExperimentalFeature(props.organizationId);
   const { canAct } = usePermissions();
@@ -64,11 +71,7 @@ function ConnectedPullRequestImportPicker({
   };
   const select = async (item: FactoriesFactoryPullRequestImportItem) => {
     if (pending.current) return;
-    if (item.existingTask?.id) {
-      onOpenTask(item.existingTask.id, item.existingTask);
-      setOpen(false);
-      return;
-    }
+    // The task can be archived after search, so resolve ownership on selection.
     if (!item.url) return;
     pending.current = true;
     setError(undefined);
@@ -238,7 +241,7 @@ export function PullRequestImportResults(props: PullRequestImportResultsProps) {
                 <span className="min-w-0 flex-1 truncate">{item.title}</span>
                 <span className="text-xs text-muted-foreground">#{item.number}</span>
               </span>
-              {item.existingTask ? (
+              {existingImportTask(item) ? (
                 <span className="text-xs text-muted-foreground">Already imported</span>
               ) : item.draft ? (
                 <span className="text-xs text-muted-foreground">Draft</span>

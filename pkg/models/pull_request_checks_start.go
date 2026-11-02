@@ -177,6 +177,9 @@ func (n *CanvasNode) CreateGitHubChecksEvent(tx *gorm.DB, event *CanvasEvent) (b
 			if err != nil {
 				return err
 			}
+			if incoming.pullRequestID != "" && identity.pullRequestID != "" && incoming.pullRequestID != identity.pullRequestID {
+				continue
+			}
 			known = append(known, identity)
 		}
 		if checksEventIsDuplicate(known, incoming) {
@@ -225,13 +228,14 @@ func (p *FactoryPullRequest) enqueueChecksStart(tx *gorm.DB) error {
 }
 
 type checksEventIdentity struct {
-	repository   string
-	number       string
-	sha          string
-	action       string
-	before       string
-	updatedAt    time.Time
-	hasUpdatedAt bool
+	pullRequestID string
+	repository    string
+	number        string
+	sha           string
+	action        string
+	before        string
+	updatedAt     time.Time
+	hasUpdatedAt  bool
 }
 
 func (identity checksEventIdentity) dedupKey() string {
@@ -255,6 +259,9 @@ func repairLegacyChecksDedupKeys(tx *gorm.DB, node *CanvasNode, key string, inco
 func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 	var payload struct {
 		Data struct {
+			Tracking struct {
+				ID string `json:"id"`
+			} `json:"pullRequest"`
 			Action     string `json:"action"`
 			Before     string `json:"before"`
 			Repository struct {
@@ -283,13 +290,14 @@ func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 	}
 	updatedAt, hasUpdatedAt := parseChecksUpdatedAt(payload.Data.PullRequest.UpdatedAt)
 	return checksEventIdentity{
-		repository:   repository,
-		number:       strconv.FormatInt(payload.Data.PullRequest.Number, 10),
-		sha:          sha,
-		action:       strings.TrimSpace(payload.Data.Action),
-		before:       strings.TrimSpace(payload.Data.Before),
-		updatedAt:    updatedAt,
-		hasUpdatedAt: hasUpdatedAt,
+		pullRequestID: payload.Data.Tracking.ID,
+		repository:    repository,
+		number:        strconv.FormatInt(payload.Data.PullRequest.Number, 10),
+		sha:           sha,
+		action:        strings.TrimSpace(payload.Data.Action),
+		before:        strings.TrimSpace(payload.Data.Before),
+		updatedAt:     updatedAt,
+		hasUpdatedAt:  hasUpdatedAt,
 	}, nil
 }
 

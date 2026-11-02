@@ -107,7 +107,7 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 	if err != nil {
 		return nil, err
 	}
-	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
+	if pullRequest.SupersededAt != nil || pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
 		return nil, request.Complete(db)
 	}
 	node, err := checksStartupTrigger(db, request, factory, pullRequest)

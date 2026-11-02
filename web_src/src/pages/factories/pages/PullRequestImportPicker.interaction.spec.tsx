@@ -1,8 +1,10 @@
+import type { FactoriesFactoryPullRequestImportItem } from "@/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { PullRequestImportPicker } from "./PullRequestImportPicker";
 import { CodexActionCancelled } from "../codex/codexActionContext";
 
+let archivedTask = false;
 let enabled = true;
 let canCreate = true;
 let canUpdate = true;
@@ -20,9 +22,13 @@ const searchPRs = vi.fn(
         url: "https://github.com/acme/app/pull/43",
         title: "Existing PR",
         number: "43",
-        existingTask: { id: "existing-task", number: "46" },
+        existingTask: {
+          id: "existing-task",
+          number: "46",
+          ...(archivedTask ? { state: "STATE_CLOSED", result: "RESULT_ARCHIVED" } : {}),
+        },
       },
-    ],
+    ] as FactoriesFactoryPullRequestImportItem[],
     isLoading: false,
     isFetching: false,
     isError: false,
@@ -42,6 +48,7 @@ vi.mock("@/hooks/useFactoryPullRequestImports", () => ({
 }));
 
 beforeEach(() => {
+  archivedTask = false;
   enabled = canCreate = canUpdate = true;
   prepareOpen.mockReset();
   prepareOpen.mockResolvedValue(true);
@@ -94,14 +101,37 @@ describe("Pull request picker integration", () => {
     });
   }
 
-  it("opens an existing task without submitting an import", async () => {
+  it("resolves an existing task through the API before opening it", async () => {
+    importPR.mockResolvedValueOnce({ id: "existing-task", number: "46" });
     const onOpenTask = vi.fn();
     render(picker(false, onOpenTask));
     fireEvent.click(screen.getByRole("button", { name: "Import pull request" }));
     fireEvent.click(await screen.findByRole("button", { name: /Already imported/ }));
-    expect(importPR).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(importPR).toHaveBeenCalledWith({
+        lineId: "selected-line",
+        pullRequestUrl: "https://github.com/acme/app/pull/43",
+      }),
+    );
     expect(onOpenTask).toHaveBeenCalledWith("existing-task", { id: "existing-task", number: "46" });
   });
+
+  for (const cachedArchiveState of [true, false]) {
+    it(`imports again when the cached archive state is ${cachedArchiveState}`, async () => {
+      archivedTask = cachedArchiveState;
+      const onOpenTask = vi.fn();
+      render(picker(false, onOpenTask));
+      fireEvent.click(screen.getByRole("button", { name: "Import pull request" }));
+      fireEvent.click(await screen.findByRole("button", { name: /Existing PR/ }));
+      await waitFor(() =>
+        expect(importPR).toHaveBeenCalledWith({
+          lineId: "selected-line",
+          pullRequestUrl: "https://github.com/acme/app/pull/43",
+        }),
+      );
+      expect(onOpenTask).toHaveBeenCalledWith("new-task", { id: "new-task", number: "47" });
+    });
+  }
 
   it("keeps connection cancellation retryable", async () => {
     prepareOpen.mockResolvedValueOnce(false);
