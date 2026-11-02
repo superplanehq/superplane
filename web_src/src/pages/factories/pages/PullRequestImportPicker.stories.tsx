@@ -1,15 +1,29 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useEffect, useState } from "react";
 import { PullRequestImportResults } from "./PullRequestImportPicker";
 
 const meta = {
   title: "Factories/Pull request import",
   component: PullRequestImportResults,
   decorators: [
-    (Story) => (
-      <div className="w-96 rounded-md border p-2">
-        <Story />
-      </div>
-    ),
+    function Interactive(Story, { args }) {
+      const [query, setQuery] = useState(args.query);
+      useEffect(() => setQuery(args.query), [args.query]);
+      return (
+        <div className="w-96 rounded-md border p-2">
+          <Story
+            args={{
+              ...args,
+              query,
+              onQueryChange: (query: string) => {
+                setQuery(query);
+                args.onQueryChange(query);
+              },
+            }}
+          />
+        </div>
+      );
+    },
   ],
   args: {
     query: "",

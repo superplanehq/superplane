@@ -1,6 +1,7 @@
 import type { FactoriesFactoryPullRequestImportItem, FactoriesWorkOrder } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useImportFactoryPullRequest, useSearchFactoryPullRequestImports } from "@/hooks/useFactoryPullRequestImports";
@@ -10,7 +11,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { factoryVCSProvider } from "@/pages/home/factories";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { GitPullRequest, Loader2, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { isCodexActionCancelled } from "../codex/codexActionContext";
 import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useBacklogCreateConnection } from "./useBacklogCreateConnection";
@@ -169,6 +170,7 @@ export type PullRequestImportResultsProps = {
 };
 
 export function PullRequestImportResults(props: PullRequestImportResultsProps) {
+  const searchId = useId();
   const resultsRef = useRef<HTMLDivElement>(null);
   const loadMore = useAutoLoadMoreOnScroll({
     hasMore: props.hasMore && !props.isPending,
@@ -182,8 +184,11 @@ export function PullRequestImportResults(props: PullRequestImportResultsProps) {
     <>
       <div className="mt-1 flex items-center gap-2.5 px-2.5 py-1.5">
         <GitPullRequest className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <Label htmlFor={searchId} className="sr-only">
+          Search pull requests
+        </Label>
         <Input
-          aria-label="Search pull requests"
+          id={searchId}
           placeholder={
             factoryVCSProvider(props.vcsProvider) === "bitbucket" ? "Import PR from Bitbucket" : "Import PR from GitHub"
           }
