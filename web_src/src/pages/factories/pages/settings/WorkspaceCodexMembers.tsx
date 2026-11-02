@@ -233,6 +233,7 @@ function UsageSummary({ limits }: { limits: FactoriesCodexMemberUsage["limits"] 
           key={balance.key}
           credits={balance.limit.credits}
           individualLimit={balance.limit.individualLimit}
+          showResetTime={false}
         />
       ))}
     </div>

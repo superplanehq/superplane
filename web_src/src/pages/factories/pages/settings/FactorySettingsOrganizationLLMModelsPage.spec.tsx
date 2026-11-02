@@ -467,14 +467,16 @@ describe("workspace LLM model settings", () => {
       const row = await screen.findByRole("row", { name: /Other member/ });
       expect(within(row).getByText(label)).toBeInTheDocument();
       expect(within(row).getByText(expected)).toBeInTheDocument();
-      const reset = within(row).queryByText(`Resets: ${new Date(resetsAt).toLocaleString()}`);
-      if (label === "Monthly credits") expect(reset).toBeInTheDocument();
-      if (label !== "Monthly credits") expect(reset).not.toBeInTheDocument();
+      const resetText = `Resets: ${new Date(resetsAt).toLocaleString()}`;
+      expect(within(row).queryByText(resetText)).not.toBeInTheDocument();
       expect(within(row).queryByText("Usage unavailable")).not.toBeInTheDocument();
       const user = userEvent.setup();
       await user.click(within(row).getByRole("button", { name: "Options for Other member" }));
       const details = screen.getByRole("menu");
       expect(within(details).getByText(expected)).toBeInTheDocument();
+      const reset = within(details).queryByText(resetText);
+      if (label === "Monthly credits") expect(reset).toBeInTheDocument();
+      if (label !== "Monthly credits") expect(reset).not.toBeInTheDocument();
       expect(within(details).queryByText("Usage unavailable")).not.toBeInTheDocument();
     },
   );

@@ -4,7 +4,8 @@ import { useTimeHasPassed } from "@/hooks/useTimeHasPassed";
 export function CodexCreditsRemaining({
   credits,
   individualLimit,
-}: Pick<FactoriesCodexUsageLimit, "credits" | "individualLimit">) {
+  showResetTime = true,
+}: Pick<FactoriesCodexUsageLimit, "credits" | "individualLimit"> & { showResetTime?: boolean }) {
   const monthlyLimit = !credits?.unlimited && credits?.balance == null ? individualLimit : undefined;
   const expired = useTimeHasPassed(monthlyLimit?.resetsAt);
   return (
@@ -15,7 +16,7 @@ export function CodexCreditsRemaining({
           {expired ? "Update needed" : formatCreditBalance({ credits, individualLimit: monthlyLimit })}
         </span>
       </div>
-      {monthlyLimit?.resetsAt ? (
+      {showResetTime && monthlyLimit?.resetsAt ? (
         <p className="text-[12px] text-muted-foreground">
           {expired ? "Reset time passed" : "Resets"}: {new Date(monthlyLimit.resetsAt).toLocaleString()}
         </p>
