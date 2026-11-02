@@ -1,18 +1,14 @@
 import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import type { IntegrationsIntegrationDefinition } from "@/api-client";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
-import {
-  useAvailableIntegrations,
-  useConnectedIntegrations,
-  useCreateIntegration,
-  useIntegrationResources,
-} from "@/hooks/useIntegrations";
+import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { usesHostedLinearOAuth } from "@/lib/integrations";
 import { startDirectLinearConnect } from "@/lib/startDirectLinearConnect";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
+import { EMPTY_LINEAR_INTAKE_SCOPE, linearIntakeScopeToApi, type LinearIntakeScope } from "./linearIntakeScope";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 
 export type LinearSetupStep = "connection" | "project";
@@ -20,7 +16,7 @@ export type LinearSetupStep = "connection" | "project";
 export function useLinearIntakeSetup(organizationId: string, factoryId: string, selectIntegrationId = "") {
   const [step, setStep] = useState<LinearSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
-  const [projectIds, setProjectIds] = useState<string[]>([]);
+  const [scope, setScope] = useState<LinearIntakeScope>(EMPTY_LINEAR_INTAKE_SCOPE);
   const [skipInitialImport, setSkipInitialImport] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [stayOnConnection, setStayOnConnection] = useState(false);
@@ -32,9 +28,6 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
   const owner = useIntakeOwnerDraft(organizationId, factoryId);
-  const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
-    enabled: Boolean(integrationId),
-  });
 
   useAdvanceLinearSetup({
     selectIntegrationId,
@@ -50,11 +43,15 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     setStep,
   });
 
-  const toggleProject = (id: string) => {
-    setProjectIds((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
+  // Teams, projects, and labels belong to one connection, so a new connection clears the scope.
+  const selectIntegration = (nextIntegrationId: string) => {
+    if (nextIntegrationId !== integrationId) {
+      setScope(EMPTY_LINEAR_INTAKE_SCOPE);
+    }
+    setIntegrationId(nextIntegrationId);
   };
   const completeConnection = (connectedIntegrationId: string) => {
-    setIntegrationId(connectedIntegrationId);
+    selectIntegration(connectedIntegrationId);
     setConnectOpen(false);
     setStep("project");
     void connectedQuery.refetch();
@@ -77,7 +74,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     setStep("connection");
   };
   const createBoundIntake = async () => {
-    if (!integrationId || projectIds.length === 0) {
+    if (!integrationId || !scope.teamId) {
       return false;
     }
     setError(undefined);
@@ -87,8 +84,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
         integrationId,
         settings: {
           ...owner.settings(),
-          linearProjectIds: projectIds,
-          linearLabels: [],
+          ...linearIntakeScopeToApi(scope),
         },
         ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
@@ -105,9 +101,9 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     step,
     setStep,
     integrationId,
-    setIntegrationId,
-    projectIds,
-    toggleProject,
+    setIntegrationId: selectIntegration,
+    scope,
+    setScope,
     skipInitialImport,
     setSkipInitialImport,
     connectOpen,
@@ -117,7 +113,6 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     connectedQuery,
     createIntegration,
     createIntake,
-    projectsQuery,
     linearIntegrations,
     linearDefinition,
     existingNames,

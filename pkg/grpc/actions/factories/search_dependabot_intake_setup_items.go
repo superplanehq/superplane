@@ -57,7 +57,7 @@ func newDependabotIntakeItemSourceForFactory(
 	factory *models.Factory,
 	severities []string,
 ) (*dependabotIntakeItemSource, error) {
-	binding, err := resolveIntakeBinding(tx, factory, models.FactoryIntakeSourceDependabotAlerts, "", "")
+	binding, err := resolveIntakeBinding(tx, factory, models.FactoryIntakeSourceDependabotAlerts, "", "", "")
 	if err != nil {
 		return nil, err
 	}

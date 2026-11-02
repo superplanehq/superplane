@@ -330,6 +330,8 @@ function IntakeGeneralTab({
   onSave,
   onClose,
 }: IntakeGeneralTabProps) {
+  const [linearLabelFilterEnabled, setLinearLabelFilterEnabled] = useState(draft.linearLabels.length > 0);
+  const [linearProjectFilterEnabled, setLinearProjectFilterEnabled] = useState(draft.linearProjectIds.length > 0);
   const ownerField = (
     <IntakeSourceDefaultOwner
       sourceId={sourceId}
@@ -340,6 +342,7 @@ function IntakeGeneralTab({
     />
   );
   const isGitHub = sourceId === "github-issues";
+  const ownerAtBottom = intakeOwnerAfterFilters(sourceId);
 
   return (
     <>
@@ -360,61 +363,33 @@ function IntakeGeneralTab({
             {isGitHub && automaticIntakeSetting ? (
               <div className="border-b border-border pb-4">{automaticIntakeSetting}</div>
             ) : null}
-            {!isGitHub ? ownerField : null}
-            <GitHubIntakeFilterFields
+            {!ownerAtBottom ? ownerField : null}
+            <IntakeFilterFields
               sourceId={sourceId}
-              settings={draft}
-              onSettingsChange={onDraftChange}
-              labelOptions={labelOptions}
-              labelOptionsLoading={labelOptionsLoading}
-              disabled={!canEdit}
-            />
-            <JiraIntakeFilterFields
-              sourceId={sourceId}
-              settings={draft}
-              onSettingsChange={onDraftChange}
-              organizationId={organizationId}
-              integrationId={integrationId}
-              projectId={resourceId}
-            />
-            <SentryIntakeFilterFields
-              sourceId={sourceId}
-              settings={draft}
-              onSettingsChange={onDraftChange}
-              organizationId={organizationId}
-              integrationId={integrationId}
-            />
-            <DependabotIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
-            <ProductiveIntakeFilterFields
-              sourceId={sourceId}
-              settings={draft}
-              onSettingsChange={onDraftChange}
-              organizationId={organizationId}
-              integrationId={integrationId}
-              projectId={resourceId}
-            />
-            <DatadogIntakeFilterFields
-              sourceId={sourceId}
-              settings={draft}
-              onSettingsChange={onDraftChange}
+              draft={draft}
+              onDraftChange={onDraftChange}
               organizationId={organizationId}
               integrationId={integrationId}
               resourceId={resourceId}
+              labelOptions={labelOptions}
+              labelOptionsLoading={labelOptionsLoading}
+              canEdit={canEdit}
+              onLabelFilterChange={setLinearLabelFilterEnabled}
+              onProjectFilterChange={setLinearProjectFilterEnabled}
             />
-            <LinearIntakeFilterFields
-              sourceId={sourceId}
-              settings={draft}
-              onSettingsChange={onDraftChange}
-              organizationId={organizationId}
-              integrationId={integrationId}
-            />
-            {isGitHub && organizationId ? <div className="border-t border-border pt-4">{ownerField}</div> : null}
+            {ownerAtBottom && organizationId ? <div className="border-t border-border pt-4">{ownerField}</div> : null}
           </fieldset>
         </div>
       </div>
       <IntakeSourceSettingsFooter
         sourceId={sourceId}
         draft={draft}
+        linearLabelsRequired={
+          sourceId === "linear-issues" && linearLabelFilterEnabled && draft.linearLabels.length === 0
+        }
+        linearProjectsRequired={
+          sourceId === "linear-issues" && linearProjectFilterEnabled && draft.linearProjectIds.length === 0
+        }
         canEdit={canEdit}
         savePending={savePending}
         saveError={saveError}
@@ -424,6 +399,92 @@ function IntakeGeneralTab({
         getDraft={getDraft}
         onSave={onSave}
         onClose={onClose}
+      />
+    </>
+  );
+}
+
+function intakeOwnerAfterFilters(sourceId: LineIntakeSourceId): boolean {
+  return sourceId === "github-issues" || sourceId === "linear-issues";
+}
+
+function IntakeFilterFields({
+  sourceId,
+  draft,
+  onDraftChange,
+  organizationId,
+  integrationId,
+  resourceId,
+  labelOptions,
+  labelOptionsLoading,
+  canEdit,
+  onLabelFilterChange,
+  onProjectFilterChange,
+}: Pick<
+  IntakeGeneralTabProps,
+  | "sourceId"
+  | "draft"
+  | "onDraftChange"
+  | "organizationId"
+  | "integrationId"
+  | "resourceId"
+  | "labelOptions"
+  | "labelOptionsLoading"
+  | "canEdit"
+> & {
+  onLabelFilterChange: (enabled: boolean) => void;
+  onProjectFilterChange: (enabled: boolean) => void;
+}) {
+  return (
+    <>
+      <GitHubIntakeFilterFields
+        sourceId={sourceId}
+        settings={draft}
+        onSettingsChange={onDraftChange}
+        labelOptions={labelOptions}
+        labelOptionsLoading={labelOptionsLoading}
+        disabled={!canEdit}
+      />
+      <JiraIntakeFilterFields
+        sourceId={sourceId}
+        settings={draft}
+        onSettingsChange={onDraftChange}
+        organizationId={organizationId}
+        integrationId={integrationId}
+        projectId={resourceId}
+      />
+      <SentryIntakeFilterFields
+        sourceId={sourceId}
+        settings={draft}
+        onSettingsChange={onDraftChange}
+        organizationId={organizationId}
+        integrationId={integrationId}
+      />
+      <DependabotIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+      <ProductiveIntakeFilterFields
+        sourceId={sourceId}
+        settings={draft}
+        onSettingsChange={onDraftChange}
+        organizationId={organizationId}
+        integrationId={integrationId}
+        projectId={resourceId}
+      />
+      <DatadogIntakeFilterFields
+        sourceId={sourceId}
+        settings={draft}
+        onSettingsChange={onDraftChange}
+        organizationId={organizationId}
+        integrationId={integrationId}
+        resourceId={resourceId}
+      />
+      <LinearIntakeFilterFields
+        sourceId={sourceId}
+        settings={draft}
+        onSettingsChange={onDraftChange}
+        organizationId={organizationId}
+        integrationId={integrationId}
+        onLabelFilterChange={onLabelFilterChange}
+        onProjectFilterChange={onProjectFilterChange}
       />
     </>
   );
