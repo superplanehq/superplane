@@ -55,6 +55,9 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 		if err := fleet.RequireAdmission(tx); err != nil {
 			return err
 		}
+		if err := fleet.RequireComputeCredit(tx, c.organizationID); err != nil {
+			return err
+		}
 		encrypted, err := encryption.ForDB(tx, c.encryptor).Encrypt(
 			context.Background(),
 			payload,

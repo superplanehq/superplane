@@ -405,19 +405,7 @@ func (s *Server) reconcileRunnerConnection(
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug, fleetScope)
 		messages.PublishPlanningRunnerStatus(database.DB(ctx), reservedTask)
 	}
-	for _, failedTask := range reservation.FailedTasks {
-		messages.PublishPlanningRunnerStatus(database.DB(ctx), failedTask)
-	}
-	publishedFactories := map[uuid.UUID]bool{}
-	for _, connection := range reservation.LoginConnections {
-		if publishedFactories[connection.OrganizationID] {
-			continue
-		}
-		if err := messages.PublishOrganizationCodexConnectionUpdated(database.DB(ctx), connection.OrganizationID); err != nil {
-			log.WithError(err).Warn("Failed to publish ChatGPT connection change")
-		}
-		publishedFactories[connection.OrganizationID] = true
-	}
+	messages.PublishRunnerTaskRejections(database.DB(ctx), reservation)
 	if s.nodeRequestExecutor != nil {
 		for _, failedTask := range reservation.FailedTasks {
 			go s.waitForTaskExecutionRequest(context.WithoutCancel(ctx), failedTask)

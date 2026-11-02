@@ -134,6 +134,8 @@ export function useCodexConnectionSetup({ organizationId, factoryId, open, onCon
   };
 
   return {
+    organizationId,
+    factoryId,
     codex,
     disabled,
     featuresLoading: features.isLoading,
