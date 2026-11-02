@@ -911,7 +911,7 @@ func (c *FactoryCodexConnection) resolvePermittedModel(tx *gorm.DB, factoryID uu
 	}
 	if model != "" {
 		if !slices.Contains(permitted, model) {
-			return "", ErrSubscriptionModelUnavailable
+			return "", SubscriptionModelUnavailableError(model)
 		}
 		return model, nil
 	}

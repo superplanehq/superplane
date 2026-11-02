@@ -13,6 +13,7 @@ export type DraftStripAnalysisArgs = {
   factoryKey?: string;
   fixture: SplitRunFixture;
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  planningFailure?: string;
 };
 
 /**
@@ -27,6 +28,11 @@ export function draftStripAnalysis(args: DraftStripAnalysisArgs, modelSelect: Re
   const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
   return {
     ...args.analysis,
+    view:
+      args.planningFailure && !args.analysis.session
+        ? { ...args.analysis.view, machineStatus: "failed" as const }
+        : args.analysis.view,
+    planningFailure: args.planningFailure,
     requestCreatedAt: args.fixture.phases.find((phase) => phase.id === "backlog")?.startedAt,
     modelSelect,
     showClarity: factoryShowsClarity(args.factory),

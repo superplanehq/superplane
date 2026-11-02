@@ -24,7 +24,7 @@ describe("usePlanningSessionLiveRun", () => {
 
     expect(useCanvasRuntimeWebsocket).toHaveBeenCalledWith(view.canvasId, "org-1", true);
     expect(useDescribeRun).toHaveBeenCalledWith(view.canvasId, view.canvasRunId, true);
-    expect(result.current.machineStatus).toBe("failed");
+    expect(result.current.view.machineStatus).toBe("failed");
   });
 
   it("waits for the next user message when the live run passed after the idle wait", () => {
@@ -33,8 +33,8 @@ describe("usePlanningSessionLiveRun", () => {
 
     const { result } = renderHook(() => usePlanningSessionLiveRun("org-1", view));
 
-    expect(result.current.machineStatus).toBe("waiting");
-    expect(result.current.turnEnded).toBe(true);
+    expect(result.current.view.machineStatus).toBe("waiting");
+    expect(result.current.view.turnEnded).toBe(true);
   });
 
   it("stays off until the session has a canvas run", () => {

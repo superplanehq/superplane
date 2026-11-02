@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as FactoryData from "@/hooks/useFactoryData";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 import { organizationBillingQueryKey } from "@/hooks/useOrganizationBilling";
@@ -110,6 +111,7 @@ import {
 import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
+import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { idleLiveLogStream } from "./PhaseLogCard.testHelpers";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
@@ -293,6 +295,93 @@ describe("WorkOrderSplitRunPopup", () => {
       allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_REBASE"],
       headSha: "abc123",
     };
+  });
+
+  it("shows a failed Backlog run before a planning session exists and clears it for a newer run", async () => {
+    const failed: BacklogAnalysisRun = {
+      canvasId: "backlog-canvas",
+      workOrderId: DRAFT_WORK_ORDER.id!,
+      run: {
+        id: "backlog-failed",
+        createdAt: "2026-11-02T10:00:00Z",
+        state: "STATE_FINISHED",
+        result: "RESULT_FAILED",
+        errors: ['model "gpt-5.4" is unavailable for this task owner'],
+      },
+    };
+    const props = {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      analysisRuns: [failed],
+    };
+    const popup = renderPopup(props);
+
+    const alert = await screen.findByRole("alert", { name: "Planning failed" });
+    expect(alert).toHaveTextContent('model "gpt-5.4"');
+    expect(alert).toHaveTextContent("Check the model and task owner, then start planning again.");
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
+
+    popup.rerenderPopup({
+      ...props,
+      analysisRuns: [
+        failed,
+        {
+          ...failed,
+          run: { id: "backlog-new", createdAt: "2026-11-02T10:01:00Z", state: "STATE_STARTED" },
+        },
+      ],
+    });
+
+    expect(screen.queryByRole("alert", { name: "Planning failed" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-thinking")).toBeInTheDocument();
+  });
+
+  it("shows the current planning session run failure", async () => {
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "planning-canvas",
+      canvasRunId: "planning-run",
+      executionId: "planning-execution",
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(canvasKeys.run("planning-canvas", "planning-run"), {
+      run: { result: "RESULT_FAILED", errors: ["The selected model is unavailable."] },
+    });
+
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        orderId: DRAFT_WORK_ORDER.id,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      },
+      client,
+    );
+
+    const alert = await screen.findByRole("alert", { name: "Planning failed" });
+    expect(alert).toHaveTextContent("The selected model is unavailable.");
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
+
+    act(() => {
+      client.setQueryData(
+        workOrderPlanningSessionQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, DRAFT_WORK_ORDER.id!),
+        {
+          id: "session-plan",
+          state: "active",
+          canvasId: "planning-canvas",
+          canvasRunId: "planning-retry",
+          executionId: "planning-retry-execution",
+        },
+      );
+      client.setQueryData(canvasKeys.run("planning-canvas", "planning-retry"), {
+        run: { result: "RESULT_UNKNOWN", state: "STATE_STARTED" },
+      });
+    });
+
+    await waitFor(() => expect(screen.queryByRole("alert", { name: "Planning failed" })).not.toBeInTheDocument());
   });
 
   it("does not poll a missing session when Planning is off", async () => {
