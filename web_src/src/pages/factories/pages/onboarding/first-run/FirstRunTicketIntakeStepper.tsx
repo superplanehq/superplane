@@ -131,7 +131,7 @@ export function FirstRunTicketIntakeStepper({
         />
         <Button
           type="button"
-          className="w-full"
+          className="mt-3 w-full"
           disabled={saving || !ticketProjectChoiceComplete(source, projects, repository)}
           onClick={onConfirmProjects}
           data-testid="first-run-confirm-projects"
@@ -227,6 +227,7 @@ function TicketProjectFields({
           integrationId={linearIntegrationId}
           scope={projects.linearScope}
           onChange={(scope) => onChangeLinearScope?.(scope)}
+          showLabels={false}
         />
       </fieldset>
     );

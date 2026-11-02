@@ -510,6 +510,21 @@ describe("IntakeSourceSettingsPopup", () => {
     );
   });
 
+  it("requires a project after selecting the project filter", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "linear-issues",
+      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearTeamId: "team-1" },
+    });
+
+    const save = screen.getByTestId("intake-source-settings-save");
+    expect(save).toBeEnabled();
+    await user.click(screen.getByRole("radio", { name: "Only issues in selected projects" }));
+    expect(save).toBeDisabled();
+    await user.click(screen.getByRole("radio", { name: "All projects" }));
+    expect(save).toBeEnabled();
+  });
+
   it("saves an older Linear intake that has projects and no team unchanged", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();

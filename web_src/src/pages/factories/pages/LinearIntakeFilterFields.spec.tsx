@@ -76,6 +76,7 @@ describe("LinearIntakeFilterFields", () => {
 
     expect(screen.getByTestId("linear-team-team-1")).toHaveAttribute("aria-selected", "true");
     expect(resourceCalls).toContainEqual({ type: "project", parameters: { team: "team-1" } });
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
     expect(resourceCalls).toContainEqual({ type: "label", parameters: { team: "team-1" } });
 
     expect(screen.getByTestId("linear-project-project-1")).toHaveAttribute("aria-selected", "true");
@@ -91,6 +92,19 @@ describe("LinearIntakeFilterFields", () => {
     await user.type(screen.getByTestId("linear-intake-label-input"), "bug");
     await user.click(screen.getByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelAdd }));
     expect(screen.getByText("bug")).toBeInTheDocument();
+  });
+
+  it("uses the issue settings label choice without widening the intake accidentally", async () => {
+    const user = userEvent.setup();
+    let latest: IntakeSourceSettings | undefined;
+    render(<Fields initial={{ linearLabels: ["bug"] }} onChange={(next) => (latest = next)} />);
+
+    expect(screen.getByRole("radio", { name: "Only issues with selected labels" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "All issues" }));
+    expect(latest?.linearLabels).toEqual([]);
+    await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+    await user.click(screen.getByRole("checkbox", { name: "feature" }));
+    expect(latest?.linearLabels).toEqual(["feature"]);
   });
 
   it("clears the projects and labels when the team changes", async () => {
@@ -114,12 +128,26 @@ describe("LinearIntakeFilterFields", () => {
     render(<Fields initial={{ linearProjectIds: [] }} onChange={(next) => (latest = next)} />);
 
     expect(screen.queryByTestId("linear-include-no-project")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "All projects" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Only issues in selected projects" }));
     await user.click(screen.getByTestId("linear-project-project-1"));
     const include = screen.getByRole("checkbox", { name: LINEAR_INTAKE_SETUP_COPY.includeNoProjectLabel });
     expect(include).toBeChecked();
     await user.click(include);
 
     expect(latest).toMatchObject({ linearProjectIds: ["project-1"], linearIncludeIssuesWithoutProject: false });
+  });
+
+  it("clears selected projects when all projects is chosen", async () => {
+    const user = userEvent.setup();
+    let latest: IntakeSourceSettings | undefined;
+    render(<Fields initial={{ linearProjectIds: ["project-1"] }} onChange={(next) => (latest = next)} />);
+
+    expect(screen.getByRole("radio", { name: "Only issues in selected projects" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "All projects" }));
+
+    expect(latest?.linearProjectIds).toEqual([]);
+    expect(screen.queryByTestId("linear-project-picker")).not.toBeInTheDocument();
   });
 
   it("keeps the projects of an older intake that has no team", () => {

@@ -11,12 +11,16 @@ export function LinearIntakeFilterFields({
   onSettingsChange,
   organizationId,
   integrationId,
+  onLabelFilterChange,
+  onProjectFilterChange,
 }: {
   sourceId: LineIntakeSourceId;
   settings: IntakeSourceSettings;
   onSettingsChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   organizationId?: string;
   integrationId?: string;
+  onLabelFilterChange?: (enabled: boolean) => void;
+  onProjectFilterChange?: (enabled: boolean) => void;
 }) {
   if (sourceId !== "linear-issues") {
     return null;
@@ -28,6 +32,9 @@ export function LinearIntakeFilterFields({
       integrationId={integrationId ?? ""}
       scope={linearScopeFromSettings(settings)}
       onChange={(scope) => onSettingsChange((current) => ({ ...current, ...linearSettingsFromScope(scope) }))}
+      settingsLayout
+      onLabelFilterChange={onLabelFilterChange}
+      onProjectFilterChange={onProjectFilterChange}
     />
   );
 }

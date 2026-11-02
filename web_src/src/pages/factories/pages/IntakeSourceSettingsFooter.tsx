@@ -27,6 +27,8 @@ import type { LineIntakeSourceId } from "./lineIntakeModel";
 type IntakeSourceSettingsFooterProps = {
   sourceId: LineIntakeSourceId;
   draft: IntakeSourceSettings;
+  linearLabelsRequired?: boolean;
+  linearProjectsRequired?: boolean;
   canEdit?: boolean;
   getDraft: () => IntakeSourceSettings;
   savePending?: boolean;
@@ -41,6 +43,8 @@ type IntakeSourceSettingsFooterProps = {
 export function IntakeSourceSettingsFooter({
   sourceId,
   draft,
+  linearLabelsRequired = false,
+  linearProjectsRequired = false,
   canEdit = true,
   savePending,
   saveError,
@@ -94,6 +98,8 @@ export function IntakeSourceSettingsFooter({
         <IntakeSaveButtons
           sourceId={sourceId}
           draft={draft}
+          linearLabelsRequired={linearLabelsRequired}
+          linearProjectsRequired={linearProjectsRequired}
           savePending={savePending}
           deletePending={deletePending}
           scopeMissing={scopeMissing}
@@ -133,6 +139,8 @@ function intakeFooterError(
 function IntakeSaveButtons({
   sourceId,
   draft,
+  linearLabelsRequired,
+  linearProjectsRequired,
   savePending,
   deletePending,
   scopeMissing,
@@ -141,11 +149,27 @@ function IntakeSaveButtons({
   onClose,
 }: Pick<
   IntakeSourceSettingsFooterProps,
-  "sourceId" | "draft" | "savePending" | "deletePending" | "getDraft" | "onSave" | "onClose"
+  | "sourceId"
+  | "draft"
+  | "linearLabelsRequired"
+  | "linearProjectsRequired"
+  | "savePending"
+  | "deletePending"
+  | "getDraft"
+  | "onSave"
+  | "onClose"
 > & { scopeMissing: boolean }) {
   const layout = useOptionalFactoriesLayout();
   const ownerMissing = layout?.factory?.onboarding?.codexSubscription === true && !draft.defaultOwnerId;
   const labelsMissing = sourceId === "github-issues" && draft.filterByLabel && draft.labels.length === 0;
+  const saveDisabled = [
+    savePending,
+    scopeMissing,
+    labelsMissing,
+    linearLabelsRequired,
+    linearProjectsRequired,
+    ownerMissing,
+  ].some(Boolean);
   return (
     <div className="ml-auto flex shrink-0 items-center gap-3">
       {sourceId === "github-issues" ? (
@@ -155,7 +179,7 @@ function IntakeSaveButtons({
       ) : null}
       <Button
         type="button"
-        disabled={savePending || scopeMissing || labelsMissing || ownerMissing}
+        disabled={saveDisabled}
         onClick={async () => {
           try {
             await onSave(normalizeIntakeSourceSettings(getDraft(), sourceId));

@@ -43,7 +43,7 @@ export function LinearTeamPicker({
 
   return (
     <div
-      className="max-h-56 overflow-y-auto rounded-lg border border-border"
+      className="max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-border"
       role="listbox"
       aria-label={LINEAR_INTAKE_SETUP_COPY.teamLabel}
       data-testid="linear-team-picker"

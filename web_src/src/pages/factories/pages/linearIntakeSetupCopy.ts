@@ -32,7 +32,7 @@ export const LINEAR_INTAKE_SETUP_COPY = {
   teamLabel: "Team",
   projectsLabel: "Projects",
   projectsHelper: "Optional. Leave empty to accept every ticket in the team.",
-  includeNoProjectLabel: "Include tickets without a project",
+  includeNoProjectLabel: "Include issues without a project",
   labelsLabel: "Labels",
   labelsHelper: "Leave this empty to include every label.",
   labelsLoading: "Loading Linear labels...",
