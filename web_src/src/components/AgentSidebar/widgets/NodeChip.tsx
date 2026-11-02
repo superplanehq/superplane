@@ -164,7 +164,7 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
 
   const handleClick = useCallback(() => {
     navigate(appPath(organizationId, canvasId, `?sidebar=1&node=${node?.id ?? nodeId}`));
-    window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId: node?.id ?? nodeId } }));
+    window.dispatchEvent(new CustomEvent("canvas:focus-node", { detail: { nodeId: node?.id ?? nodeId } }));
   }, [navigate, organizationId, canvasId, node?.id, nodeId]);
 
   return (

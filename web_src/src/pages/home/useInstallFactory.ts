@@ -1,12 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { usePermissions } from "@/contexts/usePermissions";
 import { canvasKeys, useCreateCanvas } from "@/hooks/useCanvasData";
 import { factoryAppsKey } from "@/hooks/useFactoryData";
-import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { appPath } from "@/lib/appPaths";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -89,17 +87,12 @@ async function finishFactoryInstall(args: {
     args.queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(args.canvasId) });
   }
 
-  if (args.definition.agentSuggestions?.length) {
-    setAgentSuggestions(args.canvasId, args.definition.agentSuggestions);
-  }
-
   args.queryClient.invalidateQueries({ queryKey: canvasKeys.list(args.organizationId) });
 
   if (!args.navigateOnComplete) {
     return;
   }
 
-  writeCanvasAgentSidebarOpen(args.canvasId, false);
   writeCanvasRunsSidebarOpen(args.canvasId, shouldTriggerRun);
   localStorage.setItem("canvasSidebarOpen", "false");
   args.navigate(appPath(args.organizationId, args.canvasId, shouldTriggerRun ? "?view=console" : ""));

@@ -1,7 +1,7 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
 import { cn } from "@/lib/utils";
 import type { CanvasVersionListItem } from "@/pages/app/lib/canvas-versions";
-import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
+import { RUNS_SIDEBAR_ROW_CLASS } from "@/lib/runsSidebarRowLayout";
 import { useVersionsTabScroll } from "./useVersionsTabScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
 

@@ -452,8 +452,6 @@ export type FactoryAppNavOptions = {
    * AppPage auto-edit cleanup does not tear down the Configure UI mid-bootstrap.
    */
   configure?: boolean;
-  /** Open the agent sidebar in factory edit mode (`agent=1`). */
-  agent?: boolean;
   /** Open the components panel in factory edit mode (`blocks=1`). */
   blocks?: boolean;
   /** Open the component sidebar on this node (`sidebar=1&node=`). */
@@ -470,9 +468,6 @@ function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
   }
   if (options.configure) {
     params.set("configure", "1");
-  }
-  if (options.agent) {
-    params.set("agent", "1");
   }
   if (options.blocks) {
     params.set("blocks", "1");
@@ -503,7 +498,6 @@ export function factoryAppConfigurePath(
   return factoryAppPath(organizationId, factoryKey, appId, {
     ...options,
     configure: true,
-    agent: options?.agent ?? true,
     // Component edit is not run inspection. A leftover `run` param would hide
     // the editor sidebar and strip `node` while Configure starts.
     runId: options?.nodeId ? undefined : options?.runId,

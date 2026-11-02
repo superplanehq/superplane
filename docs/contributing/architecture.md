@@ -99,7 +99,7 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 - Stores workflow graph structure, node configurations, and metadata
 - Versioning is always enabled: users edit the live canvas through a stage → commit loop. Canvas/console/files edits autosave into per-user `workflow_staged_files`; **Commit** creates a new version on main and promotes it to live
 - Edit paths:
-  - **Web UI and agent tools** stage canvas/console/files edits into `workflow_staged_files`, then require **Commit** with a message to go live. Agent reads serve the effective staged content and agent `patch_staging` writes go through the same staging layer
+  - **Web UI and CLI** stage canvas/console/files edits into `workflow_staged_files`, then require **Commit** with a message to go live.
   - **CLI** stages via `PUT /staging` and goes live via `POST /staging/commit`
 - Stale staging (when main moved while the user had staged edits) must be discarded before new edits can be committed.
 

@@ -8,7 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	adminRunnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/admin/runners"
-	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	organizationActions "github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	runnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/runners"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -18,7 +17,6 @@ import (
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminOrganizations "github.com/superplanehq/superplane/pkg/protos/admin/organizations"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
-	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -51,7 +49,6 @@ type Services struct {
 	Factories          pbFactories.FactoriesServer
 	Files              pbFiles.FilesServer
 	APIKeys            pbAPIKeys.ApiKeysServer
-	Agents             pbAgents.AgentsServer
 	AdminRunners       pbAdminRunners.RunnersServer
 	AdminKeys          pbAdminKeys.KeysServer
 	AdminOrganizations pbAdminOrganizations.AdminOrganizationsServer
@@ -67,7 +64,6 @@ type ServicesConfig struct {
 	AuthService      authorization.Authorization
 	Registry         *registry.Registry
 	OIDCProvider     oidc.Provider
-	AgentService     agentsActions.AgentsService
 	JWTSigner        *jwt.Signer
 
 	// Entitlements defaults to Community mode. Enterprise defaults to a
@@ -136,7 +132,6 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		),
 		Files:   NewFilesService(cfg.AuthService),
 		APIKeys: NewAPIKeysService(cfg.AuthService),
-		Agents:  NewAgentsService(cfg.AgentService),
 		AdminRunners: NewAdminRunnersService(
 			adminRunnerActions.NewService(
 				cfg.JWTSigner,

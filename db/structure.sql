@@ -124,45 +124,6 @@ CREATE TABLE public.accounts (
 
 
 --
--- Name: agent_session_messages; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.agent_session_messages (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    session_id uuid NOT NULL,
-    provider_event_id text DEFAULT ''::text NOT NULL,
-    role character varying(20) NOT NULL,
-    content text DEFAULT ''::text NOT NULL,
-    tool_call_id text DEFAULT ''::text NOT NULL,
-    tool_name text DEFAULT ''::text NOT NULL,
-    tool_status character varying(20) DEFAULT ''::character varying NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    images jsonb DEFAULT '[]'::jsonb NOT NULL
-);
-
-
---
--- Name: agent_sessions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.agent_sessions (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    canvas_id uuid NOT NULL,
-    provider character varying(40) NOT NULL,
-    provider_session_id text NOT NULL,
-    status character varying(40) DEFAULT 'idle'::character varying NOT NULL,
-    last_active_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    heartbeat_at timestamp with time zone,
-    agent_tool_schema_revision text DEFAULT ''::text NOT NULL,
-    context_replayed_at timestamp with time zone
-);
-
-
---
 -- Name: app_installation_requests; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2327,7 +2288,6 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     live_version_id uuid NOT NULL,
     description text DEFAULT ''::text NOT NULL,
-    dismissed_agent_suggestion_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
     factory_id uuid,
     column_key text
 );
@@ -2450,22 +2410,6 @@ ALTER TABLE ONLY public.accounts
 
 ALTER TABLE ONLY public.accounts
     ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
-
-
---
--- Name: agent_session_messages agent_session_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_session_messages
-    ADD CONSTRAINT agent_session_messages_pkey PRIMARY KEY (id);
-
-
---
--- Name: agent_sessions agent_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_sessions
-    ADD CONSTRAINT agent_sessions_pkey PRIMARY KEY (id);
 
 
 --
@@ -3610,34 +3554,6 @@ ALTER TABLE ONLY public.workspace_usage_events
 
 ALTER TABLE ONLY public.workspace_usage_events
     ADD CONSTRAINT workspace_usage_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: agent_session_messages_provider_event_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX agent_session_messages_provider_event_idx ON public.agent_session_messages USING btree (session_id, provider_event_id) WHERE (provider_event_id <> ''::text);
-
-
---
--- Name: agent_session_messages_session_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX agent_session_messages_session_idx ON public.agent_session_messages USING btree (session_id, created_at DESC, id DESC);
-
-
---
--- Name: agent_sessions_provider_session_id_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX agent_sessions_provider_session_id_idx ON public.agent_sessions USING btree (provider, provider_session_id);
-
-
---
--- Name: agent_sessions_user_canvas_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id);
 
 
 --
@@ -5177,14 +5093,6 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
--- Name: agent_session_messages agent_session_messages_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_session_messages
-    ADD CONSTRAINT agent_session_messages_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.agent_sessions(id) ON DELETE CASCADE;
-
-
---
 -- Name: app_installation_requests app_installation_requests_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6592,7 +6500,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261031230416	f
+20261102162713	f
 \.
 
 
