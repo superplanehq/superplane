@@ -18,8 +18,8 @@
 - Use `eval` to verify computed styles or state when the change has a testable visual property.
 - Check the browser console for errors before capture.
 - Capture the changed element or a focused viewport. Do not capture a mostly empty full page.
-- Call `inspect_screenshot` for every screenshot, including a video poster. Review the returned image and verify that the intended state is visible.
-- Upload an unchanged inspected screenshot with `upload_artifact`. For video evidence, call `upload_artifact` once with the video `path` and inspected screenshot `posterPath`.
+- Call `get_artifact` with the `path` of every screenshot, including a video poster. Review the returned image and verify that the intended state is visible.
+- Attach each unchanged screenshot with `add_artifact` and type `file`. For video evidence, call `add_artifact` once with type `file`, the video `path`, and the screenshot `posterPath`.
 - Do not use file size, custom PNG decoding, or pixel-color counting as a substitute for visual inspection.
 - Upload the smallest useful set. Usually, use one focused image for each affected theme or state.
 - Capture evidence after the requested UI changes and verification are complete. If later edits change the shown UI, recapture and upload the evidence.

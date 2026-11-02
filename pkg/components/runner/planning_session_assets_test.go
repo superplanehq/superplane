@@ -23,5 +23,5 @@ func TestDispatchedPlanningProtocolIncludesRefinementWithoutSkills(t *testing.T)
 	assert.Contains(t, string(protocol), "Before writing options, identify the missing information or decision")
 	assert.Contains(t, string(protocol), "'## Scope', '## Approach', '## Acceptance', and '## Risks'")
 	assert.Contains(t, string(protocol), "integer from 1 through 3")
-	assert.Contains(t, string(protocol), "propose_update")
+	assert.Contains(t, string(protocol), "propose_plan")
 }
