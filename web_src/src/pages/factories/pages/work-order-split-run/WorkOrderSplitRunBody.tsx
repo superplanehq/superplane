@@ -37,6 +37,7 @@ type WorkOrderSplitRunBodyProps = {
 
 export type WorkOrderSplitRunPopupProps = Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
   analysisRuns?: BacklogAnalysisRun[];
+  backlogCustomRunsStatus?: { isError: boolean; isFetching: boolean; retry: () => void };
   onClose?: () => void;
   fixed?: boolean;
   onDispatch?: (model?: string, thinkingLevel?: string) => Promise<void>;

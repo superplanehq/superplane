@@ -7,7 +7,7 @@ import { cn, resolveIcon } from "@/lib/utils";
 import { CircleAlert, GitCommitHorizontal, MousePointerClick } from "lucide-react";
 import { useState } from "react";
 
-import type { CustomAutomationMode } from "../lib/customAutomation";
+import type { CustomAutomationMode, CustomAutomationColumn } from "../lib/customAutomation";
 import { AutomationFlow } from "./customAutomationSetupFlow";
 import { StepEditor } from "./customAutomationStepEditor";
 import { PlanningReviewForm } from "./PlanningReviewForm";
@@ -17,6 +17,7 @@ type CustomAutomationSetupFormProps = {
   name: string;
   icon: string;
   mode: CustomAutomationMode;
+  columnKey?: CustomAutomationColumn;
   draft: PlanningReviewDraft;
   organizationId: string;
   factoryId: string;
@@ -38,6 +39,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     name,
     icon,
     mode,
+    columnKey = "verify",
     draft,
     organizationId,
     factoryId,
@@ -70,6 +72,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     <div className="flex min-h-0 flex-1 flex-col" data-testid="custom-automation-setup">
       <div className="flex min-h-0 flex-1">
         <AutomationFlow
+          columnKey={columnKey}
           mode={mode}
           steps={steps}
           selectedStep={selectedStep}
@@ -92,6 +95,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
             />
           ) : (
             <TriggerEditor
+              columnKey={columnKey}
               name={name}
               icon={icon}
               mode={mode}
@@ -260,6 +264,7 @@ function SetupFormFooter({
 }
 
 function TriggerEditor({
+  columnKey,
   name,
   icon,
   mode,
@@ -272,6 +277,7 @@ function TriggerEditor({
   onModeChange,
   onDraftChange,
 }: {
+  columnKey: CustomAutomationColumn;
   name: string;
   icon: string;
   mode: CustomAutomationMode;
@@ -294,15 +300,15 @@ function TriggerEditor({
         <Select value={mode} onValueChange={(value) => onModeChange(value === "automatic" ? "automatic" : "manual")}>
           <SelectTrigger id="custom-automation-mode" className="min-h-14 w-full !h-auto py-2.5">
             <SelectValue>
-              <TriggerOption mode={mode} />
+              <TriggerOption mode={mode} columnKey={columnKey} />
             </SelectValue>
           </SelectTrigger>
           <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
             <SelectItem value="manual" className="py-2.5">
-              <TriggerOption mode="manual" />
+              <TriggerOption mode="manual" columnKey={columnKey} />
             </SelectItem>
             <SelectItem value="automatic" className="py-2.5">
-              <TriggerOption mode="automatic" />
+              <TriggerOption mode="automatic" columnKey={columnKey} />
             </SelectItem>
           </SelectContent>
         </Select>
@@ -438,7 +444,7 @@ function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (ico
   );
 }
 
-function TriggerOption({ mode }: { mode: CustomAutomationMode }) {
+function TriggerOption({ mode, columnKey }: { mode: CustomAutomationMode; columnKey: CustomAutomationColumn }) {
   const automatic = mode === "automatic";
   const Icon = automatic ? GitCommitHorizontal : MousePointerClick;
   return (
@@ -455,10 +461,18 @@ function TriggerOption({ mode }: { mode: CustomAutomationMode }) {
       </span>
       <span className="flex min-w-0 flex-col">
         <span className="text-sm font-medium text-foreground">
-          {automatic ? "Every pull request commit" : "Manual"}
+          {automatic
+            ? columnKey === "backlog"
+              ? "When a task enters Backlog"
+              : "Every pull request commit"
+            : "Manual"}
         </span>
         <span className="text-xs font-normal text-muted-foreground">
-          {automatic ? "Runs after each new commit." : "Runs only when you start it."}
+          {automatic
+            ? columnKey === "backlog"
+              ? "Runs when a task enters Backlog."
+              : "Runs after each new commit."
+            : "Runs only when you start it."}
         </span>
       </span>
     </span>
