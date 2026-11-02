@@ -69,13 +69,6 @@ func IsReservedWorkOrderCheckKey(key string) bool {
 	return slices.Contains(planningReviewCheckKeys, key) || strings.HasSuffix(key, mergeConfidenceCheckKeySuffix)
 }
 
-// isPlanningScoreCheckName reports whether a name is a plan score name. The
-// UI finds plan scores by name, so an agent check cannot use these names.
-func isPlanningScoreCheckName(name string) bool {
-	name = strings.TrimSpace(name)
-	return strings.EqualFold(name, PlanningClarityCheckName) || strings.EqualFold(name, PlanningConfidenceCheckName)
-}
-
 var planningReviewCheckKeys = []string{
 	PlanningClarityCheckKey,
 	PlanningConfidenceCheckKey,
@@ -523,4 +516,11 @@ func encodeCheckAutomation(ref *factory.AutomationRef) (datatypes.JSON, error) {
 	}
 
 	return datatypes.JSON(encoded), nil
+}
+
+// isPlanningScoreCheckName reports whether a name is a plan score name. The
+// UI finds plan scores by name, so an agent check cannot use these names.
+func isPlanningScoreCheckName(name string) bool {
+	name = strings.TrimSpace(name)
+	return strings.EqualFold(name, PlanningClarityCheckName) || strings.EqualFold(name, PlanningConfidenceCheckName)
 }
