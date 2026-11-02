@@ -8,6 +8,9 @@
     "react": "^18.0.0"
   },
   "overrides": {
+    "@forge/manifest": {
+      "glob": "14.0.2"
+    },
     "prosemirror-view": "1.42.6"
   }
 }

@@ -16,10 +16,11 @@ import (
 )
 
 // AttachRunnerEnv mints the token of the global runner MCP server. Call it
-// after the planning, artifact, and merge confidence attach calls: the flow
-// comes from the tokens that those calls added. A run without an open task
-// gets no token, so the global server does not start.
-func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int) []TaskEnvironmentVariable {
+// after the planning, artifact, and merge confidence attach calls. Pass the
+// merge scope from AttachMergeConfidenceEnv. A nil scope is a planning or
+// task run. A run without an open task gets no token, so the global server
+// does not start.
+func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int, merge *MergeConfidenceScope) []TaskEnvironmentVariable {
 	environment = withoutEnvironmentName(environment, EnvSuperplaneRunnerToken)
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
@@ -28,7 +29,7 @@ func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVar
 	}
 
 	signer := jwt.NewSigner(secret)
-	scope, err := resolveRunnerScope(database.DB(context.Background()), signer, ctx, environment)
+	scope, err := resolveRunnerScope(database.DB(context.Background()), ctx, environment, merge)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.WithError(err).Debug("skip runner token")
@@ -46,7 +47,7 @@ func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVar
 	)
 }
 
-func resolveRunnerScope(db *gorm.DB, signer *jwt.Signer, ctx core.ExecutionContext, environment []TaskEnvironmentVariable) (*RunnerScope, error) {
+func resolveRunnerScope(db *gorm.DB, ctx core.ExecutionContext, environment []TaskEnvironmentVariable, merge *MergeConfidenceScope) (*RunnerScope, error) {
 	if ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
 		return nil, fmt.Errorf("run is missing")
 	}
@@ -69,8 +70,8 @@ func resolveRunnerScope(db *gorm.DB, signer *jwt.Signer, ctx core.ExecutionConte
 	switch {
 	case HasPlanningSessionToken(environment):
 		err = resolvePlanningRunnerScope(db, scope)
-	case HasMergeConfidenceToken(environment):
-		err = resolveMergeConfidenceRunnerScope(signer, scope, environment)
+	case merge != nil:
+		err = applyMergeConfidenceScope(scope, merge)
 	default:
 		err = resolveTaskRunnerScope(db, scope)
 	}
@@ -107,14 +108,9 @@ func resolvePlanningRunnerScope(db *gorm.DB, scope *RunnerScope) error {
 	return nil
 }
 
-func resolveMergeConfidenceRunnerScope(signer *jwt.Signer, scope *RunnerScope, environment []TaskEnvironmentVariable) error {
-	token, _ := environmentValue(environment, EnvSuperplaneMergeConfidenceToken)
-	merge, err := ParseMergeConfidenceToken(signer, token)
-	if err != nil {
-		return err
-	}
+func applyMergeConfidenceScope(scope *RunnerScope, merge *MergeConfidenceScope) error {
 	if merge.OrganizationID != scope.OrganizationID || merge.CanvasRunID != scope.CanvasRunID || merge.NodeExecutionID != scope.NodeExecutionID {
-		return fmt.Errorf("merge confidence token does not match the run")
+		return fmt.Errorf("merge confidence scope does not match the run")
 	}
 	scope.Flow = RunnerFlowMergeConfidence
 	scope.FactoryID = merge.FactoryID

@@ -3,11 +3,12 @@ import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { CustomAutomationMode } from "../lib/customAutomation";
+import type { CustomAutomationMode, CustomAutomationColumn } from "../lib/customAutomation";
 import { mergeCheckPromptBody } from "./mergeConfidenceSteps";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
 
 export function AutomationFlow({
+  columnKey = "verify",
   mode,
   steps,
   selectedStep,
@@ -17,6 +18,7 @@ export function AutomationFlow({
   onRemoveStep,
   onAddStep,
 }: {
+  columnKey?: CustomAutomationColumn;
   mode: CustomAutomationMode;
   steps: PlanningReviewStep[];
   selectedStep: number | null;
@@ -33,10 +35,18 @@ export function AutomationFlow({
         <FlowCard selected={selectedStep === null} onClick={onSelectTrigger}>
           <FlowBadge kind="trigger" />
           <p className="mt-3 text-sm font-semibold text-foreground">
-            {mode === "automatic" ? "Every pull request commit" : "Manual"}
+            {mode === "automatic"
+              ? columnKey === "backlog"
+                ? "When a task enters Backlog"
+                : "Every pull request commit"
+              : "Manual"}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {mode === "automatic" ? "Runs for every new pull request commit." : "Runs when you start it from a task."}
+            {mode === "automatic"
+              ? columnKey === "backlog"
+                ? "Runs when a task enters Backlog."
+                : "Runs for every new pull request commit."
+              : "Runs when you start it from a task."}
           </p>
         </FlowCard>
         {steps.map((step, index) => (

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { Link } from "@/components/Link/link";
 import {
   Dialog,
   DialogContent,
@@ -9,12 +10,40 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { useFactoryCodexConnection } from "../pages/onboarding/useFactoryCodexConnection";
+import { getApiErrorMessage } from "@/lib/errors";
+import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { CodexDeviceSignIn } from "./CodexDeviceSignIn";
 import { useCodexConnectionSetup } from "./useCodexConnectionSetup";
 
 type CodexConnection = ReturnType<typeof useFactoryCodexConnection>;
 
-function CodexConnectionNotices({ codex }: { codex: CodexConnection }) {
+function CodexConnectionErrorNotice({
+  error,
+  fallback,
+  billingHref,
+}: {
+  error: unknown;
+  fallback: string;
+  billingHref: string;
+}) {
+  const message = getApiErrorMessage(error, fallback);
+  const needsHostedCredit = message.startsWith("This organization has no hosted credit.");
+  return (
+    <p role="alert">
+      {message}
+      {needsHostedCredit ? (
+        <>
+          {" "}
+          <Link href={billingHref} className="font-medium underline underline-offset-2 hover:no-underline">
+            Open Billing
+          </Link>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
+function CodexConnectionNotices({ codex, billingHref }: { codex: CodexConnection; billingHref: string }) {
   const connection = codex.query.data;
   return (
     <>
@@ -26,10 +55,20 @@ function CodexConnectionNotices({ codex }: { codex: CodexConnection }) {
         <p role="status">Stopping your previous tasks. You can reconnect when cleanup finishes.</p>
       ) : null}
       {connection?.eligible === false ? <p role="alert">Your account cannot connect Codex in this workspace.</p> : null}
-      {codex.start.isError ? <p role="alert">Could not start Codex sign-in. Try again.</p> : null}
+      {codex.start.isError ? (
+        <CodexConnectionErrorNotice
+          error={codex.start.error}
+          fallback="SuperPlane could not start ChatGPT sign-in. Try again."
+          billingHref={billingHref}
+        />
+      ) : null}
       {codex.cancel.isError ? <p role="alert">Could not cancel Codex sign-in. Try again.</p> : null}
       {codex.refreshCatalog.isError ? (
-        <p role="alert">Could not load your Codex models. Close this dialog and try again.</p>
+        <CodexConnectionErrorNotice
+          error={codex.refreshCatalog.error}
+          fallback="Could not load your Codex models. Close this dialog and try again."
+          billingHref={billingHref}
+        />
       ) : null}
     </>
   );
@@ -37,9 +76,10 @@ function CodexConnectionNotices({ codex }: { codex: CodexConnection }) {
 
 export function CodexConnectionSetupContent({ setup }: { setup: ReturnType<typeof useCodexConnectionSetup> }) {
   const { codex } = setup;
+  const billingHref = factorySettingsSectionPath(setup.organizationId, setup.factoryId, "organization", "billing");
   return (
     <>
-      <CodexConnectionNotices codex={codex} />
+      <CodexConnectionNotices codex={codex} billingHref={billingHref} />
       <CodexDeviceSignIn
         disabled={setup.disabled}
         connection={codex.query.data}

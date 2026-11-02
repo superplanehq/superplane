@@ -1402,6 +1402,7 @@ message CreateFactoryCustomAutomationRequest {
   string factory_id = 1;
   string name = 2;
   FactoryCustomAutomation.Settings settings = 3;
+  string column_key = 4;
 }
 
 message CreateFactoryCustomAutomationResponse {
@@ -3500,6 +3501,14 @@ message CodexUsageLimit {
   CodexUsageWindow primary = 4;
   CodexUsageWindow secondary = 5;
   CodexUsageCredits credits = 6;
+  CodexUsageIndividualLimit individual_limit = 7;
+}
+
+message CodexUsageIndividualLimit {
+  string limit = 1;
+  string used = 2;
+  double remaining_percent = 3;
+  google.protobuf.Timestamp resets_at = 4;
 }
 
 message CodexUsageCredits {

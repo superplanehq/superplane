@@ -3,11 +3,18 @@ import { act, render, renderHook, screen, waitFor } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { useState } from "react";
+import { MemoryRouter } from "react-router";
 
-import { meCancelCodexConnection, meDescribeCodexConnection, type FactoriesFactoryCodexConnection } from "@/api-client";
+import {
+  meCancelCodexConnection,
+  meDescribeCodexConnection,
+  meStartCodexConnection,
+  type FactoriesFactoryCodexConnection,
+} from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { factoryCodexConnectionKey, useFactoryCodexConnection } from "../pages/onboarding/useFactoryCodexConnection";
 import { CodexActionProvider } from "./CodexActionProvider";
@@ -18,7 +25,9 @@ vi.mock("@/api-client", () => ({
   ...unmockedSrc<Record<string, unknown>>("api-client/index.ts"),
   meDescribeCodexConnection: vi.fn(),
   meCancelCodexConnection: vi.fn(),
+  meStartCodexConnection: vi.fn(),
 }));
+vi.mock("@/lib/toast", () => ({ showErrorToast: vi.fn() }));
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, currentUserId: "me", isLoading: false }),
 }));
@@ -77,12 +86,44 @@ function mount(save: (title: string) => Promise<void>) {
 describe("Codex assignment continuation", () => {
   beforeEach(() => {
     connection = { status: "disconnected", eligible: true };
+    vi.mocked(meStartCodexConnection).mockReset();
+    vi.mocked(showErrorToast).mockClear();
     vi.mocked(meCancelCodexConnection)
       .mockReset()
       .mockResolvedValue({ data: {} } as never);
     vi.mocked(meDescribeCodexConnection)
       .mockReset()
       .mockImplementation(async () => ({ data: { connection } }) as never);
+  });
+
+  it.each([
+    [
+      "This organization has no hosted credit. Add hosted credit to continue.",
+      "This organization has no hosted credit. Add hosted credit to continue.",
+      true,
+    ],
+    ["internal error", "SuperPlane could not start ChatGPT sign-in. Try again.", false],
+  ])("shows the sign-in failure and keeps setup available: %s", async (message, expected, offersBilling) => {
+    vi.mocked(meStartCodexConnection).mockRejectedValue({ message });
+    const onConnected = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <DismissibleCodexSetup onConnected={onConnected} />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    const button = await screen.findByRole("button", { name: "Connect ChatGPT" });
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.setup().click(button);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(expected);
+    expect(showErrorToast).toHaveBeenCalledWith(expected);
+    expect(screen.queryByRole("link", { name: "Open Billing" }) !== null).toBe(offersBilling);
+    expect(button).toBeEnabled();
+    expect(onConnected).not.toHaveBeenCalled();
   });
 
   it("preserves the action input and resumes once after connection", async () => {

@@ -216,6 +216,24 @@ export const FiveHourWeeklyAndCredits: Story = {
       },
     ]),
 };
+export const MonthlyCredits: Story = {
+  render: () =>
+    renderSubscriptionUsage([
+      {
+        limitId: "codex",
+        planType: "Business",
+        primary: fiveHourWindow,
+        secondary: weeklyWindow,
+        credits: { hasCredits: true, unlimited: false },
+        individualLimit: {
+          limit: "5000",
+          used: "288.32",
+          remainingPercent: 94,
+          resetsAt: new Date(Date.now() + 86400000 * 20).toISOString(),
+        },
+      },
+    ]),
+};
 export const ExhaustedCredits: Story = {
   render: () =>
     renderSubscriptionUsage([

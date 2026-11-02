@@ -112,6 +112,18 @@ describe("AnalysisLiveWork", () => {
     expect(status.querySelector(".sp-thinking-state-outgoing")).not.toBeInTheDocument();
   });
 
+  it("keeps the supplied progress label when activity is quiet", () => {
+    vi.useFakeTimers();
+    const progressLabel = "Preparing a plan";
+    render(<AnalysisLiveWork machineStatus="running" progressLabel={progressLabel} />);
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveAccessibleName(progressLabel);
+    act(() => vi.advanceTimersByTime(16_000));
+
+    expect(status).toHaveAccessibleName(progressLabel);
+  });
+
   it("shows exact reasoning and an active command", () => {
     vi.mocked(useAgentActivityStream).mockReturnValue({
       isConnected: true,
