@@ -45,6 +45,7 @@ const {
   answerPlanningSurvey,
   liveCanvas,
   planningLiveRun,
+  backlogRuns,
 } = vi.hoisted(() => ({
   onDispatch: vi.fn(),
   dispatchingIds: { current: new Set<string>() },
@@ -56,6 +57,7 @@ const {
   answerPlanningSurvey: vi.fn(),
   liveCanvas: { current: undefined as unknown },
   planningLiveRun: { current: undefined as unknown },
+  backlogRuns: { current: [] as unknown[] },
 }));
 
 vi.mock("../pages/planningSessionClient", () => ({
@@ -66,6 +68,13 @@ vi.mock("../pages/planningSessionClient", () => ({
 
 vi.mock("../pages/usePlanningSessionLiveRun", () => ({
   usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => ({ view, run: planningLiveRun.current }),
+}));
+
+vi.mock("@/hooks/useBacklogAnalysisRuns", () => ({
+  useFactoryBacklogAnalysis: () => ({
+    analyzingOrderIds: new Set<string>(),
+    runsByWorkOrder: new Map([[DRAFT_WORK_ORDER.id, backlogRuns.current]]),
+  }),
 }));
 
 vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
@@ -203,6 +212,7 @@ function resetPlanningSession() {
   answerPlanningSurvey.mockReset();
   liveCanvas.current = undefined;
   planningLiveRun.current = undefined;
+  backlogRuns.current = [];
 }
 
 function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?lineId=${REFUND_LINE_PLAN_ID}`) {
@@ -251,6 +261,34 @@ describe("MobileTaskDetailPage refine chat", () => {
   it("shows the planning session run failure", async () => {
     findPlanningSession.mockResolvedValue(WAITING_SESSION);
     planningLiveRun.current = { result: "RESULT_FAILED", errors: ["The selected model is unavailable."] };
+    renderDraft();
+
+    const alert = await screen.findByRole("alert", { name: "Planning failed" });
+    expect(alert).toHaveTextContent("The selected model is unavailable.");
+  });
+
+  it("shows a failed retry that started after the session run finished", async () => {
+    findPlanningSession.mockResolvedValue(WAITING_SESSION);
+    const startedAt = Date.now();
+    planningLiveRun.current = {
+      id: "run-1",
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      createdAt: new Date(startedAt - 60_000).toISOString(),
+    };
+    backlogRuns.current = [
+      {
+        canvasId: "backlog-canvas",
+        workOrderId: DRAFT_WORK_ORDER.id,
+        run: {
+          id: "run-2",
+          state: "STATE_FINISHED",
+          result: "RESULT_FAILED",
+          errors: ["The selected model is unavailable."],
+          createdAt: new Date(startedAt).toISOString(),
+        },
+      },
+    ];
     renderDraft();
 
     const alert = await screen.findByRole("alert", { name: "Planning failed" });

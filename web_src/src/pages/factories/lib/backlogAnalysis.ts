@@ -171,6 +171,27 @@ export function planningRunFailure(run: CanvasesCanvasRun | null | undefined): s
   return reason?.trim() || "The planning run failed. Review the run details and try again.";
 }
 
+/**
+ * Failure of the newest planning run. A retry can detach the session run
+ * and fail before it attaches a new one, so the latest Backlog run can be
+ * newer than the session run.
+ */
+export function currentPlanningRunFailure(
+  sessionRun: CanvasesCanvasRun | null | undefined,
+  runs: BacklogAnalysisRun[] = [],
+): string | undefined {
+  const latestBacklogRun = latestBacklogAnalysisRun(runs)?.run;
+  if (!sessionRun || !latestBacklogRun) {
+    return planningRunFailure(sessionRun ?? latestBacklogRun);
+  }
+  if (sessionRun.id === latestBacklogRun.id) {
+    return planningRunFailure(mergeCanvasRunUpdate(latestBacklogRun, sessionRun));
+  }
+  const sessionStartedAt = Date.parse(sessionRun.createdAt ?? "") || 0;
+  const backlogStartedAt = Date.parse(latestBacklogRun.createdAt ?? "") || 0;
+  return planningRunFailure(sessionStartedAt > backlogStartedAt ? sessionRun : latestBacklogRun);
+}
+
 export function analyzedWorkOrderId(run: CanvasesCanvasRun): string | undefined {
   const envelope = asRecord(run.rootEvent?.data);
   const payload = asRecord(envelope?.data) ?? envelope;

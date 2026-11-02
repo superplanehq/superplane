@@ -3,7 +3,7 @@ import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import type { ReactNode } from "react";
 
 import { analysisFirstResultDelivered } from "../lib/analysisOutcome";
-import { latestBacklogAnalysisRun, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
+import { currentPlanningRunFailure, latestBacklogAnalysisRun, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import { factoryPlanningEnabled } from "../pages/planningSettingsModel";
 import { draftStripAnalysis } from "../pages/work-order-split-run/draftStripAnalysis";
 import { useBacklogPlanningRunRefresh } from "../pages/work-order-split-run/useBacklogPlanningRunRefresh";
@@ -75,7 +75,18 @@ export function useMobileRefineChat({
     return { loadFailed: false, sessionMissing: !analysis.isLoading };
   }
   return {
-    chat: draftStripAnalysis({ factory, organizationId, factoryKey, fixture, analysis, canUpdate }, modelSelect),
+    chat: draftStripAnalysis(
+      {
+        factory,
+        organizationId,
+        factoryKey,
+        fixture,
+        analysis,
+        planningFailure: currentPlanningRunFailure(analysis.run, analysisRuns),
+        canUpdate,
+      },
+      modelSelect,
+    ),
     loadFailed: Boolean(analysis.queryError),
     sessionMissing: false,
   };

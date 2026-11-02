@@ -2,12 +2,11 @@ import { FactoryTaskScope } from "../../FactoryTaskScope";
 import { useState, type ReactNode } from "react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
-import { mergeCanvasRunUpdate } from "@/hooks/canvasInfiniteCache";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
-import { latestBacklogAnalysisRun, planningRunFailure, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
+import { currentPlanningRunFailure, latestBacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
@@ -86,7 +85,7 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
       artifacts: popupData.artifacts,
     }),
   });
-  const planningFailure = popupPlanningFailure(analysis, analysisRuns);
+  const planningFailure = currentPlanningRunFailure(analysis.run, analysisRuns);
   useBacklogPlanningRunRefresh({
     organizationId,
     factoryId,
@@ -120,23 +119,6 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
       planningFailure={planningFailure}
     />
   );
-}
-
-function popupPlanningFailure(
-  analysis: ReturnType<typeof useAnalysisPlanningSession>,
-  runs?: BacklogAnalysisRun[],
-): string | undefined {
-  const latestBacklogRun = latestBacklogAnalysisRun(runs ?? [])?.run;
-  const sessionRun = analysis.run;
-  if (!sessionRun || !latestBacklogRun) {
-    return planningRunFailure(sessionRun ?? latestBacklogRun);
-  }
-  if (sessionRun.id === latestBacklogRun.id) {
-    return planningRunFailure(mergeCanvasRunUpdate(latestBacklogRun, sessionRun));
-  }
-  const sessionStartedAt = Date.parse(sessionRun.createdAt ?? "") || 0;
-  const backlogStartedAt = Date.parse(latestBacklogRun.createdAt ?? "") || 0;
-  return planningRunFailure(sessionStartedAt > backlogStartedAt ? sessionRun : latestBacklogRun);
 }
 
 function popupHasAnalysisResult(
