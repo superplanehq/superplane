@@ -103,9 +103,9 @@ type datadogIntakeItemSource struct {
 }
 
 type linearIntakeItemSource struct {
-	linear     *linear.Client
-	projectIDs []string
-	labels     []string
+	linear *linear.Client
+	scope  linear.IssueScope
+	labels []string
 }
 
 type unsupportedIntakeItemSource struct{}
