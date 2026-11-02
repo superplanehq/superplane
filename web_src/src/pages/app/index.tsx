@@ -71,8 +71,9 @@ import type { CanvasNode, CanvasPageProps, NewNodeData, NodeEditData } from "@/u
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import { CanvasPageLoadingOverlay } from "@/ui/CanvasPage/CanvasPageLoadingOverlay";
 import { resolveFitViewVersionId } from "@/ui/CanvasPage/fitView";
-import { useAppPageAgentSuggestions } from "./useAppPageAgentSuggestions";
 import { useAutoLayoutOnUpdatePreference } from "./useAutoLayoutOnUpdatePreference";
+import { useCanvasIntegrationRequest } from "@/hooks/useCanvasIntegrationRequest";
+import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import {
   appendWorkflowFragment,
   removeWorkflowEdges,
@@ -83,7 +84,6 @@ import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { ACTIVE_RUN_API_STATES } from "@/ui/Runs/runPresentation";
 import type { CanvasEchoRelease, CanvasSaveResult, QueuedCanvasSaveRequest } from "./canvasSaveTypes";
 import { deriveConsoleNodeStatuses } from "./console/deriveNodeStatuses";
@@ -127,7 +127,6 @@ import { useDraftStagingActions } from "./useDraftStagingActions";
 import { useFactoryConfigureSession, type FactoryConfigureActions } from "./useFactoryConfigureSession";
 import { useFactoryConfigureInitialLayout } from "./useFactoryConfigureInitialLayout";
 import { resolveFactoryEmbedCanvasChrome, resolveFactoryEmbedSidebars } from "./factoryEmbedCanvasChrome";
-import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { buildDuplicatedEdges, buildDuplicatedNodes } from "./lib/duplicate-nodes";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
@@ -146,7 +145,7 @@ import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useVisibleNodeRuntimeMaps } from "./useVisibleNodeRuntimeMaps";
 import { useGetSidebarData } from "./useGetSidebarData";
 import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
-import { useAgentNodeFocusRequest, type CanvasFocusRequest } from "./useAgentNodeFocusRequest";
+import { useCanvasNodeFocusRequest, type CanvasFocusRequest } from "@/hooks/useCanvasNodeFocusRequest";
 import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
 import { useComponentIconMap } from "./useComponentIconMap";
 import { useRunSidebarNavigationState } from "./useRunSidebarNavigationState";
@@ -282,7 +281,6 @@ export type { FactoryConfigureActions } from "./useFactoryConfigureSession";
 export function AppPage({
   factoryEmbed = false,
   factoryConfigure = false,
-  factoryAgentEnabled = false,
   factoryEditWorkspace = false,
   factoryConfigureActionsRef,
   onFactoryConfigureBusyChange,
@@ -293,9 +291,7 @@ export function AppPage({
   factoryEmbed?: boolean;
   /** Factory-shell Configure: same chrome as embed, but canvas edit session allowed. */
   factoryConfigure?: boolean;
-  /** Factory-shell opt-in: show the in-app agent sidebar next to the canvas. */
-  factoryAgentEnabled?: boolean;
-  /** Factory-shell edit workspace chrome (styled agent sidebar, larger edit dots). */
+  /** Factory-shell edit workspace chrome with larger edit dots. */
   factoryEditWorkspace?: boolean;
   /** Imperative Discard/Save handlers for the factory Configure chrome (no setState bridge). */
   factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
@@ -317,7 +313,6 @@ export function AppPage({
     factoryId?: string;
   }>();
   const canvasId = appId || "";
-  const agentSuggestions = useAppPageAgentSuggestions(appId);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -390,7 +385,6 @@ export function AppPage({
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
   const canReadIntegrations = canAct("integrations", "read");
   const canUpdateIntegrations = canAct("integrations", "update");
-  const canUseAgents = (!factoryEmbed || factoryAgentEnabled) && canAct("agents", "create") && canAct("agents", "read");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const {
     data: liveCanvas,
@@ -2094,23 +2088,7 @@ export function AppPage({
     setIntegrationDialogName(integrationName);
   }, []);
 
-  // Listen for agent sidebar integration button clicks
-  const [agentConfigureIntegrationId, setAgentConfigureIntegrationId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { integrationName, instanceId } = (e as CustomEvent).detail;
-      if (instanceId) {
-        // Existing instance — open configure modal
-        setAgentConfigureIntegrationId(instanceId);
-      } else if (integrationName) {
-        // No instance — open create dialog
-        setIntegrationDialogName(integrationName);
-      }
-    };
-    window.addEventListener("agent:open-integration", handler);
-    return () => window.removeEventListener("agent:open-integration", handler);
-  }, []);
+  const canvasIntegrationRequest = useCanvasIntegrationRequest(handleConnectIntegration);
 
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
@@ -2943,58 +2921,6 @@ export function AppPage({
     [factoryConfigure, handleCommitStaging, onFactoryConfigureSaved],
   );
 
-  const handleAgentSidebarStagingCommit = useCallback(
-    async (commitMessage: string) => {
-      if (!organizationId || !canvasId) {
-        return false;
-      }
-
-      const versionId = activeCanvasVersionId || liveCanvasVersionId || "";
-      if (!versionId) {
-        return false;
-      }
-
-      const trimmedMessage = commitMessage.trim();
-      if (!trimmedMessage) {
-        return false;
-      }
-
-      try {
-        return await executeCommitStaging({
-          organizationId,
-          canvasId,
-          activeCanvasVersionId: versionId,
-          commitMessage: trimmedMessage,
-          queryClient,
-          commitCanvasStagingMutation,
-          consoleMutationGenerationRef,
-          draftCanvasSpecsRef,
-          setDraftCanvasSpec,
-          setStagingResetNonce,
-          ensureVersionActionDraftReady,
-          flushRepositoryFileStaging,
-          registerIgnoredCanvasUpdatedEcho,
-          onCommittedVersionId: handleCommittedVersionId,
-        });
-      } catch (error) {
-        showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
-        return false;
-      }
-    },
-    [
-      organizationId,
-      canvasId,
-      activeCanvasVersionId,
-      liveCanvasVersionId,
-      queryClient,
-      commitCanvasStagingMutation,
-      ensureVersionActionDraftReady,
-      flushRepositoryFileStaging,
-      handleCommittedVersionId,
-      registerIgnoredCanvasUpdatedEcho,
-    ],
-  );
-
   const handleDiscardStaleStaging = useCallback(async () => {
     await handleResetStaging();
   }, [handleResetStaging]);
@@ -3102,7 +3028,7 @@ export function AppPage({
   );
 
   const runInspectionChromeActive = isRunInspectionMode && !editSessionActive && !isEnteringEditSession;
-  useAgentNodeFocusRequest(setFocusRequest, runInspectionChromeActive);
+  useCanvasNodeFocusRequest(setFocusRequest, runInspectionChromeActive);
   const runParticipantFit = useRunParticipantFitRequest({
     isRunInspectionMode: runInspectionChromeActive,
     selectedRunId,
@@ -3157,25 +3083,6 @@ export function AppPage({
 
     await enterLiveEditSession();
   };
-
-  const handleAgentStagingReady = useCallback(async (): Promise<boolean> => {
-    if (!liveCanvasVersionId) {
-      return false;
-    }
-
-    if (editSessionActive && isViewingCurrentLiveVersion) {
-      await resyncStagedEditorState(liveCanvasVersionId, { bumpResetNonce: false });
-      return true;
-    }
-
-    return enterLiveEditSession();
-  }, [
-    editSessionActive,
-    liveCanvasVersionId,
-    enterLiveEditSession,
-    isViewingCurrentLiveVersion,
-    resyncStagedEditorState,
-  ]);
 
   const handleToggleEditMode = useCallback(async () => {
     if (!organizationId || !canvasId) {
@@ -3629,7 +3536,6 @@ export function AppPage({
   });
   const factoryEmbedCanvasChrome = resolveFactoryEmbedCanvasChrome({
     factoryEmbed,
-    factoryAgentEnabled,
     factoryEditWorkspace,
     factoryViewOnly,
     factoryOwnedApp,
@@ -3794,17 +3700,11 @@ export function AppPage({
           factoryConfigure={factoryConfigure}
           factoryConfigureLayoutReady={factoryConfigureLayoutReady}
           factoryEditWorkspace={factoryEditWorkspace}
-          activeCanvasVersionId={activeCanvasVersionId}
-          liveCanvasVersionId={liveCanvasVersionId}
-          onAgentStagingReady={handleAgentStagingReady}
-          onAgentStagingCommit={whenAllowed(canUpdateCanvas, handleAgentSidebarStagingCommit)}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
           integrations={canReadIntegrations ? integrations : []}
           canReadIntegrations={canReadIntegrations}
           canCreateIntegrations={canAct("integrations", "create")}
           canUpdateIntegrations={canUpdateIntegrations}
-          canUseAgents={canUseAgents}
-          agentSuggestions={agentSuggestions}
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly || readOnlyViewModes}
@@ -3934,9 +3834,9 @@ export function AppPage({
         }
       />
       <ConfigureIntegrationDialog
-        integrationId={agentConfigureIntegrationId}
+        integrationId={canvasIntegrationRequest.integrationId}
         organizationId={organizationId ?? ""}
-        onClose={() => setAgentConfigureIntegrationId(null)}
+        onClose={canvasIntegrationRequest.closeIntegration}
       />
     </>
   );

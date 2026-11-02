@@ -1,9 +1,4 @@
 import { factoriesMaterializeFactoryAutomationDefaults, type CanvasesCanvas } from "@/api-client";
-import {
-  requestCanvasAgentSidebarClose,
-  subscribeCanvasAgentSidebarChanged,
-} from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
-import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { showErrorToast } from "@/lib/toast";
 import { getApiErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -28,7 +23,6 @@ type FactoryAppCanvasEditActionsInput = {
   orderNumber: string | null;
   runId: string | null;
   isConfigure: boolean;
-  agentOpen: boolean;
   componentsOpen: boolean;
   canvas?: CanvasesCanvas | null;
   canUpdateCanvas: boolean;
@@ -47,7 +41,6 @@ export function useFactoryAppCanvasEditActions({
   orderNumber,
   runId,
   isConfigure,
-  agentOpen,
   componentsOpen,
   canvas,
   canUpdateCanvas,
@@ -133,7 +126,6 @@ export function useFactoryAppCanvasEditActions({
   useFactoryAppCanvasWorkspaceSync({
     appId,
     isConfigure,
-    agentOpen,
     componentsOpen,
     onComponentsOpenChange: handleComponentsOpenChange,
   });
@@ -210,35 +202,18 @@ function useFactoryAppResetActions({
 function useFactoryAppCanvasWorkspaceSync({
   appId,
   isConfigure,
-  agentOpen,
   componentsOpen,
   onComponentsOpenChange,
 }: {
   appId: string;
   isConfigure: boolean;
-  agentOpen: boolean;
   componentsOpen: boolean;
   onComponentsOpenChange: (open: boolean) => void;
 }) {
   useEffect(() => {
-    if (!appId) return;
-    writeCanvasAgentSidebarOpen(appId, false);
-    requestCanvasAgentSidebarClose(appId);
-  }, [appId, agentOpen, isConfigure]);
-
-  useEffect(() => {
     if (!isConfigure || !appId) return;
     requestBuildingBlocksSidebar(appId, componentsOpen);
   }, [appId, componentsOpen, isConfigure]);
-
-  useEffect(() => {
-    if (!isConfigure || !appId) return;
-    return subscribeCanvasAgentSidebarChanged((canvasId, open) => {
-      if (canvasId !== appId || !open) return;
-      writeCanvasAgentSidebarOpen(appId, false);
-      requestCanvasAgentSidebarClose(appId);
-    });
-  }, [appId, isConfigure]);
 
   useEffect(() => {
     if (!isConfigure || !appId) return;

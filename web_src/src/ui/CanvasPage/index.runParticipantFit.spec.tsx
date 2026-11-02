@@ -68,28 +68,6 @@ vi.mock("../componentSidebar", () => ({
   ComponentSidebar: () => null,
 }));
 
-vi.mock("@/components/CanvasToolSidebar", () => ({
-  CanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/pages/factories/agent/FactoryCanvasToolSidebar", () => ({
-  FactoryCanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
-  useCanvasToolSidebarState: () => ({
-    canvasId: undefined,
-    organizationId: undefined,
-    isEditing: false,
-    readOnly: false,
-    isToolSidebarOpen: false,
-    showToolSidebarToggle: false,
-    handleToolSidebarToggle: vi.fn(),
-    openToolSidebar: vi.fn(),
-    closeToolSidebar: vi.fn(),
-  }),
-}));
-
 vi.mock("./Header", () => ({
   Header: () => null,
 }));
@@ -156,7 +134,6 @@ describe("CanvasPage run participant fit", () => {
             edges={[]}
             buildingBlocks={[]}
             isEditing={false}
-            activeCanvasVersionId="live-version"
             hasFitToViewRef={hasFitToViewRef}
             viewportRef={viewportRef}
             fitAllRequest={1}

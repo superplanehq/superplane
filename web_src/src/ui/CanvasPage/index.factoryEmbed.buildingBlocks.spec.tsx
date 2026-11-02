@@ -79,28 +79,6 @@ vi.mock("../componentSidebar", () => ({
   ComponentSidebar: () => <aside data-testid="component-sidebar" />,
 }));
 
-vi.mock("@/components/CanvasToolSidebar", () => ({
-  CanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/pages/factories/agent/FactoryCanvasToolSidebar", () => ({
-  FactoryCanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
-  useCanvasToolSidebarState: () => ({
-    canvasId: undefined,
-    organizationId: undefined,
-    isEditing: false,
-    readOnly: false,
-    isToolSidebarOpen: false,
-    showToolSidebarToggle: false,
-    handleToolSidebarToggle: vi.fn(),
-    openToolSidebar: vi.fn(),
-    closeToolSidebar: vi.fn(),
-  }),
-}));
-
 vi.mock("./Header", () => ({
   Header: () => <header data-testid="canvas-header" />,
 }));
@@ -152,7 +130,6 @@ describe("CanvasPage factory embed building blocks sidebar", () => {
           factoryEmbed
           factoryEditWorkspace
           hideRightSideControls
-          activeCanvasVersionId=""
         />
       </MemoryRouter>,
     );
@@ -182,7 +159,6 @@ describe("CanvasPage factory embed building blocks sidebar", () => {
           factoryEmbed
           hideAddControls
           hideRightSideControls
-          activeCanvasVersionId=""
         />
       </MemoryRouter>,
     );
@@ -208,7 +184,6 @@ describe("CanvasPage factory embed building blocks sidebar", () => {
           factoryEmbed
           factoryEditWorkspace
           hideRightSideControls
-          activeCanvasVersionId=""
         />
       </MemoryRouter>,
     );
@@ -233,7 +208,6 @@ describe("CanvasPage factory embed building blocks sidebar", () => {
           factoryEmbed
           factoryEditWorkspace
           hideRightSideControls
-          activeCanvasVersionId=""
         />
       </MemoryRouter>,
     );

@@ -587,7 +587,6 @@ MODULES := \
 	widgets, \
 	canvases, \
 	api_keys, \
-	agents, \
 	files, \
 	admin/fleets, \
 	admin/keys, \
@@ -608,7 +607,6 @@ REST_API_MODULES := \
 	widgets, \
 	canvases, \
 	api_keys, \
-	agents, \
 	files, \
 	admin/fleets, \
 	admin/keys, \

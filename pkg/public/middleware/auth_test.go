@@ -127,7 +127,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
 			Subject: r.User.String(),
 			OrgID:   r.Organization.ID.String(),
-			Purpose: "agent-builder",
+			Purpose: "test-scope",
 			Scopes:  []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
 			Subject: r.User.String(),
 			OrgID:   uuid.NewString(),
-			Purpose: "agent-builder",
+			Purpose: "test-scope",
 			Scopes:  []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
@@ -177,7 +177,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
 			Subject: r.User.String(),
 			OrgID:   r.Organization.ID.String(),
-			Purpose: "agent-builder",
+			Purpose: "test-scope",
 			Scopes:  []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
@@ -199,7 +199,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
 			Subject: r.User.String(),
 			OrgID:   r.Organization.ID.String(),
-			Purpose: "agent-builder",
+			Purpose: "test-scope",
 			Scopes:  []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)

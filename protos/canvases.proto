@@ -381,8 +381,6 @@ message UpdateCanvasRequest {
   string id = 1;
   optional string name = 2;
   optional string description = 3;
-  // When set, appends this id to the canvas's dismissed Agent suggestion ids.
-  optional string dismiss_agent_suggestion_id = 4;
 }
 
 message UpdateCanvasResponse {
@@ -532,8 +530,7 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     string live_version_id = 8;
-    repeated string dismissed_agent_suggestion_ids = 9;
-    string factory_id = 10;
+    string factory_id = 9;
   }
 
   message Spec {

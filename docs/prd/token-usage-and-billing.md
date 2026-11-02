@@ -76,9 +76,9 @@ Organization (wallet, Polar customer, model allowlist, BYOK keys)
   the org allowlist.
 - Do not create a second Polar customer per workspace.
 
-**Usage event** — one append-only row per LLM call (or per terminal usage
-snapshot for long-running Anthropic managed agents), or per finished runner
-task for compute:
+**Usage event** — one append-only row per LLM call, or per finished runner
+task for compute. Historical usage records remain after the legacy canvas
+assistant is removed:
 
 - Scope: organization, factory, work order, line, dispatch, execution, canvas
   run, node execution. Factory canvases only. Org canvases are skipped.

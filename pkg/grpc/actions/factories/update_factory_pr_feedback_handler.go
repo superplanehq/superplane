@@ -60,7 +60,7 @@ func UpdateFactoryPRFeedbackHandler(
 		if name == "" {
 			return nil, factoryErrorToStatus(invalidArgument("handler name cannot be empty"), "failed to update factory PR feedback handler")
 		}
-		if _, err := canvases.UpdateCanvas(ctx, db, canvas, &name, nil, nil); err != nil {
+		if _, err := canvases.UpdateCanvas(ctx, db, canvas, &name, nil); err != nil {
 			return nil, err
 		}
 	}
