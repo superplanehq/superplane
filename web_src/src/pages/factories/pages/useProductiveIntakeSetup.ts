@@ -1,3 +1,4 @@
+import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import {
   useAvailableIntegrations,
@@ -25,6 +26,7 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
     useProductiveConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const owner = useIntakeOwnerDraft(organizationId, factoryId);
   const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
     enabled: Boolean(integrationId),
   });
@@ -63,7 +65,9 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
     if (!integrationId || !projectId) return;
     setError(undefined);
     try {
+      const ownerSettings = owner.settings();
       await createIntake.mutateAsync({
+        ...(owner.required ? { settings: ownerSettings } : {}),
         source: "SOURCE_PRODUCTIVE_TASKS",
         integrationId,
         resourceId: projectId,
@@ -77,6 +81,7 @@ export function useProductiveIntakeSetup(organizationId: string, factoryId: stri
   };
 
   return {
+    owner,
     step,
     setStep,
     integrationId,

@@ -5,11 +5,33 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 )
+
+func TestCodexRunnerAuthBundlePreservesRefreshTimestamp(t *testing.T) {
+	lastRefresh := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)
+	bundle, err := json.Marshal(map[string]any{
+		"last_refresh": lastRefresh,
+		"tokens":       map[string]string{"access_token": "access", "refresh_token": "provider-refresh", "id_token": "identity"},
+	})
+	require.NoError(t, err)
+	copy, err := runner.CodexRunnerAuthBundle(bundle, "lease-secret")
+	require.NoError(t, err)
+	var credentials struct {
+		LastRefresh string `json:"last_refresh"`
+		Tokens      struct {
+			RefreshToken string `json:"refresh_token"`
+		} `json:"tokens"`
+	}
+	require.NoError(t, json.Unmarshal(copy, &credentials))
+	assert.Equal(t, lastRefresh, credentials.LastRefresh)
+	assert.Equal(t, "lease-secret", credentials.Tokens.RefreshToken)
+	assert.NotContains(t, string(copy), "provider-refresh")
+}
 
 func TestPrepareCodexAuthBundleUsesAccountEmail(t *testing.T) {
 	longEmail := strings.Repeat("a", 50) + "@example.com"

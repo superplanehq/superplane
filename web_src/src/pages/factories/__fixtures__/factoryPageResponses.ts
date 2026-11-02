@@ -1,9 +1,13 @@
 import type {
+  SuperplaneOrganizationsFleet,
+  SuperplaneOrganizationsRunner,
   FactoriesDescribeFactoryVelocityResponse,
   OrganizationsDescribeOrganizationBillingResponse,
   OrganizationsPreviewSeatPurchaseResponse,
   OrganizationsPurchaseSeatsResponse,
   FactoriesFactory,
+  FactoriesFactoryCodexConnection,
+  FactoriesCodexMemberUsage,
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
   FactoriesFactoryLine,
@@ -318,6 +322,14 @@ export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
 ];
 
 export interface FactoriesFixture {
+  organizationFleetManagement?: {
+    fleets: SuperplaneOrganizationsFleet[];
+    runners: SuperplaneOrganizationsRunner[];
+    error?: boolean;
+    connection?: "waiting" | "connected" | "expired";
+    pendingTermination?: boolean;
+    readOnly?: boolean;
+  };
   organizationId: string;
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
@@ -371,6 +383,14 @@ export interface FactoriesFixture {
   byokSelectedByProvider?: Record<string, string[]>;
   /** Organization hosted selection. Omit to inherit all installation candidates. */
   hostedSelectedKeys?: string[];
+  /** Workspace policy state keyed by factory id, funding source, and provider. */
+  workspaceModelPolicies?: Record<string, { inheritParent: boolean; configuredModels: string[] }>;
+  workspaceModelPolicyError?: string;
+  workspaceModelPolicyDelayMs?: { GET?: number; PUT?: number };
+  codexConnection?: FactoriesFactoryCodexConnection;
+  codexMembers?: FactoriesCodexMemberUsage[];
+  codexMembersError?: boolean;
+  codexMembersDelayMs?: number;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /** Installation-wide hosted model scores for Organization · Model status. */

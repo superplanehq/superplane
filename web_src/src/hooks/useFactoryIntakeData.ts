@@ -1,3 +1,4 @@
+import { useCodexActionGuard } from "@/pages/factories/codex/codexActionContext";
 import {
   factoriesCreateFactoryIntake,
   factoriesDeleteFactoryIntake,
@@ -326,20 +327,23 @@ export function useSearchFactoryIntakeItems({
 
 export function useImportFactoryIntakeItem(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
+  const guardCodexAction = useCodexActionGuard(organizationId, factoryId);
 
   return useMutation({
     mutationFn: async (input: { intakeId: string; itemId: string }): Promise<FactoriesWorkOrder> => {
-      const response = await factoriesImportFactoryIntakeItem(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId, intakeId: input.intakeId },
-          body: { itemId: input.itemId },
-        }),
-      );
-      if (!response.data?.order) {
-        throw new Error("SuperPlane could not import the item.");
-      }
-      return response.data.order;
+      return guardCodexAction(async () => {
+        const response = await factoriesImportFactoryIntakeItem(
+          withOrganizationHeader({
+            organizationId,
+            path: { factoryId, intakeId: input.intakeId },
+            body: { itemId: input.itemId },
+          }),
+        );
+        if (!response.data?.order) {
+          throw new Error("SuperPlane could not import the item.");
+        }
+        return response.data.order;
+      });
     },
     onSuccess: (order) => {
       applyWorkOrderToListCaches(queryClient, organizationId, factoryId, order.id ?? "", order);

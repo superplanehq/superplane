@@ -7,7 +7,7 @@ const { publishMarkdown } = require("./publish_markdown");
 
 const env = {
   SUPERPLANE_BASE_URL: "https://app.example",
-  SUPERPLANE_ARTIFACT_TOKEN: "token",
+  SUPERPLANE_RUNNER_TOKEN: "token",
 };
 
 test("publishMarkdown posts the body, title, and key", async () => {
@@ -34,7 +34,7 @@ test("publishMarkdown posts the body, title, and key", async () => {
     },
   );
 
-  assert.equal(request.url, "https://app.example/api/v1/runner/artifacts/markdown");
+  assert.equal(request.url, "https://app.example/api/v1/runner/task/markdown");
   assert.equal(request.options.headers.Authorization, "Bearer token");
   assert.deepEqual(JSON.parse(request.options.body), {
     body: "Email: demo@operately.dev\n\nPassword: preview-demo-1",

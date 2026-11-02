@@ -115,21 +115,18 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
   });
 };
 
-const DEFAULT_BRANCH_FALLBACK = "main";
-
 /**
- * Imperative lookup of a single repository's default branch (main, master,
- * staging, ...), used by onboarding finish before installing the generated
- * automations. Falls back to "main" when the integration or repository is
- * missing, or the lookup returns nothing, so callers never block on this.
+ * Reads the default branch a repository reports. Missing inputs and an empty
+ * resource list return "". A failed request rejects so the caller can keep a
+ * saved branch.
  */
-export async function resolveGithubDefaultBranch(
+export async function resolveRepositoryDefaultBranch(
   organizationId: string,
   integrationId: string,
   repository: string,
 ): Promise<string> {
   if (!organizationId || !integrationId || !repository) {
-    return DEFAULT_BRANCH_FALLBACK;
+    return "";
   }
 
   const response = await organizationsListIntegrationResources(
@@ -139,8 +136,7 @@ export async function resolveGithubDefaultBranch(
       query: { type: "default_branch", repository },
     }),
   );
-  const branch = response.data?.resources?.[0]?.name;
-  return branch || DEFAULT_BRANCH_FALLBACK;
+  return response.data?.resources?.[0]?.name?.trim() ?? "";
 }
 
 export const useIntegrationResources = (

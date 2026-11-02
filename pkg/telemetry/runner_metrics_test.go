@@ -140,6 +140,7 @@ func TestPeriodicRunnerMetricsReportEveryNonTerminalStateForEachFleet(t *testing
 	}, gaugeStateCounts(t, resourceMetrics, runnerCountMetricName, fleet, models.RunnerFleetScopeInstallation))
 
 	require.Equal(t, map[string]int64{
+		models.RunnerTaskStatePending:  0,
 		models.RunnerTaskStateQueued:   2,
 		models.RunnerTaskStateReserved: 0,
 		models.RunnerTaskStateRunning:  1,
@@ -152,6 +153,7 @@ func TestPeriodicRunnerMetricsReportEveryNonTerminalStateForEachFleet(t *testing
 	}, gaugeStateCounts(t, resourceMetrics, runnerCountMetricName, secondFleet, models.RunnerFleetScopeInstallation))
 
 	require.Equal(t, map[string]int64{
+		models.RunnerTaskStatePending:  0,
 		models.RunnerTaskStateQueued:   0,
 		models.RunnerTaskStateReserved: 2,
 		models.RunnerTaskStateRunning:  0,
@@ -236,17 +238,14 @@ func TestRunnerMetricsSeparateOrganizationsSharingFleetSlug(t *testing.T) {
 	t.Fatalf("metric %q was not collected", runnerTaskExecutionDurationMetricName)
 }
 
-func TestRunnerTaskQueueDurationRecordsSecondsByFleet(t *testing.T) {
+func TestRunnerTaskQueueDurationExcludesTimeWaitingForOrganizationCapacity(t *testing.T) {
 	reader := setupRunnerMetricsReader(t)
-
-	queuedAt := time.Now().Add(-3 * time.Minute)
-	reservedAt := queuedAt.Add(2 * time.Minute)
+	queuedAt := time.Now().Add(-4 * time.Minute)
+	readyAt := queuedAt.Add(time.Minute)
+	reservedAt := readyAt.Add(2 * time.Minute)
 	fleetSlug := "e1-large-amd64"
-	RecordRunnerTaskQueueDuration(t.Context(), &models.RunnerTask{
-		QueuedAt:   queuedAt,
-		ReservedAt: &reservedAt,
-	}, fleetSlug, models.RunnerFleetScopeInstallation)
-
+	task := &models.RunnerTask{QueuedAt: queuedAt, ReadyAt: &readyAt, ReservedAt: &reservedAt}
+	RecordRunnerTaskQueueDuration(t.Context(), task, fleetSlug, models.RunnerFleetScopeInstallation)
 	var resourceMetrics metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(t.Context(), &resourceMetrics))
 	for _, scope := range resourceMetrics.ScopeMetrics {
@@ -266,7 +265,6 @@ func TestRunnerTaskQueueDurationRecordsSecondsByFleet(t *testing.T) {
 			fleetScope, found := point.Attributes.Value(attribute.Key("fleet_scope"))
 			require.True(t, found)
 			require.Equal(t, models.RunnerFleetScopeInstallation, fleetScope.AsString())
-			require.Contains(t, point.Bounds, float64(120))
 			return
 		}
 	}

@@ -23,7 +23,7 @@ vi.mock("@/lib/toast", () => ({
 import { showErrorToast } from "@/lib/toast";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useFinishOnboarding } from "./useFinishOnboarding";
-import { CODEX_SUBSCRIPTION_PLAN, resolveOnboardingAgent } from "./onboardingAgentReadiness";
+import { resolveOnboardingAgent } from "./onboardingAgentReadiness";
 
 const refetchBilling = vi.fn<() => Promise<{ data: OrganizationsDescribeOrganizationBillingResponse; error: null }>>(
   async () => ({ data: { billingEnabled: false }, error: null }),
@@ -69,10 +69,10 @@ describe("useFinishOnboarding", () => {
     vi.mocked(showErrorToast).mockReset();
   });
 
-  it.each(["pending", "connected", "hosted", "denied", "subscription"] as const)(
+  it.each(["pending", "connected", "hosted", "denied"] as const)(
     "honors the model source when the Anthropic connection is %s",
     async (connection) => {
-      byokAllowed = connection !== "denied" && connection !== "subscription";
+      byokAllowed = connection !== "denied";
       organizationsDescribeIntegration.mockResolvedValue({
         data: { integration: { metadata: { name: "github-acme" } } },
       });
@@ -87,7 +87,7 @@ describe("useFinishOnboarding", () => {
         defaultHostedModel: "openai/gpt-5",
         preferOwnKey: connection !== "hosted",
       });
-      const plan = connection === "subscription" ? CODEX_SUBSCRIPTION_PLAN : providerPlan;
+      const plan = providerPlan;
       const { result } = renderHook(
         () =>
           useFinishOnboarding({
@@ -133,14 +133,9 @@ describe("useFinishOnboarding", () => {
       expect(showErrorToast).not.toHaveBeenCalled();
       expect(updateOnboarding).toHaveBeenCalledWith(
         expect.objectContaining({
-          agentHarness:
-            connection === "connected"
-              ? "AGENT_HARNESS_CLAUDE_CODE"
-              : connection === "subscription"
-                ? "AGENT_HARNESS_CODEX"
-                : "AGENT_HARNESS_SUPERPLANE",
+          agentHarness: connection === "connected" ? "AGENT_HARNESS_CLAUDE_CODE" : "AGENT_HARNESS_SUPERPLANE",
           agentIntegrationId: connection === "connected" ? "claude-1" : "",
-          codexSubscription: connection === "subscription",
+          codexSubscription: false,
         }),
       );
       expect(installFactory).toHaveBeenCalled();
@@ -157,14 +152,7 @@ describe("useFinishOnboarding", () => {
                 planningModel: "claude-opus-5-5",
                 credentials: { source: "integration", name: "my-anthropic-key" },
               }
-            : connection === "subscription"
-              ? {
-                  component: "runnerCodex",
-                  model: "",
-                  planningModel: "",
-                  credentials: { source: "subscription" },
-                }
-              : { component: "runnerSuperPlane", model: "", planningModel: "" },
+            : { component: "runnerSuperPlane", model: "", planningModel: "" },
         );
       }
     },

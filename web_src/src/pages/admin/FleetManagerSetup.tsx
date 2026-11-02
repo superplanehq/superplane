@@ -9,7 +9,7 @@ import {
 import { FleetManagerVerificationStatus } from "@/components/fleet-manager-setup/FleetManagerWizard";
 import { Button } from "@/components/ui/button";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
-import { useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
+import { sameFleetInstallation, useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
 import {
   fleetManagerHelmCommand,
   fleetManagerValuesFileCommand,
@@ -41,12 +41,16 @@ function InstallActions({
   draftIsValid,
   error,
   commands,
+  kubeContext,
+  onKubeContextChange,
   isPreparingInstallation,
   onGenerate,
 }: {
   draftIsValid: boolean;
   error?: string;
-  commands: { valuesCommand: string; helmCommand: string } | null;
+  commands: { valuesCommand: string; helmCommand: string | null } | null;
+  kubeContext: string;
+  onKubeContextChange: (value: string) => void;
   isPreparingInstallation: boolean;
   onGenerate: () => void;
 }) {
@@ -63,7 +67,14 @@ function InstallActions({
     );
   }
   if (commands) {
-    return <FleetManagerInstallCommands valuesCommand={commands.valuesCommand} helmCommand={commands.helmCommand} />;
+    return (
+      <FleetManagerInstallCommands
+        valuesCommand={commands.valuesCommand}
+        helmCommand={commands.helmCommand}
+        kubeContext={kubeContext}
+        onKubeContextChange={onKubeContextChange}
+      />
+    );
   }
   return (
     <Button type="button" onClick={onGenerate} disabled={isPreparingInstallation}>
@@ -95,16 +106,19 @@ function ProviderChoice({ setup }: { setup: FleetManagerSetupState }) {
 function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
   const [submittedDraft, setSubmittedDraft] = useState<FleetManagerDraft | null>(null);
   const draft = setup.draft;
+  const kubeContext = draft?.kubeContext ?? "";
   const draftIsValid = setup.validationErrors.length === 0;
-  const submittedDraftIsCurrent = submittedDraft !== null && draft === submittedDraft;
+  const submittedDraftIsCurrent =
+    submittedDraft !== null && draft !== null && sameFleetInstallation(submittedDraft, draft);
   const verification = useFleetManagerVerification(submittedDraftIsCurrent, submittedDraft, setup.metadata);
   const commands = useMemo(() => {
     if (!setup.metadata || !draft || !setup.values) return null;
+    const context = kubeContext.trim();
     return {
       valuesCommand: fleetManagerValuesFileCommand(setup.values),
-      helmCommand: fleetManagerHelmCommand(setup.metadata, draft.namespace),
+      helmCommand: context === "" ? null : fleetManagerHelmCommand(setup.metadata, draft.namespace, context),
     };
-  }, [draft, setup.metadata, setup.values]);
+  }, [draft, kubeContext, setup.metadata, setup.values]);
   const installCopy = installSectionCopy(draftIsValid);
   const canCheck = draftIsValid && !submittedDraftIsCurrent && Boolean(setup.values);
 
@@ -127,6 +141,8 @@ function FleetManagerSetupForm({ setup }: { setup: FleetManagerSetupState }) {
                 ? { valuesCommand: commands.valuesCommand, helmCommand: commands.helmCommand }
                 : null
             }
+            kubeContext={kubeContext}
+            onKubeContextChange={setup.setKubeContext}
             isPreparingInstallation={setup.isPreparingInstallation}
             onGenerate={() => void setup.prepareInstallation()}
           />

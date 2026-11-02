@@ -3,11 +3,12 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as FactoryData from "@/hooks/useFactoryData";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 import { organizationBillingQueryKey } from "@/hooks/useOrganizationBilling";
@@ -17,6 +18,13 @@ import type { PlanningSessionPayload } from "../planningSessionView";
 
 const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
 const billingProductEnabled = { current: true };
+const refinementModels = {
+  current: [] as Array<{ value: string; label: string }>,
+};
+
+vi.mock("../../useWorkOrderRefinementModels", () => ({
+  useWorkOrderRefinementModels: () => ({ defaultModel: "", options: refinementModels.current, isLoading: false }),
+}));
 
 vi.mock("@/hooks/useBillingProductEnabled", () => ({
   useBillingProductEnabled: () => billingProductEnabled.current,
@@ -110,6 +118,7 @@ import {
 import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
+import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { idleLiveLogStream } from "./PhaseLogCard.testHelpers";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
@@ -277,10 +286,13 @@ function runningImplementWithZeroSavedSpend(): SplitRunFixture {
 }
 
 describe("WorkOrderSplitRunPopup", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   beforeEach(() => {
     window.localStorage.clear();
     billingProductEnabled.current = true;
     factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
+    refinementModels.current = [];
     useLiveLogStreamMock.mockReset();
     useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
     findPlanningSessionMock.mockReset();
@@ -293,6 +305,262 @@ describe("WorkOrderSplitRunPopup", () => {
       allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_REBASE"],
       headSha: "abc123",
     };
+  });
+
+  it("shows a failed Backlog run before a planning session exists and clears it for a newer run", async () => {
+    const failed: BacklogAnalysisRun = {
+      canvasId: "backlog-canvas",
+      workOrderId: DRAFT_WORK_ORDER.id!,
+      run: {
+        id: "backlog-failed",
+        createdAt: "2026-11-02T10:00:00Z",
+        state: "STATE_FINISHED",
+        result: "RESULT_FAILED",
+        errors: [
+          'model "gpt-5.4": the selected model is unavailable for this task owner; select another model or clear the override',
+        ],
+      },
+    };
+    const props = {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      analysisRuns: [failed],
+    };
+    const popup = renderPopup(props);
+
+    const alert = await screen.findByRole("alert", { name: "Planning failed" });
+    expect(alert).toHaveTextContent('Model "gpt-5.4" is not available for the current task owner.');
+    expect(alert).toHaveTextContent(
+      "Change the model in Planning settings, or select another model for this task below.",
+    );
+    expect(screen.queryByRole("button", { name: "Try planning again" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
+
+    popup.rerenderPopup({
+      ...props,
+      analysisRuns: [
+        failed,
+        {
+          ...failed,
+          run: { id: "backlog-new", createdAt: "2026-11-02T10:01:00Z", state: "STATE_STARTED" },
+        },
+      ],
+    });
+
+    expect(screen.queryByRole("alert", { name: "Planning failed" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-thinking")).toBeInTheDocument();
+  });
+
+  it("saves a new planning model from the failure alert and shows a save error inline", async () => {
+    const orderId = DRAFT_WORK_ORDER.id!;
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const requests: Array<{ refinementModel?: string }> = [];
+    let rejectSave = true;
+    refinementModels.current = [
+      { value: "gpt-5.6-luna", label: "gpt-5.6-luna" },
+      { value: "gpt-6.1-sol", label: "gpt-6.1-sol" },
+    ];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const path = new URL(request.url).pathname;
+      if (path !== `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${orderId}`) {
+        return originalFetch(input, init);
+      }
+      if (request.method === "GET") {
+        return Response.json({ order: { ...DRAFT_WORK_ORDER, refinementModel: "gpt-5.6-luna" } });
+      }
+      if (request.method === "PATCH") {
+        requests.push(await request.json());
+        if (rejectSave) {
+          return Response.json({ message: "Could not save the planning model." }, { status: 500 });
+        }
+        return Response.json({ order: { ...DRAFT_WORK_ORDER, refinementModel: "gpt-6.1-sol" } });
+      }
+      return originalFetch(input, init);
+    });
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        orderId,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        analysisRuns: [
+          {
+            canvasId: "backlog-canvas",
+            workOrderId: orderId,
+            run: {
+              id: "backlog-failed",
+              createdAt: "2026-11-02T10:00:00Z",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              errors: ['model "gpt-6.1-terra" is unavailable'],
+            },
+          },
+        ],
+      },
+      queryClient,
+    );
+
+    const alert = await screen.findByRole("alert", { name: "Planning failed" });
+    const modelSelect = within(alert).getByRole("button", { name: "Model: gpt-5.6-luna" });
+    await userEvent.click(modelSelect);
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "gpt-6.1-sol" }));
+    expect(requests).toEqual([{ refinementModel: "gpt-6.1-sol" }]);
+    expect(await within(alert).findByText("Could not save the planning model.")).toBeInTheDocument();
+
+    rejectSave = false;
+    await userEvent.click(modelSelect);
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "gpt-6.1-sol" }));
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]).toEqual({ refinementModel: "gpt-6.1-sol" });
+    await waitFor(() =>
+      expect(within(alert).queryByText("Could not save the planning model.")).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ["backlog-analysis-runs", FACTORIES_ORGANIZATION_ID] }),
+    );
+  });
+
+  it("shows the current planning session run failure", async () => {
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "planning-canvas",
+      canvasRunId: "planning-run",
+      executionId: "planning-execution",
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(canvasKeys.run("planning-canvas", "planning-run"), {
+      run: { result: "RESULT_FAILED", errors: ["The selected model is unavailable."] },
+    });
+
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        orderId: DRAFT_WORK_ORDER.id,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      },
+      client,
+    );
+
+    const alert = await screen.findByRole("alert", { name: "Planning failed" });
+    expect(alert).toHaveTextContent("The selected model is unavailable.");
+    expect(alert).toHaveTextContent("Select a model in the task header, then send a new message to continue.");
+    expect(within(alert).queryByRole("button", { name: /Model:/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
+
+    act(() => {
+      client.setQueryData(
+        workOrderPlanningSessionQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, DRAFT_WORK_ORDER.id!),
+        {
+          id: "session-plan",
+          state: "active",
+          canvasId: "planning-canvas",
+          canvasRunId: "planning-retry",
+          executionId: "planning-retry-execution",
+        },
+      );
+      client.setQueryData(canvasKeys.run("planning-canvas", "planning-retry"), {
+        run: { result: "RESULT_UNKNOWN", state: "STATE_STARTED" },
+      });
+    });
+
+    await waitFor(() => expect(screen.queryByRole("alert", { name: "Planning failed" })).not.toBeInTheDocument());
+  });
+
+  it("shows a newer failed Backlog run when an older session has no run", async () => {
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "backlog-canvas",
+    });
+    const failed: BacklogAnalysisRun = {
+      canvasId: "backlog-canvas",
+      workOrderId: DRAFT_WORK_ORDER.id!,
+      run: {
+        id: "backlog-failed",
+        createdAt: "2026-11-02T10:00:00Z",
+        state: "STATE_FINISHED",
+        result: "RESULT_FAILED",
+        errors: ['model "gpt-6.1-terra": the selected model is unavailable for this task owner'],
+      },
+    };
+    const props = {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      analysisRuns: [failed],
+    };
+    const popup = renderPopup(props);
+
+    const alert = await screen.findByRole("alert", { name: "Planning failed" });
+    expect(alert).toHaveTextContent('model "gpt-6.1-terra"');
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
+
+    popup.rerenderPopup({
+      ...props,
+      analysisRuns: [
+        failed,
+        {
+          ...failed,
+          run: { id: "backlog-retry", createdAt: "2026-11-02T10:01:00Z", state: "STATE_STARTED" },
+        },
+      ],
+    });
+
+    expect(screen.queryByRole("alert", { name: "Planning failed" })).not.toBeInTheDocument();
+  });
+
+  it("hides an older session failure when a newer Backlog run starts", async () => {
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "backlog-canvas",
+      canvasRunId: "session-failed",
+      executionId: "session-execution",
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(canvasKeys.run("backlog-canvas", "session-failed"), {
+      run: {
+        id: "session-failed",
+        createdAt: "2026-11-02T10:00:00Z",
+        state: "STATE_FINISHED",
+        result: "RESULT_FAILED",
+        errors: ["The earlier planning run failed."],
+      },
+    });
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        orderId: DRAFT_WORK_ORDER.id,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        analysisRuns: [
+          {
+            canvasId: "backlog-canvas",
+            workOrderId: DRAFT_WORK_ORDER.id!,
+            run: { id: "backlog-retry", createdAt: "2026-11-02T10:01:00Z", state: "STATE_STARTED" },
+          },
+        ],
+      },
+      client,
+    );
+
+    await waitFor(() =>
+      expect(
+        client.getQueryData(
+          workOrderPlanningSessionQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, DRAFT_WORK_ORDER.id!),
+        ),
+      ).toMatchObject({ id: "session-plan" }),
+    );
+    expect(screen.queryByRole("alert", { name: "Planning failed" })).not.toBeInTheDocument();
   });
 
   it("does not poll a missing session when Planning is off", async () => {
@@ -1712,44 +1980,17 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
   });
 
-  it("opens a draft refine view without Automations", () => {
+  it("opens a draft planning chat without a Start action", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
+    const dialog = screen.getByRole("dialog");
     expect(screen.queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
-    const description = screen.getByTestId("split-run-description");
-    expect(description).toHaveClass("justify-end");
-    expect(within(description).getByTestId("split-run-source")).toHaveTextContent("Leonardo DiCaprio");
-    expect(within(description).queryByText("Created manually")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    const card = screen.getByTestId("split-run-intent-status-card");
-    expect(card).toHaveAttribute("data-slot", "frame");
-    expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
-    expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
-    const archive = screen.getByTestId("popup-work-order-archive-button");
-    const share = screen.getByTestId("popup-work-order-copy-link-button");
-    expect(archive).toHaveAttribute("aria-label", "Archive");
-    expect(archive.compareDocumentPosition(share) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
-    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(70rem");
-    expect(screen.getByTestId("work-order-split-run").className).toContain(
-      "has-[[data-refine-chat-solo]]:w-[min(48rem",
-    );
-    expect(screen.getByTestId("work-order-split-run").className).toContain(
-      "has-[[data-refine-plan-open]]:w-[min(80rem",
-    );
-    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
-    expect(screen.queryByRole("button", { name: "Open plan" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-log-pane")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-intent-chat")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-source")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Open plan" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
   it("hides Refine on a backlog draft", () => {
@@ -2013,7 +2254,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(onDispatch).toHaveBeenCalledTimes(1);
   });
 
-  it("tells a draft is under analysis and keeps Archive in the header", () => {
+  it("keeps Archive available while a draft is under analysis", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
         analysisRuns: [
@@ -2036,11 +2277,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
-    const card = screen.getByTestId("split-run-intent-status-card");
-    expect(card).toHaveAttribute("data-slot", "frame");
-    expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
-    expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
   });

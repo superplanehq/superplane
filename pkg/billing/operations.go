@@ -48,6 +48,15 @@ func InitializeOrganization(tx *gorm.DB, organizationID uuid.UUID) error {
 	return implementation.InitializeOrganization(tx, organizationID)
 }
 
+// InitializeDemoOrganization seeds local billing within the owner setup transaction.
+func InitializeDemoOrganization(tx *gorm.DB, organizationID, accountID uuid.UUID) error {
+	implementation, err := Current()
+	if err != nil {
+		return err
+	}
+	return implementation.InitializeDemoOrganization(tx, organizationID, accountID)
+}
+
 func PrepareDeletion(ctx context.Context, organizationID uuid.UUID) (DeletionGuard, error) {
 	implementation, err := Current()
 	if err != nil {

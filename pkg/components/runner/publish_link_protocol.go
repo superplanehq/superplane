@@ -6,15 +6,15 @@ const publishLinkProtocol = `## Task link
 
 You can attach a link, a markdown note, or a file to this task.
 
-Use the publish_link tool, or run one of these commands:
+Use the add_artifact tool, or run one of these commands:
 
 superplane task artifact add-link --url "https://example.com" --name "Staging" --key staging
 
 superplane task artifact add-markdown --file ./notes.md --name "Preview login" --key preview-login
 
-superplane task artifact add-file --file "$SUPERPLANE_TASK_DIR/evidence/login.png" --name "Login" --key login
+superplane task artifact add-file --file "$SUPERPLANE_TASK_DIR/evidence/login.png" --name "Login"
 
---name is the label people see. --key replaces that artifact on the next run. Omit --key to add another artifact. Attach a link only after the deploy succeeds. add-markdown reads the note from --file. add-file uploads a PNG, JPEG, WebP, WebM, or MP4 file from the task evidence directory. A video accepts --poster. For a UI change, inspect the screenshot and use upload_artifact.`
+--name is the label people see. --key replaces the artifact with the same key on the next run. Omit --key to add another artifact. Attach a link only after the deploy succeeds. add-markdown reads the note from --file. add-file uploads a PNG, JPEG, WebP, WebM, or MP4 file from the task directory. Call get_artifact with the path of a screenshot before add-file. That tool returns the image. A video accepts --poster. For a UI change, read the screenshot with get_artifact and attach it with add_artifact.`
 
 const publishLinkProtocolMarker = "## Task link"
 

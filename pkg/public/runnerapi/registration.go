@@ -116,6 +116,9 @@ func (s *Server) registerRunner(w http.ResponseWriter, r *http.Request) {
 		)
 	})
 	switch {
+	case errors.Is(err, models.ErrOrganizationRunnersDisabled), errors.Is(err, models.ErrRunnerFleetDisabled):
+		writeError(w, http.StatusForbidden, err.Error())
+		return
 	case errors.Is(err, models.ErrRunnerVersionMismatch):
 		terminationErr := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 			current, findErr := models.FindRunner(tx, runnerID)

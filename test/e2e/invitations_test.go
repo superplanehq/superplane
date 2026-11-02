@@ -6,6 +6,7 @@ import (
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -62,6 +63,7 @@ func TestInvitations(t *testing.T) {
 	t.Run("operator cannot invite members", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
+		require.NoError(t, models.EnableExperimentalFeature(steps.session.OrgID, features.FeatureFactories))
 		loginAsOperator(steps.t, steps.session)
 		steps.visitMembersSettings()
 		steps.assertMemberVisible(steps.session.Account.Email)

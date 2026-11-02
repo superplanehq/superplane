@@ -155,7 +155,7 @@ func TestOpenDedicatedSQLDB_ConfiguresDedicatedPool(t *testing.T) {
 		t.Skip("DB_HOST not set (run with make test in Docker)")
 	}
 
-	db, err := OpenDedicatedSQLDB("agent-stream-lock-test", 0)
+	db, err := OpenDedicatedSQLDB("database-lock-test", 0)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())

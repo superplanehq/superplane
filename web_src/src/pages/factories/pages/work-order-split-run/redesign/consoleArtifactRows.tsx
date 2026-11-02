@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useFactoryGitHubHost } from "@/hooks/useFactoryGitHubHost";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
@@ -35,6 +36,7 @@ const ARTIFACT_ROW_MAIN = "group flex min-w-0 flex-1 items-center gap-1.5 py-1 t
  * media expand in place. Links and other files open in a new tab.
  */
 export function ArtifactsPage({ stage }: { stage: AutomationStage }) {
+  const githubHost = useFactoryGitHubHost();
   const artifacts = consoleCardArtifacts(stage);
   const single = artifactsPageCount(stage) === 1;
   return (
@@ -45,16 +47,29 @@ export function ArtifactsPage({ stage }: { stage: AutomationStage }) {
         </div>
       ))}
       {artifacts.map((artifact) => (
-        <ArtifactRow key={artifact.id ?? artifactLabel(artifact)} artifact={artifact} defaultOpen={single} />
+        <ArtifactRow
+          key={artifact.id ?? artifactLabel(artifact)}
+          artifact={artifact}
+          defaultOpen={single}
+          githubHost={githubHost}
+        />
       ))}
     </div>
   );
 }
 
-function ArtifactRow({ artifact, defaultOpen }: { artifact: StageArtifact; defaultOpen: boolean }) {
+function ArtifactRow({
+  artifact,
+  defaultOpen,
+  githubHost,
+}: {
+  artifact: StageArtifact;
+  defaultOpen: boolean;
+  githubHost?: string | null;
+}) {
   const kind = consoleArtifactKind(artifact);
   const name = artifactLabel(artifact);
-  const href = safeExternalUrl(artifactOpenHref(artifact)) ?? undefined;
+  const href = safeExternalUrl(artifactOpenHref(artifact, githubHost)) ?? undefined;
   const Icon = artifactKindIcon(kind, artifact);
   const size = artifactSizeLabel(toArtifactDataRecord(artifact.data));
   if (isExpandableArtifact(kind)) {

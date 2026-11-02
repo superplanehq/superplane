@@ -1,8 +1,10 @@
 /** Organization experimental feature: real factories (tasks, lines, factory apps). */
 export const FEATURE_FACTORIES = "factories";
 
+/** Organization-owned fleets and directly managed runners. */
+export const FEATURE_ORGANIZATION_RUNNERS = "organization_runners";
+
 /** Organization experimental feature: Claude managed agents on the canvas. */
-export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 
 /** Organization experimental feature: SetupProvider wizard for GitHub and similar integrations. */
 export const FEATURE_NEW_INTEGRATION_SETUP_FLOW = "new_integration_setup_flow";
@@ -16,7 +18,7 @@ export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 /** Organization experimental feature: workspace skills. */
 export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 
-/** Organization experimental feature: organization LLM Models (BYOK) settings page. */
+/** Organization experimental feature: organization Models (BYOK) settings page. */
 export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
 
 /** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
@@ -31,8 +33,8 @@ export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
 /** Organization experimental feature: public workspace MCP server for Cursor and other MCP clients. */
 export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
 
-/** Organization experimental feature: ChatGPT subscription for factory Codex runs. */
-export const FEATURE_CODEX_SUBSCRIPTIONS = "codex_subscriptions";
-
 /** Organization experimental feature: scheduled task proposals in Backlog. */
 export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
+
+/** Organization experimental feature: Actions timeline on a step card. Off until the organization enables it. */
+export const FEATURE_FACTORY_STEP_ACTIONS = "factory_step_actions";

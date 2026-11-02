@@ -35,6 +35,7 @@ export type FactorySettingsSection =
   | "usage"
   | "billing"
   | "members"
+  | "fleets"
   | "integrations"
   | "api-keys"
   | "secrets";
@@ -125,7 +126,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
       },
       {
         id: "account-codex-usage",
-        label: "Codex usage",
+        label: "Codex",
         Icon: BarChart3,
         scope: "account",
         section: "codex-usage",
@@ -171,6 +172,32 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "issue intake",
           "pull request automations",
           "save repository",
+        ],
+      },
+      {
+        id: "workspace-models",
+        label: "Models",
+        Icon: Cpu,
+        scope: "workspace",
+        section: "models",
+        permission: { resource: "factories", action: "read" },
+        keywords: [
+          "llm",
+          "ai",
+          "allowlist",
+          "claude",
+          "openai",
+          "openrouter",
+          "anthropic",
+          "use your keys",
+          "byok",
+          "your keys",
+          "your api key",
+          "chatgpt",
+          "subscription",
+          "superplane",
+          "inherit",
+          "select models",
         ],
       },
       {
@@ -227,6 +254,15 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         keywords: ["invite", "copy link", "people", "team", "role", "email", "name", "remove", "owner", "admin"],
       },
       {
+        id: "organization-fleets",
+        label: "Fleets",
+        Icon: Server,
+        scope: "organization",
+        section: "fleets",
+        permission: { resource: "org", action: "read" },
+        keywords: ["runners", "capacity", "self-hosted", "registration", "machines"],
+      },
+      {
         id: "organization-integrations",
         label: "Integrations",
         Icon: Plug,
@@ -234,27 +270,6 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         section: "integrations",
         permission: { resource: "integrations", action: "read" },
         keywords: ["connect", "filter integrations", "github", "slack", "request it"],
-      },
-      {
-        id: "organization-models",
-        label: "LLM Models",
-        Icon: Cpu,
-        scope: "organization",
-        section: "models",
-        permission: { resource: "org", action: "read" },
-        keywords: [
-          "llm",
-          "ai",
-          "allowlist",
-          "claude",
-          "openai",
-          "openrouter",
-          "anthropic",
-          "use your keys",
-          "byok",
-          "your keys",
-          "select models",
-        ],
       },
       {
         id: "organization-model-status",

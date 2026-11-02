@@ -7,6 +7,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -270,4 +271,108 @@ func TestPollTaskFinishesLostTask(t *testing.T) {
 	result := payload["data"].(map[string]any)
 	assert.Equal(t, "failed", result["status"])
 	assert.Equal(t, "runner task was lost", result["error"])
+}
+
+func TestPollTaskExposesCodexFailureCause(t *testing.T) {
+	const providerError = "Your ChatGPT subscription has reached its usage limit."
+	for _, tc := range []struct {
+		name              string
+		finishedEventType string
+		runnerError       string
+		result            json.RawMessage
+		expectedError     string
+	}{
+		{
+			name:          "provider error without a runner error",
+			result:        json.RawMessage(`{"type":"result","is_error":true,"error":"` + providerError + `","result":"private task output"}`),
+			expectedError: providerError,
+		},
+		{
+			name:          "provider error replaces shell exit code",
+			runnerError:   "exit code 1",
+			result:        json.RawMessage(`{"type":"result","is_error":true,"error":"` + providerError + `"}`),
+			expectedError: providerError,
+		},
+		{
+			name:          "provider error replaces process exit status",
+			runnerError:   "exit status 1",
+			result:        json.RawMessage(`{"type":"result","is_error":true,"error":"` + providerError + `"}`),
+			expectedError: providerError,
+		},
+		{
+			name:          "runner timeout takes precedence",
+			runnerError:   "execution timed out",
+			result:        json.RawMessage(`{"type":"result","is_error":true,"error":"` + providerError + `"}`),
+			expectedError: "execution timed out",
+		},
+		{
+			name:          "a previous successful turn does not supply an error",
+			runnerError:   "exit code 1",
+			result:        json.RawMessage(`{"type":"result","is_error":false,"error":"stale error"}`),
+			expectedError: "exit code 1",
+		},
+		{
+			name:              "other components keep their result as ordinary output",
+			finishedEventType: RunBashFinishedEventType,
+			runnerError:       "exit code 1",
+			result:            json.RawMessage(`{"type":"result","is_error":true,"error":"ordinary output field"}`),
+			expectedError:     "exit code 1",
+		},
+		{
+			name: "failure without a retained cause still produces a warning",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			finishedEventType := tc.finishedEventType
+			if finishedEventType == "" {
+				finishedEventType = "runnerCodex.finished"
+			}
+			logger, hook := logtest.NewNullLogger()
+			state := &contexts.ExecutionStateContext{}
+			ctx := core.ActionHookContext{
+				RunnerTasks: &contexts.RunnerTaskContext{Task: &core.RunnerTask{
+					ID: "task-1", State: "failed", ExitCode: intPtr(1),
+					ErrorMessage: tc.runnerError, Result: tc.result,
+				}},
+				ExecutionState: state,
+				Parameters:     map[string]any{"task_id": "task-1", "organization_id": "org-1"},
+				Logger: log.NewEntry(logger).WithFields(log.Fields{
+					"execution": "execution-1", "root_event": "root-1",
+				}),
+			}
+
+			require.NoError(t, pollTask(ctx, finishedEventType))
+			assert.Equal(t, FailedOutputChannel, state.Channel)
+			require.Len(t, state.Payloads, 1)
+			payload := state.Payloads[0].(map[string]any)["data"].(map[string]any)
+			if tc.expectedError == "" {
+				assert.NotContains(t, payload, "error")
+			} else {
+				assert.Equal(t, tc.expectedError, payload["error"])
+			}
+
+			require.Len(t, hook.AllEntries(), 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, log.WarnLevel, entry.Level)
+			assert.Equal(t, "runner.task", entry.Data["component"])
+			assert.Equal(t, "org-1", entry.Data["organization_id"])
+			assert.Equal(t, "task-1", entry.Data["task_id"])
+			assert.Equal(t, "execution-1", entry.Data["execution"])
+			assert.Equal(t, "root-1", entry.Data["root_event"])
+			assert.Equal(t, "failed", entry.Data["status"])
+			assert.Equal(t, 1, entry.Data["exit_code"])
+			if tc.expectedError == "" {
+				assert.NotContains(t, entry.Data, "error")
+			} else {
+				assert.Equal(t, tc.expectedError, entry.Data["error"])
+			}
+			assert.NotContains(t, entry.Data, "result")
+			logged, err := json.Marshal(entry.Data)
+			require.NoError(t, err)
+			assert.NotContains(t, string(logged), "private task output")
+
+			require.NoError(t, pollTask(ctx, finishedEventType))
+			assert.Len(t, hook.AllEntries(), 1, "completed execution must not log the failure again")
+		})
+	}
 }

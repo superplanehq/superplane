@@ -369,7 +369,7 @@ func TestRunnerArtifactUploadFromPRDiscussion(t *testing.T) {
 	assert.Nil(t, runContext.LineExecution)
 
 	t.Setenv("JWT_SECRET", "test")
-	assertTaskOwnerRunAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
+	assertRunnerOwnerAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
 	environment := runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
 		ID:         nodeExecution.ID,
 		RunID:      run.ID,
@@ -466,7 +466,7 @@ func TestRunnerArtifactUploadFromVisualEvidence(t *testing.T) {
 	assert.Nil(t, runContext.LineExecution)
 
 	t.Setenv("JWT_SECRET", "test")
-	assertTaskOwnerRunAccess(t, newRunnerArtifactTestServer(t, r, jwt.NewSigner("test")), core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
+	assertRunnerOwnerAccess(t, newRunnerArtifactTestServer(t, r, jwt.NewSigner("test")), core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
 	environment := runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
 		ID:         nodeExecution.ID,
 		RunID:      run.ID,
@@ -545,7 +545,7 @@ func TestRunnerPublishLinkFromCustomAutomation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, order.ID, runContext.WorkOrderID)
 	assert.True(t, runContext.PublishLinks)
-	assertTaskOwnerRunAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
+	assertRunnerOwnerAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
 
 	environment := runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
 		ID:         nodeExecution.ID,

@@ -7,7 +7,7 @@ import {
   TimelineSeparator,
   TimelineTitle,
 } from "@/components/reui/timeline";
-import superplaneIcon from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { Bot } from "lucide-react";
@@ -30,7 +30,7 @@ function intakeSourceIcon(source?: SplitRunSource): { src: string; alt: string }
   if (source?.kind === "intake" || source?.kind === "mcp") {
     return { src: source.iconSrc, alt: source.iconAlt };
   }
-  return { src: superplaneIcon, alt: "SuperPlane" };
+  return { src: superplaneMark, alt: "SuperPlane" };
 }
 
 /** Invert a dark logo on the foreground disk. The disk is light in dark mode. */

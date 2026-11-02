@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner/openrouter"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -94,7 +95,7 @@ func (c *RunSuperPlane) Configuration() []configuration.Field {
 		runner.AgentStepsField(
 			"Ordered bash commands and SuperPlane agent prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",
-			"git clone https://github.com/org/repo.git /tmp/repo",
+			"git clone "+githubcommon.DotCom().CloneURL("org/repo")+" /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
 		runner.AgentAdditionalInstructionsField(),
@@ -149,11 +150,12 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
-	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
+	var merge *runner.MergeConfidenceScope
+	environment, merge, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps)
 	if err != nil {
 		return err
 	}
-	environment = runner.AttachTaskOwnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds, merge)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
@@ -171,7 +173,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	commands = runner.ApplyFactoryCheckout(files, commands, spec.Steps)
 	environment, files = runner.AttachFactoryCommitIdentity(ctx, environment, files)
 	files = runner.AppendTaskArtifactMCP(environment, files)
-	files = runner.AppendMergeConfidenceMCP(environment, files)
+	files = runner.AppendGlobalMCP(environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {
 		access, err = mintOpenRouterRunnerKey(ctx, access, spec.ExecutionTimeoutSeconds)

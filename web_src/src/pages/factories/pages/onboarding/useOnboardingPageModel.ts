@@ -12,9 +12,9 @@ import {
   useDeleteFactoryIntake,
   useUpdateFactoryIntake,
 } from "@/hooks/useFactoryIntakeData";
-import { resolveGithubDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { resolveRepositoryDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
-import { getApiErrorMessage } from "@/lib/errors";
+import { githubHostFromIntegration } from "@/lib/githubHost";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
@@ -26,17 +26,14 @@ import { useSearchParams } from "react-router";
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
 import {
-  describeInstallationName,
-  githubIntegrationSelection,
-  selectionsWithSavedVcsInstallation,
-} from "./githubIntegrationSelection";
-import {
-  AGENT_PROVIDER_IDS,
-  CODEX_SUBSCRIPTION_PLAN,
-  isHostedAgentReady,
-  type OnboardingAgentPlan,
-} from "./onboardingAgentReadiness";
-import { useCodexSubscriptionModel } from "./useFactoryCodexConnection";
+  runSave,
+  saveBitbucketForgeRepository,
+  saveBitbucketRepository,
+  saveCatalogRepository,
+  useDefaultBranchGate,
+  type OnboardingRepositorySelection,
+} from "./selectOnboardingRepository";
+import { AGENT_PROVIDER_IDS, isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
@@ -44,6 +41,11 @@ import { useOnboardingAgentPageState } from "./useOnboardingAgentPageState";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
+import {
+  githubEnterpriseOnboardingActions,
+  readOnboardingGithubEnterprise,
+  vcsOnboardingIntegrationIds,
+} from "./onboardingGithubEnterprise";
 import {
   apiIssuesSource,
   initialWizardStep,
@@ -94,19 +96,6 @@ function useRestoreIntegrationReadiness(setup: OnboardingSetupApi, selections: I
     if (!selections.claude?.ready) return;
     setAgent("claude-code");
   }, [selections.claude?.ready, setAgent]);
-}
-
-async function runSave(setSaving: (saving: boolean) => void, action: () => Promise<unknown>): Promise<boolean> {
-  setSaving(true);
-  try {
-    await action();
-    return true;
-  } catch (error) {
-    showErrorToast(getApiErrorMessage(error, "Failed to save workspace setup"));
-    return false;
-  } finally {
-    setSaving(false);
-  }
 }
 
 function useSectionSaves(args: {
@@ -209,40 +198,23 @@ type OnboardingGithubSavesAndFinishArgs = {
   mutations: ReturnType<typeof useOnboardingMutations>;
   setSaving: (saving: boolean) => void;
   setProvisionedDestination: (destination: OnboardingDestination | null) => void;
+  onMissingDefaultBranch?: () => void;
   agent: ReturnType<typeof useOnboardingAgentContext>;
 };
-
-async function rememberBitbucketInstallation(
-  organizationId: string,
-  integrationId: string,
-  setSelections: (update: (current: IntegrationSelections) => IntegrationSelections) => void,
-) {
-  const installationName = await describeInstallationName(organizationId, integrationId);
-  if (!installationName.trim() || installationName.trim() === integrationId.trim()) {
-    throw new Error("Bitbucket integration name is missing");
-  }
-  setSelections((current) =>
-    selectionsWithSavedVcsInstallation(
-      { vcsIntegrationId: integrationId, vcsProvider: "bitbucket" },
-      current,
-      installationName,
-    ),
-  );
-}
-
-function readyIntegrationId(selection: { ready?: boolean; id: string } | undefined): string {
-  return selection?.ready ? selection.id : "";
-}
 
 function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishArgs) {
   const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, deleteIntake, installer } =
     args.mutations;
-  const githubIntegrationId = readyIntegrationId(args.integrations.selections.github);
-  const bitbucketIntegrationId = readyIntegrationId(args.integrations.selections.bitbucket);
-  const branchIntegrationId =
-    args.setup.vcsHost === "bitbucket"
-      ? (args.integrations.selections.bitbucket?.id ?? "")
-      : (args.integrations.selections.github?.id ?? "");
+  const { githubIntegrationId, bitbucketIntegrationId, branchIntegrationId } = vcsOnboardingIntegrationIds({
+    githubSelectionId: args.integrations.selections.github?.id,
+    bitbucketReady: args.integrations.selections.bitbucket?.ready,
+    bitbucketId: args.integrations.selections.bitbucket?.id,
+    githubId: args.integrations.selections.github?.id,
+    vcsHost: args.setup.vcsHost,
+    vcsProvider: args.factory?.onboarding?.vcsProvider,
+    vcsIntegrationId: args.factory?.onboarding?.vcsIntegrationId,
+    rememberedIntegrationId: readOnboardingGithubEnterprise(args.factoryId).integrationId,
+  });
   const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, args.integrations.selections.jira);
   const linear = useOnboardingLinearBinding(args.organizationId, args.factoryId, args.integrations.selections.linear);
   const takenNames = useMemo(
@@ -275,7 +247,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     deleteIntake: deleteIntake.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
-      resolveGithubDefaultBranch(args.organizationId, branchIntegrationId, repository),
+      resolveRepositoryDefaultBranch(args.organizationId, branchIntegrationId, repository),
     remainingCreditCents: args.agent.remainingCreditCents,
     hostedModelsLoading: args.agent.hostedModelsLoading,
     plan: args.agent.plan,
@@ -283,6 +255,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     jiraProjectId: jira.jiraProjectId,
     jiraCompletion: jira.jiraCompletion,
     linearProjectIds: linear.linearProjectIds,
+    onMissingDefaultBranch: args.onMissingDefaultBranch,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;
@@ -290,65 +263,50 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     onProvisioned: args.setProvisionedDestination,
   });
   const finishSetup = useFinishSetupAction({ ...args, finish });
-  const selectCatalogRepository = async (repository: {
-    repositoryId?: string;
-    fullName?: string;
-  }): Promise<boolean> => {
-    if (!repository.repositoryId || !repository.fullName) return false;
-    const repositoryId = repository.repositoryId;
-    const fullName = repository.fullName;
-    return runSave(args.setSaving, async () => {
-      const factory = await args.mutations.selectGitHubRepository.mutateAsync(repositoryId);
-      const integrationId = factory.onboarding?.vcsIntegrationId;
-      if (!integrationId) throw new Error("GitHub repository selection returned no integration");
-      const installationName = await describeInstallationName(args.organizationId, integrationId);
-      args.connect.rememberPreferredInstance("github", integrationId);
-      await args.connect.refetchConnections();
-      args.integrations.setSelections((current) => ({
-        ...current,
-        github: githubIntegrationSelection(integrationId, installationName),
-      }));
-      args.setup.selectVcsHost("github");
-      args.setup.selectRepo(fullName);
-    });
+  const repositorySelection: OnboardingRepositorySelection = {
+    organizationId: args.organizationId,
+    setSaving: args.setSaving,
+    selectGitHubRepository: (repositoryId) => args.mutations.selectGitHubRepository.mutateAsync(repositoryId),
+    selectBitbucketForgeRepository: (input) => args.mutations.selectBitbucketForgeRepository.mutateAsync(input),
+    updateOnboarding: (input) => updateOnboarding.mutateAsync(input),
+    bitbucketIntegrationId,
+    rememberPreferredInstance: args.connect.rememberPreferredInstance,
+    refetchConnections: () => args.connect.refetchConnections(),
+    setSelections: args.integrations.setSelections,
+    selectVcsHost: args.setup.selectVcsHost,
+    selectRepo: args.setup.selectRepo,
   };
+  const selectCatalogRepository = (repository: { repositoryId?: string; fullName?: string }) =>
+    saveCatalogRepository(repositorySelection, repository);
   // The backend reads the provider from the integration, so the workspace
   // becomes a Bitbucket workspace when this save completes.
-  const selectBitbucketForgeRepository = async (fullName: string): Promise<boolean> => {
-    if (!fullName) return false;
-    return runSave(args.setSaving, async () => {
-      const factory = await args.mutations.selectBitbucketForgeRepository.mutateAsync({ repository: fullName });
-      const integrationId = factory.onboarding?.vcsIntegrationId;
-      if (!integrationId) throw new Error("Bitbucket repository selection returned no integration");
-      args.connect.rememberPreferredInstance("bitbucket", integrationId);
-      await args.connect.refetchConnections();
-      await rememberBitbucketInstallation(args.organizationId, integrationId, args.integrations.setSelections);
-      args.setup.selectVcsHost("bitbucket");
-      args.setup.selectRepo(fullName);
-    });
-  };
-  const selectBitbucketRepository = async (fullName: string): Promise<boolean> => {
-    if (!bitbucketIntegrationId || !fullName) return false;
-    return runSave(args.setSaving, async () => {
-      await updateOnboarding.mutateAsync({
-        vcsIntegrationId: bitbucketIntegrationId,
-        appRepository: fullName,
-        backlogRepository: fullName,
-      });
-      args.setup.selectVcsHost("bitbucket");
-      args.setup.selectRepo(fullName);
-    });
-  };
+  const selectBitbucketForgeRepository = (fullName: string) =>
+    saveBitbucketForgeRepository(repositorySelection, fullName);
+  const selectBitbucketRepository = (fullName: string) => saveBitbucketRepository(repositorySelection, fullName);
 
   return {
     githubIntegrationId,
     bitbucketIntegrationId,
+    branchIntegrationId,
     saves,
     githubOwner,
     finishSetup,
     selectCatalogRepository,
-    selectBitbucketRepository,
     selectBitbucketForgeRepository,
+    selectBitbucketRepository,
+    ...githubEnterpriseOnboardingActions({
+      organizationId: args.organizationId,
+      factoryId: args.factoryId,
+      githubIntegrationId,
+      setSaving: args.setSaving,
+      updateOnboarding: updateOnboarding.mutateAsync,
+      rememberPreferredInstance: args.connect.rememberPreferredInstance,
+      refetchConnections: args.connect.refetchConnections,
+      setSelections: args.integrations.setSelections,
+      selectVcsHost: args.setup.selectVcsHost,
+      selectRepo: args.setup.selectRepo,
+      runSave,
+    }),
     jira,
     linear,
     installer,
@@ -370,6 +328,31 @@ function onboardingSetupOptions(
     persistVcsHostKey: factoryId,
     persistRepoKey: factoryId,
     persistInitialImportKey: factoryId,
+  };
+}
+
+function wiredVcsFields(
+  wired: ReturnType<typeof useOnboardingGithubSavesAndFinish>,
+  connectedIntegrations: Array<{
+    metadata?: { id?: string | null; integrationName?: string | null };
+    spec?: { configuration?: Record<string, unknown> | null };
+    status?: { properties?: { name?: string | null; value?: string | null }[] | null };
+  }>,
+) {
+  const githubIntegrationId = wired.githubIntegrationId;
+  const githubHost = githubHostFromIntegration(
+    connectedIntegrations.find((item) => item.metadata?.id === githubIntegrationId),
+  );
+  return {
+    selectCatalogRepository: wired.selectCatalogRepository,
+    selectBitbucketRepository: wired.selectBitbucketRepository,
+    selectBitbucketForgeRepository: wired.selectBitbucketForgeRepository,
+    selectGitHubEnterpriseRepository: wired.selectGitHubEnterpriseRepository,
+    bindGitHubEnterpriseIntegration: wired.bindGitHubEnterpriseIntegration,
+    githubIntegrationId,
+    githubHost,
+    bitbucketIntegrationId: wired.bitbucketIntegrationId,
+    branchIntegrationId: wired.branchIntegrationId,
   };
 }
 
@@ -415,8 +398,6 @@ export function useOnboardingPageModel(args: {
     connectedIntegrations,
     agentIntegrationId: onboarding?.agentIntegrationId,
   });
-  const codex = useCodexSubscriptionModel(args.organizationId, args.factoryId);
-  const finishAgent = agentCredentialChoice === "subscription" ? { ...agent, plan: CODEX_SUBSCRIPTION_PLAN } : agent;
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
   const setup = useOnboardingSetupState(
     args.factory?.name ?? "",
@@ -442,6 +423,7 @@ export function useOnboardingPageModel(args: {
   const [saving, setSaving] = useState(false);
   const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
   const mutations = useOnboardingMutations(args.organizationId, args.factoryId);
+  const branchGate = useDefaultBranchGate(setSaving, mutations.updateOnboarding.mutateAsync);
   const wired = useOnboardingGithubSavesAndFinish({
     ...args,
     reresolveWorkspace: args.reresolveWorkspace ?? null,
@@ -454,7 +436,8 @@ export function useOnboardingPageModel(args: {
     mutations,
     setSaving,
     setProvisionedDestination,
-    agent: finishAgent,
+    onMissingDefaultBranch: branchGate.onMissingDefaultBranch,
+    agent,
   });
 
   const requestConnect = (id: IntegrationId) => {
@@ -473,7 +456,6 @@ export function useOnboardingPageModel(args: {
   return {
     setup,
     hostedAgentReady: isHostedAgentReady(agent.plan),
-    ...codex,
     hostedModelsAvailable: agent.hostedModelsAvailable,
     hostedModelsAvailableLoading: agent.hostedModelsAvailableLoading,
     bringYourOwnKey: bringYourOwnKey.allowed,
@@ -486,10 +468,8 @@ export function useOnboardingPageModel(args: {
     openSection,
     setOpenSection,
     requestConnect,
-    selectCatalogRepository: wired.selectCatalogRepository,
-    selectBitbucketRepository: wired.selectBitbucketRepository,
-    selectBitbucketForgeRepository: wired.selectBitbucketForgeRepository,
-    bitbucketIntegrationId: wired.bitbucketIntegrationId,
+    ...wiredVcsFields(wired, connectedIntegrations),
+    ...branchGate.model,
     integrationDialogs: createElement(OnboardingConnectDialogs, {
       connectDialogs: connect.dialogs,
       customProviderOpen: customProviderDialogOpen,

@@ -1,6 +1,6 @@
 import type { CanvasesCanvasRun, CanvasesCanvasVersion } from "@/api-client";
 import { RunsTabPanelContent } from "@/components/CanvasToolSidebar/RunsTabPanel";
-import type { RunFiltersState } from "@/components/CanvasToolSidebar/useRunFilters";
+import type { RunFiltersState } from "@/hooks/useRunFilters";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
 import type { CanvasVersionListItem } from "@/pages/app/lib/canvas-versions";
 import type { ReactNode } from "react";

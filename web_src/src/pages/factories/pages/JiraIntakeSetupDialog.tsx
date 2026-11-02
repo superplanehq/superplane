@@ -1,3 +1,4 @@
+import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import type { OrganizationsIntegration } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +73,7 @@ export function JiraIntakeSetupDialog(props: JiraIntakeSetupDialogProps) {
             ) : null}
           </div>
         )}
+        <IntakeSetupDefaultOwner owner={setup.owner} disabled={setup.createIntake.isPending} />
       </IntakeSetupWizard>
       <IntegrationCreateDialog
         open={setup.connectOpen}

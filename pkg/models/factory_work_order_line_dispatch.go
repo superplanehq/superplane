@@ -523,7 +523,7 @@ func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) ([]*FactoryLin
 // on the same history. The second return includes admitted runs and failed
 // attempts, including waiters this retry admitted. The caller publishes
 // runs and task refreshes after commit.
-func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepIndex int) (*FactoryLineStepResult, []*FactoryLineStepResult, error) {
+func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepIndex int, startOptions ...FactoryLineStartOptions) (*FactoryLineStepResult, []*FactoryLineStepResult, error) {
 	if stepIndex < 0 {
 		return nil, nil, ErrFactoryLineStepOutOfRange
 	}
@@ -545,17 +545,38 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 	// order, so it must end before the new one opens.
 	target := pickDispatchForStepRetry(onLine, stepIndex)
 	if target == nil {
+		var options FactoryLineStartOptions
+		if len(startOptions) > 0 {
+			options = startOptions[0]
+		}
+		if stepIndex >= len(line.Steps) {
+			return nil, nil, ErrFactoryLineStepOutOfRange
+		}
+		for _, step := range line.Steps[stepIndex:] {
+			if err := o.ValidateSubscriptionCanvasModels(tx, step.AppID, options.Model); err != nil {
+				return nil, nil, err
+			}
+		}
 		abandoned, err := o.AbandonActiveLineDispatch(tx)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		_, result, err := line.DispatchFrom(tx, o, stepIndex)
+		_, result, err := line.DispatchFromWithModel(tx, o, stepIndex, options.Model, options.ThinkingLevel)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		return result, append(abandoned, lineStepExecutionResults(result)...), nil
+	}
+	options := FactoryLineStartOptions{Model: target.Model, ThinkingLevel: target.ThinkingLevel}
+	if stepIndex >= len(target.Steps) {
+		return nil, nil, ErrFactoryLineStepOutOfRange
+	}
+	for _, step := range target.Steps[stepIndex:] {
+		if err := o.ValidateSubscriptionCanvasModels(tx, step.AppID, options.Model); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	var started []*FactoryLineStepResult

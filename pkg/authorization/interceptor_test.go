@@ -269,22 +269,6 @@ func TestGatewayAuthorizerSetsOrganizationContext(t *testing.T) {
 	assert.Equal(t, "canvas-123", PathParamsFromContext(ctx)["id"])
 }
 
-func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
-	rules := DefaultAuthorizationRules()
-	routes := []HTTPRoute{
-		{Method: http.MethodGet, Pattern: "/api/v1/agents/canvases/{canvas_id}/chat"},
-		{Method: http.MethodPost, Pattern: "/api/v1/agents/canvases/{canvas_id}/chat/reset"},
-		{Method: http.MethodPost, Pattern: "/api/v1/agents/chats/{chat_id}/messages"},
-		{Method: http.MethodGet, Pattern: "/api/v1/agents/chats/{chat_id}/messages"},
-	}
-
-	for _, route := range routes {
-		rule, ok := rules[route]
-		require.True(t, ok, route.String())
-		assert.Equal(t, []string{features.FeatureClaudeManagedAgents}, rule.RequiredExperimentalFeatures)
-	}
-}
-
 func TestSetFactoryVisibilityRequiresPublish(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	rule, ok := rules[HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/factories/{id}/visibility"}]
@@ -517,7 +501,7 @@ func TestListOrganizationCreditGrantsUsesOrgRead(t *testing.T) {
 func TestListOrganizationRunnerFleetsUsesOrgRead(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 
-	rule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/organizations/{id}/fleets"}]
+	rule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/organizations/{id}/fleets/available"}]
 	require.True(t, ok)
 	assert.Equal(t, "org", rule.Resource)
 	assert.Equal(t, "read", rule.Action)

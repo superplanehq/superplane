@@ -11,10 +11,6 @@ type Feature struct {
 	Released    *bool
 }
 
-// FeatureClaudeManagedAgents enables the managed-agents chat experience on a
-// per-organization basis until the integration is generally available.
-const FeatureClaudeManagedAgents = "claude_managed_agents"
-
 // FeatureFactories enables software factories (work orders, lines, factory apps)
 // for a organization until the feature is generally available.
 const FeatureFactories = "factories"
@@ -35,16 +31,12 @@ const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 
 const FeatureFactoryScheduledIntake = "factory_scheduled_intake"
 
-// FeatureWorkspaceModels gates the in-progress workspace Models settings
-// page until it is ready for general use.
-const FeatureWorkspaceModels = "workspace_models"
-
-// FeatureOrganizationBYOK gates the organization LLM Models settings page
+// FeatureOrganizationBYOK gates the organization Models settings page
 // until the BYOK UX is ready for general use.
 const FeatureOrganizationBYOK = "organization_byok"
 
 // FeatureOrganizationBYOKCustomProvider gates a custom model provider on the
-// organization LLM Models page. It requires FeatureOrganizationBYOK as well.
+// organization Models page. It requires FeatureOrganizationBYOK as well.
 const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
 
 // FeatureFactoryCustomAutomations gates custom automations on Verify, Done,
@@ -53,10 +45,6 @@ const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
-
-// FeatureCodexSubscriptions gates ChatGPT subscription sign-in for one
-// factory. The organization must enable it explicitly.
-const FeatureCodexSubscriptions = "codex_subscriptions"
 
 // FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
 // the Merge button on pull request review until the feature is generally
@@ -68,26 +56,37 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
+// FeatureGitHubEnterpriseServer is registered and off. GitHub Enterprise Server
+// setup answers that the server is not available yet. Connecting a GitHub
+// Enterprise Server host also requires the github_enterprise license.
+const FeatureGitHubEnterpriseServer = "github_enterprise_server"
+
+// FeatureFactoryStepActions shows the Actions timeline on a step card.
+// An organization must enable it.
+const FeatureFactoryStepActions = "factory_step_actions"
+
+const FeatureOrganizationRunners = "organization_runners"
+
 func released() *bool {
 	v := true
 	return &v
 }
 
 var registry = []Feature{
-	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
+	{ID: FeatureGitHubEnterpriseServer, Label: "GitHub Enterprise Server", Description: "Connect GitHub Enterprise Server. This option is not available yet"},
+	{ID: FeatureOrganizationRunners, Label: "Organization runners", Description: "Manage self-hosted fleets and runners for an organization"},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryScheduledIntake, Label: "Scheduled Intake", Description: "Propose backlog tasks on a schedule"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
-	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
-	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
+	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add custom automations to board columns"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
-	{ID: FeatureCodexSubscriptions, Label: "ChatGPT Subscription", Description: "Sign in to ChatGPT once and reuse that subscription on factory Codex runs"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
+	{ID: FeatureFactoryStepActions, Label: "Step actions", Description: "Show agent action reasons on the step card"},
 }
 
 func All() []Feature {

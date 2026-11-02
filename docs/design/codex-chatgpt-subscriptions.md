@@ -12,7 +12,68 @@ agents on a ChatGPT subscription instead of an API key.
   [#8739](https://github.com/superplanehq/superplane/pull/8739) →
   [#8741](https://github.com/superplanehq/superplane/pull/8741) →
   [#8742](https://github.com/superplanehq/superplane/pull/8742)
-- **Feature flag:** `codex_subscriptions` (organization experimental feature, not released)
+- **Availability:** ChatGPT subscription is available for every organization that can use factories. The organization flag `codex_subscriptions` is removed.
+
+## Personal connections and workspace activation
+
+Each active human member connects one subscription per organization. The same
+connection serves that member in all organization workspaces. Access does not
+use an organization feature flag. No new services, environment variables, or
+Secret keys are required.
+
+Factories access is required for new sign-in, catalog refresh, and run admission.
+Disabling factories access does not interrupt existing leases. Membership and
+revocation checks still apply when runners fetch or refresh credentials.
+
+**Settings → Account → Codex** is available before connection. Its existing
+`account/codex-usage` URL remains valid. Connecting, refreshing, or disconnecting
+changes the personal connection only.
+
+**Settings → Models** requires an explicit default task owner and switch
+confirmation. Confirmation saves the workspace default and replaces every
+intake default owner, including scheduled intakes. New intakes inherit that
+default unless they specify another eligible owner. An unavailable saved
+default requires a new selection. Admin automation reset preserves the saved
+workspace default and intake choices.
+
+The workspace model policy lists the combined catalogs of eligible connected
+members. Each task can use only its actual owner's subscription and the models
+that its workspace permits. Members never borrow another member's credentials.
+
+Personal APIs use `/api/v1/me/codex-connection` for describe, start/refresh,
+cancel, and disconnect. Existing factory endpoints adapt to the same connection.
+Closing setup ends its continuation. Only **Cancel sign-in** cancels the shared
+connection attempt.
+
+Connections retain their encrypted IDs and table names. Their unique key is
+`(organization_id, owner_user_id)`. Run leases carry a required workspace ID;
+login and catalog-refresh leases have no workspace. Runner callbacks, refresh,
+admission, and token renewal validate the persisted lease. Exclusive operations
+and refresh locks apply across all workspaces using the connection.
+
+Connection events reach every active workspace in the organization. Workspace
+deletion preserves personal credentials. Member removal revokes all use of that
+member's connection. Organization cleanup waits for leases before deleting
+connections and users.
+
+### Organization connection migration
+
+Deploy the API and worker changes together in a drained migration window:
+
+1. Stop new Codex admissions and sign-in attempts on all API and worker processes.
+2. Let runs finish. Confirm deletion of login and catalog-refresh runner VMs.
+3. Verify that `factory_codex_leases` is empty. The migration aborts atomically if any lease remains.
+4. Apply `20261030121001_organization-codex-connections`.
+5. Start the matching API and worker versions together, then resume admissions.
+
+The migration preserves the sole usable ready connection for each member and
+organization. Multiple usable bundles require reconnection because they can
+represent different accounts. Obsolete credentials and usage are cleared before
+duplicate rows are removed. Workspace sources and intake owners remain
+unchanged until explicit switch confirmation.
+
+The original phased proposal below records the earlier design. This section
+supersedes its workspace-scoped connections and single-member restriction.
 
 ## Decision Summary
 
@@ -29,8 +90,7 @@ agents on a ChatGPT subscription instead of an API key.
   billable.
 - In this phase, only organizations with exactly one active human member can
   connect a subscription. Multi-member organizations are an open question.
-- The feature stays behind `codex_subscriptions` until an internal
-  organization verifies a live sign-in.
+- ChatGPT subscription does not use an organization feature flag.
 
 ## Problem
 
@@ -198,15 +258,14 @@ Codex reports.
 - **R38.** Whether the sign-in and catalog-refresh runner time counts as billable
   compute is TBD.
 
-### Feature flag and rollout
+### Availability
 
-- **R39.** All codex-connection API routes require the `factories` and
-  `codex_subscriptions` features. The runner endpoints check eligibility again.
-- **R40.** The flag label is "ChatGPT Subscription". The flag is off by default
-  and is not marked released.
-- **R41.** Turning the flag off makes the subscription unavailable to new runs
-  (`ErrCodexConnectionUnavailable`). The effect on runs that are already in
-  flight is TBD.
+- **R39.** Codex-connection API routes require the `factories` feature. The
+  runner endpoints check membership again.
+- **R40.** ChatGPT subscription has no organization feature flag. Every
+  organization that can use factories can connect a subscription.
+- **R41.** A missing connection or an inactive member blocks a new run. A run
+  that already holds a lease continues.
 
 ## UX Overview
 
@@ -220,7 +279,7 @@ Codex reports.
    user can choose another model source.
 4. **Ready.** "ChatGPT is connected as {account}." Reconnect shows "Connect
    ChatGPT again."
-5. **Settings → LLM Models.** A "ChatGPT" badge and the read-only subscription
+5. **Settings → Models.** A "ChatGPT" badge and the read-only subscription
    model list.
 6. **Agent model field.** Model plus Thinking level (`minimal`–`xhigh` for
    OpenAI and Codex).
@@ -269,13 +328,13 @@ SuperPlane MCP env vars and approval mode (#8739).
 1. **#8739: confirm runner deletion and deliver cancellation.** Deploy the
    server before Fleet Manager. Verify an API-key Codex run and a cancellation.
 2. **#8741: reuse ChatGPT subscriptions on Codex runners.** It depends on #8739
-   and keeps the Codex default model. Enable `codex_subscriptions` for one
-   internal single-member organization, then test a live device sign-in.
+   and keeps the Codex default model. Test a live device sign-in in one
+   internal single-member organization.
 3. **#8742: model selection and usage.** It depends on #8741. Review the
    Storybook usage states. Verify model selection, reasoning levels, and quota
    snapshots on the internal organization.
-4. **Wider enablement:** the criteria and the decision to release the flag are
-   TBD. The open questions below gate them.
+4. **Wider use:** the criteria for multi-member organizations stay open.
+   The open questions below gate them.
 
 Proposed verification checklist for the internal organization:
 

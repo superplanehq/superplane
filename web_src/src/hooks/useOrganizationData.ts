@@ -40,13 +40,14 @@ export const organizationKeys = {
 };
 
 // Hooks for fetching data
-export const useOrganization = (organizationId: string, enabled = true) => {
+export const useOrganization = (organizationId: string, enabled = true, refreshInterval = 0) => {
   return useQuery({
     queryKey: organizationKeys.details(organizationId),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const response = await organizationsDescribeOrganization(
         withOrganizationHeader({
           organizationId,
+          signal,
           path: { id: organizationId },
         }),
       );
@@ -55,6 +56,7 @@ export const useOrganization = (organizationId: string, enabled = true) => {
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!organizationId && enabled,
+    refetchInterval: refreshInterval || false,
   });
 };
 

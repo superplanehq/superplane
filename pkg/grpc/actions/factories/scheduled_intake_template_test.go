@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -86,11 +87,88 @@ func TestScheduledIntakeCreation(t *testing.T) {
 			}
 		})
 	}
+	t.Run("subscription requires a connected default before publishing", func(t *testing.T) {
+		subscription := true
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+		_, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
+		require.Error(t, err)
+		request.InstallParams["defaultOwnerId"] = r.User.String()
+		_, err = CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
+		require.Error(t, err)
+		connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+		require.NoError(t, err)
+		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+		response, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		version, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(response.Automation.Id))
+		require.NoError(t, err)
+		require.Equal(t, r.User.String(), findIntakeNode(version.Nodes, "create-task").Configuration["defaultOwnerId"])
+		require.Equal(t, "runnerCodex", findIntakeNode(version.Nodes, "scheduled-agent").ComponentName())
+		defaultOwnerID := r.User.String()
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexDefaultOwnerID: &defaultOwnerID}))
+		delete(request.InstallParams, "defaultOwnerId")
+		inherited, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		inheritedVersion, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(inherited.Automation.Id))
+		require.NoError(t, err)
+		require.Equal(t, defaultOwnerID, findIntakeNode(inheritedVersion.Nodes, "create-task").Configuration["defaultOwnerId"])
+
+	})
 	request.InstallParams["timezone"] = "Europe/Belgrade"
 	_, err = CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
 	code, _, ok = grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	require.Equal(t, codes.InvalidArgument, code)
+}
+
+func TestScheduledIntakeUsesGitHubEnterpriseHost(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("scheduled"), "", "")
+	require.NoError(t, err)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{"host": "acme.ghe.com"})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	repository, branch, vcsID := "acme/app", "main", integration.ID.String()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository, DefaultBranch: &branch, VCSIntegrationID: &vcsID}))
+	enableHostedSuperPlaneAgent(t, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryScheduledIntake))
+	deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+	response, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryAutomationRequest{
+		FactoryId: factory.ID.String(), TemplateId: scheduledIntakeTemplateID, InstallParams: map[string]string{"hour": "9", "minute": "0"},
+	})
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(response.Automation.Id))
+	require.NoError(t, err)
+	for _, node := range version.Nodes {
+		if node.ID != "scheduled-agent" {
+			continue
+		}
+		env := node.Configuration["environment"].([]any)
+		require.Equal(t, "https://acme.ghe.com/acme/app.git", env[0].(map[string]any)["value"])
+		return
+	}
+	t.Fatal("scheduled-agent node not found")
+}
+
+func TestScheduledIntakeLeavesBaseEmptyWhenWorkspaceBranchIsEmpty(t *testing.T) {
+	result, err := materializeFactoryTemplate(scheduledIntakeTemplateID, models.ProviderGitHub, factoryTemplateInput{
+		installParams: map[string]string{"appRepository": "acme/app", "defaultBranch": ""},
+	})
+	require.NoError(t, err)
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	require.NoError(t, configureScheduledIntake(canvas, models.ProviderGitHub, map[string]string{
+		"appRepository": "acme/app",
+		"defaultBranch": "",
+	}))
+
+	agent := findYAMLNode(t, canvas, "scheduled-agent")
+	env := agent.Configuration["environment"].([]any)
+	require.GreaterOrEqual(t, len(env), 2)
+	require.Equal(t, "BASE", env[1].(map[string]any)["name"])
+	require.Equal(t, "", env[1].(map[string]any)["value"])
 }
 
 func TestScheduledIntakeProposalResult(t *testing.T) {

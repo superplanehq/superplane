@@ -42,8 +42,8 @@ export const PageControls = ({
   const label = rowCount === 0 ? `Showing 0 of ${totalCount}` : `Showing ${range.start}–${range.end} of ${totalCount}`;
 
   return (
-    <div className="mt-4 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-      <Text className="text-sm text-gray-500 dark:text-gray-400">{label}</Text>
+    <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+      <Text className="text-xs text-gray-500 sm:text-xs dark:text-gray-400">{label}</Text>
       <div className="flex gap-2">
         <Button
           type="button"

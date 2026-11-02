@@ -1,3 +1,4 @@
+import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import { organizationsDeleteIntegration } from "@/api-client/sdk.gen";
 import type { OrganizationsIntegration } from "@/api-client";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
@@ -82,6 +83,7 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
             ) : null}
           </div>
         )}
+        <IntakeSetupDefaultOwner owner={setup.owner} disabled={setup.createIntake.isPending} />
       </IntakeSetupWizard>
       <IntegrationCreateDialog
         open={setup.connectOpen}

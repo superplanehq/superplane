@@ -1,6 +1,8 @@
 import { useParams } from "react-router";
 
 import { Members } from "@/pages/organization/settings/Members";
+import { OrganizationFleets, OrganizationFleetDetails } from "@/pages/organization/settings/fleets/OrganizationFleets";
+import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 
 import { FactorySettingsApiKeysPage } from "./FactorySettingsApiKeysPage";
 import { FactorySettingsPageFrame } from "./FactorySettingsCard";
@@ -18,6 +20,33 @@ export function FactoryOrganizationMembersPage() {
   return (
     <FactorySettingsPageFrame title="Members" subtitle="Invite people and manage organization access.">
       <Members organizationId={organizationId} />
+    </FactorySettingsPageFrame>
+  );
+}
+
+export function FactoryOrganizationFleetsPage({ detail = "catalog" }: { detail?: "catalog" | "fleet" }) {
+  const { organizationId = "", factoryKey = "" } = useParams();
+  const basePath = factorySettingsSectionPath(organizationId, factoryKey, "organization", "fleets");
+  if (detail === "catalog")
+    return (
+      <OrganizationFleets
+        key={organizationId}
+        organizationId={organizationId}
+        basePath={basePath}
+        renderPage={(content, actions) => (
+          <FactorySettingsPageFrame
+            title="Fleets"
+            subtitle="Manage organization fleets and directly connected runners."
+            actions={actions}
+          >
+            {content}
+          </FactorySettingsPageFrame>
+        )}
+      />
+    );
+  return (
+    <FactorySettingsPageFrame title="Fleets" subtitle="Manage organization fleets and directly connected runners.">
+      <OrganizationFleetDetails organizationId={organizationId} basePath={basePath} />
     </FactorySettingsPageFrame>
   );
 }

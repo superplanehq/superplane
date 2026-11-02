@@ -25,7 +25,7 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
-func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
+func TestRunnerWebSocketClaimsOnlyScheduledTasks(t *testing.T) {
 	resource := support.Setup(t)
 	t.Setenv(billingmodels.BillingEnabledEnv, "true")
 	db := database.DB(t.Context())
@@ -58,6 +58,7 @@ func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
 	occupyingTask := newTask(otherFleet.ID)
 	require.NoError(t, occupyingTask.Reserve(db, occupyingRunner.ID))
 	queued := newTask(fleet.ID)
+	require.NoError(t, db.Model(queued).Update("state", models.RunnerTaskStatePending).Error)
 	attachSession := func(task *models.RunnerTask, factoryModel *models.Factory) *models.FactoryPlanningSession {
 		order, err := factoryModel.CreateWorkOrder(db, "Queued planning", "", &resource.User, nil, nil)
 		require.NoError(t, err)
@@ -155,10 +156,18 @@ func TestRunnerWebSocketWaitsForOrganizationCapacity(t *testing.T) {
 	require.Equal(t, "invalid_message", invalid.Code)
 	stillQueued, err := models.FindRunnerTask(db, queued.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.RunnerTaskStateQueued, stillQueued.State)
+	assert.Equal(t, models.RunnerTaskStatePending, stillQueued.State)
 	assert.Nil(t, stillQueued.RunnerID)
 
 	require.NoError(t, occupyingRunner.Terminate(db, models.RunnerTerminationProvisioningFailed))
+	// A reservation returned to queued still owns the organization slot.
+	storedOccupying, err := models.FindRunnerTask(db, occupyingTask.ID)
+	require.NoError(t, err)
+	require.NoError(t, storedOccupying.RequestCancel(db, time.Now()))
+	// Other queued fixtures already hold slots; make them pending as production creation does.
+	require.NoError(t, db.Model(&models.RunnerTask{}).Where("id <> ? AND state = ?", queued.ID, models.RunnerTaskStateQueued).Update("state", models.RunnerTaskStatePending).Error)
+	_, err = models.ScheduleOrganizationRunnerTasks(db, resource.Organization.ID, 1)
+	require.NoError(t, err)
 	require.NoError(t, socket.WriteJSON(typedMessage{Type: messageTypePong}))
 	var delivered taskMessage
 	require.NoError(t, socket.ReadJSON(&delivered))

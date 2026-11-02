@@ -16,6 +16,8 @@ export function ModelAllowlistEditor({
   showCount = false,
   showBulkToggle = false,
   modelLabels,
+  unavailableModels = [],
+  unavailableLabel = "Unavailable",
 }: {
   modelIds: string[];
   selected: string[];
@@ -28,13 +30,15 @@ export function ModelAllowlistEditor({
   showCount?: boolean;
   showBulkToggle?: boolean;
   modelLabels?: Record<string, string>;
+  unavailableModels?: string[];
+  unavailableLabel?: string;
 }) {
   const visibleModels = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (needle === "") {
       return modelIds;
     }
-    return modelIds.filter((id) => (modelLabels?.[id] ?? id).toLowerCase().includes(needle));
+    return modelIds.filter((id) => `${modelLabels?.[id] ?? ""} ${id}`.toLowerCase().includes(needle));
   }, [modelIds, modelLabels, query]);
   const allSelected = modelIds.length > 0 && modelIds.every((model) => selected.includes(model));
 
@@ -53,7 +57,7 @@ export function ModelAllowlistEditor({
         />
       </InputGroup>
       {showCount ? (
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
             {selected.length} of {modelIds.length} models selected
           </p>
@@ -72,17 +76,33 @@ export function ModelAllowlistEditor({
           ) : null}
         </div>
       ) : null}
-      <div className="max-h-56 space-y-2 overflow-auto">
+      <div
+        role="region"
+        aria-label="Model choices"
+        tabIndex={0}
+        className="max-h-56 space-y-2 overflow-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
         {visibleModels.map((model) => (
-          <label key={model} className="flex items-center gap-2 text-[13px]">
+          <label key={model} className="flex min-w-0 items-start gap-2 rounded-md px-1 py-1.5 text-[13px]">
             <Checkbox
+              className="mt-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               checked={selected.includes(model)}
               disabled={disabled}
               onChange={(event) => onToggle(model, event.currentTarget.checked)}
             />
-            <span className="font-mono text-xs">{modelLabels?.[model] ?? model}</span>
+            <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+              <span className="block">{modelLabels?.[model] ?? model}</span>
+              {unavailableModels.includes(model) ? (
+                <span className="block text-xs text-muted-foreground">{unavailableLabel}</span>
+              ) : null}
+            </span>
           </label>
         ))}
+        {visibleModels.length === 0 ? (
+          <p role="status" className="py-2 text-xs text-muted-foreground">
+            {modelIds.length === 0 ? "No models are available." : "No matching models. Try a different search."}
+          </p>
+        ) : null}
       </div>
     </div>
   );

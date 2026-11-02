@@ -11,6 +11,7 @@ const path = require("node:path");
 
 const API_VERSION = "2022-11-28";
 const USER_AGENT = "superplane-component-release";
+const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const VERSION_PATTERN =
   /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -739,18 +740,24 @@ async function publishGitHubRelease({
   }
 
   const config = componentConfig(component);
+  const image = releaseDigest(
+    component,
+    imageDigest,
+    "an image",
+    Boolean(config.digestNames?.image),
+  );
+  const chart = releaseDigest(
+    component,
+    chartDigest,
+    "a chart",
+    Boolean(config.digestNames?.chart),
+  );
   let body = `Source commit: ${sha}`;
-  if (imageDigest) {
-    if (!config.digestNames?.image) {
-      throw new Error(`${component} releases do not publish an image digest`);
-    }
-    body += `\n\n${config.digestNames.image} digest: \`${imageDigest}\``;
+  if (image) {
+    body += `\n\n${config.digestNames.image} digest: \`${image}\``;
   }
-  if (chartDigest) {
-    if (!config.digestNames?.chart) {
-      throw new Error(`${component} releases do not publish a chart digest`);
-    }
-    body += `\n\n${config.digestNames.chart} digest: \`${chartDigest}\``;
+  if (chart) {
+    body += `\n\n${config.digestNames.chart} digest: \`${chart}\``;
   }
   if (!prerelease) {
     body += `\n\n${releaseNotes.trim()}`;
@@ -774,6 +781,21 @@ async function publishGitHubRelease({
     );
   }
   return parseJSON(response, "publish GitHub release");
+}
+
+function releaseDigest(component, digest, label, supported) {
+  if (!supported) {
+    if (digest) {
+      throw new Error(
+        `${component} releases do not publish ${label} digest`,
+      );
+    }
+    return null;
+  }
+  if (!DIGEST_PATTERN.test(digest || "")) {
+    throw new Error(`${component} releases require ${label} digest`);
+  }
+  return digest;
 }
 
 function option(name) {

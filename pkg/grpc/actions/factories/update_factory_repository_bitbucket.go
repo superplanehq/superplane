@@ -126,6 +126,7 @@ func updateBitbucketFactoryRepository(
 			previous.BacklogRepository,
 			previousBranch,
 			selectedRepository,
+			retargetTasksRequested(req.RetargetTasks),
 		)
 	})
 	if err != nil {

@@ -124,19 +124,17 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 // changes while drafting a task.
 const PLANNING_READONLY_TOOLS = "Read,Bash";
 
-function analysisAllowedTools() {
-  return [
-    "mcp__superplane__propose_update",
-    "mcp__superplane__inspect_attachment",
-    "mcp__superplane__suggest_owners",
-    "mcp__superplane__assign_owner",
-  ];
+// The global runner MCP server lists only the tools that the run token
+// allows, and the backend checks the scope on every call.
+const GLOBAL_MCP_SERVER = "superplane_global";
+
+function globalMCPEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_RUNNER_TOKEN");
 }
-const ARTIFACT_ALLOWED_TOOLS = [
-  "mcp__superplane__inspect_screenshot",
-  "mcp__superplane__upload_artifact",
-  "mcp__superplane__report_visual_evidence_unavailable",
-];
+
+function globalAllowedTools(env = process.env) {
+  return globalMCPEnabled(env) ? [`mcp__${GLOBAL_MCP_SERVER}`] : [];
+}
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
@@ -154,40 +152,9 @@ function allowedClaudeTools(env = process.env) {
   const workspaceAllow = Object.keys(workspaceMCPServers(env)).map(
     (name) => `mcp__${name}`,
   );
-  if (planningMCPEnabled(env)) {
-    return [
-      PLANNING_READONLY_TOOLS,
-      "mcp__superplane",
-      ...workspaceAllow,
-      ...analysisAllowedTools(env),
-    ].join(",");
-  }
-  if (mergeConfidenceMCPEnabled(env)) {
-    return [
-      BASE_ALLOWED_TOOLS,
-      "mcp__superplane",
-      ...workspaceAllow,
-      "mcp__superplane__report_merge_check",
-      ...(envFlag(env, "SUPERPLANE_OWNER_TOKEN")
-        ? ["mcp__superplane__suggest_owners", "mcp__superplane__assign_owner"]
-        : []),
-    ].join(",");
-  }
-  if (taskToolsEnabled(env)) {
-    const tools = [BASE_ALLOWED_TOOLS, "mcp__superplane", ...workspaceAllow];
-    if (artifactMCPEnabled(env)) tools.push(...ARTIFACT_ALLOWED_TOOLS);
-    if (publishLinksEnabled(env)) tools.push("mcp__superplane__publish_link");
-    if (envFlag(env, "SUPERPLANE_OWNER_TOKEN"))
-      tools.push(
-        "mcp__superplane__suggest_owners",
-        "mcp__superplane__assign_owner",
-      );
-    return tools.join(",");
-  }
-  if (workspaceAllow.length === 0) {
-    return BASE_ALLOWED_TOOLS;
-  }
-  return [BASE_ALLOWED_TOOLS, ...workspaceAllow].join(",");
+  const globalAllow = globalAllowedTools(env);
+  const baseTools = planningMCPEnabled(env) ? PLANNING_READONLY_TOOLS : BASE_ALLOWED_TOOLS;
+  return [baseTools, ...globalAllow, ...workspaceAllow].join(",");
 }
 
 function disallowedClaudeTools(env = process.env) {
@@ -219,14 +186,6 @@ function claudePermissionMode(env = process.env) {
   return "acceptEdits";
 }
 
-function mcpToolsEnabled(env = process.env) {
-  return (
-    planningMCPEnabled(env) ||
-    taskToolsEnabled(env) ||
-    mergeConfidenceMCPEnabled(env)
-  );
-}
-
 function planningMCPEnabled(env = process.env) {
   return (
     planningAnalysisEnabled(env) &&
@@ -245,28 +204,6 @@ function publishLinksEnabled(env = process.env) {
 
 function artifactMCPEnabled(env = process.env) {
   return visualEvidenceEnabled(env);
-}
-
-function taskToolsEnabled(env = process.env) {
-  return (
-    artifactMCPEnabled(env) ||
-    publishLinksEnabled(env) ||
-    envFlag(env, "SUPERPLANE_OWNER_TOKEN")
-  );
-}
-
-function mergeConfidenceMCPEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
-}
-
-function artifactMCPPath(taskDir, env = process.env) {
-  if (planningMCPEnabled(env)) {
-    return path.join(taskDir, "planning_session_mcp.js");
-  }
-  if (mergeConfidenceMCPEnabled(env)) {
-    return path.join(taskDir, "merge_confidence_mcp.js");
-  }
-  return path.join(taskDir, "task_artifact_mcp.js");
 }
 
 function configureArtifactOutput(taskDir, env = process.env) {
@@ -308,7 +245,7 @@ function workspaceMCPServers(env = process.env) {
     const out = {};
     for (const server of servers) {
       const name = String((server && server.name) || "").trim();
-      if (!name || name === "superplane") {
+      if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER) {
         continue;
       }
       out[name] = {
@@ -324,7 +261,7 @@ function workspaceMCPServers(env = process.env) {
   }
 }
 
-function writeClaudeMCPConfig(taskDir, env = process.env, includeSuperplane = false) {
+function writeClaudeMCPConfig(taskDir, env = process.env) {
   const mcpServers = {};
   for (const [name, server] of Object.entries(workspaceMCPServers(env))) {
     mcpServers[name] = {
@@ -333,10 +270,10 @@ function writeClaudeMCPConfig(taskDir, env = process.env, includeSuperplane = fa
       headers: server.headers,
     };
   }
-  if (includeSuperplane) {
-    mcpServers.superplane = {
+  if (globalMCPEnabled(env)) {
+    mcpServers[GLOBAL_MCP_SERVER] = {
       command: "node",
-      args: [artifactMCPPath(taskDir, env)],
+      args: [path.join(taskDir, "superplane_mcp", "server.js")],
     };
   }
   const names = Object.keys(mcpServers);
@@ -429,7 +366,6 @@ async function runPrompt(promptFile, model, thinking) {
     prompt = withoutEmbeddedAnalysisProtocol(prompt);
   }
   const planningToolsEnabled = planningMCPEnabled();
-  const toolsEnabled = mcpToolsEnabled();
   configureArtifactOutput(sp);
 
   const claudeArgs = [
@@ -452,7 +388,7 @@ async function runPrompt(promptFile, model, thinking) {
     claudeArgs[claudeArgs.length - 1] =
       SYSTEM_PROMPT + planningSystemPrompt();
   }
-  const mcpConfigPath = writeClaudeMCPConfig(sp, process.env, toolsEnabled);
+  const mcpConfigPath = writeClaudeMCPConfig(sp);
   if (mcpConfigPath) {
     claudeArgs.push("--mcp-config", mcpConfigPath);
   }
@@ -526,7 +462,7 @@ async function runPrompt(promptFile, model, thinking) {
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planningMCPEnabled()) {
     const result = JSON.parse(resultJSON);
-    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+    await require(path.join(sp, "agent_message.js")).recordAgentMessage(
       result.result,
     );
   }
@@ -1015,17 +951,6 @@ function formatSystem(event) {
     parts.push(`cwd=${event.cwd}`);
   }
   println(parts.join(" · "));
-  const tools = Array.isArray(event.tools)
-    ? event.tools.map((tool) => String(tool))
-    : [];
-  const planningTools = tools.filter((tool) =>
-    tool.includes("mcp__superplane"),
-  );
-  println(
-    planningTools.length > 0
-      ? `planning tools: ${planningTools.join(", ")}`
-      : "planning tools: none",
-  );
   if (event.mcp_server_errors) {
     println(`mcp errors: ${JSON.stringify(event.mcp_server_errors)}`);
   }

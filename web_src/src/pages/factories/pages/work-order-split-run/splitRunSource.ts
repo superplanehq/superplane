@@ -11,7 +11,8 @@ import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
-import superplaneIcon from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
+import { isGitHubWebHostname } from "@/lib/githubHost";
 import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import {
@@ -203,7 +204,7 @@ function mcpSourceIcon(name: string): { iconSrc: string; iconAlt: string } {
   if (matchesClientName(normalized, "claude")) {
     return { iconSrc: claudeIcon, iconAlt: "Claude" };
   }
-  return { iconSrc: superplaneIcon, iconAlt: "SuperPlane" };
+  return { iconSrc: superplaneMark, iconAlt: "SuperPlane" };
 }
 
 function matchesClientName(normalizedName: string, client: string): boolean {
@@ -326,7 +327,7 @@ function parseUrl(url: string): URL | undefined {
 }
 
 function githubTicketLabel(parsed: URL): string | undefined {
-  if (parsed.hostname !== "github.com") {
+  if (!isGitHubWebHostname(parsed.hostname)) {
     return undefined;
   }
   const [, owner, repo, kind, number] = parsed.pathname.split("/");

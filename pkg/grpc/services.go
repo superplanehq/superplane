@@ -8,14 +8,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	adminRunnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/admin/runners"
-	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	organizationActions "github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
+	runnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/runners"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
+	pbAdminOrganizations "github.com/superplanehq/superplane/pkg/protos/admin/organizations"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
-	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -34,23 +35,23 @@ import (
 )
 
 type Services struct {
-	Users         pbUsers.UsersServer
-	Groups        pbGroups.GroupsServer
-	Roles         pbRoles.RolesServer
-	Organizations pbOrganizations.OrganizationsServer
-	Integrations  pbIntegrations.IntegrationsServer
-	Secrets       pbSecrets.SecretsServer
-	Me            pbMe.MeServer
-	Actions       pbActions.ActionsServer
-	Triggers      pbTriggers.TriggersServer
-	Widgets       pbWidgets.WidgetsServer
-	Canvases      pbCanvases.CanvasesServer
-	Factories     pbFactories.FactoriesServer
-	Files         pbFiles.FilesServer
-	APIKeys       pbAPIKeys.ApiKeysServer
-	Agents        pbAgents.AgentsServer
-	AdminRunners  pbAdminRunners.RunnersServer
-	AdminKeys     pbAdminKeys.KeysServer
+	Users              pbUsers.UsersServer
+	Groups             pbGroups.GroupsServer
+	Roles              pbRoles.RolesServer
+	Organizations      pbOrganizations.OrganizationsServer
+	Integrations       pbIntegrations.IntegrationsServer
+	Secrets            pbSecrets.SecretsServer
+	Me                 pbMe.MeServer
+	Actions            pbActions.ActionsServer
+	Triggers           pbTriggers.TriggersServer
+	Widgets            pbWidgets.WidgetsServer
+	Canvases           pbCanvases.CanvasesServer
+	Factories          pbFactories.FactoriesServer
+	Files              pbFiles.FilesServer
+	APIKeys            pbAPIKeys.ApiKeysServer
+	AdminRunners       pbAdminRunners.RunnersServer
+	AdminKeys          pbAdminKeys.KeysServer
+	AdminOrganizations pbAdminOrganizations.AdminOrganizationsServer
 }
 
 type ServicesConfig struct {
@@ -63,7 +64,6 @@ type ServicesConfig struct {
 	AuthService      authorization.Authorization
 	Registry         *registry.Registry
 	OIDCProvider     oidc.Provider
-	AgentService     agentsActions.AgentsService
 	JWTSigner        *jwt.Signer
 
 	// Entitlements defaults to Community mode. Enterprise defaults to a
@@ -103,6 +103,7 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 
 	organizationService := NewOrganizationService(cfg.AuthService, cfg.Registry, cfg.OIDCProvider, cfg.BaseURL, cfg.WebhooksBaseURL, billingImplementation)
 	organizationService.invitations.Entitlements = entitlements
+	organizationService.runners = organizationActions.NewRunnerService(runnerActions.NewRunnerManager(cfg.JWTSigner, cfg.RunnerAPIBaseURL))
 	if cfg.EmailService != nil {
 		organizationService.invitations.EmailService = cfg.EmailService
 	}
@@ -113,7 +114,7 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		Organizations: organizationService,
 		Integrations:  NewIntegrationService(cfg.Encryptor, cfg.Registry),
 		Secrets:       NewSecretService(cfg.Encryptor, cfg.AuthService),
-		Me:            NewMeService(cfg.AuthService),
+		Me:            NewMeService(cfg.AuthService, cfg.Encryptor),
 		Actions:       NewActionService(cfg.Registry),
 		Triggers:      NewTriggerService(cfg.Registry),
 		Widgets:       NewWidgetService(cfg.Registry),
@@ -131,13 +132,13 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		),
 		Files:   NewFilesService(cfg.AuthService),
 		APIKeys: NewAPIKeysService(cfg.AuthService),
-		Agents:  NewAgentsService(cfg.AgentService),
 		AdminRunners: NewAdminRunnersService(
 			adminRunnerActions.NewService(
 				cfg.JWTSigner,
 				cfg.RunnerAPIBaseURL,
 			),
 		),
-		AdminKeys: NewAdminKeysService(cfg.EncryptionStore),
+		AdminKeys:          NewAdminKeysService(cfg.EncryptionStore),
+		AdminOrganizations: NewAdminOrganizationsService(cfg.AuthService),
 	}, nil
 }

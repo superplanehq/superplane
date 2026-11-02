@@ -10,7 +10,7 @@ import {
 
 export interface WorkOrderRefinementModelSelection {
   defaultModel: string;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{ value: string; label: string; disabled?: boolean }>;
   isLoading?: boolean;
 }
 
@@ -44,7 +44,7 @@ export function WorkOrderRefinementModelSelect({
       <DropdownMenuContent align="start" side="top">
         <DropdownMenuRadioGroup value={model} onValueChange={onChange}>
           {selection.options.map((option) => (
-            <DropdownMenuRadioItem key={option.value} value={option.value}>
+            <DropdownMenuRadioItem key={option.value} value={option.value} disabled={option.disabled}>
               {option.label}
             </DropdownMenuRadioItem>
           ))}

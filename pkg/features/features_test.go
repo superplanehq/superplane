@@ -8,11 +8,9 @@ import (
 
 func Test__Get(t *testing.T) {
 	t.Run("known id returns feature and true", func(t *testing.T) {
-		f, ok := Get(FeatureClaudeManagedAgents)
+		f, ok := Get(FeatureFactories)
 		assert.True(t, ok)
-		assert.Equal(t, FeatureClaudeManagedAgents, f.ID)
-		assert.Equal(t, "Claude Managed Agents", f.Label)
-		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
+		assert.Equal(t, FeatureFactories, f.ID)
 	})
 
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
@@ -31,20 +29,12 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Datadog intake from the Backlog column menu", f.Description)
 	})
 
-	t.Run("known id returns workspace models feature", func(t *testing.T) {
-		f, ok := Get(FeatureWorkspaceModels)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureWorkspaceModels, f.ID)
-		assert.Equal(t, "Workspace Models", f.Label)
-		assert.Equal(t, "Show the in-progress workspace Models settings page", f.Description)
-	})
-
 	t.Run("known id returns organization byok feature", func(t *testing.T) {
 		f, ok := Get(FeatureOrganizationBYOK)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureOrganizationBYOK, f.ID)
 		assert.Equal(t, "Organization BYOK", f.Label)
-		assert.Equal(t, "Show the organization LLM Models settings page", f.Description)
+		assert.Equal(t, "Show the organization Models settings page", f.Description)
 	})
 
 	t.Run("known id returns organization byok custom provider feature", func(t *testing.T) {
@@ -161,14 +151,25 @@ func Test__Get(t *testing.T) {
 		assert.False(t, ok)
 		assert.Equal(t, Feature{}, feature)
 	})
+
+	t.Run("retired GitHub Enterprise Cloud flag is absent", func(t *testing.T) {
+		feature, ok := Get("github_enterprise")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
+
+	t.Run("retired ChatGPT subscription flag is absent", func(t *testing.T) {
+		feature, ok := Get("codex_subscriptions")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
 }
 
 func Test__Exists(t *testing.T) {
-	assert.True(t, Exists(FeatureClaudeManagedAgents))
+	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
-	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
@@ -176,6 +177,8 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
+	assert.True(t, Exists(FeatureFactoryStepActions))
+	assert.False(t, IsReleased(FeatureFactoryStepActions))
 	assert.False(t, Exists("mobile_factory_board"))
 	assert.False(t, Exists("factory_risk_score"))
 	assert.False(t, Exists("factory_visual_evidence"))
@@ -186,6 +189,8 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists("factory_jira_intake"))
 	assert.False(t, Exists("factory_linear_intake"))
 	assert.False(t, Exists("factory_bitbucket"))
+	assert.False(t, Exists("github_enterprise"))
+	assert.False(t, Exists("codex_subscriptions"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

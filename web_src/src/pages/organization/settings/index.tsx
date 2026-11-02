@@ -44,6 +44,9 @@ import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
 import { IntegrationSetup } from "./components/IntegrationSetup";
 import { IntegrationSetupReturn } from "./components/IntegrationSetupReturn";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
+import { Server } from "lucide-react";
+import { useOrganizationFleetAccess } from "@/hooks/useOrganizationFleetManagement";
+import { OrganizationFleets, OrganizationFleetDetails } from "./fleets/OrganizationFleets";
 
 function settingsSidebarNavLinkClass(active: boolean) {
   return cn(
@@ -71,6 +74,7 @@ export function OrganizationSettings() {
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
+  const fleetAccess = useOrganizationFleetAccess(organizationId || "");
 
   // Use React Query hook for organization data
   const { data: organization, isLoading: loading, error } = useOrganization(organizationId || "");
@@ -118,7 +122,17 @@ export function OrganizationSettings() {
     permission?: { resource: string; action: string };
   };
 
-  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "secrets", "api-keys"];
+  const sectionIds = [
+    "profile",
+    "general",
+    "members",
+    "groups",
+    "roles",
+    "integrations",
+    "secrets",
+    "api-keys",
+    "fleets",
+  ];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
@@ -137,6 +151,17 @@ export function OrganizationSettings() {
 
   const homeHref = factoriesEnabled ? factoryListPath(organizationId) : `/${organizationId}`;
   const organizationLinks: NavLink[] = [
+    ...(fleetAccess.showNavigation
+      ? [
+          {
+            id: "fleets",
+            label: "Fleets",
+            href: `/${organizationId}/settings/fleets`,
+            Icon: Server,
+            permission: { resource: "org", action: "read" },
+          },
+        ]
+      : []),
     ...(factoriesEnabled
       ? []
       : [
@@ -236,6 +261,7 @@ export function OrganizationSettings() {
       description: string;
     }
   > = {
+    fleets: { title: "Fleets", description: "Manage organization fleets and directly connected runners." },
     general: {
       title: "Settings",
       description: "Manage your organization basics.",
@@ -397,6 +423,37 @@ export function OrganizationSettings() {
             </p>
           </div>
           <Routes>
+            <Route
+              path="fleets"
+              element={
+                <RequirePermission resource="org" action="read">
+                  <OrganizationFleets
+                    key={organizationId}
+                    organizationId={organizationId}
+                    basePath={`/${organizationId}/settings/fleets`}
+                  />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="fleets/:fleetId"
+              element={
+                <RequirePermission resource="org" action="read">
+                  <OrganizationFleetDetails
+                    organizationId={organizationId}
+                    basePath={`/${organizationId}/settings/fleets`}
+                  />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="fleets/:fleetId/runners/:runnerId"
+              element={
+                <RequirePermission resource="org" action="read">
+                  <Navigate to="../.." relative="path" replace />
+                </RequirePermission>
+              }
+            />
             <Route path="" element={<Navigate to="general" replace />} />
             <Route
               path="general"

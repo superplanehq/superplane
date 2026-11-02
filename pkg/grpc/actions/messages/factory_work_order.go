@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -54,13 +55,27 @@ func PublishCodexConnectionChanges(db *gorm.DB, previous []models.FactoryCodexCo
 		if current.Status == before.Status && current.ReservationGeneration == before.ReservationGeneration {
 			continue
 		}
-		factoryID := current.FactoryID.String()
-		if published[factoryID] {
+		organizationID := current.OrganizationID.String()
+		if published[organizationID] {
 			continue
 		}
-		if err := PublishFactoryCodexConnectionUpdated(factoryID); err != nil {
+		if err := PublishOrganizationCodexConnectionUpdated(db, current.OrganizationID); err != nil {
 			log.WithError(err).Warn("Failed to publish ChatGPT connection change")
 		}
-		published[factoryID] = true
+		published[organizationID] = true
 	}
+}
+
+// PublishOrganizationCodexConnectionUpdated carries no personal account details.
+func PublishOrganizationCodexConnectionUpdated(db *gorm.DB, organizationID uuid.UUID) error {
+	factories, err := models.ListFactories(db, organizationID)
+	if err != nil {
+		return err
+	}
+	for _, factory := range factories {
+		if err := PublishFactoryCodexConnectionUpdated(factory.ID.String()); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -3,6 +3,7 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Avatar } from "@/components/Avatar/avatar";
 import { Timestamp, type TimestampDisplay } from "@/components/Timestamp";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { githubHostFromHint } from "@/lib/githubHost";
 import { cn } from "@/lib/utils";
 
 import { ConsoleBadge } from "../ConsoleBadge";
@@ -123,7 +124,9 @@ function TimestampCell({
 
 function AvatarCell({ col, row, value }: { col: WidgetTableColumn; row: Record<string, unknown>; value: unknown }) {
   const committer = col.avatarCommitterField ? resolveCellValue(col.avatarCommitterField, row) : undefined;
-  const { src, initials, name } = resolveConsoleAvatar(value, committer);
+  const host =
+    githubHostFromHint(row.repository) || githubHostFromHint(row.html_url) || githubHostFromHint(row.url) || undefined;
+  const { src, initials, name } = resolveConsoleAvatar(value, committer, host);
   if (!name && !src && !initials) return <EmptyCell />;
 
   return (

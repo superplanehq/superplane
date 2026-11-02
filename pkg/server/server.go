@@ -22,10 +22,8 @@ import (
 	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
 	"github.com/superplanehq/superplane/ee/billing/polar"
 	billingworkers "github.com/superplanehq/superplane/ee/billing/workers"
+	"github.com/superplanehq/superplane/ee/githubenterprise"
 	"github.com/superplanehq/superplane/ee/rbac"
-	"github.com/superplanehq/superplane/pkg/agents"
-	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
-	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/bitbucketapp"
@@ -41,7 +39,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
-	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	githubintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/llm"
@@ -64,30 +62,6 @@ import (
 )
 
 var _ = registryimports.Loaded
-
-var agentProviderOverride = struct {
-	sync.Mutex
-	provider agents.Provider
-}{}
-
-func SetAgentProviderForTests(provider agents.Provider) func() {
-	agentProviderOverride.Lock()
-	previous := agentProviderOverride.provider
-	agentProviderOverride.provider = provider
-	agentProviderOverride.Unlock()
-
-	return func() {
-		agentProviderOverride.Lock()
-		agentProviderOverride.provider = previous
-		agentProviderOverride.Unlock()
-	}
-}
-
-func getAgentProviderOverride() agents.Provider {
-	agentProviderOverride.Lock()
-	defer agentProviderOverride.Unlock()
-	return agentProviderOverride.provider
-}
 
 var licenseServiceOverride = struct {
 	sync.Mutex
@@ -113,54 +87,6 @@ func getLicenseServiceOverride() *licensing.Service {
 	licenseServiceOverride.Lock()
 	defer licenseServiceOverride.Unlock()
 	return licenseServiceOverride.service
-}
-
-func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
-	if provider := getAgentProviderOverride(); provider != nil {
-		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
-		return provider, agents.NewService(provider, authService)
-	}
-
-	cfg := config.LoadAnthropicAgentConfig()
-	if !cfg.Enabled() {
-		log.Info("Anthropic managed agents disabled: missing ANTHROPIC_* env vars")
-		return nil, nil
-	}
-
-	if err := anthropic.SyncDefaultAgentPrompt(context.Background(), anthropic.Config{
-		APIKey:        cfg.APIKey,
-		AgentID:       cfg.AgentID,
-		EnvironmentID: cfg.EnvironmentID,
-	}); err != nil {
-		log.WithError(err).Warn("failed to sync Anthropic managed agent prompt; continuing with provider prompt")
-	} else {
-		log.Info("Anthropic managed agent prompt synced")
-	}
-
-	fileResources, err := anthropic.LoadDefaultSessionResources(context.Background(), anthropic.Config{
-		APIKey:        cfg.APIKey,
-		AgentID:       cfg.AgentID,
-		EnvironmentID: cfg.EnvironmentID,
-	})
-	if err != nil {
-		log.WithError(err).Warn("failed to load Anthropic session resources; continuing without mounted references")
-		fileResources = nil
-	}
-
-	provider, err := anthropic.New(anthropic.Config{
-		APIKey:        cfg.APIKey,
-		AgentID:       cfg.AgentID,
-		EnvironmentID: cfg.EnvironmentID,
-		Resources:     fileResources,
-	})
-	if err != nil {
-		log.WithError(err).Warn("failed to initialise Anthropic managed agents provider")
-		return nil, nil
-	}
-
-	service := agents.NewService(provider, authService)
-	log.Info("Anthropic managed agents enabled")
-	return provider, service
 }
 
 // Cloud has the GitHub App in the process environment at boot. A self-hosted
@@ -201,7 +127,6 @@ func startWorkers(
 	oidcProvider oidc.Provider,
 	baseURL string,
 	authService authorization.Authorization,
-	agentProvider agents.Provider,
 	nodeRequestExecutor *workers.NodeRequestExecutor,
 ) {
 	log.Println("Starting Workers")
@@ -226,6 +151,11 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_RUNNER_TASK_SCHEDULER") == "yes" {
+		log.Println("Starting Runner Task Scheduler")
+		go workers.NewRunnerTaskScheduler(time.Second).Start(context.Background())
+	}
+
 	if os.Getenv("START_RUNNER_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Runner Cleanup Worker")
 		w := workers.NewRunnerCleanupWorker(5 * time.Second)
@@ -235,6 +165,7 @@ func startWorkers(
 	if os.Getenv("START_REGULAR_WORKERS") == "no" {
 		return
 	}
+	go workers.NewOrganizationSuspensionWorker().Start(context.Background())
 
 	rabbitMQURL, err := config.RabbitMQURL()
 	if err != nil {
@@ -341,7 +272,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
-		w := workers.NewCanvasCleanupWorker(agentProvider)
+		w := workers.NewCanvasCleanupWorker()
 		go w.Start(context.Background())
 	}
 
@@ -355,7 +286,7 @@ func startWorkers(
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
-		w := workers.NewOrganizationCleanupWorker(agentProvider)
+		w := workers.NewOrganizationCleanupWorker()
 		go w.Start(context.Background())
 	}
 
@@ -412,23 +343,6 @@ func startWorkers(
 		w := workers.NewHostedModelCallOutcomeCleanupWorker()
 		go w.Start(context.Background())
 	}
-
-	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
-		log.Println("Starting Agent Stream Worker")
-		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
-			Encryptor:         encryptor,
-			ComponentRegistry: registry,
-			WebhookBaseURL:    getWebhookBaseURL(baseURL),
-			AuthService:       authService,
-		})
-		w := workers.NewAgentStreamWorker(
-			agentProvider,
-			rabbitMQURL,
-			agentToolRegistry,
-		)
-		go w.Start(context.Background())
-	}
-
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
@@ -491,14 +405,20 @@ func buildGRPCServices(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
-	agentService agentsActions.AgentsService,
 	jwtSigner *jwt.Signer,
 	licenseService *licensing.Service,
 	keyStore *encryption.Store,
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
+	features.Register(enterprise.GitHubEnterpriseCapability, githubenterprise.NewService(licenseService))
 	features.Register(enterprise.Billing, billingorganizations.New())
+
+	githubEnterprise, err := enterprise.Get[enterprise.GitHubEnterprise](features, enterprise.GitHubEnterpriseCapability)
+	if err != nil {
+		return nil, err
+	}
+	githubintegration.SetGitHubEnterprise(githubEnterprise)
 
 	return grpc.NewServices(grpc.ServicesConfig{
 		EmailService:     buildEmailService(encryptor),
@@ -510,7 +430,6 @@ func buildGRPCServices(
 		AuthService:      authService,
 		Registry:         registry,
 		OIDCProvider:     oidcProvider,
-		AgentService:     agentService,
 		JWTSigner:        jwtSigner,
 		Entitlements:     licenseService,
 		Enterprise:       features,
@@ -908,8 +827,6 @@ func Start() {
 		go worker.Start(context.Background())
 	}
 
-	agentProvider, agentService := buildAgentService(authService)
-
 	var grpcServices *grpc.Services
 	shutdown := &processShutdown{}
 	nodeRequestExecutor := workers.NewNodeRequestExecutor(encryptorInstance, registry, webhooksBaseURL, authService)
@@ -922,7 +839,6 @@ func Start() {
 			authService,
 			registry,
 			oidcProvider,
-			agentService,
 			jwtSigner,
 			licenseService,
 			keyStore,
@@ -957,7 +873,6 @@ func Start() {
 		oidcProvider,
 		baseURL,
 		authService,
-		agentProvider,
 		nodeRequestExecutor,
 	)
 

@@ -193,7 +193,7 @@ func applyIntakeUpdate(
 			}
 		}
 		if name != nil {
-			if err := canvases.UpdateCanvasInTransaction(tx, canvas, name, nil, nil); err != nil {
+			if err := canvases.UpdateCanvasInTransaction(tx, canvas, name, nil); err != nil {
 				return err
 			}
 		}
@@ -243,7 +243,11 @@ func applyIntakeGraphUpdate(
 		if intakeSourceSupportsDefaultOwner(intake.Source) {
 			currentOwner = intakeSettingsFromGraph(intake.Source, graph, spec).DefaultOwnerID
 		}
-		if err := validateIntakeDefaultOwner(tx, canvas.OrganizationID, intake.Source, currentOwner, settings); err != nil {
+		factory, err := models.FindFactory(tx, canvas.OrganizationID, intake.FactoryID)
+		if err != nil {
+			return err
+		}
+		if err := validateIntakeDefaultOwner(tx, factory, intake.Source, currentOwner, settings); err != nil {
 			return err
 		}
 		nodes, edges, err = applyIntakeSettingsToGraph(intake.Source, graph, spec, settings, nodes, edges)
