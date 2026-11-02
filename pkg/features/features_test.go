@@ -8,11 +8,9 @@ import (
 
 func Test__Get(t *testing.T) {
 	t.Run("known id returns feature and true", func(t *testing.T) {
-		f, ok := Get(FeatureClaudeManagedAgents)
+		f, ok := Get(FeatureFactories)
 		assert.True(t, ok)
-		assert.Equal(t, FeatureClaudeManagedAgents, f.ID)
-		assert.Equal(t, "Claude Managed Agents", f.Label)
-		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
+		assert.Equal(t, FeatureFactories, f.ID)
 	})
 
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
@@ -168,7 +166,7 @@ func Test__Get(t *testing.T) {
 }
 
 func Test__Exists(t *testing.T) {
-	assert.True(t, Exists(FeatureClaudeManagedAgents))
+	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))

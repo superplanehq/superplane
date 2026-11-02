@@ -91,7 +91,6 @@ function baseOptions(overrides: Partial<Parameters<typeof useFactoryAppCanvasEdi
     orderNumber: null,
     runId: null,
     isConfigure: true,
-    agentOpen: false,
     componentsOpen: false,
     canvas: implementCanvas(),
     canUpdateCanvas: true,

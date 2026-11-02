@@ -208,7 +208,7 @@ func UpdateFactoryCustomAutomation(
 		); err != nil {
 			return err
 		}
-		return canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil, nil)
+		return canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update custom automation")

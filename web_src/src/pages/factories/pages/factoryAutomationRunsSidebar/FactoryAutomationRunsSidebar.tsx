@@ -1,5 +1,5 @@
 import type { CanvasesCanvasRun, FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
-import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Input } from "@/components/ui/input";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
