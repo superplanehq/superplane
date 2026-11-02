@@ -8,8 +8,10 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
   FactoryAutomation,
+  CanvasesListRunsResponse,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import * as apiClient from "@/api-client";
 import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
@@ -377,6 +379,76 @@ async function resetLinesBoardMocks() {
   canvasStagingRefetch.mockReset().mockResolvedValue({ data: { hasStaging: false, stale: false } });
   discardCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
 }
+
+describe("LinesPage custom Backlog runs", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  it("shows task-entry custom runs without checks, including older pages and updated results", async () => {
+    const [order] = REVIEW_CANDIDATE_WORK_ORDERS;
+    const createdAt = new Date(Date.now() - 60_000).toISOString();
+    const customRun = {
+      id: "inspect-run",
+      state: "STATE_STARTED" as const,
+      createdAt,
+      rootEvent: { data: { workOrder: { id: order.id } } },
+    };
+    const response = (data: CanvasesListRunsResponse) => ({
+      data,
+      request: new Request("http://localhost/runs"),
+      response: new Response(),
+    });
+    const listRuns = vi.spyOn(apiClient, "canvasesListRuns").mockImplementation(async (options) => {
+      if (options?.path.canvasId !== "inspect-task") return response({ runs: [] });
+      if (!options.query?.before) {
+        return response({
+          runs: [{ ...customRun, id: "other-task-run", rootEvent: { data: { workOrder: { id: "other-task" } } } }],
+          hasNextPage: true,
+          lastTimestamp: createdAt,
+        });
+      }
+      return response({ runs: [customRun], hasNextPage: false });
+    });
+    try {
+      useFactoryWorkOrders.mockReturnValue({ data: [order] });
+      useWorkOrder.mockReturnValue({ data: { ...order, checks: [] } });
+      useFactoryAutomations.mockReturnValue({
+        data: [{ id: "inspect-task", name: "Inspect task", columnKey: "backlog", templateId: "custom-verification" }],
+      });
+      renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/842`);
+      await waitFor(() =>
+        expect(
+          listRuns.mock.calls.some(([options]) => options.path.canvasId === "inspect-task" && options.query?.before),
+        ).toBe(true),
+      );
+      const stage = await screen.findByTestId("redesign-console-automation-inspect-task-inspect-task");
+      expect(stage).toHaveTextContent("Inspect task");
+      expect(within(stage).getByRole("button", { name: "Stop" })).toBeInTheDocument();
+      expect(stage).toHaveTextContent("1 agent run");
+      expect(screen.getByTestId("split-run-intent-document")).toBeInTheDocument();
+
+      listRuns.mockImplementation(async () =>
+        response({
+          runs: [
+            { ...customRun, state: "STATE_FINISHED", result: "RESULT_PASSED", finishedAt: new Date().toISOString() },
+          ],
+        }),
+      );
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Toggle Inspect task details" })).toHaveAttribute(
+          "aria-expanded",
+          "false",
+        ),
+      );
+    } finally {
+      listRuns.mockRestore();
+    }
+  });
+});
 
 describe("LinesPage board", () => {
   beforeEach(async () => {

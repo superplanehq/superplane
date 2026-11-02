@@ -10,6 +10,7 @@ import type {
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
+import { useBacklogCustomRuns } from "@/hooks/useBacklogCustomRuns";
 import {
   useDeleteFactoryAutomation,
   useFactoryAutomations,
@@ -1315,11 +1316,12 @@ function LineBoardSplitRunPopup({
   onDispatch: (orderId: string, input: { lineName: string; model?: string; thinkingLevel?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
-  factoryApps: Array<{ id?: string; name?: string; columnKey?: string }>;
+  factoryApps: Array<{ id?: string; name?: string; columnKey?: string; templateId?: string }>;
   manualCustomAutomations: readonly ManualCustomAutomation[];
   onClose: () => void;
 }) {
   const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
+  const backlogCustomRuns = useBacklogCustomRuns(organizationId, peekOrderId, factoryApps);
   const { data: peekArtifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, peekOrderId);
   const peekPullRequests = describedOrder?.pullRequests ?? peekOrder.pullRequests ?? [];
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
@@ -1349,6 +1351,7 @@ function LineBoardSplitRunPopup({
           demoArtifacts: false,
           prFeedbackRuns,
           analysisRuns,
+          backlogCustomRuns,
           columnApps,
           isAnalyzing,
           stoppedBy: closer.actor,

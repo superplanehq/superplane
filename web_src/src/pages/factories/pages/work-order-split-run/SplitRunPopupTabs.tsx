@@ -7,6 +7,7 @@ import type { ManualCustomAutomation } from "../../lib/customAutomation";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
 import { phasesWithRunArtifacts } from "./attachStreamArtifacts";
 import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant";
+import { BacklogCustomRunCards } from "./BacklogCustomRunCards";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
@@ -54,6 +55,7 @@ function SplitRunPopupOverview({
   sidebarNote,
   analysis,
   sourceOnly,
+  automationRuns,
 }: Pick<
   SplitRunPopupTabsProps,
   | "fixture"
@@ -68,7 +70,7 @@ function SplitRunPopupOverview({
   | "sidebarNote"
   | "analysis"
   | "sourceOnly"
-> & { files?: FilesFile[] }) {
+> & { files?: FilesFile[]; automationRuns?: ReactNode }) {
   return (
     <WorkOrderSplitRunOverview
       title={edits.title}
@@ -96,6 +98,7 @@ function SplitRunPopupOverview({
       descriptionBusy={sourceOnly ? edits.descriptionBusy : undefined}
       onDescriptionSave={sourceOnly ? edits.saveDescription : undefined}
       sidebarNote={sidebarNote}
+      automationRuns={automationRuns}
     />
   );
 }
@@ -156,6 +159,21 @@ export function SplitRunPopupTabs({
             sidebarNote={sidebarNote}
             analysis={analysis}
             sourceOnly={sourceOnly}
+            automationRuns={
+              consoleFixture.phases.some((phase) => phase.id.startsWith("backlog-custom-")) ? (
+                <BacklogCustomRunCards
+                  fixture={consoleFixture}
+                  organizationId={organizationId}
+                  factoryId={factoryId}
+                  factoryKey={factoryKey}
+                  orderId={orderId}
+                  orderNumber={orderNumber}
+                  canUpdate={canUpdate}
+                  footerActions={footerActions}
+                  manualCustomAutomations={manualCustomAutomations}
+                />
+              ) : undefined
+            }
           />
         </div>
       </>
