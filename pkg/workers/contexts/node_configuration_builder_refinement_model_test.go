@@ -76,6 +76,8 @@ func TestBuildRefinementModel(t *testing.T) {
 					resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithRunID(run.ID).WithNodeID("refine-task").WithRootEvent(&event.ID).Build(configuration)
 					if tc.source == "subscription" && model == tc.excluded {
 						require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
+						assert.True(t, models.IsPermanentSubscriptionAdmissionError(err))
+						assert.Contains(t, err.Error(), model)
 						require.NoError(t, models.EndPlanningSessionForFinishedRun(db, run.ID, models.CanvasRunResultPassed))
 						return
 					}

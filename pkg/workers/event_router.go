@@ -2,7 +2,9 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -321,7 +323,11 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 			return nil, uuid.Nil, err
 		}
 
-		if targetNode.State == models.CanvasNodeStateError {
+		ready, err := prepareTargetNodeForRouting(tx, canvas, run, targetNode)
+		if err != nil {
+			return nil, uuid.Nil, err
+		}
+		if !ready {
 			continue
 		}
 
@@ -420,7 +426,11 @@ func (w *EventRouter) processExecutionEvent(
 			return nil, err
 		}
 
-		if targetNode.State == models.CanvasNodeStateError {
+		ready, err := prepareTargetNodeForRouting(tx, canvas, run, targetNode)
+		if err != nil {
+			return nil, err
+		}
+		if !ready {
 			continue
 		}
 
@@ -445,4 +455,36 @@ func (w *EventRouter) processExecutionEvent(
 	}
 
 	return createdQueueItems, nil
+}
+
+func prepareTargetNodeForRouting(tx *gorm.DB, canvas *models.Canvas, run *models.CanvasRun, node *models.CanvasNode) (bool, error) {
+	if err := node.RefreshHostedBillingReadiness(tx, canvas.OrganizationID, canvas.FactoryID); err != nil {
+		return false, fmt.Errorf("recheck billing for node %s: %w", node.NodeID, err)
+	}
+	if node.State != models.CanvasNodeStateError {
+		return true, nil
+	}
+
+	reason := fmt.Sprintf("Node %q is unavailable", node.Name)
+	if node.StateReason != nil && *node.StateReason != "" {
+		reason = *node.StateReason
+	}
+	if err := recordBlockedNodeError(tx, run, reason); err != nil {
+		return false, fmt.Errorf("record error for node %s: %w", node.NodeID, err)
+	}
+	return false, nil
+}
+
+// recordBlockedNodeError adds the reason to the run errors once. A full error
+// list must not block routing: the event must still be marked as routed so
+// the run can finish.
+func recordBlockedNodeError(tx *gorm.DB, run *models.CanvasRun, reason string) error {
+	if slices.ContainsFunc(run.Errors, func(e models.RunError) bool { return e.Message == reason }) {
+		return nil
+	}
+	err := run.AddError(tx, reason, config.MaxPayloadSize())
+	if errors.Is(err, models.ErrRunErrorsTooMany) || errors.Is(err, models.ErrRunErrorsTooLarge) {
+		return nil
+	}
+	return err
 }
