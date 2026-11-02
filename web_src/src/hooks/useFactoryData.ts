@@ -159,6 +159,10 @@ export function factoryAppsKey(organizationId: string, factoryId: string) {
   return factoryQueryKeys.apps(organizationId, factoryId);
 }
 
+export function workOrderUpdateMutationKey(organizationId: string, factoryId: string) {
+  return ["factories", organizationId, factoryId, "workOrderUpdate"] as const;
+}
+
 export function useFactories(organizationId: string, enabled = true) {
   return useQuery({
     queryKey: factoryListKey(organizationId),
@@ -650,6 +654,7 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: workOrderUpdateMutationKey(organizationId, factoryId),
     mutationFn: async (input: { orderId: string; title?: string; description?: string; refinementModel?: string }) => {
       const response = await factoriesUpdateWorkOrder(
         withOrganizationHeader({
@@ -667,8 +672,9 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
       }
       return response.data.order;
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (order, variables) => {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
+      queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, variables.orderId), order);
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
       });
@@ -678,6 +684,12 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
       void queryClient.invalidateQueries({
         queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, variables.orderId),
       });
+      if (variables.refinementModel !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
+        void queryClient.invalidateQueries({
+          queryKey: factoryQueryKeys.planningSession(organizationId, factoryId, variables.orderId),
+        });
+      }
     },
   });
 }
