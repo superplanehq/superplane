@@ -833,6 +833,44 @@ func TestUpdateFactoryOnboardingClearsTheBranchWhenTheRepositoryChanges(t *testi
 	assert.Equal(t, "acme/web", reloaded.OnboardingConfigValue().AppRepository)
 }
 
+func TestUpdateFactoryOnboardingReloadsTheBranchWhenTheGitHubConnectionChanges(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/app"
+	saved := "main"
+	previous := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	next := createReadyGitHubEnterpriseIntegration(t, r.Organization.ID, "acme.ghe.com")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository:    &repository,
+		VCSIntegrationID: &previous,
+		DefaultBranch:    &saved,
+	}))
+
+	ctx := withRepositoryBranchResolver(onboardingContext(r), repositoryBranchResolver{
+		gitHubDefault: func(repository string) (string, error) {
+			assert.Equal(t, "acme/app", repository)
+			return "trunk", nil
+		},
+	})
+	response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
+		Id:                factory.ID.String(),
+		VcsIntegrationId:  &next,
+		AppRepository:     &repository,
+		BacklogRepository: &repository,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acme/app", response.Factory.Onboarding.AppRepository)
+	assert.Equal(t, next, response.Factory.Onboarding.VcsIntegrationId)
+	assert.Equal(t, "trunk", response.Factory.Onboarding.DefaultBranch)
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "trunk", reloaded.OnboardingConfigValue().DefaultBranch)
+	assert.Equal(t, next, reloaded.OnboardingConfigValue().VCSIntegrationID)
+}
+
 func TestUpdateFactoryOnboardingRejectsAnUnknownBranchWhenNothingIsSaved(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
