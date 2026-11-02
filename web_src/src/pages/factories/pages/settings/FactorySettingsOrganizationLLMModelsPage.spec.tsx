@@ -169,24 +169,40 @@ describe("workspace LLM model settings", () => {
   it("shows only the saved source and keeps it selected while a switch is canceled", async () => {
     connectedProviders.add("openai");
     renderPage("AGENT_HARNESS_SUPERPLANE");
-    expect(screen.getByRole("tab", { name: "SuperPlane" })).toHaveAttribute("aria-selected", "true");
+    const user = userEvent.setup();
+    expect(screen.getByRole("status", { name: "SuperPlane is active" })).toBeInTheDocument();
     expect(screen.queryByRole("searchbox", { name: "Search OpenAI models" })).not.toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Your API key" }));
-    expect(screen.getByRole("tab", { name: "SuperPlane", hidden: true })).toHaveAttribute("aria-selected", "true");
-    await userEvent.setup().click(screen.getByRole("button", { name: "Keep SuperPlane" }));
+    expect(screen.getAllByRole("button", { name: "Change model source" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Select Your API key" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Change model source" }));
+    expect(screen.getByRole("dialog", { name: "Change model source" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Current source" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Select Your API key" }));
+    expect(screen.getByRole("status", { name: "SuperPlane is active", hidden: true })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back to sources" }));
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
+    expect(screen.getByRole("dialog", { name: "Change model source" })).toBeInTheDocument();
+    expect(switchSource).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Select Your API key" }));
+    await user.click(screen.getByRole("button", { name: "Keep SuperPlane" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change model source" })).toHaveFocus();
     expect(switchSource).not.toHaveBeenCalled();
   });
 
-  it("moves source focus with arrow keys and activates only with Enter", async () => {
+  it("opens source choices and confirmation with the keyboard", async () => {
     renderPage("AGENT_HARNESS_SUPERPLANE");
     const user = userEvent.setup();
-    screen.getByRole("tab", { name: "SuperPlane" }).focus();
-    await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: "Your API key" })).toHaveFocus();
+    screen.getByRole("button", { name: "Change model source" }).focus();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Change model source" })).toBeInTheDocument();
+    screen.getByRole("button", { name: "Select Your API key" }).focus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Select ChatGPT subscriptions" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "Switch to Codex" })).toBeInTheDocument();
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
   });
 
   it("saves an explicit empty workspace selection without enabling inheritance", async () => {
@@ -234,6 +250,25 @@ describe("workspace LLM model settings", () => {
       allowedModels: ["gpt-5"],
       inheritParent: false,
     });
+  });
+
+  it("connects another API key provider through the same source dialog", async () => {
+    connectedProviders.add("openai");
+    renderPage("AGENT_HARNESS_CODEX");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Change model source" }));
+    await user.click(screen.getByRole("button", { name: "Change provider" }));
+    await user.click(screen.getByRole("combobox", { name: "New API key provider" }));
+    await user.click(screen.getByRole("option", { name: "Claude" }));
+    await user.click(screen.getByRole("button", { name: "Switch to Claude" }));
+    expect(screen.getByRole("dialog", { name: "Your Claude key" })).toBeInTheDocument();
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
+    expect(switchSource).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText("Claude API key"), "provider-key");
+    await user.click(screen.getByRole("button", { name: "Save and switch" }));
+    expect(switchSource).toHaveBeenCalledWith({ source: "anthropic", apiKey: "provider-key" });
+    expect(await screen.findByRole("status", { name: "Your API key is active" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("preserves unavailable subscription IDs until they are removed", async () => {
@@ -297,7 +332,7 @@ describe("workspace LLM model settings", () => {
     canUpdate = false;
     renderPage("AGENT_HARNESS_SUPERPLANE");
     expect(screen.getByRole("button", { name: "Save models" })).toBeDisabled();
-    expect(screen.getByRole("tab", { name: "Your API key" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Change model source" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: /sonnet 4-6/ })).toBeDisabled();
   });
 
@@ -306,7 +341,10 @@ describe("workspace LLM model settings", () => {
     renderPage("AGENT_HARNESS_CODEX", true);
     expect(await screen.findByText("Other member")).toBeInTheDocument();
     expect(screen.getByText("other@example.com")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "5-hour window remaining" })).toHaveAttribute("aria-valuenow", "75");
+    expect(screen.getByText("5-hour window")).toBeInTheDocument();
+    expect(screen.getByText("75% remaining")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Connected members" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change default task owner" })).not.toBeInTheDocument();
     expect(screen.queryByText("personal@example.com")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /(?:Connect|Reconnect|Disconnect) ChatGPT|Refresh usage/ }),
@@ -314,12 +352,134 @@ describe("workspace LLM model settings", () => {
     expect(meStartCodexConnection).not.toHaveBeenCalled();
   });
 
-  it("shows an empty connected-member list without connection controls", async () => {
+  it("shows an empty subscription workspace without owner controls for readers", async () => {
+    canUpdate = false;
     vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({ data: { members: [] } } as never);
     renderPage("AGENT_HARNESS_CODEX", true);
     expect(await screen.findByText("No members have a connected ChatGPT account.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change default task owner" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change model source" })).toBeDisabled();
   });
+
+  it("shows unavailable usage for saved limits with no quota windows", async () => {
+    vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({
+      data: { members: [{ userId: "other", displayName: "Other member", limits: [{ limitId: "codex" }] }] },
+    } as never);
+    renderPage("AGENT_HARNESS_CODEX", true);
+    const row = await screen.findByRole("row", { name: /Other member/ });
+    expect(within(row).getByText("Usage unavailable")).toBeInTheDocument();
+  });
+
+  it("labels each available window when a member has multiple quota windows", async () => {
+    vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({
+      data: {
+        members: [
+          {
+            userId: "other",
+            displayName: "Other member",
+            limits: [
+              { limitId: "missing" },
+              {
+                limitId: "codex",
+                primary: { usedPercent: 25, windowDurationMins: "300" },
+                secondary: { usedPercent: 50, windowDurationMins: "10080" },
+                credits: { hasCredits: true, balance: "4712" },
+              },
+              { limitId: "monthly", primary: { usedPercent: 10, windowDurationMins: "43200" } },
+            ],
+          },
+        ],
+      },
+    } as never);
+    renderPage("AGENT_HARNESS_CODEX", true);
+    const row = await screen.findByRole("row", { name: /Other member/ });
+    expect(within(row).getByText("5-hour window")).toBeInTheDocument();
+    expect(within(row).getByText("75% remaining")).toBeInTheDocument();
+    expect(within(row).getByText("7-day window")).toBeInTheDocument();
+    expect(within(row).getByText("50% remaining")).toBeInTheDocument();
+    expect(within(row).getByText("30-day window")).toBeInTheDocument();
+    expect(within(row).getByText("90% remaining")).toBeInTheDocument();
+    expect(within(row).getByText("Available credits")).toBeInTheDocument();
+    expect(within(row).getByText("4,712 credits")).toBeInTheDocument();
+    expect(within(row).queryByText("Usage unavailable")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { name: "zero balance", credits: { hasCredits: false, balance: "0" }, expected: "0 credits" },
+    { name: "unlimited balance", credits: { hasCredits: true, unlimited: true }, expected: "Unlimited" },
+    { name: "unknown balance", credits: { hasCredits: true }, expected: "Available" },
+    { name: "no credits", credits: { hasCredits: false }, expected: "0 credits" },
+    { name: "fractional balance", credits: { hasCredits: true, balance: "4712.5" }, expected: "4,712.5 credits" },
+    {
+      name: "monthly allowance with an unknown balance",
+      credits: { hasCredits: true, balance: null },
+      individualLimit: { limit: "5000", used: "288.32", remainingPercent: 94 },
+      expected: "4,712 credits",
+      label: "Monthly credits",
+    },
+    {
+      name: "monthly allowance without credits",
+      individualLimit: { limit: "5000", used: "288.32", remainingPercent: 94 },
+      expected: "4,712 credits",
+      label: "Monthly credits",
+    },
+    {
+      name: "exhausted monthly allowance",
+      credits: { hasCredits: false },
+      individualLimit: { limit: "5000", used: "5000.5", remainingPercent: 0 },
+      expected: "0 credits",
+      label: "Monthly credits",
+    },
+    {
+      name: "balance before monthly allowance",
+      credits: { hasCredits: true, balance: "12.5" },
+      individualLimit: { limit: "5000", used: "288.32", remainingPercent: 94 },
+      expected: "12.5 credits",
+    },
+    {
+      name: "unlimited balance before monthly allowance",
+      credits: { hasCredits: true, unlimited: true },
+      individualLimit: { limit: "5000", used: "288.32", remainingPercent: 94 },
+      expected: "Unlimited",
+    },
+  ])(
+    "shows $name without quota windows",
+    async ({ credits, individualLimit, expected, label = "Available credits" }) => {
+      const resetsAt = new Date(Date.now() + 86400000 * 20).toISOString();
+      vi.mocked(factoriesListFactoryCodexUsage).mockResolvedValue({
+        data: {
+          members: [
+            {
+              userId: "other",
+              displayName: "Other member",
+              limits: [
+                {
+                  limitId: "codex",
+                  credits,
+                  individualLimit: individualLimit ? { ...individualLimit, resetsAt } : undefined,
+                },
+              ],
+            },
+          ],
+        },
+      } as never);
+      renderPage("AGENT_HARNESS_CODEX", true);
+      const row = await screen.findByRole("row", { name: /Other member/ });
+      expect(within(row).getByText(label)).toBeInTheDocument();
+      expect(within(row).getByText(expected)).toBeInTheDocument();
+      const resetText = `Resets: ${new Date(resetsAt).toLocaleString()}`;
+      expect(within(row).queryByText(resetText)).not.toBeInTheDocument();
+      expect(within(row).queryByText("Usage unavailable")).not.toBeInTheDocument();
+      const user = userEvent.setup();
+      await user.click(within(row).getByRole("button", { name: "Options for Other member" }));
+      const details = screen.getByRole("menu");
+      expect(within(details).getByText(expected)).toBeInTheDocument();
+      const reset = within(details).queryByText(resetText);
+      if (label === "Monthly credits") expect(reset).toBeInTheDocument();
+      if (label !== "Monthly credits") expect(reset).not.toBeInTheDocument();
+      expect(within(details).queryByText("Usage unavailable")).not.toBeInTheDocument();
+    },
+  );
 
   it("can retry a failed member usage request", async () => {
     vi.mocked(factoriesListFactoryCodexUsage).mockRejectedValueOnce(new Error("Unavailable"));

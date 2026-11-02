@@ -1,9 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router";
 
-import superplaneLogo from "@/assets/superplane.svg";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HOSTED_LLM_PROVIDERS } from "@/lib/hostedLLMModels";
 import { useFactoryLLMModels, type useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
 
@@ -11,7 +9,6 @@ import type { LLMModelsSwitchProvider } from "./FactorySettingsLLMModelsSwitchPr
 import { byokProviderProductName, ORGANIZATION_LLM_MODELS_COPY as COPY } from "./organizationLLMModelsCopy";
 import type { WorkspaceModelSource } from "./workspaceModelSource";
 import { WorkspaceModelPolicyEditor } from "./WorkspaceModelPolicyEditor";
-import { WorkspaceCodexMembers } from "./WorkspaceCodexMembers";
 
 type BYOKQuery = ReturnType<typeof useBYOKLLMModels>;
 
@@ -23,46 +20,28 @@ type ModelSourceBodyProps = {
   factoryId: string;
   byokQueries: Record<string, BYOKQuery>;
   canUpdate: boolean;
-  canCreateIntegration: boolean;
   integrationsHref: string;
-  onChooseProvider: (provider: LLMModelsSwitchProvider) => void;
-  onChangeDefaultOwner?: () => void;
 };
 
 export function ModelSourceBody(props: ModelSourceBodyProps) {
-  const { source, organizationId, factoryId, canUpdate, onChangeDefaultOwner } = props;
+  const { source, organizationId, factoryId, canUpdate } = props;
   const editorProps = { organizationId, factoryId, canUpdate };
   if (source === "subscription")
     return (
       <div className="space-y-5" data-testid="llm-models-codex-subscription">
         <p className="text-xs text-muted-foreground">{COPY.subscriptionHelper}</p>
-        {onChangeDefaultOwner ? (
-          <Button type="button" variant="outline" size="sm" disabled={!canUpdate} onClick={onChangeDefaultOwner}>
-            Change default task owner
-          </Button>
-        ) : null}
         <WorkspaceModelPolicyEditor
           {...editorProps}
           provider="openai"
           fundingSource="subscription"
           label="ChatGPT subscription"
         />
-        <WorkspaceCodexMembers organizationId={organizationId} factoryId={factoryId} />
       </div>
     );
 
   if (source === "hosted")
     return (
       <div className="space-y-5" data-testid="llm-models-hosted">
-        <div className="flex flex-col gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-2">
-            <img src={superplaneLogo} alt="" className="size-4 dark:brightness-0 dark:invert" />
-            <span className="text-[13px] font-medium">SuperPlane</span>
-          </div>
-          <p role="status" className="text-xs text-muted-foreground">
-            Managed by SuperPlane
-          </p>
-        </div>
         <HostedModelPolicies {...editorProps} />
       </div>
     );
@@ -76,8 +55,6 @@ function OwnKeyModelSource({
   byokQueries,
   integrationsHref,
   canUpdate,
-  canCreateIntegration,
-  onChooseProvider,
   organizationId,
   factoryId,
 }: ModelSourceBodyProps) {
@@ -89,26 +66,9 @@ function OwnKeyModelSource({
     <div className="space-y-5" data-testid={`llm-models-provider-${currentProvider ?? "none"}`}>
       <div className="flex flex-col gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Select
-            value={currentProvider ?? ""}
-            onValueChange={(provider) => onChooseProvider(provider as LLMModelsSwitchProvider)}
-            disabled={!canUpdate || providers.length === 0}
-          >
-            <SelectTrigger aria-label="API key provider" className="w-full sm:w-44">
-              <SelectValue placeholder="Select a provider" />
-            </SelectTrigger>
-            <SelectContent>
-              {providers.map((provider) => (
-                <SelectItem
-                  key={provider}
-                  value={provider}
-                  disabled={!canCreateIntegration && !byokQueries[provider]?.data?.connected}
-                >
-                  {byokProviderProductName(provider)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <span className="text-[13px] font-medium">
+            {currentProvider ? byokProviderProductName(currentProvider) : "Your API key"}
+          </span>
           <p role="status" className="text-xs text-muted-foreground">
             {providerConnectionStatus(providerQuery)}
           </p>

@@ -1,11 +1,11 @@
 export const CODEX_CONNECTION_COPY = {
-  subscription: "Use your ChatGPT subscription",
-  subscriptionDevice: "Open this link and enter the code.",
+  subscriptionDevice: "Open ChatGPT and enter this code.",
   subscriptionCopyCode: "Copy sign-in code",
   subscriptionCodeCopied: "Sign-in code copied",
   subscriptionCopyFailed: "SuperPlane could not copy the code. Select the code and copy it.",
   subscriptionDeviceSettings: "In ChatGPT, allow device sign-in in Security settings.",
   subscriptionPending: "Wait for the ChatGPT sign-in code.",
+  subscriptionWaiting: "Waiting for ChatGPT sign-in.",
   subscriptionFinishing: "ChatGPT sign-in is saved. Wait for connection setup to finish.",
   subscriptionCanceling: "Canceling ChatGPT sign-in. Wait for cleanup to finish.",
   subscriptionStopping: "Wait for the previous connection attempt to stop.",

@@ -145,6 +145,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         json: {
           features: [
             {
+              id: "organization_runners",
+              label: "Organization runners",
+              description: "Manage organization fleets and runners",
+            },
+            {
               id: "claude_managed_agents",
               label: "Managed agents",
               description: "Canvas agent chat",
@@ -154,11 +159,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               id: "factories",
               label: "Factories",
               description: "Software factories for tasks",
-            },
-            {
-              id: "workspace_models",
-              label: "Workspace Models",
-              description: "Show the in-progress workspace Models settings page",
             },
             {
               id: "organization_byok",

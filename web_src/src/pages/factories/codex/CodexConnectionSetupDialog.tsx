@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { Link } from "@/components/Link/link";
 import {
   Dialog,
   DialogContent,
@@ -9,77 +9,50 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
+import type { useFactoryCodexConnection } from "../pages/onboarding/useFactoryCodexConnection";
 import { getApiErrorMessage } from "@/lib/errors";
-import { codexSubscriptionReady, useFactoryCodexConnection } from "../pages/onboarding/useFactoryCodexConnection";
+import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { CodexDeviceSignIn } from "./CodexDeviceSignIn";
+import { useCodexConnectionSetup } from "./useCodexConnectionSetup";
 
 type CodexConnection = ReturnType<typeof useFactoryCodexConnection>;
-type ConnectedAction = (() => void | Promise<void>) | undefined;
 
-function useConnectionCompletion(open: boolean, codex: CodexConnection, onConnected: ConnectedAction) {
-  const [error, setError] = useState<string | null>(null);
-  const started = useRef(false);
-  const version = useRef(0);
-  const openRef = useRef(open);
-  openRef.current = open;
-  const connectedCallback = useRef(onConnected);
-  connectedCallback.current = onConnected;
-
-  useEffect(() => {
-    openRef.current = open;
-    return () => {
-      openRef.current = false;
-      version.current += 1;
-      started.current = false;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) {
-      version.current += 1;
-      started.current = false;
-      setError(null);
-      return;
-    }
-    if (!codexSubscriptionReady(codex.query.data) || !codex.query.data?.availableModels?.length || started.current)
-      return;
-    started.current = true;
-    const currentVersion = version.current;
-    void codex
-      .refresh()
-      .then(() => {
-        if (openRef.current && version.current === currentVersion) return connectedCallback.current?.();
-      })
-      .catch((completionError: unknown) => {
-        if (!openRef.current || version.current !== currentVersion) return;
-        setError(getApiErrorMessage(completionError, "Could not refresh your Codex connection. Try again."));
-      });
-  }, [open, codex]);
-
-  return {
-    error,
-    cancel: () => {
-      openRef.current = false;
-      version.current += 1;
-    },
-    retry: () => {
-      started.current = false;
-      setError(null);
-    },
-  };
+function CodexConnectionErrorNotice({
+  error,
+  fallback,
+  billingHref,
+}: {
+  error: unknown;
+  fallback: string;
+  billingHref: string;
+}) {
+  const message = getApiErrorMessage(error, fallback);
+  const needsHostedCredit = message.startsWith("This organization has no hosted credit.");
+  return (
+    <p role="alert">
+      {message}
+      {needsHostedCredit ? (
+        <>
+          {" "}
+          <Link href={billingHref} className="font-medium underline underline-offset-2 hover:no-underline">
+            Open Billing
+          </Link>
+        </>
+      ) : null}
+    </p>
+  );
 }
 
 function CodexConnectionNotices({
   codex,
   featuresLoading,
   offered,
+  billingHref,
 }: {
   codex: CodexConnection;
   featuresLoading: boolean;
   offered: boolean;
+  billingHref: string;
 }) {
   const connection = codex.query.data;
   return (
@@ -93,11 +66,64 @@ function CodexConnectionNotices({
       ) : null}
       {!featuresLoading && !offered ? <p role="alert">Codex subscriptions are unavailable in this workspace.</p> : null}
       {connection?.eligible === false ? <p role="alert">Your account cannot connect Codex in this workspace.</p> : null}
-      {codex.start.isError ? <p role="alert">Could not start Codex sign-in. Try again.</p> : null}
+      {codex.start.isError ? (
+        <CodexConnectionErrorNotice
+          error={codex.start.error}
+          fallback="SuperPlane could not start ChatGPT sign-in. Try again."
+          billingHref={billingHref}
+        />
+      ) : null}
       {codex.cancel.isError ? <p role="alert">Could not cancel Codex sign-in. Try again.</p> : null}
       {codex.refreshCatalog.isError ? (
-        <p role="alert">Could not load your Codex models. Close this dialog and try again.</p>
+        <CodexConnectionErrorNotice
+          error={codex.refreshCatalog.error}
+          fallback="Could not load your Codex models. Close this dialog and try again."
+          billingHref={billingHref}
+        />
       ) : null}
+    </>
+  );
+}
+
+export function CodexConnectionSetupContent({ setup }: { setup: ReturnType<typeof useCodexConnectionSetup> }) {
+  const { codex } = setup;
+  const billingHref = factorySettingsSectionPath(setup.organizationId, setup.factoryId, "organization", "billing");
+  return (
+    <>
+      <CodexConnectionNotices
+        codex={codex}
+        featuresLoading={setup.featuresLoading}
+        offered={setup.offered}
+        billingHref={billingHref}
+      />
+      <CodexDeviceSignIn
+        disabled={setup.disabled}
+        connection={codex.query.data}
+        starting={codex.start.isPending}
+        canceling={codex.cancel.isPending}
+        onStart={() => codex.start.mutate()}
+        onCancel={() => void setup.closeSetup()}
+        cancelAction={null}
+      />
+      {setup.completionError ? (
+        <div>
+          <p role="alert">{setup.completionError}</p>
+          <Button type="button" disabled={setup.busy} onClick={setup.retryCompletion}>
+            Try again
+          </Button>
+        </div>
+      ) : null}
+      <DialogFooter>
+        <LoadingButton
+          type="button"
+          variant="outline"
+          disabled={setup.busy}
+          loading={codex.cancel.isPending}
+          onClick={() => void setup.closeSetup()}
+        >
+          Cancel
+        </LoadingButton>
+      </DialogFooter>
     </>
   );
 }
@@ -115,29 +141,18 @@ export function CodexConnectionSetupDialog({
   onOpenChange: (open: boolean) => void;
   onConnected?: () => void | Promise<void>;
 }) {
-  const { isLoading: permissionsLoading } = usePermissions();
-  const features = useExperimentalFeature(organizationId);
-  const offered = features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const enabled = [open, !features.isLoading, offered].every(Boolean);
-  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
-  const completion = useConnectionCompletion(enabled && codex.query.data?.eligible === true, codex, onConnected);
-  const disabled = [
-    !enabled,
-    permissionsLoading,
-    codex.query.isLoading,
-    codex.query.data?.revocationPending,
-    codex.query.data?.eligible !== true,
-  ].some(Boolean);
-  const close = () => {
-    completion.cancel();
-    onOpenChange(false);
-  };
-
+  const setup = useCodexConnectionSetup({
+    organizationId,
+    factoryId,
+    open,
+    onConnected,
+    onClose: () => onOpenChange(false),
+  });
   return (
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) close();
+        if (!nextOpen && !setup.busy) void setup.closeSetup();
       }}
     >
       <DialogContent className="sm:max-w-md">
@@ -145,30 +160,7 @@ export function CodexConnectionSetupDialog({
           <DialogTitle>Connect Codex</DialogTitle>
           <DialogDescription>Connect once to use Codex across this organization’s workspaces.</DialogDescription>
         </DialogHeader>
-        <CodexConnectionNotices codex={codex} featuresLoading={features.isLoading} offered={offered} />
-        <CodexDeviceSignIn
-          selected
-          disabled={disabled}
-          connection={codex.query.data}
-          starting={codex.start.isPending}
-          canceling={codex.cancel.isPending}
-          onSelect={() => {}}
-          onStart={() => codex.start.mutate()}
-          onCancel={() => codex.cancel.mutate()}
-        />
-        {completion.error ? (
-          <div>
-            <p role="alert">{completion.error}</p>
-            <Button type="button" onClick={completion.retry}>
-              Try again
-            </Button>
-          </div>
-        ) : null}
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={close}>
-            Close setup
-          </Button>
-        </DialogFooter>
+        {open ? <CodexConnectionSetupContent setup={setup} /> : null}
       </DialogContent>
     </Dialog>
   );

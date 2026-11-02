@@ -163,7 +163,7 @@ func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 				if tc.wantErr {
 					require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
 					assert.ErrorContains(t, err, "No ChatGPT models are enabled")
-					assert.ErrorContains(t, err, "Update Workspace Models")
+					assert.ErrorContains(t, err, "Update Models in workspace settings")
 					return
 				}
 				require.NoError(t, err)
@@ -207,7 +207,7 @@ func TestBuildEnforcesFinalWorkspaceBYOKModel(t *testing.T) {
 				require.ErrorIs(t, err, models.ErrSelectableLLMModelNotAllowed)
 				if len(tc.selected) == 0 {
 					assert.ErrorContains(t, err, "No models are enabled")
-					assert.ErrorContains(t, err, "Update Workspace Models")
+					assert.ErrorContains(t, err, "Update Models in workspace settings")
 				}
 				return
 			}

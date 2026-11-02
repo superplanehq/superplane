@@ -84,17 +84,27 @@ func RefreshCodexTokens(ctx context.Context, client *http.Client, refreshToken s
 }
 
 func classifyCodexRefreshFailure(status int, body []byte) error {
-	code := codexRefreshErrorCode(body)
-	permanent := status == http.StatusUnauthorized || permanentCodexRefreshCode(code)
-	if status >= 500 && !permanentCodexRefreshCode(code) {
-		permanent = false
+	code := strings.ToLower(codexRefreshErrorCode(body))
+	terminalTokenCode := permanentCodexRefreshCode(code)
+	permanent := false
+	switch status {
+	case http.StatusUnauthorized:
+		permanent = true
+	case http.StatusBadRequest, http.StatusForbidden:
+		permanent = terminalTokenCode
+	}
+	// Provider error strings can contain credentials. Return only recognized
+	// token codes; callers must not reflect arbitrary provider text to runners.
+	if !terminalTokenCode {
+		code = ""
 	}
 	return &CodexTokenRefreshError{Permanent: permanent, Code: code}
 }
 
 func permanentCodexRefreshCode(code string) bool {
-	switch strings.ToLower(code) {
-	case "refresh_token_expired", "refresh_token_reused", "refresh_token_invalidated":
+	switch code {
+	case "refresh_token_expired", "refresh_token_reused", "refresh_token_invalidated",
+		"invalid_grant", "invalid_refresh_token", "token_expired":
 		return true
 	default:
 		return false

@@ -5,24 +5,19 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import superplaneLogo from "@/assets/superplane.svg";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ModelAllowlistEditor } from "@/pages/organization/settings/ModelAllowlistEditor";
 
+import { renderModelSourceSwitchHeader } from "./modelSourceSwitchHeader";
 import { ProviderKeyStep } from "./ModelSourceProviderKeyForm";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import {
   byokProviderProductName,
+  modelSourceSwitchLabel,
   CUSTOM_LLM_API_TYPES,
   ORGANIZATION_LLM_MODELS_COPY as COPY,
 } from "./organizationLLMModelsCopy";
@@ -294,23 +289,7 @@ function ProviderModelChecklist({ provider }: { provider: LLMModelsSwitchProvide
   );
 }
 
-function sourceLabel(source: "hosted" | "subscription" | LLMModelsSwitchProvider): string {
-  if (source === "subscription") return "Codex subscription";
-  return source === "hosted" ? "SuperPlane" : byokProviderProductName(source);
-}
-
-export function SwitchDialog({
-  source,
-  dialog,
-  onCancel,
-  onContinueToKey,
-  onBackToWarning,
-  onSaveKey,
-  onSaveCustom,
-  onSwitchToHosted,
-  saving = false,
-  providerSelector,
-}: {
+type SwitchDialogProps = {
   saving?: boolean;
   providerSelector?: ReactNode;
   source: "hosted" | "subscription" | LLMModelsSwitchProvider;
@@ -321,10 +300,10 @@ export function SwitchDialog({
   onSaveKey: (apiKey: string) => void;
   onSaveCustom?: (connection: CustomProviderConnection) => void;
   onSwitchToHosted: () => void;
-}) {
-  const current = sourceLabel(source);
-  const next = dialog ? sourceLabel(dialog.target) : "";
+};
 
+export function SwitchDialog(props: SwitchDialogProps) {
+  const { dialog, saving, onCancel } = props;
   return (
     <Dialog
       open={dialog !== null}
@@ -335,28 +314,48 @@ export function SwitchDialog({
       }}
     >
       <DialogContent data-testid="llm-models-switch-dialog">
-        <fieldset disabled={saving} className="min-w-0 space-y-4">
-          {dialog?.step === "warn" ? (
-            <SwitchWarning
-              current={current}
-              saving={saving}
-              providerSelector={providerSelector}
-              next={next}
-              target={dialog.target}
-              onCancel={onCancel}
-              onContinueToKey={onContinueToKey}
-              onSwitchToHosted={onSwitchToHosted}
-            />
-          ) : null}
-          {dialog?.step === "key" && dialog.target === "custom" ? (
-            <CustomProviderKeyStep onBack={onBackToWarning} onSaveKey={onSaveKey} onSaveCustom={onSaveCustom} />
-          ) : null}
-          {dialog?.step === "key" && dialog.target !== "custom" ? (
-            <ProviderKeyStep providerName={next} onBack={onBackToWarning} onSaveKey={onSaveKey} />
-          ) : null}
-        </fieldset>
+        {renderModelSourceSwitchHeader(props.source, dialog)}
+        <SwitchDialogContent {...props} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function SwitchDialogContent({
+  source,
+  dialog,
+  onCancel,
+  onContinueToKey,
+  onBackToWarning,
+  onSaveKey,
+  onSaveCustom,
+  onSwitchToHosted,
+  saving = false,
+  providerSelector,
+}: SwitchDialogProps) {
+  const current = modelSourceSwitchLabel(source);
+  const next = dialog ? modelSourceSwitchLabel(dialog.target) : "";
+  return (
+    <fieldset disabled={saving} className="min-w-0 space-y-4">
+      {dialog?.step === "warn" ? (
+        <SwitchWarning
+          current={current}
+          saving={saving}
+          providerSelector={providerSelector}
+          next={next}
+          target={dialog.target}
+          onCancel={onCancel}
+          onContinueToKey={onContinueToKey}
+          onSwitchToHosted={onSwitchToHosted}
+        />
+      ) : null}
+      {dialog?.step === "key" && dialog.target === "custom" ? (
+        <CustomProviderKeyStep onBack={onBackToWarning} onSaveKey={onSaveKey} onSaveCustom={onSaveCustom} />
+      ) : null}
+      {dialog?.step === "key" && dialog.target !== "custom" ? (
+        <ProviderKeyStep providerName={next} onBack={onBackToWarning} onSaveKey={onSaveKey} />
+      ) : null}
+    </fieldset>
   );
 }
 
@@ -381,13 +380,6 @@ function SwitchWarning({
 }) {
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>Switch automations to {next}?</DialogTitle>
-        <DialogDescription>
-          This replaces the {current} agent in every automation in this workspace with the {next} agent.{" "}
-          {target === "hosted" ? "SuperPlane bills these runs." : `${next} bills these runs.`}
-        </DialogDescription>
-      </DialogHeader>
       {providerSelector}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
@@ -435,12 +427,6 @@ function CustomProviderKeyStep({
         }
       }}
     >
-      <DialogHeader>
-        <DialogTitle>Custom provider</DialogTitle>
-        <DialogDescription>
-          Set the provider URL, token, and API type. SuperPlane stores the token for agents in this workspace.
-        </DialogDescription>
-      </DialogHeader>
       <div className="space-y-2">
         <Label htmlFor="llm-models-custom-url">API URL</Label>
         <Input

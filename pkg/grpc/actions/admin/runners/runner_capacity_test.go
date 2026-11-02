@@ -8,7 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
+	runneractions "github.com/superplanehq/superplane/pkg/grpc/actions/runners"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/runners"
@@ -86,11 +88,38 @@ func TestFleetCapacityCountsOnlyTasksWithOrganizationSlots(t *testing.T) {
 		require.NoError(t, db.Model(task).Update("state", models.RunnerTaskStatePending).Error)
 	}
 	ready := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
-	capacity, err := loadFleetCapacity(t.Context(), fleet)
+	capacity, err := newTestRunnerService().manager.GetFleetCapacity(t.Context(), fleet, runneractions.CapacityOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), capacity.RunnableTasks)
 	require.NoError(t, ready.RequestCancel(db, time.Now()))
-	capacity, err = loadFleetCapacity(t.Context(), fleet)
+	capacity, err = newTestRunnerService().manager.GetFleetCapacity(t.Context(), fleet, runneractions.CapacityOptions{})
 	require.NoError(t, err)
 	assert.Zero(t, capacity.RunnableTasks)
+}
+
+func TestCreateRunnerForPaidTaskWithoutCreditFailsTask(t *testing.T) {
+	t.Setenv(billingmodels.BillingEnabledEnv, "true")
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	support.AssignOpenSystemTrial(t, resource.Organization.ID)
+	require.NoError(t, db.Model(&billingmodels.OrganizationLLMCreditGrant{}).
+		Where("organization_id = ?", resource.Organization.ID).
+		Update("expires_at", time.Now().Add(-time.Minute)).Error)
+	fleet := createTestFleetWithSlug(t, models.RunnerFleetE1LargeAMD64)
+	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
+
+	_, err := newTestRunnerService().CreateRunner(t.Context(), &pb.CreateRunnerRequest{
+		FleetId: fleet.Slug, TaskId: stringPointer(task.ID.String()),
+		IdempotencyKey: "no-credit", Ephemeral: true,
+	})
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+
+	var runners int64
+	require.NoError(t, db.Model(&models.Runner{}).Count(&runners).Error)
+	assert.Zero(t, runners)
+	stored, err := models.FindRunnerTask(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStateFailed, stored.State)
+	require.NotNil(t, stored.ErrorMessage)
+	assert.Contains(t, *stored.ErrorMessage, billing.ErrHostedCreditEmpty.Error())
 }

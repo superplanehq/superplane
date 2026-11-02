@@ -1,10 +1,12 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,11 +75,26 @@ type FactoryCodexConnection struct {
 }
 
 type CodexUsageLimit struct {
-	LimitID   string            `json:"limitId"`
-	LimitName string            `json:"limitName"`
-	PlanType  string            `json:"planType"`
-	Primary   *CodexUsageWindow `json:"primary"`
-	Secondary *CodexUsageWindow `json:"secondary"`
+	LimitID         string                     `json:"limitId"`
+	LimitName       string                     `json:"limitName"`
+	PlanType        string                     `json:"planType"`
+	Primary         *CodexUsageWindow          `json:"primary"`
+	Secondary       *CodexUsageWindow          `json:"secondary"`
+	Credits         *CodexUsageCredits         `json:"credits,omitempty"`
+	IndividualLimit *CodexUsageIndividualLimit `json:"individualLimit,omitempty"`
+}
+
+type CodexUsageIndividualLimit struct {
+	Limit            string   `json:"limit"`
+	Used             string   `json:"used"`
+	RemainingPercent *float64 `json:"remainingPercent"`
+	ResetsAt         *int64   `json:"resetsAt"`
+}
+
+type CodexUsageCredits struct {
+	HasCredits bool    `json:"hasCredits"`
+	Unlimited  bool    `json:"unlimited"`
+	Balance    *string `json:"balance"`
 }
 
 type CodexUsageWindow struct {
@@ -317,7 +334,7 @@ func (c *FactoryCodexConnection) RecordDeviceCode(
 }
 
 // StoreBundle saves a newer auth bundle for the active reservation.
-// Login stays in finishing until the runner VM is confirmed deleted.
+// Login stays exclusive until setup confirms local cleanup or the VM is deleted.
 func (c *FactoryCodexConnection) StoreBundle(
 	tx *gorm.DB,
 	taskID uuid.UUID,
@@ -502,8 +519,8 @@ func MarkCodexConnectionUncertain(tx *gorm.DB, taskID uuid.UUID, now time.Time) 
 }
 
 // ReleaseCodexReservationForTask releases the lease for one runner task.
-// A run lease ends when the task is terminal. A login lease also waits until
-// its VM is confirmed deleted.
+// A run lease ends when the task is terminal. A successful login can also end
+// after confirmed local cleanup; other logins wait for VM deletion.
 func ReleaseCodexReservationForTask(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
 	lease, err := FindCodexLeaseByTask(tx, taskID)
 	if err != nil || lease == nil {
@@ -597,6 +614,12 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 	if !lease.Login() && lease.RevokedAt == nil {
 		return deleteCodexLease(tx, &lease)
 	}
+	if lease.Login() && lease.RevokedAt == nil && connection.RevocationPendingAt == nil &&
+		(connection.Status == CodexConnectionStatusFinishing || connection.Status == CodexConnectionStatusReady) &&
+		task.State == RunnerTaskStateSucceeded && task.CancelRequestedAt == nil &&
+		codexSetupCleaned(task) && codexFinalCheckpointSaved(&connection, &lease) {
+		return connection.finishLoginLease(tx, &lease, CodexConnectionStatusReady, now)
+	}
 	if task.RunnerID != nil {
 		runner, runnerErr := FindRunner(tx, *task.RunnerID)
 		if runnerErr != nil && !errors.Is(runnerErr, ErrRunnerNotFound) {
@@ -615,10 +638,20 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 	return connection.finishLoginLease(tx, &lease, codexLoginLeaseOutcome(&connection, &lease, task), now)
 }
 
-func codexLoginLeaseOutcome(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) string {
-	checkpointSaved := connection.FinalCheckpointVersion > lease.StartedVersion &&
+func codexSetupCleaned(task *RunnerTask) bool {
+	var result struct {
+		Cleaned bool `json:"codexSubscriptionSetupCleaned"`
+	}
+	return json.Unmarshal(task.Result, &result) == nil && result.Cleaned
+}
+
+func codexFinalCheckpointSaved(connection *FactoryCodexConnection, lease *FactoryCodexLease) bool {
+	return connection.FinalCheckpointVersion > lease.StartedVersion &&
 		connection.FinalCheckpointVersion == connection.CredentialVersion
-	if checkpointSaved {
+}
+
+func codexLoginLeaseOutcome(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) string {
+	if codexFinalCheckpointSaved(connection, lease) {
 		return CodexConnectionStatusReady
 	}
 	if connection.CredentialVersion > lease.StartedVersion {
@@ -767,6 +800,23 @@ func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 			return errors.New("invalid Codex usage bucket")
 		}
 		seen[limit.LimitID] = true
+		if limit.Credits != nil && limit.Credits.Balance != nil {
+			if !validCodexCreditAmount(*limit.Credits.Balance) {
+				return errors.New("invalid Codex credit balance")
+			}
+		}
+		if individual := limit.IndividualLimit; individual != nil {
+			if !validCodexCreditAmount(individual.Limit) || !validCodexCreditAmount(individual.Used) {
+				return errors.New("invalid Codex monthly credit allowance")
+			}
+			remaining := individual.RemainingPercent
+			if remaining == nil || math.IsNaN(*remaining) || math.IsInf(*remaining, 0) || *remaining < 0 || *remaining > 100 {
+				return errors.New("invalid Codex monthly credit percentage")
+			}
+			if err := validateCodexUsageReset(individual.ResetsAt); err != nil {
+				return err
+			}
+		}
 		for _, window := range []*CodexUsageWindow{limit.Primary, limit.Secondary} {
 			if window == nil {
 				continue
@@ -774,11 +824,11 @@ func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 			if window.UsedPercent == nil || math.IsNaN(*window.UsedPercent) || math.IsInf(*window.UsedPercent, 0) || *window.UsedPercent < 0 {
 				return errors.New("invalid Codex usage percentage")
 			}
-			if window.WindowDurationMins != nil && *window.WindowDurationMins <= 0 || window.ResetsAt != nil && *window.ResetsAt <= 0 {
+			if window.WindowDurationMins != nil && *window.WindowDurationMins <= 0 {
 				return errors.New("invalid Codex usage window")
 			}
-			if window.ResetsAt != nil && time.Unix(*window.ResetsAt, 0).UTC().Year() > 9999 {
-				return errors.New("Codex usage reset exceeds the API timestamp range")
+			if err := validateCodexUsageReset(window.ResetsAt); err != nil {
+				return err
 			}
 		}
 	}
@@ -885,7 +935,7 @@ func (c *FactoryCodexConnection) resolvePermittedModel(tx *gorm.DB, factoryID uu
 		return model, nil
 	}
 	if len(permitted) == 0 {
-		return "", fmt.Errorf("No ChatGPT models are enabled for this task owner. Update Workspace Models: %w", ErrSubscriptionModelUnavailable)
+		return "", fmt.Errorf("No ChatGPT models are enabled for this task owner. Update Models in workspace settings: %w", ErrSubscriptionModelUnavailable)
 	}
 	for _, candidate := range c.AvailableModels {
 		if candidate.IsDefault && slices.Contains(permitted, candidate.Model) {
@@ -939,4 +989,25 @@ func DeleteDrainedOrganizationCodexConnections(tx *gorm.DB, organizationID uuid.
 		}
 	}
 	return true, tx.Where("organization_id = ?", organizationID).Delete(&FactoryCodexConnection{}).Error
+}
+
+func validCodexCreditAmount(amount string) bool {
+	if len(amount) > 64 {
+		return false
+	}
+	value, err := strconv.ParseFloat(amount, 64)
+	return err == nil && !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
+}
+
+func validateCodexUsageReset(resetsAt *int64) error {
+	if resetsAt == nil {
+		return nil
+	}
+	if *resetsAt <= 0 {
+		return errors.New("invalid Codex usage reset time")
+	}
+	if time.Unix(*resetsAt, 0).UTC().Year() > 9999 {
+		return errors.New("Codex usage reset exceeds the API timestamp range")
+	}
+	return nil
 }

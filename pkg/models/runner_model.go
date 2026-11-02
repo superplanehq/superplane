@@ -84,7 +84,7 @@ func ResolveBYOKRunnerModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, 
 		}
 	}
 	if len(concrete) == 0 {
-		return "", fmt.Errorf("No models are enabled for this provider. Update Workspace Models: %w", ErrSelectableLLMModelNotAllowed)
+		return "", fmt.Errorf("No models are enabled for this provider. Update Models in workspace settings: %w", ErrSelectableLLMModelNotAllowed)
 	}
 	slices.Sort(concrete)
 	return concrete[0], nil

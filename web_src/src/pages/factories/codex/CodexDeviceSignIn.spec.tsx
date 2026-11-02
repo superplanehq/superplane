@@ -19,12 +19,10 @@ function renderPanel(
 ) {
   return render(
     <CodexDeviceSignIn
-      selected
       disabled={false}
       starting={false}
       canceling={false}
       connection={connection}
-      onSelect={vi.fn()}
       onStart={handlers.onStart ?? vi.fn()}
       onCancel={handlers.onCancel ?? vi.fn()}
     />,
@@ -44,12 +42,15 @@ describe("CodexDeviceSignIn", () => {
     });
 
     expect(screen.getByTestId("first-run-codex-code")).toHaveTextContent("CODE-1234");
-    expect(screen.getByRole("link", { name: "https://auth.openai.com/codex/device" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open ChatGPT" })).toHaveAttribute(
       "href",
       "https://auth.openai.com/codex/device",
     );
     expect(screen.getByText(copy.subscriptionDeviceSettings)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
+    const progress = screen.getByRole("status");
+    expect(progress).toHaveTextContent("Waiting for ChatGPT sign-in.");
+    expect(progress.querySelector("svg")).toHaveClass("animate-spin");
 
     await user.click(screen.getByRole("button", { name: "Copy sign-in code" }));
 

@@ -405,19 +405,7 @@ func (s *Server) reconcileRunnerConnection(
 		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug, fleetScope)
 		messages.PublishPlanningRunnerStatus(database.DB(ctx), reservedTask)
 	}
-	for _, failedTask := range reservation.FailedTasks {
-		messages.PublishPlanningRunnerStatus(database.DB(ctx), failedTask)
-	}
-	publishedFactories := map[uuid.UUID]bool{}
-	for _, connection := range reservation.LoginConnections {
-		if publishedFactories[connection.OrganizationID] {
-			continue
-		}
-		if err := messages.PublishOrganizationCodexConnectionUpdated(database.DB(ctx), connection.OrganizationID); err != nil {
-			log.WithError(err).Warn("Failed to publish ChatGPT connection change")
-		}
-		publishedFactories[connection.OrganizationID] = true
-	}
+	messages.PublishRunnerTaskRejections(database.DB(ctx), reservation)
 	if s.nodeRequestExecutor != nil {
 		for _, failedTask := range reservation.FailedTasks {
 			go s.waitForTaskExecutionRequest(context.WithoutCancel(ctx), failedTask)
@@ -533,6 +521,7 @@ func (s *Server) completeRunnerTask(
 
 	var completedTask *models.RunnerTask
 	var completedNow bool
+	var loginConnections []models.FactoryCodexConnection
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		currentRunner, err := models.FindRunner(tx, runner.ID)
 		if err != nil {
@@ -545,6 +534,17 @@ func (s *Server) completeRunnerTask(
 		task, err := models.FindRunnerTask(tx, taskID)
 		if err != nil {
 			return err
+		}
+		lease, err := models.FindCodexLeaseByTask(tx, task.ID)
+		if err != nil {
+			return err
+		}
+		if lease.Login() {
+			connection, err := models.FindFactoryCodexConnectionByID(tx, lease.ConnectionID)
+			if err != nil {
+				return err
+			}
+			loginConnections = append(loginConnections, *connection)
 		}
 		completedNow, err = task.Complete(
 			tx,
@@ -567,6 +567,7 @@ func (s *Server) completeRunnerTask(
 		return err
 	}
 	if completedNow {
+		messages.PublishCodexConnectionChanges(database.DB(ctx), loginConnections)
 		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask, fleetSlug, fleetScope)
 		messages.PublishPlanningRunnerStatus(database.DB(ctx), completedTask)
 	}

@@ -16,3 +16,8 @@ export function workspaceModelSource(
   if (harness && harness !== "AGENT_HARNESS_UNSPECIFIED") return "own-key";
   return anyProviderConnected ? "own-key" : "hosted";
 }
+
+export function workspaceModelSourceLabel(source: WorkspaceModelSource) {
+  if (source === "subscription") return "ChatGPT subscriptions";
+  return source === "hosted" ? "SuperPlane" : "Your API key";
+}

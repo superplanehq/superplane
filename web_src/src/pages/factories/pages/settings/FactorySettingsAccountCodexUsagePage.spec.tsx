@@ -73,7 +73,6 @@ describe("Codex usage", () => {
       expect(screen.getByText("75% remaining")).toBeInTheDocument();
       act(() => vi.advanceTimersByTime(1000));
       expect(screen.getByText("Update needed")).toBeInTheDocument();
-      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
       expect(screen.queryByText("75% remaining")).not.toBeInTheDocument();
     } finally {
       view.unmount();
@@ -103,11 +102,28 @@ describe("Codex usage", () => {
     ];
     render(<CodexUsageConnections connections={connections} />);
     expect(screen.getByText("75% remaining")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "5-hour window remaining" })).toHaveAttribute("aria-valuenow", "75");
+    expect(screen.getByText("5-hour window")).toBeInTheDocument();
     expect(screen.getByText("7-day window")).toBeInTheDocument();
     expect(screen.getByText("Update needed")).toBeInTheDocument();
     expect(screen.queryByText("10% remaining")).not.toBeInTheDocument();
     expect(screen.getByText(/Last updated/)).toBeInTheDocument();
+  });
+
+  it("shows a credit balance when no quota windows are reported", () => {
+    render(
+      <CodexUsageConnections
+        connections={[
+          {
+            id: "connection-1",
+            observedAt: new Date().toISOString(),
+            limits: [{ limitId: "codex", credits: { hasCredits: true, balance: "4712" } }],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Available credits")).toBeInTheDocument();
+    expect(screen.getByText("4,712 credits")).toBeInTheDocument();
+    expect(screen.queryByText(/Usage unavailable/)).not.toBeInTheDocument();
   });
 
   it("shows unavailable usage without a snapshot and hides usage without a connection", () => {
@@ -115,9 +131,44 @@ describe("Codex usage", () => {
       <CodexUsageConnections connections={[{ id: "connection-1", accountLabel: "ada@example.com" }]} />,
     );
     expect(screen.getByText(/Usage unavailable/)).toBeInTheDocument();
-    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     view.rerender(<CodexUsageConnections connections={[]} />);
     expect(view.container).toBeEmptyDOMElement();
+  });
+
+  it.each([
+    { name: "with credit metadata and reset time", credits: { hasCredits: true }, hasReset: true },
+    { name: "without credit metadata", hasReset: true },
+    { name: "without a reset time", credits: { hasCredits: true }, hasReset: false },
+  ])("shows monthly credits $name", ({ credits, hasReset }) => {
+    const resetsAt = new Date(Date.now() + 86400000 * 20).toISOString();
+    render(
+      <CodexUsageConnections
+        connections={[
+          {
+            id: "connection-1",
+            observedAt: new Date().toISOString(),
+            limits: [
+              {
+                limitId: "codex",
+                credits,
+                individualLimit: {
+                  limit: "5000",
+                  used: "288.32",
+                  remainingPercent: 94,
+                  resetsAt: hasReset ? resetsAt : undefined,
+                },
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Monthly credits")).toBeInTheDocument();
+    expect(screen.getByText("4,712 credits")).toBeInTheDocument();
+    const reset = screen.queryByText(`Resets: ${new Date(resetsAt).toLocaleString()}`);
+    if (hasReset) expect(reset).toBeInTheDocument();
+    if (!hasReset) expect(reset).not.toBeInTheDocument();
+    expect(screen.queryByText(/Usage unavailable/)).not.toBeInTheDocument();
   });
 
   it("loads saved usage for the organization and lets the user retry a failed request", async () => {
@@ -149,22 +200,30 @@ describe("Codex usage", () => {
     queryClient.clear();
   });
 
-  it("keeps disconnected settings open and starts personal sign-in", async () => {
-    vi.mocked(meListCodexUsage).mockResolvedValue({ data: { connections: [] }, error: undefined });
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const view = renderUsageRoute(queryClient);
-    try {
-      expect(await screen.findByRole("heading", { name: "Codex" })).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Account settings" })).not.toBeInTheDocument();
-      const connect = await screen.findByRole("button", { name: "Connect ChatGPT" });
-      await waitFor(() => expect(connect).toBeEnabled());
-      connect.click();
-      await waitFor(() => expect(meStartCodexConnection).toHaveBeenCalledTimes(1));
-    } finally {
-      view.unmount();
-      queryClient.clear();
-    }
-  });
+  for (const [status, action] of [
+    ["disconnected", "Connect ChatGPT"],
+    ["reconnect_required", "Reconnect ChatGPT"],
+  ] as const) {
+    it(`starts personal sign-in when the connection is ${status}`, async () => {
+      vi.mocked(meDescribeCodexConnection).mockResolvedValue({
+        data: { connection: { status, eligible: true } },
+      } as never);
+      vi.mocked(meListCodexUsage).mockResolvedValue({ data: { connections: [] }, error: undefined });
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const view = renderUsageRoute(queryClient);
+      try {
+        expect(await screen.findByRole("heading", { name: "Codex" })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Account settings" })).not.toBeInTheDocument();
+        const connect = await screen.findByRole("button", { name: action });
+        await waitFor(() => expect(connect).toBeEnabled());
+        connect.click();
+        await waitFor(() => expect(meStartCodexConnection).toHaveBeenCalledTimes(1));
+      } finally {
+        view.unmount();
+        queryClient.clear();
+      }
+    });
+  }
 
   it("keeps the connected view busy until the refresh task finishes", async () => {
     let connection: FactoriesFactoryCodexConnection = {
