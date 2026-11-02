@@ -112,8 +112,9 @@ const COMMANDS = [
     flags: ["file", ...labelFlags],
     alias: labelAlias,
     required: ["file"],
+    tool: "add_artifact",
+    prepare: markdownInput,
     line: (result) => result.title,
-    run: publishMarkdownFile,
   },
   {
     words: ["task", "artifact", "add-file"],
@@ -264,9 +265,8 @@ function evidenceUnavailableInput(input) {
   return { reason: input.reason, attempts: readJSON(input.attempts) };
 }
 
-async function publishMarkdownFile(input, env, fetchImpl) {
-  const { publishMarkdown } = require("./publish_markdown");
-  return publishMarkdown({ body: readText(input.file).trim(), title: input.title, key: input.key }, env, fetchImpl);
+function markdownInput(input) {
+  return { type: "markdown", body: readText(input.file), title: input.title, key: input.key };
 }
 
 function render(result) {
@@ -291,13 +291,11 @@ async function main(argv, env = process.env, fetchImpl = fetch, stdout = process
   }
   try {
     const { command, input } = parseCommand(argv);
-    if (!command.tool && !command.run) {
+    if (!command.tool) {
       throw new Error(`superplane ${command.words.join(" ")} is not available yet`);
     }
     const toolInput = command.prepare ? command.prepare(input) : input;
-    const result = command.run
-      ? await command.run(toolInput, env, fetchImpl)
-      : await callTool(command.tool, toolInput, env, fetchImpl);
+    const result = await callTool(command.tool, toolInput, env, fetchImpl);
     const shown = command.line ? command.line(result) : JSON.stringify(render(result));
     stdout.write(`${String(shown ?? "").trim()}\n`);
   } catch (error) {

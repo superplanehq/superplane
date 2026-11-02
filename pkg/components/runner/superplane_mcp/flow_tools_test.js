@@ -85,6 +85,21 @@ test("upload_artifact keeps the poster when the video upload fails", async () =>
   });
 });
 
+test("add_artifact rejects a video key with no space for the poster key", async () => {
+  const value = taskFixture();
+  call("get_artifact", { path: value.screenshot }, value.client);
+  const input = { type: "file", path: value.video, posterPath: value.screenshot };
+
+  await assert.rejects(
+    call("add_artifact", { ...input, key: "k".repeat(469) }, value.client),
+    /key must be at most 468 bytes for a video with a poster/,
+  );
+  assert.equal(value.uploads.length, 0);
+
+  await call("add_artifact", { ...input, key: "k".repeat(468) }, value.client);
+  assert.equal(value.uploads[0].headers["X-SuperPlane-Artifact-Key"], `${"k".repeat(468)}%3Aposter`);
+});
+
 test("upload_artifact reads only the task evidence directory", async () => {
   const value = taskFixture();
 

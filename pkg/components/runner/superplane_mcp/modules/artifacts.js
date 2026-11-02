@@ -138,6 +138,12 @@ function markdownLabel(value) {
     .replace(/\]/g, "\\]");
 }
 
+const POSTER_KEY_SUFFIX = ":poster";
+
+function posterKey(key) {
+  return key ? `${key}${POSTER_KEY_SUFFIX}` : "";
+}
+
 async function uploadVideoWithPoster(file, poster, title, key, client) {
   const env = client.env;
   if (!files.SCREENSHOT_CONTENT_TYPES.has(poster.contentType)) {
@@ -145,7 +151,7 @@ async function uploadVideoWithPoster(file, poster, title, key, client) {
   }
   files.requireInspectedScreenshot(poster, poster.contentType, env);
 
-  const posterResult = await uploadFile(poster, title ? `${title} poster` : "Video poster", key ? `${key}:poster` : "", client);
+  const posterResult = await uploadFile(poster, title ? `${title} poster` : "Video poster", posterKey(key), client);
   let videoResult;
   try {
     videoResult = await uploadFile(file, title, key, client);
@@ -175,6 +181,9 @@ async function addFile(input, client, rules) {
   const posterPath = text(input, "posterPath");
   if (posterPath && !file.contentType.startsWith("video/")) {
     throw new Error("posterPath is only supported for video artifacts");
+  }
+  if (posterPath && Buffer.byteLength(posterKey(key)) > MAX_RUNNER_ARTIFACT_KEY_BYTES) {
+    throw new Error(`key must be at most ${MAX_RUNNER_ARTIFACT_KEY_BYTES - POSTER_KEY_SUFFIX.length} bytes for a video with a poster`);
   }
   files.requireInspectedScreenshot(file, file.contentType, env);
   if (posterPath) {
