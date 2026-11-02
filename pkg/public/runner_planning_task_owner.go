@@ -129,7 +129,7 @@ func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request,
 
 	owner, ok := models.FindTaskOwnerCandidate(target.candidates, req.User)
 	if !ok {
-		http.Error(w, "The user cannot own tasks. Use a user_id or github_login from suggest_owners.", http.StatusBadRequest)
+		http.Error(w, "The user cannot own tasks. Use a user_id or github_login from list_members.", http.StatusBadRequest)
 		return
 	}
 
