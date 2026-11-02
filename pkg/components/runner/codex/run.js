@@ -256,7 +256,7 @@ function globalMCPConfigOverrides(taskDir, env = process.env) {
     return [];
   }
   const registry = loadGlobalMCPRegistry(taskDir);
-  const toolNames = registry ? registry.allTools().map((tool) => tool.definition.name) : [];
+  const toolNames = registry ? registry.allToolNames() : [];
   return [
     "-c",
     `mcp_servers.${GLOBAL_MCP_SERVER}.command=${tomlString("node")}`,
