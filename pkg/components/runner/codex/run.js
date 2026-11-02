@@ -8,6 +8,7 @@
  */
 
 const fs = require("fs");
+const { constants } = require("os");
 const path = require("path");
 const readline = require("readline");
 const { spawn } = require("child_process");
@@ -16,24 +17,12 @@ const SESSION_FILE = "codex_session";
 
 // Codex starts stdio MCP servers with a minimal environment. Forward by name,
 // not with mcp_servers.<id>.env, so tokens stay out of the codex argv.
-const SUPERPLANE_MCP_ENV_VARS = [
-  "SUPERPLANE_BASE_URL",
-  "SUPERPLANE_RUN_TOKEN",
-  "SUPERPLANE_TASK_DIR",
-  "SUPERPLANE_ACTIVITY_ID",
-  "SUPERPLANE_ANALYSIS_SPEC_FILE",
-  "SUPERPLANE_ANALYSIS_SCORE_FILE",
-  "SUPERPLANE_ARTIFACT_TOKEN",
-  "SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
-  "SUPERPLANE_VISUAL_EVIDENCE",
-  "SUPERPLANE_PUBLISH_LINKS",
-];
-
 const GLOBAL_MCP_SERVER = "superplane_global";
 const GLOBAL_MCP_ENV_VARS = [
   "SUPERPLANE_BASE_URL",
   "SUPERPLANE_RUNNER_TOKEN",
   "SUPERPLANE_TASK_DIR",
+  "SUPERPLANE_ANALYSIS_SPEC_FILE",
 ];
 
 function loadActivityStreamModule() {
@@ -161,27 +150,10 @@ function visualEvidenceEnabled(env = process.env) {
   return artifactEnabled(env) && !envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
 }
 
-function mergeConfidenceEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
-}
-
-function superplaneMCPScript(taskDir, env = process.env) {
-  if (planningEnabled(env)) {
-    return path.join(taskDir, "planning_session_mcp.js");
-  }
-  if (mergeConfidenceEnabled(env)) {
-    return path.join(taskDir, "merge_confidence_mcp.js");
-  }
-  return path.join(taskDir, "task_artifact_mcp.js");
-}
-
 function planningSystemPrompt(env = process.env) {
   return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
 
-// Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
-// --sandbox flag. Config overrides keep both new and resumed analysis turns
-// read-only without disabling shell commands and file reads.
 function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
@@ -203,28 +175,15 @@ function codexExecArgs(
   if (sessionID) {
     args.push("resume", sessionID);
   }
-  args.push("--json", "--skip-git-repo-check");
+  args.push("--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox");
+  args.push(...workspaceMCPConfigOverrides(env));
   if (planningEnabled(env)) {
-    args.push(
-      "-c",
-      'sandbox_mode="read-only"',
-      "-c",
-      'approval_policy="never"',
-    );
-    args.push(...mcpConfigOverrides(mcpScriptPath, env));
     args.push(
       "-c",
       `developer_instructions=${tomlString(loadAnalysisProtocol(env))}`,
     );
-  } else {
-    args.push("--dangerously-bypass-approvals-and-sandbox");
-    if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
-      args.push(...mcpConfigOverrides(mcpScriptPath, env));
-    } else {
-      args.push(...workspaceMCPConfigOverrides(env));
-    }
   }
-  args.push(...globalMCPConfigOverrides(path.dirname(String(mcpScriptPath || "")), env));
+  args.push(...globalMCPConfigOverrides(taskDirFromMCPPath(mcpScriptPath), env));
   if (model) {
     args.push("-m", model);
   }
@@ -271,26 +230,9 @@ function codexSessionIDFromEvent(event) {
   ).trim();
 }
 
-function mcpConfigOverrides(mcpScriptPath, env = process.env) {
-  return [
-    "-c",
-    `mcp_servers.superplane.command=${tomlString("node")}`,
-    "-c",
-    `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
-    "-c",
-    `mcp_servers.superplane.env_vars=${tomlStringArray(SUPERPLANE_MCP_ENV_VARS)}`,
-    // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
-    // answer that prompt, so approve only these planning tools, not shell writes.
-    ...(planningEnabled(env)
-      ? [
-          "-c",
-          'mcp_servers.superplane.tools.propose_update.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"',
-        ]
-      : []),
-    ...workspaceMCPConfigOverrides(env),
-  ];
+function taskDirFromMCPPath(value) {
+  const candidate = String(value || "");
+  return candidate.endsWith(".js") ? path.dirname(candidate) : candidate;
 }
 
 function loadGlobalMCPRegistry(taskDir) {
@@ -453,6 +395,39 @@ function saveFailureResult(message) {
   }
 }
 
+function superviseCodexProcessGroup(child) {
+  let running = true;
+  const stop = () => {
+    if (!running || !child.pid) return;
+    running = false;
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch (_error) {
+      child.kill("SIGKILL");
+    }
+  };
+  // Host runners terminate the task group before escalating to SIGKILL.
+  // Codex has its own group so credential failures can stop its native child.
+  const handlers = new Map();
+  for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) {
+    const handler = () => {
+      stop();
+      process.exit(128 + constants.signals[signal]);
+    };
+    handlers.set(signal, handler);
+    process.once(signal, handler);
+  }
+  process.once("exit", stop);
+  child.once("close", () => {
+    running = false;
+    process.removeListener("exit", stop);
+    for (const [signal, handler] of handlers) {
+      process.removeListener(signal, handler);
+    }
+  });
+  return stop;
+}
+
 async function runPrompt(promptFile, model, thinking) {
   const sp = process.env.SUPERPLANE_TASK_DIR;
   if (!sp) {
@@ -462,7 +437,24 @@ async function runPrompt(promptFile, model, thinking) {
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
+  let stopChild = () => {};
+  const subscription = loadSubscriptionModule();
+  subscription?.setCredentialFailureHandler?.((error) => {
+    // No untrusted output is safe after losing sight of credential rotation.
+    // Stop the npm launcher and its native child, and save only a fixed error.
+    stopChild();
+    process.stderr.write(`${error.message}\n`);
+    try {
+      fs.writeFileSync(resultFile, `${JSON.stringify({ type: "result", is_error: true, error: error.message, result: "" })}\n`);
+    } catch (_error) {
+      process.stderr.write("The credential protection error could not be saved.\n");
+    }
+    process.exit(1);
+  });
   const childEnv = codexExecEnv(process.env);
+  // Restore runs in a separate process. Observe credentials here before Codex
+  // can replace or remove the auth file.
+  redactSubscription("");
 
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
@@ -491,27 +483,28 @@ async function runPrompt(promptFile, model, thinking) {
     turn: promptCount + 1,
   });
   activity.start();
-  const mcpScript = superplaneMCPScript(sp);
   const codexArgs = codexExecArgs(
     process.env,
     model,
-    mcpScript,
+    sp,
     sessionID,
     thinking,
   );
   if (planning) {
     writeStdout("Planning session tools enabled\n");
-    writeStdout("sandbox: read-only\n");
   }
   if (sessionID) {
     writeStdout("Continuing Codex session in the current directory\n");
   }
   codexArgs.push(prompt);
 
+  const detached = Boolean(subscription?.setCredentialFailureHandler);
   const child = spawn("codex", codexArgs, {
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
+    detached,
   });
+  if (detached) stopChild = superviseCodexProcessGroup(child);
   const stderrDone = pipeRedactedStderr(child.stderr);
 
   let lastResult = {};
@@ -598,7 +591,7 @@ async function runPrompt(promptFile, model, thinking) {
   accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
-    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+    await require(path.join(sp, "agent_message.js")).recordAgentMessage(
       safePayload.result,
     );
   }
@@ -610,7 +603,6 @@ async function runPrompt(promptFile, model, thinking) {
         : 1,
     duration_ms: Date.now() - startedAt,
   });
-  const subscription = loadSubscriptionModule();
   if (exitCode === 0 && subscription && subscription.subscriptionEnabled()) {
     try {
       await subscription.reportUsage();
@@ -733,12 +725,12 @@ function loadSubscriptionModule(env = process.env) {
   return require(file);
 }
 
-function redactSubscription(value) {
+function redactSubscription(value, options = {}) {
   const helper = loadSubscriptionModule();
   if (!helper || !helper.redactSecrets) {
     return String(value);
   }
-  return helper.redactSecrets(String(value));
+  return helper.redactSecrets(String(value), process.env, options);
 }
 
 function writeStdout(value) {
@@ -825,16 +817,17 @@ function createCodexFormatter(telemetry, activityOverride) {
     return queue.shift() || `${type}-${contentSeq++}`;
   }
 
-  function appendContentDelta(contentKind, id, text) {
+  function appendContentDelta(contentKind, id, text, options = {}) {
     if (typeof text !== "string" || !text) {
       return;
     }
+    const safe = safeLogText(redactSubscription(text, options));
     const previous = contentText.get(id) || "";
-    const delta = text.startsWith(previous)
-      ? text.slice(previous.length)
-      : text;
+    const delta = safe.startsWith(previous)
+      ? safe.slice(previous.length)
+      : safe;
     activity.appendContent(contentKind, id, delta);
-    contentText.set(id, text);
+    contentText.set(id, safe);
   }
 
   function rememberTool(item) {
@@ -945,7 +938,7 @@ function createCodexFormatter(telemetry, activityOverride) {
         if (event.type === "item.started") {
           activity.startContent(contentKind, id);
           const initialText = item.text || item.result || "";
-          appendContentDelta(contentKind, id, initialText);
+          appendContentDelta(contentKind, id, initialText, { incomplete: true });
           return;
         }
         if (event.type === "item.completed") {
@@ -1199,7 +1192,6 @@ module.exports = {
   codexSessionForPrompt,
   codexSessionIDFromEvent,
   planningEnabled,
-  superplaneMCPScript,
   planningSystemPrompt,
   planningAnalysisEnabled,
   workspaceMCPConfigOverrides,

@@ -145,6 +145,7 @@ function AnalysisRequestChat({
                 canvasId={analysis.view.canvasId}
                 executionId={analysis.view.executionId}
                 activities={analysis.view.activities}
+                progressLabel={analysis.canTogglePlan ? undefined : "Creating the first plan…"}
               />
             ) : null}
             <AnalysisPlanControls analysis={analysis} chipsWorking={chipsWorking} position="conversation" />

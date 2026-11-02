@@ -39,7 +39,7 @@ func TestBuildRefinementModel(t *testing.T) {
 			t.Cleanup(func() { db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{}) })
 			if tc.source == "subscription" {
 				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
-				connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
+				connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 				require.NoError(t, err)
 				require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: tc.override}, {Model: tc.stored}}, time.Now()))
 				require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)

@@ -17,18 +17,20 @@ export function DropdownMenuValueSub({
   options,
   onValueChange,
   testId,
+  disabled,
 }: {
   label: string;
   value: string;
   options: Array<{ value: string; label: string; testId?: string }>;
   onValueChange: (next: string) => void;
   testId?: string;
+  disabled?: boolean;
 }) {
   const currentLabel = options.find((option) => option.value === value)?.label ?? value;
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger className={SUB_TRIGGER_CLASSNAME} data-testid={testId}>
+      <DropdownMenuSubTrigger className={SUB_TRIGGER_CLASSNAME} data-testid={testId} disabled={disabled}>
         {label}
         <span className="ml-auto text-[11px] text-muted-foreground">{currentLabel}</span>
       </DropdownMenuSubTrigger>

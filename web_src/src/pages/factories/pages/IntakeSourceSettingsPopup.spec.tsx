@@ -139,6 +139,7 @@ function renderPopup(
     onClose?: () => void;
     canvasId?: string;
     agent?: PlanningReviewAgentSlot;
+    canEdit?: boolean;
     initialTab?: IntakeSettingsTab;
     page?: boolean;
     labelOptions?: string[];
@@ -158,6 +159,8 @@ function renderPopup(
         <ThemeProvider>
           <TooltipProvider>
             <IntakeSourceSettingsPopup
+              canEdit={props.canEdit ?? true}
+              accessLoading={false}
               settings={
                 props.settings ??
                 (props.sourceId === "sentry-exceptions"
@@ -344,6 +347,18 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
     expect(screen.queryByTestId("planning-review-automation-note")).not.toBeInTheDocument();
+  });
+
+  it("does not expose the agent editor in read-only settings", () => {
+    renderPopup({
+      canEdit: false,
+      initialTab: "agent",
+      agent: { draft: PLANNING_REVIEW_DRAFT, organizationId: "org-1", onSave: vi.fn() },
+    });
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs"]);
+    expect(screen.queryByTestId("planning-review-editor")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Include reopened issues" })).toBeDisabled();
   });
 
   it("saves the edited configuration", async () => {

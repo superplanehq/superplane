@@ -1712,44 +1712,17 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
   });
 
-  it("opens a draft refine view without Automations", () => {
+  it("opens a draft planning chat without a Start action", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
+    const dialog = screen.getByRole("dialog");
     expect(screen.queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-overview-sidebar")).not.toBeInTheDocument();
-    const description = screen.getByTestId("split-run-description");
-    expect(description).toHaveClass("justify-end");
-    expect(within(description).getByTestId("split-run-source")).toHaveTextContent("Leonardo DiCaprio");
-    expect(within(description).queryByText("Created manually")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    const card = screen.getByTestId("split-run-intent-status-card");
-    expect(card).toHaveAttribute("data-slot", "frame");
-    expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
-    expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
-    const archive = screen.getByTestId("popup-work-order-archive-button");
-    const share = screen.getByTestId("popup-work-order-copy-link-button");
-    expect(archive).toHaveAttribute("aria-label", "Archive");
-    expect(archive.compareDocumentPosition(share) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
-    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(70rem");
-    expect(screen.getByTestId("work-order-split-run").className).toContain(
-      "has-[[data-refine-chat-solo]]:w-[min(48rem",
-    );
-    expect(screen.getByTestId("work-order-split-run").className).toContain(
-      "has-[[data-refine-plan-open]]:w-[min(80rem",
-    );
-    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
-    expect(screen.queryByRole("button", { name: "Open plan" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-log-pane")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-intent-chat")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-source")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Open plan" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
   it("hides Refine on a backlog draft", () => {
@@ -2013,7 +1986,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(onDispatch).toHaveBeenCalledTimes(1);
   });
 
-  it("tells a draft is under analysis and keeps Archive in the header", () => {
+  it("keeps Archive available while a draft is under analysis", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
         analysisRuns: [
@@ -2036,11 +2009,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
-    const card = screen.getByTestId("split-run-intent-status-card");
-    expect(card).toHaveAttribute("data-slot", "frame");
-    expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
-    expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
   });

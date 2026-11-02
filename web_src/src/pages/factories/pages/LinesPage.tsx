@@ -1,3 +1,5 @@
+import { IntakeOwnerCreationDialog } from "./IntakeOwnerCreationDialog";
+import { SubscriptionIntakeOwnerRecovery } from "./SubscriptionIntakeOwnerRecovery";
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
@@ -390,6 +392,7 @@ export function LinesPage() {
   const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
+  const [ownerIntakeTemplate, setOwnerIntakeTemplate] = useState<AddIntakeTemplate>();
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -614,22 +617,27 @@ export function LinesPage() {
       showErrorToast("This intake template is not available yet.");
       return;
     }
-    createIntake
-      .mutateAsync({ source: apiIntakeSource(template.id) })
-      .then((intake) => {
-        if (!intake.canvasId) {
-          return;
-        }
-        navigate(
-          factoryAppConfigurePath(organizationId, routeSegment, intake.canvasId, {
-            from: "lines",
-            lineId: selectedLine.id,
-          }),
-        );
-      })
-      .catch((error) => {
-        showErrorToast(getApiErrorMessage(error, "Failed to create intake automation"));
-      });
+    if (factory?.onboarding?.codexSubscription) {
+      setOwnerIntakeTemplate(template);
+      return;
+    }
+    void createDefaultIntake(template.id).catch((error) => {
+      showErrorToast(getApiErrorMessage(error, "Failed to create intake automation"));
+    });
+  };
+
+  const createDefaultIntake = async (sourceId: Parameters<typeof apiIntakeSource>[0], defaultOwnerId?: string) => {
+    const intake = await createIntake.mutateAsync({
+      source: apiIntakeSource(sourceId),
+      ...(defaultOwnerId ? { settings: { defaultOwnerId } } : {}),
+    });
+    if (intake.canvasId)
+      navigate(
+        factoryAppConfigurePath(organizationId, routeSegment, intake.canvasId, {
+          from: "lines",
+          lineId: selectedLine.id,
+        }),
+      );
   };
 
   const openWorkOrder = (orderId: string, order?: FactoriesWorkOrder) => {
@@ -684,6 +692,16 @@ export function LinesPage() {
           vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
           initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
+        />
+      ) : null}
+      {ownerIntakeTemplate && isLineIntakeSourceId(ownerIntakeTemplate.id) ? (
+        <IntakeOwnerCreationDialog
+          organizationId={organizationId}
+          factoryId={factoryId}
+          onClose={() => setOwnerIntakeTemplate(undefined)}
+          onCreate={(ownerId) =>
+            createDefaultIntake(ownerIntakeTemplate.id as Parameters<typeof apiIntakeSource>[0], ownerId)
+          }
         />
       ) : null}
       {scheduledIntakeOpen ? (
@@ -776,6 +794,7 @@ export function LinesPage() {
             colorView={columnColorView}
             onColorViewChange={setColumnColorView}
           />
+          <SubscriptionIntakeOwnerRecovery />
           {configuredIntakes
             .filter((intake) => intake.source.id === "github-issues" && intake.health === "HEALTH_WEBHOOK_FAILED")
             .map((intake) => (

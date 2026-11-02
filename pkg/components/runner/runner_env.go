@@ -78,7 +78,10 @@ func resolveRunnerScope(db *gorm.DB, signer *jwt.Signer, ctx core.ExecutionConte
 		return nil, err
 	}
 	scope.Scopes = ScopesForFlow(scope.Flow)
-	if err := ValidateRunnerScope(db, scope); err != nil {
+	if scope.Flow == RunnerFlowTask {
+		scope.Scopes = append(scope.Scopes, TaskCapabilityScopes(environment)...)
+	}
+	if err := validateRunnerTokenScope(db, scope); err != nil {
 		return nil, err
 	}
 	if scope.Flow == RunnerFlowPlanning {
@@ -116,6 +119,8 @@ func resolveMergeConfidenceRunnerScope(signer *jwt.Signer, scope *RunnerScope, e
 	scope.Flow = RunnerFlowMergeConfidence
 	scope.FactoryID = merge.FactoryID
 	scope.WorkOrderID = merge.WorkOrderID
+	scope.MergeChecks = merge.EnabledChecks
+	scope.MergeCheckLabels = merge.CheckLabels
 	return nil
 }
 

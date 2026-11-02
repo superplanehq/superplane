@@ -1,3 +1,4 @@
+import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import type { IntegrationsIntegrationDefinition } from "@/api-client";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
@@ -26,6 +27,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     useLinearConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const owner = useIntakeOwnerDraft(organizationId, factoryId);
 
   useAdvanceLinearSetup({
     selectIntegrationId,
@@ -80,7 +82,10 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
       await createIntake.mutateAsync({
         source: "SOURCE_LINEAR_ISSUES",
         integrationId,
-        settings: linearIntakeScopeToApi(scope),
+        settings: {
+          ...owner.settings(),
+          ...linearIntakeScopeToApi(scope),
+        },
         ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
       return true;
@@ -91,6 +96,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
   };
 
   return {
+    owner,
     organizationId,
     step,
     setStep,

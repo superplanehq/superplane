@@ -32,13 +32,7 @@ import {
   useDefaultBranchGate,
   type OnboardingRepositorySelection,
 } from "./selectOnboardingRepository";
-import {
-  AGENT_PROVIDER_IDS,
-  CODEX_SUBSCRIPTION_PLAN,
-  isHostedAgentReady,
-  type OnboardingAgentPlan,
-} from "./onboardingAgentReadiness";
-import { useCodexSubscriptionModel } from "./useFactoryCodexConnection";
+import { AGENT_PROVIDER_IDS, isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
@@ -360,8 +354,6 @@ export function useOnboardingPageModel(args: {
     connectedIntegrations,
     agentIntegrationId: onboarding?.agentIntegrationId,
   });
-  const codex = useCodexSubscriptionModel(args.organizationId, args.factoryId);
-  const finishAgent = agentCredentialChoice === "subscription" ? { ...agent, plan: CODEX_SUBSCRIPTION_PLAN } : agent;
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
   const setup = useOnboardingSetupState(
     args.factory?.name ?? "",
@@ -401,7 +393,7 @@ export function useOnboardingPageModel(args: {
     setSaving,
     setProvisionedDestination,
     onMissingDefaultBranch: branchGate.onMissingDefaultBranch,
-    agent: finishAgent,
+    agent,
   });
 
   const requestConnect = (id: IntegrationId) => {
@@ -420,7 +412,6 @@ export function useOnboardingPageModel(args: {
   return {
     setup,
     hostedAgentReady: isHostedAgentReady(agent.plan),
-    ...codex,
     hostedModelsAvailable: agent.hostedModelsAvailable,
     hostedModelsAvailableLoading: agent.hostedModelsAvailableLoading,
     bringYourOwnKey: bringYourOwnKey.allowed,

@@ -34,11 +34,11 @@ func GlobalMCPFiles() []TaskFile {
 	return files
 }
 
-// AppendGlobalMCP ships the global runner MCP server to runs that hold a
-// runner token.
+// AppendGlobalMCP ships the global runner MCP server and the task CLI to runs
+// that hold a runner token. The CLI calls the same tool handlers.
 func AppendGlobalMCP(environment []TaskEnvironmentVariable, files []TaskFile) []TaskFile {
 	if !HasRunnerToken(environment) {
 		return files
 	}
-	return appendUniqueTaskFiles(files, GlobalMCPFiles()...)
+	return appendUniqueTaskFiles(files, append(GlobalMCPFiles(), TaskCommandFiles()...)...)
 }

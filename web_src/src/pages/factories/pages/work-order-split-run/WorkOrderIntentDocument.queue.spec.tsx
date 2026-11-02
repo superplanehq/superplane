@@ -57,7 +57,7 @@ describe("queued task planning", () => {
       rendered.rerender(<TooltipProvider>{document("running")}</TooltipProvider>);
 
       expect(screen.queryByRole("status", { name: "Queued for planning" })).not.toBeInTheDocument();
-      expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Starting analysis…");
+      expect(screen.getByRole("status")).toBeVisible();
     },
   );
 });

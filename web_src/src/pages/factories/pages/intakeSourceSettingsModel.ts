@@ -434,7 +434,7 @@ export function githubIntakeLabelsForApi(settings: IntakeSourceSettings): string
 }
 
 export function intakeSourceSupportsDefaultOwner(sourceId: string | undefined): boolean {
-  return sourceId === "github-issues" || sourceId === "sentry-exceptions";
+  return sourceId !== undefined;
 }
 
 export function intakeSettingsToApi(

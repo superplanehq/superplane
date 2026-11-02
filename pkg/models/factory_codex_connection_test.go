@@ -39,6 +39,83 @@ func TestCodexConnectionStaysReservedUntilTheLoginVMIsDeleted(t *testing.T) {
 	assert.NotEqual(t, held.ReservationGeneration, released.ReservationGeneration)
 }
 
+func TestCodexCleanedSetupReleasesBeforeProviderDeletion(t *testing.T) {
+	for _, refresh := range []bool{false, true} {
+		t.Run(map[bool]string{false: "login", true: "catalog refresh"}[refresh], func(t *testing.T) {
+			db, connection, task, runner := newReadyCodexConnection(t)
+			now := time.Now()
+			if refresh {
+				require.NoError(t, connection.BeginCatalogRefresh(db, task.ID, now))
+			} else {
+				require.NoError(t, connection.BeginLogin(db, task.ID, now))
+			}
+			require.NoError(t, clearProviderDeletion(db, runner))
+			generation := connection.ReservationGeneration
+			require.NoError(t, connection.StoreBundle(db, task.ID, generation, connection.CredentialVersion+1, []byte("saved-login"), "ada@example.com", true, now))
+			require.NoError(t, db.Model(task).Update("result", datatypes.JSON(`{"codexSubscriptionSetupCleaned":true}`)).Error)
+			require.NoError(t, markRunnerTask(db, task, models.RunnerTaskStateSucceeded, &runner.ID, now))
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return models.ReleaseCodexReservationForTask(tx, task.ID, now) }))
+			ready := reloadCodexConnection(t, db, connection.ID)
+			require.Equal(t, models.CodexConnectionStatusReady, ready.Status)
+			require.Empty(t, codexLeases(t, db, connection.ID))
+			assert.Nil(t, reloadRunner(t, db, runner.ID).ProviderDeletedAt)
+			err := ready.StoreBundle(db, task.ID, generation, ready.CredentialVersion+1, []byte("late"), "late@example.com", true, now)
+			require.ErrorIs(t, err, models.ErrCodexConnectionStale)
+			// Keep a real queued task alive while deletion of the old runner arrives.
+			nextTask := &models.RunnerTask{ID: uuid.New(), OrganizationID: task.OrganizationID, FleetID: task.FleetID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateQueued, PayloadCiphertext: []byte("payload"), QueuedAt: now}
+			require.NoError(t, db.Create(nextTask).Error)
+			_, err = reserveCodexRun(t, db, ready, nextTask.ID, now)
+			require.NoError(t, err)
+			leases := codexLeases(t, db, ready.ID)
+			require.Len(t, leases, 1)
+			require.NoError(t, runner.MarkProviderDeleted(db, now))
+			after := reloadCodexConnection(t, db, ready.ID)
+			assert.Equal(t, ready.Status, after.Status)
+			assert.Equal(t, ready.CredentialVersion, after.CredentialVersion)
+			assert.Equal(t, ready.BundleCiphertext, after.BundleCiphertext)
+			assert.Equal(t, leases, codexLeases(t, db, ready.ID))
+		})
+	}
+}
+
+func TestCodexSetupWithoutCleanupProofWaitsForProviderDeletion(t *testing.T) {
+	for _, scenario := range []string{"missing marker", "missing final", "superseded final", "canceled", "failed", "lost", "revoked"} {
+		t.Run(scenario, func(t *testing.T) {
+			db, connection, task, runner := newReservedCodexLogin(t)
+			now := time.Now()
+			require.NoError(t, clearProviderDeletion(db, runner))
+			final := scenario != "missing final"
+			require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, connection.CredentialVersion+1, []byte("saved"), "ada@example.com", final, now))
+			if scenario == "superseded final" {
+				require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, connection.CredentialVersion+1, []byte("newer"), "ada@example.com", false, now))
+			}
+			if scenario != "missing marker" {
+				require.NoError(t, db.Model(task).Update("result", datatypes.JSON(`{"codexSubscriptionSetupCleaned":true}`)).Error)
+			}
+			state := models.RunnerTaskStateSucceeded
+			switch scenario {
+			case "canceled":
+				state = models.RunnerTaskStateCanceled
+			case "failed":
+				state = models.RunnerTaskStateFailed
+			case "lost":
+				state = models.RunnerTaskStateLost
+			}
+			if scenario == "revoked" {
+				require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", task.ID).Update("revoked_at", now).Error)
+			}
+			require.NoError(t, markRunnerTask(db, task, state, &runner.ID, now))
+			require.NoError(t, models.ReleaseCodexReservationForTask(db, task.ID, now))
+			require.Len(t, codexLeases(t, db, connection.ID), 1)
+			require.NoError(t, runner.MarkProviderDeleted(db, now))
+			assert.Empty(t, codexLeases(t, db, connection.ID))
+			if scenario == "missing final" || scenario == "superseded final" {
+				assert.Equal(t, models.CodexConnectionStatusReconnectRequired, reloadCodexConnection(t, db, connection.ID).Status)
+			}
+		})
+	}
+}
+
 func TestCodexRunLeaseReleasesWhenTheTaskIsLost(t *testing.T) {
 	db, connection, task, runner := newReadyCodexConnection(t)
 	now := time.Now()
@@ -107,31 +184,134 @@ func TestCodexConnectionAllowsParallelRunLeases(t *testing.T) {
 	}
 }
 
+func TestCodexConnectionIsSharedAcrossOrganizationWorkspaces(t *testing.T) {
+	db, connection, _, _ := newReadyCodexConnection(t)
+	other, err := models.CreateFactory(db, connection.OrganizationID, support.RandomName("workspace"), "", "")
+	require.NoError(t, err)
+	eligible, err := models.SubscriptionOwnerEligible(db, connection.OrganizationID, other.ID, connection.OwnerUserID)
+	require.NoError(t, err)
+	require.True(t, eligible, "a personal connection must work in another workspace")
+	shared, err := models.FindCodexConnection(db, connection.OrganizationID, connection.OwnerUserID)
+	require.NoError(t, err)
+	assert.Equal(t, connection.ID, shared.ID)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "first"}, {Model: "second"}}, time.Now()))
+	firstWorkspace := support.CodexWorkspaceID(t, db, connection.OrganizationID)
+	inherit := false
+	for _, policy := range []struct {
+		workspace uuid.UUID
+		model     string
+	}{{firstWorkspace, "first"}, {other.ID, "second"}} {
+		_, err := models.UpsertFactoryLLMModelAllowlist(db, connection.OrganizationID, policy.workspace, models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, []string{policy.model}, &inherit)
+		require.NoError(t, err)
+		runID := support.CreateCodexOwnedRunInWorkspace(t, db, connection, policy.workspace)
+		_, err = models.ReserveFactoryCodexConnection(db, connection.OrganizationID, policy.workspace, runID, uuid.New(), time.Now(), crypto.NewNoOpEncryptor(), policy.model)
+		require.NoError(t, err)
+		rejected := "first"
+		if policy.model == rejected {
+			rejected = "second"
+		}
+		_, err = models.ReserveFactoryCodexConnection(db, connection.OrganizationID, policy.workspace, runID, uuid.New(), time.Now(), crypto.NewNoOpEncryptor(), rejected)
+		require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
+	}
+	assert.Len(t, codexLeases(t, db, connection.ID), 2)
+	require.ErrorIs(t, connection.Disconnect(db, time.Now()), models.ErrCodexConnectionActive)
+	var busy *models.CodexConnectionBusyError
+	require.ErrorAs(t, connection.BeginCatalogRefresh(db, uuid.New(), time.Now()), &busy)
+	require.ErrorAs(t, connection.BeginLogin(db, uuid.New(), time.Now()), &busy)
+	for _, scope := range [][2]uuid.UUID{{uuid.New(), connection.OwnerUserID}, {connection.OrganizationID, uuid.New()}} {
+		_, err := models.FindCodexConnection(db, scope[0], scope[1])
+		require.ErrorIs(t, err, models.ErrCodexConnectionNotFound)
+	}
+
+}
+
+func TestWorkspaceDeletionPreservesPersonalCodexConnection(t *testing.T) {
+	db, connection, task, _ := newReadyCodexConnection(t)
+	factoryID := support.CodexWorkspaceID(t, db, connection.OrganizationID)
+	require.NoError(t, db.Unscoped().Delete(&models.Factory{}, "id = ?", factoryID).Error)
+	retained, err := models.FindCodexConnection(db, connection.OrganizationID, connection.OwnerUserID)
+	require.NoError(t, err)
+	assert.Equal(t, connection.ID, retained.ID)
+	assert.Equal(t, connection.BundleCiphertext, retained.BundleCiphertext)
+
+	// Organization cleanup must retain the connection until login cleanup ends.
+	require.NoError(t, retained.BeginLogin(db, task.ID, time.Now()))
+	drained, err := models.DeleteDrainedOrganizationCodexConnections(db, connection.OrganizationID)
+	require.NoError(t, err)
+	assert.False(t, drained)
+	require.NoError(t, models.ReleaseCodexReservationForTask(db, task.ID, time.Now()))
+	drained, err = models.DeleteDrainedOrganizationCodexConnections(db, connection.OrganizationID)
+	require.NoError(t, err)
+	assert.True(t, drained)
+	_, err = models.FindCodexConnection(db, connection.OrganizationID, connection.OwnerUserID)
+	assert.ErrorIs(t, err, models.ErrCodexConnectionNotFound)
+}
+
 func TestCodexConnectionsArePersonalWithinAWorkspace(t *testing.T) {
 	db, first, _, _ := newReadyCodexConnection(t)
 	secondUser := &models.User{ID: uuid.New(), OrganizationID: first.OrganizationID, Type: models.UserTypeHuman, Name: "Second member"}
 	require.NoError(t, db.Create(secondUser).Error)
-	second, err := models.CreateFactoryCodexConnection(db, first.OrganizationID, first.FactoryID, secondUser.ID, time.Now())
+	second, err := models.CreateCodexConnection(db, first.OrganizationID, secondUser.ID, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(second).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("second-bundle")}).Error)
 	firstRun := support.CreateCodexOwnedRun(t, db, first)
 	secondRun := support.CreateCodexOwnedRun(t, db, second)
 	for _, route := range []struct{ run, connection uuid.UUID }{{firstRun, first.ID}, {secondRun, second.ID}, {firstRun, first.ID}} {
-		reserved, err := models.ReserveFactoryCodexConnection(db, first.OrganizationID, first.FactoryID, route.run, uuid.New(), time.Now(), crypto.NewNoOpEncryptor())
+		reserved, err := models.ReserveFactoryCodexConnection(db, first.OrganizationID, support.CodexWorkspaceID(t, db, first.OrganizationID), route.run, uuid.New(), time.Now(), crypto.NewNoOpEncryptor())
 		require.NoError(t, err)
 		assert.Equal(t, route.connection, reserved.ID)
 	}
 	assert.Len(t, codexLeases(t, db, first.ID), 2)
 	assert.Len(t, codexLeases(t, db, second.ID), 1)
-	_, err = models.ReserveFactoryCodexConnection(db, first.OrganizationID, first.FactoryID, uuid.New(), uuid.New(), time.Now(), crypto.NewNoOpEncryptor())
+	_, err = models.ReserveFactoryCodexConnection(db, first.OrganizationID, support.CodexWorkspaceID(t, db, first.OrganizationID), uuid.New(), uuid.New(), time.Now(), crypto.NewNoOpEncryptor())
 	require.ErrorIs(t, err, models.ErrSubscriptionTaskAssociation)
 	assert.NotEqual(t, first.ID, second.ID)
 	assert.Equal(t, []byte("bundle"), reloadCodexConnection(t, db, first.ID).BundleCiphertext)
 }
 
+func TestSubscriptionWorkspacePolicyUsesEachMembersCatalog(t *testing.T) {
+	db, first, _, _ := newReadyCodexConnection(t)
+	secondUser := &models.User{ID: uuid.New(), OrganizationID: first.OrganizationID, Type: models.UserTypeHuman, Name: "Second member"}
+	require.NoError(t, db.Create(secondUser).Error)
+	second, err := models.CreateCodexConnection(db, first.OrganizationID, secondUser.ID, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(second).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("second-bundle")}).Error)
+	require.NoError(t, first.StoreUsage(db, nil, []models.CodexModel{{Model: "first-model"}, {Model: "excluded-model"}}, time.Now()))
+	require.NoError(t, second.StoreUsage(db, nil, []models.CodexModel{{Model: "second-model"}, {Model: "excluded-model"}}, time.Now()))
+	inherit := false
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, first.OrganizationID, support.CodexWorkspaceID(t, db, first.OrganizationID), models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, []string{"first-model", "second-model"}, &inherit)
+	require.NoError(t, err)
+	for _, member := range []struct {
+		connection *models.FactoryCodexConnection
+		expected   string
+	}{{first, "first-model"}, {second, "second-model"}} {
+		ids, err := models.FactoryCodexSubscriptionModels(db, first.OrganizationID, support.CodexWorkspaceID(t, db, first.OrganizationID), member.connection.OwnerUserID)
+		require.NoError(t, err)
+		assert.Equal(t, []string{member.expected}, ids)
+	}
+}
+
+func TestSubscriptionReservationRejectsNewRestrictedRunsAndPreservesExistingLease(t *testing.T) {
+	db, connection, _, _ := newReadyCodexConnection(t)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "permitted-model"}, {Model: "excluded-model"}}, time.Now()))
+	runID := support.CreateCodexOwnedRun(t, db, connection)
+	_, err := models.ReserveFactoryCodexConnection(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), runID, uuid.New(), time.Now(), crypto.NewNoOpEncryptor(), "excluded-model")
+	require.NoError(t, err)
+	existing := codexLeases(t, db, connection.ID)
+	require.Len(t, existing, 1)
+	inherit := false
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, []string{"permitted-model"}, &inherit)
+	require.NoError(t, err)
+	for _, model := range []string{"excluded-model", ""} {
+		_, err := models.ReserveFactoryCodexConnection(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), runID, uuid.New(), time.Now(), crypto.NewNoOpEncryptor(), model)
+		require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
+	}
+	assert.Equal(t, existing, codexLeases(t, db, connection.ID))
+}
+
 func TestSubscriptionReservationUsesStoredTaskAssociations(t *testing.T) {
 	db, connection, _, _ := newReadyCodexConnection(t)
-	f, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
+	f, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
 	require.NoError(t, err)
 	subscription := true
 	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
@@ -253,7 +433,7 @@ func TestCodexLoginCleanupSkipsATaskLockedByCompletion(t *testing.T) {
 	require.NoError(t, models.ReleaseConfirmedCodexReservations(cleanup, time.Now().Add(16*time.Minute)))
 	// Cleanup must not hold the connection while completion holds the task.
 	require.NoError(t, completion.Exec("SET LOCAL lock_timeout = '250ms'").Error)
-	_, err := models.LockFactoryCodexConnection(completion, connection.OrganizationID, connection.FactoryID, connection.OwnerUserID)
+	_, err := models.LockCodexConnection(completion, connection.OrganizationID, connection.OwnerUserID)
 	require.NoError(t, err)
 }
 
@@ -384,7 +564,7 @@ func TestCodexLoginRequiresReconnectAfterANewerUnfinishedCheckpoint(t *testing.T
 
 func reserveCodexRun(t *testing.T, db *gorm.DB, connection *models.FactoryCodexConnection, taskID uuid.UUID, now time.Time) (*models.FactoryCodexConnection, error) {
 	runID := support.CreateCodexOwnedRun(t, db, connection)
-	return models.ReserveFactoryCodexConnection(db, connection.OrganizationID, connection.FactoryID, runID, taskID, now, crypto.NewNoOpEncryptor())
+	return models.ReserveFactoryCodexConnection(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), runID, taskID, now, crypto.NewNoOpEncryptor())
 }
 
 func codexLeases(t *testing.T, db *gorm.DB, connectionID uuid.UUID) []models.FactoryCodexLease {
@@ -405,7 +585,7 @@ func newDisconnectedCodexLogin(t *testing.T) (*gorm.DB, *models.FactoryCodexConn
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
-	factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+	_, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	fleet := newTestRunnerFleet()
 	require.NoError(t, fleet.Create(db))
@@ -432,7 +612,7 @@ func newDisconnectedCodexLogin(t *testing.T) (*gorm.DB, *models.FactoryCodexConn
 		UpdatedAt:         now,
 	}
 	require.NoError(t, db.Create(task).Error)
-	connection, err := models.CreateFactoryCodexConnection(db, resource.Organization.ID, factory.ID, resource.User, now)
+	connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, now)
 	require.NoError(t, err)
 	require.NoError(t, connection.BeginLogin(db, task.ID, now))
 	return db, reloadCodexConnection(t, db, connection.ID), task, runner
@@ -452,7 +632,7 @@ func newReadyCodexConnection(t *testing.T) (*gorm.DB, *models.FactoryCodexConnec
 	db := database.DB(t.Context())
 	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
 
-	factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+	_, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	fleet := newTestRunnerFleet()
 	require.NoError(t, fleet.Create(db))
@@ -481,7 +661,7 @@ func newReadyCodexConnection(t *testing.T) (*gorm.DB, *models.FactoryCodexConnec
 	}
 	require.NoError(t, db.Create(task).Error)
 
-	connection, err := models.CreateFactoryCodexConnection(db, resource.Organization.ID, factory.ID, resource.User, now)
+	connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, now)
 	require.NoError(t, err)
 	require.NoError(t, connection.BeginLogin(db, task.ID, now))
 	require.NoError(t, connection.StoreBundle(db, task.ID, connection.ReservationGeneration, 1, []byte("bundle"), "ada@example.com", true, now))
@@ -548,7 +728,7 @@ func TestMemberRemovalRevokesCredentialsBeforeRunnerCleanup(t *testing.T) {
 		return err
 	}))
 	require.NoError(t, member.RestoreInTransaction(db))
-	eligible, err := models.SubscriptionOwnerEligible(db, connection.OrganizationID, connection.FactoryID, connection.OwnerUserID)
+	eligible, err := models.SubscriptionOwnerEligible(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID), connection.OwnerUserID)
 	require.NoError(t, err)
 	assert.False(t, eligible, "rejoining must not restore credentials")
 	reconnected := reloadCodexConnection(t, db, connection.ID)
@@ -559,7 +739,7 @@ func TestMemberRemovalRevokesCredentialsBeforeRunnerCleanup(t *testing.T) {
 
 func TestSubscriptionOwnerChangesValidateBeforeMutation(t *testing.T) {
 	db, connection, _, _ := newReadyCodexConnection(t)
-	f, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
+	f, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
 	require.NoError(t, err)
 	subscription := true
 	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
@@ -595,7 +775,7 @@ func TestSubscriptionOwnerChangesValidateBeforeMutation(t *testing.T) {
 
 func TestSubscriptionOwnerCannotChangeWhileRunnerTaskIsPending(t *testing.T) {
 	db, connection, task, _ := newReadyCodexConnection(t)
-	factory, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
+	factory, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
 	require.NoError(t, err)
 	subscription := true
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
@@ -613,7 +793,7 @@ func TestSubscriptionOwnerCannotChangeWhileRunnerTaskIsPending(t *testing.T) {
 
 func TestMemberRemovalCleansQueuedWorkWithoutARunnerLease(t *testing.T) {
 	db, connection, _, _ := newReadyCodexConnection(t)
-	f, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
+	f, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
 	require.NoError(t, err)
 	subscription := true
 	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))

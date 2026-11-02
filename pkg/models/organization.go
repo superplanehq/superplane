@@ -36,6 +36,9 @@ type Organization struct {
 	AllowedProviders            datatypes.JSONSlice[string]
 	EnabledExperimentalFeatures datatypes.JSONSlice[string]
 	UsageRetentionWindowDays    *int32
+	SuspendedAt                 *time.Time
+	SuspendedByAccountID        *uuid.UUID
+	SuspensionReason            string
 	CreatedAt                   *time.Time
 	UpdatedAt                   *time.Time
 	DeletedAt                   gorm.DeletedAt `gorm:"index"`
@@ -458,6 +461,15 @@ func SetOrganizationCreatedByAccount(tx *gorm.DB, organizationID, accountID uuid
 		Where("id = ?", organizationID).
 		Update("created_by_account_id", accountID).
 		Error
+}
+
+// UpdateSettings writes editable metadata without replacing concurrent state changes.
+func (o *Organization) UpdateSettings(tx *gorm.DB) error {
+	now := time.Now()
+	o.UpdatedAt = &now
+	return tx.Model(o).
+		Select("name", "slug", "description", "updated_at").
+		Updates(o).Error
 }
 
 func ListOrganizationsCreatedByAccount(tx *gorm.DB, accountID uuid.UUID) ([]Organization, error) {

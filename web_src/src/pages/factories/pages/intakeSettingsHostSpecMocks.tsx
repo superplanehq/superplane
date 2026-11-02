@@ -31,6 +31,8 @@ export const {
   useEventExecutions: vi.fn(),
 }));
 
+export const permissions = vi.hoisted(() => ({ canUpdate: true, canReadIntegrations: true, isLoading: false }));
+
 vi.mock("@monaco-editor/react", () => {
   function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
     return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
@@ -74,5 +76,21 @@ vi.mock("@/hooks/useOrganizationData", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ currentUserId: "alice", canAct: () => false }),
+  usePermissions: () => ({
+    currentUserId: "alice",
+    isLoading: permissions.isLoading,
+    canAct: (resource: string, action: string) => {
+      if (resource === "factories" && action === "update") return permissions.canUpdate;
+      if (resource === "integrations" && action === "read") return permissions.canReadIntegrations;
+      return false;
+    },
+  }),
+}));
+
+vi.mock("@/hooks/useFactoryOwnerEligibility", () => ({
+  useFactoryOwnerEligibility: () => ({
+    data: { members: [{ userId: "alice", eligible: true }] },
+    isPending: false,
+    isError: false,
+  }),
 }));

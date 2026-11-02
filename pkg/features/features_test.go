@@ -31,20 +31,12 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Datadog intake from the Backlog column menu", f.Description)
 	})
 
-	t.Run("known id returns workspace models feature", func(t *testing.T) {
-		f, ok := Get(FeatureWorkspaceModels)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureWorkspaceModels, f.ID)
-		assert.Equal(t, "Workspace Models", f.Label)
-		assert.Equal(t, "Show the in-progress workspace Models settings page", f.Description)
-	})
-
 	t.Run("known id returns organization byok feature", func(t *testing.T) {
 		f, ok := Get(FeatureOrganizationBYOK)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureOrganizationBYOK, f.ID)
 		assert.Equal(t, "Organization BYOK", f.Label)
-		assert.Equal(t, "Show the organization LLM Models settings page", f.Description)
+		assert.Equal(t, "Show the organization Models settings page", f.Description)
 	})
 
 	t.Run("known id returns organization byok custom provider feature", func(t *testing.T) {
@@ -168,7 +160,6 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
-	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))

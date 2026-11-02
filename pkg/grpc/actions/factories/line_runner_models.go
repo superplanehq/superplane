@@ -117,7 +117,7 @@ func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node model
 		return models.FactoryCodexSubscriptionModels(tx, orgID, factoryID, ownerIDs[0])
 	}
 	if node.ComponentName() == models.SuperPlaneRunnerComponent {
-		return hostedSelectableLineRunnerModels(tx, orgID, factoryID, storedRunnerModel(node.Configuration))
+		return hostedSelectableLineRunnerModels(tx, orgID, factoryID)
 	}
 
 	provider, ok := runnerNodeProvider(node)
@@ -148,28 +148,22 @@ func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node model
 }
 
 // storedRunnerModelIsAvailable applies the execution gate to stored BYOK
-// models. Hosted models stay available.
+// models and Hosted models.
 func storedRunnerModelIsAvailable(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node) (bool, error) {
-	if runnerFundingSource(node.Configuration) == models.UsageFundingSourceHosted {
-		return true, nil
-	}
 	return models.RunnerAcceptsModel(tx, orgID, &factoryID, node.ComponentName(), node.Configuration, storedRunnerModel(node.Configuration))
 }
 
-func hostedSelectableLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, stored string) ([]string, error) {
+func hostedSelectableLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID) ([]string, error) {
 	selectable, err := models.ListSelectableLLMModels(tx, orgID, &factoryID)
 	if err != nil {
 		return nil, err
 	}
-	ids := make([]string, 0, len(selectable)+1)
+	ids := make([]string, 0, len(selectable))
 	for _, model := range selectable {
 		if model.Source.ID != models.UsageFundingSourceHosted {
 			continue
 		}
 		ids = append(ids, model.Key)
-	}
-	if stored != "" {
-		ids = append(ids, stored)
 	}
 	return concreteLineRunnerModels(ids), nil
 }

@@ -17,6 +17,39 @@ import (
 	"gorm.io/datatypes"
 )
 
+func TestPersonalCodexConnectionDoesNotActivateWorkspace(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	ctx := onboardingContext(r)
+	before, err := DescribeFactoryCodexConnection(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCodexConnectionRequest{})
+	require.NoError(t, err)
+	assert.True(t, before.Connection.Eligible)
+	assert.Equal(t, "disconnected", before.Connection.Status)
+	fleets := models.DefaultInstallationRunnerFleets(models.DefaultRunnerVersion)
+	require.NoError(t, fleets[0].Create(db))
+	t.Setenv("JWT_SECRET", "personal-codex-test")
+	t.Setenv("RUNNER_API_BASE_URL", "https://superplane.example")
+	started, err := StartFactoryCodexConnection(ctx, r.Encryptor, r.Organization.ID.String(), &pb.StartFactoryCodexConnectionRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, "pending", started.Connection.Status)
+	connection, err := models.FindCodexConnection(db, r.Organization.ID, r.User)
+	require.NoError(t, err)
+	lease, err := models.FindCodexLoginLease(db, connection.ID)
+	require.NoError(t, err)
+	require.NotNil(t, lease)
+	assert.Nil(t, lease.FactoryID)
+	view, err := DescribeFactoryCodexConnection(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCodexConnectionRequest{FactoryId: factory.ID.String()})
+	require.NoError(t, err)
+	assert.Equal(t, started.Connection.Id, view.Connection.Id)
+	saved, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.False(t, saved.OnboardingConfigValue().CodexSubscription)
+	assert.Empty(t, saved.OnboardingConfigValue().CodexDefaultOwnerID)
+}
+
 func TestCancelFactoryCodexConnectionReportsCancellationUntilRunnerDeletion(t *testing.T) {
 	for _, test := range []struct {
 		status          string
@@ -47,7 +80,7 @@ func TestCancelFactoryCodexConnectionReportsCancellationUntilRunnerDeletion(t *t
 				PayloadCiphertext: []byte("login"), QueuedAt: now, CreatedAt: now, UpdatedAt: now,
 			}
 			require.NoError(t, db.Create(task).Error)
-			connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, now)
+			connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, now)
 			require.NoError(t, err)
 			if test.status == models.CodexConnectionStatusReady {
 				require.NoError(t, db.Model(connection).Updates(map[string]any{
@@ -84,7 +117,7 @@ func TestCancelFactoryCodexConnectionReportsCancellationUntilRunnerDeletion(t *t
 			require.NoError(t, err)
 			assert.Equal(t, test.cancelingStatus, refreshed.Connection.Status)
 			assert.Empty(t, refreshed.Connection.VerificationCode)
-			stored, err := models.FindFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User)
+			stored, err := models.FindCodexConnection(db, r.Organization.ID, r.User)
 			require.NoError(t, err)
 			assert.Equal(t, test.status, stored.Status)
 

@@ -1,3 +1,4 @@
+import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,7 @@ import type { LineIntakeSourceId } from "./lineIntakeModel";
 type IntakeSourceSettingsFooterProps = {
   sourceId: LineIntakeSourceId;
   draft: IntakeSourceSettings;
+  canEdit?: boolean;
   getDraft: () => IntakeSourceSettings;
   savePending?: boolean;
   saveError?: string;
@@ -39,6 +41,7 @@ type IntakeSourceSettingsFooterProps = {
 export function IntakeSourceSettingsFooter({
   sourceId,
   draft,
+  canEdit = true,
   savePending,
   saveError,
   deletePending,
@@ -48,16 +51,22 @@ export function IntakeSourceSettingsFooter({
   onSave,
   onClose,
 }: IntakeSourceSettingsFooterProps) {
-  const deleteControls = intakeSupportsDelete(sourceId);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  if (!canEdit) {
+    return (
+      <footer className="flex shrink-0 justify-end border-t border-border px-5 py-3">
+        <Button type="button" variant="outline" onClick={onClose}>
+          Close
+        </Button>
+      </footer>
+    );
+  }
+
+  const deleteControls = intakeSupportsDelete(sourceId);
   const linearScopeMissing = sourceId === "linear-issues" && linearIntakeScopeMissing(draft);
   const sentryProjectsMissing = sourceId === "sentry-exceptions" && draft.sentryProjectIds.length === 0;
   const scopeMissing = linearScopeMissing || sentryProjectsMissing;
-  const footerError =
-    saveError ??
-    (deleteOpen ? undefined : deleteError) ??
-    (linearScopeMissing ? LINEAR_INTAKE_SETUP_COPY.teamRequired : undefined) ??
-    (sentryProjectsMissing ? SENTRY_INTAKE_SETUP_COPY.projectsRequired : undefined);
+  const footerError = intakeFooterError(saveError, deleteError, deleteOpen, linearScopeMissing, sentryProjectsMissing);
 
   return (
     <>
@@ -106,6 +115,21 @@ export function IntakeSourceSettingsFooter({
   );
 }
 
+function intakeFooterError(
+  saveError: string | undefined,
+  deleteError: string | undefined,
+  deleteOpen: boolean,
+  linearScopeMissing: boolean,
+  sentryProjectsMissing: boolean,
+): string | undefined {
+  return (
+    saveError ??
+    (deleteOpen ? undefined : deleteError) ??
+    (linearScopeMissing ? LINEAR_INTAKE_SETUP_COPY.teamRequired : undefined) ??
+    (sentryProjectsMissing ? SENTRY_INTAKE_SETUP_COPY.projectsRequired : undefined)
+  );
+}
+
 function IntakeSaveButtons({
   sourceId,
   draft,
@@ -119,6 +143,8 @@ function IntakeSaveButtons({
   IntakeSourceSettingsFooterProps,
   "sourceId" | "draft" | "savePending" | "deletePending" | "getDraft" | "onSave" | "onClose"
 > & { scopeMissing: boolean }) {
+  const layout = useOptionalFactoriesLayout();
+  const ownerMissing = layout?.factory?.onboarding?.codexSubscription === true && !draft.defaultOwnerId;
   const labelsMissing = sourceId === "github-issues" && draft.filterByLabel && draft.labels.length === 0;
   return (
     <div className="ml-auto flex shrink-0 items-center gap-3">
@@ -129,7 +155,7 @@ function IntakeSaveButtons({
       ) : null}
       <Button
         type="button"
-        disabled={savePending || scopeMissing || labelsMissing}
+        disabled={savePending || scopeMissing || labelsMissing || ownerMissing}
         onClick={async () => {
           try {
             await onSave(normalizeIntakeSourceSettings(getDraft(), sourceId));

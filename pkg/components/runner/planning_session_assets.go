@@ -16,8 +16,8 @@ import (
 // in a read-only task-refinement mode. These assets keep the wait loop and MCP
 // contract identical for every supported agent CLI.
 
-//go:embed planning_session_mcp.js
-var planningSessionMCPScript string
+//go:embed agent_message.js
+var agentMessageScript string
 
 //go:embed analysis_protocol.js
 var analysisProtocolScript string
@@ -28,36 +28,18 @@ var analysisProtocolReviewMarkdown string
 //go:embed analysis_user_prompt_review.md
 var analysisUserPromptReviewMarkdown string
 
-//go:embed mcp.json
-var planningSessionMCPConfig string
-
 //go:embed follow_up_loop.js
 var followUpLoopScript string
 
 //go:embed attachment_limit.js
 var attachmentLimitScript string
 
-// PlanningSessionMCPScript is the stdio MCP server exposing task-refinement
-// tools. Runners that speak MCP (Claude, Codex, OpenCode) ship it under
-// SUPERPLANE_TASK_DIR as planning_session_mcp.js.
-func PlanningSessionMCPScript() string { return planningSessionMCPScript }
-
-// PlanningSessionMCPConfigJSON is the static mcp.json reference config.
-func PlanningSessionMCPConfigJSON() string { return planningSessionMCPConfig }
-
 // FollowUpLoopScript waits on SuperPlane for the next user message and reruns
 // run.js --continue (or the runner's equivalent) for each one.
 func FollowUpLoopScript() string { return followUpLoopScript }
 
-// PlanningSessionMCPScriptFile is just the MCP server task file. Attach it
-// together with PlanningSessionMCPConfigFile for runners that speak MCP.
-func PlanningSessionMCPScriptFile() TaskFile {
-	return TaskFile{Path: "planning_session_mcp.js", Content: planningSessionMCPScript, Mode: "0644"}
-}
-
-// PlanningSessionMCPConfigFile is the static mcp.json reference config file.
-func PlanningSessionMCPConfigFile() TaskFile {
-	return TaskFile{Path: "mcp.json", Content: planningSessionMCPConfig, Mode: "0644"}
+func AgentMessageFile() TaskFile {
+	return TaskFile{Path: "agent_message.js", Content: agentMessageScript, Mode: "0644"}
 }
 
 func PlanningSessionProtocolFile() TaskFile {
@@ -92,14 +74,12 @@ func PlanningSessionReviewProtocolMarkdownFile() TaskFile {
 	return PlanningSessionProtocolMarkdownFile()
 }
 
-// PlanningSessionMCPFiles returns the MCP server, attachment limit, static
-// config, and analysis protocol task files. Only attach these when
-// HasPlanningSessionToken is true.
+// PlanningSessionMCPFiles returns the analysis protocol and the agent-message
+// publisher. The planning tools run on the global runner MCP server.
 func PlanningSessionMCPFiles() []TaskFile {
 	return []TaskFile{
-		PlanningSessionMCPScriptFile(),
+		AgentMessageFile(),
 		AttachmentLimitFile(),
-		PlanningSessionMCPConfigFile(),
 		PlanningSessionProtocolFile(),
 		PlanningSessionProtocolMarkdownFile(),
 	}

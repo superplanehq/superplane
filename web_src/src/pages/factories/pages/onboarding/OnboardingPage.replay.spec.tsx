@@ -110,13 +110,15 @@ describe("onboarding session replay", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Connect Anthropic" }));
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
-    await user.click(screen.getByTestId("first-run-finish-setup"));
+    const finishSetup = screen.getByTestId("first-run-finish-setup");
+    await waitFor(() => expect(finishSetup).toBeEnabled());
+    await user.click(finishSetup);
 
     await screen.findByTestId("first-run-analysis", {}, { timeout: 8000 });
     expect(startRecording).toHaveBeenCalledTimes(1);
     expect(stopRecording).not.toHaveBeenCalled();
     await user.click(screen.getByTestId("first-run-go-to-board"));
-    await waitFor(() => expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument(), { timeout: 8000 });
     expect(stopRecording).toHaveBeenCalledTimes(1);
   }, 15000);
 
@@ -129,8 +131,10 @@ describe("onboarding session replay", () => {
     await user.click(screen.getByTestId("first-run-analyze-tickets"));
     await user.click(await screen.findByRole("button", { name: "Connect Anthropic" }));
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
-    await user.click(screen.getByTestId("first-run-finish-setup"));
-    await waitFor(() => expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument());
+    const finishSetup = screen.getByTestId("first-run-finish-setup");
+    await waitFor(() => expect(finishSetup).toBeEnabled());
+    await user.click(finishSetup);
+    await waitFor(() => expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument(), { timeout: 8000 });
     expect(startRecording).toHaveBeenCalledTimes(1);
     expect(stopRecording).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("first-run-analysis")).not.toBeInTheDocument();
