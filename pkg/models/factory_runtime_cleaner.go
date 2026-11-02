@@ -36,9 +36,6 @@ func (c *FactoryRuntimeCleaner) Run() error {
 		{"delete planning sessions", func() error {
 			return c.delete(&FactoryPlanningSession{}, "factory_id = ?", c.factory.ID)
 		}},
-		{"delete agent sessions", func() error {
-			return c.delete(&AgentSession{}, "canvas_id IN (?)", canvasIDs)
-		}},
 		{"delete canvas memories", func() error {
 			return c.delete(&CanvasMemory{}, "canvas_id IN (?)", canvasIDs)
 		}},

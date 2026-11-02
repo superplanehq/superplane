@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
-import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { Header } from "./Header";
@@ -22,10 +21,6 @@ vi.mock("./components/CanvasProjectSwitcher", () => ({
   CanvasProjectSwitcher: () => null,
 }));
 
-vi.mock("./components/CanvasToolSidebarTrigger", () => ({
-  CanvasToolSidebarTrigger: () => null,
-}));
-
 vi.mock("./components/CanvasRunsSidebarTrigger", () => ({
   CanvasRunsSidebarTrigger: () => null,
 }));
@@ -33,28 +28,6 @@ vi.mock("./components/CanvasRunsSidebarTrigger", () => ({
 vi.mock("./components/CanvasModeToggle", () => ({
   CanvasModeToggle: () => null,
 }));
-
-const toolSidebarState = {
-  canvasId: "canvas-1",
-  organizationId: "org-1",
-  liveCanvasVersionId: undefined,
-  headerMode: undefined,
-  isRunInspectionMode: false,
-  onAgentStagingReady: undefined,
-  onAgentStagingCommit: undefined,
-  isEditing: false,
-  isAutoLayoutOnUpdateEnabled: false,
-  readOnly: false,
-  isToolSidebarOpen: true,
-  showToolSidebarToggle: true,
-  isAgentEnabled: false,
-  agentUnavailable: false,
-  markAgentUnavailable: vi.fn(),
-  markAgentAvailable: vi.fn(),
-  handleToolSidebarToggle: vi.fn(),
-  openToolSidebar: vi.fn(),
-  closeToolSidebar: vi.fn(),
-} satisfies CanvasToolSidebarState;
 
 const runsSidebarState = {
   isRunsSidebarOpen: true,
@@ -97,7 +70,6 @@ function renderHeader(
               activeDraftBranchLabel={options?.activeDraftBranchLabel}
               onEnterEditMode={vi.fn()}
               onExitEditMode={options?.onExitEditMode}
-              toolSidebarState={toolSidebarState}
               runsSidebarState={runsSidebarState}
               versionsSidebarState={versionsSidebarState}
             />

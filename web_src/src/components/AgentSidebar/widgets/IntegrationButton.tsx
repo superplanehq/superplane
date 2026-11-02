@@ -29,7 +29,7 @@ type ResolvedIntegration = {
  * Resolves instance ID → name + icon from connected integrations.
  * Dispatches a CustomEvent so the parent page can open the integration dialog.
  *
- * Agent outputs:
+ * Markdown links:
  *   [Dash0](integration:791ee6d1-...)     -> resolved button for specific instance
  *   [GitHub](integration:github)           -> connect/create dialog for GitHub
  */
@@ -60,7 +60,7 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
 
   const handleClick = useCallback(() => {
     window.dispatchEvent(
-      new CustomEvent("agent:open-integration", {
+      new CustomEvent("canvas:open-integration", {
         detail: {
           integrationName,
           instanceId: resolved.instanceId,
