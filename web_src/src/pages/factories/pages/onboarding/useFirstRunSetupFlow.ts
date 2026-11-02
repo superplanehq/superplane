@@ -169,6 +169,7 @@ function useFirstRunNavigation(
   const githubPending = connection.onboarding.isPending;
   if (FINAL_SCREENS.has(screen) && !model.setup.selectedRepo) screen = "host";
   if (FINAL_SCREENS.has(screen) && !intakePrerequisitesSatisfied(model)) screen = "tickets";
+  if (model.defaultBranchRequired && (screen === "tickets" || FINAL_SCREENS.has(screen))) screen = "choose";
   useEffect(() => {
     if (githubPending && !initialFirstRunScreen(searchParams)) return;
     const step = urlStepFor(screen);
@@ -228,11 +229,16 @@ function intakePrerequisitesSatisfied(model: OnboardingPageModel) {
   return selectedIssuesChoice(model) != null;
 }
 
+function repositorySaveResult(value: boolean | "needs-branch" | undefined): "failed" | "ready" | "needs-branch" {
+  if (value === "needs-branch") return "needs-branch";
+  return value ? "ready" : "failed";
+}
+
 function saveSelectedRepository(args: {
   model: OnboardingPageModel;
   connection: GitHubConnectionState;
   forgeConfigured: boolean;
-}): Promise<boolean> {
+}): Promise<boolean | "needs-branch"> {
   const selectedRepo = args.model.setup.selectedRepo;
   if (!selectedRepo) return Promise.resolve(false);
   if (args.model.setup.vcsHost === "bitbucket") {
@@ -275,9 +281,20 @@ function useFirstRunCommands(args: {
   const saveRepository = () => saveSelectedRepository({ model, connection, forgeConfigured });
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
-      if (await saveRepository()) {
+      if (model.defaultBranchRequired) {
+        if (!model.chosenDefaultBranch.trim()) return;
+        if (!(await model.saveChosenDefaultBranch(model.chosenDefaultBranch))) return;
+        model.clearDefaultBranchRequirement();
         navigation.goToScreen("tickets");
+        return;
       }
+      const result = repositorySaveResult(await saveRepository());
+      if (result === "ready") {
+        model.clearDefaultBranchRequirement();
+        navigation.goToScreen("tickets");
+        return;
+      }
+      if (result === "needs-branch") model.requireDefaultBranch();
     });
   const chooseVcsHost = (host: VcsHostId) => {
     if (host === "gitlab") return;

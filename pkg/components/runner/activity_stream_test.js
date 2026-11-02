@@ -2,6 +2,9 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
 const {
   ACTIVITY_SCHEMA_VERSION,
@@ -99,12 +102,17 @@ test("normalizes terminal control sequences and carriage-return progress", () =>
 
 test("redacts credentials from activity text", () => {
   const env = { OPENAI_API_KEY: "secret-value-123", OTHER: "safe" };
-  const input = "Bearer abc.def.ghi secret-value-123 https://example.test/?token=visible";
+  const jwt = [{ alg: "RS256" }, { sub: "account" }]
+    .map((part) => Buffer.from(JSON.stringify(part)).toString("base64url"))
+    .concat(Buffer.from("signature").toString("base64url"))
+    .join(".");
+  const input = `Bearer abc.def.ghi secret-value-123 https://example.test/?token=visible ${jwt}`;
   const output = redactSensitiveText(input, env);
 
   assert.equal(output.includes("secret-value-123"), false);
   assert.equal(output.includes("abc.def.ghi"), false);
   assert.equal(output.includes("token=visible"), false);
+  assert.equal(output.includes(jwt), false);
   assert.match(output, /\[REDACTED\]/);
 });
 
@@ -134,6 +142,47 @@ test("sanitizes secrets in structured live-log values", () => {
   assert.equal(encoded.includes(token), false);
   assert.equal(encoded.includes("x-access-token:"), false);
   assert.match(encoded, /\[REDACTED\]/);
+});
+
+test("refreshes credentials once per structured output and observes the next rotation", (t) => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "activity-redaction-"));
+  t.after(() => fs.rmSync(taskDir, { recursive: true, force: true }));
+  const home = path.join(taskDir, "codex-home");
+  fs.mkdirSync(home);
+  const auth = path.join(home, "auth.json");
+  const initial = "initial-opaque-credential-value";
+  const rotated = "rotated-opaque-credential-value";
+  fs.writeFileSync(auth, JSON.stringify({ tokens: { access_token: initial } }));
+  const env = { ...analysisEnvironment(), SUPERPLANE_TASK_DIR: taskDir };
+  const records = [];
+  const stream = createActivityStream({ provider: "codex", env, writeRecord: (record) => records.push(record) });
+  stream.startTool({ id: "auth", input: initial });
+  stream.appendToolOutput("auth", JSON.stringify({ [initial]: [initial, { nested: initial }] }));
+
+  const readFile = fs.readFileSync;
+  let authReads = 0;
+  fs.readFileSync = (file, ...args) => {
+    if (file === auth) authReads++;
+    return readFile(file, ...args);
+  };
+  t.after(() => { fs.readFileSync = readFile; });
+
+  const snapshot = stream.snapshot();
+  assert.equal(authReads, 1, "snapshot credential reads must not grow with field count");
+  assert.equal(JSON.stringify(snapshot).includes(initial), false);
+
+  fs.writeFileSync(auth, JSON.stringify({ tokens: { access_token: rotated } }));
+  authReads = 0;
+  const value = sanitizeLogValue({ [rotated]: [{ initial, rotated }, JSON.stringify({ [rotated]: initial })] }, env);
+  assert.equal(authReads, 1, "nested objects, keys, and JSON text must share the credential set");
+  assert.equal(JSON.stringify(value).includes(initial), false);
+  assert.equal(JSON.stringify(value).includes(rotated), false);
+
+  authReads = 0;
+  stream.startContent("assistant", rotated);
+  assert.equal(authReads, 1, "an emitted record must refresh credentials once");
+  assert.equal(JSON.stringify(records).includes(rotated), false);
+  stream.endTool("auth", { status: "passed" });
 });
 
 test("summarizes MCP image blocks without serializing base64 data", () => {

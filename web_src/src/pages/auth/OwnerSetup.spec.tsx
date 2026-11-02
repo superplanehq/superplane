@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 
+import { FLEET_MANAGER_DRAFT_KEY } from "@/lib/fleetManagerSetup";
 import OwnerSetup from "./OwnerSetup";
 import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
 
@@ -487,7 +488,14 @@ describe("OwnerSetup", () => {
     renderOwnerSetup();
 
     expect(await screen.findByRole("heading", { name: "Install the chart" })).toBeInTheDocument();
-    expect(screen.getByText(/helm upgrade --install fleet-manager/)).toBeInTheDocument();
+    expect(screen.queryByText(/helm upgrade --install fleet-manager/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Run this command in the same directory/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Kubernetes context"), { target: { value: "aws-prod" } });
+    const helmCommand = await screen.findByText(/helm upgrade --install fleet-manager/);
+    expect(screen.getByText(/Run this command in the same directory/)).toBeInTheDocument();
+    expect(helmCommand).toHaveTextContent("--kube-context 'aws-prod'");
+    expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).toContain("aws-prod");
+    expect(helmCommand).not.toHaveTextContent("kubectl");
     expect(screen.getByRole("button", { name: "Finish later" })).toBeInTheDocument();
     expect(createToken).not.toHaveBeenCalled();
   });

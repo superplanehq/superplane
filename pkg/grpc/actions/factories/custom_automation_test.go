@@ -14,6 +14,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
@@ -80,7 +81,7 @@ func TestCustomAutomationScheduleRoundTripAndTransitions(t *testing.T) {
 				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 					return reconcileFactoryRepository(ctx, tx, deps, factory, r.User,
 						previous.VCSIntegrationID, selectedID, previous.AppRepository,
-						previous.BacklogRepository, previous.DefaultBranch, repository)
+						previous.BacklogRepository, previous.DefaultBranch, repository, true)
 				}))
 				node, err = models.FindCanvasNode(db, canvasID, customAutomationRunnerID)
 				require.NoError(t, err)
@@ -142,6 +143,140 @@ func TestCustomAutomationSettingsAllowBashOnly(t *testing.T) {
 	assert.Equal(t, prFeedbackTimeoutSeconds, settings.ExecutionTimeoutSeconds)
 }
 
+func TestBacklogCustomAutomationLifecycle(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	settings := &pb.FactoryCustomAutomation_Settings{
+		StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+		Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+		Steps: []*pb.FactoryCustomAutomation_Step{
+			{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Inspect the task.", WorkingDirectory: "repo"},
+			{Name: "Check", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "true"},
+		},
+	}
+	_, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), ColumnKey: "done", Settings: settings,
+	})
+	require.Error(t, err)
+	scheduled := proto.Clone(settings).(*pb.FactoryCustomAutomation_Settings)
+	scheduled.StartMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
+	scheduled.Schedule = &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *"}
+	_, err = CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), ColumnKey: "backlog", Settings: scheduled,
+	})
+	require.Error(t, err)
+	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), Name: "Inspect task", ColumnKey: "backlog", Settings: settings,
+	})
+	require.NoError(t, err)
+	automationID := created.GetCustomAutomation().GetAutomation().GetId()
+	assert.Equal(t, "backlog", created.GetCustomAutomation().GetAutomation().GetColumnKey())
+	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(automationID))
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	trigger := customAutomationNode([]models.Node(version.Nodes), customAutomationTaskTriggerID)
+	require.NotNil(t, trigger)
+	assert.Equal(t, "onWorkOrder", trigger.ComponentName())
+	for _, node := range version.Nodes {
+		assert.NotEqual(t, "github.onPullRequest", node.ComponentName())
+	}
+	order, err := factory.CreateWorkOrder(db, "Inspect this task", "Task context", &r.User, nil, nil)
+	require.NoError(t, err)
+	contexts.EmitWorkOrderCreated(db, factory, order)
+	runs, err := order.ListRuns(db)
+	require.NoError(t, err)
+	require.Empty(t, runs)
+	started, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, started.GetRunId())
+	event, err := models.FindCanvasEventForCanvas(db, canvas.ID, uuid.MustParse(started.GetEventId()))
+	require.NoError(t, err)
+	payload := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
+	assert.Equal(t, order.ID.String(), payload["workOrder"].(map[string]any)["id"])
+	runs, err = order.ListRuns(db)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	labels, err := models.ResolveCanvasRunTasks(db, canvas, runs)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, labels[runs[0].ID].ID)
+	settings.StartMode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+	settings.Steps[1].Command = "make lint"
+	updated, err := UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Inspect task", Settings: settings,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "backlog", updated.GetCustomAutomation().GetAutomation().GetColumnKey())
+	assert.Equal(t, "make lint", updated.GetCustomAutomation().GetSettings().GetSteps()[1].GetCommand())
+	runs, err = order.ListRuns(db)
+	require.NoError(t, err)
+	require.Len(t, runs, 1, "saving must not start a run")
+	second, err := factory.CreateWorkOrder(db, "New task", "Automatic context", &r.User, nil, nil)
+	require.NoError(t, err)
+	contexts.EmitWorkOrderCreated(db, factory, second)
+	contexts.EmitWorkOrderCreated(db, factory, second)
+	runs, err = second.ListRuns(db)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	_, err = second.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultArchived, Actor: &r.User})
+	require.NoError(t, err)
+	_, err = SendWorkOrderToBacklog(ctx, deps, r.Organization.ID.String(), &pb.SendWorkOrderToBacklogRequest{FactoryId: factory.ID.String(), OrderId: second.ID.String()})
+	require.NoError(t, err)
+	second, err = factory.FindWorkOrder(db, second.ID)
+	require.NoError(t, err)
+	contexts.EmitBacklogCustomAutomations(db, factory, second)
+	runs, err = second.ListRuns(db)
+	require.NoError(t, err)
+	assert.Len(t, runs, 2)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, second.State)
+	for i, state := range []pb.WorkOrder_State{pb.WorkOrder_STATE_OPEN, pb.WorkOrder_STATE_CLOSED} {
+		_, err = UpdateWorkOrderStatus(ctx, r.Organization.ID.String(), &pb.UpdateWorkOrderStatusRequest{
+			FactoryId: factory.ID.String(), OrderId: second.ID.String(), State: state, Result: pb.WorkOrder_RESULT_ARCHIVED,
+		})
+		require.NoError(t, err)
+		_, err = UpdateWorkOrderStatus(ctx, r.Organization.ID.String(), &pb.UpdateWorkOrderStatusRequest{
+			FactoryId: factory.ID.String(), OrderId: second.ID.String(), State: pb.WorkOrder_STATE_DRAFT,
+		})
+		require.NoError(t, err)
+		second, err = factory.FindWorkOrder(db, second.ID)
+		require.NoError(t, err)
+		runs, err = second.ListRuns(db)
+		require.NoError(t, err)
+		expectedRuns := 3 + i
+		require.Len(t, runs, expectedRuns, "the status API must start a run for each Backlog entry")
+		contexts.EmitBacklogCustomAutomations(db, factory, second)
+		runs, err = second.ListRuns(db)
+		require.NoError(t, err)
+		assert.Len(t, runs, expectedRuns, "repeated delivery must not start another run")
+	}
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultArchived, Actor: &r.User})
+	require.NoError(t, err)
+	settings.StartMode = pb.FactoryCustomAutomation_START_MODE_MANUAL
+	_, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Inspect task", Settings: settings,
+	})
+	require.NoError(t, err)
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: order.ID.String(),
+	})
+	require.Error(t, err, "closed tasks are not eligible")
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, "Other factory", "", "")
+	require.NoError(t, err)
+	otherOrder, err := otherFactory.CreateWorkOrder(db, "Other task", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: otherOrder.ID.String(),
+	})
+	require.Error(t, err, "tasks from another factory are not eligible")
+}
+
 func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		t.Run(provider, func(t *testing.T) {
@@ -149,9 +284,11 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
 			integrationID := uuid.NewString()
+			branch := "develop"
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 				VCSProvider:      &provider,
 				VCSIntegrationID: &integrationID,
+				DefaultBranch:    &branch,
 			}))
 			prompt := "Review the pull request."
 			command := "make test"
@@ -202,13 +339,39 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			assert.Equal(t, "acme/app", got["REPO"])
 			assert.Equal(t, "acme/app", got["SOURCE_REPO"])
 			assert.Equal(t, runner.WorkspaceContextRepoURL(provider, "acme/app"), got["REPO_URL"])
-			assert.Equal(t, "main", got["BASE"])
+			assert.Equal(t, "develop", got["BASE"])
 			assert.Equal(t, prFeedbackPRNumberExpression(), got["PR_NUMBER"])
 			assert.Equal(t, prFeedbackPRHeadExpression(), got["PR_HEAD"])
 			_, err = structpb.NewStruct(agent.Configuration)
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestCustomAutomationOmitsBaseWhenWorkspaceBranchIsEmpty(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	integrationID := uuid.NewString()
+	empty := ""
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID: &integrationID,
+		DefaultBranch:    &empty,
+	}))
+
+	settings, err := parseCustomAutomationSettings(db, factory, &pb.FactoryCustomAutomation_Settings{
+		StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+		Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+		Steps: []*pb.FactoryCustomAutomation_Step{
+			{Name: "Lint", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make lint"},
+		},
+	})
+	require.NoError(t, err)
+	doc, err := buildCustomAutomationCanvas(db, factory, "Verify changes", settings)
+	require.NoError(t, err)
+
+	_, hasBase := environmentVars(t, doc.Spec.Nodes[1].Configuration["environment"])["BASE"]
+	assert.False(t, hasBase)
 }
 
 func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
@@ -341,6 +504,15 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeStateReady, repaired.State)
 	assert.Nil(t, repaired.StateReason)
 	assert.NotContains(t, repaired.Configuration.Data(), "credentials")
+}
+
+func customAutomationNode(nodes []models.Node, id string) *models.Node {
+	for i := range nodes {
+		if nodes[i].ID == id {
+			return &nodes[i]
+		}
+	}
+	return nil
 }
 
 func requireSuperPlaneAutomationNode(t *testing.T, db *gorm.DB, canvasID uuid.UUID) *models.CanvasNode {

@@ -88,7 +88,7 @@ func StartAutomaticCustomAutomations(
 	}
 	for i := range canvases {
 		canvas := &canvases[i]
-		if canvas.LiveVersionID == nil {
+		if canvas.LiveVersionID == nil || canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyVerify {
 			continue
 		}
 		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
@@ -121,6 +121,9 @@ func startCustomAutomation(
 	order *models.FactoryWorkOrder,
 	automatic bool,
 ) (*models.CanvasEvent, error) {
+	if canvas.ColumnKey != nil && *canvas.ColumnKey == models.CanvasColumnKeyBacklog {
+		return contexts.StartBacklogCustomAutomation(db, factory, canvas, order, automatic)
+	}
 	if err := requireWorkOrderInVerify(db, order); err != nil {
 		return nil, err
 	}

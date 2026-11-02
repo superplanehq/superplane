@@ -2,6 +2,8 @@
 "use strict";
 
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
 const ACTIVITY_SCHEMA_VERSION = 2;
 const DEFAULT_LIMITS = Object.freeze({
@@ -40,12 +42,27 @@ function escapeRegExp(value) {
 }
 
 function redactSensitiveText(value, env = process.env) {
+  return createTextRedactor(env)(value);
+}
+
+function createTextRedactor(env) {
+  const secrets = secretValues(env);
+  const subscription = subscriptionRedactor(env);
+  const redactSubscription = subscription?.createSecretRedactor
+    ? subscription.createSecretRedactor(env)
+    : (text) => subscription ? subscription.redactSecrets(text, env) : text;
+  return (value) => redactText(value, secrets, redactSubscription);
+}
+
+function redactText(value, secrets, redactSubscription) {
   let text = normalizeTerminalText(value);
-  for (const secret of secretValues(env)) {
+  for (const secret of secrets) {
     text = text.replace(new RegExp(escapeRegExp(secret), "g"), "[REDACTED]");
   }
+  text = redactSubscription(text);
   text = text
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[REDACTED]")
     .replace(/\b(?:sk|rk|gh[pousr]|github_pat|xox[baprs]|glpat|npm_)-?[A-Za-z0-9_-]{8,}\b/g, "[REDACTED]")
     .replace(/\b(?:AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35})\b/g, "[REDACTED]")
     .replace(
@@ -56,32 +73,53 @@ function redactSensitiveText(value, env = process.env) {
   return text;
 }
 
+function subscriptionRedactor(env) {
+  const taskDir = env.SUPERPLANE_TASK_DIR;
+  if (!taskDir) return null;
+  const candidates = [
+    path.join(taskDir, "codex_subscription.js"),
+    path.join(__dirname, "codex", "codex_subscription.js"),
+  ];
+  const file = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!file) return null;
+  const subscription = require(file);
+  return typeof subscription.redactSecrets === "function" ? subscription : null;
+}
+
 function sanitizeLogValue(value, env = process.env) {
-  if (typeof value === "string") return sanitizeLogText(value, env);
-  if (Array.isArray(value)) return value.map((item) => sanitizeLogValue(item, env));
+  return sanitizeValue(value, createTextRedactor(env));
+}
+
+function sanitizeValue(value, redact) {
+  if (typeof value === "string") return sanitizeText(value, redact);
+  if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, redact));
   if (!value || typeof value !== "object") return value;
   if (value.type === "image") {
     return {
       type: "image",
-      ...(value.mimeType ? { mimeType: String(value.mimeType) } : {}),
+      ...(value.mimeType ? { mimeType: redact(value.mimeType) } : {}),
       summary: "[image content omitted from logs]",
     };
   }
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeLogValue(item, env)]));
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [redact(key), sanitizeValue(item, redact)]));
 }
 
 function sanitizeLogText(value, env = process.env) {
+  return sanitizeText(value, createTextRedactor(env));
+}
+
+function sanitizeText(value, redact) {
   const text = String(value || "");
   const trimmed = text.trim();
   if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
     try {
       const start = text.indexOf(trimmed);
-      return `${text.slice(0, start)}${JSON.stringify(sanitizeLogValue(JSON.parse(trimmed), env))}${text.slice(start + trimmed.length)}`;
+      return `${text.slice(0, start)}${JSON.stringify(sanitizeValue(JSON.parse(trimmed), redact))}${text.slice(start + trimmed.length)}`;
     } catch (_error) {
       // The value is normal text that happens to look like JSON.
     }
   }
-  return redactSensitiveText(text, env);
+  return redact(text);
 }
 
 function byteLength(value) {
@@ -176,7 +214,7 @@ function createActivityStream(options = {}) {
       return;
     }
     sequence += 1;
-    writeRecord({
+    writeRecord(sanitizeLogValue({
       ...record,
       schema_version: ACTIVITY_SCHEMA_VERSION,
       event_id: `${activityId}:${sequence}`,
@@ -185,7 +223,7 @@ function createActivityStream(options = {}) {
       timestamp: new Date(now()).toISOString(),
       provider,
       turn,
-    });
+    }, env));
     persistence.schedule(persistImmediately);
   }
 
@@ -433,7 +471,7 @@ function createActivityStream(options = {}) {
   }
 
   function snapshot() {
-    const value = {
+    const value = sanitizeLogValue({
       schema_version: ACTIVITY_SCHEMA_VERSION,
       activity_id: activityId,
       provider,
@@ -443,7 +481,7 @@ function createActivityStream(options = {}) {
       started_at: startedAt,
       completed_at: completedAt,
       items: items.map(snapshotItem),
-    };
+    }, env);
     if (byteLength(JSON.stringify(value)) <= limits.snapshotBytes) {
       return value;
     }

@@ -29,7 +29,7 @@ func TestPublicManifestJSON(t *testing.T) {
 	assert.Equal(t, "https://hooks.example/api/v1/github/app/webhook", hooks["url"])
 	events, ok := manifest["default_events"].([]any)
 	require.True(t, ok)
-	assert.Equal(t, []any{"member"}, events)
+	assert.Equal(t, []any{"member", "repository", "create"}, events)
 	permissions, ok := manifest["default_permissions"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "write", permissions["contents"])

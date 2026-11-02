@@ -59,7 +59,7 @@ while [ "$#" -gt 0 ]; do
       printf '%s' "$2" >"${TMP_DIR}/max-time"
       shift 2
       ;;
-    --silent|--show-error)
+    --silent|--show-error|--head)
       shift
       ;;
     --)
@@ -80,7 +80,9 @@ if [ -z "${output}" ] || [ -z "${header_file}" ] || [ -z "${url}" ]; then
   exit 1
 fi
 
-printf '%s\n' "${authorization}" >"${CURL_AUTH_FLAG}"
+if [[ "${url}" != *fleet-manager-chart* ]]; then
+  printf '%s\n' "${authorization}" >"${CURL_AUTH_FLAG}"
+fi
 printf 'curl %s\n' "${url}" >>"${CURL_SEQUENCE}"
 
 if [[ "${url}" == *"/releases/latest"* ]]; then
@@ -100,6 +102,21 @@ write_response() {
   printf '%s' "${body}" >"${output}"
   printf '%s' "${status%% *}"
 }
+
+if [[ "${url}" == *"/token?scope=repository:superplanehq/fleet-manager-chart:pull"* ]]; then
+  write_response "200 OK" '{"token":"registry-token"}'
+  exit 0
+fi
+if [[ "${url}" == *"/v2/superplanehq/fleet-manager-chart/manifests/"* ]]; then
+  version="${url##*/}"
+  status_file="${TMP_DIR}/chart-status/${version}"
+  if [ -f "${status_file}" ]; then
+    write_response "$(cat "${status_file}")" ""
+  else
+    write_response "200 OK" ""
+  fi
+  exit 0
+fi
 
 page_one="$(cat "${TMP_DIR}/page-one.json" 2>/dev/null || true)"
 page_two="$(cat "${TMP_DIR}/page-two.json" 2>/dev/null || true)"
@@ -326,6 +343,34 @@ componentReleases:
 tail: keep
 EOF
 assert_file "${TMP_DIR}/expected.yaml"
+
+write_saved_values
+mkdir -p "${TMP_DIR}/chart-status"
+printf '404 Not Found' >"${TMP_DIR}/chart-status/0.4.0"
+printf '%s\n' \
+  '[{"tag_name":"runner/v0.3.0","draft":false,"prerelease":false},{"tag_name":"fleet-manager/v0.4.0","draft":false,"prerelease":false},{"tag_name":"fleet-manager/v0.3.0","draft":false,"prerelease":false}]' \
+  >"${TMP_DIR}/page-one.json"
+export CURL_MODE=numeric
+run_updater
+cat >"${TMP_DIR}/expected.yaml" <<EOF
+other: keep
+
+${FALLBACK_COMMENT}
+componentReleases:
+  runnerVersion: v0.3.0
+  runnerVersions:
+    - v0.3.0
+  fleetManagerVersion: v0.3.0
+
+tail: keep
+EOF
+assert_file "${TMP_DIR}/expected.yaml"
+grep -q 'Fleet Manager default: v0.3.0' "${TMP_DIR}/stdout"
+if grep -q 'fleetManagerVersion: v0.4.0' "${TMP_DIR}/values.yaml"; then
+  echo "updater wrote a Fleet Manager release that has no chart" >&2
+  exit 1
+fi
+rm -rf "${TMP_DIR}/chart-status"
 
 write_saved_values
 cp "${TMP_DIR}/values.yaml" "${TMP_DIR}/values.before"

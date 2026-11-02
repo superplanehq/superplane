@@ -63,7 +63,6 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/web",
       backlogRepository: "acme/web",
-      defaultBranch: "main",
     });
     expect(
       normalizeFactoryInstallParams({
@@ -75,7 +74,6 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
-      defaultBranch: "main",
     });
   });
 
@@ -87,9 +85,9 @@ describe("materializeFactoryTemplate", () => {
     ).toBe("base: staging");
   });
 
-  it("defaults defaultBranch to main when absent or blank", () => {
-    expect(normalizeFactoryInstallParams({ appRepository: "acme/app" }).defaultBranch).toBe("main");
-    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "" }).defaultBranch).toBe("main");
+  it("keeps a missing or blank default branch empty", () => {
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app" }).defaultBranch).toBeUndefined();
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "" }).defaultBranch).toBe("");
     expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "staging" }).defaultBranch).toBe(
       "staging",
     );

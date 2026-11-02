@@ -1,20 +1,16 @@
 package models
 
 import (
-	"errors"
-
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-const RunnerTaskQueueReasonParallelismLimit = "parallelism_limit"
-
 // RunnerTaskExecutionStatus describes the runner behind a node execution.
 // A started node can still have a queued runner task.
 type RunnerTaskExecutionStatus struct {
-	ExecutionID uuid.UUID
-	State       string
-	QueueReason string
+	ExecutionID               uuid.UUID
+	State                     string
+	BlockedByParallelismLimit bool
 }
 
 func ListRunnerTaskExecutionStatuses(tx *gorm.DB, executionIDs []uuid.UUID) (map[uuid.UUID]RunnerTaskExecutionStatus, error) {
@@ -71,19 +67,17 @@ func ListRunnerTaskExecutionStatuses(tx *gorm.DB, executionIDs []uuid.UUID) (map
 			continue
 		}
 		status := RunnerTaskExecutionStatus{ExecutionID: record.ExecutionID, State: task.State}
-		if task.State == RunnerTaskStateQueued {
+		if task.State == RunnerTaskStatePending {
 			limited, checked := limitedOrganizations[record.OrganizationID]
 			if !checked {
-				err := checkOrganizationRunnerCapacity(tx, record.OrganizationID)
-				if err != nil && !errors.Is(err, ErrOrganizationRunnerCapacity) {
+				available, err := availableOrganizationRunnerSlots(tx, record.OrganizationID)
+				if err != nil {
 					return nil, err
 				}
-				limited = errors.Is(err, ErrOrganizationRunnerCapacity)
+				limited = available != nil && *available <= 0
 				limitedOrganizations[record.OrganizationID] = limited
 			}
-			if limited {
-				status.QueueReason = RunnerTaskQueueReasonParallelismLimit
-			}
+			status.BlockedByParallelismLimit = limited
 		}
 		statuses[record.ExecutionID] = status
 	}

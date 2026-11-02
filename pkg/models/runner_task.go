@@ -15,6 +15,7 @@ const (
 	RunnerTaskBackendLegacy     = "legacy"
 	RunnerTaskBackendIntegrated = "integrated"
 
+	RunnerTaskStatePending   = "pending"
 	RunnerTaskStateQueued    = "queued"
 	RunnerTaskStateReserved  = "reserved"
 	RunnerTaskStateRunning   = "running"
@@ -29,13 +30,14 @@ const (
 	RunnerTaskLogStateArchived   = "archived"
 )
 
+const runnerTaskReservationAttemptLimit = 10
+
 var (
 	ErrRunnerTaskNotFound           = errors.New("runner task not found")
 	ErrRunnerTaskNotReservable      = errors.New("runner task is not available for reservation")
 	ErrRunnerTaskFleetMismatch      = errors.New("runner task fleet does not match runner fleet")
 	ErrRunnerTaskBackendMismatch    = errors.New("runner task does not use the integrated backend")
 	ErrRunnerTaskAlreadyAssigned    = errors.New("runner task already has a runner")
-	ErrOrganizationRunnerCapacity   = errors.New("organization parallel runner limit reached")
 	ErrRunnerTaskNotStartable       = errors.New("runner task is not available to start")
 	ErrRunnerTaskNotCompletable     = errors.New("runner task is not available to complete")
 	ErrRunnerTaskLogStoreRequired   = errors.New("runner task active log store is required")
@@ -60,6 +62,7 @@ type RunnerTask struct {
 	ErrorMessage      *string
 	CancelRequestedAt *time.Time
 	QueuedAt          time.Time
+	ReadyAt           *time.Time
 	ReservedAt        *time.Time
 	StartedAt         *time.Time
 	FinishedAt        *time.Time
@@ -115,6 +118,10 @@ func FindRunnerTask(tx *gorm.DB, id uuid.UUID) (*RunnerTask, error) {
 	return &task, nil
 }
 
+func (t *RunnerTask) CanCancelImmediately() bool {
+	return t.RunnerID == nil && (t.State == RunnerTaskStatePending || t.State == RunnerTaskStateQueued)
+}
+
 func (t *RunnerTask) IsTerminal() bool {
 	switch t.State {
 	case RunnerTaskStateSucceeded,
@@ -129,7 +136,7 @@ func (t *RunnerTask) IsTerminal() bool {
 
 /*
  * RequestCancel is idempotent.
- * A queued task can be canceled immediately because no runner has observed it.
+ * Pending and queued tasks can be canceled immediately because no runner has observed them.
  * Assigned tasks retain their state and expose a cancellation request to the connected runner.
  */
 func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
@@ -137,9 +144,9 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 		return nil
 	}
 
-	if t.State == RunnerTaskStateQueued && t.RunnerID == nil {
+	if t.CanCancelImmediately() {
 		result := tx.Model(t).
-			Where("state = ? AND runner_id IS NULL", RunnerTaskStateQueued).
+			Where("state IN ? AND runner_id IS NULL", []string{RunnerTaskStatePending, RunnerTaskStateQueued}).
 			Updates(map[string]any{
 				"state":       RunnerTaskStateCanceled,
 				"finished_at": now,
@@ -181,12 +188,14 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 	return nil
 }
 
-// FailQueued rejects an attempt that no runner has observed. Failure and lease
-// release commit together, including when called without an outer transaction.
-func (t *RunnerTask) FailQueued(tx *gorm.DB, message string, now time.Time) error {
+// FailUnassigned rejects a pending or queued attempt that no runner has
+// observed. Failure and lease release commit together, including when called
+// without an outer transaction.
+func (t *RunnerTask) FailUnassigned(tx *gorm.DB, message string, now time.Time) error {
 	err := tx.Transaction(func(tx *gorm.DB) error {
 		result := tx.Model(&RunnerTask{}).
-			Where("id = ? AND state = ? AND runner_id IS NULL", t.ID, RunnerTaskStateQueued).
+			Where("id = ? AND state IN ? AND runner_id IS NULL", t.ID,
+				[]string{RunnerTaskStatePending, RunnerTaskStateQueued}).
 			Updates(map[string]any{
 				"state":         RunnerTaskStateFailed,
 				"error_message": message,
@@ -211,7 +220,7 @@ func (t *RunnerTask) FailQueued(tx *gorm.DB, message string, now time.Time) erro
 	return nil
 }
 
-// Reserve serializes admission across every fleet in the organization. It can
+// Reserve assigns a task that already holds an organization slot. It can
 // be called with or without an existing transaction.
 func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
 	return tx.Transaction(func(tx *gorm.DB) error {
@@ -219,9 +228,15 @@ func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
 		if err != nil {
 			return err
 		}
-		if err := lockRunnerTaskOrganization(tx, current.OrganizationID, ""); err != nil {
+		fleet, err := FindRunnerFleet(tx, current.FleetID)
+		if err != nil {
 			return err
 		}
+		if fleet.ScopeType == RunnerFleetScopeOrganization &&
+			(fleet.ScopeID == nil || current.OrganizationID != *fleet.ScopeID) {
+			return ErrRunnerTaskFleetMismatch
+		}
+		admissionErr := fleet.RequireAdmission(tx)
 		runner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), runnerID)
 		if err != nil {
 			return err
@@ -234,6 +249,9 @@ func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
 			(current.State == RunnerTaskStateReserved || current.State == RunnerTaskStateRunning) {
 			*t = *current
 			return nil
+		}
+		if admissionErr != nil {
+			return admissionErr
 		}
 		if err := current.reserveLocked(tx, runner); err != nil {
 			return err
@@ -265,26 +283,49 @@ func (r *Runner) FindActiveTask(tx *gorm.DB) (*RunnerTask, error) {
 func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, error) {
 	var reservation RunnerTaskReservationResult
 	err := tx.Transaction(func(tx *gorm.DB) error {
-		currentRunner, err := FindRunner(tx, r.ID)
+		fleet, err := FindRunnerFleet(tx, r.FleetID)
+		if err != nil {
+			return err
+		}
+		admissionErr := fleet.RequireAdmission(tx)
+		if admissionErr != nil && !errors.Is(admissionErr, ErrRunnerFleetDisabled) &&
+			!errors.Is(admissionErr, ErrOrganizationRunnersDisabled) {
+			return admissionErr
+		}
+		// Keep runner-before-task lock ordering across assignment and completion.
+		currentRunner, err := LockRunner(tx, r.ID)
 		if err != nil {
 			return err
 		}
 		active, err := currentRunner.FindActiveTask(tx)
 		if err == nil {
+			if fleet.ScopeType == RunnerFleetScopeOrganization &&
+				(fleet.ScopeID == nil || active.OrganizationID != *fleet.ScopeID) {
+				return ErrRunnerTaskFleetMismatch
+			}
 			reservation.Task = active
 			return nil
 		}
 		if !errors.Is(err, ErrRunnerTaskNotFound) {
 			return err
 		}
+		if admissionErr != nil {
+			return nil
+		}
 		if currentRunner.State != RunnerStatePending && currentRunner.State != RunnerStateIdle {
 			return nil
 		}
 
-		var skippedOrganizations []uuid.UUID
-		for {
+		var skippedTasks, skippedOrganizations []uuid.UUID
+		for range runnerTaskReservationAttemptLimit {
 			query := tx.Where("fleet_id = ? AND backend = ? AND state = ? AND runner_id IS NULL AND cancel_requested_at IS NULL",
 				currentRunner.FleetID, RunnerTaskBackendIntegrated, RunnerTaskStateQueued)
+			if fleet.ScopeType == RunnerFleetScopeOrganization {
+				query = query.Where("organization_id = ?", fleet.ScopeID)
+			}
+			if len(skippedTasks) > 0 {
+				query = query.Where("id NOT IN ?", skippedTasks)
+			}
 			if len(skippedOrganizations) > 0 {
 				query = query.Where("organization_id NOT IN ?", skippedOrganizations)
 			}
@@ -295,25 +336,29 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (RunnerTaskReservationResult, erro
 				}
 				return err
 			}
-			candidateResult, err := r.reserveCandidate(tx, &candidate)
+			attempt, err := currentRunner.reserveCandidate(tx, &candidate)
+			if errors.Is(err, ErrRunnerTaskNotReservable) {
+				skippedTasks = append(skippedTasks, candidate.ID)
+				continue
+			}
 			var busy *CodexConnectionBusyError
-			if errors.Is(err, ErrRunnerTaskNotReservable) || errors.Is(err, ErrOrganizationRunnerCapacity) || errors.As(err, &busy) {
-				// Retry this organization's oldest job on the next attempt.
-				// A later job must not overtake it if capacity changes mid-scan.
+			if errors.As(err, &busy) {
+				// Preserve this organization's queue order while allowing others
+				// to proceed. Retry it on the next notification or heartbeat.
 				skippedOrganizations = append(skippedOrganizations, candidate.OrganizationID)
 				continue
 			}
 			if err != nil {
 				return err
 			}
-			reservation.FailedTasks = append(reservation.FailedTasks, candidateResult.FailedTasks...)
-			reservation.LoginConnections = append(reservation.LoginConnections, candidateResult.LoginConnections...)
-			if candidateResult.Task == nil {
-				continue
+			reservation.FailedTasks = append(reservation.FailedTasks, attempt.FailedTasks...)
+			reservation.LoginConnections = append(reservation.LoginConnections, attempt.LoginConnections...)
+			if attempt.Task != nil {
+				reservation.Task = attempt.Task
+				return nil
 			}
-			reservation.Task = candidateResult.Task
-			return nil
 		}
+		return nil
 	})
 	return reservation, err
 }
@@ -553,33 +598,9 @@ func (t *RunnerTask) markLogsArchivable(tx *gorm.DB, now time.Time) error {
 
 func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTaskReservationResult, error) {
 	var reservation RunnerTaskReservationResult
-	// Roll back each skipped candidate to a savepoint so its locks do not block
-	// other organizations while the fleet scan continues.
+	// Release task and subscription locks on a retryable rejection, even when
+	// the caller keeps an outer transaction open.
 	err := tx.Transaction(func(tx *gorm.DB) error {
-		if err := lockRunnerTaskOrganization(tx, candidate.OrganizationID, "SKIP LOCKED"); err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrRunnerTaskNotReservable
-			}
-			return err
-		}
-		runner, err := LockRunner(tx, r.ID)
-		if errors.Is(err, ErrRunnerNotFound) {
-			return ErrRunnerTaskNotFound
-		}
-		if err != nil {
-			return err
-		}
-		active, err := runner.FindActiveTask(tx)
-		if err == nil {
-			reservation.Task = active
-			return nil
-		}
-		if !errors.Is(err, ErrRunnerTaskNotFound) {
-			return err
-		}
-		if runner.State != RunnerStatePending && runner.State != RunnerStateIdle {
-			return ErrRunnerTaskNotFound
-		}
 		task, err := FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}), candidate.ID)
 		if errors.Is(err, ErrRunnerTaskNotFound) {
 			return ErrRunnerTaskNotReservable
@@ -587,9 +608,9 @@ func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTas
 		if err != nil {
 			return err
 		}
-		if err := task.reserveLocked(tx, runner); err != nil {
-			if IsPermanentSubscriptionAdmissionError(err) {
-				reservation, err = task.rejectSubscriptionAdmission(tx, err)
+		if err := task.reserveLocked(tx, r); err != nil {
+			if IsPermanentSubscriptionAdmissionError(err) || errors.Is(err, ErrSelectableLLMModelNotAllowed) || errors.Is(err, billing.ErrHostedCreditEmpty) {
+				reservation, err = task.rejectAdmission(tx, err)
 			}
 			return err
 		}
@@ -599,7 +620,44 @@ func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTas
 	return reservation, err
 }
 
-func (t *RunnerTask) rejectSubscriptionAdmission(tx *gorm.DB, admissionError error) (RunnerTaskReservationResult, error) {
+// RejectRunnerTaskWithoutComputeCredit fails an unassigned task when its fleet
+// bills compute and the organization has no hosted credit. Task-bound runner
+// creation calls it after its own transaction rolls back, so the task does not
+// keep its organization slot. The result is empty when the task still has
+// credit or is no longer unassigned.
+func RejectRunnerTaskWithoutComputeCredit(tx *gorm.DB, taskID uuid.UUID) (RunnerTaskReservationResult, error) {
+	var result RunnerTaskReservationResult
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		task, err := FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE"}), taskID)
+		if err != nil {
+			return err
+		}
+		if !task.isUnassigned() {
+			return nil
+		}
+		fleet, err := FindRunnerFleet(tx, task.FleetID)
+		if err != nil {
+			return err
+		}
+		creditErr := fleet.RequireComputeCredit(tx, task.OrganizationID)
+		if !errors.Is(creditErr, billing.ErrHostedCreditEmpty) {
+			return creditErr
+		}
+		result, err = task.rejectAdmission(tx, creditErr)
+		return err
+	})
+	if err != nil {
+		return RunnerTaskReservationResult{}, err
+	}
+	return result, nil
+}
+
+func (t *RunnerTask) isUnassigned() bool {
+	return t.RunnerID == nil && t.Backend == RunnerTaskBackendIntegrated &&
+		(t.State == RunnerTaskStatePending || t.State == RunnerTaskStateQueued)
+}
+
+func (t *RunnerTask) rejectAdmission(tx *gorm.DB, admissionError error) (RunnerTaskReservationResult, error) {
 	var result RunnerTaskReservationResult
 	lease, err := FindCodexLeaseByTask(tx, t.ID)
 	if err != nil {
@@ -614,7 +672,7 @@ func (t *RunnerTask) rejectSubscriptionAdmission(tx *gorm.DB, admissionError err
 			result.LoginConnections = append(result.LoginConnections, *connection)
 		}
 	}
-	if err := t.FailQueued(tx, admissionError.Error(), time.Now()); err != nil {
+	if err := t.FailUnassigned(tx, admissionError.Error(), time.Now()); err != nil {
 		return RunnerTaskReservationResult{}, err
 	}
 	result.FailedTasks = append(result.FailedTasks, t)
@@ -631,6 +689,14 @@ func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
 	if t.FleetID != runner.FleetID {
 		return ErrRunnerTaskFleetMismatch
 	}
+	fleet, err := FindRunnerFleet(tx, t.FleetID)
+	if err != nil {
+		return err
+	}
+	if fleet.ScopeType == RunnerFleetScopeOrganization &&
+		(fleet.ScopeID == nil || t.OrganizationID != *fleet.ScopeID) {
+		return ErrRunnerTaskFleetMismatch
+	}
 	if runner.State != RunnerStatePending && runner.State != RunnerStateIdle {
 		return ErrRunnerTaskNotReservable
 	}
@@ -640,10 +706,13 @@ func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
 		}
 		return ErrRunnerTaskAlreadyAssigned
 	}
+	if err := fleet.RequireComputeCredit(tx, t.OrganizationID); err != nil {
+		return err
+	}
 	if err := t.RequireSubscriptionLeaseAdmission(tx); err != nil {
 		return err
 	}
-	if err := checkOrganizationRunnerCapacity(tx, t.OrganizationID); err != nil {
+	if err := t.RequireModelPolicyAdmission(tx); err != nil {
 		return err
 	}
 
@@ -666,38 +735,5 @@ func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
 	t.State = RunnerTaskStateReserved
 	t.ReservedAt = &now
 	t.UpdatedAt = now
-	return nil
-}
-
-func lockRunnerTaskOrganization(tx *gorm.DB, organizationID uuid.UUID, options string) error {
-	var organization Organization
-	// NO KEY UPDATE serializes admissions without blocking foreign-key checks
-	// when another transaction adds queued work for the organization.
-	return tx.Select("id").Clauses(clause.Locking{Strength: "NO KEY UPDATE", Options: options}).
-		Where("id = ?", organizationID).First(&organization).Error
-}
-
-func checkOrganizationRunnerCapacity(tx *gorm.DB, organizationID uuid.UUID) error {
-	if !billing.Enabled() {
-		return nil
-	}
-	limit, err := billing.ResolveParallelTaskLimit(tx, organizationID)
-	if err != nil {
-		return err
-	}
-	if limit == nil {
-		return nil
-	}
-	var count int64
-	err = tx.Model(&RunnerTask{}).
-		Where("organization_id = ? AND backend = ? AND state IN ?", organizationID,
-			RunnerTaskBackendIntegrated, []string{RunnerTaskStateReserved, RunnerTaskStateRunning}).
-		Count(&count).Error
-	if err != nil {
-		return err
-	}
-	if count >= int64(*limit) {
-		return ErrOrganizationRunnerCapacity
-	}
 	return nil
 }

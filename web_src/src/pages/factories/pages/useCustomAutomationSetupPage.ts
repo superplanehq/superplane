@@ -26,6 +26,7 @@ export function useCustomAutomationSetupPage(args: {
   factory?: FactoriesFactory;
   lineId?: string;
   automationId?: string;
+  columnKey?: "backlog" | "verify";
 }) {
   const described = useFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId);
   const create = useCreateFactoryCustomAutomation(args.organizationId, args.factoryId);
@@ -40,6 +41,12 @@ export function useCustomAutomationSetupPage(args: {
   );
   const [saveError, setSaveError] = useState("");
   const automation = described.data;
+  const columnKey =
+    automation?.automation?.columnKey === "backlog"
+      ? "backlog"
+      : args.automationId
+        ? "verify"
+        : (args.columnKey ?? "verify");
 
   useEffect(() => {
     if (args.automationId) {
@@ -93,7 +100,7 @@ export function useCustomAutomationSetupPage(args: {
       if (args.automationId) {
         await update.mutateAsync(input);
       } else {
-        await create.mutateAsync(input);
+        await create.mutateAsync({ ...input, columnKey });
       }
       return true;
     } catch (error) {
@@ -103,6 +110,7 @@ export function useCustomAutomationSetupPage(args: {
   };
 
   return {
+    columnKey,
     boardHref,
     returnHref,
     lineExists: Boolean(line),

@@ -167,13 +167,13 @@ func (w *ExecutionTerminator) LockAndCancelExecution(execution models.CanvasNode
 	finished := false
 	runCancellations := &RunCancellationNotifier{}
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		execution, err := models.LockCancellingNodeExecutionInActiveCanvas(tx, execution.ID)
+		execution, err := models.LockCancellingNodeExecution(tx, execution.ID)
 		if err != nil {
 			return err
 		}
 
 		logger.Info("Cancelling execution")
-		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
+		canvas, err := models.FindUnscopedCanvasInTransaction(tx, execution.WorkflowID)
 		if err != nil {
 			return err
 		}

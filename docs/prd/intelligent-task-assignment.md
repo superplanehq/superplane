@@ -9,7 +9,8 @@ reviews and who owns a task.
 Every supported agent gets two owner tools when its run has a validated task
 association. One tool finds eligible owners. The other tool sets the task owner
 through an explicit agent action. Teams supply assignment rules in their agent
-instructions. Planning sessions keep their existing owner tools and instructions.
+instructions. A planning session also assigns one owner by default when the
+task has none.
 
 This includes Run Claude Code, Run Codex, Run OpenRouter Agent, and Run
 SuperPlane Agent. Hosted providers and custom providers through OpenCode use
@@ -22,12 +23,12 @@ runs. Visual evidence is not required.
 1. Let the agent find the best reviewer for the code that a change touches.
 2. Let the agent see the members of the organization, their roles, and the
    number of open tasks that each member owns.
-3. Let the agent set the task owner when the instructions ask for it.
+3. Let the agent set the task owner when the instructions ask for it, and let a planning session set an owner when the task has none.
 
 ## Non-goals
 
-- Assign an owner when the instructions do not ask for it.
-- Read rules from a repository file.
+- Assign an owner on a line run, a PR discussion run, a visual verification run, a custom automation, or a merge-confidence run when the instructions do not ask for it.
+- Read assignment rules from a repository file other than CODEOWNERS during a planning session.
 - Assign a fallback owner from the server.
 - Send a new notification for the assignment.
 - Change manual assignment controls, owner ranking, or team routing rules.
@@ -70,8 +71,15 @@ sequenceDiagram
   API-->>Agent: assigned and selected owner
 ```
 
-The planning protocol names the two tools. It tells the agent to use them only
-when the task or the instructions ask for a reviewer or an owner.
+## Default planning owner
+
+A planning session sets one owner on the first plan turn when the task has no owner. It does not replace an existing owner. The agent picks a member in this order:
+
+1. For a GitHub, Linear, or Jira issue, the issue assignee. If the issue has no assignee, or the assignee is not a member, the issue author. The agent reads the issue with the tools it has. If it cannot read the issue, it uses the next step.
+2. For every other task, and when step 1 finds no member, the CODEOWNERS entry for the files the change will touch. A user or email entry must match a member. Team entries do not match. If no entry matches, the agent uses the first code owner from suggest_owners. That list ranks members by recent commits. Newer commits weigh more than older commits.
+3. The member who owns the fewest open tasks.
+
+Owner rules in Additional instructions take precedence over these steps. Other task agents still use the owner tools only when the task or the instructions ask for an owner.
 
 ## Tools
 
@@ -118,6 +126,11 @@ The tool replaces all current assignees with the selected person, including
 owners that a person set manually. A successful call leaves exactly one owner.
 Replacement is the default and does not require a force option.
 
+`only_if_unassigned` keeps the current owners when the task already has one.
+The check runs inside the task lock. The response status is `kept`, and the
+call does not change the task. A planning session sets this field, so an owner
+added while the agent researches stays in place.
+
 Successful calls return `status: assigned` and `owner`, the selected member.
 The timeline records the assigned and unassigned users, the agent source, and
 the normalized reason. A subsequent `suggest_owners` call reports the new owner.
@@ -152,6 +165,19 @@ integration of the factory. The server:
 
 ## Endpoints
 
+The `superplane_global` MCP server and the `superplane task` CLI call these
+routes with `SUPERPLANE_RUNNER_TOKEN`. The token scope selects the task: the
+draft task of a planning session, or the task of the run.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/v1/runner/tools` | List the global tools that the run token allows. |
+| `POST /api/v1/runner/task/suggest-owners` | List members and rank code owners for the task. |
+| `PUT /api/v1/runner/task/owner` | Set the owner of the task. |
+
+The routes below stay for one release so that runs that started before the
+change can finish. Remove them in a later release.
+
 | Route | Purpose |
 | --- | --- |
 | `POST /api/v1/runner/planning-sessions/suggest-owners` | List members and rank code owners for the session task. |
@@ -163,7 +189,7 @@ integration of the factory. The server:
 
 No new deployment configuration is required. API and worker processes use the
 existing signing secret and runner API URL configuration. The runner receives
-the managed `SUPERPLANE_OWNER_TOKEN` and `SUPERPLANE_BASE_URL` for each eligible
+the managed `SUPERPLANE_RUNNER_TOKEN` and `SUPERPLANE_BASE_URL` for each eligible
 execution. Codex forwards the token by environment variable name.
 
 Code-history ranking uses the existing factory GitHub integration. Bitbucket

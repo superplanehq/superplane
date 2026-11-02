@@ -24,6 +24,7 @@ import { OrganizationSettingsBillingPage } from "@/pages/factories/pages/organiz
 import { OrganizationSettingsUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsUsagePage";
 import {
   FactoryOrganizationApiKeyDetailPage,
+  FactoryOrganizationFleetsPage,
   FactoryOrganizationApiKeysPage,
   FactoryOrganizationLLMModelsPage,
   FactoryOrganizationMembersPage,
@@ -34,6 +35,7 @@ import {
   AccountLinkedAccountsRedirect,
   LegacyFactorySettingsRedirect,
   OrganizationUsageRedirect,
+  OrganizationModelsRedirect,
   WorkspaceAgentMcpConnectionRedirect,
   WorkspaceAgentSettingsRedirect,
   WorkspaceAgentSkillRedirect,
@@ -47,6 +49,31 @@ import { FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCo
 import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 
 export const factorySettingsSectionRoutes = [
+  ...(
+    [
+      ["organization/fleets", "catalog"],
+      ["organization/fleets/:fleetId", "fleet"],
+    ] as const
+  ).map(([path, detail]) => (
+    <Route
+      key={path}
+      path={path}
+      element={
+        <RequirePermission resource="org" action="read">
+          <FactoryOrganizationFleetsPage detail={detail} />
+        </RequirePermission>
+      }
+    />
+  )),
+  <Route
+    key="factory-settings-runner-redirect"
+    path="organization/fleets/:fleetId/runners/:runnerId"
+    element={
+      <RequirePermission resource="org" action="read">
+        <Navigate to="../.." relative="path" replace />
+      </RequirePermission>
+    }
+  />,
   <Route
     key="factory-settings-account-codex-usage"
     path="account/codex-usage"
@@ -199,13 +226,18 @@ export const factorySettingsSectionRoutes = [
     }
   />,
   <Route
-    key="factory-settings-organization-models"
-    path="organization/models"
+    key="factory-settings-workspace-models"
+    path="workspace/models"
     element={
-      <RequirePermission resource="org" action="read">
+      <RequirePermission resource="factories" action="read">
         <FactoryOrganizationLLMModelsPage />
       </RequirePermission>
     }
+  />,
+  <Route
+    key="factory-settings-organization-models"
+    path="organization/models"
+    element={<OrganizationModelsRedirect />}
   />,
   <Route
     key="factory-settings-organization-integration-setup"

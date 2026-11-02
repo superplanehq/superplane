@@ -300,16 +300,65 @@ describe("PlanningReviewForm model options", () => {
 
     renderForm(claudeCodeDraft("sonnet"), { onChange });
 
-    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 5-5");
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("sonnet 4-6");
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
         components: [
           expect.objectContaining({
-            configuration: expect.objectContaining({ model: "claude-opus-5-5" }),
+            configuration: expect.objectContaining({ model: "claude-sonnet-4-6" }),
           }),
         ],
       }),
     );
+  });
+
+  it("keeps a blank subscription model native instead of applying a BYOK default", async () => {
+    const onChange = vi.fn();
+    vi.mocked(useComponent).mockReturnValue({
+      data: {
+        name: "runnerCodex",
+        configuration: [
+          { name: "model", label: "Model", type: "hosted-model", typeOptions: { hostedModel: { provider: "openai" } } },
+        ],
+      },
+    } as ReturnType<typeof useComponent>);
+    vi.mocked(useSelectableLLMModels).mockImplementation(
+      (_organizationId, options) =>
+        ({
+          data: options?.sources?.includes("subscription")
+            ? [
+                {
+                  source: { id: "subscription", name: "Your ChatGPT subscription" },
+                  provider: { id: "openai", name: "OpenAI" },
+                  model: { id: "native-codex", name: "Native Codex" },
+                  key: "subscription::openai::native-codex",
+                  label: "Native Codex",
+                },
+              ]
+            : [
+                {
+                  source: { id: "byok", name: "Your API key" },
+                  provider: { id: "openai", name: "OpenAI" },
+                  model: { id: "gpt-byok", name: "gpt-byok" },
+                  key: "byok::openai::gpt-byok",
+                  label: "gpt-byok",
+                },
+              ],
+          isLoading: false,
+          isError: false,
+        }) as unknown as ReturnType<typeof useSelectableLLMModels>,
+    );
+    const draft = claudeCodeDraft("");
+    draft.components[0].component = "runnerCodex";
+    draft.components[0].configuration.credentials = { source: "subscription" };
+    renderForm(draft, { onChange, factoryId: PRIMARY_FACTORY_ID });
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("Default");
+    expect(onChange).not.toHaveBeenCalled();
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.hover(screen.getByTestId("field-model-hosted-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "Native Codex" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "gpt-byok" })).not.toBeInTheDocument();
   });
 
   it("keeps an explicit model that is not a Claude alias", () => {

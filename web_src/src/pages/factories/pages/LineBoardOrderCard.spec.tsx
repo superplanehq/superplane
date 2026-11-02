@@ -132,8 +132,8 @@ describe("LineBoardOrderCard", () => {
         id: "ps-1",
         state: "running",
         executionId: "exec-1",
-        runnerState: "queued",
-        queueReason: "parallelism_limit",
+        runnerState: "pending",
+        blockedByParallelismLimit: true,
       },
     };
     const view = renderCard(queuedOrder, { isAnalyzing: true });
@@ -145,7 +145,7 @@ describe("LineBoardOrderCard", () => {
 
     view.rerenderOrder({
       ...queuedOrder,
-      planningSession: { ...queuedOrder.planningSession, runnerState: "running", queueReason: "" },
+      planningSession: { ...queuedOrder.planningSession, runnerState: "running", blockedByParallelismLimit: false },
     });
 
     expect(screen.getByText("Planning")).toBeVisible();
@@ -198,8 +198,8 @@ describe("LineBoardOrderCard", () => {
         id: "ps-1",
         state: "ended",
         executionId: "exec-1",
-        runnerState: "queued",
-        queueReason: "parallelism_limit",
+        runnerState: "pending",
+        blockedByParallelismLimit: true,
       },
     });
 

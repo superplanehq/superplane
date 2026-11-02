@@ -17,6 +17,11 @@ func TestAttachmentLimitMatchesSharedMaxFileBytes(t *testing.T) {
 	runnerLimit := attachmentLimitMiB(t, AttachmentLimitFile().Content, `const MAX_ATTACHMENT_BYTES = (\d+) \* 1024 \* 1024;`)
 	assert.Equal(t, int64(models.MaxFileBytes), runnerLimit<<20)
 
+	globalSource, err := os.ReadFile("superplane_mcp/modules/plan.js")
+	require.NoError(t, err)
+	globalLimit := attachmentLimitMiB(t, string(globalSource), `const MAX_ATTACHMENT_BYTES = (\d+) \* 1024 \* 1024;`)
+	assert.Equal(t, int64(models.MaxFileBytes), globalLimit<<20)
+
 	uiSource, err := os.ReadFile("../../../web_src/src/lib/workOrderFiles.ts")
 	require.NoError(t, err)
 	uiLimit := attachmentLimitMiB(t, string(uiSource), `export const MAX_WORK_ORDER_FILE_BYTES = (\d+) \* 1024 \* 1024;`)
@@ -36,7 +41,6 @@ func TestPlanningFilesShipOneAttachmentLimit(t *testing.T) {
 	}
 	assert.Equal(t, 1, copies)
 	assert.Contains(t, FollowUpLoopFile().Content, `require("./attachment_limit")`)
-	assert.Contains(t, PlanningSessionMCPScript(), `require("./attachment_limit")`)
 }
 
 func attachmentLimitMiB(t *testing.T, source, pattern string) int64 {

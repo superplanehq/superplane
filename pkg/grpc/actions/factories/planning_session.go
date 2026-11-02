@@ -130,6 +130,7 @@ func sendPlanningSessionMessage(
 	}
 	assigned := false
 	firstRefinement := false
+	var newEvents []models.CanvasEvent
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		draft, err := lockAnalysisSessionAndDraft(tx, session)
 		if err != nil {
@@ -158,9 +159,16 @@ func sendPlanningSessionMessage(
 		if err := session.MarkUserMessagesDelivered(tx); err != nil {
 			return err
 		}
-		return restartAnalysisCanvasRun(tx, factoryModel, session)
+		newEvents, err = restartAnalysisCanvasRun(tx, factoryModel, session)
+		return err
 	}); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to send planning session message")
+	}
+	for i := range newEvents {
+		event := &newEvents[i]
+		if err := messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), session.OrganizationID.String(), event).Publish(); err != nil {
+			log.WithError(err).Warnf("failed to publish analysis event %s", event.ID)
+		}
 	}
 	if assigned {
 		publishDraftAssigneesUpdated(session)
@@ -268,19 +276,19 @@ func lockAnalysisSessionAndDraft(tx *gorm.DB, session *models.FactoryPlanningSes
 	return &order, nil
 }
 
-func restartAnalysisCanvasRun(db *gorm.DB, factoryModel *models.Factory, session *models.FactoryPlanningSession) error {
+func restartAnalysisCanvasRun(tx *gorm.DB, factoryModel *models.Factory, session *models.FactoryPlanningSession) ([]models.CanvasEvent, error) {
 	if session.DraftWorkOrderID == nil || session.CanvasID == nil {
-		return models.ErrFactoryPlanningSessionInvalid
+		return nil, models.ErrFactoryPlanningSessionInvalid
 	}
-	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(tx, *session.DraftWorkOrderID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if err := workersctx.EmitWorkOrderCreatedOnCanvas(db, factoryModel, order, *session.CanvasID); err != nil {
+	events, err := workersctx.CreateWorkOrderEventsOnCanvas(tx, factoryModel, order, *session.CanvasID)
+	if err != nil {
 		log.WithError(err).Warnf("failed to restart analysis run for session %s", session.ID)
-		return err
 	}
-	return nil
+	return events, err
 }
 
 func planningSessionActor(ctx context.Context, organizationID, factoryID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
@@ -429,7 +437,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	runtime := runtimeBySession[session.ID]
 	out.ExecutionId = runtime.executionID
 	out.RunnerState = runtime.runnerState
-	out.QueueReason = runtime.queueReason
+	out.BlockedByParallelismLimit = runtime.blockedByParallelismLimit
 	out.SelectableModelKey = session.SelectableModelKey
 	if draft := session.Draft(); strings.TrimSpace(draft.Title) != "" {
 		out.Draft = &pb.PlanningSessionDraft{
@@ -452,12 +460,12 @@ func serializePlanningSessionSummary(session *models.FactoryPlanningSession, run
 		return nil
 	}
 	out := &pb.PlanningSessionSummary{
-		Id:          session.ID.String(),
-		State:       session.State,
-		WaitState:   session.WaitState,
-		ExecutionId: runtime.executionID,
-		RunnerState: runtime.runnerState,
-		QueueReason: runtime.queueReason,
+		Id:                        session.ID.String(),
+		State:                     session.State,
+		WaitState:                 session.WaitState,
+		ExecutionId:               runtime.executionID,
+		RunnerState:               runtime.runnerState,
+		BlockedByParallelismLimit: runtime.blockedByParallelismLimit,
 	}
 	if survey := session.CurrentSurvey(); session.SurveyID != nil && len(survey.Questions) > 0 {
 		out.Survey = &pb.PlanningSessionSurvey{
@@ -557,9 +565,9 @@ func planningSessionSurveyQuestions(survey models.PlanningSessionSurvey) []*pb.P
 }
 
 type planningSessionRuntime struct {
-	executionID string
-	runnerState string
-	queueReason string
+	executionID               string
+	runnerState               string
+	blockedByParallelismLimit bool
 }
 
 func planningSessionRuntimes(tx *gorm.DB, sessions []*models.FactoryPlanningSession) (map[uuid.UUID]planningSessionRuntime, error) {
@@ -605,9 +613,9 @@ func planningSessionRuntimes(tx *gorm.DB, sessions []*models.FactoryPlanningSess
 		}
 		runner := runnerStatuses[executionID]
 		runtimeBySession[session.ID] = planningSessionRuntime{
-			executionID: executionID.String(),
-			runnerState: runner.State,
-			queueReason: runner.QueueReason,
+			executionID:               executionID.String(),
+			runnerState:               runner.State,
+			blockedByParallelismLimit: runner.BlockedByParallelismLimit,
 		}
 	}
 	return runtimeBySession, nil

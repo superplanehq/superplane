@@ -359,7 +359,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, "", payload["result"])
 		assert.Equal(t, repository, payload["repository"])
 		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
-		assert.Equal(t, defaultBranch, payload["default_branch"])
+		assert.Equal(t, "", payload["default_branch"])
 		assert.Equal(t, false, payload["visual_evidence_enabled"])
 		assert.NotContains(t, payload, "url")
 		assert.NotContains(t, payload, "artifacts")
@@ -445,7 +445,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, repository, payload["repository"])
 		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
-		assert.Equal(t, defaultBranch, payload["default_branch"])
+		assert.Equal(t, "", payload["default_branch"])
 	})
 
 	t.Run("uses workspace values for partial work order snapshots", func(t *testing.T) {

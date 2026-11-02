@@ -6,6 +6,7 @@ import {
   type InfiniteData,
   type QueryClient,
   type UseQueryResult,
+  replaceEqualDeep,
 } from "@tanstack/react-query";
 import {
   agentsGetCanvasAgentChat,
@@ -54,6 +55,27 @@ export function useCanvasAgentChat(
 
 export type AgentMessagesPage = { messages: AgentMessage[]; hasMore: boolean };
 
+// First pages that a refresh fetched and that the cache has not yet reconciled.
+// Each value is the first-page messages that the cache held when the request
+// started. Pages that upserts or reconciliation create are never in this map.
+const freshFirstPages = new WeakMap<AgentMessagesPage, AgentMessage[] | undefined>();
+
+function reconcileRefreshedHistory(
+  cachedData: InfiniteData<AgentMessagesPage> | undefined,
+  refreshedData: InfiniteData<AgentMessagesPage>,
+): InfiniteData<AgentMessagesPage> {
+  const firstPage = refreshedData.pages[0];
+  if (!firstPage || !freshFirstPages.has(firstPage)) return refreshedData;
+
+  const messagesAtRequestStart = freshFirstPages.get(firstPage);
+  freshFirstPages.delete(firstPage);
+  const messages = mergePendingOptimisticMessages(
+    mergeMessagesReceivedDuringFetch(firstPage.messages, messagesAtRequestStart, cachedData?.pages[0]?.messages),
+    cachedData,
+  );
+  return { ...refreshedData, pages: [{ ...firstPage, messages }, ...refreshedData.pages.slice(1)] };
+}
+
 export function useAgentChatMessages(chatId: string | null, organizationId: string | undefined, enabled: boolean) {
   const queryClient = useQueryClient();
 
@@ -62,6 +84,9 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
     enabled: enabled && Boolean(chatId),
     initialPageParam: "",
     queryFn: async ({ pageParam }): Promise<AgentMessagesPage> => {
+      const messagesAtRequestStart = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(
+        agentChatKeys.messages(chatId ?? ""),
+      )?.pages[0]?.messages;
       const response = await agentsListAgentChatMessages(
         withOrganizationHeader({
           organizationId,
@@ -72,17 +97,18 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
       const messages = (response.data?.messages ?? [])
         .map((message) => fromApiMessage(message, chatId ?? "", organizationId))
         .filter((m): m is AgentMessage => m !== null);
-      if (!pageParam && chatId) {
-        return {
-          messages: mergePendingOptimisticMessages(
-            messages,
-            queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(chatId)),
-          ),
-          hasMore: Boolean(response.data?.hasMore),
-        };
+      const page: AgentMessagesPage = { messages, hasMore: Boolean(response.data?.hasMore) };
+      if (!pageParam) {
+        // Reconcile when the whole refresh is saved, not now. Older pages can
+        // still be loading, and live events can arrive while they load.
+        freshFirstPages.set(page, messagesAtRequestStart);
       }
-
-      return { messages, hasMore: Boolean(response.data?.hasMore) };
+      return page;
+    },
+    structuralSharing: (cachedData, refreshedData) => {
+      const cached = cachedData as InfiniteData<AgentMessagesPage> | undefined;
+      const refreshed = refreshedData as InfiniteData<AgentMessagesPage>;
+      return replaceEqualDeep(cached, reconcileRefreshedHistory(cached, refreshed));
     },
     getNextPageParam: (lastPage) => {
       if (!lastPage.hasMore || lastPage.messages.length === 0) return undefined;
@@ -160,6 +186,25 @@ export function useSendAgentChatMessage(organizationId: string | undefined) {
       }
     },
   });
+}
+
+// A history response can predate live events received while it was in flight.
+// Keep new arrivals and updates within the returned page, without moving
+// older cached history across its pagination boundary.
+function mergeMessagesReceivedDuringFetch(
+  messages: AgentMessage[],
+  messagesAtRequestStart: AgentMessage[] | undefined,
+  currentMessages: AgentMessage[] | undefined,
+): AgentMessage[] {
+  const initialById = new Map(messagesAtRequestStart?.map((message) => [message.id, message]));
+  const merged = new Map(messages.map((message) => [message.id, message]));
+  for (const message of currentMessages ?? []) {
+    const initial = initialById.get(message.id);
+    if (!isOptimisticAgentMessage(message) && initial !== message && (!initial || merged.has(message.id))) {
+      merged.set(message.id, message);
+    }
+  }
+  return [...merged.values()];
 }
 
 function mergePendingOptimisticMessages(

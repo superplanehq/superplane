@@ -59,6 +59,10 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
+	s.uploadRunnerArtifact(w, r, scope)
+}
+
+func (s *Server) uploadRunnerArtifact(w http.ResponseWriter, r *http.Request, scope *runneraction.ArtifactUploadScope) {
 	logger := log.WithFields(log.Fields{
 		"artifact_type": "file",
 		"work_order_id": scope.WorkOrderID,
@@ -242,6 +246,10 @@ func (s *Server) handleRunnerArtifactLink(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
+	s.attachRunnerArtifactLink(w, r, scope)
+}
+
+func (s *Server) attachRunnerArtifactLink(w http.ResponseWriter, r *http.Request, scope *runneraction.ArtifactUploadScope) {
 	logger := log.WithFields(log.Fields{
 		"artifact_type": "link",
 		"work_order_id": scope.WorkOrderID,
@@ -332,6 +340,10 @@ func (s *Server) handleRunnerArtifactMarkdown(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
+	s.attachRunnerArtifactMarkdown(w, r, scope)
+}
+
+func (s *Server) attachRunnerArtifactMarkdown(w http.ResponseWriter, r *http.Request, scope *runneraction.ArtifactUploadScope) {
 	logger := log.WithFields(log.Fields{
 		"artifact_type": "markdown",
 		"work_order_id": scope.WorkOrderID,

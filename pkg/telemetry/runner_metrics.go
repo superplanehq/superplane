@@ -52,7 +52,7 @@ func registerRunnerMetrics() error {
 
 	runnerTaskQueueDuration, err = meter.Float64Histogram(
 		runnerTaskQueueDurationMetricName,
-		metric.WithDescription("Time from runner task queueing to reservation"),
+		metric.WithDescription("Time from runner task readiness to reservation"),
 		metric.WithUnit("s"),
 		metric.WithExplicitBucketBoundaries(runnerTaskDurationBoundaries...),
 	)
@@ -80,11 +80,11 @@ func registerRunnerMetrics() error {
 }
 
 func RecordRunnerTaskQueueDuration(ctx context.Context, task *models.RunnerTask, fleetSlug, fleetScope string) {
-	if !metricsReady.Load() || fleetScope == "" || task.ReservedAt == nil || task.QueuedAt.IsZero() {
+	if !metricsReady.Load() || fleetScope == "" || task.ReservedAt == nil || task.ReadyAt == nil {
 		return
 	}
 
-	duration := task.ReservedAt.Sub(task.QueuedAt)
+	duration := task.ReservedAt.Sub(*task.ReadyAt)
 	if duration < 0 {
 		return
 	}

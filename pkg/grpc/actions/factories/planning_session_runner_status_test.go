@@ -48,6 +48,7 @@ func TestPlanningSessionReportsRunnerCapacityThroughSessionAndBoardAPIs(t *testi
 	occupying := newTask()
 	require.NoError(t, occupying.Reserve(db, newRunner().ID))
 	queued := newTask()
+	require.NoError(t, db.Model(queued).Update("state", models.RunnerTaskStatePending).Error)
 	event := support.EmitCanvasEventForNode(t, *session.CanvasID, "start", "default", nil)
 	execution := support.CreateCanvasNodeExecution(t, *session.CanvasID, intakeAnalysisNodeID, event.ID, event.ID)
 	require.NoError(t, db.Model(execution).Updates(map[string]any{
@@ -55,28 +56,31 @@ func TestPlanningSessionReportsRunnerCapacityThroughSessionAndBoardAPIs(t *testi
 	}).Error)
 	require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, *session.CanvasID, intakeAnalysisNodeID, execution.ID, "task_id", queued.ID.String()))
 
-	assertStatus := func(state, reason string) {
+	assertStatus := func(state string, blocked bool) {
 		t.Helper()
 		described, err := DescribePlanningSession(ctx, r.Organization.ID.String(), &pb.DescribePlanningSessionRequest{
 			FactoryId: session.FactoryID.String(), SessionId: session.ID.String(),
 		})
 		require.NoError(t, err)
 		assert.Equal(t, state, described.Session.GetRunnerState())
-		assert.Equal(t, reason, described.Session.GetQueueReason())
+		assert.Equal(t, blocked, described.Session.GetBlockedByParallelismLimit())
 		listed, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{FactoryId: session.FactoryID.String()})
 		require.NoError(t, err)
 		require.Len(t, listed.Orders, 1)
 		assert.Equal(t, state, listed.Orders[0].GetPlanningSession().GetRunnerState())
-		assert.Equal(t, reason, listed.Orders[0].GetPlanningSession().GetQueueReason())
+		assert.Equal(t, blocked, listed.Orders[0].GetPlanningSession().GetBlockedByParallelismLimit())
 	}
 
-	assertStatus(models.RunnerTaskStateQueued, "parallelism_limit")
+	assertStatus(models.RunnerTaskStatePending, true)
 	plan.ParallelTaskLimit = new(2)
 	require.NoError(t, billingmodels.SaveBillingPlan(db, plan))
-	assertStatus(models.RunnerTaskStateQueued, "")
+	assertStatus(models.RunnerTaskStatePending, false)
+	_, err = models.ScheduleOrganizationRunnerTasks(db, r.Organization.ID, 100)
+	require.NoError(t, err)
+	assertStatus(models.RunnerTaskStateQueued, false)
 	runner := newRunner()
 	require.NoError(t, queued.Reserve(db, runner.ID))
-	assertStatus(models.RunnerTaskStateReserved, "")
+	assertStatus(models.RunnerTaskStateReserved, false)
 	require.NoError(t, queued.Start(db, runner, "test", time.Now()))
-	assertStatus(models.RunnerTaskStateRunning, "")
+	assertStatus(models.RunnerTaskStateRunning, false)
 }

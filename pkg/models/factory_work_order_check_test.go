@@ -111,6 +111,7 @@ func TestFactoryWorkOrder_ReportCheck_CreatesRowAndEvent(t *testing.T) {
 	require.NoError(t, json.Unmarshal(event.Data, &payload))
 	require.NotNil(t, payload.Check)
 	assert.Equal(t, "risk-review", payload.Check.Key)
+	assert.Equal(t, "Low risk overall.", payload.Check.Summary)
 	assert.Equal(t, float64(3), payload.Check.Score)
 	assert.Equal(t, FactoryWorkOrderCheckLevelPositive, payload.Check.Level)
 	assert.Nil(t, payload.Check.PreviousScore)

@@ -1,3 +1,4 @@
+import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
@@ -9,11 +10,14 @@ export function useGitHubIntakeSetup(organizationId: string, factoryId: string) 
   const [error, setError] = useState<string>();
 
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const owner = useIntakeOwnerDraft(organizationId, factoryId);
 
   const createGithubIntake = async () => {
     setError(undefined);
     try {
+      const ownerSettings = owner.settings();
       await createIntake.mutateAsync({
+        ...(owner.required ? { settings: ownerSettings } : {}),
         source: "SOURCE_GITHUB_ISSUES",
         ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
@@ -25,6 +29,7 @@ export function useGitHubIntakeSetup(organizationId: string, factoryId: string) 
   };
 
   return {
+    owner,
     skipInitialImport,
     setSkipInitialImport,
     error,

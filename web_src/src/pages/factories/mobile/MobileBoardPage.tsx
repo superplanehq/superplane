@@ -1,3 +1,4 @@
+import { SubscriptionIntakeOwnerRecovery } from "../pages/SubscriptionIntakeOwnerRecovery";
 import type {
   FactoriesFactoryIntake,
   FactoriesFactoryLine,
@@ -312,6 +313,7 @@ function MobileLineBoard(props: {
       />
       {!settingsOpen ? (
         <>
+          <SubscriptionIntakeOwnerRecovery />
           <MobileBoardHeader
             state={model.listState}
             searchRef={searchRef}

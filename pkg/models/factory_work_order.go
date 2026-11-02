@@ -434,7 +434,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		}
 
 		if fromState == FactoryWorkOrderStateDraft {
-			if err := o.endAnalysisSessionForTransition(tx, update.Actor, toState); err != nil {
+			if err := o.endAnalysisSessionForTransition(tx, update.Actor, update.Run, toState); err != nil {
 				return err
 			}
 		}
@@ -490,7 +490,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	return true, nil
 }
 
-func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *uuid.UUID, toState string) error {
+func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *uuid.UUID, caller *factory.RunRef, toState string) error {
 	var session FactoryPlanningSession
 	err := tx.
 		Where("organization_id = ? AND factory_id = ? AND draft_work_order_id = ?", o.OrganizationID, o.FactoryID, o.ID).
@@ -519,6 +519,10 @@ func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *u
 	if toState == FactoryWorkOrderStateOpen {
 		_, err = run.RequestCompletion(tx, actor)
 		return err
+	}
+	// The run that closed the draft must finish its own step.
+	if caller != nil && run.ID == caller.ID {
+		return nil
 	}
 
 	_, err = run.RequestCancellation(tx, actor)
@@ -764,6 +768,20 @@ func (o *FactoryWorkOrder) CountEvents(tx *gorm.DB) (int64, error) {
 	}
 
 	return count, nil
+}
+
+// BacklogEntryID identifies the latest transition into Backlog, not later edits.
+func (o *FactoryWorkOrder) BacklogEntryID(tx *gorm.DB) (string, error) {
+	var event FactoryWorkOrderEvent
+	err := tx.Where("work_order_id = ? AND type = ? AND data->>'toState' = ?", o.ID, factory.EventTypeOrderStatusUpdated, FactoryWorkOrderStateDraft).
+		Order("created_at DESC, id DESC").First(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return o.ID.String(), nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return event.ID.String(), nil
 }
 
 func (o *FactoryWorkOrder) Ref() *factory.WorkOrderRef {

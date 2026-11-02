@@ -88,7 +88,7 @@ func AgentModelField(provider string) configuration.Field {
 		Label:       "Model",
 		Type:        configuration.FieldTypeHostedModel,
 		Required:    false,
-		Description: "Select a model from Organization LLM Models.",
+		Description: "Select a model from Workspace Models.",
 		Placeholder: "Select a model",
 		TypeOptions: &configuration.TypeOptions{
 			HostedModel: &configuration.HostedModelTypeOptions{Provider: provider},

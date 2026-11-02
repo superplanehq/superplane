@@ -16,6 +16,7 @@ export function GitHubIntakeFilterFields({
   onSettingsChange,
   labelOptions = [],
   labelOptionsLoading = false,
+  disabled = false,
 }: {
   sourceId: LineIntakeSourceId;
   settings: IntakeSourceSettings;
@@ -23,6 +24,7 @@ export function GitHubIntakeFilterFields({
   /** Labels that exist in the connected repository. */
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
+  disabled?: boolean;
 }) {
   const id = useId();
   if (sourceId !== "github-issues") return null;
@@ -36,6 +38,7 @@ export function GitHubIntakeFilterFields({
           onSettingsChange={onSettingsChange}
           options={labelOptions}
           loading={labelOptionsLoading}
+          disabled={disabled}
         />
         <div className="flex items-start gap-3">
           <Checkbox
@@ -80,11 +83,13 @@ function GitHubIntakeLabels({
   onSettingsChange,
   options,
   loading,
+  disabled,
 }: {
   settings: IntakeSourceSettings;
   onSettingsChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   options: string[];
   loading: boolean;
+  disabled: boolean;
 }) {
   const id = useId();
   const filterByLabel = settings.filterByLabel || settings.labels.length > 0;
@@ -123,6 +128,7 @@ function GitHubIntakeLabels({
         {filterByLabel ? (
           <div className="ml-7 flex min-w-0 flex-col gap-2">
             <MultiCombobox
+              disabled={disabled}
               aria-label="Search or add a label"
               placeholder="Search or add a label"
               options={choices.map((label) => ({ id: label }))}

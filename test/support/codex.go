@@ -13,11 +13,16 @@ import (
 // runner. Callers exercise reservation, callbacks, or runner delivery with it.
 func CreateCodexOwnedRun(t *testing.T, db *gorm.DB, connection *models.FactoryCodexConnection, runnerTaskIDs ...uuid.UUID) uuid.UUID {
 	t.Helper()
+	return CreateCodexOwnedRunInWorkspace(t, db, connection, CodexWorkspaceID(t, db, connection.OrganizationID), runnerTaskIDs...)
+}
+
+func CreateCodexOwnedRunInWorkspace(t *testing.T, db *gorm.DB, connection *models.FactoryCodexConnection, factoryID uuid.UUID, runnerTaskIDs ...uuid.UUID) uuid.UUID {
+	t.Helper()
 	canvas, _ := CreateCanvas(t, connection.OrganizationID, connection.OwnerUserID, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, nil)
-	require.NoError(t, db.Model(canvas).Update("factory_id", connection.FactoryID).Error)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factoryID).Error)
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "trigger", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
-	factory, err := models.FindFactory(db, connection.OrganizationID, connection.FactoryID)
+	factory, err := models.FindFactory(db, connection.OrganizationID, factoryID)
 	require.NoError(t, err)
 	_, err = factory.CreateWorkOrder(db, "Run subscription task", "", &connection.OwnerUserID, []uuid.UUID{connection.OwnerUserID}, &run.ID)
 	require.NoError(t, err)
@@ -28,4 +33,13 @@ func CreateCodexOwnedRun(t *testing.T, db *gorm.DB, connection *models.FactoryCo
 		require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, "trigger", execution.ID, "task_id", taskID.String()))
 	}
 	return run.ID
+}
+
+// CodexWorkspaceID resolves the single workspace created by a subscription
+// fixture. Scenarios with multiple workspaces use their explicit workspace IDs.
+func CodexWorkspaceID(t *testing.T, db *gorm.DB, organizationID uuid.UUID) uuid.UUID {
+	t.Helper()
+	var factory models.Factory
+	require.NoError(t, db.Where("organization_id = ?", organizationID).Order("created_at, id").First(&factory).Error)
+	return factory.ID
 }

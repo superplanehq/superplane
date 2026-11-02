@@ -46,13 +46,12 @@ func listStatusCheckResourcesFromClient(ctx context.Context, client githubStatus
 	}
 
 	branch := strings.TrimSpace(repo.GetDefaultBranch())
-	if branch == "" {
-		branch = "main"
-	}
-
-	protectionNames, err := statusCheckNamesForBranchProtection(ctx, client, repository, branch)
-	if err != nil {
-		protectionNames = nil
+	var protectionNames []string
+	if branch != "" {
+		protectionNames, err = statusCheckNamesForBranchProtection(ctx, client, repository, branch)
+		if err != nil {
+			protectionNames = nil
+		}
 	}
 
 	refs, err := recentStatusCheckRefs(ctx, client, repository, branch)

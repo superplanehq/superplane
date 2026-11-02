@@ -268,6 +268,10 @@ func (s *Server) handleRunnerPlanningUpdate(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
+	s.runnerPlanningUpdate(w, r, scope)
+}
+
+func (s *Server) runnerPlanningUpdate(w http.ResponseWriter, r *http.Request, scope *runneraction.PlanningSessionScope) {
 	var req planningUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)

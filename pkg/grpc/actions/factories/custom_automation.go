@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -22,10 +23,11 @@ import (
 )
 
 const (
-	customAutomationDefaultName = "Custom automation"
-	customAutomationTriggerID   = "on-pull-request"
-	customAutomationRunnerID    = "verify"
-	customAutomationVersion     = 1
+	customAutomationDefaultName   = "Custom automation"
+	customAutomationTriggerID     = "on-pull-request"
+	customAutomationTaskTriggerID = "on-task"
+	customAutomationRunnerID      = "verify"
+	customAutomationVersion       = 1
 )
 
 func CreateFactoryCustomAutomation(
@@ -52,6 +54,13 @@ func CreateFactoryCustomAutomation(
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 
+	column := strings.TrimSpace(req.GetColumnKey())
+	if column == "" {
+		column = models.CanvasColumnKeyVerify
+	}
+	if column != models.CanvasColumnKeyVerify && column != models.CanvasColumnKeyBacklog {
+		return nil, factoryErrorToStatus(invalidArgument("column must be backlog or verify"), "failed to create custom automation")
+	}
 	settings, err := parseCustomAutomationSettings(db, factory, req.GetSettings())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
@@ -66,6 +75,7 @@ func CreateFactoryCustomAutomation(
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 
+	settings.ColumnKey = column
 	doc, err := buildCustomAutomationCanvas(db, factory, name, settings)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
@@ -98,7 +108,7 @@ func CreateFactoryCustomAutomation(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
-	if err := canvas.SetColumnKey(db, models.CanvasColumnKeyVerify); err != nil {
+	if err := canvas.SetColumnKey(db, column); err != nil {
 		discardIntakeCanvas(db, orgID, canvasID)
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
@@ -171,6 +181,9 @@ func UpdateFactoryCustomAutomation(
 	if name == "" {
 		return nil, factoryErrorToStatus(invalidArgument("name is required"), "failed to update custom automation")
 	}
+	if canvas.ColumnKey != nil {
+		settings.ColumnKey = *canvas.ColumnKey
+	}
 	doc, err := buildCustomAutomationCanvas(db, factory, name, settings)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update custom automation")
@@ -203,6 +216,10 @@ func UpdateFactoryCustomAutomation(
 	}
 	canvases.PublishCanvasUpdated(canvas)
 
+	canvas, err = models.FindCanvasInTransaction(db, orgID, canvas.ID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update custom automation")
+	}
 	automation, err := serializeCustomAutomation(db, factory, canvas)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update custom automation")
@@ -211,6 +228,7 @@ func UpdateFactoryCustomAutomation(
 }
 
 type customAutomationSettings struct {
+	ColumnKey               string
 	StartMode               pb.FactoryCustomAutomation_StartMode
 	Agent                   *intakeAgent
 	Steps                   []runner.AgentStep
@@ -419,7 +437,7 @@ func buildCustomAutomationCanvas(
 	}
 	settings.Agent.applyLLMProvider(runnerConfiguration)
 
-	return &yaml.Canvas{
+	doc := &yaml.Canvas{
 		APIVersion: yaml.APIVersion,
 		Kind:       yaml.KindCanvas,
 		Metadata: &yaml.CanvasMetadata{
@@ -451,7 +469,27 @@ func buildCustomAutomationCanvas(
 				{SourceID: triggerID, TargetID: customAutomationRunnerID, Channel: "default"},
 			},
 		},
-	}, nil
+	}
+	if settings.ColumnKey == models.CanvasColumnKeyBacklog {
+		if settings.StartMode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+			return nil, invalidArgument("Use Schedule only on a Verify automation.")
+		}
+		trigger := &doc.Spec.Nodes[0]
+		trigger.ID = customAutomationTaskTriggerID
+		trigger.Name = "On Task"
+		trigger.Component = factorycomponent.OnWorkOrderTriggerName
+		trigger.Configuration = map[string]any{}
+		trigger.Integration = nil
+		doc.Spec.Edges[0].SourceID = trigger.ID
+		doc.Spec.Nodes[1].Name = "Run automation"
+		doc.Metadata.Description = "Run prompt and Bash steps for a Backlog task."
+		runnerConfiguration["environment"] = []any{
+			checkoutEnvironmentVar("REPO", "{{ $['on-task'].data.workOrder.repository }}"),
+			checkoutEnvironmentVar("REPO_URL", "{{ $['on-task'].data.workOrder.repository_url }}"),
+			checkoutEnvironmentVar("BASE", "{{ $['on-task'].data.workOrder.default_branch }}"),
+		}
+	}
+	return doc, nil
 }
 
 func customAutomationCheckoutEnvironment(factory *models.Factory, mode pb.FactoryCustomAutomation_StartMode) []any {
