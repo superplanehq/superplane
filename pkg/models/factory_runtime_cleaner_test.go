@@ -135,17 +135,6 @@ func Test__FactoryRuntimeCleaner__KeepsWorkspaceAndWipesRuntime(t *testing.T) {
 
 	require.NoError(t, models.AddCanvasMemory(canvas.ID, "notes", map[string]any{"k": "v"}))
 
-	session := &models.AgentSession{
-		ID:                uuid.New(),
-		OrganizationID:    r.Organization.ID,
-		UserID:            r.User,
-		CanvasID:          canvas.ID,
-		Provider:          "anthropic",
-		ProviderSessionID: "sesn_reset",
-		Status:            models.AgentSessionStatusIdle,
-	}
-	require.NoError(t, models.CreateAgentSessionInTransaction(db, session))
-
 	planningCanvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
 	planningRun, err := models.CreateCanvasRunInTransaction(db, planningCanvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
@@ -228,7 +217,6 @@ func Test__FactoryRuntimeCleaner__KeepsWorkspaceAndWipesRuntime(t *testing.T) {
 	assertCount(t, db, &models.FactoryWorkOrderArtifact{}, "factory_id = ?", factoryModel.ID, 0)
 	assertCount(t, db, &models.File{}, "factory_id = ?", factoryModel.ID, 0)
 	assertCount(t, db, &models.CanvasRun{}, "workflow_id = ?", canvas.ID, 0)
-	assertCount(t, db, &models.AgentSession{}, "canvas_id = ?", canvas.ID, 0)
 	assertCount(t, db, &models.CanvasMemory{}, "canvas_id = ?", canvas.ID, 0)
 	assertCount(t, db, &models.FactoryPlanningSession{}, "factory_id = ?", factoryModel.ID, 0)
 	assertCount(t, db, &models.FactoryVelocityRepositoryMerge{}, "factory_id = ?", factoryModel.ID, 0)

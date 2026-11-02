@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  isFactoryAppAgentPanelOpen,
   isFactoryAppAgentPromptOpen,
   isFactoryAppComponentsOpen,
   isFactoryAppConfigureMode,
@@ -26,10 +25,8 @@ describe("factory app canvas search flags", () => {
     expect(isFactoryAppYamlViewOpen(new URLSearchParams("from=lines"))).toBe(false);
   });
 
-  it("detects the agent and components workspace flags", () => {
-    expect(isFactoryAppAgentPanelOpen(new URLSearchParams("agent=1"))).toBe(true);
+  it("detects the components workspace flag", () => {
     expect(isFactoryAppComponentsOpen(new URLSearchParams("blocks=1"))).toBe(true);
-    expect(isFactoryAppAgentPanelOpen(new URLSearchParams("from=lines"))).toBe(false);
     expect(isFactoryAppComponentsOpen(new URLSearchParams("from=lines"))).toBe(false);
   });
 });

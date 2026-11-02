@@ -1,10 +1,6 @@
 {
   "minTotalCoverage": 52.7,
   "minCoverageByPackage": {
-    "pkg/agents": 65.9,
-    "pkg/agents/agent_tools": 81.5,
-    "pkg/agents/agent_tools/actions": 66.4,
-    "pkg/agents/anthropic": 79.3,
     "pkg/authentication": 28.9,
     "pkg/authorization": 59.7,
     "pkg/cli": 47.4,
@@ -36,7 +32,6 @@
     "pkg/features": 78.9,
     "pkg/grpc": 4,
     "pkg/grpc/actions": 32.8,
-    "pkg/grpc/actions/agents": 66.7,
     "pkg/grpc/actions/auth": 80.8,
     "pkg/grpc/actions/canvases": 63,
     "pkg/grpc/actions/canvases/changesets": 85,

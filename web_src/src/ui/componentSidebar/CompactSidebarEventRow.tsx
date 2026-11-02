@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type MouseEvent } from "react";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
-import { RUNS_SIDEBAR_ROW_CLASS } from "@/components/CanvasToolSidebar/runsSidebarRowLayout";
+import { RUNS_SIDEBAR_ROW_CLASS } from "@/lib/runsSidebarRowLayout";
 import { appPath } from "@/lib/appPaths";
 import { isNormalClick } from "@/lib/linkHelpers";
 import { cn } from "@/lib/utils";

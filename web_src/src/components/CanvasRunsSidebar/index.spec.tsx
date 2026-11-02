@@ -38,8 +38,6 @@ describe("CanvasRunsSidebar", () => {
     setViewportWidth(1400);
     localStorage.setItem("runs-sidebar-width", "300");
     useSidebarLayoutStore.setState({
-      leftMountCount: 1,
-      leftWidth: 600,
       rightMountCount: 0,
       auxLeftMountCount: 0,
       auxLeftWidth: 300,
@@ -47,16 +45,17 @@ describe("CanvasRunsSidebar", () => {
 
     renderRunsSidebar();
 
+    let leftEdge = 600;
     const sidebar = screen.getByTestId("canvas-runs-sidebar");
     sidebar.getBoundingClientRect = () =>
       ({
-        left: useSidebarLayoutStore.getState().leftWidth,
-        right: useSidebarLayoutStore.getState().leftWidth + useSidebarLayoutStore.getState().auxLeftWidth,
+        left: leftEdge,
+        right: leftEdge + useSidebarLayoutStore.getState().auxLeftWidth,
         top: 0,
         bottom: 0,
         width: useSidebarLayoutStore.getState().auxLeftWidth,
         height: 0,
-        x: useSidebarLayoutStore.getState().leftWidth,
+        x: leftEdge,
         y: 0,
         toJSON: () => ({}),
       }) as DOMRect;
@@ -71,7 +70,7 @@ describe("CanvasRunsSidebar", () => {
     });
 
     fireEvent.mouseMove(document, { clientX: 920 });
-    useSidebarLayoutStore.setState({ leftWidth: 580 });
+    leftEdge = 580;
     fireEvent.mouseMove(document, { clientX: 920 });
     fireEvent.mouseUp(document);
 

@@ -7,8 +7,6 @@ func TestKindFromTopic(t *testing.T) {
 		topic string
 		want  string
 	}{
-		{topic: "agent-session:abc", want: KindAgent},
-		{topic: "agent-session:", want: KindAgent},
 		{topic: "factory:abc", want: KindFactory},
 		{topic: "public-line:abc", want: KindPublic},
 		{topic: "factory:", want: KindFactory},

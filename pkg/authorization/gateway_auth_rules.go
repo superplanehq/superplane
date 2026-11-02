@@ -134,18 +134,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "GET", Pattern: "/api/v1/agents/canvases/{canvas_id}/chat"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "GET", Pattern: "/api/v1/agents/chats/{chat_id}/messages"}: {
-			Resource:                     "agents",
-			Action:                       "read",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
 		{Method: "GET", Pattern: "/api/v1/canvases"}: {
 			Resource:   "canvases",
 			Action:     "read",
@@ -715,30 +703,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:   "api_keys",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
-		},
-		{Method: "POST", Pattern: "/api/v1/agents/canvases/{canvas_id}/chat/reset"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "POST", Pattern: "/api/v1/agents/chats/{chat_id}/interrupt"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "POST", Pattern: "/api/v1/agents/chats/{chat_id}/messages"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "POST", Pattern: "/api/v1/agents/chats/{chat_id}/outcome"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
 		},
 		{Method: "POST", Pattern: "/api/v1/canvases"}: {
 			Resource:   "canvases",
