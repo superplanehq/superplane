@@ -31,7 +31,11 @@ func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 	used := 25.0
 	duration := int64(300)
 	reset := now.Add(time.Hour).Unix()
-	limits := []models.CodexUsageLimit{{LimitID: "codex", Credits: &models.CodexUsageCredits{HasCredits: false, Balance: &balance}, Primary: &models.CodexUsageWindow{UsedPercent: &used, WindowDurationMins: &duration, ResetsAt: &reset}}}
+	remaining := 0.0
+	limits := []models.CodexUsageLimit{
+		{LimitID: "codex", Credits: &models.CodexUsageCredits{HasCredits: false, Balance: &balance}, Primary: &models.CodexUsageWindow{UsedPercent: &used, WindowDurationMins: &duration, ResetsAt: &reset}},
+		{LimitID: "business", IndividualLimit: &models.CodexUsageIndividualLimit{Limit: "5000", Used: "5000", RemainingPercent: &remaining}},
+	}
 	require.NoError(t, connection.StoreUsage(db, limits, nil, now))
 	response, err := ListCodexUsage(meContext(r))
 	require.NoError(t, err)
@@ -39,13 +43,20 @@ func TestListCodexUsageScopesSnapshotsToOwnerAndOrganization(t *testing.T) {
 	snapshot := response.Connections[0]
 	assert.Equal(t, "ada@example.com", snapshot.AccountLabel)
 	assert.WithinDuration(t, now, snapshot.ObservedAt.AsTime(), time.Second)
-	require.Len(t, snapshot.Limits, 1)
+	require.Len(t, snapshot.Limits, 2)
 	assert.Equal(t, used, snapshot.Limits[0].Primary.UsedPercent)
 	require.NotNil(t, snapshot.Limits[0].Credits)
 	require.NotNil(t, snapshot.Limits[0].Credits.Balance)
 	assert.Equal(t, balance, *snapshot.Limits[0].Credits.Balance)
 	assert.Equal(t, duration, *snapshot.Limits[0].Primary.WindowDurationMins)
 	assert.Equal(t, reset, snapshot.Limits[0].Primary.ResetsAt.AsTime().Unix())
+	assert.Nil(t, snapshot.Limits[0].IndividualLimit)
+	monthly := snapshot.Limits[1].IndividualLimit
+	require.NotNil(t, monthly)
+	assert.Equal(t, "5000", monthly.Limit)
+	assert.Equal(t, "5000", monthly.Used)
+	assert.Zero(t, monthly.RemainingPercent)
+	assert.Nil(t, monthly.ResetsAt)
 
 	for _, ids := range [][2]string{{uuid.NewString(), r.Organization.ID.String()}, {r.User.String(), uuid.NewString()}} {
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-user-id", ids[0], "x-organization-id", ids[1]))

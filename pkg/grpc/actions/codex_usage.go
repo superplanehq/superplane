@@ -23,6 +23,18 @@ func SerializeCodexUsageLimit(limit models.CodexUsageLimit) *pb.CodexUsageLimit 
 			Balance:    limit.Credits.Balance,
 		}
 	}
+	if individual := limit.IndividualLimit; individual != nil {
+		view.IndividualLimit = &pb.CodexUsageIndividualLimit{
+			Limit: individual.Limit,
+			Used:  individual.Used,
+		}
+		if individual.RemainingPercent != nil {
+			view.IndividualLimit.RemainingPercent = *individual.RemainingPercent
+		}
+		if individual.ResetsAt != nil {
+			view.IndividualLimit.ResetsAt = timestamppb.New(time.Unix(*individual.ResetsAt, 0))
+		}
+	}
 	return view
 }
 
