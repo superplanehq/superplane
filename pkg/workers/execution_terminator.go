@@ -233,10 +233,15 @@ func (w *ExecutionTerminator) cancelComponent(
 		return nil
 	}
 
-	action, err := w.registry.GetAction(ref.Component.Name)
+	componentName := ref.Component.Name
+	if frozen := execution.FrozenComponentName(); frozen != "" {
+		componentName = frozen
+	}
+
+	action, err := w.registry.GetAction(componentName)
 	if err != nil {
-		log.Errorf("action %s not found: %v", ref.Component.Name, err)
-		return err
+		logger.Warnf("action %s not found: %v, skipping action cancel", componentName, err)
+		return nil
 	}
 
 	orgUUID := canvas.OrganizationID
