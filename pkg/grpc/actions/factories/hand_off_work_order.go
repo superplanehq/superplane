@@ -38,6 +38,8 @@ var bitbucketHandOffPullRequestURLPattern = regexp.MustCompile(
 )
 
 type handOffPullRequest struct {
+	Description    string
+	Draft          bool
 	Provider       string
 	ExternalID     string
 	Repository     string
@@ -434,6 +436,8 @@ func loadGitHubHandOffPullRequest(
 		Number:         int64(githubPR.GetNumber()),
 		URL:            handOffPullRequestURL(githubPR.GetHTMLURL(), rawURL),
 		Title:          githubPR.GetTitle(),
+		Description:    githubPR.GetBody(),
+		Draft:          githubPR.GetDraft(),
 		State:          githubPR.GetState(),
 		HeadBranch:     githubPR.GetHead().GetRef(),
 		HeadRepository: githubPR.GetHead().GetRepo().GetFullName(),
@@ -470,6 +474,8 @@ func loadBitbucketHandOffPullRequest(
 		Number:         number,
 		URL:            handOffPullRequestURL(pullRequest.HTMLURL, rawURL),
 		Title:          pullRequest.Title,
+		Description:    pullRequest.Description,
+		Draft:          pullRequest.Draft,
 		State:          pullRequest.State,
 		HeadBranch:     pullRequest.SourceBr,
 		HeadRepository: pullRequest.SourceRepository,
