@@ -162,6 +162,8 @@ function CustomAutomationConfiguration({
       icon={model.icon}
       mode={model.mode}
       columnKey={model.columnKey}
+      schedule={model.schedule}
+      onScheduleChange={model.setSchedule}
       draft={model.draft}
       organizationId={organizationId}
       factoryId={factoryId}

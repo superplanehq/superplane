@@ -5,11 +5,39 @@ import {
   customAutomationDraft,
   customAutomationModeCopy,
   customAutomationSettings,
+  customAutomationSchedule,
+  customAutomationMode,
   workspaceAgentFromOnboarding,
 } from "./customAutomation";
 import { customAutomationIdFromSearch } from "./customAutomationPaths";
 
 describe("custom automation settings", () => {
+  it("preserves a saved schedule offset and ordered steps across trigger changes", () => {
+    const automation = {
+      settings: {
+        startMode: "START_MODE_SCHEDULED" as const,
+        schedule: { cronExpression: "30 0 9 * * MON-FRI", utcOffset: 5.75 },
+        steps: [
+          { name: "Test", type: "TYPE_BASH" as const, command: "make test", secrets: ["deploy"] },
+          { name: "Review", type: "TYPE_PROMPT" as const, prompt: "Review the repository." },
+        ],
+      },
+    };
+    const draft = customAutomationDraft(automation);
+    const schedule = customAutomationSchedule(automation);
+    expect(schedule).toEqual(automation.settings.schedule);
+    expect(customAutomationMode(automation.settings.startMode)).toBe("scheduled");
+    const saved = customAutomationSettings("scheduled", draft, "clock", schedule);
+    expect(saved.schedule).toEqual(automation.settings.schedule);
+    expect(saved.startMode).toBe("START_MODE_SCHEDULED");
+    expect(customAutomationSettings("manual", draft).steps).toEqual(saved.steps);
+    expect(customAutomationSettings("automatic", draft).steps).toEqual(saved.steps);
+    expect(
+      customAutomationSchedule({
+        settings: { startMode: "START_MODE_SCHEDULED", schedule: { cronExpression: "0 9 * * *" } },
+      }).utcOffset,
+    ).toBe(0);
+  });
   it("maps saved agent and ordered steps into the shared editor and back", () => {
     const draft = customAutomationDraft({
       automation: { id: "review-1", name: "Security review" },
@@ -123,6 +151,14 @@ describe("custom automation settings", () => {
           templateId: "custom-verification",
           customAutomationMode: "automatic",
         },
+        {
+          id: "scheduled-review",
+          name: "Scheduled review",
+          columnKey: "verify",
+          templateId: "custom-verification",
+          customAutomationMode: "scheduled",
+          customAutomationCronExpression: "0 9 * * *",
+        },
       ],
     });
 
@@ -136,6 +172,10 @@ describe("custom automation settings", () => {
         kind: "custom-verification",
         name: "Policy review",
         action: "Run automation automatically",
+      }),
+      expect.objectContaining({
+        name: "Scheduled review",
+        trigger: "On schedule: 0 9 * * *",
       }),
     ]);
   });
