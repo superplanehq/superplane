@@ -7,7 +7,6 @@ import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
 import { modelNameWithThinking, supportedThinkingLevel, thinkingOptions } from "@/lib/thinkingLevel";
-import { useFactoryTaskIdentity } from "../../factoryTaskContext";
 
 import { DRAFT_START_MODEL_AUTO, draftStartThinkingLevels } from "./draftStartModel";
 
@@ -53,8 +52,8 @@ export function DraftStartModelSelect({
   disabled?: boolean;
   appearance?: Appearance;
 }) {
-  const task = useFactoryTaskIdentity();
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, task.orderId);
+  // Omit the task ID. Start assigns the task to the caller before it checks the model.
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true);
   const runnerModels = models.data?.models;
   const catalogName = (runnerModels ?? []).find((item) => item.id === model)?.name;
   const selectedName =

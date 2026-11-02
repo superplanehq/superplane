@@ -6,23 +6,27 @@ import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { TooltipProvider } from "@/ui/tooltip";
 
+import { FactoryTaskScope } from "../../FactoryTaskScope";
+
 import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { SplitRunReview } from "./SplitRunReview";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO, draftStartModelPayload } from "./draftStartModel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
+const useFactoryLineRunnerModelsMock = vi.fn((..._args: unknown[]) => ({
+  data: {
+    models: [
+      { id: "claude-haiku-4-5", name: "claude-haiku-4-5", thinkingLevels: [] },
+      { id: "claude-opus-4-6", name: "claude-opus-4-6", thinkingLevels: ["low", "medium", "high", "max"] },
+      { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6", thinkingLevels: ["low", "medium", "high"] },
+    ],
+  },
+  isLoading: false,
+}));
+
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
-  useFactoryLineRunnerModels: () => ({
-    data: {
-      models: [
-        { id: "claude-haiku-4-5", name: "claude-haiku-4-5", thinkingLevels: [] },
-        { id: "claude-opus-4-6", name: "claude-opus-4-6", thinkingLevels: ["low", "medium", "high", "max"] },
-        { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6", thinkingLevels: ["low", "medium", "high"] },
-      ],
-    },
-    isLoading: false,
-  }),
+  useFactoryLineRunnerModels: (...args: unknown[]) => useFactoryLineRunnerModelsMock(...args),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -247,5 +251,26 @@ describe("SplitRunReview draft model select", () => {
     const button = screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" });
     expect(button).not.toHaveTextContent("Medium");
     expect(button).not.toHaveTextContent("claude-opus-4-6");
+  });
+
+  it("loads the caller's model catalog inside a task, not the saved owner's catalog", () => {
+    useFactoryLineRunnerModelsMock.mockClear();
+    render(
+      <FactoryTaskScope factoryId="factory-1" orderId="order-1">
+        <DraftStartModelSelect
+          organizationId="org-1"
+          factoryId="factory-1"
+          lineName="ship"
+          model={DRAFT_START_MODEL_AUTO}
+          thinkingLevel=""
+          onChange={vi.fn()}
+        />
+      </FactoryTaskScope>,
+    );
+
+    expect(useFactoryLineRunnerModelsMock).toHaveBeenCalled();
+    for (const call of useFactoryLineRunnerModelsMock.mock.calls) {
+      expect(call[4]).toBeUndefined();
+    }
   });
 });

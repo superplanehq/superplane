@@ -13,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
-import { useFactoryTaskIdentity } from "../factoryTaskContext";
 import { DRAFT_START_MODEL_AUTO, draftStartThinkingLevels } from "../pages/work-order-split-run/draftStartModel";
 
 const MENU_ITEM_CLASS = "cursor-pointer text-[13px]";
@@ -40,8 +39,8 @@ export function MobileDraftStartModelSelect({
   onChange: (next: StartChoice) => void;
   disabled?: boolean;
 }) {
-  const task = useFactoryTaskIdentity();
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName), task.orderId);
+  // Omit the task ID. Start assigns the task to the caller before it checks the model.
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName));
   const modelOptions = lineName
     ? runnerModelOptions(models.data?.models)
     : [{ value: DRAFT_START_MODEL_AUTO, label: "Auto" }];
