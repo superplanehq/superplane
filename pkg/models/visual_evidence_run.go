@@ -18,9 +18,8 @@ func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateVisualEvidenceID, visualEvidenceRunTitle)
 }
 
-// MaybeLinkCustomAutomationRun attaches a custom Verify automation run to
-// the factory pull request in the root event. The task log shows that
-// automation only after that link exists.
+// MaybeLinkCustomAutomationRun stores task authority for a custom automation.
+// Backlog runs use a task link; Verify runs use pull-request activity.
 func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
 	title := customAutomationRunTitle
 	if canvas != nil {
@@ -28,7 +27,48 @@ func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEven
 			title = name
 		}
 	}
+	if canvas != nil && canvas.ColumnKey != nil && *canvas.ColumnKey == CanvasColumnKeyBacklog {
+		return maybeLinkBacklogCustomAutomationRun(tx, canvas, event, run, title)
+	}
 	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
+}
+
+func maybeLinkBacklogCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun, title string) error {
+	if event == nil || run == nil || canvas.FactoryID == nil || event.WorkflowID != canvas.ID || run.WorkflowID != canvas.ID {
+		return nil
+	}
+	matches, err := CanvasHasFactoryAppTemplate(tx, canvas.ID, FactoryAppTemplateCustomAutomationID)
+	if err != nil || !matches {
+		return err
+	}
+	payload, ok := objectMap(RootEventSourcePayload(event.Data.Data()))
+	if !ok {
+		return nil
+	}
+	task, ok := objectMap(payload["workOrder"])
+	if !ok {
+		return nil
+	}
+	raw, _ := task["id"].(string)
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return err
+	}
+	factory, err := FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return err
+	}
+	order, err := factory.FindWorkOrder(tx, id)
+	if err != nil {
+		return err
+	}
+	if err := order.RequireExecutionOwner(tx, true); err != nil {
+		return recordColumnAppRejection(tx, order, title, err)
+	}
+	if err := order.ValidateSubscriptionCanvasModels(tx, canvas.ID, ""); err != nil {
+		return recordColumnAppRejection(tx, order, title, err)
+	}
+	return order.RecordRefinementRun(tx, run.ID)
 }
 
 // MaybeLinkMergeConfidenceRun records task authority before agent admission.

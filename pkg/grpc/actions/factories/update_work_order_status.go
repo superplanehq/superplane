@@ -13,6 +13,7 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
 )
 
@@ -68,6 +69,7 @@ func UpdateWorkOrderStatus(
 	var order *models.FactoryWorkOrder
 	var fromState string
 	var changed bool
+	var backlogEvents []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -85,11 +87,15 @@ func UpdateWorkOrderStatus(
 			Result:  result,
 			Actor:   &actor,
 		})
+		if err == nil && changed && toState == models.FactoryWorkOrderStateDraft {
+			backlogEvents = contexts.EmitBacklogCustomAutomations(tx, factory, order)
+		}
 		return err
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}
+	contexts.PublishWorkOrderCreatedEvents(orgID, backlogEvents)
 
 	factory, err := models.FindFactory(db, orgID, factoryID)
 	if err != nil {
