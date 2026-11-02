@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { MemoryRouter } from "react-router";
 
 import {
@@ -19,7 +19,7 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import { factoryCodexConnectionKey, useFactoryCodexConnection } from "../pages/onboarding/useFactoryCodexConnection";
 import { CodexActionProvider } from "./CodexActionProvider";
 import { CodexConnectionSetupDialog } from "./CodexConnectionSetupDialog";
-import { isCodexActionCancelled, useCodexActionGuard } from "./codexActionContext";
+import { CodexActionContext, isCodexActionCancelled, useCodexActionGuard } from "./codexActionContext";
 
 vi.mock("@/api-client", () => ({
   ...unmockedSrc<Record<string, unknown>>("api-client/index.ts"),
@@ -58,6 +58,11 @@ function TaskDraft({ save }: { save: (title: string) => Promise<void> }) {
   );
 }
 
+function ReconnectButton() {
+  const connect = useContext(CodexActionContext);
+  return <Button onClick={() => void connect?.("org", "factory", "setup")}>Reconnect ChatGPT</Button>;
+}
+
 function DismissibleCodexSetup({ onConnected }: { onConnected: () => void }) {
   const [open, setOpen] = useState(true);
   return (
@@ -94,6 +99,21 @@ describe("Codex assignment continuation", () => {
     vi.mocked(meDescribeCodexConnection)
       .mockReset()
       .mockImplementation(async () => ({ data: { connection } }) as never);
+  });
+
+  it("opens connection setup directly for reconnection", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <CodexActionProvider>
+          <ReconnectButton />
+        </CodexActionProvider>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Reconnect ChatGPT" }));
+    expect(await screen.findByRole("heading", { name: "Connect Codex" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Connect Codex to continue" })).not.toBeInTheDocument();
   });
 
   it.each([
