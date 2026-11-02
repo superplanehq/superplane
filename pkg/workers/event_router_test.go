@@ -331,6 +331,19 @@ func Test__EventRouter_RechecksHostedCreditBeforeRoutingPlanningAgent(t *testing
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	db := database.Conn()
 	require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
+	settings, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+			"default_hosted_provider": settings.DefaultHostedProvider,
+			"default_hosted_model":    settings.DefaultHostedModel,
+		}).Error)
+		require.NoError(t, db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{}).Error)
+	})
+	require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+		"default_hosted_provider": nil,
+		"default_hosted_model":    nil,
+	}).Error)
 
 	triggerID := "trigger"
 	gateID := "refinement-enabled"
@@ -386,6 +399,24 @@ func Test__EventRouter_RechecksHostedCreditBeforeRoutingPlanningAgent(t *testing
 
 	_, err = billingmodels.AddAdminLLMCreditGrant(db, r.Organization.ID, 1_000_000, "restore credit", nil)
 	require.NoError(t, err)
+	noModelRun := routePlanningAttempt()
+	require.Equal(t, []string{models.SuperPlaneRunnerNoModelMessage}, noModelRun.ErrorMessages())
+	queueItems, err = models.ListNodeQueueItems(db, canvas.ID, agentID, 10, nil)
+	require.NoError(t, err)
+	require.Empty(t, queueItems)
+
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.InstallationLLMSettings{}).Where("id = ?", settings.ID).Updates(map[string]any{
+		"default_hosted_provider": models.UsageProviderAnthropic,
+		"default_hosted_model":    "claude-sonnet-4-6",
+	}).Error)
+
 	readyRun := routePlanningAttempt()
 	require.Empty(t, readyRun.ErrorMessages())
 	queueItems, err = models.ListNodeQueueItems(db, canvas.ID, agentID, 10, nil)

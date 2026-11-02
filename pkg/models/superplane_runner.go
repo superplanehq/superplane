@@ -366,8 +366,8 @@ func (c *CanvasNode) RefreshHostedBillingReadiness(tx *gorm.DB, orgID uuid.UUID,
 		return nil
 	}
 
-	readiness := billing.AssertHostedRunAllowed(tx, orgID, factoryID)
-	if readiness != nil && !isHostedBillingReadinessError(readiness) {
+	readiness := SuperPlaneRunnerReadinessError(tx, orgID, factoryID)
+	if readiness != nil && !isSuperPlaneReadinessError(readiness) && !isHostedBillingReadinessError(readiness) {
 		return readiness
 	}
 
