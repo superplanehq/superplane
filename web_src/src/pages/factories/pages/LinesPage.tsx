@@ -1348,6 +1348,7 @@ function LineBoardSplitRunPopup({
           resolveUser,
           columnAppRuns: columnAppCheckRuns.lookup,
         })}
+        analysisRuns={analysisRuns}
         canDispatch={canDispatch && Boolean(resolvedLineName)}
         canUpdate={canUpdate}
         isDispatching={isDispatching}

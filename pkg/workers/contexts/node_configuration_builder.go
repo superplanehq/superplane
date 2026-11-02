@@ -2425,7 +2425,7 @@ func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, m
 	}
 	if !ok {
 		if credentials["source"] == "subscription" {
-			return nil, models.ErrSubscriptionModelUnavailable
+			return nil, models.SubscriptionModelUnavailableError(override)
 		}
 		if llmFundingSource(resolved) == models.UsageFundingSourceBYOK {
 			return nil, models.ErrSelectableLLMModelNotAllowed

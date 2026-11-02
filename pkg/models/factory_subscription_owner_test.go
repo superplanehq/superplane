@@ -94,6 +94,8 @@ func TestValidateSubscriptionCanvasModelsChecksLiteralChoicesOnly(t *testing.T) 
 				return
 			}
 			require.ErrorIs(t, err, tc.expected)
+			assert.True(t, models.IsPermanentSubscriptionAdmissionError(err))
+			assert.Contains(t, err.Error(), tc.model)
 		})
 	}
 }
