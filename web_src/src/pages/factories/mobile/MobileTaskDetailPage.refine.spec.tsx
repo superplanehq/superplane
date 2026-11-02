@@ -63,7 +63,7 @@ vi.mock("../pages/planningSessionClient", () => ({
 }));
 
 vi.mock("../pages/usePlanningSessionLiveRun", () => ({
-  usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => view,
+  usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => ({ view, run: undefined }),
 }));
 
 vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
