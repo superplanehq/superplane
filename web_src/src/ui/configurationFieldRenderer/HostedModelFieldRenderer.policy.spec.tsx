@@ -44,6 +44,7 @@ function selectableModel(source: SelectableLLMSourceID, provider: string, id: st
     model: { id, name: id },
     key: `${source}::${provider}::${id}`,
     label: source === "subscription" ? id : `${provider}/${id}`,
+    thinkingLevels: [],
   };
 }
 

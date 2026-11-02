@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/llm"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -67,8 +68,11 @@ type listHostedLLMModelsResponse struct {
 }
 
 type hostedLLMModelResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID                   string   `json:"id"`
+	Name                 string   `json:"name"`
+	ThinkingLevels       []string `json:"thinking_levels"`
+	DefaultThinkingLevel string   `json:"default_thinking_level"`
+	ReasoningMandatory   bool     `json:"reasoning_mandatory"`
 }
 
 func (s *Server) adminGetInstallationLLMSettings(w http.ResponseWriter, r *http.Request) {
@@ -159,6 +163,7 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	var saved *models.HostedLLMProvider
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		current, err := models.FindHostedLLMProvider(tx, provider)
 		if err != nil && !errors.Is(err, models.ErrHostedLLMProviderNotFound) {
@@ -220,7 +225,8 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		if next.Enabled && len(next.AllowedModels) == 0 {
 			return errors.New("select at least one model when the provider is enabled")
 		}
-		if _, err = models.UpsertHostedLLMProvider(tx, next); err != nil {
+		saved, err = models.UpsertHostedLLMProvider(tx, next)
+		if err != nil {
 			return err
 		}
 		return models.SyncDefaultHostedLLMModelAfterProviderChange(tx)
@@ -233,6 +239,13 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		}
 		http.Error(w, err.Error(), status)
 		return
+	}
+
+	if saved.Provider == models.UsageProviderOpenRouter && saved.HasAPIKey() {
+		catalog := llmcatalog.New(s.encryptor, s.registry.HTTPContext())
+		if refreshErr := catalog.Refresh(r.Context(), database.DB(r.Context()), *saved); refreshErr != nil {
+			log.Warnf("admin: saved hosted LLM provider %s but failed to refresh model capabilities: %v", provider, refreshErr)
+		}
 	}
 
 	response, err := s.buildInstallationLLMSettingsResponse()
@@ -299,7 +312,13 @@ func (s *Server) adminListHostedLLMProviderModels(w http.ResponseWriter, r *http
 
 	out := listHostedLLMModelsResponse{Models: make([]hostedLLMModelResponse, 0, len(modelsList))}
 	for _, model := range modelsList {
-		out.Models = append(out.Models, hostedLLMModelResponse{ID: model.ID, Name: model.ID})
+		out.Models = append(out.Models, hostedLLMModelResponse{
+			ID:                   model.ID,
+			Name:                 model.ID,
+			ThinkingLevels:       model.ThinkingLevels,
+			DefaultThinkingLevel: model.DefaultThinkingLevel,
+			ReasoningMandatory:   model.ReasoningMandatory,
+		})
 	}
 	respondJSON(w, out)
 }
