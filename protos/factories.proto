@@ -487,6 +487,19 @@ service Factories {
     };
   }
 
+  rpc SearchFactoryPullRequestImportItems(SearchFactoryPullRequestImportItemsRequest) returns (SearchFactoryPullRequestImportItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/pull-request-imports/candidates"
+    };
+  }
+
+  rpc ImportFactoryPullRequest(ImportFactoryPullRequestRequest) returns (ImportFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/pull-request-imports"
+      body: "*"
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -3521,4 +3534,36 @@ message CodexUsageWindow {
   double used_percent = 1;
   optional int64 window_duration_mins = 2;
   google.protobuf.Timestamp resets_at = 3;
+}
+
+message SearchFactoryPullRequestImportItemsRequest {
+  string factory_id = 1;
+  string query = 2;
+  int32 limit = 3;
+}
+
+message FactoryPullRequestImportItem {
+  string url = 1;
+  string title = 2;
+  string description = 3;
+  int64 number = 4;
+  bool draft = 5;
+  string repository = 6;
+  string provider = 7;
+  WorkOrder existing_task = 8;
+}
+
+message SearchFactoryPullRequestImportItemsResponse {
+  repeated FactoryPullRequestImportItem items = 1;
+}
+
+message ImportFactoryPullRequestRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  string pull_request_url = 3;
+}
+
+message ImportFactoryPullRequestResponse {
+  WorkOrder order = 1;
+  bool created = 2;
 }
