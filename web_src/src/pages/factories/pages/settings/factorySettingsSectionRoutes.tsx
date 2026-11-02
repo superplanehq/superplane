@@ -24,6 +24,7 @@ import { OrganizationSettingsBillingPage } from "@/pages/factories/pages/organiz
 import { OrganizationSettingsUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsUsagePage";
 import {
   FactoryOrganizationApiKeyDetailPage,
+  FactoryOrganizationFleetsPage,
   FactoryOrganizationApiKeysPage,
   FactoryOrganizationLLMModelsPage,
   FactoryOrganizationMembersPage,
@@ -47,6 +48,31 @@ import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/Mobi
 import { FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCodexUsagePage";
 
 export const factorySettingsSectionRoutes = [
+  ...(
+    [
+      ["organization/fleets", "catalog"],
+      ["organization/fleets/:fleetId", "fleet"],
+    ] as const
+  ).map(([path, detail]) => (
+    <Route
+      key={path}
+      path={path}
+      element={
+        <RequirePermission resource="org" action="read">
+          <FactoryOrganizationFleetsPage detail={detail} />
+        </RequirePermission>
+      }
+    />
+  )),
+  <Route
+    key="factory-settings-runner-redirect"
+    path="organization/fleets/:fleetId/runners/:runnerId"
+    element={
+      <RequirePermission resource="org" action="read">
+        <Navigate to="../.." relative="path" replace />
+      </RequirePermission>
+    }
+  />,
   <Route
     key="factory-settings-account-codex-usage"
     path="account/codex-usage"

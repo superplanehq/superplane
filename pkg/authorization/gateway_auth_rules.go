@@ -8,10 +8,21 @@ import (
 
 func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 	return map[HTTPRoute]AuthorizationRule{
-		{Method: "POST", Pattern: "/api/v1/organizations/{id}/invitations"}:                        {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
-		{Method: "GET", Pattern: "/api/v1/organizations/{id}/invitations"}:                         {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
-		{Method: "POST", Pattern: "/api/v1/organizations/{id}/invitations/{invitation_id}/resend"}: {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
-		{Method: "DELETE", Pattern: "/api/v1/organizations/{id}/invitations/{invitation_id}"}:      {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets/{fleet_id}/tasks"}:               {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets"}:                                {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/fleets"}:                               {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets/{fleet_id}"}:                     {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		{Method: "PATCH", Pattern: "/api/v1/organizations/{id}/fleets/{fleet_id}"}:                   {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets/{fleet_id}/capacity"}:            {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/runners"}:                               {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/runners"}:                              {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/runners/{runner_id}"}:                   {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		{Method: "DELETE", Pattern: "/api/v1/organizations/{id}/runners/{runner_id}"}:                {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/runners/{runner_id}:provider-deleted"}: {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/invitations"}:                          {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/invitations"}:                           {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/invitations/{invitation_id}/resend"}:   {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		{Method: "DELETE", Pattern: "/api/v1/organizations/{id}/invitations/{invitation_id}"}:        {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
 		{Method: "DELETE", Pattern: "/api/v1/canvases/{canvas_id}/memory/{memory_id}"}: {
 			Resource:           "canvases",
 			Action:             "update",
@@ -442,7 +453,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets"}: {
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets/available"}: {
 			Resource:   "org",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,

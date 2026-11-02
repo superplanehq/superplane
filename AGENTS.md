@@ -79,7 +79,7 @@ The development environment is **entirely Docker-based**: build, lint, test, and
 run commands execute inside containers via `docker compose`. You do not need Go
 or Node installed on the host, only Docker.
 
-- Go `1.26.10` (pinned in `go.mod`; provided by the dev container).
+- Go `1.27.3` (pinned in `go.mod`; provided by the dev container).
 - Node.js, npm, and Bun (provided by the dev container; used by Vite/frontend).
 - Docker with a working `docker compose`.
 
@@ -181,10 +181,16 @@ Cross-cutting rules when extending the backend:
   constants in `pkg/models`. Check the `Proto*` and `*ToProto` functions in
   `pkg/grpc/actions/common.go`.
 - When adding a new worker in `pkg/workers`, add its startup to
-  `cmd/server/main.go` and update the docker compose files with any new
-  environment variables.
+  `pkg/server/server.go` and update the docker compose files with any new
+  environment variables. `cmd/server/main.go` calls `server.Start()`.
 - After adding new API endpoints, ensure they are covered in
   `pkg/authorization/interceptor.go`.
+- Define all new admin API endpoints in `protos/admin/`. Register them with
+  the admin gRPC gateway behind the existing admin authentication middleware.
+  Do not add manual admin HTTP handlers in core or `ee/`. Existing handlers
+  remain until they migrate. Run `make check.admin.routes` to check this rule.
+  Remove migrated routes from `.admin-http-routes-baseline.txt`. Do not add
+  new routes to the baseline.
 
 Further reading:
 

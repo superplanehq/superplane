@@ -33,19 +33,11 @@ function useQuotaWindowStatus(window: FactoriesCodexUsageWindow, fallbackLabel: 
   return { windowLabel, expired, status };
 }
 
-export function CodexQuotaRemaining({
-  window,
-  label,
-  showWindowLabel,
-}: {
-  window: FactoriesCodexUsageWindow;
-  label: string;
-  showWindowLabel: boolean;
-}) {
+export function CodexQuotaRemaining({ window, label }: { window: FactoriesCodexUsageWindow; label: string }) {
   const { windowLabel, status } = useQuotaWindowStatus(window, label);
   return (
-    <div className={`flex min-w-0 items-center gap-2 ${showWindowLabel ? "justify-between" : "justify-center"}`}>
-      {showWindowLabel ? <span className="text-muted-foreground">{windowLabel}</span> : null}
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <span className="text-muted-foreground">{windowLabel}</span>
       <span className="shrink-0 font-medium">{status}</span>
     </div>
   );

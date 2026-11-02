@@ -145,6 +145,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         json: {
           features: [
             {
+              id: "organization_runners",
+              label: "Organization runners",
+              description: "Manage organization fleets and runners",
+            },
+            {
               id: "claude_managed_agents",
               label: "Managed agents",
               description: "Canvas agent chat",

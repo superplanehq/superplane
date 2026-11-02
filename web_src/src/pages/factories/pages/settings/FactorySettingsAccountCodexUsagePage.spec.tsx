@@ -106,6 +106,23 @@ describe("Codex usage", () => {
     expect(screen.getByText(/Last updated/)).toBeInTheDocument();
   });
 
+  it("shows a credit balance when no quota windows are reported", () => {
+    render(
+      <CodexUsageConnections
+        connections={[
+          {
+            id: "connection-1",
+            observedAt: new Date().toISOString(),
+            limits: [{ limitId: "codex", credits: { hasCredits: true, balance: "4712" } }],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Available credits")).toBeInTheDocument();
+    expect(screen.getByText("4,712 credits")).toBeInTheDocument();
+    expect(screen.queryByText(/Usage unavailable/)).not.toBeInTheDocument();
+  });
+
   it("shows unavailable usage without a snapshot and hides usage without a connection", () => {
     const view = render(
       <CodexUsageConnections connections={[{ id: "connection-1", accountLabel: "ada@example.com" }]} />,
@@ -144,22 +161,30 @@ describe("Codex usage", () => {
     queryClient.clear();
   });
 
-  it("keeps disconnected settings open and starts personal sign-in", async () => {
-    vi.mocked(meListCodexUsage).mockResolvedValue({ data: { connections: [] }, error: undefined });
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const view = renderUsageRoute(queryClient);
-    try {
-      expect(await screen.findByRole("heading", { name: "Codex" })).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Account settings" })).not.toBeInTheDocument();
-      const connect = await screen.findByRole("button", { name: "Connect ChatGPT" });
-      await waitFor(() => expect(connect).toBeEnabled());
-      connect.click();
-      await waitFor(() => expect(meStartCodexConnection).toHaveBeenCalledTimes(1));
-    } finally {
-      view.unmount();
-      queryClient.clear();
-    }
-  });
+  for (const [status, action] of [
+    ["disconnected", "Connect ChatGPT"],
+    ["reconnect_required", "Reconnect ChatGPT"],
+  ] as const) {
+    it(`starts personal sign-in when the connection is ${status}`, async () => {
+      vi.mocked(meDescribeCodexConnection).mockResolvedValue({
+        data: { connection: { status, eligible: true } },
+      } as never);
+      vi.mocked(meListCodexUsage).mockResolvedValue({ data: { connections: [] }, error: undefined });
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const view = renderUsageRoute(queryClient);
+      try {
+        expect(await screen.findByRole("heading", { name: "Codex" })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Account settings" })).not.toBeInTheDocument();
+        const connect = await screen.findByRole("button", { name: action });
+        await waitFor(() => expect(connect).toBeEnabled());
+        connect.click();
+        await waitFor(() => expect(meStartCodexConnection).toHaveBeenCalledTimes(1));
+      } finally {
+        view.unmount();
+        queryClient.clear();
+      }
+    });
+  }
 
   it("keeps the connected view busy until the refresh task finishes", async () => {
     let connection: FactoriesFactoryCodexConnection = {

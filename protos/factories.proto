@@ -3499,6 +3499,13 @@ message CodexUsageLimit {
   string plan_type = 3;
   CodexUsageWindow primary = 4;
   CodexUsageWindow secondary = 5;
+  CodexUsageCredits credits = 6;
+}
+
+message CodexUsageCredits {
+  bool has_credits = 1;
+  bool unlimited = 2;
+  optional string balance = 3;
 }
 
 message CodexUsageWindow {

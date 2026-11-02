@@ -18,7 +18,12 @@ import (
 	"gorm.io/gorm"
 )
 
-const maxCodexSubscriptionBodyBytes = 256*1024 + 4096
+const (
+	maxCodexSubscriptionBodyBytes  = 256*1024 + 4096
+	codexRefreshOperationTimeout   = 30 * time.Second
+	codexRefreshExchangeTimeout    = 15 * time.Second
+	codexRefreshPersistenceReserve = 5 * time.Second
+)
 
 var errInvalidCodexBundle = errors.New("chatgpt subscription credentials are invalid")
 
@@ -214,11 +219,15 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	// The provider can rotate its refresh token before the client disconnects.
+	// Finish this bounded operation so a disconnect cannot discard the new token.
+	operation, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), codexRefreshOperationTimeout)
+	defer cancel()
 	var accessToken string
 	var idToken string
 	var permanent *runneraction.CodexTokenRefreshError
 	var changedOrganizationID uuid.UUID
-	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+	err = database.DB(operation).Transaction(func(tx *gorm.DB) error {
 		lease, err := models.FindCodexRunLeaseBySecret(tx, secret)
 		if err != nil {
 			return err
@@ -244,7 +253,7 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		if len(locked.BundleCiphertext) == 0 {
 			return models.ErrCodexConnectionNotReady
 		}
-		plain, err := s.encryptor.Decrypt(r.Context(), locked.BundleCiphertext, []byte(locked.ID.String()))
+		plain, err := s.encryptor.Decrypt(operation, locked.BundleCiphertext, []byte(locked.ID.String()))
 		if err != nil {
 			return err
 		}
@@ -253,7 +262,7 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		if !runneraction.CodexAccessTokenNeedsRefresh(accessToken, time.Now()) {
 			return nil
 		}
-		refreshed, refreshErr := s.refreshCodexToken(r.Context(), runneraction.CodexAuthToken(plain, "refresh_token"))
+		refreshed, refreshErr := s.refreshCodexToken(operation, runneraction.CodexAuthToken(plain, "refresh_token"))
 		var tokenErr *runneraction.CodexTokenRefreshError
 		if errors.As(refreshErr, &tokenErr) && tokenErr.Permanent {
 			if err := locked.MarkReconnectRequired(tx, time.Now()); err != nil {
@@ -277,7 +286,7 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		if err != nil {
 			return err
 		}
-		ciphertext, err := s.encryptor.Encrypt(context.Background(), prepared, []byte(locked.ID.String()))
+		ciphertext, err := s.encryptor.Encrypt(operation, prepared, []byte(locked.ID.String()))
 		if err != nil {
 			return err
 		}
@@ -291,15 +300,7 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		return nil
 	})
 	if err == nil && changedOrganizationID != uuid.Nil {
-		_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(r.Context()), changedOrganizationID)
-	}
-	if permanent != nil {
-		code := permanent.Code
-		if code == "" {
-			code = "refresh_token_invalidated"
-		}
-		_ = writeJSON(w, http.StatusUnauthorized, map[string]any{"error": code})
-		return
+		_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(operation), changedOrganizationID)
 	}
 	if err != nil {
 		var tokenErr *runneraction.CodexTokenRefreshError
@@ -314,6 +315,14 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		writeCodexSubscriptionError(w, err)
 		return
 	}
+	if permanent != nil {
+		code := permanent.Code
+		if code == "" {
+			code = "refresh_token_invalidated"
+		}
+		_ = writeJSON(w, http.StatusUnauthorized, map[string]any{"error": code})
+		return
+	}
 	_ = writeJSON(w, http.StatusOK, map[string]any{
 		"access_token":  accessToken,
 		"id_token":      idToken,
@@ -322,6 +331,17 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 }
 
 func (s *Server) refreshCodexToken(ctx context.Context, refreshToken string) (runneraction.CodexTokenSet, error) {
+	// Leave a persistence reserve even if row-lock acquisition used part of the
+	// operation deadline. A depleted reserve prevents a new exchange from starting.
+	deadline := time.Now().Add(codexRefreshExchangeTimeout)
+	if operationDeadline, ok := ctx.Deadline(); ok && operationDeadline.Add(-codexRefreshPersistenceReserve).Before(deadline) {
+		deadline = operationDeadline.Add(-codexRefreshPersistenceReserve)
+	}
+	ctx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return runneraction.CodexTokenSet{}, &runneraction.CodexTokenRefreshError{}
+	}
 	if s.codexTokenRefresh != nil {
 		return s.codexTokenRefresh(ctx, refreshToken)
 	}

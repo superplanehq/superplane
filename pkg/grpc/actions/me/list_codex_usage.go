@@ -7,7 +7,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	factorypb "github.com/superplanehq/superplane/pkg/protos/factories"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -39,13 +38,7 @@ func ListCodexUsage(ctx context.Context) (*pb.ListCodexUsageResponse, error) {
 			view.ObservedAt = timestamppb.New(*connection.UsageObservedAt)
 		}
 		for _, limit := range connection.UsageLimits {
-			view.Limits = append(view.Limits, &factorypb.CodexUsageLimit{
-				LimitId:   limit.LimitID,
-				LimitName: limit.LimitName,
-				PlanType:  limit.PlanType,
-				Primary:   actions.SerializeCodexUsageWindow(limit.Primary),
-				Secondary: actions.SerializeCodexUsageWindow(limit.Secondary),
-			})
+			view.Limits = append(view.Limits, actions.SerializeCodexUsageLimit(limit))
 		}
 		response.Connections = append(response.Connections, view)
 	}

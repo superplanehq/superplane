@@ -1,6 +1,9 @@
 /** Organization experimental feature: real factories (tasks, lines, factory apps). */
 export const FEATURE_FACTORIES = "factories";
 
+/** Organization-owned fleets and directly managed runners. */
+export const FEATURE_ORGANIZATION_RUNNERS = "organization_runners";
+
 /** Organization experimental feature: Claude managed agents on the canvas. */
 export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 

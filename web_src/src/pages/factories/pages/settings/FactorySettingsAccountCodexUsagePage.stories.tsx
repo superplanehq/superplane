@@ -46,6 +46,14 @@ export const Connected: Story = {
     ],
   },
 };
+export const WithAvailableCredits: Story = {
+  args: {
+    connections: Connected.args.connections.map((connection) => ({
+      ...connection,
+      limits: connection.limits.map((limit) => ({ ...limit, credits: { hasCredits: true, balance: "4712" } })),
+    })),
+  },
+};
 export const NoConnection: Story = { args: { connections: [] } };
 export const UsageUnavailable: Story = {
   args: { connections: [{ id: "connection-1", accountLabel: "ada@example.com", status: "ready" }] },

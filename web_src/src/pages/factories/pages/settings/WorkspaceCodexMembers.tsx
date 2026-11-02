@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { CodexQuotaRemaining, CodexQuotaWindow } from "./CodexQuotaWindow";
+import { CodexCreditsRemaining } from "./CodexCreditsRemaining";
 
 export function WorkspaceCodexMembers({
   organizationId,
@@ -31,7 +32,7 @@ export function WorkspaceCodexMembers({
   factoryId: string;
   canUpdate: boolean;
   defaultOwnerId?: string;
-  onChangeDefaultOwner: (ownerId?: string) => void;
+  onChangeDefaultOwner: (ownerId: string) => void;
 }) {
   const query = useQuery({
     queryKey: ["factories", organizationId, factoryId, "codex-usage"],
@@ -55,12 +56,6 @@ export function WorkspaceCodexMembers({
 
   return (
     <section aria-label="Connected ChatGPT members" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[13px] font-medium">Connected members</h2>
-        <Button type="button" variant="outline" size="sm" disabled={!canUpdate} onClick={() => onChangeDefaultOwner()}>
-          Change default task owner
-        </Button>
-      </div>
       {query.isPending ? (
         <p role="status" className="text-xs text-muted-foreground">
           Loading connected members...
@@ -156,7 +151,7 @@ function ConnectedMember({
           </div>
         </div>
       </TableCell>
-      <TableCell className="min-w-[220px] !px-4 !py-3 align-middle text-center">
+      <TableCell className="min-w-[220px] !px-4 !py-3 align-middle">
         <UsageSummary limits={limits} />
       </TableCell>
       <TableCell className="w-12 !px-2 !py-2 text-right">
@@ -179,7 +174,8 @@ function ConnectedMember({
                     <div className="mt-2 space-y-3 text-muted-foreground">
                       {limit.primary ? <CodexQuotaWindow window={limit.primary} label="Primary window" /> : null}
                       {limit.secondary ? <CodexQuotaWindow window={limit.secondary} label="Secondary window" /> : null}
-                      {!limit.primary && !limit.secondary ? <p>Usage unavailable</p> : null}
+                      {limit.credits ? <CodexCreditsRemaining credits={limit.credits} /> : null}
+                      {!limit.primary && !limit.secondary && !limit.credits ? <p>Usage unavailable</p> : null}
                     </div>
                   </div>
                 ))
@@ -217,17 +213,19 @@ function UsageSummary({ limits }: { limits: FactoriesCodexMemberUsage["limits"] 
         : null,
     ])
     .filter((item) => item !== null);
-  if (windows.length === 0) return <p className="text-sm text-muted-foreground">Usage unavailable</p>;
+  const balances = (limits ?? []).flatMap((limit, index) =>
+    limit.credits ? [{ key: `${limit.limitId ?? index}-credits`, credits: limit.credits }] : [],
+  );
+  const rowCount = windows.length + balances.length;
+  if (rowCount === 0) return <p className="text-sm text-muted-foreground">Usage unavailable</p>;
 
   return (
-    <div className={`flex flex-col justify-center ${windows.length > 1 ? "gap-2" : "min-h-10"}`}>
+    <div className={`flex flex-col justify-center ${rowCount > 1 ? "gap-2" : "min-h-10"}`}>
       {windows.map((item) => (
-        <CodexQuotaRemaining
-          key={item.key}
-          window={item.window}
-          label={item.label}
-          showWindowLabel={windows.length > 1}
-        />
+        <CodexQuotaRemaining key={item.key} window={item.window} label={item.label} />
+      ))}
+      {balances.map((balance) => (
+        <CodexCreditsRemaining key={balance.key} credits={balance.credits} />
       ))}
     </div>
   );

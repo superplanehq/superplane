@@ -28,6 +28,7 @@ func TestSubscriptionScriptSavesSetupFailuresWithoutSecrets(t *testing.T) {
 		command    string
 		status     int
 		bundle     map[string]any
+		rawBody    string
 		brokenHome bool
 		wantError  string
 	}{
@@ -44,6 +45,13 @@ func TestSubscriptionScriptSavesSetupFailuresWithoutSecrets(t *testing.T) {
 			wantError: "ChatGPT subscription credentials are missing",
 		},
 		{
+			name:      "restore malformed credentials",
+			command:   "restore",
+			status:    http.StatusOK,
+			rawBody:   "opaque-value-1234",
+			wantError: "ChatGPT subscription response is invalid",
+		},
+		{
 			name:       "restore filesystem error contains token",
 			command:    "restore",
 			status:     http.StatusOK,
@@ -57,6 +65,10 @@ func TestSubscriptionScriptSavesSetupFailuresWithoutSecrets(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/v1/runner/codex-subscription/credentials", r.URL.Path)
 				w.WriteHeader(tt.status)
+				if tt.rawBody != "" {
+					_, _ = w.Write([]byte(tt.rawBody))
+					return
+				}
 				_ = json.NewEncoder(w).Encode(map[string]any{"bundle": tt.bundle})
 			}))
 			t.Cleanup(server.Close)
@@ -90,6 +102,9 @@ func TestSubscriptionScriptSavesSetupFailuresWithoutSecrets(t *testing.T) {
 			assert.Contains(t, string(out), tt.wantError)
 			assert.NotContains(t, string(out), runnerToken)
 			assert.NotContains(t, string(contents), runnerToken)
+			if tt.rawBody != "" {
+				assert.NotContains(t, string(out)+string(contents), tt.rawBody)
+			}
 		})
 	}
 }
@@ -232,7 +247,7 @@ if (process.argv[2] === "app-server") {
     if (request.method === "account/rateLimits/read") {
       const reply = fs.existsSync(path.join(process.env.CODEX_HOME, "unavailable"))
         ? { error: { message: "provider unavailable access-token-value" } }
-        : { result: { rateLimits: { limitId: "codex", primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1900000000 }, secondary: null } } };
+        : { result: { rateLimits: { limitId: "codex", primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1900000000 }, secondary: { usedPercent: 67, windowDurationMins: 10080, resetsAt: 1900000000 }, credits: { hasCredits: true, unlimited: false, balance: "4712" } } } };
       if (reply.result && fs.existsSync(path.join(process.env.CODEX_HOME, "multi"))) {
         reply.result.rateLimitsByLimitId = {
           codex: reply.result.rateLimits,
@@ -323,6 +338,8 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 	primary := limits[0].(map[string]any)["primary"].(map[string]any)
 	assert.Equal(t, float64(25), primary["usedPercent"])
 	assert.Equal(t, float64(300), primary["windowDurationMins"])
+	assert.Equal(t, float64(10080), limits[0].(map[string]any)["secondary"].(map[string]any)["windowDurationMins"])
+	assert.Equal(t, map[string]any{"hasCredits": true, "unlimited": false, "balance": "4712"}, limits[0].(map[string]any)["credits"])
 	for _, checkpoint := range checkpoints[1 : len(checkpoints)-1] {
 		usage, ok := checkpoint["usage"].(map[string]any)
 		require.True(t, ok, "an unavailable quota must not discard the catalog")

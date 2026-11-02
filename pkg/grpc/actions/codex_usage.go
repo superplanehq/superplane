@@ -8,6 +8,24 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+func SerializeCodexUsageLimit(limit models.CodexUsageLimit) *pb.CodexUsageLimit {
+	view := &pb.CodexUsageLimit{
+		LimitId:   limit.LimitID,
+		LimitName: limit.LimitName,
+		PlanType:  limit.PlanType,
+		Primary:   SerializeCodexUsageWindow(limit.Primary),
+		Secondary: SerializeCodexUsageWindow(limit.Secondary),
+	}
+	if limit.Credits != nil {
+		view.Credits = &pb.CodexUsageCredits{
+			HasCredits: limit.Credits.HasCredits,
+			Unlimited:  limit.Credits.Unlimited,
+			Balance:    limit.Credits.Balance,
+		}
+	}
+	return view
+}
+
 func SerializeCodexUsageWindow(window *models.CodexUsageWindow) *pb.CodexUsageWindow {
 	if window == nil || window.UsedPercent == nil {
 		return nil
