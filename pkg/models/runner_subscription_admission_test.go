@@ -162,7 +162,7 @@ func TestRunnerAdmissionRejectsInvalidSubscriptionAndContinuesFleetScan(t *testi
 			require.NotNil(t, stored.ErrorMessage)
 			if reason == "workspace disables subscription models" {
 				assert.Contains(t, *stored.ErrorMessage, "No ChatGPT models are enabled")
-				assert.Contains(t, *stored.ErrorMessage, "Update Workspace Models")
+				assert.Contains(t, *stored.ErrorMessage, "Update Models in workspace settings")
 			}
 			assert.Contains(t, *stored.ErrorMessage, expectedError.Error())
 			assert.NotNil(t, stored.FinishedAt)
