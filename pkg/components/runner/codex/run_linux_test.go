@@ -1,6 +1,9 @@
 package codex
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +30,10 @@ func TestCodexRunCancellationStopsLauncherAndWorker(t *testing.T) {
 			home := filepath.Join(taskDir, "codex-home")
 			require.NoError(t, os.Mkdir(home, 0o700))
 			require.NoError(t, os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"tokens":{"access_token":"subscription-credential"}}`), 0o600))
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_ = json.NewEncoder(w).Encode(map[string]any{"bundle": map[string]any{"tokens": map[string]string{"access_token": "subscription-credential"}}})
+			}))
+			t.Cleanup(server.Close)
 			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(`#!/usr/bin/env node
 const fs = require("fs");
 const path = require("path");
@@ -49,6 +56,7 @@ if (!worker) require("child_process").spawn(process.execPath, [__filename, "work
 				"CODEX_HOME="+home,
 				"SUPERPLANE_RESULT_FILE="+filepath.Join(taskDir, "result.json"),
 				"SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=subscription-token",
+				"SUPERPLANE_BASE_URL="+server.URL,
 			)
 			require.NoError(t, cmd.Start())
 			waited := false

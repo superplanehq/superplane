@@ -182,14 +182,13 @@ func looksLikeCodexToken(value string) bool {
 
 // CodexRunnerAuthBundle copies a stored auth bundle for one runner.
 // The OpenAI refresh token is replaced by that runner's lease secret.
-func CodexRunnerAuthBundle(raw []byte, leaseSecret string, now time.Time) ([]byte, error) {
+func CodexRunnerAuthBundle(raw []byte, leaseSecret string) ([]byte, error) {
 	document, err := decodeCodexAuthDocument(raw)
 	if err != nil {
 		return nil, err
 	}
 	previous := codexBundleString(document, "refresh_token")
 	replaceCodexAuthValue(document, "refresh_token", leaseSecret)
-	document["last_refresh"] = now.UTC().Format(time.RFC3339Nano)
 	encoded, err := json.Marshal(document)
 	if err != nil {
 		return nil, fmt.Errorf("chatgpt subscription credentials are invalid")
