@@ -392,7 +392,6 @@ function analysisDraftChrome(args: AnalysisDraftChromeArgs) {
   const modelSelects = draftModelSelects({
     organizationId: args.organizationId,
     factoryId: args.factoryId,
-    orderId: args.orderId,
     fixture: args.fixture,
     model: args.draftModel,
     thinkingLevel: args.draftThinking,
@@ -444,7 +443,6 @@ function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], fact
 function draftModelSelects(args: {
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   model: string;
   thinkingLevel: string;

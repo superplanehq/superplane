@@ -98,6 +98,7 @@ type settingsPermissionGuardSteps struct {
 func (s *settingsPermissionGuardSteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
+	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactories))
 	s.session.Login()
 }
 

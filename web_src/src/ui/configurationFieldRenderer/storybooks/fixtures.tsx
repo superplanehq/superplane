@@ -746,7 +746,7 @@ export const rendererExamples: RendererExample[] = [
       name: "model",
       label: "Model",
       type: "hosted-model",
-      description: "Select a model from Organization LLM Models.",
+      description: "Select a model from Workspace Models.",
       placeholder: "Select a model",
       typeOptions: {
         hostedModel: {

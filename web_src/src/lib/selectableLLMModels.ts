@@ -1,11 +1,4 @@
-import {
-  compareModelLabels,
-  concreteClaudeModelId,
-  hostedLLMTechnicalName,
-  parseHostedLLMModelKey,
-  pickHostedModel,
-  specificModelId,
-} from "./hostedLLMModels";
+import { compareModelLabels, hostedLLMTechnicalName, parseHostedLLMModelKey, specificModelId } from "./hostedLLMModels";
 
 export const SELECTABLE_LLM_SOURCE_HOSTED = "hosted";
 export const SELECTABLE_LLM_SOURCE_BYOK = "byok";
@@ -29,6 +22,8 @@ export type SelectableLLMModel = {
   label: string;
   /** Thinking levels that the model supports. Empty means that the model has no thinking control. */
   thinkingLevels: string[];
+  /** True when the provider catalog marks this model as its default. */
+  isDefault?: boolean;
 };
 
 export function selectableLLMModelKey(source: string, provider: string, model: string): string {
@@ -87,9 +82,6 @@ export function selectableLLMModelsForProvider(models: SelectableLLMModel[], pro
 }
 
 const LEGACY_CLAUDE_MODEL_ALIASES = new Set(["haiku", "opus", "sonnet"]);
-const CLAUDE_OPUS_55 = "claude-opus-5-5";
-/** Versioned ids written by the previous Claude default. */
-const PREVIOUS_CLAUDE_DEFAULTS = new Set(["claude-opus-4-6", "claude-sonnet-4-6"]);
 
 function modelLeaf(id: string): string {
   const trimmed = id.trim().toLowerCase();
@@ -97,61 +89,27 @@ function modelLeaf(id: string): string {
   return slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
 }
 
-/** Allowlisted model that replaces an empty value, a Claude alias, or the previous Claude default. */
+/** Permitted model that replaces an empty value or a Claude alias. */
 export function defaultByokRunnerModel(current: string, provider: string, modelIds: string[]): string | undefined {
   const selected = current.trim();
-  const leaf = modelLeaf(selected);
-  const opus55 = modelIds.find((id) => modelLeaf(id) === CLAUDE_OPUS_55 || modelLeaf(id) === "claude-opus-5.5");
-  const replaceAliasOrEmpty =
-    provider === "anthropic" && Boolean(opus55) && (selected === "" || LEGACY_CLAUDE_MODEL_ALIASES.has(leaf));
-  if (replaceAliasOrEmpty && opus55 && opus55 !== selected) {
-    return opus55;
-  }
+  const usesClaudeAliases = provider === "anthropic" || provider === "openrouter";
   if (modelIds.includes(selected)) {
     return undefined;
   }
-  // A previous default that the key no longer offers can move to Opus 5.5.
-  // An id that is still allowed stays, even when Opus 5.5 is also allowed.
-  if (provider === "anthropic" && opus55 && PREVIOUS_CLAUDE_DEFAULTS.has(leaf) && opus55 !== selected) {
-    return opus55;
+  if (selected !== "") {
+    return usesClaudeAliases ? specificModelId(selected, modelIds) : undefined;
   }
-  if (selected !== "" && !LEGACY_CLAUDE_MODEL_ALIASES.has(leaf)) {
-    return undefined;
-  }
-  const specific = specificModelId(selected, modelIds);
-  if (specific && specific !== selected) {
-    return specific;
-  }
-  if (LEGACY_CLAUDE_MODEL_ALIASES.has(leaf)) {
-    if (provider === "anthropic" && modelIds.length === 0) {
-      return CLAUDE_OPUS_55;
-    }
-    const concrete = concreteClaudeModelId(selected, modelIds);
-    if (concrete !== selected) {
-      return concrete;
-    }
-  }
-  const picked = pickHostedModel(provider, modelIds);
-  if (!picked || picked === selected) {
-    return undefined;
-  }
-  return picked;
+  return modelIds.filter((id) => !usesClaudeAliases || !LEGACY_CLAUDE_MODEL_ALIASES.has(modelLeaf(id))).sort()[0];
 }
 
 export function byokRunnerModelOptions(
   models: SelectableLLMModel[],
-  current: string,
 ): Array<{ value: string; label: string; thinkingLevels: string[] }> {
-  const options = models.map((model) => ({
+  return models.map((model) => ({
     value: model.model.id,
     label: model.label,
     thinkingLevels: model.thinkingLevels,
   }));
-  const selected = concreteClaudeModelId(current.trim());
-  if (selected === "" || options.some((option) => option.value === selected)) {
-    return options;
-  }
-  return [{ value: selected, label: selected, thinkingLevels: [] }, ...options];
 }
 
 export function selectableLLMModelsFromResponse(
@@ -162,6 +120,7 @@ export function selectableLLMModelsFromResponse(
     key?: string;
     label?: string;
     thinkingLevels?: string[];
+    isDefault?: boolean;
   }>,
   sources?: SelectableLLMSourceID[],
 ): SelectableLLMModel[] {
@@ -194,6 +153,7 @@ function selectableLLMModelFromResponse(item: {
   key?: string;
   label?: string;
   thinkingLevels?: string[];
+  isDefault?: boolean;
 }): SelectableLLMModel | undefined {
   const key = item.key?.trim() ?? "";
   const source = selectableNamedID(item.source);
@@ -209,6 +169,7 @@ function selectableLLMModelFromResponse(item: {
     key,
     label: item.label?.trim() || model.id,
     thinkingLevels: item.thinkingLevels ?? [],
+    isDefault: item.isDefault,
   };
 }
 

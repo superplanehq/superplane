@@ -78,19 +78,13 @@ func TestAppendTaskArtifactMCPRequiresArtifactToken(t *testing.T) {
 	assert.Equal(t, files, AppendTaskArtifactMCP(nil, files))
 
 	environment := []TaskEnvironmentVariable{{Name: EnvSuperplaneArtifactToken, Value: "token"}}
-	withMCP := AppendTaskArtifactMCP(environment, files)
-	require.Len(t, withMCP, 3)
-	assert.Equal(t, "task_artifact_mcp.js", withMCP[1].Path)
-	assert.Equal(t, "publish_link.js", withMCP[2].Path)
+	assert.Equal(t, files, AppendTaskArtifactMCP(environment, files))
 
 	withLink := AppendTaskArtifactMCP([]TaskEnvironmentVariable{
 		{Name: EnvSuperplaneArtifactToken, Value: "token"},
 		{Name: EnvSuperplanePublishLinks, Value: "yes"},
 	}, files)
-	require.Len(t, withLink, 7)
-	assert.Equal(t, "task_cli.js", withLink[3].Path)
-	assert.Equal(t, "publish_markdown.js", withLink[4].Path)
-	assert.Equal(t, "publish_file.js", withLink[5].Path)
-	assert.Equal(t, "bin/superplane", withLink[6].Path)
-	assert.Equal(t, "0755", withLink[6].Mode)
+	require.Len(t, withLink, 2)
+	assert.Equal(t, "publish_markdown.js", withLink[1].Path)
+	assert.Equal(t, "0644", withLink[1].Mode)
 }

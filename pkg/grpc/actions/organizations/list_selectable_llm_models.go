@@ -3,9 +3,11 @@ package organizations
 import (
 	"context"
 	"errors"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
-
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/llmcatalog"
@@ -53,16 +55,21 @@ func ListSelectableLLMModels(
 			if err != nil {
 				return nil, grpcerrors.InvalidArgument(err, err.Error())
 			}
-			ids, err := models.FactoryCodexSubscriptionModels(tx, organization.ID, f.ID, ownerID)
+			catalog, err := models.FactoryCodexSubscriptionCatalog(tx, organization.ID, f.ID, ownerID)
 			if err != nil {
 				return nil, grpcerrors.Internal(err, "failed to load subscription models")
 			}
 			out := &pb.ListSelectableLLMModelsResponse{}
-			for _, id := range ids {
+			for _, model := range catalog {
+				id := strings.TrimSpace(model.Model)
 				out.Models = append(out.Models, &pb.SelectableLLMModel{
-					Source:   &pb.SelectableLLMNamedID{Id: "subscription", Name: "ChatGPT subscription"},
-					Provider: &pb.SelectableLLMNamedID{Id: "openai", Name: "OpenAI"},
-					Model:    &pb.SelectableLLMNamedID{Id: id, Name: id}, Key: id, Label: id,
+					Source:         &pb.SelectableLLMNamedID{Id: "subscription", Name: "ChatGPT subscription"},
+					Provider:       &pb.SelectableLLMNamedID{Id: "openai", Name: "OpenAI"},
+					Model:          &pb.SelectableLLMNamedID{Id: id, Name: id},
+					Key:            id,
+					Label:          id,
+					ThinkingLevels: runner.SupportedThinkingLevels(model.ReasoningEfforts()),
+					IsDefault:      model.IsDefault,
 				})
 			}
 			return out, nil

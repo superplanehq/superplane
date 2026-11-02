@@ -1,9 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
-import { useFactoryCodexConnection } from "@/pages/factories/pages/onboarding/useFactoryCodexConnection";
 import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
 import {
   createField,
@@ -35,77 +33,14 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: useCanvasMock,
 }));
 
-vi.mock("@/pages/factories/pages/onboarding/useFactoryCodexConnection", () => ({
-  useFactoryCodexConnection: vi.fn(),
-}));
-
-describe("subscription model picker", () => {
-  it("shows Default for an unset model and saves an explicit subscription selection", async () => {
-    vi.mocked(useFactoryCodexConnection).mockReturnValue({
-      query: {
-        data: {
-          status: "ready",
-          availableModels: ["gpt-5.4", "gpt-5.3"],
-          availableModelOptions: [
-            { id: "gpt-5.4", name: "gpt-5.4", thinkingLevels: ["low", "high"] },
-            { id: "gpt-5.3", name: "gpt-5.3", thinkingLevels: [] },
-          ],
-        },
-        isLoading: false,
-        isError: false,
-      },
-    } as unknown as ReturnType<typeof useFactoryCodexConnection>);
-    mockSelectableModels([selectableModel("byok", "openai", "gpt-4o")]);
-    const onChange = vi.fn();
-    const field = createField("openai");
-    const picker = (value: string) => (
-      <MemoryRouter>
-        <HostedModelFieldRenderer
-          field={field}
-          value={value}
-          onChange={onChange}
-          organizationId="org-1"
-          factoryId="factory-1"
-          modelOnly
-          allValues={{ credentials: { source: "subscription" } }}
-        />
-      </MemoryRouter>
-    );
-    const view = render(picker(""));
-    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("Default");
-    expect(screen.getByTestId("field-model-hosted-model")).not.toHaveTextContent("gpt-5.4");
-    expect(onChange).not.toHaveBeenCalled();
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId("field-model-hosted-model"));
-    expect(screen.getByRole("menuitem", { name: "gpt-5.4" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "gpt-5.3" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /gpt-4o/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("menuitem", { name: "gpt-5.3" }));
-    expect(onChange).toHaveBeenCalledWith("gpt-5.3");
-    view.rerender(picker("gpt-5.3"));
-    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("gpt-5.3");
-  });
-});
-
 describe("subscription default model thinking", () => {
   beforeAll(installPointerCapturePolyfills);
 
   it("shows the thinking levels of the catalog default model and keeps the model unset", async () => {
-    vi.mocked(useFactoryCodexConnection).mockReturnValue({
-      query: {
-        data: {
-          status: "ready",
-          availableModels: ["gpt-5.4", "gpt-5.3"],
-          availableModelOptions: [
-            { id: "gpt-5.4", name: "gpt-5.4", thinkingLevels: ["low", "high"], isDefault: true },
-            { id: "gpt-5.3", name: "gpt-5.3", thinkingLevels: [] },
-          ],
-        },
-        isLoading: false,
-        isError: false,
-      },
-    } as unknown as ReturnType<typeof useFactoryCodexConnection>);
-    mockSelectableModels([]);
+    mockSelectableModels([
+      selectableModel("subscription", "openai", "gpt-5.4", ["low", "high"], { isDefault: true }),
+      selectableModel("subscription", "openai", "gpt-5.3", []),
+    ]);
     const onValuesChange = vi.fn();
 
     renderField(
@@ -206,7 +141,7 @@ describe("HostedModelFieldRenderer", () => {
 
     expect(
       screen.getByText(
-        "No models are selected for this provider. Select models on Organization LLM Models, or connect a provider on Integrations.",
+        "No models are available for this provider. Select models in Workspace Models or connect a provider in Integrations.",
       ),
     ).toBeInTheDocument();
   });

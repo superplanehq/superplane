@@ -1,3 +1,4 @@
+import { CodexActionProvider } from "../codex/CodexActionProvider";
 import type { FactoriesFactory } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -142,24 +143,26 @@ function MobileFactoryShell({
 
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
-      <PinnedPhoneShell testId="mobile-factories-layout">
-        {pathname.endsWith("/velocity") ? (
-          <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center border-b border-border px-4 pt-[env(safe-area-inset-top)]">
-            <MobileWorkspaceSwitcher />
-          </header>
+      <CodexActionProvider>
+        <PinnedPhoneShell testId="mobile-factories-layout">
+          {pathname.endsWith("/velocity") ? (
+            <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center border-b border-border px-4 pt-[env(safe-area-inset-top)]">
+              <MobileWorkspaceSwitcher />
+            </header>
+          ) : null}
+          <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none">
+            {children ?? <Outlet />}
+          </main>
+          <MobileBottomBar />
+        </PinnedPhoneShell>
+        {canCreateWorkOrder ? (
+          <CreateWorkOrderDialog
+            open={createWorkOrderOpen}
+            onClose={closeCreateWorkOrder}
+            onCreated={completeCreateWorkOrder}
+          />
         ) : null}
-        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none">
-          {children ?? <Outlet />}
-        </main>
-        <MobileBottomBar />
-      </PinnedPhoneShell>
-      {canCreateWorkOrder ? (
-        <CreateWorkOrderDialog
-          open={createWorkOrderOpen}
-          onClose={closeCreateWorkOrder}
-          onCreated={completeCreateWorkOrder}
-        />
-      ) : null}
+      </CodexActionProvider>
     </FactoriesLayoutContext.Provider>
   );
 }

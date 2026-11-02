@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -48,13 +47,11 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(invalidArgument("line_name is required"), "failed to dispatch work order")
 	}
 
-	var actor *uuid.UUID
-	if userIDStr, ok := authentication.GetUserIdFromMetadata(ctx); ok {
-		parsed, err := uuid.Parse(userIDStr)
-		if err == nil {
-			actor = &parsed
-		}
+	callerID, err := codexCallerID(ctx)
+	if err != nil {
+		return nil, err
 	}
+	actor := &callerID
 
 	line, err := resolvedFactory.FindLineByName(db, lineName)
 	if err != nil {
@@ -186,6 +183,9 @@ func dispatchWorkOrderOnLineTx(
 		return nil, models.ErrFactoryWorkOrderNotDispatchable
 	}
 
+	if err := assignWorkOrderStarter(tx, factory, order, actor); err != nil {
+		return nil, err
+	}
 	if err := order.RequireExecutionOwner(tx, false); err != nil {
 		return nil, err
 	}
@@ -238,7 +238,7 @@ func dispatchWorkOrderOnLineTx(
 
 	var startedSteps []*models.FactoryLineStepResult
 	if replaceActive && startIndex > 0 {
-		_, started, err := order.RetryLineStep(tx, currentLine, startIndex)
+		_, started, err := order.RetryLineStep(tx, currentLine, startIndex, models.FactoryLineStartOptions{Model: model, ThinkingLevel: normalizedThinking})
 		if err != nil {
 			return nil, err
 		}

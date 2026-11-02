@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
+import { useFactoryTaskIdentity } from "../factoryTaskContext";
 import { DRAFT_START_MODEL_AUTO, draftStartThinkingLevels } from "../pages/work-order-split-run/draftStartModel";
 
 const MENU_ITEM_CLASS = "cursor-pointer text-[13px]";
@@ -25,7 +26,6 @@ type StartChoice = {
 export function MobileDraftStartModelSelect({
   organizationId,
   factoryId,
-  orderId,
   lineName,
   model,
   thinkingLevel,
@@ -34,18 +34,19 @@ export function MobileDraftStartModelSelect({
 }: {
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
   lineName?: string;
   model: string;
   thinkingLevel: string;
   onChange: (next: StartChoice) => void;
   disabled?: boolean;
 }) {
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName), orderId);
+  const task = useFactoryTaskIdentity();
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName), task.orderId);
   const modelOptions = lineName
     ? runnerModelOptions(models.data?.models)
     : [{ value: DRAFT_START_MODEL_AUTO, label: "Auto" }];
-  const selectedName = modelOptions.find((option) => option.value === model)?.label || model;
+  const catalogName = modelOptions.find((option) => option.value === model)?.label;
+  const selectedName = catalogName || (models.isLoading || !lineName ? model : `${model} (unavailable)`);
   const levelsFor = (value: string) => draftStartThinkingLevels(models.data?.models, value);
   const thinking = thinkingOptions(levelsFor(model), { withDefault: false });
   const selectedThinking = supportedThinkingLevel(thinkingLevel, levelsFor(model));

@@ -36,6 +36,22 @@ func UpdateFactoryOnboarding(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
+	// Subscription mode is configured in Settings. Old unfinished choices must
+	// return to the model-source step without removing personal connections.
+	if !wasComplete {
+		if req.GetCodexSubscription() {
+			return nil, factoryErrorToStatus(invalidArgument("Choose hosted models or an API key during workspace setup"), "failed to update factory onboarding")
+		}
+		subscription := false
+		patch.CodexSubscription = &subscription
+		if factory.OnboardingConfigValue().CodexSubscription && patch.AgentHarness == nil {
+			unset := ""
+			patch.AgentHarness = &unset
+			patch.AgentIntegrationID = &unset
+		}
+	} else {
+		patch.CodexSubscription = nil
+	}
 	setOnboardingVCSProvider(db, orgID, &patch)
 	patch, err = verifiedOnboardingDefaultBranch(ctx, deps, db, orgID, organizationID, factory, patch)
 	if err != nil {
@@ -80,11 +96,6 @@ func UpdateFactoryOnboarding(
 			}
 			if !wasComplete {
 				if err := synchronizeOnboardingSubscriptionApps(ctx, tx, deps, factory, config); err != nil {
-					return err
-				}
-			}
-			if config.CodexSubscription {
-				if err := validateSubscriptionCanvases(tx, factory); err != nil {
 					return err
 				}
 			}
@@ -210,41 +221,9 @@ func validateFactoryOnboardingResources(
 		}
 	}
 
-	if config.CodexSubscription {
-		if err := validateCodexSubscriptionOnboarding(ctx, db, organizationID, factory, config); err != nil {
+	if !config.CodexSubscription {
+		if err := validateOnboardingAgentResources(db, organizationID, config); err != nil {
 			return err
-		}
-	} else if config.AgentIntegrationID != "" {
-		integration, err := findReadyOnboardingIntegration(db, organizationID, config.AgentIntegrationID)
-		if err != nil {
-			return err
-		}
-		expectedNames := map[string][]string{
-			// OpenCode agents (OpenRouter and a custom provider) use this harness.
-			models.FactoryOnboardingAgentHarnessClaudeCode: {"claude", "openrouter", models.CustomLLMAppName},
-			models.FactoryOnboardingAgentHarnessCursor:     {"cursor"},
-			models.FactoryOnboardingAgentHarnessCodex:      {"openai"},
-		}[config.AgentHarness]
-		if len(expectedNames) > 0 && !slices.Contains(expectedNames, integration.AppName) {
-			return invalidArgument("coding agent integration does not match the selected agent")
-		}
-	} else {
-		offered, hostedErr := models.HasOfferedHostedLLMProvider(db)
-		if hostedErr != nil {
-			return hostedErr
-		}
-		if !offered {
-			return models.ErrFactoryOnboardingHostedAgentUnavailable
-		}
-		defaultModel, modelErr := models.GetInstallationDefaultHostedLLMModel(db)
-		if modelErr != nil {
-			return modelErr
-		}
-		if !defaultModel.IsSet() {
-			return models.ErrFactoryOnboardingHostedAgentUnavailable
-		}
-		if err := models.AssertDefaultHostedLLMModelAllowed(db, defaultModel); err != nil {
-			return models.ErrFactoryOnboardingHostedAgentUnavailable
 		}
 	}
 
@@ -276,6 +255,44 @@ func validateFactoryOnboardingResources(
 			return step.AppID == appID
 		}) {
 			return invalidArgument("provisioned line does not run the provisioned app")
+		}
+	}
+
+	return nil
+}
+
+func validateOnboardingAgentResources(db *gorm.DB, organizationID uuid.UUID, config models.FactoryOnboardingConfig) error {
+	if config.AgentIntegrationID != "" {
+		integration, err := findReadyOnboardingIntegration(db, organizationID, config.AgentIntegrationID)
+		if err != nil {
+			return err
+		}
+		expectedNames := map[string][]string{
+			// OpenCode agents (OpenRouter and a custom provider) use this harness.
+			models.FactoryOnboardingAgentHarnessClaudeCode: {"claude", "openrouter", models.CustomLLMAppName},
+			models.FactoryOnboardingAgentHarnessCursor:     {"cursor"},
+			models.FactoryOnboardingAgentHarnessCodex:      {"openai"},
+		}[config.AgentHarness]
+		if len(expectedNames) > 0 && !slices.Contains(expectedNames, integration.AppName) {
+			return invalidArgument("coding agent integration does not match the selected agent")
+		}
+	} else {
+		offered, hostedErr := models.HasOfferedHostedLLMProvider(db)
+		if hostedErr != nil {
+			return hostedErr
+		}
+		if !offered {
+			return models.ErrFactoryOnboardingHostedAgentUnavailable
+		}
+		defaultModel, modelErr := models.GetInstallationDefaultHostedLLMModel(db)
+		if modelErr != nil {
+			return modelErr
+		}
+		if !defaultModel.IsSet() {
+			return models.ErrFactoryOnboardingHostedAgentUnavailable
+		}
+		if err := models.AssertDefaultHostedLLMModelAllowed(db, defaultModel); err != nil {
+			return models.ErrFactoryOnboardingHostedAgentUnavailable
 		}
 	}
 
@@ -377,74 +394,6 @@ func factoryOnboardingPatchFromRequest(req *pb.UpdateFactoryOnboardingRequest) (
 	}
 
 	return patch, nil
-}
-
-func validateCodexSubscriptionOnboarding(
-	ctx context.Context,
-	db *gorm.DB,
-	organizationID uuid.UUID,
-	factory *models.Factory,
-	config models.FactoryOnboardingConfig,
-) error {
-	if config.AgentHarness != models.FactoryOnboardingAgentHarnessCodex {
-		return invalidArgument("ChatGPT subscription uses Codex")
-	}
-	if config.AgentIntegrationID != "" {
-		return invalidArgument("ChatGPT subscription does not use an API key")
-	}
-	callerID, err := codexCallerID(ctx)
-	if err != nil {
-		return err
-	}
-	if _, err := models.ActiveCodexMember(db, organizationID, callerID); err != nil {
-		return err
-	}
-	connection, err := models.FindFactoryCodexConnection(db, organizationID, factory.ID, callerID)
-	if err != nil {
-		return invalidArgument("Connect ChatGPT before you finish setup")
-	}
-	if connection.Status != models.CodexConnectionStatusReady || connection.Reserved() {
-		return invalidArgument("Wait until the ChatGPT sign-in runner has stopped")
-	}
-	return nil
-}
-
-func validateSubscriptionCanvases(db *gorm.DB, factory *models.Factory) error {
-	canvases, err := factory.ListCanvases(db)
-	if err != nil {
-		return err
-	}
-	for i := range canvases {
-		nodes, err := models.FindCanvasNodesInTransaction(db, canvases[i].ID)
-		if err != nil {
-			return err
-		}
-		for _, node := range nodes {
-			if err := validateSubscriptionCodexNode(node); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func validateSubscriptionCodexNode(node models.CanvasNode) error {
-	name := node.ComponentName()
-	switch name {
-	case "", "runnerClaudeCode", "runnerOpenRouter", models.SuperPlaneRunnerComponent:
-		if name == "" {
-			return nil
-		}
-		return invalidArgument("This workspace must use Codex with a ChatGPT subscription")
-	case "runnerCodex":
-		configuration := node.Configuration.Data()
-		credentials, _ := configuration["credentials"].(map[string]any)
-		source, _ := credentials["source"].(string)
-		if source != "subscription" {
-			return invalidArgument("This workspace must use Codex with a ChatGPT subscription")
-		}
-	}
-	return nil
 }
 
 func factoryOnboardingIssuesSourceFromProto(source pb.FactoryOnboarding_IssuesSource) (string, error) {

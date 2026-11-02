@@ -14,6 +14,63 @@ agents on a ChatGPT subscription instead of an API key.
   [#8742](https://github.com/superplanehq/superplane/pull/8742)
 - **Feature flag:** `codex_subscriptions` (organization experimental feature, not released)
 
+## Personal connections and workspace activation
+
+Each active human member connects one subscription per organization. The same
+connection serves that member in all organization workspaces. The existing
+`codex_subscriptions` feature flag controls access. No new services,
+environment variables, or Secret keys are required.
+
+**Settings → Account → Codex** is available before connection. Its existing
+`account/codex-usage` URL remains valid. Connecting, refreshing, or disconnecting
+changes the personal connection only.
+
+**Settings → Models** requires an explicit default task owner and switch
+confirmation. Confirmation saves the workspace default and replaces every
+intake default owner, including scheduled intakes. New intakes inherit that
+default unless they specify another eligible owner. An unavailable saved
+default requires a new selection. Admin automation reset preserves the saved
+workspace default and intake choices.
+
+The workspace model policy lists the combined catalogs of eligible connected
+members. Each task can use only its actual owner's subscription and the models
+that its workspace permits. Members never borrow another member's credentials.
+
+Personal APIs use `/api/v1/me/codex-connection` for describe, start/refresh,
+cancel, and disconnect. Existing factory endpoints adapt to the same connection.
+Closing setup ends its continuation. Only **Cancel sign-in** cancels the shared
+connection attempt.
+
+Connections retain their encrypted IDs and table names. Their unique key is
+`(organization_id, owner_user_id)`. Run leases carry a required workspace ID;
+login and catalog-refresh leases have no workspace. Runner callbacks, refresh,
+admission, and token renewal validate the persisted lease. Exclusive operations
+and refresh locks apply across all workspaces using the connection.
+
+Connection events reach every active workspace in the organization. Workspace
+deletion preserves personal credentials. Member removal revokes all use of that
+member's connection. Organization cleanup waits for leases before deleting
+connections and users.
+
+### Organization connection migration
+
+Deploy the API and worker changes together in a drained migration window:
+
+1. Stop new Codex admissions and sign-in attempts on all API and worker processes.
+2. Let runs finish. Confirm deletion of login and catalog-refresh runner VMs.
+3. Verify that `factory_codex_leases` is empty. The migration aborts atomically if any lease remains.
+4. Apply `20261030121001_organization-codex-connections`.
+5. Start the matching API and worker versions together, then resume admissions.
+
+The migration preserves the sole usable ready connection for each member and
+organization. Multiple usable bundles require reconnection because they can
+represent different accounts. Obsolete credentials and usage are cleared before
+duplicate rows are removed. Workspace sources and intake owners remain
+unchanged until explicit switch confirmation.
+
+The original phased proposal below records the earlier design. This section
+supersedes its workspace-scoped connections and single-member restriction.
+
 ## Decision Summary
 
 - Phase 1 supports one vendor: a ChatGPT subscription used by the Codex CLI.
@@ -220,7 +277,7 @@ Codex reports.
    user can choose another model source.
 4. **Ready.** "ChatGPT is connected as {account}." Reconnect shows "Connect
    ChatGPT again."
-5. **Settings → LLM Models.** A "ChatGPT" badge and the read-only subscription
+5. **Settings → Models.** A "ChatGPT" badge and the read-only subscription
    model list.
 6. **Agent model field.** Model plus Thinking level (`minimal`–`xhigh` for
    OpenAI and Codex).

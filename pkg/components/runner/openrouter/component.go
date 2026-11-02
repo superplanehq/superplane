@@ -69,7 +69,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: One or more ordered bash commands or agent prompts.
 - **Credentials**: SuperPlane secret or OpenRouter integration used as ` + "`OPENROUTER_API_KEY`" + `.
-- **Model**: Required. Select a model from Organization LLM Models.
+- **Model**: Required. Select a model from Workspace Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -162,7 +162,6 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
-	task.Files = runner.AppendMergeConfidenceMCP(environment, task.Files)
 	task.Files = runner.AppendGlobalMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)

@@ -1,4 +1,3 @@
-import { useFactoryTaskIdentity } from "../../factoryTaskContext";
 import { Bot, ChevronDown } from "lucide-react";
 import { useEffect } from "react";
 
@@ -8,6 +7,7 @@ import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
 import { modelNameWithThinking, supportedThinkingLevel, thinkingOptions } from "@/lib/thinkingLevel";
+import { useFactoryTaskIdentity } from "../../factoryTaskContext";
 
 import { DRAFT_START_MODEL_AUTO, draftStartThinkingLevels } from "./draftStartModel";
 
@@ -26,7 +26,9 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
 };
 
 /**
- * Picks the runner model and thinking for Start. `icon` is the chevron fused to Start,
+ * Picks the runner model and thinking for Start. Start assigns the task to
+ * the caller, so the list is the caller's catalog and not the saved owner's
+ * catalog. `icon` is the chevron fused to Start,
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
  * strip settings row. Closed labeled and ghost triggers show the model name
  * and the thinking word when one is chosen. Thinking lists the levels of the
@@ -35,7 +37,6 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
 export function DraftStartModelSelect({
   organizationId,
   factoryId,
-  orderId,
   lineName,
   model,
   thinkingLevel,
@@ -45,7 +46,6 @@ export function DraftStartModelSelect({
 }: {
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
   lineName?: string;
   model: string;
   thinkingLevel: string;
@@ -54,10 +54,11 @@ export function DraftStartModelSelect({
   appearance?: Appearance;
 }) {
   const task = useFactoryTaskIdentity();
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId ?? task.orderId);
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, task.orderId);
   const runnerModels = models.data?.models;
+  const catalogName = (runnerModels ?? []).find((item) => item.id === model)?.name;
   const selectedName =
-    model === DRAFT_START_MODEL_AUTO ? "Auto" : (runnerModels ?? []).find((item) => item.id === model)?.name || model;
+    model === DRAFT_START_MODEL_AUTO ? "Auto" : catalogName || (models.isLoading ? model : `${model} (unavailable)`);
   const levels = draftStartThinkingLevels(runnerModels, model);
   const thinking = thinkingOptions(levels, { withDefault: false });
   const selectedThinking = supportedThinkingLevel(thinkingLevel, levels);

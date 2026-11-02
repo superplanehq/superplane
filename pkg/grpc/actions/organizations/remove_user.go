@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -73,6 +74,9 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, grpcerrors.Internal(err, "error deleting user")
 	}
 
+	if err := messages.PublishOrganizationCodexConnectionUpdated(database.DB(ctx), orgUUID); err != nil {
+		log.WithError(err).Warn("Failed to publish Codex member removal")
+	}
 	billing.CapacityAlerts{capacity}.Emit()
 	// The freed seat stays paid and reusable. Removal never changes the
 	// Polar seat count, so it needs no billing service.

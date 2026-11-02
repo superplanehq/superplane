@@ -12,6 +12,7 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/llm"
@@ -145,6 +146,50 @@ func Test__ListSelectableLLMModels__EnablesConnectedKeyModelsByDefault(t *testin
 	resp, err = ListSelectableLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
 	require.NoError(t, err)
 	assert.Empty(t, resp.Models)
+}
+
+func TestSelectableSubscriptionModelsUseCodexCatalogEfforts(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	subscription := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+		{Model: "gpt-5.3"},
+		{
+			Model:     "gpt-5.4",
+			IsDefault: true,
+			SupportedReasoningEfforts: []models.CodexReasoningEffortOption{
+				{ReasoningEffort: "high"},
+				{ReasoningEffort: "low"},
+			},
+		},
+	}, time.Now()))
+	require.NoError(t, db.Model(connection).Updates(map[string]any{
+		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle"),
+	}).Error)
+
+	resp, err := ListSelectableLLMModels(
+		authentication.SetUserIdInMetadata(t.Context(), r.User.String()),
+		nil,
+		r.Organization.ID.String(),
+		&pb.ListSelectableLLMModelsRequest{FactoryId: factory.ID.String()},
+	)
+	require.NoError(t, err)
+	byID := map[string]*pb.SelectableLLMModel{}
+	for _, model := range resp.Models {
+		byID[model.GetModel().GetId()] = model
+	}
+	require.Contains(t, byID, "gpt-5.4")
+	assert.Equal(t, []string{"low", "high"}, byID["gpt-5.4"].GetThinkingLevels())
+	assert.True(t, byID["gpt-5.4"].GetIsDefault())
+	assert.Equal(t, "subscription", byID["gpt-5.4"].GetSource().GetId())
+	assert.Empty(t, byID["gpt-5.3"].GetThinkingLevels())
+	assert.False(t, byID["gpt-5.3"].GetIsDefault())
 }
 
 func saveEmptyHostedModelSelections(t *testing.T, db *gorm.DB, orgID uuid.UUID) {

@@ -8,13 +8,11 @@ import {
   type OnboardingAgentCredentialChoice,
 } from "../onboardingAgentReadiness";
 import type { OnboardingSetupApi } from "../useOnboardingSetupState";
-import { FirstRunCodexSubscription } from "./FirstRunCodexSubscription";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
 import { FirstRunModelSourceChoice } from "./FirstRunModelSourceChoice";
 import type { FirstRunChrome } from "./firstRunTypes";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
-import type { OnboardingPageModel } from "../useFirstRunSetupFlow";
 
 const AGENT_STEP: { id: "agent"; label: string; purpose: string } = WIZARD_STEPS[3];
 
@@ -22,16 +20,6 @@ type AgentModelSource = {
   offered: boolean;
   choice: OnboardingAgentCredentialChoice | null;
   onSelect: (choice: OnboardingAgentCredentialChoice) => void;
-};
-
-type CodexPanel = {
-  offered: boolean;
-  connection: OnboardingPageModel["codexConnection"];
-  ready: boolean;
-  starting: boolean;
-  canceling: boolean;
-  onStart: () => void;
-  onCancel: () => void;
 };
 
 function agentScreenBody(modelSource: AgentModelSource, customProvider: boolean): string {
@@ -43,7 +31,6 @@ function agentScreenBody(modelSource: AgentModelSource, customProvider: boolean)
 }
 
 function finishCredentialChoice(modelSource: AgentModelSource): OnboardingAgentCredentialChoice | null {
-  if (modelSource.choice === "subscription") return "subscription";
   if (modelSource.offered && !modelSource.choice) return "hosted";
   return modelSource.choice;
 }
@@ -55,9 +42,7 @@ function AgentConnectionChoices({
   loading,
   showCustomProvider,
   modelSource,
-  codex,
   providerKeysOffered,
-  subscriptionSelected,
   showProviders,
   modelPicker,
   onRequestConnect,
@@ -68,9 +53,7 @@ function AgentConnectionChoices({
   loading: boolean;
   showCustomProvider: boolean;
   modelSource: AgentModelSource;
-  codex?: CodexPanel;
   providerKeysOffered: boolean;
-  subscriptionSelected: boolean;
   showProviders: boolean;
   modelPicker?: OnboardingAgentModelPicker;
   onRequestConnect: (id: IntegrationId) => void;
@@ -82,23 +65,8 @@ function AgentConnectionChoices({
           <FirstRunModelSourceChoice
             disabled={saving || loading}
             modelSource={modelSource.choice}
-            subscriptionOffered={codex?.offered}
             providerKeysOffered={providerKeysOffered}
             onSelectModelSource={modelSource.onSelect}
-          />
-        </FirstRunPanel>
-      ) : null}
-      {codex?.offered && (!modelSource.offered || modelSource.choice === "own-key" || subscriptionSelected) ? (
-        <FirstRunPanel>
-          <FirstRunCodexSubscription
-            selected={subscriptionSelected}
-            disabled={saving || loading}
-            connection={codex.connection}
-            starting={codex.starting}
-            canceling={codex.canceling}
-            onSelect={() => modelSource.onSelect("subscription")}
-            onStart={codex.onStart}
-            onCancel={codex.onCancel}
           />
         </FirstRunPanel>
       ) : null}
@@ -131,7 +99,6 @@ export function FirstRunAgentScreen({
   providerKeysOffered,
   showCustomProvider,
   modelSource,
-  codex,
   modelPicker,
   onRequestConnect,
   onContinue,
@@ -146,22 +113,18 @@ export function FirstRunAgentScreen({
   providerKeysOffered: boolean;
   showCustomProvider: boolean;
   modelSource: AgentModelSource;
-  codex?: CodexPanel;
   modelPicker?: OnboardingAgentModelPicker;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
 }) {
-  const subscriptionSelected = modelSource.choice === "subscription";
   const canFinish = agentFinishReady({
     modelSourceChoice: modelSource.offered,
     credentialChoice: finishCredentialChoice(modelSource),
     providerConnected: isAgentProviderConnected(setup.connected),
     agentReady: setup.agentReady,
     hostedAgentReady,
-    subscriptionReady: codex?.ready,
   });
-  const showProviders =
-    providerKeysOffered && !subscriptionSelected && (!modelSource.offered || modelSource.choice === "own-key");
+  const showProviders = providerKeysOffered && (!modelSource.offered || modelSource.choice === "own-key");
   return (
     <FirstRunShell
       testId="first-run-agent"
@@ -187,9 +150,7 @@ export function FirstRunAgentScreen({
           loading={loading}
           showCustomProvider={showCustomProvider}
           modelSource={modelSource}
-          codex={codex}
           providerKeysOffered={providerKeysOffered}
-          subscriptionSelected={subscriptionSelected}
           showProviders={showProviders}
           modelPicker={modelPicker}
           onRequestConnect={onRequestConnect}

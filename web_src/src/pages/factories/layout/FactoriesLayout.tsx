@@ -1,3 +1,4 @@
+import { CodexActionProvider } from "../codex/CodexActionProvider";
 import type { FactoriesFactory } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { useAccount } from "@/contexts/useAccount";
@@ -216,25 +217,29 @@ function FactoriesLayoutContent({
 
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
-      <div className="flex h-screen w-full bg-background text-foreground" data-testid="factories-layout">
-        {hideSidebar ? null : (
-          <FactoriesSidebar
-            organizationId={organizationId}
-            factoryKey={routeSegment}
-            factory={factory}
-            factories={factories}
-          />
-        )}
-        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">{children ?? <Outlet />}</main>
-      </div>
+      <CodexActionProvider>
+        <div className="flex h-screen w-full bg-background text-foreground" data-testid="factories-layout">
+          {hideSidebar ? null : (
+            <FactoriesSidebar
+              organizationId={organizationId}
+              factoryKey={routeSegment}
+              factory={factory}
+              factories={factories}
+            />
+          )}
+          <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
+            {children ?? <Outlet />}
+          </main>
+        </div>
 
-      {canCreateWorkOrder ? (
-        <CreateWorkOrderDialog
-          open={createWorkOrderOpen}
-          onClose={closeCreateWorkOrder}
-          onCreated={completeCreateWorkOrder}
-        />
-      ) : null}
+        {canCreateWorkOrder ? (
+          <CreateWorkOrderDialog
+            open={createWorkOrderOpen}
+            onClose={closeCreateWorkOrder}
+            onCreated={completeCreateWorkOrder}
+          />
+        ) : null}
+      </CodexActionProvider>
     </FactoriesLayoutContext.Provider>
   );
 }

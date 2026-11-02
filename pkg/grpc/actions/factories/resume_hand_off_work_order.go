@@ -61,6 +61,9 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		if order.PendingHandOff == nil || !order.IsDispatchable() || order.PendingHandOff.Data() != intent {
 			return grpcFailedPrecondition("This handoff changed. Reload the task and try again.")
 		}
+		if err := assignWorkOrderStarter(tx, factory, order, &actor); err != nil {
+			return err
+		}
 		if err := order.RequireExecutionOwner(tx, false); err != nil {
 			return err
 		}

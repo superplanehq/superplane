@@ -38,6 +38,7 @@ const LEGACY_WORKSPACE_SETTINGS: Record<string, FactorySettingsDestination> = {
 };
 
 const LEGACY_ORGANIZATION_SETTINGS: Record<string, FactorySettingsDestination> = {
+  models: { scope: "workspace", section: "models" },
   general: { scope: "organization", section: "general" },
   members: { scope: "organization", section: "members" },
   "api-keys": { scope: "organization", section: "api-keys" },
@@ -102,7 +103,7 @@ export function LegacyFactorySettingsRedirect() {
     rest,
     WORKSPACE_GENERAL,
   );
-  return <Navigate to={`${destination}${location.search}`} replace />;
+  return <Navigate to={`${destination}${location.search}${location.hash}`} replace />;
 }
 
 /** Old `/settings/workspace/automations` URLs. Send the user to the factory nav Automations tab. */
@@ -191,7 +192,7 @@ export function LegacyFactoryOrganizationSettingsRedirect() {
     rest,
     ORGANIZATION_GENERAL,
   );
-  return <Navigate to={`${destination}${location.search}`} replace />;
+  return <Navigate to={`${destination}${location.search}${location.hash}`} replace />;
 }
 
 export function LegacyOrganizationSettingsRedirect({ destination = "general" }: { destination?: string }) {
@@ -260,4 +261,13 @@ export function OrganizationUsageRedirect() {
 export function AccountLinkedAccountsRedirect() {
   const { pathname, search } = useLocation();
   return <Navigate to={`${pathname.replace(/\/linked-accounts\/?$/, "/profile")}${search}`} replace />;
+}
+
+/** Preserve bookmarks for the former organization model settings page. */
+export function OrganizationModelsRedirect() {
+  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
+  const location = useLocation();
+  if (!organizationId || !factoryKey) return <Navigate to="/" replace />;
+  const destination = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "models");
+  return <Navigate to={`${destination}${location.search}${location.hash}`} replace />;
 }

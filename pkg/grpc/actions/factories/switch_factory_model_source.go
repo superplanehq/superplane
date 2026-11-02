@@ -31,11 +31,12 @@ import (
 const planningAgentNodeID = "planner-agent-no-issue"
 
 const (
-	modelSourceHosted     = "hosted"
-	modelSourceAnthropic  = "anthropic"
-	modelSourceOpenAI     = "openai"
-	modelSourceOpenRouter = "openrouter"
-	modelSourceCustom     = "custom"
+	modelSourceHosted       = "hosted"
+	modelSourceSubscription = "subscription"
+	modelSourceAnthropic    = "anthropic"
+	modelSourceOpenAI       = "openai"
+	modelSourceOpenRouter   = "openrouter"
+	modelSourceCustom       = "custom"
 )
 
 type workspaceAgentRewrite struct {
@@ -50,6 +51,8 @@ type workspaceAgentRewrite struct {
 
 func workspaceAgentRewriteFor(source, integrationName string, modelIDs []string) (workspaceAgentRewrite, error) {
 	switch strings.TrimSpace(source) {
+	case modelSourceSubscription:
+		return workspaceAgentRewrite{Component: "runnerCodex", CredentialsSource: "subscription", Harness: models.FactoryOnboardingAgentHarnessCodex}, nil
 	case modelSourceHosted:
 		return workspaceAgentRewrite{
 			Component: models.SuperPlaneRunnerComponent,
@@ -502,17 +505,33 @@ func switchFactoryModelSource(
 	apiKey string,
 	baseURL string,
 	apiType string,
+	defaultOwnerID string,
 ) ([]uuid.UUID, string, error) {
-	if factory.OnboardingConfigValue().CodexSubscription {
-		return nil, "", grpcerrors.FailedPrecondition(nil, "This workspace uses a ChatGPT subscription. Model source cannot change.")
+	source = strings.TrimSpace(source)
+	subscription := source == modelSourceSubscription
+	if subscription {
+		if _, err := models.ActiveCodexMember(tx, factory.OrganizationID, versionOwnerID(ctx)); err != nil {
+			return nil, "", err
+		}
+		ownerID, err := uuid.Parse(strings.TrimSpace(defaultOwnerID))
+		if err != nil || ownerID == uuid.Nil {
+			return nil, "", factoryErrorToStatus(invalidArgument("Select a default task owner with Codex connected"), "failed to switch model source")
+		}
+		defaultOwnerID = ownerID.String()
+		eligible, err := models.SubscriptionOwnerEligible(tx.Clauses(clause.Locking{Strength: "SHARE"}).Session(&gorm.Session{}), factory.OrganizationID, factory.ID, ownerID)
+		if err != nil {
+			return nil, "", err
+		}
+		if !eligible {
+			return nil, "", factoryErrorToStatus(invalidArgument("The default task owner is unavailable. Select an active member with Codex connected."), "failed to switch model source")
+		}
 	}
 	var integration *models.Integration
-	if strings.TrimSpace(source) != modelSourceHosted {
-		provider := strings.TrimSpace(source)
-		if err := models.RequireOrganizationBYOKAccess(tx, factory.OrganizationID, provider); err != nil {
+	if source != modelSourceHosted && !subscription {
+		if err := models.RequireOrganizationBYOKAccess(tx, factory.OrganizationID, source); err != nil {
 			return nil, "", factoryErrorToStatus(err, "failed to switch model source")
 		}
-		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, reg.Encryptor, factory.OrganizationID, provider, apiKey, baseURL, apiType)
+		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, reg.Encryptor, factory.OrganizationID, source, apiKey, baseURL, apiType)
 		if err != nil {
 			return nil, "", err
 		}
@@ -526,6 +545,11 @@ func switchFactoryModelSource(
 		integrationName = integration.InstallationName
 		integrationID = integration.ID.String()
 		ids, err := organizations.ListConnectedBYOKModelIDs(tx, reg, integration)
+		if err == nil {
+			if err := models.CreateOrganizationBYOKModelAllowlistIfAbsent(tx, factory.OrganizationID, source, datatypes.JSONSlice[string](ids)); err != nil {
+				return nil, "", err
+			}
+		}
 		if strings.TrimSpace(source) == modelSourceCustom {
 			if err != nil {
 				return nil, "", err
@@ -543,13 +567,22 @@ func switchFactoryModelSource(
 	if err != nil {
 		return nil, "", err
 	}
+	if integration != nil {
+		rewrite, err = applyWorkspaceModelPolicyToRewrite(tx, factory, rewrite, modelIDs)
+		if err != nil {
+			return nil, "", err
+		}
+	}
 
-	patch := models.FactoryOnboardingPatch{AgentHarness: &rewrite.Harness}
+	patch := models.FactoryOnboardingPatch{AgentHarness: &rewrite.Harness, CodexSubscription: &subscription}
+	if subscription {
+		patch.CodexDefaultOwnerID = &defaultOwnerID
+	}
 	if integration != nil {
 		id := integration.ID.String()
 		patch.AgentIntegrationID = &id
 	}
-	if rewrite.Component == models.SuperPlaneRunnerComponent {
+	if rewrite.Component == models.SuperPlaneRunnerComponent || subscription {
 		cleared := ""
 		patch.AgentIntegrationID = &cleared
 	}
@@ -562,7 +595,54 @@ func switchFactoryModelSource(
 	if err != nil {
 		return nil, "", err
 	}
+	if subscription {
+		repaired, err := replaceSubscriptionIntakeOwners(tx, factory, uuid.MustParse(defaultOwnerID), ownerID)
+		if err != nil {
+			return nil, "", err
+		}
+		for _, canvasID := range repaired {
+			if !slices.Contains(changed, canvasID) {
+				changed = append(changed, canvasID)
+			}
+		}
+	}
 	return changed, integrationID, nil
+}
+
+func applyWorkspaceModelPolicyToRewrite(tx *gorm.DB, factory *models.Factory, rewrite workspaceAgentRewrite, catalog []string) (workspaceAgentRewrite, error) {
+	policy, err := models.FindFactoryLLMModelAllowlist(tx, factory.ID, rewrite.Provider, models.UsageFundingSourceBYOK)
+	if err != nil {
+		return workspaceAgentRewrite{}, err
+	}
+	parentSaved, err := models.OrganizationBYOKModelAllowlistExists(tx, factory.OrganizationID, rewrite.Provider)
+	if err != nil {
+		return workspaceAgentRewrite{}, err
+	}
+	if policy.InheritsParent() && !parentSaved {
+		return rewrite, nil
+	}
+	permitted, err := models.ResolveSelectableLLMModels(tx, factory.OrganizationID, &factory.ID, rewrite.Provider, models.UsageFundingSourceBYOK)
+	if err != nil {
+		return workspaceAgentRewrite{}, err
+	}
+	// A nil catalog means the provider list was temporarily unavailable. Saved
+	// policy still applies; a successful empty response permits no models.
+	if catalog != nil {
+		permitted = models.IntersectModelIDs(permitted, catalog)
+	}
+	slices.Sort(permitted)
+	if len(permitted) == 0 {
+		rewrite.Model = ""
+		rewrite.PlanningModel = ""
+		return rewrite, nil
+	}
+	if !slices.Contains(permitted, rewrite.Model) {
+		rewrite.Model = permitted[0]
+	}
+	if !slices.Contains(permitted, rewrite.PlanningModel) {
+		rewrite.PlanningModel = rewrite.Model
+	}
+	return rewrite, nil
 }
 
 // providerModelListUsesDefaults reports a temporary catalog failure.
@@ -597,6 +677,7 @@ func SwitchFactoryModelSourceInTransaction(
 	apiKey string,
 	baseURL string,
 	apiType string,
+	defaultOwnerIDs ...string,
 ) ([]uuid.UUID, string, error) {
 	if reg == nil {
 		return nil, "", fmt.Errorf("integration registry is required")
@@ -607,15 +688,19 @@ func SwitchFactoryModelSourceInTransaction(
 		return nil, "", err
 	}
 
+	defaultOwnerID := ""
+	if len(defaultOwnerIDs) > 0 {
+		defaultOwnerID = defaultOwnerIDs[0]
+	}
 	var changed []uuid.UUID
 	var integrationID string
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, err := findFactory(tx, orgID, factoryID)
+		factory, err := lockFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err
 		}
 		var savedID string
-		changed, savedID, err = switchFactoryModelSource(ctx, tx, reg, factory, source, apiKey, baseURL, apiType)
+		changed, savedID, err = switchFactoryModelSource(ctx, tx, reg, factory, source, apiKey, baseURL, apiType, defaultOwnerID)
 		integrationID = savedID
 		return err
 	})

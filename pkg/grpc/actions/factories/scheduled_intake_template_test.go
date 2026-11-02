@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -86,6 +87,34 @@ func TestScheduledIntakeCreation(t *testing.T) {
 			}
 		})
 	}
+	t.Run("subscription requires a connected default before publishing", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
+		subscription := true
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+		_, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
+		require.Error(t, err)
+		request.InstallParams["defaultOwnerId"] = r.User.String()
+		_, err = CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
+		require.Error(t, err)
+		connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+		require.NoError(t, err)
+		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+		response, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		version, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(response.Automation.Id))
+		require.NoError(t, err)
+		require.Equal(t, r.User.String(), findIntakeNode(version.Nodes, "create-task").Configuration["defaultOwnerId"])
+		require.Equal(t, "runnerCodex", findIntakeNode(version.Nodes, "scheduled-agent").ComponentName())
+		defaultOwnerID := r.User.String()
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexDefaultOwnerID: &defaultOwnerID}))
+		delete(request.InstallParams, "defaultOwnerId")
+		inherited, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		inheritedVersion, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(inherited.Automation.Id))
+		require.NoError(t, err)
+		require.Equal(t, defaultOwnerID, findIntakeNode(inheritedVersion.Nodes, "create-task").Configuration["defaultOwnerId"])
+
+	})
 	request.InstallParams["timezone"] = "Europe/Belgrade"
 	_, err = CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), request)
 	code, _, ok = grpcerrors.HandlerStatus(err)

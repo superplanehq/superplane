@@ -60,10 +60,26 @@ describe("useWorkOrderCardActions", () => {
     expect(showSuccessToast).not.toHaveBeenCalled();
   });
 
-  it("clears the in-flight task when the dispatch fails", async () => {
+  it.each([
+    {
+      name: "shows the model availability error from the server",
+      error: {
+        code: 9,
+        message: "the selected model is unavailable for this task owner; select another model or clear the override",
+        details: [],
+      },
+      expectedMessage:
+        "the selected model is unavailable for this task owner; select another model or clear the override",
+    },
+    {
+      name: "uses a fallback for network failures",
+      error: new Error("Failed to fetch"),
+      expectedMessage: "Failed to dispatch task.",
+    },
+  ])("$name and clears the in-flight task", async ({ error, expectedMessage }) => {
     mockMutations();
     vi.mocked(useDispatchWorkOrder).mockReturnValue({
-      mutateAsync: vi.fn().mockRejectedValue(new Error("nope")),
+      mutateAsync: vi.fn().mockRejectedValue(error),
     } as unknown as DispatchMutation);
     const { result } = renderHook(() => useWorkOrderCardActions("org-1", "factory-1"));
 
@@ -72,7 +88,7 @@ describe("useWorkOrderCardActions", () => {
     });
 
     expect(result.current.dispatchingOrderIds.has("wo-1")).toBe(false);
-    expect(showErrorToast).toHaveBeenCalledWith("Failed to dispatch task.");
+    expect(showErrorToast).toHaveBeenCalledWith(expectedMessage);
     expect(showSuccessToast).not.toHaveBeenCalled();
   });
 });

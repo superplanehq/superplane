@@ -1,3 +1,4 @@
+import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import type { IntegrationsIntegrationDefinition } from "@/api-client";
 import { useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import {
@@ -23,9 +24,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
   const [integrationId, setIntegrationId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [skipInitialImport, setSkipInitialImport] = useState(false);
-  const [jiraCompletion, setJiraCompletion] = useState<JiraCompletionColumnValue>({
-    ...DEFAULT_JIRA_COMPLETION_SETTINGS,
-  });
+  const [jiraCompletion, setJiraCompletion] = useState<JiraCompletionColumnValue>(DEFAULT_JIRA_COMPLETION_SETTINGS);
   const [connectOpen, setConnectOpen] = useState(false);
   const [stayOnConnection, setStayOnConnection] = useState(false);
   const [error, setError] = useState<string>();
@@ -35,6 +34,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
     useJiraConnections(organizationId);
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const owner = useIntakeOwnerDraft(organizationId, factoryId);
   const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
     enabled: Boolean(integrationId),
   });
@@ -110,7 +110,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
         source: "SOURCE_JIRA_ISSUES",
         integrationId,
         resourceId: projectId,
-        settings: jiraCompletionSettingsToApi(jiraCompletion),
+        settings: { ...jiraCompletionSettingsToApi(jiraCompletion), ...owner.settings() },
         ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
       return true;
@@ -121,6 +121,7 @@ export function useJiraIntakeSetup(organizationId: string, factoryId: string, se
   };
 
   return {
+    owner,
     step,
     setStep,
     integrationId,

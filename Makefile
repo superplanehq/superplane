@@ -1,4 +1,4 @@
-.PHONY: lint test test.release test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners runner.new doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status check.ee.imports simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
+.PHONY: lint test test.release test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status check.ee.imports simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -195,6 +195,7 @@ ci.setup.unit:
 ci.setup.e2e:
 	$(MAKE) ci.setup.ui
 	$(MAKE) pb.gen.go
+	$(MAKE) openapi.client.gen
 	$(MAKE) ci.setup.modules
 	$(MAKE) ci.setup.test-db
 
@@ -241,9 +242,6 @@ dev.runners:
 	@$(MAKE) dev.setup.runner.fleet
 	$(COMPOSE_RUNNER) up -d --no-build --no-deps fleet-manager
 	@echo "Fleet Manager is running with ephemeral Docker runners."
-
-runner.new:
-	@bash ./scripts/runner-new
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
@@ -366,6 +364,10 @@ check.models.tx.debt:
 
 check.models.tx.debt.baseline.update:
 	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go --update-baseline
+
+.PHONY: check.admin.routes
+check.admin.routes:
+	@$(COMPOSE) exec app go run ./scripts/check_admin_routes.go
 
 # Core workflows depend on billing contracts; server binds Enterprise code.
 check.ee.imports:
@@ -568,8 +570,49 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,api_keys,agents,files,admin/fleets,admin/keys
-REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,api_keys,agents,files,admin/fleets,admin/keys
+MODULES := \
+	authorization, \
+	organizations, \
+	integrations, \
+	factories, \
+	secrets, \
+	users, \
+	groups, \
+	roles, \
+	me, \
+	configuration, \
+	components, \
+	actions, \
+	triggers, \
+	widgets, \
+	canvases, \
+	api_keys, \
+	agents, \
+	files, \
+	admin/fleets, \
+	admin/keys, \
+	admin/organizations
+REST_API_MODULES := \
+	authorization, \
+	organizations, \
+	integrations, \
+	factories, \
+	secrets, \
+	users, \
+	groups, \
+	roles, \
+	me, \
+	configuration, \
+	actions, \
+	triggers, \
+	widgets, \
+	canvases, \
+	api_keys, \
+	agents, \
+	files, \
+	admin/fleets, \
+	admin/keys, \
+	admin/organizations
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.go
@@ -585,13 +628,13 @@ pb.gen.go: dev.test.is.running
 	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
 
 pb.gen.models:
-	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc.sh "$(MODULES)"
 
 pb.gen.gateway:
-	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh "$(REST_API_MODULES)"
 
 openapi.spec.gen: dev.test.is.running
-	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh "$(REST_API_MODULES)"
 
 # Recreate the output directory in the app container. A host rm and mkdir
 # leaves Docker Desktop with a stale directory, and the generator cannot write.
@@ -635,15 +678,8 @@ cli.build.binary:
 cli.build: cli.build.prepare
 	$(MAKE) cli.build.binary
 
-admincli.build:
-	$(MAKE) pb.gen
-	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/admin cmd/admin/main.go'
-
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
-
-admincli.build.m1:
-	$(MAKE) admincli.build OS=darwin ARCH=arm64
 
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)

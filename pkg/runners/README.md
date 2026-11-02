@@ -21,33 +21,28 @@ for another task.
 
 ## Local development
 
-Start the development environment and complete owner setup. Use this command
-to test runner or runner API changes. Set `INSTALLATION_ADMIN_TOKEN` to a
-personal API token for an installation administrator:
+Start the development environment and complete owner setup. Enable the
+`organization_runners` feature for your organization and select its CLI context.
+Create an organization fleet with `superplane fleets create --file fleet.yaml`.
+Use `runnerVersion: dev` in the fleet definition.
+
+Create registration credentials for that fleet:
 
 ```sh
-make runner.new
+superplane runners create --fleet my-local-fleet --ephemeral=false
 ```
 
-The target rebuilds the local runner image and starts one attached ephemeral
-runner. It pauses the local Fleet Manager and restores it after the runner
-exits. `make dev.setup` creates the default `e1-large-amd64` fleet. To use a
-different fleet, create it through the admin CLI and set `RUNNER_FLEET`:
-
-```sh
-make runner.new RUNNER_FLEET=my-local-fleet
-```
-
-Use a different terminal to start tasks and inspect runner behavior. Press
-Ctrl-C to test a controlled shutdown.
-
-To run the runner directly from the development container, use:
+Run the local source in the development container with the returned token:
 
 ```sh
 docker compose -f docker-compose.dev.yml exec app go run ./cmd/runner \
   --url http://localhost:8000 \
   --registration-token "$RUNNER_REGISTRATION_TOKEN"
 ```
+
+Select the organization fleet when you start tasks from another terminal.
+Press Ctrl-C to test a controlled shutdown. Organization fleets let you test
+runner changes without pausing the installation Fleet Manager.
 
 The registration token determines whether the runner is generic or bound to a
 specific task. The runner does not receive an installation administrator
@@ -60,6 +55,57 @@ Run focused checks with:
 docker compose -f docker-compose.dev.yml exec app go test ./pkg/runners/...
 docker compose -f docker-compose.dev.yml exec app go build ./cmd/runner
 ```
+
+## Direct runner setup
+
+Create a fleet and registration credentials through the main CLI:
+
+```sh
+superplane fleets create --file fleet.yaml
+superplane runners create --fleet my-fleet
+superplane runners create --fleet my-fleet --ephemeral=false
+```
+
+Organization creation and configuration require the `organization_runners`
+feature. Authorized inspection and runner termination remain available when
+the feature is disabled. Fleet lists include disabled managed fleets.
+
+For installation fleets, set both `SUPERPLANE_URL` and
+`SUPERPLANE_TOKEN` to the server URL and an installation administrator token.
+No organization context is required:
+
+```sh
+superplane fleets create --installation --file fleet.yaml
+superplane runners create --installation --fleet my-fleet --ephemeral
+superplane fleets list-tasks --installation --fleet my-fleet --state queued --limit 200
+```
+
+Installation runners are ephemeral-only. Organization runners can be ephemeral
+or reusable. The default is ephemeral. Use `--task` with `--idempotency-key` to
+bind registration to one task. Lists support repeatable `--state`, `--limit`
+from 1 to 1000, and `--after-id`.
+
+Creation returns a runner record, a short-lived registration token, its
+expiration, and the runner server URL. It does not provision or start a machine.
+Use the returned URL and registration token to start the runner:
+
+```sh
+runner --url <returned-server-root> --registration-token <registration-token>
+```
+
+Use the returned URL even if it differs from the management URL.
+Do not append `/runner/v1`. The CLI does not save registration tokens.
+Use `--output json` or `--output yaml` for scripts. Structured output preserves
+credentials, timestamps, and list pagination metadata.
+
+The main CLI replaces the `admin` binary. Use `.superplane.yaml` or main CLI
+environment credentials instead of `.superplane-admin.yaml`, `--url`, and `--token`.
+Set both `SUPERPLANE_URL` and `SUPERPLANE_TOKEN` when you use environment credentials.
+Replace `admin tasks list` with `superplane fleets list-tasks --installation`.
+Fleet updates now require `superplane fleets update <fleet-id> --file fleet.yaml`.
+Fleet Manager still accepts `INSTALLATION_ADMIN_TOKEN` for installation fleet
+API access. Local development generates this token unless you supply an override.
+Runner processes receive only their registration token.
 
 ## Controlled shutdown
 

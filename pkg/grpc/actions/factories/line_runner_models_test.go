@@ -254,7 +254,7 @@ func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testi
 	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6")
 	seedHostedModels(t, db, models.UsageProviderOpenRouter, "x-ai/grok-4.6")
 
-	app := createLineAppWithRunner(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	app := createLineAppWithRunner(t, r, factoryModel.ID, models.SuperPlaneRunnerComponent, "hosted", models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenAI, "excluded-model"))
 	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
 	})
@@ -272,13 +272,14 @@ func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testi
 func Test__SerializeLineRunnerModels__NamesHostedSelectableKeys(t *testing.T) {
 	modelsProto := serializeLineRunnerModels([]lineRunnerModel{
 		{ID: models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenRouter, "x-ai/grok-4.6")},
-		{ID: "opus"},
+		{ID: "opus", ThinkingLevels: []string{"max", "low"}},
 	})
 	require.Len(t, modelsProto, 2)
 	assert.Equal(t, "hosted::openrouter::x-ai/grok-4.6", modelsProto[0].GetId())
 	assert.Equal(t, "x-ai/grok-4.6", modelsProto[0].GetName())
 	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetId())
 	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetName())
+	assert.Equal(t, []string{"low", "max"}, modelsProto[1].GetThinkingLevels())
 }
 
 func TestLineRunnerModelsKeepSubscriptionAndAPIKeyCatalogsSeparate(t *testing.T) {
@@ -289,7 +290,7 @@ func TestLineRunnerModelsKeepSubscriptionAndAPIKeyCatalogsSeparate(t *testing.T)
 	require.NoError(t, err)
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, []string{"gpt-4o"})
 	require.NoError(t, err)
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}}, time.Now()))
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
@@ -314,7 +315,7 @@ func TestLineRunnerModelsReportModelThinkingLevels(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-opus-5-5", "claude-haiku-4-5")
-	connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, factory.ID, r.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{
 		Model: "gpt-5.4",

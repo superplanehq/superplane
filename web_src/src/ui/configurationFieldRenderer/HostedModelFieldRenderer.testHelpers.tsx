@@ -44,7 +44,9 @@ export function mockSelectableModels(
 ) {
   vi.mocked(useSelectableLLMModels).mockImplementation((_organizationId, queryOptions) => {
     const sources = queryOptions?.sources;
-    const listed = sources ? data.filter((item) => sources.includes(item.source.id as "hosted" | "byok")) : data;
+    const listed = sources
+      ? data.filter((item) => sources.includes(item.source.id as "hosted" | "byok" | "subscription"))
+      : data;
     return {
       data: listed,
       isLoading: options.isLoading ?? false,
@@ -54,10 +56,11 @@ export function mockSelectableModels(
 }
 
 export function selectableModel(
-  source: "hosted" | "byok",
+  source: "hosted" | "byok" | "subscription",
   provider: string,
   id: string,
   thinkingLevels: string[] = ["low", "medium", "high"],
+  extras: { isDefault?: boolean } = {},
 ): {
   source: { id: string; name: string };
   provider: { id: string; name: string };
@@ -65,15 +68,21 @@ export function selectableModel(
   key: string;
   label: string;
   thinkingLevels: string[];
+  isDefault?: boolean;
 } {
-  const label = provider === "openrouter" || provider === "custom" ? id : `${provider}/${id}`;
+  const label =
+    source === "subscription" || provider === "openrouter" || provider === "custom" ? id : `${provider}/${id}`;
   return {
-    source: { id: source, name: source === "hosted" ? "SuperPlane" : "Your keys" },
+    source: {
+      id: source,
+      name: source === "hosted" ? "SuperPlane" : source === "subscription" ? "ChatGPT" : "Your keys",
+    },
     provider: { id: provider, name: provider },
     model: { id, name: id },
     key: `${source}::${provider}::${id}`,
     label,
     thinkingLevels,
+    isDefault: extras.isDefault,
   };
 }
 
