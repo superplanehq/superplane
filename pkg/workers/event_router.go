@@ -321,7 +321,11 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 			return nil, uuid.Nil, err
 		}
 
-		if targetNode.State == models.CanvasNodeStateError {
+		ready, err := prepareTargetNodeForRouting(tx, canvas, run, targetNode)
+		if err != nil {
+			return nil, uuid.Nil, err
+		}
+		if !ready {
 			continue
 		}
 
@@ -420,7 +424,11 @@ func (w *EventRouter) processExecutionEvent(
 			return nil, err
 		}
 
-		if targetNode.State == models.CanvasNodeStateError {
+		ready, err := prepareTargetNodeForRouting(tx, canvas, run, targetNode)
+		if err != nil {
+			return nil, err
+		}
+		if !ready {
 			continue
 		}
 
@@ -445,4 +453,22 @@ func (w *EventRouter) processExecutionEvent(
 	}
 
 	return createdQueueItems, nil
+}
+
+func prepareTargetNodeForRouting(tx *gorm.DB, canvas *models.Canvas, run *models.CanvasRun, node *models.CanvasNode) (bool, error) {
+	if err := node.RefreshHostedBillingReadiness(tx, canvas.OrganizationID, canvas.FactoryID); err != nil {
+		return false, fmt.Errorf("recheck billing for node %s: %w", node.NodeID, err)
+	}
+	if node.State != models.CanvasNodeStateError {
+		return true, nil
+	}
+
+	reason := fmt.Sprintf("Node %q is unavailable", node.Name)
+	if node.StateReason != nil && *node.StateReason != "" {
+		reason = *node.StateReason
+	}
+	if err := run.AddError(tx, reason, config.MaxPayloadSize()); err != nil {
+		return false, fmt.Errorf("record error for node %s: %w", node.NodeID, err)
+	}
+	return false, nil
 }

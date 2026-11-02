@@ -15,6 +15,7 @@ export type IntentAnalysisChat = {
   view: CreateWithAgentView;
   composer: string;
   composerError?: string;
+  planningFailure?: string;
   canSend: boolean;
   isUploading?: boolean;
   onComposerChange: (value: string) => void;

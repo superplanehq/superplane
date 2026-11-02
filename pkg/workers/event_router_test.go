@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -322,4 +323,76 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 
 	assert.True(t, queueConsumer.HasReceivedMessage())
 	assert.False(t, runConsumer.HasReceivedMessage())
+}
+
+func Test__EventRouter_RechecksHostedCreditBeforeRoutingPlanningAgent(t *testing.T) {
+	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	db := database.Conn()
+	require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).Delete(&billingmodels.OrganizationLLMCreditGrant{}).Error)
+
+	triggerID := "trigger"
+	gateID := "refinement-enabled"
+	agentID := "refine-task"
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: triggerID, Type: models.NodeTypeTrigger},
+		{NodeID: gateID, Type: models.NodeTypeComponent},
+		{
+			NodeID: agentID,
+			Name:   "Refine Task",
+			Type:   models.NodeTypeComponent,
+			Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: models.SuperPlaneRunnerComponent}}),
+		},
+	}, []models.Edge{
+		{SourceID: triggerID, TargetID: gateID, Channel: "default"},
+		{SourceID: gateID, TargetID: agentID, Channel: "true"},
+	})
+	require.NoError(t, db.Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, agentID).
+		Updates(map[string]any{
+			"state":        models.CanvasNodeStateError,
+			"state_reason": models.SuperPlaneRunnerNoCreditMessage,
+		}).Error)
+
+	router := NewEventRouter("")
+	logger := log.NewEntry(log.New())
+	routePlanningAttempt := func() *models.CanvasRun {
+		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerID, "default", nil)
+		run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
+		require.NoError(t, err)
+		require.NoError(t, rootEvent.Routed())
+
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, gateID, rootEvent.ID, rootEvent.ID)
+		execution.RunID = run.ID
+		require.NoError(t, db.Save(execution).Error)
+		_, err = execution.Pass(map[string][]any{"true": {map[string]any{}}})
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(db, canvas.ID, gateID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		require.NoError(t, router.LockAndProcessEvent(logger, events[0], time.Now()))
+		updatedRun, err := models.FindCanvasRunInTransaction(db, canvas.ID, run.ID)
+		require.NoError(t, err)
+		return updatedRun
+	}
+
+	blockedRun := routePlanningAttempt()
+	require.Equal(t, []string{models.SuperPlaneRunnerNoCreditMessage}, blockedRun.ErrorMessages())
+	queueItems, err := models.ListNodeQueueItems(db, canvas.ID, agentID, 10, nil)
+	require.NoError(t, err)
+	require.Empty(t, queueItems)
+
+	_, err = billingmodels.AddAdminLLMCreditGrant(db, r.Organization.ID, 1_000_000, "restore credit", nil)
+	require.NoError(t, err)
+	readyRun := routePlanningAttempt()
+	require.Empty(t, readyRun.ErrorMessages())
+	queueItems, err = models.ListNodeQueueItems(db, canvas.ID, agentID, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, queueItems, 1)
+	require.Equal(t, readyRun.ID, queueItems[0].RunID)
+	agent, err := models.FindCanvasNode(db, canvas.ID, agentID)
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeStateReady, agent.State)
+	require.Nil(t, agent.StateReason)
 }
