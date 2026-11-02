@@ -212,7 +212,11 @@ func TestCodexRunningTaskKeepsCredentialsAfterWorkspaceModelPolicyChange(t *test
 		Generation:     lease.Generation,
 	}, time.Hour)
 	require.NoError(t, err)
-	server := &Server{jwt: signer, encryptor: r.Encryptor}
+	server := &Server{jwt: signer, encryptor: r.Encryptor,
+		codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
+			return runneraction.CodexTokenSet{AccessToken: codexTestAccessToken(time.Now().Add(time.Hour))}, nil
+		},
+	}
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
@@ -238,7 +242,11 @@ func TestCodexCatalogRefreshCannotFetchCredentialsAfterOrganizationDeletion(t *t
 		TaskID: taskID, Generation: connection.ReservationGeneration,
 	}, time.Hour)
 	require.NoError(t, err)
-	server := &Server{jwt: signer, encryptor: r.Encryptor}
+	server := &Server{jwt: signer, encryptor: r.Encryptor,
+		codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
+			return runneraction.CodexTokenSet{AccessToken: codexTestAccessToken(time.Now().Add(time.Hour))}, nil
+		},
+	}
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
@@ -415,6 +423,61 @@ func TestCodexRefreshIsSingleFlightAndHidesTheRefreshToken(t *testing.T) {
 	require.NoError(t, db.Model(&originalLease).Update("revoked_at", time.Now()).Error)
 	assert.Equal(t, http.StatusUnauthorized, refresh(secret).Code)
 	assert.Equal(t, int32(1), calls.Load(), "invalid and revoked leases must not reach the provider")
+}
+
+func TestCodexCredentialsRefreshBeforeRestoreAndReuseRotatedToken(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	connection, factory, secret := readyCodexRun(t, r)
+	lease, err := models.FindCodexRunLeaseBySecret(db, secret)
+	require.NoError(t, err)
+	signer := jwt.NewSigner("test-credential-restore")
+	token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
+		OrganizationID: connection.OrganizationID, FactoryID: factory.ID, ConnectionID: connection.ID,
+		TaskID: lease.TaskID, Generation: lease.Generation,
+	}, time.Hour)
+	require.NoError(t, err)
+	var exchanges atomic.Int32
+	firstAccess := codexTestAccessToken(time.Now().Add(time.Hour))
+	secondAccess := codexTestAccessToken(time.Now().Add(2 * time.Hour))
+	server := &Server{
+		jwt: signer, encryptor: r.Encryptor,
+		codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
+			if exchanges.Add(1) == 1 {
+				return runneraction.CodexTokenSet{AccessToken: firstAccess, RefreshToken: "provider-refresh-2", IDToken: "identity-2"}, nil
+			}
+			return runneraction.CodexTokenSet{AccessToken: secondAccess, RefreshToken: "provider-refresh-3", IDToken: "identity-3"}, nil
+		},
+	}
+	credentials := func() *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
+		request.Header.Set("Authorization", "Bearer "+token)
+		response := httptest.NewRecorder()
+		server.handleRunnerCodexSubscriptionCredentials(response, request)
+		return response
+	}
+	first := credentials()
+	require.Equal(t, http.StatusOK, first.Code, first.Body.String())
+	assert.Contains(t, first.Body.String(), firstAccess)
+	assert.NotContains(t, first.Body.String(), "provider-refresh-2")
+	require.Equal(t, http.StatusOK, credentials().Code)
+	assert.Equal(t, int32(1), exchanges.Load(), "fresh credentials must not rotate again")
+
+	refresh := func(rejected string) *httptest.ResponseRecorder {
+		body, err := json.Marshal(map[string]string{"refresh_token": secret, "rejected_access_token": rejected})
+		require.NoError(t, err)
+		response := httptest.NewRecorder()
+		server.handleRunnerCodexSubscriptionRefresh(response, httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", bytes.NewReader(body)))
+		return response
+	}
+	stale := refresh(codexTestAccessToken(time.Now().Add(time.Minute)))
+	require.Equal(t, http.StatusOK, stale.Code, stale.Body.String())
+	assert.Contains(t, stale.Body.String(), firstAccess)
+	assert.Equal(t, int32(1), exchanges.Load())
+	forced := refresh(firstAccess)
+	require.Equal(t, http.StatusOK, forced.Code, forced.Body.String())
+	assert.Contains(t, forced.Body.String(), secondAccess)
+	assert.Equal(t, int32(2), exchanges.Load())
 }
 
 // The provider can rotate a token before the client disconnects. The stored

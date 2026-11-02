@@ -14,6 +14,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { CodexDeviceSignIn } from "./CodexDeviceSignIn";
 import { useCodexConnectionSetup } from "./useCodexConnectionSetup";
+import { codexModelLoadError } from "./codexConnectionCopy";
 
 type CodexConnection = ReturnType<typeof useFactoryCodexConnection>;
 
@@ -64,11 +65,7 @@ function CodexConnectionNotices({ codex, billingHref }: { codex: CodexConnection
       ) : null}
       {codex.cancel.isError ? <p role="alert">Could not cancel Codex sign-in. Try again.</p> : null}
       {codex.refreshCatalog.isError ? (
-        <CodexConnectionErrorNotice
-          error={codex.refreshCatalog.error}
-          fallback="Could not load your Codex models. Close this dialog and try again."
-          billingHref={billingHref}
-        />
+        <p role="alert">{codexModelLoadError(codex.refreshCatalog.error, connection?.status)}</p>
       ) : null}
     </>
   );
