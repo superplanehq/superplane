@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import type { FactoriesFactory } from "@/api-client";
 
+import { planningRunFailure } from "../../lib/backlogAnalysis";
 import { factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
 import { composerCreditVerdict, creditBillingHref } from "./splitRunFooter";
 import type { SplitRunFixture } from "./splitRunMocks";
@@ -26,13 +27,10 @@ export function draftStripAnalysis(args: DraftStripAnalysisArgs, modelSelect: Re
     return undefined;
   }
   const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
-  const planningFailure = args.planningFailure ?? args.analysis.runFailure;
+  const planningFailure = "planningFailure" in args ? args.planningFailure : planningRunFailure(args.analysis.run);
   return {
     ...args.analysis,
-    view:
-      planningFailure && !args.analysis.session
-        ? { ...args.analysis.view, machineStatus: "failed" as const }
-        : args.analysis.view,
+    view: planningFailure ? { ...args.analysis.view, machineStatus: "failed" as const } : args.analysis.view,
     planningFailure,
     requestCreatedAt: args.fixture.phases.find((phase) => phase.id === "backlog")?.startedAt,
     modelSelect,

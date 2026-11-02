@@ -2,6 +2,7 @@ import { FactoryTaskScope } from "../../FactoryTaskScope";
 import { useState, type ReactNode } from "react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
+import { mergeCanvasRunUpdate } from "@/hooks/canvasInfiniteCache";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 
@@ -116,10 +117,17 @@ function popupPlanningFailure(
   analysis: ReturnType<typeof useAnalysisPlanningSession>,
   runs?: BacklogAnalysisRun[],
 ): string | undefined {
-  if (analysis.session) {
-    return analysis.runFailure;
+  const latestBacklogRun = latestBacklogAnalysisRun(runs ?? [])?.run;
+  const sessionRun = analysis.run;
+  if (!sessionRun || !latestBacklogRun) {
+    return planningRunFailure(sessionRun ?? latestBacklogRun);
   }
-  return planningRunFailure(latestBacklogAnalysisRun(runs ?? [])?.run);
+  if (sessionRun.id === latestBacklogRun.id) {
+    return planningRunFailure(mergeCanvasRunUpdate(latestBacklogRun, sessionRun));
+  }
+  const sessionStartedAt = Date.parse(sessionRun.createdAt ?? "") || 0;
+  const backlogStartedAt = Date.parse(latestBacklogRun.createdAt ?? "") || 0;
+  return planningRunFailure(sessionStartedAt > backlogStartedAt ? sessionRun : latestBacklogRun);
 }
 
 function popupHasAnalysisResult(

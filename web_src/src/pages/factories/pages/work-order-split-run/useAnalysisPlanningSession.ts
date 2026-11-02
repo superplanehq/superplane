@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import { useEffect, useState } from "react";
 
 import { emptyCreateWithAgentView } from "../createWithAgentDemo";
-import { planningRunFailure } from "../../lib/backlogAnalysis";
 import {
   answerPlanningSessionSurvey,
   findPlanningSessionByWorkOrder,
@@ -287,7 +286,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     queryError: query.error,
     isLoading: query.isLoading,
     view,
-    runFailure: planningRunFailure(liveRun.run),
+    run: liveRun.run,
     composer,
     composerError,
     canSend,

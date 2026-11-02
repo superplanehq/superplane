@@ -384,6 +384,95 @@ describe("WorkOrderSplitRunPopup", () => {
     await waitFor(() => expect(screen.queryByRole("alert", { name: "Planning failed" })).not.toBeInTheDocument());
   });
 
+  it("shows a newer failed Backlog run when an older session has no run", async () => {
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "backlog-canvas",
+    });
+    const failed: BacklogAnalysisRun = {
+      canvasId: "backlog-canvas",
+      workOrderId: DRAFT_WORK_ORDER.id!,
+      run: {
+        id: "backlog-failed",
+        createdAt: "2026-11-02T10:00:00Z",
+        state: "STATE_FINISHED",
+        result: "RESULT_FAILED",
+        errors: ['model "gpt-6.1-terra": the selected model is unavailable for this task owner'],
+      },
+    };
+    const props = {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      analysisRuns: [failed],
+    };
+    const popup = renderPopup(props);
+
+    const alert = await screen.findByRole("alert", { name: "Planning failed" });
+    expect(alert).toHaveTextContent('model "gpt-6.1-terra"');
+    expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
+
+    popup.rerenderPopup({
+      ...props,
+      analysisRuns: [
+        failed,
+        {
+          ...failed,
+          run: { id: "backlog-retry", createdAt: "2026-11-02T10:01:00Z", state: "STATE_STARTED" },
+        },
+      ],
+    });
+
+    expect(screen.queryByRole("alert", { name: "Planning failed" })).not.toBeInTheDocument();
+  });
+
+  it("hides an older session failure when a newer Backlog run starts", async () => {
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "backlog-canvas",
+      canvasRunId: "session-failed",
+      executionId: "session-execution",
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(canvasKeys.run("backlog-canvas", "session-failed"), {
+      run: {
+        id: "session-failed",
+        createdAt: "2026-11-02T10:00:00Z",
+        state: "STATE_FINISHED",
+        result: "RESULT_FAILED",
+        errors: ["The earlier planning run failed."],
+      },
+    });
+    renderPopup(
+      {
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryId: PRIMARY_FACTORY_ID,
+        orderId: DRAFT_WORK_ORDER.id,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+        analysisRuns: [
+          {
+            canvasId: "backlog-canvas",
+            workOrderId: DRAFT_WORK_ORDER.id!,
+            run: { id: "backlog-retry", createdAt: "2026-11-02T10:01:00Z", state: "STATE_STARTED" },
+          },
+        ],
+      },
+      client,
+    );
+
+    await waitFor(() =>
+      expect(
+        client.getQueryData(
+          workOrderPlanningSessionQueryKey(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, DRAFT_WORK_ORDER.id!),
+        ),
+      ).toMatchObject({ id: "session-plan" }),
+    );
+    expect(screen.queryByRole("alert", { name: "Planning failed" })).not.toBeInTheDocument();
+  });
+
   it("does not poll a missing session when Planning is off", async () => {
     factoryPlanning.current = { enabled: false, clarity: false, confidence: false };
     const { queryClient } = renderPopup({
