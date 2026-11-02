@@ -67,7 +67,9 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
 	require.NoError(t, err)
-	assert.Equal(t, "onWorkOrder", version.Nodes[0].ComponentName())
+	trigger := customAutomationNode([]models.Node(version.Nodes), customAutomationTaskTriggerID)
+	require.NotNil(t, trigger)
+	assert.Equal(t, "onWorkOrder", trigger.ComponentName())
 	for _, node := range version.Nodes {
 		assert.NotEqual(t, "github.onPullRequest", node.ComponentName())
 	}
@@ -389,6 +391,15 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeStateReady, repaired.State)
 	assert.Nil(t, repaired.StateReason)
 	assert.NotContains(t, repaired.Configuration.Data(), "credentials")
+}
+
+func customAutomationNode(nodes []models.Node, id string) *models.Node {
+	for i := range nodes {
+		if nodes[i].ID == id {
+			return &nodes[i]
+		}
+	}
+	return nil
 }
 
 func requireSuperPlaneAutomationNode(t *testing.T, db *gorm.DB, canvasID uuid.UUID) *models.CanvasNode {
