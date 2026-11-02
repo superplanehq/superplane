@@ -88,7 +88,7 @@ describe("Codex assignment continuation", () => {
       .mockImplementation(async () => ({ data: { connection } }) as never);
   });
 
-  it("preserves the action input and resumes once after connection", async () => {
+  it("preserves the action input and resumes once while the connected account refreshes", async () => {
     const save = vi.fn().mockRejectedValueOnce(connectionRequired).mockResolvedValue(undefined);
     const client = mount(save);
     const user = userEvent.setup();
@@ -106,7 +106,7 @@ describe("Codex assignment continuation", () => {
       await screen.findByText("ChatGPT sign-in is saved. Wait for connection setup to finish."),
     ).toBeInTheDocument();
     expect(save).toHaveBeenCalledTimes(1);
-    connection = { status: "ready", eligible: true, availableModels: ["gpt-5.4"] };
+    connection = { status: "ready", eligible: true, availableModels: ["gpt-5.4"], catalogRefreshTaskId: "catalog-1" };
     await act(async () => client.setQueryData(factoryCodexConnectionKey("org", "factory", "me"), connection));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Saved"));
     expect(

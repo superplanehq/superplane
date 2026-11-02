@@ -494,7 +494,7 @@ message DescribeCodexConnectionResponse { Superplane.Factories.FactoryCodexConne
 message StartCodexConnectionRequest { bool refresh_catalog = 1; }
 message StartCodexConnectionResponse { Superplane.Factories.FactoryCodexConnection connection = 1; }
 
-message CancelCodexConnectionRequest { }
+message CancelCodexConnectionRequest { string catalog_refresh_task_id = 1; }
 message CancelCodexConnectionResponse { Superplane.Factories.FactoryCodexConnection connection = 1; }
 
 message DisconnectCodexConnectionRequest { }
