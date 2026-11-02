@@ -545,7 +545,7 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 		return
 	}
 
-	client, err := newClientForAppInstallation(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := newClientForAppInstallation(ctx.HTTP, ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create client: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
@@ -565,7 +565,7 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 		metadata.Owner = ownerFromInstallationAccount(event.GetInstallation())
 	}
 	if metadata.Owner == "" {
-		appClient, err := newClientForApp(ctx.Integration, metadata.GitHubApp.ID)
+		appClient, err := newClientForApp(ctx.HTTP, ctx.Integration, metadata.GitHubApp.ID)
 		if err != nil {
 			ctx.Logger.Errorf("failed to create app client: %v", err)
 		}
@@ -854,7 +854,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	client, err := newClientForAppInstallation(ctx.Integration, appIDNumber, installationID)
+	client, err := newClientForAppInstallation(ctx.HTTP, ctx.Integration, appIDNumber, installationID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create client: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
@@ -1109,7 +1109,7 @@ func integrationAppID(ctx core.HTTPRequestContext) int64 {
 }
 
 func lookupInstallationAppIDFromGitHub(ctx core.HTTPRequestContext, appID int64, installationID string) (int64, error) {
-	client, err := newAppJWTClient(ctx.Integration, appID)
+	client, err := newAppJWTClient(ctx.HTTP, ctx.Integration, appID)
 	if err != nil {
 		return 0, err
 	}
@@ -1438,13 +1438,17 @@ func (g *GitHub) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }
 
-func newClientForApp(ctx core.IntegrationContext, appID int64) (*github.Client, error) {
+func newClientForApp(httpCtx core.HTTPContext, ctx core.IntegrationContext, appID int64) (*github.Client, error) {
 	pem, err := findAppPrivateKey(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find PEM: %v", err)
 	}
 
-	itr, err := ghinstallation.NewAppsTransport(http.DefaultTransport, appID, []byte(pem))
+	base, err := common.HTTPRoundTripper(httpCtx)
+	if err != nil {
+		return nil, err
+	}
+	itr, err := ghinstallation.NewAppsTransport(base, appID, []byte(pem))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
 	}
@@ -1454,7 +1458,7 @@ func newClientForApp(ctx core.IntegrationContext, appID int64) (*github.Client, 
 	return common.ApplyHostToGitHubClient(github.NewClient(&http.Client{Transport: itr}), host)
 }
 
-func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, installationID string) (*github.Client, error) {
+func newClientForAppInstallation(httpCtx core.HTTPContext, ctx core.IntegrationContext, appID int64, installationID string) (*github.Client, error) {
 	installationNumber, err := strconv.ParseInt(installationID, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
@@ -1465,13 +1469,11 @@ func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, insta
 		return nil, fmt.Errorf("failed to find PEM: %v", err)
 	}
 
-	itr, err := ghinstallation.New(
-		http.DefaultTransport,
-		appID,
-		installationNumber,
-		[]byte(pem),
-	)
-
+	base, err := common.HTTPRoundTripper(httpCtx)
+	if err != nil {
+		return nil, err
+	}
+	itr, err := ghinstallation.New(base, appID, installationNumber, []byte(pem))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
 	}

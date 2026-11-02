@@ -28,6 +28,15 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.http.Do(req)
 }
 
+// HTTPRoundTripper sends GitHub SDK requests through SuperPlane HTTP checks
+// (private-address and redirect policy).
+func HTTPRoundTripper(httpCtx core.HTTPContext) (http.RoundTripper, error) {
+	if httpCtx == nil {
+		return nil, fmt.Errorf("HTTP context is required")
+	}
+	return &transport{http: httpCtx}, nil
+}
+
 type Client struct {
 	authMethod string
 	ownerType  string

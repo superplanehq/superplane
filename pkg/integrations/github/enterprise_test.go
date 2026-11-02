@@ -1,6 +1,7 @@
 package github
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -307,6 +308,39 @@ func TestFindWebhookSecretRefusesHostedFallbackOnEnterprise(t *testing.T) {
 	_, err := (&GitHub{}).findWebhookSecret(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GitHub Enterprise cannot use SuperPlane's public GitHub App")
+}
+
+func TestNewClientForAppUsesProtectedHTTP(t *testing.T) {
+	intCtx := enterpriseAppIntegration(t)
+	httpCtx := &contexts.HTTPContext{}
+
+	client, err := newClientForApp(httpCtx, intCtx, 1)
+	require.NoError(t, err)
+	_, _, err = client.Apps.Get(context.Background(), "superplane")
+	require.Error(t, err)
+	require.NotEmpty(t, httpCtx.Requests)
+	assert.Contains(t, httpCtx.Requests[0].URL.String(), "https://api.acme.ghe.com/")
+
+	httpCtx = &contexts.HTTPContext{}
+	client, err = newClientForAppInstallation(httpCtx, intCtx, 1, "99")
+	require.NoError(t, err)
+	_, err = listInstallationRepositories(context.Background(), client)
+	require.Error(t, err)
+	require.NotEmpty(t, httpCtx.Requests)
+	assert.Contains(t, httpCtx.Requests[0].URL.String(), "https://api.acme.ghe.com/")
+}
+
+func enterpriseAppIntegration(t *testing.T) *contexts.IntegrationContext {
+	t.Helper()
+	return &contexts.IntegrationContext{
+		NewSetupFlow: true,
+		CurrentProperties: map[string]any{
+			common.PropertyHost: "acme.ghe.com",
+		},
+		CurrentSecrets: map[string]core.IntegrationSecret{
+			common.SecretAppPEM: {Name: common.SecretAppPEM, Value: githubPrivateKeyPEM(t)},
+		},
+	}
 }
 
 type rewriteHTTP struct {
