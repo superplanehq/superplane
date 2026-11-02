@@ -15,6 +15,9 @@ export function AnalysisPlanControls({
   if (position !== "conversation") {
     return null;
   }
+  if (!shouldShowPlanningReview(analysis)) {
+    return null;
+  }
   return (
     <PlanningReview
       open={Boolean(analysis.planPaneOpen)}
@@ -32,4 +35,19 @@ export function AnalysisPlanControls({
       creditVerdict={analysis.creditVerdict}
     />
   );
+}
+
+/** Keep credit blocks and finished reviews visible; a new run uses its live activity until a plan exists. */
+function shouldShowPlanningReview(analysis: IntentAnalysisChat): boolean {
+  if (analysis.creditVerdict || analysis.canTogglePlan) {
+    return true;
+  }
+  switch (analysis.view.machineStatus) {
+    case "queued":
+    case "starting":
+    case "running":
+      return false;
+    default:
+      return true;
+  }
 }
