@@ -57,7 +57,7 @@ activation.
    Preserve the existing subscription feature flags for active runs.
 2. Drain existing sign-in and catalog setup tasks. Do not reinterpret old login
    leases as catalog leases. Preserve existing run contracts.
-3. Apply `20261031144703_add-codex-catalog-leases` through the normal migration
+3. Apply `20261102120509_add-codex-catalog-leases` through the normal migration
    process. It preserves existing login/run rows, scope, and secret uniqueness.
    It adds the catalog purpose, permits its null workspace, and creates a unique
    catalog index that includes locally revoked rows.

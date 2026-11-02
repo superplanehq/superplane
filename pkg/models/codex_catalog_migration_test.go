@@ -14,7 +14,7 @@ import (
 )
 
 func TestCodexCatalogMigrationPreservesLeasesAndEnforcesScopeAndUniqueness(t *testing.T) {
-	migration, err := os.ReadFile("../../db/migrations/20261031144703_add-codex-catalog-leases.up.sql")
+	migration, err := os.ReadFile("../../db/migrations/20261102120509_add-codex-catalog-leases.up.sql")
 	require.NoError(t, err)
 	sql := strings.ReplaceAll(strings.ReplaceAll(string(migration), "BEGIN;", ""), "COMMIT;", "")
 	tx := database.DB(t.Context()).Begin()
