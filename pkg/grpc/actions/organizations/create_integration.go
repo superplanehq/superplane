@@ -23,6 +23,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -84,7 +85,18 @@ func CreateIntegration(
 	// new_integration_setup_flow.
 	//
 	if usesSetupWizard(registry, org, integrationName, configMap) {
-		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
+		var configuration map[string]any
+		if integrationName == "github" {
+			var err error
+			configuration, err = github.WizardCreateConfiguration(org, configMap, registry.HTTPContext())
+			if err != nil {
+				if grpcerrors.Code(err) == codes.PermissionDenied {
+					return nil, err
+				}
+				return nil, grpcerrors.InvalidArgument(err, err.Error())
+			}
+		}
+		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, configuration)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")
 			return nil, grpcerrors.Internal(err, "failed to create integration")
@@ -129,6 +141,9 @@ func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName st
 	if sentry.PreferHostedInstall(integrationName, config) {
 		return false
 	}
+	if integrationName == "github" && github.HostRequiresPrivateApp(config) {
+		return true
+	}
 	return reg.UseNewSetupFlow(orgID, integrationName)
 }
 
@@ -153,6 +168,7 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
 			Capabilities:   capabilityCtx,
 			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration),
+			Configuration:  newIntegration.Configuration.Data(),
 		})
 
 		setupState := datatypes.NewJSONType(models.SetupState{

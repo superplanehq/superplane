@@ -157,5 +157,8 @@ describe("consolePages", () => {
     expect(artifactOpenHref({ type: "TYPE_BRANCH", data: { name: "feature/x", repository: "acme/app" } })).toBe(
       "https://github.com/acme/app/tree/feature/x",
     );
+    expect(
+      artifactOpenHref({ type: "TYPE_BRANCH", data: { name: "feature/x", repository: "acme/app" } }, "acme.ghe.com"),
+    ).toBe("https://acme.ghe.com/acme/app/tree/feature/x");
   });
 });
