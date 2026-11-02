@@ -31,9 +31,6 @@ vi.mock("@/lib/toast", () => ({ showErrorToast: vi.fn() }));
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, currentUserId: "me", isLoading: false }),
 }));
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ isLoading: false, has: () => true }),
-}));
 
 const connectionRequired = { details: [{ domain: "superplane.com", reason: "CODEX_CONNECTION_REQUIRED" }] };
 let connection: FactoriesFactoryCodexConnection;

@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
@@ -46,7 +45,6 @@ func TestRunnerReservationFailureProcessesSavedErrorAfterCommit(t *testing.T) {
 		QueuedAt: time.Now(), PayloadCiphertext: []byte(`{}`)}
 	require.NoError(t, db.Create(task).Error)
 	execution, request := createRunnerTaskPoll(t, resource, task)
-	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
 	_, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now())

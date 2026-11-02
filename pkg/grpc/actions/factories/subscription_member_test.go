@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -24,7 +23,6 @@ import (
 func TestSubscriptionConnectionsAndCatalogsFollowTheTaskOwner(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	subscription := true
@@ -148,7 +146,6 @@ func requireCodexConnectionRequired(t *testing.T, err error) {
 func TestSubscriptionStartReassignsOpenTasksAndStepRetries(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	subscription := true

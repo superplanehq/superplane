@@ -43,28 +43,17 @@ function CodexConnectionErrorNotice({
   );
 }
 
-function CodexConnectionNotices({
-  codex,
-  featuresLoading,
-  offered,
-  billingHref,
-}: {
-  codex: CodexConnection;
-  featuresLoading: boolean;
-  offered: boolean;
-  billingHref: string;
-}) {
+function CodexConnectionNotices({ codex, billingHref }: { codex: CodexConnection; billingHref: string }) {
   const connection = codex.query.data;
   return (
     <>
-      {featuresLoading || codex.query.isLoading ? <p role="status">Loading Codex connection...</p> : null}
+      {codex.query.isLoading ? <p role="status">Loading Codex connection...</p> : null}
       {codex.query.isError ? (
         <p role="alert">Could not load your Codex connection. Close this dialog and try again.</p>
       ) : null}
       {connection?.revocationPending ? (
         <p role="status">Stopping your previous tasks. You can reconnect when cleanup finishes.</p>
       ) : null}
-      {!featuresLoading && !offered ? <p role="alert">Codex subscriptions are unavailable in this workspace.</p> : null}
       {connection?.eligible === false ? <p role="alert">Your account cannot connect Codex in this workspace.</p> : null}
       {codex.start.isError ? (
         <CodexConnectionErrorNotice
@@ -90,12 +79,7 @@ export function CodexConnectionSetupContent({ setup }: { setup: ReturnType<typeo
   const billingHref = factorySettingsSectionPath(setup.organizationId, setup.factoryId, "organization", "billing");
   return (
     <>
-      <CodexConnectionNotices
-        codex={codex}
-        featuresLoading={setup.featuresLoading}
-        offered={setup.offered}
-        billingHref={billingHref}
-      />
+      <CodexConnectionNotices codex={codex} billingHref={billingHref} />
       <CodexDeviceSignIn
         disabled={setup.disabled}
         connection={codex.query.data}
