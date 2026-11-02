@@ -193,7 +193,10 @@ func TestCodexExecArgsStartsOnlyTheGlobalMCPWithARunnerToken(t *testing.T) {
 			assert.Contains(t, args, `mcp_servers.superplane_global.command="node"`)
 			assert.Contains(t, args, `mcp_servers.superplane_global.args=["/task/superplane_mcp/server.js"]`)
 			assert.Contains(t, args, `mcp_servers.superplane_global.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ANALYSIS_SPEC_FILE"]`)
-			for _, tool := range []string{"assign_owner", "propose_update", "inspect_attachment", "upload_artifact", "publish_link", "report_merge_check"} {
+			for _, tool := range []string{
+				"list_members", "assign_task_owner", "add_checks", "get_artifact", "add_artifact", "propose_plan", "report_merge_check",
+				"assign_owner", "propose_update", "inspect_attachment", "upload_artifact", "publish_link",
+			} {
 				assert.Contains(t, args, fmt.Sprintf(`mcp_servers.superplane_global.tools.%s.approval_mode="approve"`, tool))
 			}
 			assert.NotContains(t, joined, "mcp_servers.superplane.")
@@ -882,12 +885,12 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, joined, "developer_instructions=")
-	assert.Contains(t, joined, "propose_update")
+	assert.Contains(t, joined, "propose_plan")
 	assert.Contains(t, joined, "Do not call propose_spec, propose_clarity, propose_confidence, or survey")
 	assert.NotContains(t, joined, "Call propose_spec")
 	assert.NotContains(t, joined, "Call propose_clarity")
 	assert.NotContains(t, joined, "Call propose_confidence")
-	assert.NotContains(t, joined, "propose_plan")
+	assert.NotContains(t, joined, "propose_update")
 	assert.Contains(t, joined, "Use only the analysis tools")
 }
 

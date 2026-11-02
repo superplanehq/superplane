@@ -286,6 +286,21 @@ func (o *FactoryWorkOrder) FindArtifactByKey(tx *gorm.DB, key string) (*FactoryW
 	return &artifact, nil
 }
 
+func (o *FactoryWorkOrder) FindArtifactByID(tx *gorm.DB, id uuid.UUID) (*FactoryWorkOrderArtifact, error) {
+	var artifact FactoryWorkOrderArtifact
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND work_order_id = ? AND id = ?", o.OrganizationID, o.FactoryID, o.ID, id).
+		First(&artifact).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFactoryWorkOrderArtifactNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &artifact, nil
+}
+
 func (o *FactoryWorkOrder) UpdateArtifactData(
 	tx *gorm.DB,
 	key string,

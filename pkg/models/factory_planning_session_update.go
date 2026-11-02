@@ -105,7 +105,7 @@ func (s *FactoryPlanningSession) ProposeUpdate(tx *gorm.DB, update PlanningSessi
 	})
 }
 
-// validatePlanningSessionUpdate checks one propose_update call. Review
+// validatePlanningSessionUpdate checks one propose_plan call. Review
 // scoring is not optional: the first plan turn must publish all three
 // sub-parameters, and any scores sent later must be complete and valid.
 func validatePlanningSessionUpdate(update PlanningSessionUpdate, checks []FactoryWorkOrderCheck) error {

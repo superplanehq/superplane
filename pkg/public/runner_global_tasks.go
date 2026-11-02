@@ -226,7 +226,17 @@ func (s *Server) handleRunnerRemoveArtifact(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	removed, err := target.order.RemoveArtifact(database.DB(r.Context()), key, title, nil)
+	db := database.DB(r.Context())
+	if key != "" {
+		artifact, err := findRunnerArtifactByKey(db, target.order, key)
+		if err != nil {
+			writeRunnerTaskError(w, err)
+			return
+		}
+		key = *artifact.Key
+		title = ""
+	}
+	removed, err := target.order.RemoveArtifact(db, key, title, nil)
 	if err != nil {
 		writeRunnerTaskError(w, err)
 		return

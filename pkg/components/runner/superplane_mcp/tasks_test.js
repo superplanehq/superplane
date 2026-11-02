@@ -18,6 +18,22 @@ const env = {
   SUPERPLANE_RUNNER_TOKEN: "runner-token",
 };
 
+function call(name, input, client) {
+  return registry.resolve(name, registry.allTools()).handler(input, client);
+}
+
+function ownerFetch(calls) {
+  return async (url, init) => {
+    calls.push({ url, method: init.method, headers: init.headers, body: init.body && JSON.parse(init.body) });
+    return { ok: true, status: 200, text: async () => '{"status":"assigned"}' };
+  };
+}
+
+const ownerEnv = {
+  SUPERPLANE_BASE_URL: "https://superplane.example/",
+  SUPERPLANE_RUNNER_TOKEN: "runner-token",
+};
+
 test("list_tasks sends state and limit", async () => {
   const calls = [];
   const client = createClient(env, recordingFetch(calls));
@@ -84,4 +100,103 @@ test("close_task rejects an unknown result", async () => {
     () => registry.findTool("close_task").handler({ result: "archived" }, client),
     /result must be completed, rejected, or failed/,
   );
+});
+
+test("suggest_task_owner posts normalized paths to the task route", async () => {
+  const calls = [];
+  const client = createClient(ownerEnv, ownerFetch(calls));
+  const many = Array.from({ length: 12 }, (_, index) => `pkg/${index}`);
+
+  await call("suggest_task_owner", { paths: [" pkg/payments ", "", ...many] }, client);
+  await call("suggest_task_owner", {}, client);
+
+  assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/task/suggest-owners");
+  assert.equal(calls[0].method, "POST");
+  assert.equal(calls[0].headers.Authorization, "Bearer runner-token");
+  assert.equal(calls[0].body.paths.length, 10);
+  assert.equal(calls[0].body.paths[0], "pkg/payments");
+  assert.deepEqual(calls[1].body, { paths: [] });
+});
+
+test("assign_task_owner puts the owner on the task route", async () => {
+  const calls = [];
+  const client = createClient(ownerEnv, ownerFetch(calls));
+
+  await call("assign_task_owner", { user: "@mijat", reason: " You changed pkg/payments. " }, client);
+
+  assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/task/owner");
+  assert.equal(calls[0].method, "PUT");
+  assert.deepEqual(calls[0].body, { user: "@mijat", reason: "You changed pkg/payments." });
+});
+
+test("assign_task_owner can keep an existing owner", async () => {
+  const calls = [];
+  const client = createClient(ownerEnv, ownerFetch(calls));
+
+  await call("assign_task_owner", { user: "mijat", only_if_unassigned: true }, client);
+
+  assert.deepEqual(calls[0].body, { user: "mijat", only_if_unassigned: true });
+});
+
+test("assign_task_owner sends a call with no reason", async () => {
+  const calls = [];
+  const client = createClient(ownerEnv, ownerFetch(calls));
+
+  await call("assign_task_owner", { user: "mijat" }, client);
+
+  assert.deepEqual(calls[0].body, { user: "mijat" });
+  assert.equal(Object.hasOwn(calls[0].body, "reason"), false);
+});
+
+test("assign_task_owner requires a user", async () => {
+  const client = createClient(ownerEnv, ownerFetch([]));
+
+  await assert.rejects(() => call("assign_task_owner", { reason: "Owns pkg." }, client), /user is required/);
+});
+
+test("the client requires the runner token", async () => {
+  const client = createClient({ SUPERPLANE_BASE_URL: "https://superplane.example" }, ownerFetch([]));
+  await assert.rejects(
+    () => call("suggest_task_owner", {}, client),
+    /SUPERPLANE_RUNNER_TOKEN/,
+  );
+});
+
+test("the client returns the backend message on an HTTP error", async () => {
+  const client = createClient(env, async () => ({
+    ok: false,
+    status: 403,
+    text: async () => "This run cannot use this tool\n",
+  }));
+  await assert.rejects(
+    () => call("suggest_task_owner", {}, client),
+    (error) => error.status === 403 && error.message === "This run cannot use this tool",
+  );
+});
+
+test("the previous owner tool names send the same requests", async () => {
+  const calls = [];
+  const client = createClient(ownerEnv, ownerFetch(calls));
+  const pairs = [
+    ["suggest_owners", "suggest_task_owner", { paths: ["pkg/payments"] }],
+    ["assign_owner", "assign_task_owner", { user: "mijat", reason: "Owns pkg.", only_if_unassigned: true }],
+  ];
+
+  for (const [previous, current, input] of pairs) {
+    await call(previous, input, client);
+    await call(current, input, client);
+  }
+
+  assert.deepEqual(calls[0], calls[1]);
+  assert.deepEqual(calls[2], calls[3]);
+});
+
+test("list_members reads the organization members", async () => {
+  const calls = [];
+  const client = createClient(env, recordingFetch(calls, '{"members":[]}'));
+
+  await call("list_members", {}, client);
+
+  assert.equal(calls[0].method, "GET");
+  assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/members");
 });
