@@ -74,6 +74,27 @@ func TestRunnerReservationCannotClaimPendingTasks(t *testing.T) {
 	assert.Nil(t, reservation.Task)
 }
 
+func TestRunnerReservationRejectsQueuedPaidTaskAfterCreditExpires(t *testing.T) {
+	f := newRunnerCapacityTest(t, new(1))
+	fleet := f.fleet(models.RunnerFleetE1LargeAMD64)
+	task := f.task(f.organizationID, fleet.ID)
+	scheduled, err := models.ScheduleOrganizationRunnerTasks(f.db, f.organizationID, 1)
+	require.NoError(t, err)
+	require.Len(t, scheduled, 1)
+	require.NoError(t, f.db.Model(&billingmodels.OrganizationLLMCreditGrant{}).
+		Where("organization_id = ?", f.organizationID).
+		Update("expires_at", time.Now().Add(-time.Minute)).Error)
+
+	result, err := f.runner(fleet.ID).ReserveNextTask(f.db)
+	require.NoError(t, err)
+	assert.Nil(t, result.Task)
+	require.Len(t, result.FailedTasks, 1)
+	assert.Equal(t, task.ID, result.FailedTasks[0].ID)
+	stored, err := models.FindRunnerTask(f.db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStateFailed, stored.State)
+}
+
 func TestRunnerReservationSkipsLockedQueuedTask(t *testing.T) {
 	f := newRunnerCapacityTest(t, new(2))
 	fleet := f.fleet("locked-task-amd64")

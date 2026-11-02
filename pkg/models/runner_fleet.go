@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -345,6 +346,22 @@ func (f *RunnerFleet) RequireAdmission(tx *gorm.DB) error {
 	}
 	if !f.Enabled {
 		return ErrRunnerFleetDisabled
+	}
+	return nil
+}
+
+// RequireComputeCredit checks the wallet only when this fleet bills VM time.
+func (f *RunnerFleet) RequireComputeCredit(tx *gorm.DB, organizationID uuid.UUID) error {
+	price, err := billing.PriceCompute(billing.ComputeUsage{MachineType: f.Slug, FleetID: f.Slug, DurationSeconds: 1})
+	if err != nil || price.CostMicros <= 0 || !billing.Enabled() {
+		return err
+	}
+	credit, err := billing.DescribeCredit(tx, organizationID)
+	if err != nil {
+		return err
+	}
+	if credit.RemainingMicros <= 0 {
+		return billing.ErrHostedCreditEmpty
 	}
 	return nil
 }
