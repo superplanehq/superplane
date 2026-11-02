@@ -10,10 +10,12 @@ import type { PlanningReviewDraft, PlanningReviewStep } from "../pages/planningR
 export const CUSTOM_AUTOMATION_TEMPLATE_ID = "custom-verification";
 
 export type CustomAutomationMode = "manual" | "automatic";
+export type CustomAutomationColumn = "backlog" | "verify";
 export type ManualCustomAutomation = {
   id: string;
   name: string;
   icon?: string;
+  columnKey?: CustomAutomationColumn;
 };
 
 export const DEFAULT_CUSTOM_AUTOMATION_ICON = "sparkles";
@@ -23,18 +25,21 @@ export function customAutomationMode(value: FactoryCustomAutomationStartMode | u
   return value === "START_MODE_AUTOMATIC" ? "automatic" : "manual";
 }
 
-export function customAutomationModeCopy(mode: CustomAutomationMode): {
+export function customAutomationModeCopy(
+  mode: CustomAutomationMode,
+  columnKey: CustomAutomationColumn = "verify",
+): {
   trigger: string;
   action: string;
 } {
   if (mode === "automatic") {
     return {
-      trigger: "On Verify and new commits",
+      trigger: columnKey === "backlog" ? "When a task enters Backlog" : "On Verify and new commits",
       action: "Run automation automatically",
     };
   }
   return {
-    trigger: "Manual start on a Verify task",
+    trigger: columnKey === "backlog" ? "Manual start on a Backlog task" : "Manual start on a Verify task",
     action: "Run automation on demand",
   };
 }
