@@ -3,7 +3,6 @@ package factories
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -302,17 +301,9 @@ func buildFactoryBitbucketAPI(db *gorm.DB, deps IntakeDependencies, factory *mod
 		return nil, errFactoryBitbucketNotConnected
 	}
 
-	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
-	if integrationID == "" {
-		return nil, errFactoryBitbucketNotConnected
-	}
-
-	integration, err := findReadyOnboardingIntegration(db, factory.OrganizationID, integrationID)
+	integration, err := findFactoryVCSIntegration(db, factory, models.ProviderBitbucket, errFactoryBitbucketNotConnected)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errFactoryBitbucketNotConnected, err)
-	}
-	if integration.AppName != models.ProviderBitbucket {
-		return nil, errFactoryBitbucketNotConnected
+		return nil, err
 	}
 
 	return buildBitbucketClient(db, deps, integration)
@@ -324,7 +315,7 @@ func buildBitbucketClient(db *gorm.DB, deps IntakeDependencies, integration *mod
 	}
 	metadata := bitbucketintegration.Metadata{}
 	if err := mapstructure.Decode(integration.Metadata.Data(), &metadata); err != nil {
-		return nil, fmt.Errorf("%w: %w", errFactoryBitbucketNotConnected, err)
+		return nil, factoryVCSSetupError(errFactoryBitbucketNotConnected, err)
 	}
 
 	client, err := bitbucketintegration.NewClient(
@@ -333,7 +324,7 @@ func buildBitbucketClient(db *gorm.DB, deps IntakeDependencies, integration *mod
 		contexts.NewIntegrationContext(db, nil, integration, deps.Encryptor, deps.Registry, nil),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errFactoryBitbucketNotConnected, err)
+		return nil, factoryVCSSetupError(errFactoryBitbucketNotConnected, err)
 	}
 	return client, nil
 }

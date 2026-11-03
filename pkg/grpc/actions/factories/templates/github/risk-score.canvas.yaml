@@ -8,6 +8,12 @@ spec:
     - channel: default
       sourceId: on-pr-risk
       targetId: assess-risk
+    - channel: passed
+      sourceId: assess-risk
+      targetId: publish-merge-confidence
+    - channel: failed
+      sourceId: assess-risk
+      targetId: publish-merge-confidence
   nodes:
     - id: on-pr-risk
       name: On Pull Request
@@ -268,5 +274,14 @@ spec:
               Do not repeat the score. Do not write a second sentence.
       position:
         x: 640
+        "y": 80
+      isCollapsed: true
+    - id: publish-merge-confidence
+      name: Publish Merge Confidence
+      type: TYPE_ACTION
+      component: publishMergeConfidence
+      configuration: {}
+      position:
+        x: 1200
         "y": 80
       isCollapsed: true

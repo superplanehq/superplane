@@ -44,6 +44,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Loop" href="#loop" description="Repeat downstream steps until a condition is met" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="Publish Merge Confidence" href="#publish-merge-confidence" description="Publish the assessment checks in the pull request description" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
   <LinkCard title="Report Task Check" href="#report-task-check" description="Report a scored or pass/fail check (risk, coverage, CI) on a task" />
   <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
@@ -1363,6 +1364,28 @@ When executed, the No Operation component immediately emits the incoming event d
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "noop.finished"
+}
+```
+
+<a id="publish-merge-confidence"></a>
+
+## Publish Merge Confidence
+
+**Component key:** `publishMergeConfidence`
+
+Connect the assessment agent directly to this component. Publish the saved checks from the current run in this factory. Connect both Passed and Failed outputs to publish complete and incomplete assessments. Publication preserves the existing description. Transient host failures retry through scheduled requests. Execution details show attempts and skipped outcomes. Newer assessments and changed commits stop publication.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attempts": 1,
+    "sourceRunId": "123",
+    "status": "published"
+  },
+  "timestamp": "2026-11-03T12:00:00Z",
+  "type": "mergeConfidence.published"
 }
 ```
 
