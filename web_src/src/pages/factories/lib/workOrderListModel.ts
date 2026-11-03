@@ -5,7 +5,7 @@ import type {
   FactoriesWorkOrderLineDispatch,
   FactoriesWorkOrderSummary,
 } from "@/api-client";
-import { selectWorkOrderCardPullRequest, workOrderCardPullRequestShowsMergeable } from "./workOrderCardPullRequest";
+import { selectWorkOrderCardPullRequest, workOrderCardPullRequestIsMergeable } from "./workOrderCardPullRequest";
 import { workOrderListSource } from "./workOrderCardSource";
 import { pullRequestState } from "./workOrderPullRequest";
 import { workOrderMatchesUser } from "./workOrderListPagination";
@@ -426,7 +426,7 @@ function workOrderMatchesFilterLabel(order: FactoriesWorkOrderSummary, label: Wo
   if (label === "review") {
     return pullRequestState(card.pullRequest.state) === "open";
   }
-  return workOrderCardPullRequestShowsMergeable(card.pullRequest, order.checkScores);
+  return workOrderCardPullRequestIsMergeable(card.pullRequest);
 }
 
 export function applyWorkOrderFilters(
