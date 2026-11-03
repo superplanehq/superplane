@@ -357,6 +357,27 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 	}, nil
 }
 
+// GetPullRequestEvent reads a current snapshot using the webhook event contract.
+// Keep the full provider payload so fork, author, and branch data survive startup.
+func (c *Client) GetPullRequestEvent(repository string, id int64) (map[string]any, error) {
+	path, err := repositoryPath(repository)
+	if err != nil {
+		return nil, err
+	}
+	var current map[string]any
+	endpoint := fmt.Sprintf("%s/repositories/%s/pullrequests/%d", baseURL, path, id)
+	if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &current); err != nil {
+		return nil, err
+	}
+	event, ok := normalizeBitbucketPullRequestEvent(pullRequestEventCreated, map[string]any{
+		"pullrequest": current, "repository": map[string]any{"full_name": repository},
+	})
+	if !ok {
+		return nil, fmt.Errorf("pull request %s#%d has no event snapshot", repository, id)
+	}
+	return event, nil
+}
+
 // errBitbucketMergeAsync reports a merge that Bitbucket accepted for
 // background processing. The merge may still fail, so callers must not
 // treat it as completed.

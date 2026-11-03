@@ -731,7 +731,6 @@ func publishVerificationHandOff(ctx context.Context, deps IntakeDependencies, db
 			factory.ID,
 			trackedPR.ID,
 		)
-		StartPullRequestChecks(ctx, deps, trackedPR.ID)
 		StartVisualEvidenceCapture(
 			ctx,
 			deps,
@@ -741,6 +740,7 @@ func publishVerificationHandOff(ctx context.Context, deps IntakeDependencies, db
 		)
 	}
 	if trackedPR != nil {
+		StartPullRequestChecks(ctx, deps, trackedPR.ID)
 		if err := StartAutomaticCustomAutomations(ctx, deps, factory, order); err != nil {
 			log.WithError(err).Warnf("Failed to start custom automation for order %s", order.ID)
 		}

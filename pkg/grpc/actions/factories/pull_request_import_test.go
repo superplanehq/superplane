@@ -9,20 +9,28 @@ import (
 	"testing"
 	"time"
 
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/json"
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
+	testcontexts "github.com/superplanehq/superplane/test/support/contexts"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -407,4 +415,119 @@ func TestPullRequestImportBitbucket(t *testing.T) {
 	artifacts, err := order.ListArtifacts(db)
 	require.NoError(t, err)
 	assert.True(t, hasBranchArtifact(artifacts, "feature", "contributor/app"))
+}
+
+// Imported Bitbucket PRs have no new provider event to start Merge confidence.
+func TestBitbucketImportStartsMergeConfidence(t *testing.T) {
+	for _, scenario := range []string{"open", "retry", "draft", "closed", "missing revision"} {
+		t.Run(scenario, func(t *testing.T) {
+			r := support.Setup(t)
+			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+			db := database.DB(ctx)
+			factory := seedBitbucketHandOffFactory(t, r, db)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
+			app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+			line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
+			require.NoError(t, err)
+			canvas := createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+			// A same-repository GitHub automation must not receive this import.
+			githubCanvas := createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+			otherRepository := createMergeConfidenceStartupCanvas(t, r, factory, "other/app")
+			for _, bitbucketCanvas := range []*models.Canvas{canvas, otherRepository} {
+				version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, bitbucketCanvas)
+				require.NoError(t, err)
+				version.Nodes[0].Ref.Trigger.Name = "bitbucket.onPullRequest"
+				require.NoError(t, db.Save(version).Error)
+				require.NoError(t, db.Model(&models.CanvasNode{}).Where("workflow_id = ?", bitbucketCanvas.ID).
+					Update("ref", datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "bitbucket.onPullRequest"}})).Error)
+			}
+			body := `{"id":42,"title":"Review refunds","description":"Fix refunds","state":"OPEN","author":{"nickname":"contributor"},"links":{"html":{"href":"https://bitbucket.org/acme/app/pull-requests/42"}},"source":{"branch":{"name":"feature"},"commit":{"hash":"abc123"},"repository":{"full_name":"contributor/app"}},"destination":{"branch":{"name":"main"},"repository":{"full_name":"acme/app"}}}`
+			updatedAt := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+			body = strings.Replace(body, `"state":"OPEN"`, `"state":"OPEN","updated_on":"`+updatedAt.Format(time.RFC3339)+`"`, 1)
+			current := strings.ReplaceAll(body, "abc123", "def456")
+			startup := okBitbucketResponse(current)
+			switch scenario {
+			case "retry":
+				startup = &http.Response{StatusCode: http.StatusServiceUnavailable, Body: http.NoBody}
+			case "draft":
+				startup = okBitbucketResponse(strings.Replace(current, `"state":"OPEN"`, `"state":"OPEN","draft":true`, 1))
+			case "closed":
+				startup = okBitbucketResponse(strings.Replace(current, `"state":"OPEN"`, `"state":"MERGED"`, 1))
+			case "missing revision":
+				startup = okBitbucketResponse(strings.ReplaceAll(current, "def456", ""))
+			}
+			stubBitbucketMergeAPI(t, map[string][]*http.Response{
+				"/2.0/repositories/acme/app/pullrequests/42": {okBitbucketResponse(body), startup, okBitbucketResponse(current)},
+			})
+			req := &pb.ImportFactoryPullRequestRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), PullRequestUrl: "https://bitbucket.org/acme/app/pull-requests/42"}
+			result, err := ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), req)
+			require.NoError(t, err)
+			require.True(t, result.Created)
+			pr, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{Provider: "bitbucket", Repository: "acme/app", Number: 42})
+			require.NoError(t, err)
+			if scenario == "retry" || scenario == "missing revision" {
+				assert.Zero(t, countCanvasEvents(t, canvas.ID))
+				requests, err := models.ListPullRequestChecksStartRequests(db, pr.ID)
+				require.NoError(t, err)
+				require.Len(t, requests, 1, "a failed initial start must remain recoverable")
+				require.NoError(t, requests[0].Reschedule(db, time.Now().Add(-time.Second)))
+				events, err := ProcessPullRequestChecksStartRequest(ctx, IntakeDependencies{}, requests[0].ID)
+				require.NoError(t, err)
+				require.Len(t, events, 1)
+			}
+			assert.Zero(t, countCanvasEvents(t, githubCanvas.ID))
+			assert.Zero(t, countCanvasEvents(t, otherRepository.ID))
+			if scenario == "draft" || scenario == "closed" {
+				assert.Zero(t, countCanvasEvents(t, canvas.ID))
+				requests, err := models.ListPullRequestChecksStartRequests(db, pr.ID)
+				require.NoError(t, err)
+				assert.Empty(t, requests)
+				return
+			}
+			var events []models.CanvasEvent
+			require.NoError(t, db.Where("workflow_id = ?", canvas.ID).Find(&events).Error)
+			require.Len(t, events, 1)
+			payload := models.RootEventSourcePayload(events[0].Data.Data()).(map[string]any)
+			assert.Equal(t, result.Order.GetId(), payload["workOrder"].(map[string]any)["id"])
+			view := payload["pull_request"].(map[string]any)
+			assert.Equal(t, "def456", view["head"].(map[string]any)["sha"])
+			assert.Equal(t, "main", view["base"].(map[string]any)["ref"])
+			assert.Equal(t, "contributor", view["user"].(map[string]any)["login"])
+			source := payload["pullrequest"].(map[string]any)["source"].(map[string]any)
+			assert.Equal(t, "contributor/app", source["repository"].(map[string]any)["full_name"])
+			// Delayed provider delivery and repeated import must not start a second run.
+			node, err := models.FindCanvasNode(db, canvas.ID, "renamed-pr-trigger")
+			require.NoError(t, err)
+			emitWebhook := func(action, snapshot string) {
+				t.Helper()
+				webhook, err := json.Marshal(map[string]any{"pullrequest": json.RawMessage(snapshot), "repository": map[string]any{"full_name": "acme/app"}})
+				require.NoError(t, err)
+				mac := hmac.New(sha256.New, []byte("test-secret"))
+				mac.Write(webhook)
+				code, _, err := (&bitbucket.OnPullRequest{}).HandleWebhook(core.WebhookRequestContext{
+					Body: webhook, Headers: http.Header{"X-Event-Key": {"pullrequest:" + action}, "X-Hub-Signature": {"sha256=" + fmt.Sprintf("%x", mac.Sum(nil))}},
+					Configuration: bitbucket.OnPullRequestConfiguration{Repository: "acme/app", Actions: []string{"created", "updated"}, OnlyFactoryPullRequests: true},
+					Webhook:       &testcontexts.NodeWebhookContext{Secret: "test-secret"},
+					Events:        contexts.NewEventContext(db, node, nil, nil), Factory: contexts.NewFactoryContext(db, canvas, nil),
+				})
+				require.NoError(t, err)
+				assert.Equal(t, http.StatusOK, code)
+			}
+			emitWebhook("created", current)
+			again, err := ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), req)
+			require.NoError(t, err)
+			assert.False(t, again.Created)
+			assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
+			if scenario == "open" {
+				// A later Bitbucket update at the same head still needs a new review.
+				updated := strings.Replace(current, updatedAt.Format(time.RFC3339), updatedAt.Add(time.Minute).Format(time.RFC3339), 1)
+				emitWebhook("updated", updated)
+				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
+				emitWebhook("updated", updated)
+				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
+				emitWebhook("updated", strings.ReplaceAll(updated, "def456", "fedcba"))
+				assert.EqualValues(t, 3, countCanvasEvents(t, canvas.ID))
+			}
+		})
+	}
 }
