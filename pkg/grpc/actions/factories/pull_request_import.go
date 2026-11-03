@@ -48,7 +48,7 @@ func ImportFactoryPullRequest(ctx context.Context, deps IntakeDependencies, orga
 	if _, err := validateImportPullRequestURL(factory, req.GetPullRequestUrl()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to import pull request")
 	}
-	// Existing non-archived tasks are navigation only.
+	// An existing task, including an archived task, keeps ownership of the PR.
 	existing, err := existingPullRequestImport(db, factory, req.GetPullRequestUrl())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to find imported task")
@@ -96,11 +96,6 @@ func ImportFactoryPullRequest(ctx context.Context, deps IntakeDependencies, orga
 		}
 		if factory.OnboardingConfigValue().CodexSubscription && len(assignees) == 0 {
 			return errCodexConnectionRequired
-		}
-		if err := factory.ReleaseArchivedPullRequest(tx, models.FactoryPullRequestLookup{
-			Provider: pr.Provider, Repository: pr.Repository, Number: pr.Number,
-		}); err != nil {
-			return err
 		}
 		origin := models.OriginFromImportedIntakeItem(pr.URL, pr.Title)
 		order, err = factory.CreateWorkOrderWithOrigin(tx, pr.Title, pr.Description, &actor, assignees, nil, origin)
@@ -190,9 +185,6 @@ func existingPullRequestImport(db *gorm.DB, factory *models.Factory, rawURL stri
 	order, err := factory.FindWorkOrder(db, pr.WorkOrderID)
 	if err != nil {
 		return nil, err
-	}
-	if order.IsArchived() {
-		return nil, nil
 	}
 	return order, nil
 }

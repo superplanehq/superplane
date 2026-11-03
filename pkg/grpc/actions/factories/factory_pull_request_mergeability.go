@@ -70,9 +70,6 @@ func loadFactoryPullRequestForMerge(
 	if err != nil {
 		return nil, nil, err
 	}
-	if pullRequest.SupersededAt != nil {
-		return nil, nil, models.ErrFactoryPullRequestNotFound
-	}
 	if !strings.EqualFold(pullRequest.Provider, factory.OnboardingConfigValue().EffectiveVCSProvider()) {
 		return nil, nil, errFactoryPullRequestNotGitHub
 	}

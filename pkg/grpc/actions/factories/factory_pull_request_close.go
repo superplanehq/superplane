@@ -131,7 +131,7 @@ func applyGitHubPullRequestClosed(
 ) (*factoryPullRequestCloseResult, error) {
 	var outcome *factoryPullRequestCloseResult
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// Startup, merge, and reimport lock the task before the PR.
+		// Startup and merge lock the task before the PR.
 		if err := models.LockFactoryWorkOrder(tx, pullRequest.WorkOrderID); err != nil {
 			return err
 		}

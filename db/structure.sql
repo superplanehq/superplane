@@ -784,7 +784,6 @@ CREATE TABLE public.factory_pull_requests (
     merge_blocked_message text DEFAULT ''::text NOT NULL,
     mergeable_head_sha text DEFAULT ''::text NOT NULL,
     mergeable_allowed_methods text DEFAULT ''::text NOT NULL,
-    superseded_at timestamp with time zone,
     CONSTRAINT factory_pull_requests_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_pull_requests_state_valid CHECK ((state = ANY (ARRAY['open'::text, 'draft'::text, 'closed'::text, 'merged'::text])))
 );
@@ -4018,14 +4017,14 @@ CREATE INDEX idx_factory_pull_requests_factory_merged_at ON public.factory_pull_
 -- Name: idx_factory_pull_requests_factory_provider_external; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_factory_pull_requests_factory_provider_external ON public.factory_pull_requests USING btree (factory_id, provider, external_id) WHERE ((external_id IS NOT NULL) AND (superseded_at IS NULL));
+CREATE UNIQUE INDEX idx_factory_pull_requests_factory_provider_external ON public.factory_pull_requests USING btree (factory_id, provider, external_id) WHERE (external_id IS NOT NULL);
 
 
 --
 -- Name: idx_factory_pull_requests_factory_provider_repo_number; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_factory_pull_requests_factory_provider_repo_number ON public.factory_pull_requests USING btree (factory_id, provider, repository, number) WHERE (superseded_at IS NULL);
+CREATE UNIQUE INDEX idx_factory_pull_requests_factory_provider_repo_number ON public.factory_pull_requests USING btree (factory_id, provider, repository, number);
 
 
 --
@@ -4039,7 +4038,7 @@ CREATE INDEX idx_factory_pull_requests_factory_state ON public.factory_pull_requ
 -- Name: idx_factory_pull_requests_factory_url; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_factory_pull_requests_factory_url ON public.factory_pull_requests USING btree (factory_id, url) WHERE (superseded_at IS NULL);
+CREATE UNIQUE INDEX idx_factory_pull_requests_factory_url ON public.factory_pull_requests USING btree (factory_id, url);
 
 
 --
@@ -6503,7 +6502,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261103100351	f
+20261102225827	f
 \.
 
 

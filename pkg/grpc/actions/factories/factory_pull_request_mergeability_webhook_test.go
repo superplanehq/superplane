@@ -894,7 +894,7 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 			})
 			require.NoError(t, err)
 
-			// Startup, merge, and reimport hold the task before touching the PR.
+			// Startup and merge hold the task before touching the PR.
 			locked := db.Begin()
 			require.NoError(t, locked.Error)
 			defer locked.Rollback()

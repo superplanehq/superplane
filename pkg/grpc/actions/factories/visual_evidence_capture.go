@@ -131,7 +131,7 @@ func enqueueVisualEvidenceCapture(
 	if err != nil {
 		return nil, err
 	}
-	if pullRequest.SupersededAt != nil || pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
+	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
 		return nil, nil
 	}
 
@@ -155,7 +155,8 @@ func enqueueVisualEvidenceCapture(
 				tx,
 				node.WorkflowID,
 				node.NodeID,
-				pullRequest.ID,
+				pullRequest.Repository,
+				pullRequest.Number,
 			)
 			if err != nil || started {
 				return err
@@ -291,7 +292,7 @@ func captureVisualEvidenceRequest(
 	if err != nil {
 		return nil, err
 	}
-	if pullRequest.SupersededAt != nil || pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
+	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
 		return nil, completeVisualEvidenceCapture(db, request)
 	}
 
@@ -303,7 +304,7 @@ func captureVisualEvidenceRequest(
 		return nil, err
 	}
 
-	started, err := models.CanvasHasGitHubPullRequestEvent(db, node.WorkflowID, node.NodeID, pullRequest.ID)
+	started, err := models.CanvasHasGitHubPullRequestEvent(db, node.WorkflowID, node.NodeID, pullRequest.Repository, pullRequest.Number)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +335,7 @@ func captureVisualEvidenceRequest(
 		if err := models.LockVisualEvidenceCapture(tx, node.WorkflowID, pullRequest.Number); err != nil {
 			return err
 		}
-		started, err := models.CanvasHasGitHubPullRequestEvent(tx, node.WorkflowID, node.NodeID, pullRequest.ID)
+		started, err := models.CanvasHasGitHubPullRequestEvent(tx, node.WorkflowID, node.NodeID, pullRequest.Repository, pullRequest.Number)
 		if err != nil {
 			return err
 		}

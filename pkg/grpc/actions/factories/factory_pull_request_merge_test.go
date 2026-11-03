@@ -312,53 +312,6 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 		assert.Equal(t, 0, api.mergeCalls)
 	})
 
-	for _, timing := range []string{"before merge", "during mergeability lookup"} {
-		t.Run("refuses a superseded PR "+timing, func(t *testing.T) {
-			factory := newFactory(t)
-			order := createOrder(t, factory)
-			pr := createMergeTestPullRequest(t, db, order)
-			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
-			require.NoError(t, err)
-			api := readyAPI()
-			useGitHub(t, api)
-			reimport := func() {
-				t.Helper()
-				_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultArchived, Actor: &r.User})
-				require.NoError(t, err)
-				replacement := createOrder(t, factory)
-				var current *models.FactoryPullRequest
-				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-					if err := factory.ReleaseArchivedPullRequest(tx, models.FactoryPullRequestLookup{ID: stored.ID}); err != nil {
-						return err
-					}
-					current, err = replacement.CreatePullRequest(tx, models.FactoryPullRequestParams{URL: stored.URL})
-					return err
-				}))
-				grantExclusivePullRequestAccess(t, db, r, factory, &pb.FactoryPullRequest{Id: current.ID.String()})
-			}
-			if timing == "before merge" {
-				reimport()
-			} else {
-				// The provider boundary lets reimport finish after the initial load,
-				// before merge takes the task and PR locks.
-				newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
-					reimport()
-					newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) { return api, nil }
-					return api, nil
-				}
-			}
-
-			_, err = merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
-			require.Error(t, err)
-			assert.ErrorIs(t, err, models.ErrFactoryPullRequestNotFound)
-			assert.Zero(t, api.mergeCalls, "a historical PR ID must not reach the provider merge API")
-			history, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: stored.ID})
-			require.NoError(t, err)
-			assert.NotNil(t, history.SupersededAt)
-			assert.Equal(t, models.FactoryPullRequestStateOpen, history.State)
-		})
-	}
-
 	t.Run("refuses while a run is active", func(t *testing.T) {
 		factory := newFactory(t)
 		order := createOrder(t, factory)

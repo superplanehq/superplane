@@ -129,9 +129,6 @@ func MergeFactoryPullRequest(
 		return nil
 	})
 	if err != nil {
-		if errors.Is(err, models.ErrFactoryPullRequestNotFound) {
-			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
-		}
 		if errors.Is(err, vcs.ErrNotSupported) {
 			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 		}
@@ -213,11 +210,6 @@ func assertNoActiveAutomationLocked(tx *gorm.DB, factory *models.Factory, pullRe
 	}
 	if err := pullRequest.LockForUpdate(tx); err != nil {
 		return err
-	}
-	// Reimport can supersede this record after the initial mergeability read.
-	// The task lock also serializes this check with ReleaseArchivedPullRequest.
-	if pullRequest.SupersededAt != nil {
-		return models.ErrFactoryPullRequestNotFound
 	}
 	active, err := factoryPullRequestHasActiveAutomation(tx, factory, pullRequest)
 	if err != nil {

@@ -112,36 +112,29 @@ func TestImportFactoryPullRequest(t *testing.T) {
 		})
 	}
 
-	// An archived import stays in history while a fresh task takes over Verify.
+	// An archived task keeps ownership of its pull request.
 	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultArchived, Actor: &r.User})
 	require.NoError(t, err)
 	useGitHub(t, pr)
 	available, err := SearchFactoryPullRequestImportItems(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String(), Query: "42"})
 	require.NoError(t, err)
 	require.Len(t, available.Items, 1)
-	assert.Nil(t, available.Items[0].ExistingTask, "an archived task must not block import")
-	pr.State = github.Ptr("closed")
-	_, err = ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), req)
-	require.Error(t, err)
-	preserved, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{Provider: "github", Repository: "acme/app", Number: 42})
+	assert.Equal(t, order.ID.String(), available.Items[0].GetExistingTask().GetId())
+	reused, err := ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), req)
 	require.NoError(t, err)
-	assert.Equal(t, order.ID, preserved.WorkOrderID, "failed reimport must preserve the old tracking association")
-	pr.State = github.Ptr("open")
-	recreated, err := ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), req)
-	require.NoError(t, err)
-	require.True(t, recreated.Created)
-	assert.NotEqual(t, order.ID.String(), recreated.Order.GetId())
+	assert.False(t, reused.Created)
+	assert.Equal(t, order.ID.String(), reused.Order.GetId())
 	archived, err := factory.FindWorkOrder(db, order.ID)
 	require.NoError(t, err)
 	assert.True(t, archived.IsArchived())
 	tracked, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{Provider: "github", Repository: "acme/app", Number: 42})
 	require.NoError(t, err)
-	assert.Equal(t, recreated.Order.GetId(), tracked.WorkOrderID.String())
+	assert.Equal(t, order.ID, tracked.WorkOrderID)
 	history, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{order.ID})
 	require.NoError(t, err)
-	assert.Len(t, history[order.ID], 1, "the archived task retains its pull request history")
-	assert.EqualValues(t, 2, countCanvasEvents(t, checks.ID))
-	assert.EqualValues(t, 2, countCanvasEvents(t, mergeConfidence.ID), "the new task needs checks even at the same PR revision")
+	assert.Len(t, history[order.ID], 1)
+	assert.EqualValues(t, 1, countCanvasEvents(t, checks.ID))
+	assert.EqualValues(t, 1, countCanvasEvents(t, mergeConfidence.ID))
 }
 
 // Search tests inspect provider requests as well as results: a local filter
@@ -287,64 +280,48 @@ func TestSearchFactoryPullRequestImportItemsBatchesExistingTasks(t *testing.T) {
 }
 
 func TestImportFactoryPullRequestConcurrent(t *testing.T) {
-	for _, archived := range []bool{false, true} {
-		t.Run(fmt.Sprintf("archived predecessor %t", archived), func(t *testing.T) {
-			r := support.Setup(t)
-			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-			db := database.DB(ctx)
-			factory := seedHandOffFactory(t, r, db)
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
-			app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
-			line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
-			require.NoError(t, err)
-			if archived {
-				previous, err := factory.CreateWorkOrder(db, "Previous import", "", &r.User, nil, nil)
-				require.NoError(t, err)
-				_, err = previous.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/42"})
-				require.NoError(t, err)
-				_, err = previous.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultArchived, Actor: &r.User})
-				require.NoError(t, err)
-			}
-			arrivals := make(chan struct{}, 2)
-			release := make(chan struct{})
-			fake := &concurrentImportGitHub{fakeFactoryGitHub: &fakeFactoryGitHub{pullRequest: openHandOffPullRequest("acme/app", 42, "branch")}, arrivals: arrivals, release: release}
-			original := newFactoryGitHubAPI
-			newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) { return fake, nil }
-			t.Cleanup(func() { newFactoryGitHubAPI = original })
-			req := &pb.ImportFactoryPullRequestRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), PullRequestUrl: "https://github.com/acme/app/pull/42"}
-			type outcome struct {
-				result *pb.ImportFactoryPullRequestResponse
-				err    error
-			}
-			outcomes := make(chan outcome, 2)
-			for range 2 {
-				go func() {
-					result, err := ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), req)
-					outcomes <- outcome{result, err}
-				}()
-			}
-			for range 2 {
-				select {
-				case <-arrivals:
-				case <-time.After(10 * time.Second):
-					t.Fatal("concurrent imports did not reach provider lookup")
-				}
-			}
-			close(release)
-			first, second := <-outcomes, <-outcomes
-			require.NoError(t, first.err)
-			require.NoError(t, second.err)
-			assert.Equal(t, first.result.Order.GetId(), second.result.Order.GetId())
-			assert.NotEqual(t, first.result.Created, second.result.Created)
-			orders, err := factory.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{})
-			require.NoError(t, err)
-			want := 1
-			if archived {
-				want = 2
-			}
-			assert.Len(t, orders, want)
-		})
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(ctx)
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
+	require.NoError(t, err)
+	arrivals := make(chan struct{}, 2)
+	release := make(chan struct{})
+	fake := &concurrentImportGitHub{fakeFactoryGitHub: &fakeFactoryGitHub{pullRequest: openHandOffPullRequest("acme/app", 42, "branch")}, arrivals: arrivals, release: release}
+	original := newFactoryGitHubAPI
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) { return fake, nil }
+	t.Cleanup(func() { newFactoryGitHubAPI = original })
+	req := &pb.ImportFactoryPullRequestRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), PullRequestUrl: "https://github.com/acme/app/pull/42"}
+	type outcome struct {
+		result *pb.ImportFactoryPullRequestResponse
+		err    error
 	}
+	outcomes := make(chan outcome, 2)
+	for range 2 {
+		go func() {
+			result, err := ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), req)
+			outcomes <- outcome{result, err}
+		}()
+	}
+	for range 2 {
+		select {
+		case <-arrivals:
+		case <-time.After(10 * time.Second):
+			t.Fatal("concurrent imports did not reach provider lookup")
+		}
+	}
+	close(release)
+	first, second := <-outcomes, <-outcomes
+	require.NoError(t, first.err)
+	require.NoError(t, second.err)
+	assert.Equal(t, first.result.Order.GetId(), second.result.Order.GetId())
+	assert.NotEqual(t, first.result.Created, second.result.Created)
+	orders, err := factory.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{})
+	require.NoError(t, err)
+	assert.Len(t, orders, 1)
 }
 
 type concurrentImportGitHub struct {

@@ -103,8 +103,6 @@ type FactoryPullRequest struct {
 	MergeableAllowedMethods string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
-	// SupersededAt preserves an archived task association after a new import.
-	SupersededAt *time.Time
 }
 
 type FactoryPullRequestRun struct {
@@ -421,7 +419,6 @@ func ListOpenGitHubFactoryPullRequestsForWebhook(
 	query := tx.Model(&FactoryPullRequest{}).
 		Where("organization_id = ?", organizationID).
 		Where("provider = ?", FactoryPullRequestProviderGitHub).
-		Where("superseded_at IS NULL").
 		Where("state IN ?", []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}).
 		Where("repository = ?", repository)
 
@@ -463,7 +460,6 @@ func ListGitHubFactoryPullRequestsForWebhook(
 	err := tx.Model(&FactoryPullRequest{}).
 		Where("organization_id = ?", organizationID).
 		Where("provider = ?", FactoryPullRequestProviderGitHub).
-		Where("superseded_at IS NULL").
 		Where("repository = ?", repository).
 		Where("number IN ?", numbers).
 		Find(&pullRequests).Error
@@ -473,8 +469,8 @@ func ListGitHubFactoryPullRequestsForWebhook(
 	return pullRequests, nil
 }
 
-// ListWorkOrdersByPullRequestNumbers resolves current, non-archived imports in
-// one query. Numbers are scoped to this factory, provider, and repository.
+// ListWorkOrdersByPullRequestNumbers resolves imported tasks in one query.
+// Numbers are scoped to this factory, provider, and repository.
 func (f *Factory) ListWorkOrdersByPullRequestNumbers(tx *gorm.DB, provider, repository string, numbers []int64) (map[int64]FactoryWorkOrder, error) {
 	ordersByNumber := make(map[int64]FactoryWorkOrder, len(numbers))
 	if len(numbers) == 0 {
@@ -484,12 +480,12 @@ func (f *Factory) ListWorkOrdersByPullRequestNumbers(tx *gorm.DB, provider, repo
 		FactoryWorkOrder  `gorm:"embedded"`
 		PullRequestNumber int64
 	}
-	err := f.workOrdersQuery(tx, ListFactoryWorkOrdersFilters{ExcludeArchived: true}).
+	err := f.workOrdersQuery(tx, ListFactoryWorkOrdersFilters{}).
 		Select("factory_work_orders.*, factory_pull_requests.number AS pull_request_number").
 		Joins("JOIN factory_pull_requests ON factory_pull_requests.work_order_id = factory_work_orders.id").
 		Where("factory_pull_requests.organization_id = ? AND factory_pull_requests.factory_id = ?", f.OrganizationID, f.ID).
 		Where("factory_pull_requests.provider = ? AND lower(factory_pull_requests.repository) = lower(?)", strings.TrimSpace(provider), strings.TrimSpace(repository)).
-		Where("factory_pull_requests.number IN ? AND factory_pull_requests.superseded_at IS NULL", numbers).
+		Where("factory_pull_requests.number IN ?", numbers).
 		Find(&matches).Error
 	if err != nil {
 		return nil, err
@@ -525,10 +521,6 @@ func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) 
 		return nil, ErrFactoryPullRequestLookupIncomplete
 	}
 
-	if filter.ID == uuid.Nil {
-		query = query.Where("superseded_at IS NULL")
-	}
-
 	var pullRequest FactoryPullRequest
 	err := query.First(&pullRequest).Error
 	if err != nil {
@@ -539,30 +531,6 @@ func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) 
 	}
 
 	return &pullRequest, nil
-}
-
-// ReleaseArchivedPullRequest allows a new import to own provider events without
-// deleting the archived task's PR, revisions, activities, or execution history.
-// Call this in the same transaction that creates the replacement task and PR.
-func (f *Factory) ReleaseArchivedPullRequest(tx *gorm.DB, lookup FactoryPullRequestLookup) error {
-	pullRequest, err := f.FindPullRequest(tx, lookup)
-	if errors.Is(err, ErrFactoryPullRequestNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if err := LockFactoryWorkOrder(tx, pullRequest.WorkOrderID); err != nil {
-		return err
-	}
-	order, err := f.FindWorkOrder(tx, pullRequest.WorkOrderID)
-	if err != nil {
-		return err
-	}
-	if !order.IsArchived() {
-		return ErrFactoryPullRequestAlreadyExists
-	}
-	return tx.Model(pullRequest).Where("superseded_at IS NULL").Update("superseded_at", time.Now()).Error
 }
 
 func (f *Factory) ListPullRequests(tx *gorm.DB, filter FactoryPullRequestFilter) ([]FactoryPullRequest, error) {

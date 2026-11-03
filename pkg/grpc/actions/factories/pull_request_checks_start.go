@@ -107,7 +107,7 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 	if err != nil {
 		return nil, err
 	}
-	if pullRequest.SupersededAt != nil || (pullRequest.Provider != models.FactoryPullRequestProviderGitHub && pullRequest.Provider != models.FactoryPullRequestProviderBitbucket) || pullRequest.State != models.FactoryPullRequestStateOpen {
+	if (pullRequest.Provider != models.FactoryPullRequestProviderGitHub && pullRequest.Provider != models.FactoryPullRequestProviderBitbucket) || pullRequest.State != models.FactoryPullRequestStateOpen {
 		return nil, request.Complete(db)
 	}
 	node, err := checksStartupTrigger(db, request, factory, pullRequest)
@@ -126,15 +126,15 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 	}
 	var events []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
-		// Reimport takes the same task lock. Reload after the provider fetch so
-		// a superseded pull request cannot start another review.
+		// The PR can close during the provider fetch. Check its state under the
+		// same locks used by the close path before starting a review.
 		if err := models.LockFactoryWorkOrder(tx, pullRequest.WorkOrderID); err != nil {
 			return err
 		}
 		if err := pullRequest.LockForUpdate(tx); err != nil {
 			return err
 		}
-		if pullRequest.SupersededAt != nil || pullRequest.State != models.FactoryPullRequestStateOpen {
+		if pullRequest.State != models.FactoryPullRequestStateOpen {
 			return request.Complete(tx)
 		}
 		current, err := checksStartupTrigger(tx, request, factory, pullRequest)

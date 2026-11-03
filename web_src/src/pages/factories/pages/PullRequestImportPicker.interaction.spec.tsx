@@ -116,22 +116,21 @@ describe("Pull request picker integration", () => {
     expect(onOpenTask).toHaveBeenCalledWith("existing-task", { id: "existing-task", number: "46" });
   });
 
-  for (const cachedArchiveState of [true, false]) {
-    it(`imports again when the cached archive state is ${cachedArchiveState}`, async () => {
-      archivedTask = cachedArchiveState;
-      const onOpenTask = vi.fn();
-      render(picker(false, onOpenTask));
-      fireEvent.click(screen.getByRole("button", { name: "Import pull request" }));
-      fireEvent.click(await screen.findByRole("button", { name: /Existing PR/ }));
-      await waitFor(() =>
-        expect(importPR).toHaveBeenCalledWith({
-          lineId: "selected-line",
-          pullRequestUrl: "https://github.com/acme/app/pull/43",
-        }),
-      );
-      expect(onOpenTask).toHaveBeenCalledWith("new-task", { id: "new-task", number: "47" });
-    });
-  }
+  it("opens an archived task without creating another import", async () => {
+    archivedTask = true;
+    importPR.mockResolvedValueOnce({ id: "existing-task", number: "46" });
+    const onOpenTask = vi.fn();
+    render(picker(false, onOpenTask));
+    fireEvent.click(screen.getByRole("button", { name: "Import pull request" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Archived task/ }));
+    await waitFor(() =>
+      expect(importPR).toHaveBeenCalledWith({
+        lineId: "selected-line",
+        pullRequestUrl: "https://github.com/acme/app/pull/43",
+      }),
+    );
+    expect(onOpenTask).toHaveBeenCalledWith("existing-task", { id: "existing-task", number: "46" });
+  });
 
   it("keeps connection cancellation retryable", async () => {
     prepareOpen.mockResolvedValueOnce(false);
