@@ -1,10 +1,6 @@
+import { PullRequestImportPicker } from "../pages/PullRequestImportPicker";
 import { SubscriptionIntakeOwnerRecovery } from "../pages/SubscriptionIntakeOwnerRecovery";
-import type {
-  FactoriesFactoryIntake,
-  FactoriesFactoryLine,
-  FactoriesWorkOrder,
-  FactoriesWorkOrderSummary,
-} from "@/api-client";
+import type { FactoriesFactoryIntake, FactoriesFactoryLine, FactoriesWorkOrderSummary } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -21,12 +17,10 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
-import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { useMemo } from "react";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
-import { BOARD_COLUMN_SEARCH_PARAM, boardColumnKeyFromSearch } from "../lib/boardColumnSearch";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import {
@@ -61,14 +55,14 @@ import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { LineBoardWorkOrderCard } from "../pages/LineBoardOrderCard";
 import { lineBoardColumnLaneProps, normalizeColumnColors } from "../pages/lineBoardColumnColors";
 import { intakeSourcesFromFactoryIntakes } from "../pages/lineIntakeModel";
-import { PhaseGlyph } from "../pages/linePhaseGlyph";
 import { usePRFeedbackWorkOrderAttention } from "../pages/useWorkOrderPRFeedbackRunHref";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
-import { MobileColumn, type ColumnPaging } from "./MobileBoardColumn";
+import type { ColumnPaging } from "./MobileBoardColumn";
+import { MobileColumnCarousel } from "./MobileColumnCarousel";
 import { MobileBoardHeader } from "./MobileBoardHeader";
 import { MobileBoardSettings } from "./MobileBoardSettings";
 import { MobileCreateTaskButton } from "./MobileCreateTaskButton";
-import { activeColumnIndex, buildMobileBoardColumns, type MobileBoardColumn } from "./mobileBoardColumns";
+import { buildMobileBoardColumns, type MobileBoardColumn } from "./mobileBoardColumns";
 
 function phoneBoardScope(scope: WorkOrderScope): WorkOrderScope {
   if (scope === "my" || scope === "unassigned") {
@@ -336,6 +330,19 @@ function MobileLineBoard(props: {
               lineBoardColumnLaneProps(columnColors[column.key] ?? null, colorView, { mutedFallback: true })
             }
             paging={model.paging}
+            renderColumnAction={(column) =>
+              column.key === "verify" ? (
+                <PullRequestImportPicker
+                  mobile
+                  organizationId={organizationId}
+                  factoryId={factoryId}
+                  lineId={lineId}
+                  onOpenTask={(_, order) => {
+                    if (order) onOpenWorkOrder(order, "verify");
+                  }}
+                />
+              ) : null
+            }
             renderCard={(column, order) => (
               <LineBoardWorkOrderCard
                 order={order}
@@ -354,168 +361,6 @@ function MobileLineBoard(props: {
           ) : null}
         </>
       ) : null}
-    </div>
-  );
-}
-
-/**
- * Horizontal snap carousel. Each column fills the screen width and scrolls
- * on its own. Tabs above mirror the swipe position and jump on tap.
- *
- * The active column is the `column` search param, so it survives opening a
- * task and Back to board. A key that is missing or not in `columns` shows
- * Backlog. The track scrolls to a restored key once, when that key first
- * appears in `columns`.
- */
-function MobileColumnCarousel({
-  columns,
-  cardsPending,
-  laneClassName,
-  paging,
-  renderCard,
-}: {
-  columns: MobileBoardColumn[];
-  cardsPending: boolean;
-  laneClassName: (column: MobileBoardColumn) => { className?: string; surfaceClassName?: string };
-  paging: Record<MobileBoardColumn["paging"], ColumnPaging>;
-  renderCard: (column: MobileBoardColumn, order: FactoriesWorkOrder) => ReactNode;
-}) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const { search } = useLocation();
-  const [, setSearchParams] = useSearchParams();
-  const requestedColumnKey = boardColumnKeyFromSearch(search);
-  const [initialColumnKey] = useState(requestedColumnKey);
-  const restoredRef = useRef(false);
-  const requestedIndex = columns.findIndex((column) => column.key === requestedColumnKey);
-  const activeIndex = requestedIndex >= 0 ? requestedIndex : 0;
-
-  const selectColumn = useCallback(
-    (index: number) => {
-      const key = columns[index]?.key;
-      if (!key) {
-        return;
-      }
-      restoredRef.current = true;
-      setSearchParams(
-        (previous) => {
-          const next = new URLSearchParams(previous);
-          next.set(BOARD_COLUMN_SEARCH_PARAM, key);
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [columns, setSearchParams],
-  );
-
-  useLayoutEffect(() => {
-    const track = trackRef.current;
-    if (restoredRef.current || !track || !initialColumnKey) {
-      return;
-    }
-    const index = columns.findIndex((column) => column.key === initialColumnKey);
-    if (index < 0) {
-      return;
-    }
-    restoredRef.current = true;
-    track.scrollTo({ left: index * track.clientWidth, behavior: "auto" });
-  }, [columns, initialColumnKey]);
-
-  const syncActiveFromScroll = useCallback(() => {
-    const track = trackRef.current;
-    if (!track) {
-      return;
-    }
-    const index = activeColumnIndex(track.scrollLeft, track.clientWidth, columns.length);
-    if (index !== activeIndex) {
-      selectColumn(index);
-    }
-  }, [activeIndex, columns.length, selectColumn]);
-
-  const scrollToColumn = useCallback(
-    (index: number) => {
-      const track = trackRef.current;
-      if (!track) {
-        return;
-      }
-      track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
-      selectColumn(index);
-    },
-    [selectColumn],
-  );
-
-  return (
-    <>
-      <MobileColumnTabs columns={columns} activeIndex={activeIndex} onSelect={scrollToColumn} />
-      <div
-        ref={trackRef}
-        onScroll={syncActiveFromScroll}
-        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
-        data-testid="mobile-board-track"
-      >
-        {columns.map((column, index) => (
-          <MobileColumn
-            key={column.key}
-            column={column}
-            hidden={index !== activeIndex}
-            cardsPending={cardsPending}
-            lane={laneClassName(column)}
-            paging={paging[column.paging]}
-            renderCard={(order) => renderCard(column, order)}
-          />
-        ))}
-      </div>
-    </>
-  );
-}
-
-function MobileColumnTabs({
-  columns,
-  activeIndex,
-  onSelect,
-}: {
-  columns: MobileBoardColumn[];
-  activeIndex: number;
-  onSelect: (index: number) => void;
-}) {
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  useEffect(() => {
-    tabRefs.current[activeIndex]?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
-  }, [activeIndex]);
-
-  return (
-    <div
-      role="tablist"
-      aria-label="Board columns"
-      className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-4 [scrollbar-width:none]"
-      data-testid="mobile-board-tabs"
-    >
-      {columns.map((column, index) => {
-        const active = index === activeIndex;
-        return (
-          <button
-            key={column.key}
-            ref={(element) => {
-              tabRefs.current[index] = element;
-            }}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onSelect(index)}
-            data-testid={`mobile-board-tab-${column.key}`}
-            className={cn(
-              "flex h-12 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-[13px] font-medium tracking-[-0.01em] transition-colors",
-              active ? "border-foreground text-foreground" : "border-transparent text-muted-foreground",
-            )}
-          >
-            {column.glyph ? <PhaseGlyph kind={column.glyph} className="size-3" /> : null}
-            <span className="truncate">{column.title}</span>
-            <span className="tabular-nums text-[12px] text-muted-foreground">
-              {column.totalCount ?? column.cards.length}
-            </span>
-          </button>
-        );
-      })}
     </div>
   );
 }
