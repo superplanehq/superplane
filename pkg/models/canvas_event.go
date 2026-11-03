@@ -1,7 +1,6 @@
 package models
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
@@ -236,23 +235,13 @@ func ListCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string, limit int,
 	return events, nil
 }
 
-func CanvasHasGitHubPullRequestEvent(
-	tx *gorm.DB,
-	canvasID uuid.UUID,
-	nodeID, repository string,
-	number int64,
-) (bool, error) {
+func CanvasHasGitHubPullRequestEvent(tx *gorm.DB, canvasID uuid.UUID, nodeID string, pullRequestID uuid.UUID) (bool, error) {
 	var count int64
 	err := tx.Model(&CanvasEvent{}).
 		Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).
-		Where("data #>> '{data,repository,full_name}' = ?", repository).
-		Where("data #>> '{data,pull_request,number}' = ?", strconv.FormatInt(number, 10)).
-		Count(&count).
-		Error
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
+		Where("data #>> '{data,pullRequest,id}' = ?", pullRequestID.String()).
+		Count(&count).Error
+	return count > 0, err
 }
 
 func CountCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string) (int64, error) {
