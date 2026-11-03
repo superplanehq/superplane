@@ -1,4 +1,4 @@
-ALTER TABLE factory_pull_requests ADD COLUMN superseded_at timestamptz;
+ALTER TABLE factory_pull_requests ADD COLUMN IF NOT EXISTS superseded_at timestamptz;
 
 DROP INDEX idx_factory_pull_requests_factory_provider_external;
 CREATE UNIQUE INDEX idx_factory_pull_requests_factory_provider_external
