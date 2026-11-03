@@ -190,7 +190,7 @@ describe("Verify and Done run history", () => {
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getByTestId("column-automation-view-edit")).toHaveAttribute(
       "href",
-      "/org/workspaces/sp/automations/custom?configure=1&agent=1&from=lines",
+      "/org/workspaces/sp/automations/custom?configure=1&from=lines",
     );
     expect(screen.queryByTestId("column-automation-view-canvas")).not.toBeInTheDocument();
   });
@@ -294,7 +294,7 @@ describe("Verify and Done run history", () => {
     await userEvent.click(screen.getByRole("button", { name: "Open run run-intake-1" }));
     expect(screen.getByTestId("column-automation-view-edit")).toHaveAttribute(
       "href",
-      "/org/workspaces/sp/automations/custom?configure=1&agent=1&from=lines&lineId=line-1",
+      "/org/workspaces/sp/automations/custom?configure=1&from=lines&lineId=line-1",
     );
   });
 

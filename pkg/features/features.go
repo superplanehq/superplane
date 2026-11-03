@@ -2,6 +2,8 @@
 // enabled per organization. The registry is the source of truth: feature IDs
 // referenced by enable/disable APIs must exist here, and a feature can be
 // graduated to all organizations by setting Released to a pointer to true.
+// Hidden features stay in the registry but are omitted from UIs and cannot
+// be enabled through the admin API.
 package features
 
 type Feature struct {
@@ -9,11 +11,11 @@ type Feature struct {
 	Label       string
 	Description string
 	Released    *bool
+	// Hidden features stay in the registry so later work can reuse the ID.
+	// They do not appear in experimental-feature UIs and cannot be enabled
+	// through the admin API.
+	Hidden bool
 }
-
-// FeatureClaudeManagedAgents enables the managed-agents chat experience on a
-// per-organization basis until the integration is generally available.
-const FeatureClaudeManagedAgents = "claude_managed_agents"
 
 // FeatureFactories enables software factories (work orders, lines, factory apps)
 // for a organization until the feature is generally available.
@@ -60,6 +62,16 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
+// FeatureGitHubEnterprise is the org rollout gate for GitHub Enterprise Cloud
+// (ghe.com). Connecting a host other than github.com also requires the
+// github_enterprise license.
+const FeatureGitHubEnterprise = "github_enterprise"
+
+// FeatureGitHubEnterpriseServer is registered and hidden. GitHub Enterprise
+// Server setup answers that the server is not available yet. Connecting a
+// GitHub Enterprise Server host also requires the github_enterprise license.
+const FeatureGitHubEnterpriseServer = "github_enterprise_server"
+
 // FeatureFactoryStepActions shows the Actions timeline on a step card.
 // An organization must enable it.
 const FeatureFactoryStepActions = "factory_step_actions"
@@ -72,8 +84,9 @@ func released() *bool {
 }
 
 var registry = []Feature{
+	{ID: FeatureGitHubEnterprise, Label: "GitHub Enterprise Cloud", Description: "Connect GitHub Enterprise Cloud (ghe.com) with a private GitHub App"},
+	{ID: FeatureGitHubEnterpriseServer, Label: "GitHub Enterprise Server", Description: "Connect GitHub Enterprise Server. This option is not available yet", Hidden: true},
 	{ID: FeatureOrganizationRunners, Label: "Organization runners", Description: "Manage self-hosted fleets and runners for an organization"},
-	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
@@ -106,6 +119,14 @@ func Get(id string) (Feature, bool) {
 func Exists(id string) bool {
 	_, ok := Get(id)
 	return ok
+}
+
+// IsHidden reports whether the feature is in the registry and omitted from
+// experimental-feature UIs. Hidden features cannot be enabled through the
+// admin API.
+func IsHidden(id string) bool {
+	f, ok := Get(id)
+	return ok && f.Hidden
 }
 
 // IsReleased reports whether the feature with the given id is in the registry

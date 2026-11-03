@@ -254,9 +254,9 @@ func TestAnalysisContinuationTextUsesProposeUpdateWhenReviewIsOn(t *testing.T) {
 
 	text, err := AnalysisContinuationText(db, session)
 	require.NoError(t, err)
-	assert.Contains(t, text, "Call propose_update with scores and any updated spec in one call")
+	assert.Contains(t, text, "Call propose_plan with scores and any updated spec in one call")
 	assert.Contains(t, text, "When every required score is 3")
-	assert.Contains(t, text, "include spec on propose_update")
+	assert.Contains(t, text, "include spec on propose_plan")
 	assert.Contains(t, text, "Omit survey when you do not ask a necessary question")
 	assert.Contains(t, text, "Current Clarity: 3/3")
 	assert.Contains(t, text, "Current Complexity: 2/3")

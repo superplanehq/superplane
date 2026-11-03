@@ -125,24 +125,6 @@ func TestSuspensionReplicaOwnershipAndOrganizationFirstLocks(t *testing.T) {
 	require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
 }
 
-func TestSuspensionIgnoresBuiltInAgentSessions(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-	db := database.DB(t.Context())
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	session := models.AgentSession{
-		OrganizationID: r.Organization.ID, UserID: r.User, CanvasID: canvas.ID,
-		Provider: "unused", ProviderSessionID: "legacy-session", Status: models.AgentSessionStatusStreaming,
-	}
-	require.NoError(t, db.Create(&session).Error)
-	require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop workflow work"))
-	require.NoError(t, NewOrganizationSuspensionWorker().Process(t.Context()))
-	require.NoError(t, r.Organization.Reactivate(db, uuid.New()))
-	stored, err := models.FindAgentSession(session.ID)
-	require.NoError(t, err)
-	require.Equal(t, models.AgentSessionStatusStreaming, stored.Status)
-}
-
 func TestSuspensionStopsDeletedCanvasComponentBeforeReactivation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

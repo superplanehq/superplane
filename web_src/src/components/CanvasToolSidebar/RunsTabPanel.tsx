@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, type UIEvent } from "react";
 import type { CanvasRunsFilters } from "@/hooks/useCanvasData";
 import { LiveCanvasSidebarRow } from "./LiveCanvasSidebarRow";
 import { RunsTabListView } from "./RunsTabListView";
-import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
-import { useRunFilters, type RunFiltersState } from "./useRunFilters";
+import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
+import { useRunFilters, type RunFiltersState } from "@/hooks/useRunFilters";
 
 export type RunsSidebarView = "list" | "detail";
 

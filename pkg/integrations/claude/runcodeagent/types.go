@@ -35,16 +35,6 @@ const (
 // the terminal event to be written. A var so tests can shrink it.
 var finalMessageDelay = 2 * time.Second
 
-// defaultGitHubHosts are always allowed when networking is "limited" so the
-// agent can clone, push, and open pull requests.
-var defaultGitHubHosts = []string{
-	"github.com",
-	"api.github.com",
-	"codeload.github.com",
-	"*.githubusercontent.com",
-	"objects.githubusercontent.com",
-}
-
 // Spec is the workflow node configuration for claude.runCodeAgent.
 type Spec struct {
 	SourceMode   string    `json:"sourceMode" mapstructure:"sourceMode"`

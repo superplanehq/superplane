@@ -491,7 +491,6 @@ export const useCreateCanvas = (organizationId: string) => {
 type UpdateCanvasInput = {
   name?: string;
   description?: string;
-  dismissAgentSuggestionId?: string;
 };
 
 export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
@@ -505,24 +504,9 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           body: {
             name: data.name,
             description: data.description,
-            dismissAgentSuggestionId: data.dismissAgentSuggestionId,
           },
         }),
       );
-    },
-    onMutate: async (data) => {
-      if (!data.dismissAgentSuggestionId) return {};
-      await queryClient.cancelQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      const previousCanvas = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
-      queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) =>
-        mergeDismissedAgentSuggestionId(current, data.dismissAgentSuggestionId),
-      );
-      return { previousCanvas };
-    },
-    onError: (_error, data, context) => {
-      if (data.dismissAgentSuggestionId && context?.previousCanvas) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), context.previousCanvas);
-      }
     },
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
@@ -546,12 +530,6 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
               ...updatedMetadata,
               name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
               description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
-              dismissedAgentSuggestionIds: Array.from(
-                new Set([
-                  ...(current.metadata?.dismissedAgentSuggestionIds ?? []),
-                  ...(updatedMetadata?.dismissedAgentSuggestionIds ?? []),
-                ]),
-              ),
             },
             spec: updatedSpec ?? current.spec,
           };
@@ -601,24 +579,6 @@ export const useUpdateCanvasPreference = (organizationId: string) => {
     },
   });
 };
-
-function mergeDismissedAgentSuggestionId(
-  current: CanvasesCanvas | undefined,
-  suggestionId: string | undefined,
-): CanvasesCanvas | undefined {
-  if (!current || !suggestionId) return current;
-  const dismissedAgentSuggestionIds = [...(current.metadata?.dismissedAgentSuggestionIds ?? [])];
-  if (!dismissedAgentSuggestionIds.includes(suggestionId)) {
-    dismissedAgentSuggestionIds.push(suggestionId);
-  }
-  return {
-    ...current,
-    metadata: {
-      ...current.metadata,
-      dismissedAgentSuggestionIds,
-    },
-  };
-}
 
 function applyCanvasPreferenceToSummary(
   canvas: CanvasesCanvasSummary,

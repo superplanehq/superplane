@@ -27,10 +27,6 @@ export function isFactoryAppYamlViewOpen(searchParams: URLSearchParams) {
   return searchParams.get("yaml") === "1";
 }
 
-export function isFactoryAppAgentPanelOpen(searchParams: URLSearchParams) {
-  return searchParams.get("agent") === "1";
-}
-
 export function isFactoryAppComponentsOpen(searchParams: URLSearchParams) {
   return searchParams.get("blocks") === "1";
 }

@@ -5,9 +5,11 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	sentrytest "github.com/superplanehq/superplane/test/support/sentry"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -374,4 +376,159 @@ type headErrorBlob struct {
 
 func (p headErrorBlob) Head(context.Context, string) (*blob.ObjectInfo, error) {
 	return nil, p.err
+}
+
+func TestHandleImportedRunnerTaskLogs(t *testing.T) {
+	resource := support.Setup(t)
+	defer resource.Close()
+	server, signer := mustRunnerLiveLogServer(t, resource)
+	provider, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	previous := blob.Current()
+	blob.SetCurrent(provider)
+	t.Cleanup(func() { blob.SetCurrent(previous) })
+	fleet := models.RunnerFleet{
+		ID: uuid.New(), Slug: "imported-logs", ScopeType: models.RunnerFleetScopeInstallation,
+		Enabled: true, Spec: datatypes.NewJSONType(models.RunnerFleetSpec{}), RunnerVersion: "0.1.0",
+	}
+	require.NoError(t, fleet.Create(database.DB(t.Context())))
+	installationID, err := models.GetInstallationID(database.DB(t.Context()))
+	require.NoError(t, err)
+	const records = "{\"type\":\"cmd_start\",\"index\":0,\"text\":\"Run\"}\n{\"type\":\"turn\",\"turn\":1,\"usage\":{\"input_tokens\":10}}\n{\"type\":\"line\",\"text\":\"historical output\"}\n"
+	for _, state := range []string{models.RunnerTaskStateSucceeded, models.RunnerTaskStateFailed, models.RunnerTaskStateCanceled} {
+		t.Run(state, func(t *testing.T) {
+			task := createRunnerTaskForLogTest(t, resource, fleet.ID, state)
+			require.NoError(t, database.DB(t.Context()).Model(&task).Update("backend", models.RunnerTaskBackendLegacy).Error)
+			canvasID, executionID := createCanvasWithComponentExecution(t, resource, "runnerBash", "historical", map[string]any{
+				runneraction.ExecutionMetadataBrokerTaskID: task.ID.String(),
+			})
+			missing := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+			require.Equal(t, http.StatusNotFound, missing.Code)
+			assert.Empty(t, missing.Header().Get(runnerlogs.HeaderURL))
+
+			var compressed bytes.Buffer
+			writer := gzip.NewWriter(&compressed)
+			_, err := writer.Write([]byte(records))
+			require.NoError(t, err)
+			require.NoError(t, writer.Close())
+			key := runnerlogs.FinalKey(installationID, task.OrganizationID, task.ID)
+			require.NoError(t, provider.Put(t.Context(), key, &compressed, blob.PutOptions{
+				ContentType: "application/x-ndjson", ContentEncoding: "gzip",
+			}))
+			response := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+			reader, err := gzip.NewReader(response.Body)
+			require.NoError(t, err)
+			content, err := io.ReadAll(reader)
+			require.NoError(t, err)
+			require.NoError(t, reader.Close())
+			assert.Equal(t, records, string(content))
+			assert.Equal(t, models.RunnerTaskLogStateArchived, response.Header().Get(runnerlogs.HeaderState))
+			reset := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "old-cursor")
+			assert.Equal(t, http.StatusConflict, reset.Code)
+			assert.Equal(t, "true", reset.Header().Get(runnerlogs.HeaderReset))
+
+			session := runnerLiveLogSessionGET(t, server, signer, resource, canvasID.String(), executionID.String())
+			require.Equal(t, http.StatusOK, session.Code, session.Body.String())
+			assert.Contains(t, session.Body.String(), "\"backend\":\"legacy\"")
+			assert.Contains(t, session.Body.String(), "/runner-logs")
+			assert.NotContains(t, session.Body.String(), "\"token\"")
+
+			blob.SetCurrent(signingBlobProvider{Provider: provider, signedURL: "https://storage.example/historical"})
+			signed := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+			require.Equal(t, http.StatusNoContent, signed.Code)
+			assert.Equal(t, "https://storage.example/historical", signed.Header().Get(runnerlogs.HeaderURL))
+			blob.SetCurrent(provider)
+
+			// Some historical executions only retained the task_id KV.
+			require.NoError(t, models.CreateNodeExecutionKVInTransaction(database.DB(t.Context()),
+				canvasID, "historical", executionID, "task_id", task.ID.String()))
+			require.NoError(t, database.DB(t.Context()).Model(&models.CanvasNodeExecution{}).Where("id = ?", executionID).
+				Update("metadata", datatypes.NewJSONType(map[string]any{})).Error)
+			fromKV := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+			require.Equal(t, http.StatusOK, fromKV.Code)
+
+			require.NoError(t, provider.Put(t.Context(), key, bytes.NewReader(nil), blob.PutOptions{}))
+			empty := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+			assert.Equal(t, http.StatusNoContent, empty.Code)
+			assert.Equal(t, models.RunnerTaskLogStateArchived, empty.Header().Get(runnerlogs.HeaderState))
+			assert.Empty(t, empty.Body.String())
+			assert.Empty(t, empty.Header().Get(runnerlogs.HeaderURL))
+		})
+	}
+}
+
+func TestRunnerLogsAuthorizeCanvasExecutionAndTask(t *testing.T) {
+	resource := support.Setup(t)
+	defer resource.Close()
+	server, signer := mustRunnerLiveLogServer(t, resource)
+	provider, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	previous := blob.Current()
+	blob.SetCurrent(signingBlobProvider{Provider: provider, signedURL: "https://storage.example/private"})
+	t.Cleanup(func() { blob.SetCurrent(previous) })
+	task := createSessionRunnerTask(t, resource)
+	require.NoError(t, database.DB(t.Context()).Model(&task).Update("backend", models.RunnerTaskBackendLegacy).Error)
+	canvasID, executionID := createCanvasWithComponentExecution(t, resource, "runner", "authorized", map[string]any{
+		runneraction.ExecutionMetadataBrokerTaskID: task.ID.String(),
+	})
+	otherCanvasID, otherExecutionID := createCanvasWithComponentExecution(t, resource, "runner", "other", map[string]any{
+		runneraction.ExecutionMetadataBrokerTaskID: task.ID.String(),
+	})
+	otherOrg := support.CreateOrganization(t, resource, resource.UserModel.ID)
+	foreignCanvas, _ := support.CreateCanvas(t, otherOrg.ID, resource.User, nil, nil)
+	foreignTask := createSessionRunnerTask(t, resource)
+	require.NoError(t, database.DB(t.Context()).Model(&foreignTask).Update("organization_id", otherOrg.ID).Error)
+	foreignTask.OrganizationID = otherOrg.ID
+	installationID, err := models.GetInstallationID(database.DB(t.Context()))
+	require.NoError(t, err)
+	for _, row := range []models.RunnerTask{task, foreignTask} {
+		require.NoError(t, provider.Put(t.Context(), runnerlogs.FinalKey(installationID, row.OrganizationID, row.ID),
+			bytes.NewBufferString("private log content"), blob.PutOptions{}))
+	}
+	account, err := models.CreateAccount("restricted-log-reader@example.com", "Restricted log reader")
+	require.NoError(t, err)
+	_, err = models.CreateUser(resource.Organization.ID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	for _, endpoint := range []string{"runner-live-logs/session", "runner-logs"} {
+		t.Run(endpoint, func(t *testing.T) {
+			request := func(accountID, canvasID, executionID uuid.UUID) *httptest.ResponseRecorder {
+				return runnerLogEndpointGETAs(t, server, signer, accountID, resource.Organization.ID,
+					fmt.Sprintf("/api/v1/canvases/%s/node-executions/%s/%s", canvasID, executionID, endpoint))
+			}
+			allowed := request(resource.Account.ID, canvasID, executionID)
+			require.Contains(t, []int{http.StatusOK, http.StatusNoContent}, allowed.Code, allowed.Body.String())
+			for _, item := range []struct {
+				name                             string
+				accountID, canvasID, executionID uuid.UUID
+				status                           int
+			}{
+				{"no canvas permission", account.ID, canvasID, executionID, http.StatusForbidden},
+				{"foreign canvas", resource.Account.ID, foreignCanvas.ID, executionID, http.StatusNotFound},
+				{"mixed execution", resource.Account.ID, canvasID, otherExecutionID, http.StatusNotFound},
+				{"mixed canvas", resource.Account.ID, otherCanvasID, executionID, http.StatusNotFound},
+			} {
+				t.Run(item.name, func(t *testing.T) {
+					response := request(item.accountID, item.canvasID, item.executionID)
+					require.Equal(t, item.status, response.Code, response.Body.String())
+					assert.Empty(t, response.Header().Get(runnerlogs.HeaderURL))
+					assert.NotContains(t, response.Body.String(), "private")
+					assert.NotContains(t, response.Body.String(), "stream_url")
+				})
+			}
+			require.NoError(t, database.DB(t.Context()).Model(&models.CanvasNodeExecution{}).Where("id = ?", executionID).
+				Update("metadata", datatypes.NewJSONType(map[string]any{
+					runneraction.ExecutionMetadataBrokerTaskID: foreignTask.ID.String(),
+				})).Error)
+			response := request(resource.Account.ID, canvasID, executionID)
+			assert.Equal(t, http.StatusNotFound, response.Code)
+			assert.Empty(t, response.Header().Get(runnerlogs.HeaderURL))
+			assert.NotContains(t, response.Body.String(), "private")
+			assert.NotContains(t, response.Body.String(), "stream_url")
+			require.NoError(t, database.DB(t.Context()).Model(&models.CanvasNodeExecution{}).Where("id = ?", executionID).
+				Update("metadata", datatypes.NewJSONType(map[string]any{
+					runneraction.ExecutionMetadataBrokerTaskID: task.ID.String(),
+				})).Error)
+		})
+	}
 }

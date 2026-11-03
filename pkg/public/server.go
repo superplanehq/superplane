@@ -47,7 +47,6 @@ import (
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminOrganizations "github.com/superplanehq/superplane/pkg/protos/admin/organizations"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
-	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -401,11 +400,6 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
-	err = pbAgents.RegisterAgentsHandlerServer(ctx, grpcGatewayMux, services.Agents)
-	if err != nil {
-		return err
-	}
-
 	adminGatewayMux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
 		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
@@ -462,6 +456,12 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerListTasks).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerCreateTask).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/close", s.handleRunnerCloseTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/members", s.handleRunnerListMembers).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/checks", s.handleRunnerListChecks).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/task/checks", s.handleRunnerAddChecks).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/checks", s.handleRunnerRemoveChecks).Methods(http.MethodDelete)
+	s.Router.HandleFunc("/api/v1/runner/task/artifacts", s.handleRunnerListArtifacts).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/task/artifact", s.handleRunnerGetArtifact).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/task/artifacts", s.handleRunnerRemoveArtifact).Methods(http.MethodDelete)
 	s.Router.HandleFunc("/api/v1/runner/task/suggest-owners", s.handleRunnerGlobalSuggestOwners).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/owner", s.handleRunnerGlobalAssignOwner).Methods(http.MethodPut)
@@ -498,11 +498,6 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	).Methods(http.MethodGet)
 
 	s.Router.Handle(
-		"/api/v1/agents/chats/{chatId}/messages/{messageId}/images/{index}",
-		orgAuthMiddleware(http.HandlerFunc(s.handleAgentChatMessageImage)),
-	).Methods(http.MethodGet)
-
-	s.Router.Handle(
 		"/api/v1/files/{file_id}/content",
 		orgAuthMiddleware(http.HandlerFunc(s.handleFileContentUpload)),
 	).Methods(http.MethodPut)
@@ -531,7 +526,6 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/api-keys").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/factories").Handler(protectedGRPCHandler)
 
@@ -651,7 +645,7 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
-// RegisterWebSocketRoutes registers canvas, agent-session, factory, and
+// RegisterWebSocketRoutes registers canvas, factory, and
 // user-notification WebSocket endpoints.
 func (s *Server) RegisterWebSocketRoutes() {
 	log.Info("Registering websocket routes")
@@ -661,15 +655,6 @@ func (s *Server) RegisterWebSocketRoutes() {
 		"/ws/{workflowId}",
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleWebSocket)),
-	)
-
-	// Agent-session WebSocket: scoped to the session's owning user. Auth
-	// uses the same middleware; ownership is enforced inside the handler
-	// because sessions are private per user, not per organization.
-	s.Router.Handle(
-		"/ws/agents/sessions/{sessionId}",
-		middleware.OrganizationAuthMiddleware(s.jwt).
-			Middleware(http.HandlerFunc(s.handleAgentSessionWebSocket)),
 	)
 
 	// Factory WebSocket: org-scoped work-order updates for a single factory.
@@ -2283,6 +2268,14 @@ func (l *lazyWebhookFactory) VCSProvider() (string, error) {
 		return "", err
 	}
 	return inner.VCSProvider()
+}
+
+func (l *lazyWebhookFactory) GitHubHost() (string, error) {
+	inner, err := l.load()
+	if err != nil {
+		return "", err
+	}
+	return inner.GitHubHost()
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {

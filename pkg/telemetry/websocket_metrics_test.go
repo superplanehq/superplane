@@ -25,9 +25,9 @@ func TestRecordWebSocketMetrics_WhenReady(t *testing.T) {
 	ctx := context.Background()
 	RecordWebSocketConnectionOpened(ctx, WebSocketKindCanvas)
 	RecordWebSocketConnectionClosed(ctx, WebSocketKindCanvas)
-	RecordWebSocketConnectionOutcome(ctx, WebSocketKindAgent, WebSocketConnectionOutcomeAuthError)
+	RecordWebSocketConnectionOutcome(ctx, WebSocketKindCanvas, WebSocketConnectionOutcomeAuthError)
 	RecordWebSocketBroadcast(ctx, WebSocketKindCanvas, 0)
-	RecordWebSocketBroadcast(ctx, WebSocketKindAgent, 3)
+	RecordWebSocketBroadcast(ctx, WebSocketKindCanvas, 3)
 
 	var rm metricdata.ResourceMetrics
 	if err := reader.Collect(ctx, &rm); err != nil {
@@ -58,6 +58,6 @@ func TestRecordWebSocketMetrics_NoPanicWhenNotReady(t *testing.T) {
 	ctx := context.Background()
 	RecordWebSocketConnectionOpened(ctx, WebSocketKindCanvas)
 	RecordWebSocketConnectionClosed(ctx, WebSocketKindCanvas)
-	RecordWebSocketConnectionOutcome(ctx, WebSocketKindAgent, WebSocketConnectionOutcomeUpgradeError)
+	RecordWebSocketConnectionOutcome(ctx, WebSocketKindCanvas, WebSocketConnectionOutcomeUpgradeError)
 	RecordWebSocketBroadcast(ctx, WebSocketKindCanvas, 2)
 }

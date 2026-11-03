@@ -150,12 +150,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Manage organization fleets and runners",
             },
             {
-              id: "claude_managed_agents",
-              label: "Managed agents",
-              description: "Canvas agent chat",
-              released: true,
-            },
-            {
               id: "factories",
               label: "Factories",
               description: "Software factories for tasks",

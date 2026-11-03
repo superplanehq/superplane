@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -38,45 +37,15 @@ type Canvas struct {
 	Description    string
 	// ColumnKey is the line-board column this factory event automation is
 	// shown on. Empty when the canvas is not attached to Verify or Done.
-	ColumnKey                   *string
-	CreatedBy                   *uuid.UUID
-	DismissedAgentSuggestionIDs datatypes.JSONSlice[string]
-	CreatedAt                   *time.Time
-	UpdatedAt                   *time.Time
-	DeletedAt                   gorm.DeletedAt `gorm:"index"`
+	ColumnKey *string
+	CreatedBy *uuid.UUID
+	CreatedAt *time.Time
+	UpdatedAt *time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) TableName() string {
 	return "workflows"
-}
-
-// DismissAgentSuggestion appends suggestionID to the canvas-scoped dismissal list.
-func (c *Canvas) DismissAgentSuggestion(tx *gorm.DB, suggestionID string) error {
-	if suggestionID == "" {
-		return nil
-	}
-	if slices.Contains(c.DismissedAgentSuggestionIDs, suggestionID) {
-		return nil
-	}
-
-	updated := append(append(datatypes.JSONSlice[string]{}, c.DismissedAgentSuggestionIDs...), suggestionID)
-	now := time.Now()
-	result := tx.Model(&Canvas{}).
-		Where("organization_id = ? AND id = ?", c.OrganizationID, c.ID).
-		Updates(map[string]any{
-			"dismissed_agent_suggestion_ids": updated,
-			"updated_at":                     now,
-		})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-
-	c.DismissedAgentSuggestionIDs = updated
-	c.UpdatedAt = &now
-	return nil
 }
 
 func MapCanvasNameUniqueConstraintError(err error) error {

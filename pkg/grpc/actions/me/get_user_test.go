@@ -60,7 +60,6 @@ func Test_ListUserPermissions(t *testing.T) {
 			"factories",
 			"work_orders",
 			"api_keys",
-			"agents",
 			"notifications",
 		})
 		expected = append(expected,

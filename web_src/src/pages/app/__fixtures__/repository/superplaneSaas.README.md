@@ -59,8 +59,6 @@ fan-out is:
      which then fans into:
      - `Update install.superplane.com` — rewrites the Cloudflare redirect
        rule for `install.superplane.com/*` to point at the new tag.
-     - `Publish to APT (S3)` —
-       `.semaphore/publish-apt.yml`. Failure → `Discord: APT Publish Failed`.
      - `Publish to NPM` —
        `.semaphore/publish-npm.yml`. Failure → `Discord: NPM Publish Failed`.
    - **Beta track** (`Mark Release as BETA` with `REL_CHANNEL=beta`) →

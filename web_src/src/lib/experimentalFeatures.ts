@@ -5,7 +5,6 @@ export const FEATURE_FACTORIES = "factories";
 export const FEATURE_ORGANIZATION_RUNNERS = "organization_runners";
 
 /** Organization experimental feature: Claude managed agents on the canvas. */
-export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 
 /** Organization experimental feature: SetupProvider wizard for GitHub and similar integrations. */
 export const FEATURE_NEW_INTEGRATION_SETUP_FLOW = "new_integration_setup_flow";
@@ -39,3 +38,6 @@ export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
 
 /** Organization experimental feature: Actions timeline on a step card. Off until the organization enables it. */
 export const FEATURE_FACTORY_STEP_ACTIONS = "factory_step_actions";
+
+/** Organization experimental feature: GitHub Enterprise Cloud (ghe.com) connections. */
+export const FEATURE_FLAG_GITHUB_ENTERPRISE = "github_enterprise";

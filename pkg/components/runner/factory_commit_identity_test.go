@@ -139,6 +139,119 @@ func TestFactoryCommitHookDropsOtherAgentTrailers(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(second, "Co-authored-by: André Calil <andre@superplane.com>"))
 }
 
+func TestFactoryRepoCommitSetupSignsAbsoluteGitAndRejectsUnsignedPush(t *testing.T) {
+	git, err := exec.LookPath("git")
+	require.NoError(t, err)
+	git, err = filepath.Abs(git)
+	require.NoError(t, err)
+
+	taskDir := t.TempDir()
+	repo := filepath.Join(taskDir, "repo")
+	remote := filepath.Join(taskDir, "origin.git")
+	env := append(withoutGitIdentity(os.Environ()), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	runGit(t, taskDir, git, env, "init", "--bare", remote)
+	initRepository(t, repo, env, "")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("seed\n"), 0o644))
+	runGit(t, repo, git, env, "add", "README")
+	runGit(t, repo, git, env, "commit", "-m", "seed")
+	runGit(t, repo, git, env, "remote", "add", "origin", remote)
+	runGit(t, repo, git, env, "push", "-u", "origin", "main")
+
+	command := exec.Command("bash", "-c", runner.FactoryRepoCommitSetup())
+	command.Dir, command.Env = repo, env
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, string(output))
+	assert.NotEmpty(t, strings.TrimSpace(runGit(t, repo, git, env, "config", "--local", "--get", "core.hooksPath")))
+
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("signed\n"), 0o644))
+	runGit(t, repo, git, env, "commit", "-am", "signed")
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ae"))
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ce"))
+	assert.Contains(t, gitShow(t, repo, env, "%B"), "Signed-off-by: SuperPlane Agent <"+runner.FactoryAgentEmail+">")
+	runGit(t, repo, git, env, "push", "origin", "main")
+
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("unsigned\n"), 0o644))
+	runGit(t, repo, git, env, "-c", "core.hooksPath=/dev/null", "commit", "-am", "unsigned")
+	push := exec.Command(git, "push", "origin", "main")
+	push.Dir, push.Env = repo, env
+	output, err = push.CombinedOutput()
+	require.Error(t, err, string(output))
+	assert.Contains(t, string(output), "Unsigned commit")
+	assert.NotEqual(t, strings.TrimSpace(runGit(t, repo, git, env, "rev-parse", "HEAD")),
+		strings.TrimSpace(runGit(t, remote, git, env, "rev-parse", "refs/heads/main")))
+}
+
+func TestFactoryRepoCommitSetupPushesMergedUpstreamHistory(t *testing.T) {
+	taskDir := t.TempDir()
+	repo := filepath.Join(taskDir, "repo")
+	upstream := filepath.Join(taskDir, "upstream")
+	remote := filepath.Join(taskDir, "origin.git")
+	env := append(withoutGitIdentity(os.Environ()), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	runGit(t, taskDir, "git", env, "init", "--bare", "-b", "main", remote)
+	initRepository(t, upstream, env, "")
+	runGit(t, upstream, "git", env, "config", "user.name", "Pat Example")
+	runGit(t, upstream, "git", env, "config", "user.email", "pat@example.com")
+	require.NoError(t, os.WriteFile(filepath.Join(upstream, "README"), []byte("seed\n"), 0o644))
+	runGit(t, upstream, "git", env, "add", "README")
+	runGit(t, upstream, "git", env, "commit", "-m", "seed")
+	runGit(t, upstream, "git", env, "push", remote, "main", "main:feedback")
+	runGit(t, taskDir, "git", env, "clone", "--branch", "feedback", "--single-branch", remote, repo)
+	runFactoryRepoCommitSetup(t, repo, env)
+
+	require.NoError(t, os.WriteFile(filepath.Join(upstream, "UPSTREAM"), []byte("human\n"), 0o644))
+	runGit(t, upstream, "git", env, "add", "UPSTREAM")
+	runGit(t, upstream, "git", env, "commit", "-m", "feat: human change without agent sign-off")
+	runGit(t, upstream, "git", env, "push", remote, "main")
+
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("agent\n"), 0o644))
+	runGit(t, repo, "git", env, "commit", "-am", "fix: agent change")
+	runGit(t, repo, "git", env, "fetch", remote, "main")
+	runGit(t, repo, "git", env, "merge", "--no-edit", "FETCH_HEAD")
+	assert.Contains(t, gitShow(t, repo, env, "%B"), "Signed-off-by: SuperPlane Agent <"+runner.FactoryAgentEmail+">")
+
+	runGit(t, repo, "git", env, "push", "origin", "HEAD:feedback")
+	assert.Equal(t, strings.TrimSpace(runGit(t, repo, "git", env, "rev-parse", "HEAD")),
+		strings.TrimSpace(runGit(t, remote, "git", env, "rev-parse", "refs/heads/feedback")))
+}
+
+func TestFactoryRepoCommitSetupKeepsRepositoryHooks(t *testing.T) {
+	taskDir := t.TempDir()
+	repo := filepath.Join(taskDir, "repo")
+	remote := filepath.Join(taskDir, "origin.git")
+	logPath := filepath.Join(taskDir, "hooks.log")
+	env := append(withoutGitIdentity(os.Environ()), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	runGit(t, taskDir, "git", env, "init", "--bare", "-b", "main", remote)
+	initRepository(t, repo, env, ".githooks")
+	hooks := filepath.Join(repo, ".githooks")
+	writeExec(t, filepath.Join(hooks, "pre-commit"), fmt.Sprintf("#!/bin/sh\nprintf 'pre-commit\\n' >> %q\n", logPath))
+	writeExec(t, filepath.Join(hooks, "prepare-commit-msg"), "#!/bin/sh\nprintf '\\nRepository-Hook: yes\\n' >> \"$1\"\n")
+	writeExec(t, filepath.Join(hooks, "pre-push"), fmt.Sprintf("#!/bin/sh\nwhile read -r local_ref rest; do printf 'pre-push %%s\\n' \"$local_ref\" >> %q; done\n", logPath))
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("seed\n"), 0o644))
+	runGit(t, repo, "git", env, "add", "README")
+	runGit(t, repo, "git", env, "-c", "core.hooksPath=/dev/null", "commit", "-m", "seed")
+	runGit(t, repo, "git", env, "remote", "add", "origin", remote)
+	runGit(t, repo, "git", env, "-c", "core.hooksPath=/dev/null", "push", "-u", "origin", "main")
+
+	runFactoryRepoCommitSetup(t, repo, env)
+	runFactoryRepoCommitSetup(t, repo, env)
+
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("signed\n"), 0o644))
+	runGit(t, repo, "git", env, "commit", "-am", "fix: keep hooks")
+	trailers := gitTrailers(t, repo, env)
+	assert.Contains(t, trailers, "Repository-Hook: yes")
+	assert.Contains(t, trailers, "Signed-off-by: SuperPlane Agent <"+runner.FactoryAgentEmail+">")
+	runGit(t, repo, "git", env, "push", "origin", "main")
+	assert.Equal(t, "pre-commit\npre-push refs/heads/main\n", readText(t, logPath))
+}
+
+func runFactoryRepoCommitSetup(t *testing.T, repo string, env []string) {
+	t.Helper()
+	command := exec.Command("bash", "-c", runner.FactoryRepoCommitSetup())
+	command.Dir, command.Env = repo, env
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, string(output))
+}
+
 func TestFactoryGitWrapperForcesIdentityOnCommitAndMerge(t *testing.T) {
 	taskDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(taskDir, "bin"), 0o755))

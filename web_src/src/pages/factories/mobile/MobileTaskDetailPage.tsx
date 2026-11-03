@@ -1,4 +1,3 @@
-import { TaskRefinementModelSelect } from "../TaskRefinementModelSelect";
 import { FactoryTaskScope } from "../FactoryTaskScope";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
@@ -458,7 +457,6 @@ function MobileTaskHeader({ order, model }: { order: FactoriesWorkOrder; model: 
       <h1 className="text-[20px] leading-snug font-semibold tracking-[-0.02em] text-foreground break-words">
         {fixture.title}
       </h1>
-      <TaskRefinementModelSelect organizationId={organizationId} canEdit={ownerEdits.canEdit} />
       <OwnerTimeCostRow
         fixture={{ ...fixture, owner: ownerEdits.owner }}
         className="mt-0"

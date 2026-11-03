@@ -13,7 +13,7 @@ import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 import { isNormalClick } from "@/lib/linkHelpers";
 import { useRunsSidebarRunHref } from "./useRunsSidebarRunHref";
-import { RUNS_SIDEBAR_RUN_ROW_CLASS } from "./runsSidebarRowLayout";
+import { RUNS_SIDEBAR_RUN_ROW_CLASS } from "@/lib/runsSidebarRowLayout";
 
 interface RunRowProps {
   run: CanvasesCanvasRun;
