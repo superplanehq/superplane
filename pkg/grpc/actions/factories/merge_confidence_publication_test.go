@@ -100,7 +100,7 @@ func newPublicationFixture(t *testing.T) publicationFixture {
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger, Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata("risk-score", 1)), Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}})}, {NodeID: "agent", Type: models.NodeTypeComponent,
 		Ref:           datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}}),
 		Configuration: datatypes.NewJSONType(map[string]any{"environment": []any{map[string]any{"name": "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID", "value": order.ID.String()}}, "steps": []any{map[string]any{"name": "Security", "prompt": "Merge check: security."}}}),
-	}, {NodeID: "publication", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRunFinished"}})},
+	},
 		{NodeID: "publish", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: factorycomponent.PublishMergeConfidenceComponentName}})},
 	}, nil)
 	require.NoError(t, db.Model(canvas).Update("factory_id", workspace.ID).Error)

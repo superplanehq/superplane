@@ -36,9 +36,6 @@ func Test__RunInitializer__PublishesRunStateWhenInitializationFails(t *testing.T
 				NodeID: "not-a-trigger",
 				Type:   models.NodeTypeComponent,
 			},
-			{NodeID: "publication", Type: models.NodeTypeTrigger,
-				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRunFinished"}}),
-				Configuration: datatypes.NewJSONType(map[string]any{"sourceEntryNodeId": "not-a-trigger"})},
 		},
 		nil,
 	)
@@ -59,10 +56,6 @@ func Test__RunInitializer__PublishesRunStateWhenInitializationFails(t *testing.T
 	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
 	assert.Equal(t, models.CanvasRunResultFailed, updatedRun.Result)
 	assert.True(t, runConsumer.HasReceivedMessage())
-	var events []models.CanvasEvent
-	require.NoError(t, database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "publication").Find(&events).Error)
-	require.Len(t, events, 1)
-	assert.NotEqual(t, run.ID, events[0].RunID)
 }
 
 func Test__RunInitializer__PublishesRunStateWhenInitializationSucceeds(t *testing.T) {

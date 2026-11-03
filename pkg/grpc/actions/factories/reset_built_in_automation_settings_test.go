@@ -173,10 +173,6 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 				trigger := findIntakeNode(version.Nodes, template.entrypointNodeID)
 				require.NotNil(t, trigger)
 				if templateID == "risk-score" {
-					completion := findIntakeNode(version.Nodes, "on-assessment-finished")
-					require.NotNil(t, completion)
-					assert.Equal(t, "onRunFinished", completion.Ref.Trigger.Name)
-					assert.Equal(t, template.entrypointNodeID, completion.Configuration["sourceEntryNodeId"])
 					publication := findIntakeNode(version.Nodes, "publish-merge-confidence")
 					require.NotNil(t, publication)
 					assert.Equal(t, "publishMergeConfidence", publication.ComponentName())

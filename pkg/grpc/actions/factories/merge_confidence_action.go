@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strings"
 	"time"
 
-	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/uuid"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -30,11 +30,12 @@ type mergeConfidencePublicationState struct {
 }
 
 type mergeConfidenceActionAttempt struct {
-	request   *models.CanvasNodeRequest
-	execution *models.CanvasNodeExecution
-	source    *models.CanvasRun
-	state     mergeConfidencePublicationState
-	events    []models.CanvasEvent
+	request          *models.CanvasNodeRequest
+	execution        *models.CanvasNodeExecution
+	source           *models.CanvasRun
+	assessmentPassed bool
+	state            mergeConfidencePublicationState
+	events           []models.CanvasEvent
 }
 
 // ProcessMergeConfidencePublicationRequest releases the request transaction
@@ -64,7 +65,7 @@ func ProcessMergeConfidencePublicationRequest(ctx context.Context, deps IntakeDe
 	}
 
 	baseURL, _ := attempt.request.Spec.Data().InvokeAction.Parameters["baseURL"].(string)
-	outcome, publishErr := PublishMergeConfidenceWithOutcome(ctx, db, deps, attempt.source.WorkflowID, attempt.source.ID, baseURL)
+	outcome, publishErr := publishMergeConfidenceRun(ctx, db, deps, attempt.source, attempt.assessmentPassed, baseURL)
 	err = db.Transaction(func(tx *gorm.DB) error { return attempt.finish(tx, outcome, publishErr) })
 	return attempt.events, err
 }
@@ -114,11 +115,7 @@ func (a *mergeConfidenceActionAttempt) claim(tx *gorm.DB) error {
 	if a.state.LeaseUntil != nil && a.state.LeaseUntil.After(time.Now()) {
 		return gorm.ErrRecordNotFound
 	}
-	var config factorycomponent.PublishMergeConfidenceConfiguration
-	if err := mapstructure.Decode(execution.Configuration.Data(), &config); err != nil {
-		return err
-	}
-	a.state.SourceRunID = config.SourceRunID
+	a.state.SourceRunID = execution.RunID.String()
 	a.state.Attempts++
 	if err := a.resolveSource(tx); err != nil {
 		return err
@@ -137,28 +134,42 @@ func (a *mergeConfidenceActionAttempt) claim(tx *gorm.DB) error {
 }
 
 func (a *mergeConfidenceActionAttempt) resolveSource(tx *gorm.DB) error {
-	sourceID, err := uuid.Parse(a.state.SourceRunID)
-	if err != nil {
-		return a.reject(tx, "Source run ID is invalid.")
-	}
-	a.source, err = models.FindUnscopedCanvasRun(tx, sourceID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return a.reject(tx, "Source run was not found.")
-	}
+	var err error
+	a.source, err = models.FindCanvasRunInTransaction(tx, a.execution.WorkflowID, a.execution.RunID)
 	if err != nil {
 		return err
 	}
-	owner, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, a.execution.WorkflowID)
+	if a.source.State != models.CanvasRunStateStarted {
+		return a.reject(tx, "The assessment run is no longer active.")
+	}
+	input, err := models.FindCanvasEventInTransaction(tx, a.execution.EventID)
 	if err != nil {
 		return err
 	}
-	sourceCanvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, a.source.WorkflowID)
+	if input.ExecutionID == nil || input.RunID != a.source.ID || (input.Channel != "passed" && input.Channel != "failed") {
+		return a.reject(tx, "Connect publication to the assessment agent output.")
+	}
+	agent, err := models.FindNodeExecutionInTransaction(tx, a.execution.WorkflowID, *input.ExecutionID)
 	if err != nil {
 		return err
 	}
-	if owner.FactoryID == nil || sourceCanvas.FactoryID == nil || owner.OrganizationID != sourceCanvas.OrganizationID || *owner.FactoryID != *sourceCanvas.FactoryID {
-		return a.reject(tx, "Source run must belong to this organization and factory.")
+	if agent.State != models.CanvasNodeExecutionStateFinished {
+		return a.reject(tx, "The assessment agent is not finished.")
 	}
+	component := agent.FrozenComponentName()
+	if component == "" {
+		node, err := models.FindCanvasNode(tx, agent.WorkflowID, agent.NodeID)
+		if err != nil {
+			return err
+		}
+		if node.Ref.Data().Component != nil {
+			component = node.Ref.Data().Component.Name
+		}
+	}
+	if !strings.HasPrefix(component, "runner") {
+		return a.reject(tx, "Connect publication to the assessment agent output.")
+	}
+	a.assessmentPassed = input.Channel == "passed" && len(a.source.Errors) == 0
 	return nil
 }
 
@@ -200,7 +211,11 @@ func (a *mergeConfidenceActionAttempt) finish(tx *gorm.DB, outcome MergeConfiden
 	if err := setMergeConfidencePublicationState(tx, execution, a.state); err != nil {
 		return err
 	}
-	if err := contexts.NewExecutionStateContext(tx, execution, a.collectEvents).Emit("default", factorycomponent.MergeConfidencePublishedPayloadType, []any{a.state}); err != nil {
+	channel := "default"
+	if !a.assessmentPassed {
+		channel = "failed"
+	}
+	if err := contexts.NewExecutionStateContext(tx, execution, a.collectEvents).Emit(channel, factorycomponent.MergeConfidencePublishedPayloadType, []any{a.state}); err != nil {
 		return err
 	}
 	return current.Complete(tx)

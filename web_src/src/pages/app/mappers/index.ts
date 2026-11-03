@@ -285,7 +285,6 @@ import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
 import { onRunTriggerRenderer } from "./messages/on_run";
-import { onRunFinishedTriggerRenderer } from "./messages/on_run_finished";
 import { publishMergeConfidenceMapper } from "./publishMergeConfidence";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
@@ -301,7 +300,6 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
   start: startTriggerRenderer,
   onBroadcast: onBroadcastTriggerRenderer,
   onRun: onRunTriggerRenderer,
-  onRunFinished: onRunFinishedTriggerRenderer,
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {

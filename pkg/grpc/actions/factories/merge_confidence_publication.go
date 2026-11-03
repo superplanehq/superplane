@@ -34,11 +34,7 @@ func PublishMergeConfidence(ctx context.Context, db *gorm.DB, deps IntakeDepende
 }
 
 func PublishMergeConfidenceWithOutcome(ctx context.Context, db *gorm.DB, deps IntakeDependencies, canvasID, runID uuid.UUID, baseURL string) (outcome MergeConfidencePublicationOutcome, err error) {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	db = db.WithContext(ctx)
-	logger := log.WithFields(log.Fields{"component": "publishMergeConfidence", "run_id": runID})
-	run, err := models.FindUnscopedCanvasRun(db, runID)
+	run, err := models.FindUnscopedCanvasRun(db.WithContext(ctx), runID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return skippedMergeConfidence("Source run was not found."), nil
 	}
@@ -48,6 +44,16 @@ func PublishMergeConfidenceWithOutcome(ctx context.Context, db *gorm.DB, deps In
 	if run.WorkflowID != canvasID || run.State != models.CanvasRunStateFinished {
 		return skippedMergeConfidence("Source run is not finished in this canvas."), nil
 	}
+	return publishMergeConfidenceRun(ctx, db, deps, run, run.Result == models.CanvasRunResultPassed, baseURL)
+}
+
+// The direct continuation runs before the canvas run finishes. Its incoming
+// agent output supplies the assessment result independently of publication.
+func publishMergeConfidenceRun(ctx context.Context, db *gorm.DB, deps IntakeDependencies, run *models.CanvasRun, assessmentPassed bool, baseURL string) (outcome MergeConfidencePublicationOutcome, err error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	db = db.WithContext(ctx)
+	logger := log.WithFields(log.Fields{"component": "publishMergeConfidence", "run_id": run.ID})
 	activity, err := models.FindPullRequestActivityByRunID(db, run.ID)
 	if errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
 		return skippedMergeConfidence("Source run has no pull request activity."), nil
@@ -100,7 +106,7 @@ func PublishMergeConfidenceWithOutcome(ctx context.Context, db *gorm.DB, deps In
 		if err != nil {
 			return err
 		}
-		canvas, err := models.FindCanvasInTransaction(tx, pr.OrganizationID, canvasID)
+		canvas, err := models.FindCanvasInTransaction(tx, pr.OrganizationID, run.WorkflowID)
 		if err != nil {
 			return err
 		}
@@ -132,7 +138,7 @@ func PublishMergeConfidenceWithOutcome(ctx context.Context, db *gorm.DB, deps In
 			outcome = skippedMergeConfidence("Assessment has no reviewed commit.")
 			return nil
 		}
-		assessment.Passed = run.Result == models.CanvasRunResultPassed
+		assessment.Passed = assessmentPassed
 		assessment.TaskURL = strings.TrimRight(baseURL, "/") + order.URLPath(workspace.RouteSegment())
 		return nil
 	})
@@ -166,7 +172,7 @@ func newestMergeConfidenceAssessment(tx *gorm.DB, pr *models.FactoryPullRequest,
 		if err != nil {
 			return nil, err
 		}
-		if !isMergeConfidenceAssessmentRun(run, version) {
+		if models.FactoryAppTemplateID(version.Nodes) != "risk-score" {
 			continue
 		}
 		// A newer run supersedes this one even if its saved settings are
@@ -177,19 +183,6 @@ func newestMergeConfidenceAssessment(tx *gorm.DB, pr *models.FactoryPullRequest,
 		return mergeConfidenceAssessmentFromVersion(version)
 	}
 	return nil, nil
-}
-
-func isMergeConfidenceAssessmentRun(run models.CanvasRun, version *models.CanvasVersion) bool {
-	if models.FactoryAppTemplateID(version.Nodes) != "risk-score" {
-		return false
-	}
-	for _, node := range version.Nodes {
-		if node.ID == run.NodeID {
-			// Completion branches share the template marker but are not assessments.
-			return node.Ref.Trigger != nil && (node.Ref.Trigger.Name == "github.onPullRequest" || node.Ref.Trigger.Name == "bitbucket.onPullRequest")
-		}
-	}
-	return false
 }
 
 func mergeConfidenceAssessmentFromVersion(version *models.CanvasVersion) (*mergeconfidence.Assessment, error) {

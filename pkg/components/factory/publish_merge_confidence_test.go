@@ -11,20 +11,20 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestPublishMergeConfidenceSchedulesIndependentPublication(t *testing.T) {
+func TestPublishMergeConfidenceSchedulesPublicationForCurrentRun(t *testing.T) {
 	requests := &contexts.RequestContext{}
 	state := &contexts.ExecutionStateContext{}
 	metadata := &contexts.MetadataContext{}
-	err := (&PublishMergeConfidence{}).Execute(core.ExecutionContext{Configuration: map[string]any{"sourceRunId": uuid.NewString()}, Requests: requests, Metadata: metadata, ExecutionState: state, BaseURL: "https://example.com"})
+	err := (&PublishMergeConfidence{}).Execute(core.ExecutionContext{RunID: uuid.New(), Requests: requests, Metadata: metadata, ExecutionState: state, BaseURL: "https://example.com"})
 	require.NoError(t, err)
 	assert.Equal(t, PublishMergeConfidenceHook, requests.Action)
 	assert.Equal(t, time.Second, requests.Duration)
 	assert.False(t, state.Finished)
 }
 
-func TestPublishMergeConfidenceRejectsInvalidSourceBeforeScheduling(t *testing.T) {
+func TestPublishMergeConfidenceRejectsMissingRunBeforeScheduling(t *testing.T) {
 	requests := &contexts.RequestContext{}
-	err := (&PublishMergeConfidence{}).Execute(core.ExecutionContext{Configuration: map[string]any{"sourceRunId": "invalid"}, Requests: requests})
+	err := (&PublishMergeConfidence{}).Execute(core.ExecutionContext{Requests: requests})
 	require.Error(t, err)
 	assert.Empty(t, requests.Action)
 }

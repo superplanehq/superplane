@@ -5,7 +5,6 @@ import (
 	"maps"
 	"time"
 
-	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -17,9 +16,6 @@ const PublishMergeConfidenceHook = "publishMergeConfidence"
 const MergeConfidencePublishedPayloadType = "mergeConfidence.published"
 
 type PublishMergeConfidence struct{}
-type PublishMergeConfidenceConfiguration struct {
-	SourceRunID string `json:"sourceRunId" mapstructure:"sourceRunId"`
-}
 
 func init() {
 	registry.RegisterAction(PublishMergeConfidenceComponentName, &PublishMergeConfidence{})
@@ -30,11 +26,11 @@ func (c *PublishMergeConfidence) Name() string { return PublishMergeConfidenceCo
 func (c *PublishMergeConfidence) Label() string { return "Publish Merge Confidence" }
 
 func (c *PublishMergeConfidence) Description() string {
-	return "Publish a completed assessment in the pull request description"
+	return "Publish the assessment checks in the pull request description"
 }
 
 func (c *PublishMergeConfidence) Documentation() string {
-	return "Publish the saved checks for a completed assessment run in this factory. Set sourceRunId from an On Run Finished event. Publication preserves the existing description. Transient host failures retry independently. Execution details show attempts and skipped outcomes. Newer assessments and changed commits stop publication."
+	return "Connect the assessment agent directly to this component. Publish the saved checks from the current run in this factory. Connect both Passed and Failed outputs to publish complete and incomplete assessments. Publication preserves the existing description. Transient host failures retry through scheduled requests. Execution details show attempts and skipped outcomes. Newer assessments and changed commits stop publication."
 }
 
 func (c *PublishMergeConfidence) Icon() string { return "file-check" }
@@ -42,8 +38,7 @@ func (c *PublishMergeConfidence) Icon() string { return "file-check" }
 func (c *PublishMergeConfidence) Color() string { return "blue" }
 
 func (c *PublishMergeConfidence) Configuration() []configuration.Field {
-	return []configuration.Field{{Name: "sourceRunId", Label: "Source run ID", Type: configuration.FieldTypeString, Required: true,
-		Description: "The completed assessment run in this factory."}}
+	return nil
 }
 
 func (c *PublishMergeConfidence) ExampleOutput() map[string]any {
@@ -51,25 +46,21 @@ func (c *PublishMergeConfidence) ExampleOutput() map[string]any {
 }
 
 func (c *PublishMergeConfidence) OutputChannels(any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{core.DefaultOutputChannel, {Name: core.FailedOutputChannel, Label: "Failed"}}
 }
 
 func (c *PublishMergeConfidence) Setup(core.SetupContext) error { return nil }
 
 func (c *PublishMergeConfidence) Execute(ctx core.ExecutionContext) error {
-	var config PublishMergeConfidenceConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return err
-	}
-	if _, err := uuid.Parse(config.SourceRunID); err != nil {
-		return fmt.Errorf("source run ID must be a valid run ID")
+	if ctx.RunID == uuid.Nil {
+		return fmt.Errorf("a current run is required")
 	}
 	metadata, _ := ctx.Metadata.Get().(map[string]any)
 	metadata = maps.Clone(metadata)
 	if metadata == nil {
 		metadata = map[string]any{}
 	}
-	metadata["sourceRunId"], metadata["status"], metadata["attempts"] = config.SourceRunID, "queued", 0
+	metadata["sourceRunId"], metadata["status"], metadata["attempts"] = ctx.RunID.String(), "queued", 0
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
 	}

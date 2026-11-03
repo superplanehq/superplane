@@ -22,19 +22,20 @@ func TestNodeRequestExecutorDispatchesMergeConfidencePublication(t *testing.T) {
 	require.NoError(t, err)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
 		{NodeID: "assessment", Type: models.NodeTypeTrigger},
-		{NodeID: "publication", Type: models.NodeTypeTrigger},
+		{NodeID: "agent", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}})},
 		{NodeID: "publish", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: factorycomponent.PublishMergeConfidenceComponentName}})},
 	}, nil)
 	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
-	source, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "assessment", models.CanvasRunStateFinished, "")
+	root := support.EmitCanvasEventForNode(t, canvas.ID, "assessment", "default", nil)
+	agent := support.CreateCanvasNodeExecution(t, canvas.ID, "agent", root.ID, root.ID)
+	outputs, err := agent.PassInTransaction(db, map[string][]any{"passed": {map[string]any{"type": "runnerClaudeCode.finished"}}})
 	require.NoError(t, err)
-	event := support.EmitCanvasEventForNode(t, canvas.ID, "publication", "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "publish", event.ID, event.ID)
+	require.Len(t, outputs, 1)
+	execution := support.CreateNextNodeExecution(t, canvas.ID, "publish", root.ID, outputs[0].ID, &agent.ID)
 	execution.State = models.CanvasNodeExecutionStateStarted
-	execution.Configuration = datatypes.NewJSONType(map[string]any{"sourceRunId": source.ID.String()})
 	require.NoError(t, db.Save(execution).Error)
 	require.NoError(t, (&factorycomponent.PublishMergeConfidence{}).Execute(core.ExecutionContext{
-		Configuration: execution.Configuration.Data(), Metadata: contexts.NewExecutionMetadataContext(db, execution), Requests: contexts.NewExecutionRequestContext(db, execution),
+		RunID: execution.RunID, Metadata: contexts.NewExecutionMetadataContext(db, execution), Requests: contexts.NewExecutionRequestContext(db, execution),
 	}))
 	var request models.CanvasNodeRequest
 	require.NoError(t, db.Where("execution_id = ?", execution.ID).First(&request).Error)

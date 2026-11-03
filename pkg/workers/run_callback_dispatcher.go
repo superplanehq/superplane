@@ -126,10 +126,6 @@ func (d *RunCallbackDispatcher) dispatchPendingHookOnEntryNode(callback core.Run
 }
 
 func (d *RunCallbackDispatcher) DispatchFinished() error {
-	if err := d.dispatchRunFinishedTriggers(); err != nil {
-		return fmt.Errorf("dispatch run finished triggers: %w", err)
-	}
-
 	finishedIndex := slices.IndexFunc(d.run.Callbacks, func(callback core.RunCallback) bool {
 		return callback.When == core.RunCallbackWhenFinished
 	})
