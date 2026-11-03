@@ -331,6 +331,12 @@ rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"
 trap 'rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"' EXIT
 : > "$kept_file"
 
+# Git writes a merge message without a final newline. Without it,
+# the sign-off lands on the subject paragraph and is not a trailer.
+if [ -s "$msg_file" ] && [ -n "$(tail -c 1 "$msg_file")" ]; then
+  printf '\n' >> "$msg_file"
+fi
+
 bounds=$(awk '
 function is_blank(line) { return line ~ /^[ \t]*$/ }
 function is_divider(line) { return line ~ /^---$/ || line ~ /^---[ \t]/ }
