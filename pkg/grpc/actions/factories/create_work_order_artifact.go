@@ -2,16 +2,20 @@ package factories
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
+	"gorm.io/gorm"
 )
 
 func CreateWorkOrderArtifact(
@@ -56,6 +60,13 @@ func CreateWorkOrderArtifact(
 	}
 	orderID := order.ID
 
+	if artifactType == models.FactoryWorkOrderArtifactTypeFile {
+		data, err = uploadedFileArtifactData(db, order, userID, data)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to create work order artifact")
+		}
+	}
+
 	artifact, err := order.CreateArtifact(db, models.FactoryWorkOrderArtifactParams{
 		Type:      artifactType,
 		Data:      data,
@@ -83,4 +94,59 @@ func CreateWorkOrderArtifact(
 	}
 
 	return &pb.CreateWorkOrderArtifactResponse{Artifact: serialized}, nil
+}
+
+// uploadedFileArtifactData turns data.fileId into the stored file fields.
+// The file must be an artifact file that this user uploaded to this task.
+func uploadedFileArtifactData(
+	db *gorm.DB,
+	order *models.FactoryWorkOrder,
+	userID uuid.UUID,
+	input map[string]any,
+) (map[string]any, error) {
+	rawID, _ := input["fileId"].(string)
+	fileID, err := uuid.Parse(strings.TrimSpace(rawID))
+	if err != nil {
+		return nil, invalidArgument("file artifacts require data.fileId")
+	}
+	file, err := models.FindFile(db, fileID)
+	if err != nil {
+		return nil, invalidArgument("file not found")
+	}
+	if !isUploadedArtifactFile(file, order, userID) {
+		return nil, invalidArgument("file is not an uploaded artifact file of this task")
+	}
+	attached, err := order.HasFileArtifact(db, file.ID)
+	if err != nil {
+		return nil, err
+	}
+	if attached {
+		return nil, invalidArgument("file is already attached to this task")
+	}
+	publicURL, err := storedfiles.ArtifactPublicURL(file)
+	if err != nil {
+		return nil, err
+	}
+	title, _ := input["title"].(string)
+	title = strings.TrimSpace(title)
+	if title == "" {
+		title = file.Filename
+	}
+	return map[string]any{
+		"fileId":      file.ID.String(),
+		"filename":    file.Filename,
+		"contentType": file.ContentType,
+		"sizeBytes":   file.SizeBytes,
+		"title":       title,
+		"url":         publicURL,
+	}, nil
+}
+
+func isUploadedArtifactFile(file *models.File, order *models.FactoryWorkOrder, userID uuid.UUID) bool {
+	return file.State == models.FileStateReady &&
+		file.Purpose == models.FilePurposeArtifact &&
+		file.Scope == blob.ScopeTask &&
+		file.WorkOrderID != nil && *file.WorkOrderID == order.ID &&
+		file.OrganizationID != nil && *file.OrganizationID == order.OrganizationID &&
+		file.CreatedByID != nil && *file.CreatedByID == userID
 }
