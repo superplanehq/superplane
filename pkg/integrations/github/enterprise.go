@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -20,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
 )
 
 const gitHubEnterpriseUnavailable = "GitHub Enterprise is not available"
@@ -42,28 +44,41 @@ func SetGitHubEnterprise(impl enterprise.GitHubEnterprise) {
 	gitHubEnterprise = impl
 }
 
-func githubEnterpriseEnabled(orgID uuid.UUID) bool {
-	ok, err := models.HasExperimentalFeature(orgID, features.FeatureGitHubEnterprise)
+type transactionalDB interface {
+	DB() *gorm.DB
+}
+
+func setupDB(httpCtx core.HTTPContext) *gorm.DB {
+	if holder, ok := httpCtx.(transactionalDB); ok {
+		if db := holder.DB(); db != nil {
+			return db
+		}
+	}
+	return database.Conn()
+}
+
+func githubEnterpriseEnabled(tx *gorm.DB, orgID uuid.UUID) bool {
+	ok, err := models.OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureGitHubEnterprise)
 	return err == nil && ok
 }
 
-func githubEnterpriseEnabledForOrg(orgID string) bool {
+func githubEnterpriseEnabledForOrg(tx *gorm.DB, orgID string) bool {
 	id, err := uuid.Parse(orgID)
 	if err != nil {
 		return false
 	}
-	return orgHasGitHubEnterprise(id)
+	return orgHasGitHubEnterprise(tx, id)
 }
 
-func authorizeGitHubEnterpriseHost(orgID uuid.UUID, host common.Host) error {
+func authorizeGitHubEnterpriseHost(tx *gorm.DB, orgID uuid.UUID, host common.Host) error {
 	if host.IsDotCom() {
 		return nil
 	}
 	if host.IsGHES() {
-		if !orgHasGitHubEnterpriseServer(orgID) {
+		if !orgHasGitHubEnterpriseServer(tx, orgID) {
 			return grpcerrors.FailedPrecondition(errors.New("GitHub Enterprise Server is not available"), "GitHub Enterprise Server is not available")
 		}
-	} else if !orgHasGitHubEnterprise(orgID) {
+	} else if !orgHasGitHubEnterprise(tx, orgID) {
 		return grpcerrors.FailedPrecondition(errors.New(gitHubEnterpriseUnavailable), gitHubEnterpriseUnavailable)
 	}
 	impl := gitHubEnterprise
@@ -73,7 +88,7 @@ func authorizeGitHubEnterpriseHost(orgID uuid.UUID, host common.Host) error {
 	return impl.AuthorizeHost(host.WebHostname())
 }
 
-func authorizeGitHubEnterpriseOrg(orgID string, host common.Host) error {
+func authorizeGitHubEnterpriseOrg(tx *gorm.DB, orgID string, host common.Host) error {
 	if host.IsDotCom() {
 		return nil
 	}
@@ -84,7 +99,7 @@ func authorizeGitHubEnterpriseOrg(orgID string, host common.Host) error {
 		}
 		return grpcerrors.FailedPrecondition(errors.New(gitHubEnterpriseUnavailable), gitHubEnterpriseUnavailable)
 	}
-	return authorizeGitHubEnterpriseHost(id, host)
+	return authorizeGitHubEnterpriseHost(tx, id, host)
 }
 
 func writeGitHubEnterpriseAuthorizationError(w http.ResponseWriter, err error) {
@@ -107,8 +122,8 @@ func gitHubEnterpriseLicensed() bool {
 	return impl.AuthorizeHost("acme.ghe.com") == nil
 }
 
-func githubEnterpriseServerEnabled(orgID uuid.UUID) bool {
-	ok, err := models.HasExperimentalFeature(orgID, features.FeatureGitHubEnterpriseServer)
+func githubEnterpriseServerEnabled(tx *gorm.DB, orgID uuid.UUID) bool {
+	ok, err := models.OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureGitHubEnterpriseServer)
 	return err == nil && ok
 }
 
@@ -125,13 +140,13 @@ func WithGitHubEnterpriseForTest(impl enterprise.GitHubEnterprise) func() {
 
 func withGitHubEnterpriseFlagForTest(fn func(uuid.UUID) bool) func() {
 	previous := orgHasGitHubEnterprise
-	orgHasGitHubEnterprise = fn
+	orgHasGitHubEnterprise = func(_ *gorm.DB, orgID uuid.UUID) bool { return fn(orgID) }
 	return func() { orgHasGitHubEnterprise = previous }
 }
 
 func withGitHubEnterpriseServerForTest(fn func(uuid.UUID) bool) func() {
 	previous := orgHasGitHubEnterpriseServer
-	orgHasGitHubEnterpriseServer = fn
+	orgHasGitHubEnterpriseServer = func(_ *gorm.DB, orgID uuid.UUID) bool { return fn(orgID) }
 	return func() { orgHasGitHubEnterpriseServer = previous }
 }
 
@@ -230,7 +245,7 @@ func ProbeGitHubHost(httpCtx core.HTTPContext, host common.Host, orgID uuid.UUID
 	if strings.TrimSpace(meta.InstalledVersion) == "" {
 		return nil
 	}
-	if !orgHasGitHubEnterpriseServer(orgID) {
+	if !orgHasGitHubEnterpriseServer(setupDB(httpCtx), orgID) {
 		return fmt.Errorf("GitHub Enterprise Server is not available")
 	}
 	return nil

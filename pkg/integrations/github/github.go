@@ -576,7 +576,7 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 }
 
 func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
-	if err := authorizeGitHubEnterpriseOrg(ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
+	if err := authorizeGitHubEnterpriseOrg(setupDB(ctx.HTTP), ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
 		writeGitHubEnterpriseAuthorizationError(ctx.Response, err)
 		return
 	}
@@ -749,7 +749,7 @@ func (g *GitHub) afterAppCreationLegacy(ctx core.HTTPRequestContext, appData *Gi
 
 func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	if !gitHubAppAlreadyCreated(ctx) {
-		if err := authorizeGitHubEnterpriseOrg(ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
+		if err := authorizeGitHubEnterpriseOrg(setupDB(ctx.HTTP), ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
 			writeGitHubEnterpriseAuthorizationError(ctx.Response, err)
 			return
 		}

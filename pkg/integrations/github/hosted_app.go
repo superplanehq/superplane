@@ -64,7 +64,7 @@ func WizardCreateConfiguration(orgID uuid.UUID, configMap map[string]any, httpCt
 		return nil, err
 	}
 	if !host.IsDotCom() {
-		if err := authorizeGitHubEnterpriseHost(orgID, host); err != nil {
+		if err := authorizeGitHubEnterpriseHost(setupDB(httpCtx), orgID, host); err != nil {
 			return nil, err
 		}
 		if !hostAllowed(host) {
