@@ -151,7 +151,6 @@ func Test__ListSelectableLLMModels__EnablesConnectedKeyModelsByDefault(t *testin
 func TestSelectableSubscriptionModelsUseCodexCatalogEfforts(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	subscription := true
