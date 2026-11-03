@@ -67,9 +67,23 @@ func (f *Factory) IsWorkspaceRepository(tx *gorm.DB, repository string) (bool, e
 	return false, nil
 }
 
-// RequireWorkspacePullRequest rejects a pull request outside the workspace
-// repositories. A workspace without a repository accepts every pull request.
-func (f *Factory) RequireWorkspacePullRequest(tx *gorm.DB, params FactoryPullRequestParams) error {
+// IsTaskRepository reports whether a task may have a pull request in
+// repository. A task keeps its saved repository after the workspace primary
+// repository changes, so that repository stays valid for the task.
+func (f *Factory) IsTaskRepository(tx *gorm.DB, order *FactoryWorkOrder, repository string) (bool, error) {
+	canonical := CanonicalContextRepo(repository)
+	if canonical == "" {
+		return false, nil
+	}
+	if order != nil && order.Repository != nil && CanonicalContextRepo(*order.Repository) == canonical {
+		return true, nil
+	}
+	return f.IsWorkspaceRepository(tx, repository)
+}
+
+// RequireTaskPullRequest rejects a pull request outside the repositories of
+// the task. A workspace without a repository accepts every pull request.
+func (f *Factory) RequireTaskPullRequest(tx *gorm.DB, order *FactoryWorkOrder, params FactoryPullRequestParams) error {
 	normalized, err := normalizeFactoryPullRequestParams(params)
 	if err != nil {
 		return err
@@ -81,13 +95,14 @@ func (f *Factory) RequireWorkspacePullRequest(tx *gorm.DB, params FactoryPullReq
 	if len(repositories) == 0 {
 		return nil
 	}
-	canonical := CanonicalContextRepo(normalized.Repository)
-	for _, repository := range repositories {
-		if CanonicalContextRepo(repository) == canonical {
-			return nil
-		}
+	allowed, err := f.IsTaskRepository(tx, order, normalized.Repository)
+	if err != nil {
+		return err
 	}
-	return ErrFactoryPullRequestRepositoryNotInWorkspace
+	if !allowed {
+		return ErrFactoryPullRequestRepositoryNotInWorkspace
+	}
+	return nil
 }
 
 func isGitHubContextRepo(config FactoryAgentResourceConfig) bool {

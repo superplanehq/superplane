@@ -1264,7 +1264,7 @@ func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
 	}
-	if err := factoryModel.RequireWorkspacePullRequest(c.tx, pullRequestParams); err != nil {
+	if err := factoryModel.RequireTaskPullRequest(c.tx, order, pullRequestParams); err != nil {
 		return nil, err
 	}
 	pullRequest, err := order.CreatePullRequest(c.tx, pullRequestParams)

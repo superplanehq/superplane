@@ -88,7 +88,16 @@ func OpenTaskPullRequest(
 		input.Base = repository.GetDefaultBranch()
 	}
 
-	remote, err := createOrUpdateTaskPullRequest(ctx, client, input, taskPullRequestBody(baseURL, factory, order, input.Body))
+	open, err := findOpenTaskPullRequest(ctx, client, input)
+	if err != nil {
+		return nil, err
+	}
+	if open != nil {
+		if err := requireTaskOwnsPullRequest(db, factory, order, input.Repository, open); err != nil {
+			return nil, err
+		}
+	}
+	remote, err := createOrUpdateTaskPullRequest(ctx, client, input, open, taskPullRequestBody(baseURL, factory, order, input.Body))
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +153,7 @@ func normalizeTaskPullRequestInput(
 		return input, invalidTaskPullRequest("title is required")
 	}
 
-	inWorkspace, err := factory.IsWorkspaceRepository(tx, input.Repository)
+	inWorkspace, err := factory.IsTaskRepository(tx, order, input.Repository)
 	if err != nil {
 		return input, err
 	}
@@ -160,23 +169,61 @@ func normalizeTaskPullRequestInput(
 	return input, nil
 }
 
-func createOrUpdateTaskPullRequest(
-	ctx context.Context,
-	client taskPullRequestGitHubAPI,
-	input TaskPullRequestInput,
-	body string,
-) (*github.PullRequest, error) {
+func findOpenTaskPullRequest(ctx context.Context, client taskPullRequestGitHubAPI, input TaskPullRequestInput) (*github.PullRequest, error) {
 	owner, _, _ := strings.Cut(input.Repository, "/")
 	open, _, err := client.ListPullRequests(ctx, input.Repository, &github.PullRequestListOptions{
 		State: "open",
 		Head:  owner + ":" + input.Head,
 		Base:  input.Base,
 	})
-	if err != nil {
+	if err != nil || len(open) == 0 {
 		return nil, err
 	}
-	if len(open) > 0 {
-		updated, _, err := client.EditPullRequest(ctx, input.Repository, open[0].GetNumber(), &github.PullRequest{
+	return open[0], nil
+}
+
+// requireTaskOwnsPullRequest rejects an open pull request that another task
+// tracks. The check runs before the GitHub edit, which cannot be undone.
+func requireTaskOwnsPullRequest(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	repository string,
+	open *github.PullRequest,
+) error {
+	existing, err := factory.FindPullRequest(tx, models.FactoryPullRequestLookup{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: taskPullRequestRepository(repository, open),
+		Number:     int64(open.GetNumber()),
+	})
+	if errors.Is(err, models.ErrFactoryPullRequestNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if existing.WorkOrderID != order.ID {
+		return ErrTaskPullRequestOtherTask
+	}
+	return nil
+}
+
+func taskPullRequestRepository(repository string, remote *github.PullRequest) string {
+	if fullName := remote.GetBase().GetRepo().GetFullName(); fullName != "" {
+		return fullName
+	}
+	return repository
+}
+
+func createOrUpdateTaskPullRequest(
+	ctx context.Context,
+	client taskPullRequestGitHubAPI,
+	input TaskPullRequestInput,
+	open *github.PullRequest,
+	body string,
+) (*github.PullRequest, error) {
+	if open != nil {
+		updated, _, err := client.EditPullRequest(ctx, input.Repository, open.GetNumber(), &github.PullRequest{
 			Title: github.Ptr(input.Title),
 			Body:  github.Ptr(body),
 		})
@@ -206,10 +253,7 @@ func attachTaskPullRequest(
 	if remote.GetDraft() {
 		state = models.FactoryPullRequestStateDraft
 	}
-	repository := input.Repository
-	if fullName := remote.GetBase().GetRepo().GetFullName(); fullName != "" {
-		repository = fullName
-	}
+	repository := taskPullRequestRepository(input.Repository, remote)
 	title := remote.GetTitle()
 	url := remote.GetHTMLURL()
 

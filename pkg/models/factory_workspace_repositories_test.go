@@ -66,6 +66,23 @@ func Test__FactoryWorkspaceRepositories(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("accepts the saved task repository after the primary repository changes", func(t *testing.T) {
+		factory := newWorkspace(t, "")
+		order, err := factory.CreateWorkOrder(db, "Running", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		saved := "acme/app"
+		order.Repository = &saved
+		next := "acme/next"
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &next}))
+
+		ok, err := factory.IsTaskRepository(db, order, "acme/app")
+		require.NoError(t, err)
+		assert.True(t, ok)
+		ok, err = factory.IsTaskRepository(db, order, "acme/other")
+		require.NoError(t, err)
+		assert.False(t, ok)
+	})
+
 	t.Run("keeps only the primary repository for Bitbucket", func(t *testing.T) {
 		factory := newWorkspace(t, models.ProviderBitbucket)
 		addContextRepo(t, factory, "acme/web", true)

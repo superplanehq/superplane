@@ -156,4 +156,19 @@ func TestOpenTaskPullRequest(t *testing.T) {
 		require.ErrorIs(t, err, models.ErrFactoryPullRequestRepositoryNotInWorkspace)
 		assert.Equal(t, calls, fake.calls)
 	})
+
+	t.Run("does not edit the pull request of another task", func(t *testing.T) {
+		other, err := factory.CreateWorkOrder(db, "Other", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		_, err = OpenTaskPullRequest(context.Background(), IntakeDependencies{}, "http://app.test", factory, other, TaskPullRequestInput{
+			Repository: "acme/api", Head: "other-feature", Title: "Other task change",
+		})
+		require.NoError(t, err)
+		edits := len(fake.edited)
+
+		_, err = open(TaskPullRequestInput{Repository: "acme/api", Head: "other-feature", Title: "Take over"})
+
+		require.ErrorIs(t, err, ErrTaskPullRequestOtherTask)
+		assert.Len(t, fake.edited, edits)
+	})
 }

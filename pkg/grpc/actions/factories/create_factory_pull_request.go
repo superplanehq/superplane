@@ -44,7 +44,7 @@ func CreateFactoryPullRequest(
 		MergedAt:   timestampPointer(req.GetMergedAt()),
 		ClosedAt:   timestampPointer(req.GetClosedAt()),
 	}
-	if err := factory.RequireWorkspacePullRequest(db, params); err != nil {
+	if err := factory.RequireTaskPullRequest(db, order, params); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}
 	pullRequest, err := order.CreatePullRequest(db, params)

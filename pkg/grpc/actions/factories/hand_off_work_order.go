@@ -368,7 +368,7 @@ func attachVerifyHandOffPullRequest(
 	if len(repositories) == 0 {
 		return invalidArgument("This workspace has no repository.")
 	}
-	inWorkspace, err := factory.IsWorkspaceRepository(tx, pullRequest.Repository)
+	inWorkspace, err := factory.IsTaskRepository(tx, order, pullRequest.Repository)
 	if err != nil {
 		return err
 	}

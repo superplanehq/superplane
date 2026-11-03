@@ -29,12 +29,31 @@ func TestRefreshWorkspaceRepositoryAutomationsListensOnEveryRepository(t *testin
 	closure := support.CreateFactoryCanvas(t, r, factory.ID, "Close")
 	metadata := models.FactoryAppTemplateMetadataFor("pr-closure", 1, models.ProviderGitHub)
 	metadata["repository"] = map[string]any{"id": 201, "name": "acme/api"}
-	publishRepositoryCanvas(t, r, deps, closure, []models.Node{{
-		ID: prClosureTriggerNodeID, Name: "On pull request closed", Type: models.NodeTypeTrigger,
+	publishRepositoryCanvas(t, r, deps, closure, []models.Node{
+		{
+			ID: prClosureTriggerNodeID, Name: "On pull request closed", Type: models.NodeTypeTrigger,
+			Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}},
+			IntegrationID: &integrationID,
+			Configuration: map[string]any{"repository": "acme/api", "actions": []any{"closed"}},
+			Metadata:      metadata,
+		},
+		{
+			ID: "complete-work-order", Name: "Complete task", Type: models.NodeTypeComponent,
+			Ref: models.NodeRef{Component: &models.ComponentRef{Name: "updateWorkOrderStatus"}},
+			Configuration: map[string]any{
+				"orderId": "{{ root().data.workOrder.id }}", "status": "closed", "result": "completed",
+			},
+		},
+	})
+	risk := support.CreateFactoryCanvas(t, r, factory.ID, "Merge confidence")
+	riskMetadata := models.FactoryAppTemplateMetadataFor("risk-score", 1, models.ProviderGitHub)
+	riskMetadata["repository"] = map[string]any{"id": 201, "name": "acme/api"}
+	publishRepositoryCanvas(t, r, deps, risk, []models.Node{{
+		ID: riskScoreTriggerNodeID, Name: "On pull request", Type: models.NodeTypeTrigger,
 		Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}},
 		IntegrationID: &integrationID,
-		Configuration: map[string]any{"repository": "acme/api", "actions": []any{"closed"}},
-		Metadata:      metadata,
+		Configuration: map[string]any{"repository": "acme/api", "actions": []any{"opened"}},
+		Metadata:      riskMetadata,
 	}})
 
 	_, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
@@ -49,6 +68,12 @@ func TestRefreshWorkspaceRepositoryAutomationsListensOnEveryRepository(t *testin
 	require.NotNil(t, trigger)
 	assert.Equal(t, true, trigger.Configuration[githubcommon.WorkspaceRepositoriesField])
 	assert.Equal(t, "acme/api", trigger.Configuration["repository"])
+	complete := findIntakeNode(live.Nodes, "complete-work-order")
+	require.NotNil(t, complete)
+	assert.Equal(t, true, complete.Configuration[allPullRequestsDoneField], "the task must stay open until every pull request is done")
+	riskTrigger := findIntakeNode(liveRepositoryCanvas(t, db, r.Organization.ID, risk).Nodes, riskScoreTriggerNodeID)
+	require.NotNil(t, riskTrigger)
+	assert.Equal(t, true, riskTrigger.Configuration[githubcommon.WorkspaceRepositoriesField])
 
 	node, err := models.FindCanvasNode(db, closure.ID, prClosureTriggerNodeID)
 	require.NoError(t, err)

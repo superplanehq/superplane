@@ -177,6 +177,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
 	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
 	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
+	assert.Equal(t, true, entrypoint.Configuration["workspaceRepositories"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
 	assert.NotContains(t, result.canvasYAML, "should-assess")
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "on-pr-risk", TargetID: "assess-risk", Channel: "default"})

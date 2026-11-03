@@ -17,7 +17,16 @@ import (
 	"gorm.io/gorm"
 )
 
-const prClosureTriggerNodeID = "on-pr-closed"
+const (
+	prClosureTriggerNodeID = "on-pr-closed"
+	riskScoreTriggerNodeID = "on-pr-risk"
+)
+
+const allPullRequestsDoneField = "whenAllPullRequestsDone"
+
+// A workspace-scope closure app closes the task only after every attached
+// pull request is done. Older closure apps close on the first one.
+var prClosureCloseNodeIDs = []string{"complete-work-order", "reject-work-order"}
 
 // syncWorkspaceRepositoryAccess grants the hosted GitHub App write token
 // access to every workspace repository. Workspaces without a hosted app
@@ -54,8 +63,9 @@ func refreshWorkspaceRepositoryAutomations(ctx context.Context, deps IntakeDepen
 }
 
 // republishWorkspaceRepositoryAutomations turns on the workspace scope on
-// the pull request closure and PR feedback nodes, then runs their Setup again
-// so each webhook covers the current workspace repositories.
+// the pull request closure, merge confidence, and PR feedback nodes, then
+// runs their Setup again so each webhook covers the current workspace
+// repositories.
 func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, factory *models.Factory) error {
 	if factory.OnboardingConfigValue().EffectiveVCSProvider() != models.ProviderGitHub {
 		return nil
@@ -97,6 +107,9 @@ func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, d
 		}
 
 		nodes, changed := withWorkspaceScope(slices.Clone(liveVersion.Nodes), nodeIDs)
+		if slices.Contains(nodeIDs, prClosureTriggerNodeID) {
+			nodes, changed = withAllPullRequestsClose(nodes, changed)
+		}
 		if changed {
 			if err := canvases.PublishGeneratedCanvasNodesWithOwner(
 				ctx,
@@ -120,11 +133,17 @@ func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, d
 }
 
 // workspaceScopeNodeIDs lists the GitHub nodes that listen for pull request
-// events of the workspace: the closure trigger and the PR feedback nodes.
+// events of the workspace: the closure and merge confidence triggers and the
+// PR feedback nodes.
 func workspaceScopeNodeIDs(spec models.LiveCanvasSpec, prFeedback bool) []string {
 	nodeIDs := []string{}
-	if template, ok := resolveFactoryTemplate(spec.Nodes); ok && template.id == "pr-closure" {
-		nodeIDs = append(nodeIDs, prClosureTriggerNodeID)
+	if template, ok := resolveFactoryTemplate(spec.Nodes); ok {
+		switch template.id {
+		case "pr-closure":
+			nodeIDs = append(nodeIDs, prClosureTriggerNodeID)
+		case "risk-score":
+			nodeIDs = append(nodeIDs, riskScoreTriggerNodeID)
+		}
 	}
 	if prFeedback {
 		graph := resolvePRFeedbackGraph(spec)
@@ -161,6 +180,25 @@ func withWorkspaceScope(nodes []models.Node, nodeIDs []string) ([]models.Node, b
 		if !nodeChanged {
 			continue
 		}
+		nodes[i].Configuration = configuration
+		changed = true
+	}
+	return nodes, changed
+}
+
+func withAllPullRequestsClose(nodes []models.Node, changed bool) ([]models.Node, bool) {
+	for i := range nodes {
+		if !slices.Contains(prClosureCloseNodeIDs, nodes[i].ID) || nodes[i].ComponentName() != "updateWorkOrderStatus" {
+			continue
+		}
+		if enabled, _ := nodes[i].Configuration[allPullRequestsDoneField].(bool); enabled {
+			continue
+		}
+		configuration := maps.Clone(nodes[i].Configuration)
+		if configuration == nil {
+			configuration = map[string]any{}
+		}
+		configuration[allPullRequestsDoneField] = true
 		nodes[i].Configuration = configuration
 		changed = true
 	}

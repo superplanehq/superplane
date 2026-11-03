@@ -159,6 +159,59 @@ func TestGitHub__ResolveSecrets__HostedWriteTokenCoversWorkspaceRepositories(t *
 	assert.JSONEq(t, `{"repository_ids":[601,602]}`, readRequestBody(t, httpCtx.Requests[0]))
 }
 
+func TestGitHub__ResolveSecrets__HostedWriteTokenCoversContextRepositoriesWithoutGrants(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	organization, err := models.CreateOrganization("org-"+uuid.NewString(), "")
+	require.NoError(t, err)
+	t.Setenv(common.EnvGitHubAppID, "99")
+	t.Setenv(common.EnvGitHubAppSlug, "superplane")
+	t.Setenv(common.EnvGitHubAppPrivateKey, string(githubPrivateKeyPEM(t)))
+	t.Setenv(common.EnvGitHubAppWebhookSecret, "whsec")
+
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 501,
+		AccountLogin:   "acme",
+	}))
+	integration, err := models.FindOrCreateVCSProviderBinding(database.Conn(), organization.ID, models.ProviderGitHub, 501, "acme")
+	require.NoError(t, err)
+	require.NoError(t, models.ReplaceVCSProviderRepositories(database.Conn(), models.ProviderGitHub, 501, []models.VCSProviderRepository{
+		{RepositoryID: 601, FullName: "acme/api"},
+		{RepositoryID: 602, FullName: "acme/web"},
+	}))
+	// A connection saved before agents changed context repositories has a
+	// grant for the primary repository only.
+	require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), integration.ID, models.ProviderGitHub, 601))
+
+	factory := createContextRepoWorkspace(t, organization.ID, integration.ID)
+	for _, repository := range []string{"acme/web", "acme/missing"} {
+		_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: repository,
+		})
+		require.NoError(t, err)
+	}
+
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
+	}}
+	_, err = (&GitHub{}).ResolveSecrets(core.IntegrationSecretContext{
+		HTTP: httpCtx,
+		Integration: &contexts.IntegrationContext{
+			IntegrationID: integration.ID.String(),
+			Metadata:      common.Metadata{HostedApp: true},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.JSONEq(t, `{"repository_ids":[601,602]}`, readRequestBody(t, httpCtx.Requests[0]))
+	var jobs int64
+	require.NoError(t, database.Conn().Model(&models.VCSProviderInstallationReconcileJob{}).
+		Where("provider = ? AND installation_id = ?", models.ProviderGitHub, int64(501)).
+		Count(&jobs).Error)
+	assert.Equal(t, int64(1), jobs, "a context repository missing from the catalog refreshes the installation")
+}
+
 func createContextRepoWorkspace(t *testing.T, organizationID, integrationID uuid.UUID) *models.Factory {
 	t.Helper()
 	factory, err := models.CreateFactory(database.Conn(), organizationID, "workspace-"+uuid.NewString(), "", "")

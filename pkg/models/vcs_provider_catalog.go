@@ -1508,12 +1508,19 @@ func matchBindingContextRepositoryIDs(tx *gorm.DB, integrationID uuid.UUID, prov
 	if provider != ProviderGitHub {
 		return nil, nil
 	}
-	names, err := ListEnabledGitHubContextRepositoryNames(tx, integrationID)
-	if err != nil {
-		return nil, err
-	}
-	ids, _, err := MatchVCSProviderRepositoryIDs(tx, provider, installationID, names)
+	ids, _, err := MatchBindingContextRepositoryIDs(tx, integrationID, installationID)
 	return ids, err
+}
+
+// MatchBindingContextRepositoryIDs returns the catalog IDs of the enabled
+// GitHub context repositories that use the integration, and the names that
+// the installation catalog does not have yet.
+func MatchBindingContextRepositoryIDs(tx *gorm.DB, integrationID uuid.UUID, installationID int64) ([]int64, []string, error) {
+	names, err := ListEnabledGitHubContextRepositoryNames(tx, integrationID)
+	if err != nil || len(names) == 0 {
+		return nil, nil, err
+	}
+	return MatchVCSProviderRepositoryIDs(tx, ProviderGitHub, installationID, names)
 }
 
 func normalizeVCSProvider(provider string) (string, error) {
