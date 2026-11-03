@@ -213,6 +213,7 @@ export const useNextIntegrationSetupStep = (organizationId: string) => {
     mutationFn: async (data: { integrationId: string; inputs?: Record<string, unknown>; capabilities?: string[] }) => {
       return await organizationsNextIntegrationSetupStep(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId: data.integrationId },
           body: {
             inputs: data.inputs,
@@ -242,6 +243,7 @@ export const usePreviousIntegrationSetupStep = (organizationId: string) => {
     mutationFn: async (data: { integrationId: string }) => {
       return await organizationsPreviousIntegrationSetupStep(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId: data.integrationId },
           body: {},
         }),
@@ -296,6 +298,7 @@ export const useUpdateIntegrationCapabilities = (organizationId: string, integra
     mutationFn: async (capabilities: IntegrationCapabilityState[]) => {
       return await organizationsUpdateIntegrationCapabilities(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           body: { capabilities },
         }),
@@ -344,6 +347,7 @@ export const useUpdateIntegrationProperty = (organizationId: string, integration
     mutationFn: async (body: { propertyName: string; value: string }) => {
       const response = await organizationsUpdateIntegrationProperty(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           body: { propertyName: body.propertyName, value: body.value },
         }),
@@ -363,6 +367,7 @@ export const useUpdateIntegrationSecret = (organizationId: string, integrationId
     mutationFn: async (body: { secretName: string; value: string }) => {
       const response = await organizationsUpdateIntegrationSecret(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           body: { secretName: body.secretName, value: body.value },
         }),
@@ -398,6 +403,7 @@ export const useDeleteIntegration = (organizationId: string, integrationId: stri
     mutationFn: async (data: { integrationName: string }) => {
       await organizationsDeleteIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
         }),
       );

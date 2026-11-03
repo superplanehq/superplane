@@ -93,8 +93,8 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 		created, err = s.node.CreateRootEventUnlessLatestInScope(s.tx, &event, mergeConfidence.Scope, mergeConfidence.Key, mergeConfidence.isRedundantAfter)
 	} else if dedupKey != "" && s.run == nil {
 		created, err = s.node.CreateDeduplicatedRootEvent(s.tx, &event, dedupKey)
-	} else if payloadType == "github.pullRequest" && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.Ref.Data().Trigger != nil && s.node.Ref.Data().Trigger.Name == "github.onPullRequest" {
-		created, err = s.node.CreateGitHubChecksEvent(s.tx, &event)
+	} else if (payloadType == "github.pullRequest" || payloadType == "bitbucket.pullRequest") && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.ComponentName() == strings.TrimSuffix(payloadType, ".pullRequest")+".onPullRequest" {
+		created, err = s.node.CreatePullRequestChecksEvent(s.tx, &event)
 	} else {
 		err = s.tx.Create(&event).Error
 	}
@@ -126,10 +126,12 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 // mergeConfidenceWebhookIdentity identifies the diff that an automatic
 // Bitbucket merge confidence start assesses.
 type mergeConfidenceWebhookIdentity struct {
-	// Scope is the dedup key prefix for all starts of one pull request.
-	Scope string
-	// Key identifies the head commit and the destination branch.
+	// Scope selects all earlier starts of one pull request.
+	Scope models.RootEventScope
+	// Key identifies the pull request, the head commit, and the destination branch.
 	Key string
+	// Diff identifies the head commit and the destination branch.
+	Diff string
 	// UpdatedAt is the Bitbucket update time of the pull request in the event.
 	UpdatedAt time.Time
 }
@@ -143,28 +145,68 @@ func (m mergeConfidenceWebhookIdentity) isRedundantAfter(latest models.CanvasEve
 	if latest.DedupKey != nil && *latest.DedupKey == m.Key {
 		return true
 	}
-	latestUpdatedAt, ok := bitbucketPullRequestUpdatedAt(latest.Data.Data())
+	envelope, _ := latest.Data.Data().(map[string]any)
+	stored := parseBitbucketMergeConfidenceEvent(envelope["data"])
+	// Starts from other paths and legacy starts have no key in this format.
+	if stored.diff() != "" && stored.diff() == m.Diff {
+		return true
+	}
+	latestUpdatedAt, ok := stored.updatedAt()
 	if !ok || m.UpdatedAt.IsZero() {
 		return false
 	}
 	return m.UpdatedAt.Before(latestUpdatedAt)
 }
 
-// bitbucketPullRequestUpdatedAt reads pullrequest.updated_on from a stored
-// event envelope.
-func bitbucketPullRequestUpdatedAt(stored any) (time.Time, bool) {
-	envelope, _ := stored.(map[string]any)
-	payload, _ := envelope["data"].(map[string]any)
-	return parseBitbucketPullRequestUpdatedAt(payload)
+type bitbucketMergeConfidenceEvent struct {
+	PullRequest struct {
+		ID string `json:"id"`
+	} `json:"pullRequest"`
+	Repository struct {
+		FullName string `json:"full_name"`
+	} `json:"repository"`
+	View struct {
+		Number json.Number `json:"number"`
+		Head   struct {
+			SHA string `json:"sha"`
+		} `json:"head"`
+		Base struct {
+			Ref string `json:"ref"`
+		} `json:"base"`
+	} `json:"pull_request"`
+	Raw struct {
+		UpdatedOn string `json:"updated_on"`
+	} `json:"pullrequest"`
 }
 
-func parseBitbucketPullRequestUpdatedAt(payload map[string]any) (time.Time, bool) {
-	pullRequest, _ := payload["pullrequest"].(map[string]any)
-	value, _ := pullRequest["updated_on"].(string)
-	if strings.TrimSpace(value) == "" {
+func parseBitbucketMergeConfidenceEvent(payload any) bitbucketMergeConfidenceEvent {
+	var event bitbucketMergeConfidenceEvent
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return bitbucketMergeConfidenceEvent{}
+	}
+	if err := json.Unmarshal(raw, &event); err != nil {
+		return bitbucketMergeConfidenceEvent{}
+	}
+	return event
+}
+
+// diff joins the head commit and the destination branch. Git ref names cannot
+// contain ":", so the parts stay unambiguous.
+func (e bitbucketMergeConfidenceEvent) diff() string {
+	sha := strings.TrimSpace(e.View.Head.SHA)
+	if sha == "" {
+		return ""
+	}
+	return sha + ":" + e.View.Base.Ref
+}
+
+func (e bitbucketMergeConfidenceEvent) updatedAt() (time.Time, bool) {
+	value := strings.TrimSpace(e.Raw.UpdatedOn)
+	if value == "" {
 		return time.Time{}, false
 	}
-	updatedAt, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(value))
+	updatedAt, err := time.Parse(time.RFC3339Nano, value)
 	if err != nil {
 		return time.Time{}, false
 	}
@@ -177,6 +219,11 @@ func parseBitbucketPullRequestUpdatedAt(payload map[string]any) (time.Time, bool
 // reflects a later PR update. A retargeted PR gets a new assessment, also when
 // it returns to an earlier destination. Explicit reruns use a different
 // payload type and remain available.
+//
+// The newest start can also come from the PR checks start path, which keys
+// events by repository, PR number, and head commit, or from an event stored
+// before dedup keys existed. The scope includes both, so the rollout of this
+// key format does not start a second assessment for the same diff.
 func mergeConfidenceWebhookDedupKey(node *models.CanvasNode, payloadType string, payload any) mergeConfidenceWebhookIdentity {
 	if node == nil || node.Type != models.NodeTypeTrigger || payloadType != "bitbucket.pullRequest" {
 		return mergeConfidenceWebhookIdentity{}
@@ -185,36 +232,23 @@ func mergeConfidenceWebhookDedupKey(node *models.CanvasNode, payloadType string,
 	if template["id"] != "risk-score" {
 		return mergeConfidenceWebhookIdentity{}
 	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
+	event := parseBitbucketMergeConfidenceEvent(payload)
+	diff := event.diff()
+	if event.PullRequest.ID == "" || diff == "" {
 		return mergeConfidenceWebhookIdentity{}
 	}
-	var identity struct {
-		PullRequest struct {
-			ID string `json:"id"`
-		} `json:"pullRequest"`
-		View struct {
-			Head struct {
-				SHA string `json:"sha"`
-			} `json:"head"`
-			Base struct {
-				Ref string `json:"ref"`
-			} `json:"base"`
-		} `json:"pull_request"`
-		Raw map[string]any `json:"pullrequest"`
+	scope := models.RootEventScope{KeyPrefix: "merge-confidence:" + event.PullRequest.ID + ":"}
+	repository := strings.ToLower(strings.TrimSpace(event.Repository.FullName))
+	number := event.View.Number.String()
+	if repository != "" && number != "" {
+		scope.OtherKeyPrefixes = []string{repository + "|" + number + "|"}
+		scope.LegacyPullRequest = &models.LegacyPullRequestEventMatch{Repository: repository, Number: number}
 	}
-	if err := json.Unmarshal(raw, &identity); err != nil {
-		return mergeConfidenceWebhookIdentity{}
-	}
-	if identity.PullRequest.ID == "" || identity.View.Head.SHA == "" {
-		return mergeConfidenceWebhookIdentity{}
-	}
-	// Git ref names cannot contain ":", so the key parts stay unambiguous.
-	scope := "merge-confidence:" + identity.PullRequest.ID + ":"
-	updatedAt, _ := parseBitbucketPullRequestUpdatedAt(map[string]any{"pullrequest": identity.Raw})
+	updatedAt, _ := event.updatedAt()
 	return mergeConfidenceWebhookIdentity{
 		Scope:     scope,
-		Key:       scope + identity.View.Head.SHA + ":" + identity.View.Base.Ref,
+		Key:       scope.KeyPrefix + diff,
+		Diff:      diff,
 		UpdatedAt: updatedAt,
 	}
 }

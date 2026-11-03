@@ -106,36 +106,49 @@ func (n *CanvasNode) CreateDeduplicatedRootEvent(tx *gorm.DB, event *CanvasEvent
 	return created, err
 }
 
+// RootEventScope selects the earlier root events of one subject, for example
+// one pull request.
+type RootEventScope struct {
+	// KeyPrefix is the dedup key prefix that the caller writes. The new key
+	// must start with it.
+	KeyPrefix string
+	// OtherKeyPrefixes match dedup keys that other start paths wrote for the
+	// same subject.
+	OtherKeyPrefixes []string
+	// LegacyPullRequest matches pull request events stored without a dedup key.
+	LegacyPullRequest *LegacyPullRequestEventMatch
+}
+
+// LegacyPullRequestEventMatch identifies a pull request in an event payload.
+type LegacyPullRequestEventMatch struct {
+	Repository string
+	Number     string
+}
+
 // CreateRootEventUnlessLatestInScope creates a root event with the dedup key
-// unless the newest root event in the same dedup scope makes it redundant.
+// unless the newest root event in the same scope makes it redundant.
 // The skip function receives that newest event and decides. Unlike
 // CreateDeduplicatedRootEvent, an older key can start again after a different
 // key in the scope, for example when a pull request returns to an earlier
 // target.
-func (n *CanvasNode) CreateRootEventUnlessLatestInScope(tx *gorm.DB, event *CanvasEvent, scope, key string, skip func(latest CanvasEvent) bool) (bool, error) {
-	if scope == "" || !strings.HasPrefix(key, scope) {
-		return false, fmt.Errorf("dedup key %q is not in scope %q", key, scope)
+func (n *CanvasNode) CreateRootEventUnlessLatestInScope(tx *gorm.DB, event *CanvasEvent, scope RootEventScope, key string, skip func(latest CanvasEvent) bool) (bool, error) {
+	if scope.KeyPrefix == "" || !strings.HasPrefix(key, scope.KeyPrefix) {
+		return false, fmt.Errorf("dedup key %q is not in scope %q", key, scope.KeyPrefix)
 	}
 
 	event.DedupKey = &key
 	created := false
 	err := tx.Transaction(func(inner *gorm.DB) error {
-		lockKey := "canvas-event-scope:" + n.WorkflowID.String() + ":" + n.NodeID + ":" + scope
+		lockKey := "canvas-event-scope:" + n.WorkflowID.String() + ":" + n.NodeID + ":" + scope.KeyPrefix
 		if err := inner.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
 			return err
 		}
 
-		var latest []CanvasEvent
-		err := inner.
-			Where("workflow_id = ? AND node_id = ? AND dedup_key IS NOT NULL", n.WorkflowID, n.NodeID).
-			Where("left(dedup_key, ?) = ?", len([]rune(scope)), scope).
-			Order("created_at DESC, id DESC").
-			Limit(1).
-			Find(&latest).Error
+		latest, err := n.latestRootEventInScope(inner, scope)
 		if err != nil {
 			return err
 		}
-		if len(latest) > 0 && skip(latest[0]) {
+		if latest != nil && skip(*latest) {
 			return nil
 		}
 		if err := inner.Create(event).Error; err != nil {
@@ -145,6 +158,65 @@ func (n *CanvasNode) CreateRootEventUnlessLatestInScope(tx *gorm.DB, event *Canv
 		return nil
 	})
 	return created, err
+}
+
+func (n *CanvasNode) latestRootEventInScope(tx *gorm.DB, scope RootEventScope) (*CanvasEvent, error) {
+	prefixes := append([]string{scope.KeyPrefix}, scope.OtherKeyPrefixes...)
+	prefixMatch := tx.Session(&gorm.Session{NewDB: true}).Where("1 = 0")
+	for _, prefix := range prefixes {
+		if prefix == "" {
+			continue
+		}
+		prefixMatch = prefixMatch.Or("left(dedup_key, ?) = ?", len([]rune(prefix)), prefix)
+	}
+
+	var candidates []CanvasEvent
+	var keyed []CanvasEvent
+	err := tx.
+		Where("workflow_id = ? AND node_id = ? AND dedup_key IS NOT NULL", n.WorkflowID, n.NodeID).
+		Where(prefixMatch).
+		Order("created_at DESC, id DESC").
+		Limit(1).
+		Find(&keyed).Error
+	if err != nil {
+		return nil, err
+	}
+	candidates = append(candidates, keyed...)
+
+	if legacy := scope.LegacyPullRequest; legacy != nil {
+		// Events stored before dedup keys existed keep the PR only in the payload.
+		var unkeyed []CanvasEvent
+		err := tx.
+			Where("workflow_id = ? AND node_id = ? AND dedup_key IS NULL", n.WorkflowID, n.NodeID).
+			Where("data ->> 'type' IN ('github.pullRequest', 'bitbucket.pullRequest')").
+			Where("lower(data #>> '{data,repository,full_name}') = ?", strings.ToLower(strings.TrimSpace(legacy.Repository))).
+			Where("data #>> '{data,pull_request,number}' = ?", legacy.Number).
+			Order("created_at DESC, id DESC").
+			Limit(1).
+			Find(&unkeyed).Error
+		if err != nil {
+			return nil, err
+		}
+		candidates = append(candidates, unkeyed...)
+	}
+
+	var latest *CanvasEvent
+	for i := range candidates {
+		if latest == nil || newerCanvasEvent(candidates[i], *latest) {
+			latest = &candidates[i]
+		}
+	}
+	return latest, nil
+}
+
+func newerCanvasEvent(left, right CanvasEvent) bool {
+	if left.CreatedAt == nil || right.CreatedAt == nil {
+		return right.CreatedAt == nil && left.CreatedAt != nil
+	}
+	if !left.CreatedAt.Equal(*right.CreatedAt) {
+		return left.CreatedAt.After(*right.CreatedAt)
+	}
+	return left.ID.String() > right.ID.String()
 }
 
 func FindCanvasEvents(tx *gorm.DB, ids []string) ([]CanvasEvent, error) {

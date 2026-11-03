@@ -886,6 +886,63 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 		assert.Equal(t, before+1, countStatusEvents(t, reloaded))
 	})
 
+	for _, merged := range []bool{false, true} {
+		t.Run(fmt.Sprintf("preserves closure while the task is locked merged %t", merged), func(t *testing.T) {
+			factory, order, webhook := setupOpenOrder(t, "acme/app", 66)
+			pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{
+				Provider: models.FactoryPullRequestProviderGitHub, Repository: "acme/app", Number: 66,
+			})
+			require.NoError(t, err)
+
+			// Startup and merge hold the task before touching the PR.
+			locked := db.Begin()
+			require.NoError(t, locked.Error)
+			defer locked.Rollback()
+			require.NoError(t, locked.Exec("SET LOCAL lock_timeout = '500ms'").Error)
+			require.NoError(t, models.LockFactoryWorkOrder(locked, order.ID))
+			var pid int
+			require.NoError(t, locked.Raw("SELECT pg_backend_pid()").Scan(&pid).Error)
+
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			finished := make(chan struct{})
+			body := closedPayload("acme/app", 66, merged)
+			go func() {
+				defer close(finished)
+				RefreshFactoryPullRequestMergeabilityFromGitHubEvent(ctx, IntakeDependencies{}, webhook, "pull_request", body)
+			}()
+			t.Cleanup(func() {
+				cancel()
+				locked.Rollback()
+				<-finished
+			})
+
+			// Wait for the real close transaction to block on the task lock.
+			require.Eventually(t, func() bool {
+				var waiting bool
+				err := db.Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid)))", pid).Scan(&waiting).Error
+				return err == nil && waiting
+			}, 2*time.Second, 10*time.Millisecond)
+			require.NoError(t, pullRequest.LockForUpdate(locked), "closure must let the task lock holder finish without a deadlock")
+			require.NoError(t, locked.Commit().Error)
+			select {
+			case <-finished:
+			case <-ctx.Done():
+				t.Fatal("close webhook did not finish after the task lock was released")
+			}
+
+			reloaded := reload(t, factory, order.ID)
+			assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+			result, state := models.FactoryWorkOrderResultPRClosed, models.FactoryPullRequestStateClosed
+			if merged {
+				result, state = models.FactoryWorkOrderResultCompleted, models.FactoryPullRequestStateMerged
+			}
+			assert.Equal(t, result, reloaded.Result)
+			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+			require.NoError(t, err)
+			assert.Equal(t, state, stored.State)
+		})
+	}
+
 	t.Run("ignores a repository with no matching pull request", func(t *testing.T) {
 		factory, order, webhook := setupOpenOrder(t, "acme/app", 64)
 		deliver(webhook, closedPayload("acme/other", 64, true))
