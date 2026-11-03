@@ -484,3 +484,13 @@ func (s *FactoryService) ResumeHandOffWorkOrder(ctx context.Context, req *pb.Res
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ResumeHandOffWorkOrder(ctx, s.intakeDeps, organizationID, req)
 }
+
+func (s *FactoryService) SearchFactoryPullRequestImportItems(ctx context.Context, req *pb.SearchFactoryPullRequestImportItemsRequest) (*pb.SearchFactoryPullRequestImportItemsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SearchFactoryPullRequestImportItems(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) ImportFactoryPullRequest(ctx context.Context, req *pb.ImportFactoryPullRequestRequest) (*pb.ImportFactoryPullRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ImportFactoryPullRequest(ctx, s.intakeDeps, organizationID, req)
+}
