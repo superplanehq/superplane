@@ -33,7 +33,7 @@ func CreateFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}
 
-	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+	params := models.FactoryPullRequestParams{
 		Provider:   pullRequestProviderFromProto(req.GetProvider()),
 		ExternalID: req.GetExternalId(),
 		Repository: req.GetRepository(),
@@ -43,7 +43,11 @@ func CreateFactoryPullRequest(
 		State:      pullRequestStateFromProto(req.GetState()),
 		MergedAt:   timestampPointer(req.GetMergedAt()),
 		ClosedAt:   timestampPointer(req.GetClosedAt()),
-	})
+	}
+	if err := factory.RequireWorkspacePullRequest(db, params); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
+	}
+	pullRequest, err := order.CreatePullRequest(db, params)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory pull request")
 	}

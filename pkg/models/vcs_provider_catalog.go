@@ -1365,6 +1365,13 @@ func SyncVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID, pr
 				selected[config.BacklogRepositoryID] = struct{}{}
 			}
 		}
+		contextRepositoryIDs, err := matchBindingContextRepositoryIDs(tx, integrationID, provider, binding.InstallationID)
+		if err != nil {
+			return err
+		}
+		for _, repositoryID := range contextRepositoryIDs {
+			selected[repositoryID] = struct{}{}
+		}
 
 		if err := tx.Where("integration_id = ?", integrationID).Delete(&VCSProviderIntegrationRepository{}).Error; err != nil {
 			return err
@@ -1490,6 +1497,23 @@ func ListVCSProviderIntegrationBindings(
 		Find(&bindings).
 		Error
 	return bindings, err
+}
+
+// matchBindingContextRepositoryIDs returns the catalog IDs of the enabled
+// GitHub context repositories on workspaces that use the binding. Agents
+// change and open pull requests in these repositories, so the write token
+// must cover them. Names missing from the catalog are skipped until the
+// installation reconcile adds them.
+func matchBindingContextRepositoryIDs(tx *gorm.DB, integrationID uuid.UUID, provider string, installationID int64) ([]int64, error) {
+	if provider != ProviderGitHub {
+		return nil, nil
+	}
+	names, err := ListEnabledGitHubContextRepositoryNames(tx, integrationID)
+	if err != nil {
+		return nil, err
+	}
+	ids, _, err := MatchVCSProviderRepositoryIDs(tx, provider, installationID, names)
+	return ids, err
 }
 
 func normalizeVCSProvider(provider string) (string, error) {

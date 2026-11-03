@@ -15,6 +15,7 @@ const MODULES = [
   require("./modules/plan"),
   require("./modules/evidence"),
   require("./modules/merge"),
+  require("./modules/pull_requests"),
 ];
 
 function allTools(modules = MODULES) {

@@ -739,6 +739,39 @@ func ListPullRequestsByWorkOrderIDs(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[
 	return result, nil
 }
 
+// PullRequestCloseOutcome reports how the task closes from its pull
+// requests. A task stays open while any pull request is open or draft.
+func (o *FactoryWorkOrder) PullRequestCloseOutcome(tx *gorm.DB) (string, bool, error) {
+	grouped, err := ListPullRequestsByWorkOrderIDs(tx, []uuid.UUID{o.ID})
+	if err != nil {
+		return "", false, err
+	}
+	result, done := PullRequestsCloseResult(grouped[o.ID])
+	return result, done, nil
+}
+
+// PullRequestsCloseResult returns completed when every pull request is done
+// and at least one merged, and pr_closed when all closed without a merge.
+func PullRequestsCloseResult(pullRequests []FactoryPullRequest) (string, bool) {
+	if len(pullRequests) == 0 {
+		return "", false
+	}
+	merged := false
+	for _, pullRequest := range pullRequests {
+		switch pullRequest.State {
+		case FactoryPullRequestStateMerged:
+			merged = true
+		case FactoryPullRequestStateClosed:
+		default:
+			return "", false
+		}
+	}
+	if merged {
+		return FactoryWorkOrderResultCompleted, true
+	}
+	return FactoryWorkOrderResultPRClosed, true
+}
+
 func ListFactoryPullRequests(tx *gorm.DB, factoryID uuid.UUID, filter FactoryPullRequestFilter) ([]FactoryPullRequest, error) {
 	query := tx.Where("factory_id = ?", factoryID)
 

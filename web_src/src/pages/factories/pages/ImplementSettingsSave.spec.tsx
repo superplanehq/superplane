@@ -11,7 +11,7 @@ import { organizationKeys } from "@/hooks/useOrganizationData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { implementConfigGraph } from "./MergeConfidenceConfigModal.spec.fixtures";
+import { implementAgentPullRequestGraph, implementConfigGraph } from "./MergeConfidenceConfigModal.spec.fixtures";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import { useImplementSettingsDraft } from "./implementSettingsDraft";
 import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
@@ -46,9 +46,9 @@ vi.mock("@/hooks/useComponentData", () => ({
 function renderImplementSettings(
   onSaveNode: (update: NodeConfigurationSave) => Promise<void> | void,
   onClose: () => void,
+  graph = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Keep this prompt" }]),
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const graph = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Keep this prompt" }]);
   client.setQueryData(experimentalFeaturesKeys.registry(), {
     features: [],
   });
@@ -122,6 +122,30 @@ describe("Implement settings save", () => {
       expect.objectContaining({ nodeId: "create-pr" }),
     ]);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the draft setting on the agent when the agent opens the pull requests", async () => {
+    const user = userEvent.setup();
+    const onSaveNode = vi.fn();
+    renderImplementSettings(onSaveNode, vi.fn(), implementAgentPullRequestGraph());
+
+    const toggle = screen.getByRole("switch", { name: "Create draft pull requests" });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    await user.click(screen.getByTestId("implement-settings-save"));
+
+    await waitFor(() => expect(onSaveNode).toHaveBeenCalledTimes(1));
+    expect(onSaveNode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodeId: "implementation-agent-no-issue",
+        configuration: expect.objectContaining({
+          environment: [
+            { name: "BASE", value: "main", valueSource: "literal" },
+            { name: "DRAFT_PULL_REQUESTS", value: "true", valueSource: "literal" },
+          ],
+        }),
+      }),
+    );
   });
 
   it("locks fields while save is in progress", async () => {
