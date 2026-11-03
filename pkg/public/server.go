@@ -545,6 +545,22 @@ func headersMatcher(key string) (string, bool) {
 	}
 }
 
+// gatewayIdentityHeaders are forwarded to gRPC metadata by headersMatcher.
+// The server must set them; a client-sent value is never trusted.
+var gatewayIdentityHeaders = []string{
+	"x-user-id",
+	"x-organization-id",
+	"x-account-id",
+	"x-token-scopes",
+	"x-support-session",
+}
+
+func stripGatewayIdentityHeaders(header http.Header) {
+	for _, key := range gatewayIdentityHeaders {
+		header.Del(key)
+	}
+}
+
 func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, ok := middleware.GetUserFromContext(r.Context())
@@ -554,19 +570,18 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		}
 
 		r2 := middleware.CloneGatewayRequest(r)
+
+		//
+		// Drop every identity header the client sent, so gRPC handlers
+		// only see values derived from the authenticated principal.
+		//
+		stripGatewayIdentityHeaders(r2.Header)
 		r2.Header.Set("x-User-id", user.ID.String())
 		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
 		if user.AccountID != nil {
 			r2.Header.Set("x-account-id", user.AccountID.String())
 		}
 
-		//
-		// Remove the scoped token scopes from the request header,
-		// to not allow them to be spoofed by the client.
-		//
-		r2.Header.Del("x-Token-Scopes")
-
-		r2.Header.Del("x-Support-Session")
 		if middleware.IsSupportSessionActive(r) {
 			r2.Header.Set("x-Support-Session", "true")
 		}
@@ -604,6 +619,7 @@ func apiKeyCanvasScopes(canvasIDs []string) []string {
 func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r2 := middleware.CloneGatewayRequest(r)
+		stripGatewayIdentityHeaders(r2.Header)
 		if middleware.IsFleetManagerRequest(r.Context()) {
 			middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 			return
