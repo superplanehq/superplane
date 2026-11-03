@@ -353,15 +353,30 @@ func TestEnsureOpenCodeModelCatalogContinuesWhenRefreshUnavailable(t *testing.T)
 	}
 }
 
-func TestRunPromptLogsUnavailableCatalogFallback(t *testing.T) {
+func TestRunPromptContinuesSilentlyWhenCatalogUnavailable(t *testing.T) {
+	model := "openai/gpt-6.1-sol"
 	result := runOpenRouterPrompt(t, promptHarness{
-		model:         "x-ai/grok-4.6",
+		model:         model,
 		catalogSource: "unavailable",
 		spawns:        []spawnScript{successSpawn("ok")},
 	})
 
-	assert.Equal(t, 0, result.exitCode)
-	requireStdoutLine(t, result.output, "Model catalog refresh unavailable. Continuing with OpenCode configuration for x-ai/grok-4.6.")
+	require.Equal(t, 0, result.exitCode, result.output, result.stderr)
+	warning := "Model catalog refresh unavailable. Continuing with OpenCode configuration"
+	assert.NotContains(t, result.output, warning)
+	assert.NotContains(t, result.stderr, warning)
+	require.Len(t, result.spawns, 1)
+	assert.Contains(t, result.spawns[0], "openrouter/"+model)
+	assert.Equal(t, "ok", resultPayload(t, result.resultFile)["result"])
+
+	raw, err := os.ReadFile(filepath.Join(result.taskDir, "opencode.json"))
+	require.NoError(t, err)
+	var config map[string]any
+	require.NoError(t, json.Unmarshal(raw, &config))
+	provider, _ := config["provider"].(map[string]any)
+	openrouter, _ := provider["openrouter"].(map[string]any)
+	models, _ := openrouter["models"].(map[string]any)
+	assert.Contains(t, models, model)
 }
 
 func TestFormatOpenCodeJsonLinesEmitsWorkingLineOnStepStart(t *testing.T) {

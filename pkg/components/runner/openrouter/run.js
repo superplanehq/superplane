@@ -770,11 +770,6 @@ async function runPrompt(promptFile, model, helpers = {}) {
       `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
     );
   }
-  if (catalogSource === "unavailable") {
-    printLiveLogLine(
-      `Model catalog refresh unavailable. Continuing with OpenCode configuration for ${currentModel}.`,
-    );
-  }
   writeOpenCodeConfig(sp, {
     env,
     models: currentModel ? [currentModel] : [],
