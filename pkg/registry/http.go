@@ -220,6 +220,11 @@ func (c *HTTPContextInTransaction) Do(request *http.Request) (*http.Response, er
 	return c.httpCtx.doWithTransaction(request, c.tx)
 }
 
+// DB returns the transaction this HTTP context is bound to.
+func (c *HTTPContextInTransaction) DB() *gorm.DB {
+	return c.tx
+}
+
 func (c *HTTPContext) doWithTransaction(request *http.Request, tx *gorm.DB) (*http.Response, error) {
 	policy, err := c.activePolicy(tx)
 	if err != nil {

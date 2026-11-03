@@ -36,8 +36,6 @@ func TestBillableSeconds(t *testing.T) {
 }
 
 func TestIntegratedRunnerTaskRecordsSelectedFleetUsage(t *testing.T) {
-	t.Setenv("TASK_BROKER_FLEET_ID", "local")
-	t.Setenv("TASK_BROKER_BASE_URL", "http://localhost:8091")
 
 	started := time.Now()
 	finished := started.Add(1500 * time.Millisecond)

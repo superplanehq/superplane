@@ -101,8 +101,6 @@ func TestRecordRunnerComputeUsageRecordsZeroDuration(t *testing.T) {
 }
 
 func TestRecordRunnerComputeUsageResolvesFleetWhenKVMissing(t *testing.T) {
-	t.Setenv("TASK_BROKER_FLEET_ID", "local")
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 
 	claimed := time.Now()
 	finished := claimed.Add(time.Second)
@@ -119,8 +117,6 @@ func TestRecordRunnerComputeUsageResolvesFleetWhenKVMissing(t *testing.T) {
 }
 
 func TestRecordRunnerComputeUsagePrefersStoredFleetKV(t *testing.T) {
-	t.Setenv("TASK_BROKER_FLEET_ID", "local")
-	t.Setenv("TASK_BROKER_BASE_URL", "http://localhost:8091")
 
 	claimed := time.Now()
 	finished := claimed.Add(time.Second)
@@ -140,8 +136,6 @@ func TestRecordRunnerComputeUsagePrefersStoredFleetKV(t *testing.T) {
 }
 
 func TestRecordRunnerComputeUsageUsesIntegratedFleetWhenKVMissing(t *testing.T) {
-	t.Setenv("TASK_BROKER_FLEET_ID", "local")
-	t.Setenv("TASK_BROKER_BASE_URL", "http://localhost:8091")
 
 	claimed := time.Now()
 	finished := claimed.Add(time.Second)

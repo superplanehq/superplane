@@ -3,6 +3,7 @@ package github
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/ee/githubenterprise"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/licensing"
@@ -20,4 +21,15 @@ func communityGitHubEnterprise() enterprise.GitHubEnterprise {
 func withLicensedGitHubEnterprise(t *testing.T) {
 	t.Helper()
 	t.Cleanup(withGitHubEnterpriseForTest(licensedGitHubEnterprise()))
+}
+
+func enableGitHubEnterpriseFlag(t *testing.T) {
+	t.Helper()
+	t.Cleanup(withGitHubEnterpriseFlagForTest(func(uuid.UUID) bool { return true }))
+}
+
+func withGitHubEnterpriseCloudAllowed(t *testing.T) {
+	t.Helper()
+	withLicensedGitHubEnterprise(t)
+	enableGitHubEnterpriseFlag(t)
 }
