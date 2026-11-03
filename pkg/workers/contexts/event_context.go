@@ -80,7 +80,10 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	created := true
 	if dedupKey == "" {
 		var suppress bool
-		dedupKey, suppress = customAutomationWebhookPolicy(s.tx, s.node, payloadType, payload)
+		dedupKey = mergeConfidenceWebhookDedupKey(s.node, payloadType, payload)
+		if dedupKey == "" {
+			dedupKey, suppress = customAutomationWebhookPolicy(s.tx, s.node, payloadType, payload)
+		}
 		if suppress {
 			return nil
 		}
@@ -115,6 +118,40 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	}
 
 	return nil
+}
+
+// Bitbucket emits PR updates for description edits. Deduplicate automatic
+// merge confidence starts per head so publishing a result cannot start a loop.
+// Explicit reruns use a different payload type and remain available.
+func mergeConfidenceWebhookDedupKey(node *models.CanvasNode, payloadType string, payload any) string {
+	if node == nil || node.Type != models.NodeTypeTrigger || payloadType != "bitbucket.pullRequest" {
+		return ""
+	}
+	template, _ := node.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
+	if template["id"] != "risk-score" {
+		return ""
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return ""
+	}
+	var identity struct {
+		PullRequest struct {
+			ID string `json:"id"`
+		} `json:"pullRequest"`
+		View struct {
+			Head struct {
+				SHA string `json:"sha"`
+			} `json:"head"`
+		} `json:"pull_request"`
+	}
+	if err := json.Unmarshal(raw, &identity); err != nil {
+		return ""
+	}
+	if identity.PullRequest.ID == "" || identity.View.Head.SHA == "" {
+		return ""
+	}
+	return "merge-confidence:" + identity.PullRequest.ID + ":" + identity.View.Head.SHA
 }
 
 func customAutomationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (string, bool) {
