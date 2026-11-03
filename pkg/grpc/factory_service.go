@@ -350,6 +350,16 @@ func (s *FactoryService) RemoveWorkOrderArtifact(ctx context.Context, req *pb.Re
 	return actions.RemoveWorkOrderArtifact(ctx, organizationID, req)
 }
 
+func (s *FactoryService) AddWorkOrderChecks(ctx context.Context, req *pb.AddWorkOrderChecksRequest) (*pb.AddWorkOrderChecksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.AddWorkOrderChecks(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RemoveWorkOrderChecks(ctx context.Context, req *pb.RemoveWorkOrderChecksRequest) (*pb.RemoveWorkOrderChecksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RemoveWorkOrderChecks(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DescribeFactoryVelocity(ctx context.Context, req *pb.DescribeFactoryVelocityRequest) (*pb.DescribeFactoryVelocityResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeFactoryVelocity(ctx, organizationID, req)

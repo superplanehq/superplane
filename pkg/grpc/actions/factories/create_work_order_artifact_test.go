@@ -5,9 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -156,6 +158,47 @@ func Test__CreateWorkOrderArtifact(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
+	t.Run("creates file artifact from an uploaded artifact file", func(t *testing.T) {
+		file := createReadyArtifactFile(t, r.Organization.ID, factoryModel.ID, order.ID, r.User)
+
+		resp, err := createFileArtifact(ctx, r.Organization.ID.String(), factoryModel.ID.String(), order.ID.String(), file.ID.String())
+
+		require.NoError(t, err)
+		assert.Equal(t, pb.WorkOrderArtifact_TYPE_FILE, resp.Artifact.Type)
+		artifactData := resp.Artifact.Data.AsMap()
+		assert.Equal(t, file.ID.String(), artifactData["fileId"])
+		assert.Equal(t, "login.png", artifactData["title"])
+		assert.Contains(t, artifactData["url"], "/api/v1/public/artifacts/"+file.PublicID.String()+"/login.png")
+
+		_, err = createFileArtifact(ctx, r.Organization.ID.String(), factoryModel.ID.String(), order.ID.String(), file.ID.String())
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code, "one file cannot back two artifacts")
+	})
+
+	t.Run("rejects a file from another task", func(t *testing.T) {
+		other, err := factoryModel.CreateWorkOrder(database.DB(t.Context()), "Other", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		file := createReadyArtifactFile(t, r.Organization.ID, factoryModel.ID, other.ID, r.User)
+
+		_, err = createFileArtifact(ctx, r.Organization.ID.String(), factoryModel.ID.String(), order.ID.String(), file.ID.String())
+
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("rejects a file from another user", func(t *testing.T) {
+		otherUser := support.CreateUser(t, r, r.Organization.ID)
+		file := createReadyArtifactFile(t, r.Organization.ID, factoryModel.ID, order.ID, otherUser.ID)
+
+		_, err := createFileArtifact(ctx, r.Organization.ID.String(), factoryModel.ID.String(), order.ID.String(), file.ID.String())
+
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
 	t.Run("not found factory", func(t *testing.T) {
 		data, err := structpb.NewStruct(map[string]any{"body": "x"})
 		require.NoError(t, err)
@@ -185,4 +228,37 @@ func Test__CreateWorkOrderArtifact(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, code)
 	})
+}
+
+func createFileArtifact(ctx context.Context, organizationID, factoryID, orderID, fileID string) (*pb.CreateWorkOrderArtifactResponse, error) {
+	data, err := structpb.NewStruct(map[string]any{"fileId": fileID})
+	if err != nil {
+		return nil, err
+	}
+	return CreateWorkOrderArtifact(ctx, organizationID, &pb.CreateWorkOrderArtifactRequest{
+		FactoryId: factoryID,
+		OrderId:   orderID,
+		Type:      pb.WorkOrderArtifact_TYPE_FILE,
+		Data:      data,
+	})
+}
+
+func createReadyArtifactFile(t *testing.T, organizationID, factoryID, orderID, userID uuid.UUID) *models.File {
+	t.Helper()
+	db := database.DB(t.Context())
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: organizationID,
+		FactoryID:      factoryID,
+		WorkOrderID:    orderID,
+		Filename:       "login.png",
+		ContentType:    "image/png",
+		CreatedByID:    userID,
+		Purpose:        models.FilePurposeArtifact,
+	})
+	require.NoError(t, err)
+	require.NoError(t, file.MarkReady(db, 9, ""))
+	loaded, err := models.FindFile(db, file.ID)
+	require.NoError(t, err)
+	return loaded
 }

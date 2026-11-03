@@ -11,9 +11,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func RemoveWorkOrderArtifact(
@@ -49,7 +51,11 @@ func RemoveWorkOrderArtifact(
 		return nil, grpcerrors.Conflict(nil, "Task is closed or archived")
 	}
 
-	removed, err := order.RemoveArtifact(db, req.GetKey(), req.GetTitle(), &userID)
+	key, err := storedArtifactKey(db, order, req.GetKey())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to remove work order artifact")
+	}
+	removed, err := order.RemoveArtifact(db, key, req.GetTitle(), &userID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to remove work order artifact")
 	}
@@ -66,6 +72,18 @@ func RemoveWorkOrderArtifact(
 		Id:    removed.ID.String(),
 		Title: artifactDataTitle(removed.Data),
 	}, nil
+}
+
+// storedArtifactKey maps the key that lists show to the stored key.
+func storedArtifactKey(db *gorm.DB, order *models.FactoryWorkOrder, key string) (string, error) {
+	if strings.TrimSpace(key) == "" {
+		return "", nil
+	}
+	artifact, err := order.FindArtifactByDisplayKey(db, key)
+	if err != nil {
+		return "", err
+	}
+	return *artifact.Key, nil
 }
 
 func artifactDataTitle(data datatypes.JSON) string {
