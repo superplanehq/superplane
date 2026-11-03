@@ -2,7 +2,6 @@ package public
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"slices"
 	"strings"
@@ -98,14 +97,7 @@ func (s *Server) handleRunnerGetArtifact(w http.ResponseWriter, r *http.Request)
 // findRunnerArtifactByKey finds an artifact by the key that a run gave it,
 // then by its stored key. Runs store "<task id>:<key>".
 func findRunnerArtifactByKey(db *gorm.DB, order *models.FactoryWorkOrder, key string) (*models.FactoryWorkOrderArtifact, error) {
-	scoped := scopedArtifactLinkKey(order.ID, key)
-	if len(scoped) <= models.MaxFactoryWorkOrderArtifactKeyBytes {
-		artifact, err := order.FindArtifactByKey(db, scoped)
-		if !errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
-			return artifact, err
-		}
-	}
-	return order.FindArtifactByKey(db, key)
+	return order.FindArtifactByDisplayKey(db, key)
 }
 
 // runnerArtifactKey returns the key as the run gave it.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path"
 	"slices"
 	"strings"
@@ -299,6 +300,15 @@ func CompleteUpload(ctx context.Context, tx *gorm.DB, provider blob.Provider, fi
 		return err
 	}
 	return nil
+}
+
+// ArtifactPublicURL is the link that a task shows for an artifact file.
+// Anyone with the link can download the file.
+func ArtifactPublicURL(file *models.File) (string, error) {
+	if file.PublicID == nil || *file.PublicID == uuid.Nil {
+		return "", fmt.Errorf("artifact public id is missing")
+	}
+	return fmt.Sprintf("%s/api/v1/public/artifacts/%s/%s", blob.PublicBaseURL(), file.PublicID, url.PathEscape(file.Filename)), nil
 }
 
 func DownloadURL(ctx context.Context, provider blob.Provider, file *models.File, ttl time.Duration) (string, error) {

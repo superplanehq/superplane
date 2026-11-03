@@ -16,9 +16,9 @@ type taskSuggestOwnersCommand struct {
 }
 
 func (c *taskSuggestOwnersCommand) Execute(ctx core.CommandContext) error {
-	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	rawTaskID := taskRef(c.taskID)
 	if rawTaskID == "" {
-		return fmt.Errorf("--task is required")
+		return errTaskRequired
 	}
 
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)

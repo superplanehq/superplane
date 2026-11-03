@@ -22,11 +22,11 @@ type artifactAddCommand struct {
 }
 
 func (c *artifactAddCommand) Execute(ctx core.CommandContext) error {
-	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	rawTaskID := taskRef(c.taskID)
 	artifactType := strings.ToLower(strings.TrimSpace(stringValue(c.typ)))
 
 	if rawTaskID == "" {
-		return fmt.Errorf("--task is required")
+		return errTaskRequired
 	}
 
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)
@@ -39,7 +39,15 @@ func (c *artifactAddCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	data, protoType, err := c.buildData(ctx, artifactType)
+	var (
+		data      map[string]any
+		protoType openapi_client.FactoriesWorkOrderArtifactType
+	)
+	if artifactType == "file" {
+		data, protoType, err = c.uploadFile(ctx, workspaceID, taskID)
+	} else {
+		data, protoType, err = c.buildData(ctx, artifactType)
+	}
 	if err != nil {
 		return err
 	}
@@ -110,8 +118,27 @@ func (c *artifactAddCommand) buildData(
 		return data, openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_LINK, nil
 
 	default:
-		return nil, "", fmt.Errorf("unknown artifact type %q (expected markdown, branch, or link)", artifactType)
+		return nil, "", fmt.Errorf("unknown artifact type %q (expected markdown, branch, link, or file)", artifactType)
 	}
+}
+
+func (c *artifactAddCommand) uploadFile(
+	ctx core.CommandContext,
+	workspaceID, taskID string,
+) (map[string]any, openapi_client.FactoriesWorkOrderArtifactType, error) {
+	path := strings.TrimSpace(stringValue(c.file))
+	if path == "" || path == "-" {
+		return nil, "", fmt.Errorf("--file is required for type file")
+	}
+	fileID, err := uploadTaskArtifactFile(ctx, workspaceID, taskID, path)
+	if err != nil {
+		return nil, "", err
+	}
+	data := map[string]any{"fileId": fileID}
+	if title := strings.TrimSpace(stringValue(c.title)); title != "" {
+		data["title"] = title
+	}
+	return data, openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_FILE, nil
 }
 
 func (c *artifactAddCommand) resolveMarkdownBody(ctx core.CommandContext) (string, error) {

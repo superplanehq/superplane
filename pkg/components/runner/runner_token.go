@@ -14,6 +14,9 @@ import (
 const (
 	RunnerTokenPurpose       = "runner_run"
 	EnvSuperplaneRunnerToken = "SUPERPLANE_RUNNER_TOKEN"
+	// EnvSuperplaneTaskID is the number of the task of the run. The task CLI
+	// uses it when a command needs a task and the caller gives none.
+	EnvSuperplaneTaskID = "SUPERPLANE_TASK_ID"
 )
 
 // RunnerScope is the signed identity of one agent run. The global runner MCP
