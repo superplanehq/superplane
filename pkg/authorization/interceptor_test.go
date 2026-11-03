@@ -348,6 +348,21 @@ func TestContinueFixesRouteRequiresWorkOrderUpdate(t *testing.T) {
 	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
 }
 
+func TestWorkOrderCheckRoutesRequireWorkOrderUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	routes := []HTTPRoute{
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/checks/remove"},
+	}
+	for _, route := range routes {
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
+		assert.Equal(t, "work_orders", rule.Resource)
+		assert.Equal(t, "update", rule.Action)
+		assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
+	}
+}
+
 func TestAgentResourceRoutesRequireFactoriesFeature(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	required := []string{features.FeatureFactories}

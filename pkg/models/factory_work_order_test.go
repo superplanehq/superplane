@@ -1034,6 +1034,26 @@ func TestFactoryWorkOrder_DeleteArtifacts(t *testing.T) {
 	assert.Equal(t, userID, payload.User.ID)
 }
 
+func TestFactoryWorkOrder_RemoveArtifactAcceptsTheDisplayedRunKey(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "display-key")
+	db := database.Conn()
+	order, err := factoryModel.CreateWorkOrder(db, "Display key", "", &userID, nil, nil)
+	require.NoError(t, err)
+	stored, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+		Type: FactoryWorkOrderArtifactTypeLink,
+		Key:  order.ID.String() + ":preview",
+		Data: map[string]any{"url": "https://preview.example.com/pr-42"},
+	})
+	require.NoError(t, err)
+
+	removed, err := order.RemoveArtifact(db, "preview", "", &userID)
+
+	require.NoError(t, err)
+	assert.Equal(t, stored.ID, removed.ID)
+}
+
 func TestFactoryWorkOrder_PaddedArtifactTitleStillMatches(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

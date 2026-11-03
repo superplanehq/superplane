@@ -277,6 +277,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "MCP client not found")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryWorkOrderCheckOwned):
+		return grpcerrors.FailedPrecondition(err, err.Error()+"; use another key")
+	case errors.Is(err, models.ErrFactoryWorkOrderCheckInvalid):
+		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		return grpcerrors.NotFound(err, "resource not found")
 	case errors.Is(err, models.ErrCodexConnectionNotFound):
