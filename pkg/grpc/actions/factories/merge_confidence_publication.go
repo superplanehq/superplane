@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -16,42 +17,86 @@ import (
 	"gorm.io/gorm"
 )
 
-// PublishMergeConfidence handles a canvas run notification. It uses saved run
-// configuration and immutable check reports. Host failures never change the run.
+type MergeConfidencePublicationOutcome struct {
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
+}
+
+func skippedMergeConfidence(reason string) MergeConfidencePublicationOutcome {
+	return MergeConfidencePublicationOutcome{Status: "skipped", Reason: reason}
+}
+
+// PublishMergeConfidence uses saved run configuration and immutable reports.
+// Call with a database handle: provider calls run outside database transactions.
 func PublishMergeConfidence(ctx context.Context, db *gorm.DB, deps IntakeDependencies, canvasID, runID uuid.UUID, baseURL string) error {
-	logger := log.WithFields(log.Fields{"consumer": "merge_confidence_publication", "run_id": runID})
-	err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		run, err := models.FindUnscopedCanvasRun(tx, runID)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
+	_, err := PublishMergeConfidenceWithOutcome(ctx, db, deps, canvasID, runID, baseURL)
+	return err
+}
+
+func PublishMergeConfidenceWithOutcome(ctx context.Context, db *gorm.DB, deps IntakeDependencies, canvasID, runID uuid.UUID, baseURL string) (outcome MergeConfidencePublicationOutcome, err error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	db = db.WithContext(ctx)
+	logger := log.WithFields(log.Fields{"component": "publishMergeConfidence", "run_id": runID})
+	run, err := models.FindUnscopedCanvasRun(db, runID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return skippedMergeConfidence("Source run was not found."), nil
+	}
+	if err != nil {
+		return outcome, err
+	}
+	if run.WorkflowID != canvasID || run.State != models.CanvasRunStateFinished {
+		return skippedMergeConfidence("Source run is not finished in this canvas."), nil
+	}
+	activity, err := models.FindPullRequestActivityByRunID(db, run.ID)
+	if errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
+		return skippedMergeConfidence("Source run has no pull request activity."), nil
+	}
+	if err != nil {
+		return outcome, err
+	}
+	claim := &models.MergeConfidencePublicationClaim{PullRequestID: activity.PullRequestID, OwnerID: uuid.New(), LeaseUntil: time.Now().Add(5 * time.Minute)}
+	for {
+		acquired, err := claim.Acquire(db)
 		if err != nil {
-			return err
+			return outcome, err
 		}
-		if run.WorkflowID != canvasID || run.State != models.CanvasRunStateFinished {
-			return nil
+		if acquired {
+			break
 		}
-		activity, err := models.FindPullRequestActivityByRunID(tx, run.ID)
-		if errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
-			return nil
+		select {
+		case <-ctx.Done():
+			return outcome, fmt.Errorf("wait for publication claim: %w", ctx.Err())
+		case <-time.After(25 * time.Millisecond):
 		}
-		if err != nil {
-			return err
+	}
+	defer func() {
+		// A request cancellation must not prevent releasing our claim.
+		releaseContext, cancelRelease := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancelRelease()
+		if releaseErr := claim.Release(db.WithContext(releaseContext)); releaseErr != nil {
+			err = errors.Join(err, releaseErr)
 		}
-		// The same row lock is taken when linking new PR activities. Hold it through
-		// the external update, so concurrent consumers cannot publish out of order.
-		pr := &models.FactoryPullRequest{ID: activity.PullRequestID}
+	}()
+
+	var pr *models.FactoryPullRequest
+	var workspace *models.Factory
+	var assessment *mergeconfidence.Assessment
+	err = db.Transaction(func(tx *gorm.DB) error {
+		pr = &models.FactoryPullRequest{ID: activity.PullRequestID}
 		if err := pr.LockForUpdate(tx); err != nil {
 			return err
 		}
-		assessment, err := newestMergeConfidenceAssessment(tx, pr, run.ID)
+		var err error
+		assessment, err = newestMergeConfidenceAssessment(tx, pr, run.ID)
 		if err != nil {
 			return err
 		}
 		if assessment == nil {
+			outcome = skippedMergeConfidence("Assessment is stale or has no supported checks.")
 			return nil
 		}
-		workspace, err := models.FindFactory(tx, pr.OrganizationID, pr.FactoryID)
+		workspace, err = models.FindFactory(tx, pr.OrganizationID, pr.FactoryID)
 		if err != nil {
 			return err
 		}
@@ -60,6 +105,8 @@ func PublishMergeConfidence(ctx context.Context, db *gorm.DB, deps IntakeDepende
 			return err
 		}
 		if canvas.FactoryID == nil || *canvas.FactoryID != workspace.ID {
+			assessment = nil
+			outcome = skippedMergeConfidence("Assessment belongs to a different factory.")
 			return nil
 		}
 		order, err := workspace.FindWorkOrder(tx, pr.WorkOrderID)
@@ -72,7 +119,8 @@ func PublishMergeConfidence(ctx context.Context, db *gorm.DB, deps IntakeDepende
 		}
 		event, err := run.RootEvent(tx)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Warn("Skipping merge confidence publication without a root event")
+			assessment = nil
+			outcome = skippedMergeConfidence("Assessment has no source event.")
 			return nil
 		}
 		if err != nil {
@@ -80,24 +128,32 @@ func PublishMergeConfidence(ctx context.Context, db *gorm.DB, deps IntakeDepende
 		}
 		assessment.ReviewedCommit = mergeConfidenceReviewedCommit(event)
 		if assessment.ReviewedCommit == "" {
-			logger.Warn("Skipping merge confidence publication without a reviewed commit")
+			assessment = nil
+			outcome = skippedMergeConfidence("Assessment has no reviewed commit.")
 			return nil
 		}
 		assessment.Passed = run.Result == models.CanvasRunResultPassed
 		assessment.TaskURL = strings.TrimRight(baseURL, "/") + order.URLPath(workspace.RouteSegment())
-		provider := openFactoryVCS(tx, deps, workspace)
-		client, ok := provider.(vcs.DescriptionClient)
-		if !ok || workspace.OnboardingConfigValue().EffectiveVCSProvider() != pr.Provider {
-			return nil
-		}
-		// Token refresh, description read, and update can exceed the normal
-		// 30-second idle limit. Keep the row lock for the bounded host requests.
-		if err := tx.Exec("SET LOCAL idle_in_transaction_session_timeout = '3min'").Error; err != nil {
-			return err
-		}
-		return publishMergeConfidenceDescription(ctx, client, pr, assessment, logger)
+		return nil
 	})
-	return err
+	if err != nil || assessment == nil {
+		return outcome, err
+	}
+	provider := openFactoryVCS(db, deps, workspace)
+	client, ok := provider.(vcs.DescriptionClient)
+	if !ok || workspace.OnboardingConfigValue().EffectiveVCSProvider() != pr.Provider {
+		return skippedMergeConfidence("Pull request provider is unavailable."), nil
+	}
+	return publishMergeConfidenceDescription(ctx, client, pr, assessment, logger, func() (bool, error) {
+		// New assessments can attach while the provider reads the description.
+		// Recheck immediately before writing, without holding a connection at I/O.
+		current, err := claim.IsCurrent(db)
+		if err != nil || !current {
+			return false, err
+		}
+		latest, err := newestMergeConfidenceAssessment(db, pr, run.ID)
+		return latest != nil, err
+	})
 }
 
 func newestMergeConfidenceAssessment(tx *gorm.DB, pr *models.FactoryPullRequest, runID uuid.UUID) (*mergeconfidence.Assessment, error) {
@@ -110,7 +166,7 @@ func newestMergeConfidenceAssessment(tx *gorm.DB, pr *models.FactoryPullRequest,
 		if err != nil {
 			return nil, err
 		}
-		if models.FactoryAppTemplateID(version.Nodes) != "risk-score" {
+		if !isMergeConfidenceAssessmentRun(run, version) {
 			continue
 		}
 		// A newer run supersedes this one even if its saved settings are
@@ -121,6 +177,19 @@ func newestMergeConfidenceAssessment(tx *gorm.DB, pr *models.FactoryPullRequest,
 		return mergeConfidenceAssessmentFromVersion(version)
 	}
 	return nil, nil
+}
+
+func isMergeConfidenceAssessmentRun(run models.CanvasRun, version *models.CanvasVersion) bool {
+	if models.FactoryAppTemplateID(version.Nodes) != "risk-score" {
+		return false
+	}
+	for _, node := range version.Nodes {
+		if node.ID == run.NodeID {
+			// Completion branches share the template marker but are not assessments.
+			return node.Ref.Trigger != nil && (node.Ref.Trigger.Name == "github.onPullRequest" || node.Ref.Trigger.Name == "bitbucket.onPullRequest")
+		}
+	}
+	return false
 }
 
 func mergeConfidenceAssessmentFromVersion(version *models.CanvasVersion) (*mergeconfidence.Assessment, error) {
@@ -187,35 +256,41 @@ func mergeConfidenceReviewedCommit(event *models.CanvasEvent) string {
 	return strings.TrimSpace(sha)
 }
 
-func publishMergeConfidenceDescription(ctx context.Context, client vcs.DescriptionClient, pr *models.FactoryPullRequest, a *mergeconfidence.Assessment, logger *log.Entry) error {
+func publishMergeConfidenceDescription(ctx context.Context, client vcs.DescriptionClient, pr *models.FactoryPullRequest, a *mergeconfidence.Assessment, logger *log.Entry, eligible func() (bool, error)) (MergeConfidencePublicationOutcome, error) {
 	ref := vcs.PullRequestRef{Provider: pr.Provider, Repository: pr.Repository, Number: pr.Number}
 	section := mergeconfidence.Render(*a)
-	// Fetch raw Markdown immediately before every write, including retries.
 	latest, err := client.ReadDescription(ctx, ref)
 	if err != nil {
 		return descriptionPublicationError(logger, err)
 	}
 	if latest.State != models.FactoryPullRequestStateOpen || latest.HeadSHA != a.ReviewedCommit {
-		return nil
+		return skippedMergeConfidence("Pull request is closed or its reviewed commit changed."), nil
 	}
 	description, err := mergeconfidence.UpdateDescription(latest.Description, section)
 	if err != nil {
-		logger.WithError(err).WithField("pull_request_id", pr.ID).Warn("Skipping merge confidence publication")
-		return nil
+		logger.WithError(err).Warn("Skipping merge confidence publication")
+		return skippedMergeConfidence("Description contains invalid report markers."), nil
 	}
 	if description == latest.Description {
-		return nil
+		return skippedMergeConfidence("Report is already current."), nil
+	}
+	current, err := eligible()
+	if err != nil {
+		return MergeConfidencePublicationOutcome{}, err
+	}
+	if !current {
+		return skippedMergeConfidence("Assessment was superseded before publication."), nil
 	}
 	if err := client.UpdateDescription(ctx, ref, description); err != nil {
 		return descriptionPublicationError(logger, err)
 	}
-	return nil
+	return MergeConfidencePublicationOutcome{Status: "published"}, nil
 }
 
-func descriptionPublicationError(logger *log.Entry, err error) error {
+func descriptionPublicationError(logger *log.Entry, err error) (MergeConfidencePublicationOutcome, error) {
 	if retryableDescriptionError(err) {
-		return fmt.Errorf("publish merge confidence description: %w", err)
+		return MergeConfidencePublicationOutcome{}, fmt.Errorf("publish merge confidence description: %w", err)
 	}
 	logger.WithError(err).Warn("Skipping merge confidence publication after a permanent host failure")
-	return nil
+	return skippedMergeConfidence("Host rejected publication: " + err.Error()), nil
 }

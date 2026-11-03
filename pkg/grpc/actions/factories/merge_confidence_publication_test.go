@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
@@ -97,7 +98,9 @@ func newPublicationFixture(t *testing.T) publicationFixture {
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger, Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata("risk-score", 1)), Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}})}, {NodeID: "agent", Type: models.NodeTypeComponent,
 		Ref:           datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}}),
 		Configuration: datatypes.NewJSONType(map[string]any{"environment": []any{map[string]any{"name": "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID", "value": order.ID.String()}}, "steps": []any{map[string]any{"name": "Security", "prompt": "Merge check: security."}}}),
-	}}, nil)
+	}, {NodeID: "publication", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRunFinished"}})},
+		{NodeID: "publish", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: factorycomponent.PublishMergeConfidenceComponentName}})},
+	}, nil)
 	require.NoError(t, db.Model(canvas).Update("factory_id", workspace.ID).Error)
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "trigger", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
@@ -171,6 +174,91 @@ func TestPublishMergeConfidenceIncomplete(t *testing.T) {
 			}
 		})
 	}
+}
+
+type publicationHTTPContext struct {
+	contexts.HTTPContext
+	beforeRequest func(*http.Request)
+}
+
+func (h *publicationHTTPContext) Do(request *http.Request) (*http.Response, error) {
+	h.beforeRequest(request)
+	return h.HTTPContext.Do(request)
+}
+
+func TestPublishMergeConfidenceReleasesConnectionsBeforeProviderCalls(t *testing.T) {
+	for _, provider := range []string{"github", "bitbucket"} {
+		t.Run(provider, func(t *testing.T) {
+			f := newPublicationFixture(t)
+			f.report(t, f.run, 5)
+			f.finish(t, models.CanvasRunResultPassed)
+			require.NoError(t, f.workspace.UpdateOnboarding(f.db, models.FactoryOnboardingPatch{VCSProvider: &provider}))
+			require.NoError(t, f.db.Model(f.pr).Update("provider", provider).Error)
+			pool, err := f.db.DB()
+			require.NoError(t, err)
+			checkConnections := func() {
+				assert.Zero(t, pool.Stats().InUse, "provider calls must not reserve a database connection")
+			}
+			payload := `{"state":"open","head":{"sha":"abc"}}`
+			if provider == "bitbucket" {
+				payload = `{"state":"OPEN","source":{"commit":{"hash":"abc"}}}`
+			}
+			host := &publicationHTTPContext{
+				HTTPContext:   contexts.HTTPContext{Responses: []*http.Response{publicationHTTPResponse(200, payload), publicationHTTPResponse(200, "{}")}},
+				beforeRequest: func(*http.Request) { checkConnections() },
+			}
+			if provider == "github" {
+				previous := newFactoryGitHubAPI
+				t.Cleanup(func() { newFactoryGitHubAPI = previous })
+				newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+					checkConnections()
+					return publicationGitHubClient(t, host), nil
+				}
+			} else {
+				previous := newFactoryBitbucketAPI
+				t.Cleanup(func() { newFactoryBitbucketAPI = previous })
+				newFactoryBitbucketAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (*bitbucket.Client, error) {
+					checkConnections()
+					return &bitbucket.Client{HTTP: host, Token: "token", AuthType: bitbucket.AuthTypeWorkspaceAccessToken}, nil
+				}
+			}
+			require.NoError(t, PublishMergeConfidence(t.Context(), f.db, IntakeDependencies{}, f.canvas.ID, f.run.ID, "https://example.com"))
+			require.Len(t, host.Requests, 2)
+		})
+	}
+}
+
+func TestPublishMergeConfidenceSkipsRunSupersededDuringDescriptionRead(t *testing.T) {
+	f := newPublicationFixture(t)
+	f.report(t, f.run, 5)
+	f.finish(t, models.CanvasRunResultPassed)
+	host := &publicationHTTPContext{
+		HTTPContext: contexts.HTTPContext{Responses: []*http.Response{publicationHTTPResponse(200, `{"state":"open","head":{"sha":"abc"}}`), publicationHTTPResponse(200, "{}")}},
+		beforeRequest: func(request *http.Request) {
+			if request.Method != http.MethodGet {
+				return
+			}
+			newer, err := models.CreateCanvasRunInTransaction(f.db, f.canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			// Bound the lock wait so this regression also fails promptly when
+			// publication holds the PR row lock during the provider request.
+			err = f.db.Transaction(func(tx *gorm.DB) error {
+				if err := tx.Exec("SET LOCAL lock_timeout = '100ms'").Error; err != nil {
+					return err
+				}
+				_, err := f.pr.CreateActivity(tx, models.FactoryPullRequestActivityParams{RunID: newer.ID})
+				return err
+			})
+			require.NoError(t, err)
+		},
+	}
+	previous := newFactoryGitHubAPI
+	t.Cleanup(func() { newFactoryGitHubAPI = previous })
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+		return publicationGitHubClient(t, host), nil
+	}
+	require.NoError(t, PublishMergeConfidence(t.Context(), f.db, IntakeDependencies{}, f.canvas.ID, f.run.ID, "https://example.com"))
+	require.Len(t, host.Requests, 1, "a newer assessment must suppress the pending write")
 }
 
 func TestPublishMergeConfidenceRejectsStaleRuns(t *testing.T) {
@@ -354,12 +442,7 @@ func TestPublishMergeConfidenceSerializesConcurrentDeliveries(t *testing.T) {
 	}
 	finished := make(chan error, 2)
 	publish := func() {
-		finished <- f.db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Exec("SET LOCAL idle_in_transaction_session_timeout = '50ms'").Error; err != nil {
-				return err
-			}
-			return PublishMergeConfidence(t.Context(), tx, IntakeDependencies{}, f.canvas.ID, f.run.ID, "https://example.com")
-		})
+		finished <- PublishMergeConfidence(t.Context(), f.db, IntakeDependencies{}, f.canvas.ID, f.run.ID, "https://example.com")
 	}
 	go publish()
 	select {
@@ -368,8 +451,8 @@ func TestPublishMergeConfidenceSerializesConcurrentDeliveries(t *testing.T) {
 		t.Fatal("publication did not reach host")
 	}
 	go publish()
-	// Give the second delivery a chance to reach the row lock while the first
-	// holds it across the host write. Without that lock both read an empty body.
+	// Give the second delivery a chance to wait for the durable claim.
+	// Without serialization both deliveries read an empty description.
 	time.Sleep(100 * time.Millisecond)
 	close(host.release)
 	for range 2 {
@@ -382,6 +465,33 @@ func TestPublishMergeConfidenceSerializesConcurrentDeliveries(t *testing.T) {
 	}
 	assert.Equal(t, 2, host.reads)
 	assert.Equal(t, 1, host.updates, "the second delivery must see the published section and skip its write")
+}
+
+func TestPublishMergeConfidenceRecoversExpiredClaim(t *testing.T) {
+	f := newPublicationFixture(t)
+	f.finish(t, models.CanvasRunResultPassed)
+	f.report(t, f.run, 5)
+	old := &models.MergeConfidencePublicationClaim{PullRequestID: f.pr.ID, OwnerID: uuid.New(), LeaseUntil: time.Now().Add(-time.Minute)}
+	acquired, err := old.Acquire(f.db)
+	require.NoError(t, err)
+	require.True(t, acquired)
+	host := &publicationHTTPContext{
+		HTTPContext: contexts.HTTPContext{Responses: []*http.Response{publicationHTTPResponse(200, `{"state":"open","head":{"sha":"abc"}}`), publicationHTTPResponse(200, `{}`)}},
+		beforeRequest: func(*http.Request) {
+			// An old worker can finish after its lease expires. Its cleanup must
+			// leave the new owner's claim intact.
+			require.NoError(t, old.Release(f.db))
+		},
+	}
+	previous := newFactoryGitHubAPI
+	t.Cleanup(func() { newFactoryGitHubAPI = previous })
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+		return publicationGitHubClient(t, host), nil
+	}
+	outcome, err := PublishMergeConfidenceWithOutcome(t.Context(), f.db, IntakeDependencies{}, f.canvas.ID, f.run.ID, "https://example.com")
+	require.NoError(t, err)
+	assert.Equal(t, "published", outcome.Status)
+	require.Len(t, host.Requests, 2)
 }
 
 func TestPublishMergeConfidenceClassifiesAppTokenFailures(t *testing.T) {

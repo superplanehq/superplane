@@ -237,9 +237,16 @@ Local `make test.e2e` needs the same dummy values or a real app.
 ## Merge confidence publication
 
 Merge confidence publishes terminal run results to the PR description.
-Existing automations use this behavior without a template reset.
-The consumer starts when `START_CONSUMERS=yes` and
-`START_REGULAR_WORKERS` is not `no`.
+The built-in templates use this branch:
+
+`Assessment run finishes → On Run Finished → Publish Merge Confidence`
+
+The trigger filters runs by the assessment entry node, `on-pr-risk`.
+Publication runs are independent and cannot trigger themselves.
+Failed and cancelled assessments also publish, including failures before the agent starts.
+Host failures do not change assessment results.
+Transient failures use scheduled action requests. Execution details show attempts,
+the next retry, the last error, and skipped outcomes.
 
 The worker process needs `BASE_URL`, database and RabbitMQ access, and
 `ENCRYPTION_MASTER_KEYS` for the workspace integration credentials.
@@ -265,7 +272,28 @@ Bitbucket Forge uses the shared encrypted installation token in the database.
 API and worker processes must use the same encryption keys.
 Verify hosted chart values and Secret references before worker rollout.
 API-only credential configuration does not configure workers.
-No migration or runner rollout is required for description publication.
+Apply the publication-claim migration before deploying the new worker code.
+Claims serialize description updates without holding database connections during host requests.
+The node request worker needs `START_NODE_REQUEST_WORKER=yes`.
+Completion delivery also needs the run initializer, run finalizer, and event router.
+The local Compose file and repository chart enable these workers.
+No new configuration keys or runner changes are required.
+
+Roll out in this order:
+
+1. Deploy the migration, trigger, action, and template support while the existing publication consumer remains active.
+2. Run the built-in admin reset for Merge confidence automations. Supported merge-check and agent settings survive this reset.
+3. Verify publication branches for GitHub and Bitbucket. Then deploy removal of `MergeConfidencePublicationConsumer` and its startup registration.
+
+Publication claims and report markers make overlapping deliveries safe.
+The default rollout uses admin reset. Custom graph migration is outside this change.
+The final code removes the consumer. Stage its removal separately during deployment
+so saved automations receive the branch before the consumer stops.
+
+The hosted `superplanehq/helm-chart` and `superplanehq/launchpad` repositories were
+unavailable during implementation. Their worker values and Secret references still
+need verification before activating the branch. No companion deployment change was
+published or live configuration verified.
 
 ## Bitbucket Forge local development
 
