@@ -172,6 +172,11 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 				version := resetTestLiveVersion(t, canvas)
 				trigger := findIntakeNode(version.Nodes, template.entrypointNodeID)
 				require.NotNil(t, trigger)
+				if templateID == "risk-score" {
+					publication := findIntakeNode(version.Nodes, "publish-merge-confidence")
+					require.NotNil(t, publication)
+					assert.Equal(t, "publishMergeConfidence", publication.ComponentName())
+				}
 				assert.Equal(t, false, trigger.Configuration["onlyFactoryPullRequests"])
 				assert.Equal(t, false, trigger.Configuration["ignoreDrafts"])
 				action := "opened"

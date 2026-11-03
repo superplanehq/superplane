@@ -620,6 +620,17 @@ CREATE TABLE public.factory_llm_model_allowlists (
 
 
 --
+-- Name: factory_merge_confidence_publication_claims; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_merge_confidence_publication_claims (
+    pull_request_id uuid NOT NULL,
+    owner_id uuid NOT NULL,
+    lease_until timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: factory_planning_session_activities; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2684,6 +2695,14 @@ ALTER TABLE ONLY public.factory_lines
 
 ALTER TABLE ONLY public.factory_llm_model_allowlists
     ADD CONSTRAINT factory_llm_model_allowlists_pkey PRIMARY KEY (factory_id, provider, funding_source);
+
+
+--
+-- Name: factory_merge_confidence_publication_claims factory_merge_confidence_publication_claims_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_merge_confidence_publication_claims
+    ADD CONSTRAINT factory_merge_confidence_publication_claims_pkey PRIMARY KEY (pull_request_id);
 
 
 --
@@ -5311,6 +5330,14 @@ ALTER TABLE ONLY public.factory_lines
 
 
 --
+-- Name: factory_merge_confidence_publication_claims factory_merge_confidence_publication_claim_pull_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_merge_confidence_publication_claims
+    ADD CONSTRAINT factory_merge_confidence_publication_claim_pull_request_id_fkey FOREIGN KEY (pull_request_id) REFERENCES public.factory_pull_requests(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_planning_session_activities factory_planning_session_activities_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6502,7 +6529,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261103140609	f
+20261103152520	f
 \.
 
 
