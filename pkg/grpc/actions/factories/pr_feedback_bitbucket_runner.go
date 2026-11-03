@@ -174,11 +174,7 @@ func bitbucketCommitPushCommand(message string) string {
 		`  echo "Local checkout is not the pull request source commit. Stop without pushing." >&2`,
 		`  exit 1`,
 		`fi`,
-		`git add -A`,
-		`if ! git diff --cached --quiet; then`,
-		`  git commit -s -m "`+message+`"`,
-		`  git push -- "https://bitbucket.org/${SOURCE_REPO}.git" "HEAD:${SOURCE_BRANCH}"`,
-		`fi`,
 	)
+	lines = append(lines, prFeedbackCommitPushLines(message, `git push -- "https://bitbucket.org/${SOURCE_REPO}.git" "HEAD:${SOURCE_BRANCH}"`)...)
 	return strings.Join(lines, "\n")
 }
