@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -84,6 +85,7 @@ type publicationFixture struct {
 	pr        *models.FactoryPullRequest
 	canvas    *models.Canvas
 	run       *models.CanvasRun
+	deps      IntakeDependencies
 }
 
 func newPublicationFixture(t *testing.T) publicationFixture {
@@ -107,7 +109,7 @@ func newPublicationFixture(t *testing.T) publicationFixture {
 	require.NoError(t, db.Create(&models.CanvasEvent{WorkflowID: canvas.ID, NodeID: "trigger", RunID: run.ID, State: models.CanvasEventStateRouted, Data: models.NewJSONValue(map[string]any{"data": map[string]any{"pull_request": map[string]any{"head": map[string]any{"sha": "abc"}}}})}).Error)
 	_, err = pr.CreateActivity(db, models.FactoryPullRequestActivityParams{RunID: run.ID, Title: "Merge confidence"})
 	require.NoError(t, err)
-	return publicationFixture{db, workspace, order, pr, canvas, run}
+	return publicationFixture{db, workspace, order, pr, canvas, run, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor}}
 }
 
 func (f publicationFixture) report(t *testing.T, run *models.CanvasRun, score float64) {
@@ -511,6 +513,44 @@ func TestPublishMergeConfidenceClassifiesAppTokenFailures(t *testing.T) {
 			} else {
 				require.Error(t, err)
 			}
+		})
+	}
+}
+
+func TestPublishMergeConfidenceRetriesVCSSetupFailures(t *testing.T) {
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) {
+			f := newPublicationFixture(t)
+			f.report(t, f.run, 5)
+			f.finish(t, models.CanvasRunResultPassed)
+			integrationID := uuid.NewString()
+			require.NoError(t, f.workspace.UpdateOnboarding(f.db, models.FactoryOnboardingPatch{VCSProvider: &provider, VCSIntegrationID: &integrationID}))
+			require.NoError(t, f.db.Model(f.pr).Update("provider", provider).Error)
+
+			// The integration does not exist, so the connection is missing.
+			outcome, err := PublishMergeConfidenceWithOutcome(t.Context(), f.db, f.deps, f.canvas.ID, f.run.ID, "https://example.com")
+			require.NoError(t, err)
+			assert.Equal(t, "skipped", outcome.Status)
+
+			// A failed integration lookup is temporary and must retry.
+			failingLookup, cancel := context.WithCancel(t.Context())
+			cancel()
+			lookupDB := f.db.WithContext(failingLookup)
+			if provider == models.ProviderGitHub {
+				previous := newFactoryGitHubAPI
+				t.Cleanup(func() { newFactoryGitHubAPI = previous })
+				newFactoryGitHubAPI = func(_ *gorm.DB, deps IntakeDependencies, factory *models.Factory) (factoryGitHubAPI, error) {
+					return githubClientForFactory(lookupDB, deps, factory)
+				}
+			} else {
+				previous := newFactoryBitbucketAPI
+				t.Cleanup(func() { newFactoryBitbucketAPI = previous })
+				newFactoryBitbucketAPI = func(_ *gorm.DB, deps IntakeDependencies, factory *models.Factory) (*bitbucket.Client, error) {
+					return buildFactoryBitbucketAPI(lookupDB, deps, factory)
+				}
+			}
+			_, err = PublishMergeConfidenceWithOutcome(t.Context(), f.db, f.deps, f.canvas.ID, f.run.ID, "https://example.com")
+			require.ErrorIs(t, err, errFactoryVCSSetupFailed)
 		})
 	}
 }

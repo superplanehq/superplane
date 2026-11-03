@@ -58,6 +58,10 @@ func (b *bitbucketProvider) UpdateDescription(_ context.Context, ref vcs.PullReq
 }
 
 func retryableDescriptionError(err error) bool {
+	// A configured connection that SuperPlane could not load is temporary.
+	if errors.Is(err, errFactoryVCSSetupFailed) {
+		return true
+	}
 	if errors.Is(err, errFactoryGitHubNotConnected) || errors.Is(err, errFactoryBitbucketNotConnected) {
 		return false
 	}
