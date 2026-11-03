@@ -258,12 +258,7 @@ func attachRunnerTaskExecution(t *testing.T, resource *support.ResourceRegistry,
 	}}, nil)
 	event := support.EmitCanvasEventForNode(t, canvas.ID, "runner", "default", nil)
 	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "runner", event.ID, event.ID)
-	require.NoError(t, db.Model(execution).Updates(map[string]any{
-		"configuration": datatypes.NewJSONType(configuration),
-		"metadata": datatypes.NewJSONType(map[string]any{
-			models.CanvasNodeExecutionFrozenComponentKey: "runnerCodex",
-		}),
-	}).Error)
+	require.NoError(t, db.Model(execution).Update("configuration", datatypes.NewJSONType(configuration)).Error)
 	require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, "runner", execution.ID, "task_id", task.ID.String()))
 	return execution
 }

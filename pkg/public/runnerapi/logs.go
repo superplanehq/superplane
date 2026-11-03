@@ -93,7 +93,11 @@ func hostedModelCallInputs(tx *gorm.DB, task *models.RunnerTask, content []byte)
 	if err != nil {
 		return nil
 	}
-	provider, ok := runneraction.HostedModelStatusProvider(execution.FrozenComponentName(), execution.Configuration.Data())
+	component, err := execution.ComponentName(tx)
+	if err != nil || component == "" {
+		return nil
+	}
+	provider, ok := runneraction.HostedModelStatusProvider(component, execution.Configuration.Data())
 	if !ok {
 		return nil
 	}
