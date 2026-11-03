@@ -1,6 +1,5 @@
 import type { FactoriesFactoryPullRequest } from "@/api-client";
 
-import { isMergeConfidenceMetric, mergeConfidenceCheckLevel } from "./mergeConfidenceScore";
 import type { WorkOrderAttentionReason } from "./workOrderAttention";
 import { pullRequestLabel, pullRequestState, type FactoryPullRequestState } from "./workOrderPullRequest";
 
@@ -47,50 +46,21 @@ export function workOrderCardPullRequestVisibleLabel(pullRequest: FactoriesFacto
   return `${verb} ${number}${extra}`;
 }
 
+/** Uses the provider's mergeability state, independent of confidence scores. */
 export function workOrderCardPullRequestIsMergeable(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
   return Boolean(pullRequest?.mergeable) && pullRequestState(pullRequest?.state) === "open";
-}
-
-type MergeConfidenceScore = {
-  key?: string;
-  score?: number;
-  scoreSupplied?: boolean;
-};
-
-/**
- * GitHub can still call the pull request mergeable. A critical merge
- * confidence check hides the badge. Caution does not. A check with no
- * score, and any check outside the five merge confidence metrics, does
- * not count.
- */
-export function workOrderCardPullRequestShowsMergeable(
-  pullRequest: FactoriesFactoryPullRequest | undefined,
-  checks: readonly MergeConfidenceScore[] | undefined,
-): boolean {
-  if (!workOrderCardPullRequestIsMergeable(pullRequest)) {
-    return false;
-  }
-  return !(checks ?? []).some(isCriticalMergeConfidenceCheck);
-}
-
-function isCriticalMergeConfidenceCheck(check: MergeConfidenceScore): boolean {
-  if (check.scoreSupplied === false || check.score == null || !isMergeConfidenceMetric(check)) {
-    return false;
-  }
-  return mergeConfidenceCheckLevel(check.key, check.score) === "critical";
 }
 
 /**
  * An open Review pill already asks for review. A merged request is
  * already done, so hide the review wait until the task closes. Keep
  * other attention next to a closed request. A visible Mergeable pill
- * already says checks passed.
+ * makes the generic checks-passed reason redundant.
  */
 export function visibleWorkOrderCardAttentionReasons(
   reasons: WorkOrderAttentionReason[],
   cardPullRequest: WorkOrderCardPullRequest | null,
   showPullRequestMerge?: boolean,
-  checks?: readonly MergeConfidenceScore[],
 ): WorkOrderAttentionReason[] {
   if (!cardPullRequest) {
     return reasons;
@@ -106,7 +76,7 @@ export function visibleWorkOrderCardAttentionReasons(
     if (
       reason === "checksPassed" &&
       showPullRequestMerge &&
-      workOrderCardPullRequestShowsMergeable(cardPullRequest.pullRequest, checks)
+      workOrderCardPullRequestIsMergeable(cardPullRequest.pullRequest)
     ) {
       return false;
     }
