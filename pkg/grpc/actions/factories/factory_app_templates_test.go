@@ -582,7 +582,7 @@ func TestCanvasAgentIncludesVisualEvidenceIgnoresUnrelatedRunners(t *testing.T) 
 	assert.False(t, *input.includeVisualEvidence)
 }
 
-func TestMaterializePRFeedbackDefaultsOmitsCommitIdentity(t *testing.T) {
+func TestMaterializePRFeedbackDefaultsIncludesCommitIdentity(t *testing.T) {
 	cases := []struct {
 		name    string
 		source  string
@@ -619,8 +619,8 @@ func TestMaterializePRFeedbackDefaultsOmitsCommitIdentity(t *testing.T) {
 			require.NoError(t, err)
 			for _, nodeID := range testCase.runners {
 				runner := findYAMLNode(t, defaults, nodeID)
-				assert.False(t, runnerHasStep(t, *runner, "Set Up Git User"))
-				assert.False(t, runnerHasStep(t, *runner, "Set Up DCO Signing"))
+				assert.True(t, runnerHasStep(t, *runner, "Set Up Git User"))
+				assert.True(t, runnerHasStep(t, *runner, "Set Up DCO Signing"))
 			}
 		})
 	}
