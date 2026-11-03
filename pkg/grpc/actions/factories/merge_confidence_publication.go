@@ -65,29 +65,6 @@ func publishMergeConfidenceRun(ctx context.Context, db *gorm.DB, deps IntakeDepe
 	if err != nil {
 		return outcome, err
 	}
-	claim := &models.MergeConfidencePublicationClaim{PullRequestID: activity.PullRequestID, OwnerID: uuid.New(), LeaseUntil: time.Now().Add(5 * time.Minute)}
-	for {
-		acquired, err := claim.Acquire(db)
-		if err != nil {
-			return outcome, err
-		}
-		if acquired {
-			break
-		}
-		select {
-		case <-ctx.Done():
-			return outcome, fmt.Errorf("wait for publication claim: %w", ctx.Err())
-		case <-time.After(25 * time.Millisecond):
-		}
-	}
-	defer func() {
-		// A request cancellation must not prevent releasing our claim.
-		releaseContext, cancelRelease := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		defer cancelRelease()
-		if releaseErr := claim.Release(db.WithContext(releaseContext)); releaseErr != nil {
-			err = errors.Join(err, releaseErr)
-		}
-	}()
 
 	var pr *models.FactoryPullRequest
 	var workspace *models.Factory
@@ -158,10 +135,6 @@ func publishMergeConfidenceRun(ctx context.Context, db *gorm.DB, deps IntakeDepe
 		// New assessments can attach while the provider reads the description.
 		// A user can also cancel the run during that read.
 		// Recheck immediately before writing, without holding a connection at I/O.
-		current, err := claim.IsCurrent(db)
-		if err != nil || !current {
-			return false, err
-		}
 		if stillActive != nil {
 			active, err := stillActive(db)
 			if err != nil || !active {

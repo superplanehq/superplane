@@ -8,9 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -394,106 +392,6 @@ func TestPublishMergeConfidenceHostFailuresAndMalformedMarkers(t *testing.T) {
 	installPublicationGitHub(t, httpCtx)
 	require.NoError(t, PublishMergeConfidence(t.Context(), f.db, IntakeDependencies{}, f.canvas.ID, f.run.ID, "https://example.com"))
 	require.Len(t, httpCtx.Requests, 1)
-}
-
-// This host retains the written body, like the real API. Delaying the first
-// write exposes lost updates if simultaneous deliveries do not take the PR lock.
-type concurrentPublicationHost struct {
-	mu             sync.Mutex
-	body           string
-	reads, updates int
-	writing        chan struct{}
-	release        chan struct{}
-}
-
-func (h *concurrentPublicationHost) Do(request *http.Request) (*http.Response, error) {
-	if request.Method == http.MethodGet {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		h.reads++
-		encoded, _ := json.Marshal(map[string]any{"state": "open", "head": map[string]any{"sha": "abc"}, "body": h.body})
-		return publicationHTTPResponse(200, string(encoded)), nil
-	}
-	h.mu.Lock()
-	h.updates++
-	first := h.updates == 1
-	h.mu.Unlock()
-	if first {
-		close(h.writing)
-		<-h.release
-	}
-	var update map[string]string
-	if err := json.NewDecoder(request.Body).Decode(&update); err != nil {
-		return nil, err
-	}
-	h.mu.Lock()
-	h.body = update["body"]
-	h.mu.Unlock()
-	return publicationHTTPResponse(200, "{}"), nil
-}
-
-func TestPublishMergeConfidenceSerializesConcurrentDeliveries(t *testing.T) {
-	f := newPublicationFixture(t)
-	f.report(t, f.run, 5)
-	f.finish(t, models.CanvasRunResultPassed)
-	host := &concurrentPublicationHost{writing: make(chan struct{}), release: make(chan struct{})}
-	previous := newFactoryGitHubAPI
-	t.Cleanup(func() { newFactoryGitHubAPI = previous })
-	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
-		return publicationGitHubClient(t, host), nil
-	}
-	finished := make(chan error, 2)
-	publish := func() {
-		finished <- PublishMergeConfidence(t.Context(), f.db, IntakeDependencies{}, f.canvas.ID, f.run.ID, "https://example.com")
-	}
-	go publish()
-	select {
-	case <-host.writing:
-	case <-time.After(5 * time.Second):
-		t.Fatal("publication did not reach host")
-	}
-	go publish()
-	// Give the second delivery a chance to wait for the durable claim.
-	// Without serialization both deliveries read an empty description.
-	time.Sleep(100 * time.Millisecond)
-	close(host.release)
-	for range 2 {
-		select {
-		case err := <-finished:
-			require.NoError(t, err)
-		case <-time.After(5 * time.Second):
-			t.Fatal("publication did not complete")
-		}
-	}
-	assert.Equal(t, 2, host.reads)
-	assert.Equal(t, 1, host.updates, "the second delivery must see the published section and skip its write")
-}
-
-func TestPublishMergeConfidenceRecoversExpiredClaim(t *testing.T) {
-	f := newPublicationFixture(t)
-	f.finish(t, models.CanvasRunResultPassed)
-	f.report(t, f.run, 5)
-	old := &models.MergeConfidencePublicationClaim{PullRequestID: f.pr.ID, OwnerID: uuid.New(), LeaseUntil: time.Now().Add(-time.Minute)}
-	acquired, err := old.Acquire(f.db)
-	require.NoError(t, err)
-	require.True(t, acquired)
-	host := &publicationHTTPContext{
-		HTTPContext: contexts.HTTPContext{Responses: []*http.Response{publicationHTTPResponse(200, `{"state":"open","head":{"sha":"abc"}}`), publicationHTTPResponse(200, `{}`)}},
-		beforeRequest: func(*http.Request) {
-			// An old worker can finish after its lease expires. Its cleanup must
-			// leave the new owner's claim intact.
-			require.NoError(t, old.Release(f.db))
-		},
-	}
-	previous := newFactoryGitHubAPI
-	t.Cleanup(func() { newFactoryGitHubAPI = previous })
-	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
-		return publicationGitHubClient(t, host), nil
-	}
-	outcome, err := PublishMergeConfidenceWithOutcome(t.Context(), f.db, IntakeDependencies{}, f.canvas.ID, f.run.ID, "https://example.com")
-	require.NoError(t, err)
-	assert.Equal(t, "published", outcome.Status)
-	require.Len(t, host.Requests, 2)
 }
 
 func TestPublishMergeConfidenceClassifiesAppTokenFailures(t *testing.T) {
