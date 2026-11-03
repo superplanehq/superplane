@@ -8,6 +8,9 @@ spec:
     - channel: default
       sourceId: on-pr-risk
       targetId: assess-risk
+    - channel: default
+      sourceId: on-assessment-finished
+      targetId: publish-merge-confidence
   nodes:
     - id: on-pr-risk
       name: On Pull Request
@@ -269,4 +272,24 @@ spec:
       position:
         x: 640
         "y": 80
+      isCollapsed: true
+    - id: on-assessment-finished
+      name: On Run Finished
+      type: TYPE_TRIGGER
+      component: onRunFinished
+      configuration:
+        sourceEntryNodeId: on-pr-risk
+      position:
+        x: 80
+        "y": 400
+      isCollapsed: true
+    - id: publish-merge-confidence
+      name: Publish Merge Confidence
+      type: TYPE_ACTION
+      component: publishMergeConfidence
+      configuration:
+        sourceRunId: '{{ root().data.runId }}'
+      position:
+        x: 640
+        "y": 400
       isCollapsed: true

@@ -14,6 +14,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Broadcast" href="#on-broadcast" description="Receive broadcast messages from another SuperPlane app" />
   <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
   <LinkCard title="On Run" href="#on-run" description="Handle runs started from another app" />
+  <LinkCard title="On Run Finished" href="#on-run-finished" description="Start when a run from the selected entry node finishes in this canvas" />
   <LinkCard title="On Task" href="#on-task" description="Start when a task is created in this factory" />
   <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
   <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
@@ -44,6 +45,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Loop" href="#loop" description="Repeat downstream steps until a condition is met" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="Publish Merge Confidence" href="#publish-merge-confidence" description="Publish a completed assessment in the pull request description" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
   <LinkCard title="Report Task Check" href="#report-task-check" description="Report a scored or pass/fail check (risk, coverage, CI) on a task" />
   <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
@@ -203,6 +205,28 @@ Handle runs started from another app
   },
   "timestamp": "2026-07-19T12:00:00Z",
   "type": "app.invocation"
+}
+```
+
+<a id="on-run-finished"></a>
+
+## On Run Finished
+
+**Trigger key:** `onRunFinished`
+
+Start a separate run when a run in this canvas finishes. Select its source entry-node ID. Passed, failed, and cancelled runs emit events, including runs that fail before execution starts. The event contains runId, result, and entryNodeId. This trigger does not react to its own runs.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "entryNodeId": "assessment",
+    "result": "passed",
+    "runId": "123"
+  },
+  "timestamp": "2026-11-03T12:00:00Z",
+  "type": "run.finished"
 }
 ```
 
@@ -1363,6 +1387,28 @@ When executed, the No Operation component immediately emits the incoming event d
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "noop.finished"
+}
+```
+
+<a id="publish-merge-confidence"></a>
+
+## Publish Merge Confidence
+
+**Component key:** `publishMergeConfidence`
+
+Publish the saved checks for a completed assessment run in this factory. Set sourceRunId from an On Run Finished event. Publication preserves the existing description. Transient host failures retry independently. Execution details show attempts and skipped outcomes. Newer assessments and changed commits stop publication.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attempts": 1,
+    "sourceRunId": "123",
+    "status": "published"
+  },
+  "timestamp": "2026-11-03T12:00:00Z",
+  "type": "mergeConfidence.published"
 }
 ```
 
