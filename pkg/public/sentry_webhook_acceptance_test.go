@@ -208,3 +208,23 @@ func TestSentryDirectWebhookFailsAdmissionWhenEventCannotPersist(t *testing.T) {
 	require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&receiptsAfter).Error)
 	assert.Equal(t, receiptsBefore, receiptsAfter)
 }
+
+func TestSentryHostedInstallWebhookStoresUnclaimedGrant(t *testing.T) {
+	_, server := sentryAdmissionServer(t)
+	installationUUID := uuid.NewString()
+	body := []byte(`{"action":"created","installation":{"uuid":"` + installationUUID + `"},` +
+		`"data":{"installation":{"uuid":"` + installationUUID + `","code":"grant-code","organization":{"slug":"acme"}}}}`)
+	request := signedSentryRequest("/api/v1/sentry/app/webhook", body, "csecret")
+	request.Header.Set("Sentry-Hook-Resource", "installation")
+
+	recorder := httptest.NewRecorder()
+	server.HandleSentryAppWebhook(recorder, request)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	digest := sha256.Sum256([]byte("grant-code"))
+	grant, err := models.FindSentryAppInstallGrant(database.Conn(), installationUUID, hex.EncodeToString(digest[:]), time.Now())
+	require.NoError(t, err)
+	require.NotNil(t, grant)
+	assert.Equal(t, "acme", grant.OrganizationSlug)
+	assert.Empty(t, grant.AccessToken)
+}

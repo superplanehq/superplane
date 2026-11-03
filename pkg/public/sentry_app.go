@@ -2,6 +2,7 @@ package public
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -130,31 +131,35 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if len(integrations) == 0 {
-		s.claimPendingHostedSentryInstall(r, app, body)
+		if err := rememberPendingHostedSentryInstall(r, body); err != nil {
+			captureSentryWebhookErrorToSentry(r, err, "installation_uuid", summary.InstallationUUID)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
 	}
 	s.acceptSentryWebhook(w, r, body, integrations, started)
 }
 
-func (s *Server) claimPendingHostedSentryInstall(r *http.Request, app sentryintegration.HostedApp, body []byte) {
+// rememberPendingHostedSentryInstall stores the grant from an unclaimed
+// installation.created event for the setup callback. It does not call
+// Sentry, so a failed write keeps the code unused and Sentry can send the
+// event again.
+func rememberPendingHostedSentryInstall(r *http.Request, body []byte) error {
 	grant, ok := sentryintegration.ParseInstallationCreatedGrant(r.Header.Get("Sentry-Hook-Resource"), body)
-	if !ok {
-		return
-	}
-
-	if err := s.rememberHostedSentryGrant(app, grant); err != nil {
-		logging.LogSentryWebhookError("failed to store unclaimed Sentry app install", log.Fields{
-			"installation_uuid":        grant.UUID,
-			"sentry_organization_slug": grant.OrgSlug,
-			"sentry_organization_id":   grant.OrgID,
-		}, err)
-	}
-}
-
-func (s *Server) rememberHostedSentryGrant(app sentryintegration.HostedApp, grant sentryintegration.InstallationGrant) error {
-	if s.registry == nil || s.registry.HTTPContext() == nil {
+	if !ok || grant.Code == "" {
 		return nil
 	}
-	return sentryintegration.RememberHostedInstallGrant(s.registry.HTTPContext(), app, grant)
+
+	err := sentryintegration.RememberHostedInstallGrant(grant)
+	if err == nil {
+		return nil
+	}
+	logging.LogSentryWebhookError("failed to store unclaimed Sentry app install", log.Fields{
+		"installation_uuid":        grant.UUID,
+		"sentry_organization_slug": grant.OrgSlug,
+		"sentry_organization_id":   grant.OrgID,
+	}, err)
+	return fmt.Errorf("store Sentry install grant for installation %s: %w", grant.UUID, err)
 }
 
 func findSentryAppSetupIntegration(r *http.Request) (*models.Integration, error) {
