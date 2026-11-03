@@ -16,6 +16,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func CreateWorkOrderArtifact(
@@ -60,17 +61,26 @@ func CreateWorkOrderArtifact(
 	}
 	orderID := order.ID
 
-	if artifactType == models.FactoryWorkOrderArtifactTypeFile {
-		data, err = uploadedFileArtifactData(db, order, userID, data)
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to create work order artifact")
+	var artifact *models.FactoryWorkOrderArtifact
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if artifactType == models.FactoryWorkOrderArtifactTypeFile {
+			// The task lock stops two requests from attaching the same file.
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(order, "id = ?", order.ID).Error; err != nil {
+				return err
+			}
+			fileData, err := uploadedFileArtifactData(tx, order, userID, data)
+			if err != nil {
+				return err
+			}
+			data = fileData
 		}
-	}
-
-	artifact, err := order.CreateArtifact(db, models.FactoryWorkOrderArtifactParams{
-		Type:      artifactType,
-		Data:      data,
-		CreatedBy: &userID,
+		created, err := order.CreateArtifact(tx, models.FactoryWorkOrderArtifactParams{
+			Type:      artifactType,
+			Data:      data,
+			CreatedBy: &userID,
+		})
+		artifact = created
+		return err
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order artifact")

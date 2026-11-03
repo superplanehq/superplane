@@ -86,7 +86,9 @@ func putFileContent(ctx core.CommandContext, fileID, contentType string, content
 
 	client := &http.Client{Timeout: artifactUploadTimeout}
 	if config.HTTPClient != nil {
-		client = &http.Client{Transport: config.HTTPClient.Transport, Timeout: artifactUploadTimeout}
+		configured := *config.HTTPClient
+		configured.Timeout = artifactUploadTimeout
+		client = &configured
 	}
 	response, err := client.Do(request)
 	if err != nil {

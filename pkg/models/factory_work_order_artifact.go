@@ -286,6 +286,20 @@ func (o *FactoryWorkOrder) FindArtifactByKey(tx *gorm.DB, key string) (*FactoryW
 	return &artifact, nil
 }
 
+// FindArtifactByDisplayKey finds an artifact by the key that lists show.
+// Runs store their artifact keys as "<task id>:<key>".
+func (o *FactoryWorkOrder) FindArtifactByDisplayKey(tx *gorm.DB, key string) (*FactoryWorkOrderArtifact, error) {
+	key = strings.TrimSpace(key)
+	scoped := o.ID.String() + ":" + key
+	if key != "" && len(scoped) <= MaxFactoryWorkOrderArtifactKeyBytes {
+		artifact, err := o.FindArtifactByKey(tx, scoped)
+		if !errors.Is(err, ErrFactoryWorkOrderArtifactNotFound) {
+			return artifact, err
+		}
+	}
+	return o.FindArtifactByKey(tx, key)
+}
+
 func (o *FactoryWorkOrder) FindArtifactByID(tx *gorm.DB, id uuid.UUID) (*FactoryWorkOrderArtifact, error) {
 	var artifact FactoryWorkOrderArtifact
 	err := tx.
@@ -449,7 +463,7 @@ func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
 
 func (o *FactoryWorkOrder) findArtifactToRemove(tx *gorm.DB, key, title string) (*FactoryWorkOrderArtifact, error) {
 	if key != "" {
-		return o.FindArtifactByKey(tx, key)
+		return o.FindArtifactByDisplayKey(tx, key)
 	}
 	return o.findNewestUnkeyedArtifactByTitle(tx, title)
 }
