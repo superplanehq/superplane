@@ -142,7 +142,17 @@ func TestWizardCreateConfigurationEnterprise(t *testing.T) {
 		assert.Equal(t, "", got[common.ConfigHost])
 	})
 
-	t.Run("rejects GitHub Enterprise hosts in Community", func(t *testing.T) {
+	t.Run("rejects GitHub Enterprise hosts when the flag is off", func(t *testing.T) {
+		withLicensedGitHubEnterprise(t)
+		_, err := WizardCreateConfiguration(orgID, map[string]any{"host": "acme.ghe.com"}, nil)
+		require.Error(t, err)
+		assert.Equal(t, gitHubEnterpriseUnavailable, grpcerrors.StatusMessage(err))
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+		assert.NotContains(t, grpcerrors.StatusMessage(err), "license")
+	})
+
+	t.Run("rejects GitHub Enterprise hosts in Community when the flag is on", func(t *testing.T) {
+		enableGitHubEnterpriseFlag(t)
 		t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
 		_, err := WizardCreateConfiguration(orgID, map[string]any{"host": "acme.ghe.com"}, nil)
 		require.Error(t, err)
@@ -150,15 +160,15 @@ func TestWizardCreateConfigurationEnterprise(t *testing.T) {
 		assert.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
 	})
 
-	t.Run("accepts github.com in Community", func(t *testing.T) {
+	t.Run("accepts github.com with neither the flag nor the license", func(t *testing.T) {
 		t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
 		got, err := WizardCreateConfiguration(orgID, map[string]any{"host": "github.com"}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "", got[common.ConfigHost])
 	})
 
-	t.Run("accepts ghe.com when the license grants GitHub Enterprise", func(t *testing.T) {
-		withLicensedGitHubEnterprise(t)
+	t.Run("accepts ghe.com when the flag and the license are on", func(t *testing.T) {
+		withGitHubEnterpriseCloudAllowed(t)
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		}}
@@ -171,11 +181,30 @@ func TestWizardCreateConfigurationEnterprise(t *testing.T) {
 	})
 
 	t.Run("rejects a host outside the allowlist", func(t *testing.T) {
-		withLicensedGitHubEnterprise(t)
+		withGitHubEnterpriseCloudAllowed(t)
 		t.Setenv(config.EnvGitHubEnterpriseAllowedHosts, "allowed.ghe.com")
 		_, err := WizardCreateConfiguration(orgID, map[string]any{"host": "acme.ghe.com"}, &contexts.HTTPContext{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "is not allowed")
+	})
+
+	t.Run("rejects GitHub Enterprise Server without the server flag", func(t *testing.T) {
+		withGitHubEnterpriseCloudAllowed(t)
+		_, err := WizardCreateConfiguration(orgID, map[string]any{"host": "ghes.corp"}, nil)
+		require.Error(t, err)
+		assert.Contains(t, grpcerrors.StatusMessage(err), "GitHub Enterprise Server is not available")
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	})
+
+	t.Run("accepts GitHub Enterprise Server with the server flag and the license", func(t *testing.T) {
+		withLicensedGitHubEnterprise(t)
+		t.Cleanup(withGitHubEnterpriseServerForTest(func(uuid.UUID) bool { return true }))
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"installed_version":"3.16.0"}`))},
+		}}
+		got, err := WizardCreateConfiguration(orgID, map[string]any{"host": "ghes.corp"}, httpCtx)
+		require.NoError(t, err)
+		assert.Equal(t, "ghes.corp", got[common.ConfigHost])
 	})
 }
 

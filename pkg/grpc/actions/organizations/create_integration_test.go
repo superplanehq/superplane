@@ -427,10 +427,29 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Equal(t, true, stored.Configuration.Data()["privateApp"])
 	})
 
-	t.Run("github wizard rejects a GitHub Enterprise host in Community", func(t *testing.T) {
+	t.Run("github wizard rejects a GitHub Enterprise host when the flag is off", func(t *testing.T) {
+		t.Cleanup(github.WithGitHubEnterpriseForTest(githubenterprise.NewService(
+			licensingtest.EnterpriseService(licensing.FeatureGitHubEnterprise),
+		)))
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+
+		appConfig, err := structpb.NewStruct(map[string]any{"privateApp": true, "host": "acme.ghe.com"})
+		require.NoError(t, err)
+
+		name := support.RandomName("integration")
+		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, appConfig)
+		require.Error(t, err)
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+		assert.Equal(t, "GitHub Enterprise is not available", grpcerrors.StatusMessage(err))
+	})
+
+	t.Run("github wizard rejects a GitHub Enterprise host in Community when the flag is on", func(t *testing.T) {
 		t.Cleanup(github.WithGitHubEnterpriseForTest(githubenterprise.NewService(licensing.Community)))
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureGitHubEnterprise))
 		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
 		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
 
@@ -444,7 +463,7 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Equal(t, licensing.ErrNotLicensed.Error(), grpcerrors.StatusMessage(err))
 	})
 
-	t.Run("github wizard accepts GitHub Enterprise Cloud when the license grants it", func(t *testing.T) {
+	t.Run("github wizard accepts GitHub Enterprise Cloud when the flag and the license are on", func(t *testing.T) {
 		t.Cleanup(github.WithGitHubEnterpriseForTest(githubenterprise.NewService(
 			licensingtest.EnterpriseService(licensing.FeatureGitHubEnterprise),
 		)))
@@ -456,6 +475,7 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
 		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureGitHubEnterprise))
 
 		restore := github.WithProbeGitHubHostForTest(func(core.HTTPContext, githubcommon.Host, uuid.UUID) error {
 			return nil
@@ -487,6 +507,7 @@ func Test__CreateIntegration(t *testing.T) {
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
 		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureGitHubEnterprise))
 		t.Cleanup(github.WithProbeGitHubHostForTest(func(core.HTTPContext, githubcommon.Host, uuid.UUID) error {
 			return nil
 		}))

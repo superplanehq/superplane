@@ -90,7 +90,7 @@ func CreateIntegration(
 			var err error
 			configuration, err = github.WizardCreateConfiguration(org, configMap, registry.HTTPContext())
 			if err != nil {
-				if grpcerrors.Code(err) == codes.PermissionDenied {
+				if isGitHubEnterpriseClientError(err) {
 					return nil, err
 				}
 				return nil, grpcerrors.InvalidArgument(err, err.Error())
@@ -145,6 +145,11 @@ func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName st
 		return true
 	}
 	return reg.UseNewSetupFlow(orgID, integrationName)
+}
+
+func isGitHubEnterpriseClientError(err error) bool {
+	code := grpcerrors.Code(err)
+	return code == codes.PermissionDenied || code == codes.FailedPrecondition
 }
 
 func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capability {
