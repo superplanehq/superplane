@@ -50,10 +50,35 @@ function readSidecar(taskDir) {
       return { usage: emptyUsage() };
     }
     parsed.usage = addUsage(emptyUsage(), parsed.usage || {});
+    parsed.modelCallOutcomes = normalizeOutcomes(parsed.modelCallOutcomes);
     return parsed;
   } catch (_err) {
     return { usage: emptyUsage() };
   }
+}
+
+function normalizeOutcomes(rows) {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  const out = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") {
+      continue;
+    }
+    const model = String(row.model || "").trim();
+    const outcome = String(row.outcome || "").trim();
+    if (!model || !outcome) {
+      continue;
+    }
+    const item = { model, outcome };
+    const occurredAt = String(row.occurredAt || "").trim();
+    if (occurredAt) {
+      item.occurredAt = occurredAt;
+    }
+    out.push(item);
+  }
+  return out;
 }
 
 function sidecarHasUsage(sidecar) {
@@ -66,6 +91,65 @@ function sidecarHasUsage(sidecar) {
     usage.reasoning_tokens > 0 ||
     asNumber(sidecar.total_cost_usd) > 0
   );
+}
+
+function sidecarHasOutcomes(sidecar) {
+  return Array.isArray(sidecar.modelCallOutcomes) && sidecar.modelCallOutcomes.length > 0;
+}
+
+function hostedModelStatusEnabled() {
+  return String(process.env.SUPERPLANE_HOSTED_MODEL_STATUS || "").trim() === "yes";
+}
+
+function nextModelCallSequence(taskDir) {
+  const dir = String(taskDir || process.env.SUPERPLANE_TASK_DIR || "").trim();
+  if (!dir) {
+    return 0;
+  }
+  const file = path.join(dir, "model_call_sequence");
+  let n = 0;
+  try {
+    n = parseInt(fs.readFileSync(file, "utf8"), 10) || 0;
+  } catch (_err) {
+    n = 0;
+  }
+  n += 1;
+  try {
+    fs.writeFileSync(file, `${n}\n`);
+  } catch (_err) {
+    // Sequence is best-effort. The finished result still records the call.
+  }
+  return n;
+}
+
+function publishModelCallOutcomes(provider, rows) {
+  if (!hostedModelStatusEnabled()) {
+    return;
+  }
+  const source = String(provider || "").trim();
+  const list = Array.isArray(rows) ? rows : [];
+  for (const row of list) {
+    if (!row || typeof row !== "object") {
+      continue;
+    }
+    const model = String(row.model || "").trim();
+    const outcome = String(row.outcome || "").trim();
+    if (!source || !model || !outcome) {
+      continue;
+    }
+    const rec = {
+      type: "model_call",
+      provider: source,
+      model,
+      outcome,
+      sequence: nextModelCallSequence(),
+    };
+    const occurredAt = String(row.occurredAt || "").trim();
+    if (occurredAt) {
+      rec.occurredAt = occurredAt;
+    }
+    process.stdout.write(`${JSON.stringify(rec)}\n`);
+  }
 }
 
 function readPromptSeries(taskDir) {
@@ -100,6 +184,9 @@ function accumulate(taskDir, payload) {
   }
   const current = readSidecar(taskDir);
   current.usage = addUsage(current.usage || emptyUsage(), payload.usage || payload);
+  current.modelCallOutcomes = normalizeOutcomes(current.modelCallOutcomes).concat(
+    normalizeOutcomes(payload.modelCallOutcomes),
+  );
   if (payload.model) {
     current.model = String(payload.model);
   }
@@ -118,7 +205,7 @@ function mergeResult(resultFile, taskDir) {
   const sidecar = readSidecar(taskDir);
   const series = readPromptSeries(taskDir);
   const telemetry = telemetryForResult(series);
-  if (!sidecarHasUsage(sidecar) && !telemetry) {
+  if (!sidecarHasUsage(sidecar) && !telemetry && !sidecarHasOutcomes(sidecar)) {
     return;
   }
   let parsed = {};
@@ -145,6 +232,9 @@ function mergeResult(resultFile, taskDir) {
   if (telemetry) {
     merged.telemetry = telemetry;
   }
+  if (sidecarHasOutcomes(sidecar)) {
+    merged.modelCallOutcomes = sidecar.modelCallOutcomes;
+  }
   fs.writeFileSync(resultFile, `${JSON.stringify(merged)}\n`);
 }
 
@@ -164,4 +254,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { accumulate, mergeResult, addUsage };
+module.exports = { accumulate, mergeResult, addUsage, publishModelCallOutcomes };

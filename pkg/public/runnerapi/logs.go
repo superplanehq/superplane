@@ -8,10 +8,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerclientapi "github.com/superplanehq/superplane/pkg/runners/api"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	"gorm.io/gorm"
 )
 
 func (s *Server) uploadTaskLogChunk(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +70,9 @@ func (s *Server) uploadTaskLogChunk(w http.ResponseWriter, r *http.Request) {
 	var appendResult runnerlogs.AppendResult
 	if err == nil {
 		appendResult, err = store.Append(r.Context(), taskID, sequence, content)
+		if err == nil {
+			_ = models.InsertHostedModelCallOutcomes(tx, hostedModelCallInputs(tx, task, content))
+		}
 	}
 	switch {
 	case err == nil:
@@ -81,6 +86,22 @@ func (s *Server) uploadTaskLogChunk(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "failed to upload log chunk", http.StatusInternalServerError)
 	}
+}
+
+func hostedModelCallInputs(tx *gorm.DB, task *models.RunnerTask, content []byte) []models.HostedModelCallOutcomeInput {
+	execution, err := task.FindExecution(tx)
+	if err != nil {
+		return nil
+	}
+	component, err := execution.ComponentName(tx)
+	if err != nil || component == "" {
+		return nil
+	}
+	provider, ok := runneraction.HostedModelStatusProvider(component, execution.Configuration.Data())
+	if !ok {
+		return nil
+	}
+	return runneraction.TrustedHostedModelCallInputs(provider, models.ParseHostedModelCallLogChunk(task.ID.String(), content))
 }
 
 func writeLogUploadResponse(w http.ResponseWriter, stop bool) {

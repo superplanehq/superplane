@@ -41,6 +41,11 @@ func TestMatchHTTPRoute(t *testing.T) {
 			wantOK: false,
 		},
 		{
+			method: http.MethodGet,
+			path:   "/api/v1/me/model-status",
+			wantOK: false,
+		},
+		{
 			method: http.MethodPost,
 			path:   "/api/v1/me/feedback",
 			wantOK: false,

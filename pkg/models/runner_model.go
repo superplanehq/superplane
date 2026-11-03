@@ -109,22 +109,9 @@ func (t *RunnerTask) RequireModelPolicyAdmission(tx *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	component := execution.FrozenComponentName()
-	if component == "" {
-		run, err := FindCanvasRunInTransaction(tx, execution.WorkflowID, execution.RunID)
-		if err != nil {
-			return err
-		}
-		version, err := FindCanvasVersionInTransaction(tx, execution.WorkflowID, run.VersionID)
-		if err != nil {
-			return err
-		}
-		for _, node := range version.Nodes {
-			if node.ID == execution.NodeID {
-				component = node.ComponentName()
-				break
-			}
-		}
+	component, err := execution.ComponentName(tx)
+	if err != nil {
+		return err
 	}
 	model, _ := configuration["model"].(string)
 	if credentials["source"] == "integration" || credentials["source"] == "secret" {

@@ -114,6 +114,32 @@ func (e *CanvasNodeExecution) FrozenComponentName() string {
 	return strings.TrimSpace(name)
 }
 
+// ComponentName returns the component this execution runs.
+// A model-source switch stores that name on the execution.
+// Other executions use the component saved in the run version.
+func (e *CanvasNodeExecution) ComponentName(tx *gorm.DB) (string, error) {
+	if e == nil {
+		return "", nil
+	}
+	if name := e.FrozenComponentName(); name != "" {
+		return name, nil
+	}
+	run, err := FindCanvasRunInTransaction(tx, e.WorkflowID, e.RunID)
+	if err != nil {
+		return "", err
+	}
+	version, err := FindCanvasVersionInTransaction(tx, e.WorkflowID, run.VersionID)
+	if err != nil {
+		return "", err
+	}
+	for _, node := range version.Nodes {
+		if node.ID == e.NodeID {
+			return node.ComponentName(), nil
+		}
+	}
+	return "", nil
+}
+
 func (e *CanvasNodeExecution) ExistingTaskID() string {
 	id, _ := e.Metadata.Data()[CanvasNodeExecutionExistingTaskIDKey].(string)
 	return id
