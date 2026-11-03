@@ -154,6 +154,7 @@
     "trailingComma": "all"
   },
   "overrides": {
+    "minimatch@10": "11.0.4",
     "@joshwooding/vite-plugin-react-docgen-typescript": {
       "glob": "14.0.2"
     },
