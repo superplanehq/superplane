@@ -139,6 +139,48 @@ func TestFactoryCommitHookDropsOtherAgentTrailers(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(second, "Co-authored-by: André Calil <andre@superplane.com>"))
 }
 
+func TestFactoryRepoCommitSetupSignsAbsoluteGitAndRejectsUnsignedPush(t *testing.T) {
+	git, err := exec.LookPath("git")
+	require.NoError(t, err)
+	git, err = filepath.Abs(git)
+	require.NoError(t, err)
+
+	taskDir := t.TempDir()
+	repo := filepath.Join(taskDir, "repo")
+	remote := filepath.Join(taskDir, "origin.git")
+	env := append(withoutGitIdentity(os.Environ()), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	runGit(t, taskDir, git, env, "init", "--bare", remote)
+	initRepository(t, repo, env, "")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("seed\n"), 0o644))
+	runGit(t, repo, git, env, "add", "README")
+	runGit(t, repo, git, env, "commit", "-m", "seed")
+	runGit(t, repo, git, env, "remote", "add", "origin", remote)
+	runGit(t, repo, git, env, "push", "-u", "origin", "main")
+
+	command := exec.Command("bash", "-c", runner.FactoryRepoCommitSetup())
+	command.Dir, command.Env = repo, env
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, string(output))
+	assert.NotEmpty(t, strings.TrimSpace(runGit(t, repo, git, env, "config", "--local", "--get", "core.hooksPath")))
+
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("signed\n"), 0o644))
+	runGit(t, repo, git, env, "commit", "-am", "signed")
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ae"))
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ce"))
+	assert.Contains(t, gitShow(t, repo, env, "%B"), "Signed-off-by: SuperPlane Agent <"+runner.FactoryAgentEmail+">")
+	runGit(t, repo, git, env, "push", "origin", "main")
+
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("unsigned\n"), 0o644))
+	runGit(t, repo, git, env, "-c", "core.hooksPath=/dev/null", "commit", "-am", "unsigned")
+	push := exec.Command(git, "push", "origin", "main")
+	push.Dir, push.Env = repo, env
+	output, err = push.CombinedOutput()
+	require.Error(t, err, string(output))
+	assert.Contains(t, string(output), "Unsigned commit")
+	assert.NotEqual(t, strings.TrimSpace(runGit(t, repo, git, env, "rev-parse", "HEAD")),
+		strings.TrimSpace(runGit(t, remote, git, env, "rev-parse", "refs/heads/main")))
+}
+
 func TestFactoryGitWrapperForcesIdentityOnCommitAndMerge(t *testing.T) {
 	taskDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(taskDir, "bin"), 0o755))
