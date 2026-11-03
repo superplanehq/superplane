@@ -411,7 +411,7 @@ func TestPullRequestImportBitbucket(t *testing.T) {
 
 // Imported Bitbucket PRs have no new provider event to start Merge confidence.
 func TestBitbucketImportStartsMergeConfidence(t *testing.T) {
-	for _, scenario := range []string{"open", "retry", "draft", "closed", "missing revision"} {
+	for _, scenario := range []string{"open", "retry", "draft", "closed", "missing revision", "legacy webhook", "keyed legacy webhook"} {
 		t.Run(scenario, func(t *testing.T) {
 			r := support.Setup(t)
 			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
@@ -487,6 +487,17 @@ func TestBitbucketImportStartsMergeConfidence(t *testing.T) {
 			assert.Equal(t, "contributor", view["user"].(map[string]any)["login"])
 			source := payload["pullrequest"].(map[string]any)["source"].(map[string]any)
 			assert.Equal(t, "contributor/app", source["repository"].(map[string]any)["full_name"])
+			if scenario == "legacy webhook" || scenario == "keyed legacy webhook" {
+				// Older events keep the timestamp only in pullrequest.updated_on.
+				delete(view, "updated_at")
+				if scenario == "legacy webhook" {
+					events[0].DedupKey = nil
+				}
+				events[0].State = models.CanvasEventStateRouted
+				require.NoError(t, db.Save(&events[0]).Error)
+				require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", events[0].RunID).
+					Update("state", models.CanvasRunStateFinished).Error)
+			}
 			// Delayed provider delivery and repeated import must not start a second run.
 			node, err := models.FindCanvasNode(db, canvas.ID, "renamed-pr-trigger")
 			require.NoError(t, err)
@@ -510,13 +521,16 @@ func TestBitbucketImportStartsMergeConfidence(t *testing.T) {
 			require.NoError(t, err)
 			assert.False(t, again.Created)
 			assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
-			if scenario == "open" {
+			if scenario == "open" || scenario == "legacy webhook" || scenario == "keyed legacy webhook" {
 				// A later Bitbucket update at the same head still needs a new review.
 				updated := strings.Replace(current, updatedAt.Format(time.RFC3339), updatedAt.Add(time.Minute).Format(time.RFC3339), 1)
+				updated = strings.Replace(updated, "Review refunds", "Review updated refunds", 1)
 				emitWebhook("updated", updated)
 				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
 				emitWebhook("updated", updated)
 				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
+				emitWebhook("updated", current)
+				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID), "an older snapshot must remain a duplicate")
 				emitWebhook("updated", strings.ReplaceAll(updated, "def456", "fedcba"))
 				assert.EqualValues(t, 3, countCanvasEvents(t, canvas.ID))
 			}

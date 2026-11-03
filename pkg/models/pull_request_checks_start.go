@@ -234,6 +234,7 @@ func repairLegacyChecksDedupKeys(tx *gorm.DB, node *CanvasNode, key string, inco
 
 func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 	var payload struct {
+		Type string `json:"type"`
 		Data struct {
 			Action     string `json:"action"`
 			Before     string `json:"before"`
@@ -247,6 +248,9 @@ func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 					SHA string `json:"sha"`
 				} `json:"head"`
 			} `json:"pull_request"`
+			BitbucketPullRequest struct {
+				UpdatedOn string `json:"updated_on"`
+			} `json:"pullrequest"`
 		} `json:"data"`
 	}
 	raw, err := event.Data.MarshalJSON()
@@ -262,6 +266,10 @@ func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 		return checksEventIdentity{}, errors.New("pull request checks event has no repository, PR number, or head SHA")
 	}
 	updatedAt, hasUpdatedAt := parseChecksUpdatedAt(payload.Data.PullRequest.UpdatedAt)
+	if !hasUpdatedAt && payload.Type == "bitbucket.pullRequest" {
+		// Older Bitbucket events keep only the provider's original timestamp.
+		updatedAt, hasUpdatedAt = parseChecksUpdatedAt(payload.Data.BitbucketPullRequest.UpdatedOn)
+	}
 	return checksEventIdentity{
 		repository:   repository,
 		number:       strconv.FormatInt(payload.Data.PullRequest.Number, 10),
