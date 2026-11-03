@@ -599,6 +599,7 @@ func (p *CanvasPublisher) triggerContext(ctx context.Context, node *models.Canva
 		Events:        contexts.NewEventContext(p.tx, node, nil, nil),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
+		Factory:       p.factoryContext(),
 	}
 
 	if node.AppInstallationID != nil {
@@ -622,6 +623,13 @@ func (p *CanvasPublisher) triggerContext(ctx context.Context, node *models.Canva
 	return triggerCtx, nil
 }
 
+func (p *CanvasPublisher) factoryContext() core.FactoryContext {
+	if p.canvas == nil || p.canvas.FactoryID == nil {
+		return nil
+	}
+	return contexts.NewFactoryContext(p.tx, p.canvas, nil)
+}
+
 func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNode) error {
 	ref := node.Ref.Data()
 	action, err := p.options.Registry.GetAction(ref.Component.Name)
@@ -638,6 +646,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
 		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
+		Factory:       p.factoryContext(),
 	}
 
 	if node.AppInstallationID != nil {

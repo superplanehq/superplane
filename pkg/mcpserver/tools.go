@@ -137,7 +137,7 @@ func Tools() []Tool {
 		},
 		{
 			Name:        "hand_off_task",
-			Description: "Create an open task from this MCP client and move it to Implement or Verify. Store plan as the spec the implement agent reads. Implement starts the implementation stage. Verify tracks an open pull request and does not start an agent. It does not wait for an agent.",
+			Description: "Create an open task from this MCP client and move it to Implement or Verify. Store plan as the spec the implement agent reads. Implement starts the implementation stage. Verify tracks one or more open pull requests and does not start an agent. Each pull request must be in a workspace repository. It does not wait for an agent.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -145,8 +145,13 @@ func Tools() []Tool {
 					"description":      map[string]any{"type": "string", "description": "Task description in markdown."},
 					"plan":             map[string]any{"type": "string", "description": "Implementation plan stored as the task spec."},
 					"column":           map[string]any{"type": "string", "enum": []string{"implement", "verify"}, "description": "Board column to hand the task to."},
-					"pull_request_url": map[string]any{"type": "string", "description": "Open pull request URL (GitHub or Bitbucket). Required when column is verify."},
-					"line":             map[string]any{"type": "string", "description": "Line name. Required when the workspace has more than one line."},
+					"pull_request_url": map[string]any{"type": "string", "description": "Open pull request URL (GitHub or Bitbucket). Verify needs this value or pull_request_urls."},
+					"pull_request_urls": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string"},
+						"description": "Open pull request URLs, one for each changed workspace repository. Use this when the change has more than one pull request.",
+					},
+					"line": map[string]any{"type": "string", "description": "Line name. Required when the workspace has more than one line."},
 				},
 				"required": []string{"title", "plan", "column"},
 			},
@@ -512,19 +517,24 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	}
 	description, _ := args["description"].(string)
 	pullRequestURL, _ := args["pull_request_url"].(string)
+	pullRequestURLs, err := optionalStringListArg(args, "pull_request_urls")
+	if err != nil {
+		return ToolResult{}, err
+	}
 	line, _ := args["line"].(string)
 
 	clientName := ClientDisplayName(database.DB(ctx), claims.ClientID)
 	result, err := factories.HandOffWorkOrder(toolContext(ctx, claims), rt.Intake, claims.OrgID.String(), factories.HandOffWorkOrderRequest{
-		FactoryID:      factory.ID.String(),
-		Title:          title,
-		Description:    strings.TrimSpace(description),
-		Plan:           plan,
-		Column:         column,
-		PullRequestURL: strings.TrimSpace(pullRequestURL),
-		LineName:       strings.TrimSpace(line),
-		MCPClientID:    claims.ClientID,
-		MCPClientName:  clientName,
+		FactoryID:       factory.ID.String(),
+		Title:           title,
+		Description:     strings.TrimSpace(description),
+		Plan:            plan,
+		Column:          column,
+		PullRequestURL:  strings.TrimSpace(pullRequestURL),
+		PullRequestURLs: pullRequestURLs,
+		LineName:        strings.TrimSpace(line),
+		MCPClientID:     claims.ClientID,
+		MCPClientName:   clientName,
 	})
 	if err != nil {
 		return ToolResult{}, actionError(err)
@@ -539,10 +549,18 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 		"url":    links.url(order.GetNumber()),
 	}
 	if pending := order.GetPendingHandoff(); pending != nil {
-		payload["pending_handoff"] = map[string]any{"line_id": pending.GetLineId(), "column": pending.GetColumn(), "pull_request_url": pending.GetPullRequestUrl()}
+		payload["pending_handoff"] = map[string]any{
+			"line_id":           pending.GetLineId(),
+			"column":            pending.GetColumn(),
+			"pull_request_url":  pending.GetPullRequestUrl(),
+			"pull_request_urls": pending.GetPullRequestUrls(),
+		}
 	}
 	if result.PullRequestURL != "" {
 		payload["pull_request_url"] = result.PullRequestURL
+	}
+	if len(result.PullRequestURLs) > 0 {
+		payload["pull_request_urls"] = result.PullRequestURLs
 	}
 	return TextResult(mustJSON(payload)), nil
 }
@@ -685,6 +703,26 @@ func optionalStringArg(args map[string]any, name string) (string, error) {
 		return "", ToolError(name + " must be text.")
 	}
 	return strings.TrimSpace(value), nil
+}
+
+func optionalStringListArg(args map[string]any, name string) ([]string, error) {
+	raw, ok := args[name]
+	if !ok || raw == nil {
+		return nil, nil
+	}
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, ToolError(name + " must be a list of text values.")
+	}
+	values := make([]string, 0, len(items))
+	for _, item := range items {
+		value, ok := item.(string)
+		if !ok {
+			return nil, ToolError(name + " must be a list of text values.")
+		}
+		values = append(values, strings.TrimSpace(value))
+	}
+	return values, nil
 }
 
 func optionalBoolArg(args map[string]any, name string) (bool, error) {

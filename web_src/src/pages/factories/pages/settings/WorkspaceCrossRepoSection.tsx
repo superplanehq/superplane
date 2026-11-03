@@ -149,7 +149,9 @@ export function CrossRepoContextCard({
       <FactorySettingsCard
         title={AGENT_RESOURCES_COPY.crossRepoTitle}
         titleClassName="text-sm font-semibold"
-        description={AGENT_RESOURCES_COPY.crossRepoHelper}
+        description={
+          choices.bitbucket ? AGENT_RESOURCES_COPY.crossRepoHelperReadOnly : AGENT_RESOURCES_COPY.crossRepoHelper
+        }
         icon={<GitBranch className="size-4" strokeWidth={1.75} aria-hidden />}
         iconClassName="border-border bg-muted/60 text-foreground"
         className="shadow-sm"
@@ -186,7 +188,11 @@ export function CrossRepoContextCard({
         <DialogContent className="p-8 sm:max-w-2xl" data-testid="agent-cross-repo-picker">
           <DialogHeader>
             <DialogTitle>{AGENT_RESOURCES_COPY.addRepository}</DialogTitle>
-            <DialogDescription>{AGENT_RESOURCES_COPY.crossRepoDialogHelper}</DialogDescription>
+            <DialogDescription>
+              {choices.bitbucket
+                ? AGENT_RESOURCES_COPY.crossRepoDialogHelperReadOnly
+                : AGENT_RESOURCES_COPY.crossRepoDialogHelper}
+            </DialogDescription>
           </DialogHeader>
           <RepositoryChoice
             organizationId={organizationId}
