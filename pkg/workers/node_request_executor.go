@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -65,6 +66,19 @@ func (e *NodeRequestExecutor) execute(
 	lockRequest func(*gorm.DB, uuid.UUID) (*models.CanvasNodeRequest, error),
 ) error {
 	defer e.publishExecution(request)
+	if request.Type == models.NodeRequestTypeInvokeAction && request.Spec.Data().InvokeAction != nil &&
+		request.Spec.Data().InvokeAction.ActionName == factorycomponent.PublishMergeConfidenceHook {
+		events, err := factoryactions.ProcessMergeConfidencePublicationRequest(context.Background(), e.factoryIntakeDeps(), request.ID, lockRequest)
+		if err != nil {
+			return err
+		}
+		for i := range events {
+			if err := messages.PublishCanvasEventCreatedMessage(&events[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 
 	if request.Type == models.NodeRequestTypePullRequestChecksStart {
 		events, err := factoryactions.ProcessPullRequestChecksStartRequest(context.Background(), e.factoryIntakeDeps(), request.ID)
