@@ -166,37 +166,52 @@ func (f *importSearchGitHub) SearchIssues(_ context.Context, query string, opts 
 	assert.Equal(f.t, f.query, query)
 	assert.Equal(f.t, 50, opts.PerPage)
 	return &github.IssuesSearchResult{Issues: []*github.Issue{
-		{Number: github.Ptr(42), Title: github.Ptr("Ready"), State: github.Ptr("open"), HTMLURL: github.Ptr("https://github.com/acme/app/pull/42"), Draft: github.Ptr(true), PullRequestLinks: &github.PullRequestLinks{}},
+		{Number: github.Ptr(42), Title: github.Ptr("Ready"), State: github.Ptr("open"), HTMLURL: f.pullRequest.HTMLURL, Draft: github.Ptr(true), PullRequestLinks: &github.PullRequestLinks{}},
 		{Number: github.Ptr(43), Title: github.Ptr("Wrong repository"), State: github.Ptr("open"), HTMLURL: github.Ptr("https://github.com/other/app/pull/43"), PullRequestLinks: &github.PullRequestLinks{}},
 	}}, nil, nil
 }
 
 func TestSearchFactoryPullRequestImportItemsGitHub(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
-	pr := openHandOffPullRequest("acme/app", 42, "branch")
-	pr.Draft = github.Ptr(true)
-	fake := &importSearchGitHub{fakeFactoryGitHub: &fakeFactoryGitHub{pullRequest: pr}, t: t, query: `repo:acme/app is:pr is:open in:title "fix \" repo:other/app"`}
-	original := newFactoryGitHubAPI
-	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) { return fake, nil }
-	t.Cleanup(func() { newFactoryGitHubAPI = original })
-	for _, query := range []string{"", "42", "#42", pr.GetHTMLURL(), `fix " repo:other/app`} {
-		t.Run(query, func(t *testing.T) {
-			limit := int32(0)
-			if strings.HasPrefix(query, "fix") {
-				limit = 100
-			}
-			result, err := SearchFactoryPullRequestImportItems(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String(), Query: query, Limit: limit})
+	for _, host := range []string{"github.com", "acme.ghe.com"} {
+		t.Run(host, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory := seedHandOffFactory(t, r, db)
+			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{"host": host})
 			require.NoError(t, err)
-			require.Len(t, result.Items, 1)
-			assert.True(t, result.Items[0].Draft)
-			assert.Equal(t, pr.GetHTMLURL(), result.Items[0].Url)
+			vcsID := integration.ID.String()
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
+			pr := openHandOffPullRequest("acme/app", 42, "branch")
+			pr.HTMLURL = github.Ptr("https://" + host + "/ACME/App/pull/42?diff=split#files")
+			pr.Draft = github.Ptr(true)
+			fake := &importSearchGitHub{fakeFactoryGitHub: &fakeFactoryGitHub{pullRequest: pr}, t: t, query: `repo:acme/app is:pr is:open in:title "fix \" repo:other/app"`}
+			original := newFactoryGitHubAPI
+			newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) { return fake, nil }
+			t.Cleanup(func() { newFactoryGitHubAPI = original })
+			for _, query := range []string{"", "42", "#42", pr.GetHTMLURL(), `fix " repo:other/app`} {
+				t.Run(query, func(t *testing.T) {
+					limit := int32(0)
+					if strings.HasPrefix(query, "fix") {
+						limit = 100
+					}
+					result, err := SearchFactoryPullRequestImportItems(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String(), Query: query, Limit: limit})
+					require.NoError(t, err)
+					require.Len(t, result.Items, 1)
+					assert.True(t, result.Items[0].Draft)
+					assert.Equal(t, pr.GetHTMLURL(), result.Items[0].Url)
+				})
+			}
+			for _, rawURL := range []string{"https://" + host + "/other/app/pull/42", "https://other.ghe.com/acme/app/pull/42"} {
+				t.Run("reject "+rawURL, func(t *testing.T) {
+					_, err := SearchFactoryPullRequestImportItems(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String(), Query: rawURL})
+					code, _, ok := grpcerrors.HandlerStatus(err)
+					require.True(t, ok)
+					assert.Equal(t, codes.InvalidArgument, code)
+				})
+			}
 		})
 	}
-	_, err := SearchFactoryPullRequestImportItems(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String(), Query: "https://github.com/other/app/pull/42"})
-	require.Error(t, err)
 }
 
 func TestSearchFactoryPullRequestImportItemsBatchesExistingTasks(t *testing.T) {
