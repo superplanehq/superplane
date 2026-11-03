@@ -141,6 +141,21 @@ func Test__IntakeTriggerBinding(t *testing.T) {
 	assert.Equal(t, "payments", graph.TriggerResourceID(spec))
 }
 
+func TestSentryIntakeConnectionBindsEnrichment(t *testing.T) {
+	nodes := []models.Node{
+		triggerNode(intakeTriggerNodeID, "sentry.onIssue"),
+		componentNode(intakeEnrichIssueNodeID, intakeEnrichIssueComponent),
+		componentNode(intakeCreateNodeID, intakeCreateComponent),
+	}
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, models.LiveCanvasSpec{Nodes: nodes})
+	updated, err := applyIntakeBindingToGraph(graph, &intakeBinding{
+		Integration: &yaml.IntegrationRef{ID: "new-sentry"},
+	}, nodes)
+	require.NoError(t, err)
+	assert.Equal(t, "new-sentry", *findModelNode(t, updated, intakeTriggerNodeID).IntegrationID)
+	assert.Equal(t, "new-sentry", *findModelNode(t, updated, intakeEnrichIssueNodeID).IntegrationID)
+}
+
 func Test__IntakeTriggerBinding_DatadogService(t *testing.T) {
 	integrationID := "int-ready"
 	node := triggerNode(intakeTriggerNodeID, "datadog.onErrorTrackingAlert")

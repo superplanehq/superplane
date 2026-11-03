@@ -415,7 +415,11 @@ func applyIntakeBindingToGraph(
 
 	boundID := binding.integrationRef().ID
 	for i := range nodes {
-		if nodes[i].ID != graph.TriggerNodeID {
+		if nodes[i].ID != graph.TriggerNodeID && nodes[i].ID != graph.EnrichIssueNodeID {
+			continue
+		}
+		if nodes[i].ID == graph.EnrichIssueNodeID {
+			nodes[i].IntegrationID = &boundID
 			continue
 		}
 		configuration := maps.Clone(nodes[i].Configuration)

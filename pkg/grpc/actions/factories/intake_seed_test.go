@@ -432,7 +432,7 @@ func Test__SentryIssueEvents(t *testing.T) {
 		{ID: "2", Title: "Older null pointer", LastSeen: now.Add(-time.Hour).Format(time.RFC3339)},
 	}
 
-	events := sentryIssueEvents(nil, issues)
+	events := sentryIssueEvents(issues)
 	require.Len(t, events, 2)
 	assert.Equal(t, "created", events[0]["action"])
 	assert.Equal(t, "issue", events[0]["resource"])
@@ -510,7 +510,7 @@ func Test__SentrySeedSkipsKnownIssues(t *testing.T) {
 		Title:     "Queued timeout",
 		Permalink: "https://acme.sentry.io/issues/44/",
 	}}
-	first, err := seedKnownSentryIssues(tx, canvasID, nil, queued)
+	first, err := seedKnownSentryIssues(tx, canvasID, queued)
 	require.NoError(t, err)
 	assert.Equal(t, 1, first.itemCount)
 
@@ -518,7 +518,7 @@ func Test__SentrySeedSkipsKnownIssues(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, before, 1)
 
-	result, err := seedKnownSentryIssues(tx, canvasID, nil, []sentry.Issue{
+	result, err := seedKnownSentryIssues(tx, canvasID, []sentry.Issue{
 		{ID: "11", Title: "Draft timeout", Permalink: "https://acme.sentry.io/issues/11/"},
 		{ID: "22", Title: "Closed timeout", Permalink: "https://acme.sentry.io/issues/22/"},
 		{ID: "33", Title: "Archived timeout", Permalink: "https://acme.sentry.io/issues/33/"},
@@ -540,7 +540,7 @@ func Test__SentrySeedSkipsKnownIssues(t *testing.T) {
 	}
 	assert.Equal(t, map[string]bool{"44": true, "55": true}, freshIDs)
 
-	repeat, err := seedKnownSentryIssues(tx, canvasID, nil, []sentry.Issue{
+	repeat, err := seedKnownSentryIssues(tx, canvasID, []sentry.Issue{
 		{ID: "11", Title: "Draft timeout"},
 		{ID: "22", Title: "Closed timeout"},
 		{ID: "33", Title: "Archived timeout"},

@@ -311,6 +311,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   "github.onIssue": { title: "On Issue", iconSlug: "github" },
   "github.onPullRequest": { title: "On Pull Request", iconSlug: "github" },
   "sentry.onIssue": { title: "On Issue", iconSlug: "bug", iconSrc: sentryIcon },
+  "sentry.enrichIssue": { title: "Enrich Issue", iconSlug: "bug", iconSrc: sentryIcon },
   "slack.onAppMention": { title: "On Mention", iconSlug: "slack", iconSrc: slackIcon },
   "pagerduty.onIncident": { title: "On Incident", iconSlug: "pagerduty" },
   findWorkOrder: { title: "Find Task", iconSlug: "factory" },

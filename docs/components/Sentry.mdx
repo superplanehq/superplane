@@ -19,6 +19,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Deploy" href="#create-deploy" description="Mark a deploy against an existing Sentry release" />
   <LinkCard title="Create Release" href="#create-release" description="Register a new release in Sentry after a deploy or build step" />
   <LinkCard title="Delete Alert" href="#delete-alert" description="Delete a Sentry metric alert rule" />
+  <LinkCard title="Enrich Issue" href="#enrich-issue" description="Fetch issue details and a stack trace from Sentry" />
   <LinkCard title="Get Alert" href="#get-alert" description="Retrieve a Sentry metric alert rule with its thresholds, projects, and actions" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Sentry issue with tags, frequency, assignee, and recent events" />
   <LinkCard title="Link GitHub Issue" href="#link-git-hub-issue" description="Link an existing GitHub issue to a Sentry issue through the Sentry GitHub integration" />
@@ -63,7 +64,7 @@ The On Issue Event trigger starts a workflow execution when Sentry sends issue w
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
 - **data.issue**: the Sentry issue object from the webhook
-- **description**: Markdown of the Sentry issue and preferred event (event link, highlights, message, stack, request, user, tags, contexts, breadcrumbs). SuperPlane fetches this from the Sentry API. Use this instead of interpolating `data.issue`, which renders as a Go map
+- **description**: A basic Markdown description built from the webhook issue. Add Enrich Issue after any filters when a workflow needs the issue details and stack trace
 - **actor**: the user or team that triggered the event when available
 
 ### Setup
@@ -342,6 +343,34 @@ Returns the deleted alert ID and name so downstream steps can record the removal
   },
   "timestamp": "2026-03-26T09:25:00Z",
   "type": "sentry.alertDeleted"
+}
+```
+
+<a id="enrich-issue"></a>
+
+## Enrich Issue
+
+**Component key:** `sentry.enrichIssue`
+
+Enrich Issue fetches the latest issue details and a preferred event from Sentry. Add it after filters so rejected issues do not make API requests.
+
+### Configuration
+
+- **Issue**: The issue object from On Issue Event, usually `{{ root().data.data.issue }}`
+
+### Output
+
+- **description**: Markdown with the issue link, details, and available event data. If Sentry is unavailable, the action uses the original issue object and continues.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "description": "[View in Sentry](https://sentry.io/issues/123/)"
+  },
+  "timestamp": "2026-04-22T10:05:00Z",
+  "type": "sentry.enrichedIssue"
 }
 ```
 
