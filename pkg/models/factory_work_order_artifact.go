@@ -463,7 +463,7 @@ func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
 
 func (o *FactoryWorkOrder) findArtifactToRemove(tx *gorm.DB, key, title string) (*FactoryWorkOrderArtifact, error) {
 	if key != "" {
-		return o.FindArtifactByDisplayKey(tx, key)
+		return o.FindArtifactByKey(tx, key)
 	}
 	return o.findNewestUnkeyedArtifactByTitle(tx, title)
 }
