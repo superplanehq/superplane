@@ -234,6 +234,39 @@ If Connect cannot create the app, confirm `BASE_URL` and
 CI sets dummy GitHub App values so factory E2E can skip create-app.
 Local `make test.e2e` needs the same dummy values or a real app.
 
+## Merge confidence publication
+
+Merge confidence publishes terminal run results to the PR description.
+Existing automations use this behavior without a template reset.
+The consumer starts when `START_CONSUMERS=yes` and
+`START_REGULAR_WORKERS` is not `no`.
+
+The worker process needs `BASE_URL`, database and RabbitMQ access, and
+`ENCRYPTION_MASTER_KEYS` for the workspace integration credentials.
+GitHub requires pull request write permission. Bitbucket requires pull request
+write access, or the equivalent API token or Forge scope.
+The runner does not publish descriptions and needs no additional credentials.
+
+Local Docker Compose supplies these dependencies to the app process.
+The repository Helm chart supplies database, RabbitMQ, encryption, and base URL
+configuration to workers. Self-hosted GitHub Apps use the encrypted installation
+record. Hosted GitHub Apps also require these keys on API and worker processes:
+
+- `SUPERPLANE_GITHUB_APP_ID`
+- `SUPERPLANE_GITHUB_APP_SLUG`
+- `SUPERPLANE_GITHUB_APP_PRIVATE_KEY`
+- `SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET`
+
+For Helm, put hosted GitHub App keys in the existing
+`authentication.secretName` Secret. Both API and worker pods load that Secret.
+Do not put credential values in chart files.
+
+Bitbucket Forge uses the shared encrypted installation token in the database.
+API and worker processes must use the same encryption keys.
+Verify hosted chart values and Secret references before worker rollout.
+API-only credential configuration does not configure workers.
+No migration or runner rollout is required for description publication.
+
 ## Bitbucket Forge local development
 
 Create a separate Forge app for your local instance. Keep the shared manifest unchanged when you configure your app and tunnel.

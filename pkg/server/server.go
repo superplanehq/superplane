@@ -178,6 +178,8 @@ func startWorkers(
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
 		startFactorySentryResolveConsumer(rabbitMQURL, encryptor, registry)
 		startFactoryJiraCloseConsumer(rabbitMQURL, encryptor, registry, baseURL)
+		mergeConfidence := workers.NewMergeConfidencePublicationConsumer(rabbitMQURL, encryptor, registry, baseURL)
+		go mergeConfidence.Start()
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
