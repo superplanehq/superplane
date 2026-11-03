@@ -78,17 +78,20 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	}
 
 	created := true
+	mergeConfidenceScope, mergeConfidenceKey := "", ""
 	if dedupKey == "" {
+		mergeConfidenceScope, mergeConfidenceKey = mergeConfidenceWebhookDedupKey(s.node, payloadType, payload)
+	}
+	if dedupKey == "" && mergeConfidenceKey == "" {
 		var suppress bool
-		dedupKey = mergeConfidenceWebhookDedupKey(s.node, payloadType, payload)
-		if dedupKey == "" {
-			dedupKey, suppress = customAutomationWebhookPolicy(s.tx, s.node, payloadType, payload)
-		}
+		dedupKey, suppress = customAutomationWebhookPolicy(s.tx, s.node, payloadType, payload)
 		if suppress {
 			return nil
 		}
 	}
-	if dedupKey != "" && s.run == nil {
+	if mergeConfidenceKey != "" && s.run == nil {
+		created, err = s.node.CreateRootEventUnlessLatestDedupKey(s.tx, &event, mergeConfidenceScope, mergeConfidenceKey)
+	} else if dedupKey != "" && s.run == nil {
 		created, err = s.node.CreateDeduplicatedRootEvent(s.tx, &event, dedupKey)
 	} else if payloadType == "github.pullRequest" && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.Ref.Data().Trigger != nil && s.node.Ref.Data().Trigger.Name == "github.onPullRequest" {
 		created, err = s.node.CreateGitHubChecksEvent(s.tx, &event)
@@ -120,20 +123,23 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	return nil
 }
 
-// Bitbucket emits PR updates for description edits. Deduplicate automatic
-// merge confidence starts per head so publishing a result cannot start a loop.
+// Bitbucket emits PR updates for description edits. Skip an automatic merge
+// confidence start when the newest start for the PR has the same head and
+// destination branch, so publishing a result cannot start a loop. A retargeted
+// PR gets a new assessment, also when it returns to an earlier destination.
 // Explicit reruns use a different payload type and remain available.
-func mergeConfidenceWebhookDedupKey(node *models.CanvasNode, payloadType string, payload any) string {
+// It returns the per-PR scope and the key for the assessed diff.
+func mergeConfidenceWebhookDedupKey(node *models.CanvasNode, payloadType string, payload any) (string, string) {
 	if node == nil || node.Type != models.NodeTypeTrigger || payloadType != "bitbucket.pullRequest" {
-		return ""
+		return "", ""
 	}
 	template, _ := node.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
 	if template["id"] != "risk-score" {
-		return ""
+		return "", ""
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	var identity struct {
 		PullRequest struct {
@@ -143,15 +149,20 @@ func mergeConfidenceWebhookDedupKey(node *models.CanvasNode, payloadType string,
 			Head struct {
 				SHA string `json:"sha"`
 			} `json:"head"`
+			Base struct {
+				Ref string `json:"ref"`
+			} `json:"base"`
 		} `json:"pull_request"`
 	}
 	if err := json.Unmarshal(raw, &identity); err != nil {
-		return ""
+		return "", ""
 	}
 	if identity.PullRequest.ID == "" || identity.View.Head.SHA == "" {
-		return ""
+		return "", ""
 	}
-	return "merge-confidence:" + identity.PullRequest.ID + ":" + identity.View.Head.SHA
+	// Git ref names cannot contain ":", so the key parts stay unambiguous.
+	scope := "merge-confidence:" + identity.PullRequest.ID + ":"
+	return scope, scope + identity.View.Head.SHA + ":" + identity.View.Base.Ref
 }
 
 func customAutomationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (string, bool) {

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -94,6 +95,45 @@ func (n *CanvasNode) CreateDeduplicatedRootEvent(tx *gorm.DB, event *CanvasEvent
 			return err
 		}
 		if count > 0 {
+			return nil
+		}
+		if err := inner.Create(event).Error; err != nil {
+			return err
+		}
+		created = true
+		return nil
+	})
+	return created, err
+}
+
+// CreateRootEventUnlessLatestDedupKey creates a root event unless the newest
+// root event in the same dedup scope already has the key. Unlike
+// CreateDeduplicatedRootEvent, an older key starts again after a different key
+// in the scope, for example when a pull request returns to an earlier target.
+func (n *CanvasNode) CreateRootEventUnlessLatestDedupKey(tx *gorm.DB, event *CanvasEvent, scope, key string) (bool, error) {
+	if scope == "" || !strings.HasPrefix(key, scope) {
+		return false, fmt.Errorf("dedup key %q is not in scope %q", key, scope)
+	}
+
+	event.DedupKey = &key
+	created := false
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		lockKey := "canvas-event-scope:" + n.WorkflowID.String() + ":" + n.NodeID + ":" + scope
+		if err := inner.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+			return err
+		}
+
+		var latest []string
+		err := inner.Model(&CanvasEvent{}).
+			Where("workflow_id = ? AND node_id = ? AND dedup_key IS NOT NULL", n.WorkflowID, n.NodeID).
+			Where("left(dedup_key, ?) = ?", len([]rune(scope)), scope).
+			Order("created_at DESC, id DESC").
+			Limit(1).
+			Pluck("dedup_key", &latest).Error
+		if err != nil {
+			return err
+		}
+		if len(latest) > 0 && latest[0] == key {
 			return nil
 		}
 		if err := inner.Create(event).Error; err != nil {

@@ -20,18 +20,29 @@ func TestBitbucketMergeConfidenceDoesNotRestartOnDescriptionUpdates(t *testing.T
 		Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata("risk-score", 1)),
 	}}, nil)
 	events := NewEventContext(db, &nodes[0], nil, nil)
-	for _, revision := range []string{"abc", "abc", "next"} {
+	emit := func(revision, base string) int64 {
+		t.Helper()
 		require.NoError(t, events.Emit("bitbucket.pullRequest", map[string]any{
-			"pullRequest":  map[string]any{"id": "tracked-pr"},
-			"pull_request": map[string]any{"head": map[string]any{"sha": revision}},
-			"pullrequest":  map[string]any{"description": "Updated merge confidence section"},
+			"pullRequest": map[string]any{"id": "tracked-pr"},
+			"pull_request": map[string]any{
+				"head": map[string]any{"sha": revision},
+				"base": map[string]any{"ref": base},
+			},
+			"pullrequest": map[string]any{"description": "Updated merge confidence section"},
 		}))
+		var count int64
+		require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&count).Error)
+		return count
 	}
-	var count int64
-	require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&count).Error)
-	assert.EqualValues(t, 2, count, "publication must not start an assessment for the same head")
+	assert.EqualValues(t, 1, emit("abc", "main"))
+	assert.EqualValues(t, 1, emit("abc", "main"), "publication must not start an assessment for the same diff")
+	assert.EqualValues(t, 2, emit("next", "main"), "a new head starts an assessment")
+	assert.EqualValues(t, 3, emit("next", "develop"), "a retargeted PR starts an assessment")
+	assert.EqualValues(t, 3, emit("next", "develop"))
+	assert.EqualValues(t, 4, emit("next", "main"), "a return to an earlier target starts an assessment")
 	// An explicit rerun bypasses webhook deduplication.
 	require.NoError(t, events.Emit("factory.mergeConfidence", map[string]any{}))
+	var count int64
 	require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&count).Error)
-	assert.EqualValues(t, 3, count)
+	assert.EqualValues(t, 5, count)
 }
