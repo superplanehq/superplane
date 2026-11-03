@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -322,6 +323,81 @@ func TestPullRequestChecksStartupRecovery(t *testing.T) {
 			assert.Equal(t, api.pullRequest.GetHead().GetSHA(), payload["pull_request"].(map[string]any)["head"].(map[string]any)["sha"])
 			_, err = ProcessPullRequestChecksStartRequest(t.Context(), IntakeDependencies{}, saved.ID)
 			require.NoError(t, err)
+			assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
+		})
+	}
+}
+
+func TestPullRequestChecksStartupSkipsReimportedPullRequest(t *testing.T) {
+	for _, mergeConfidence := range []bool{false, true} {
+		t.Run(fmt.Sprintf("merge confidence %t", mergeConfidence), func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, order, pullRequest, canvas, request := pullRequestStartupFixture(t, r, mergeConfidence)
+			arrivals := make(chan struct{}, 1)
+			release := make(chan struct{})
+			resume := sync.OnceFunc(func() { close(release) })
+			stubFactoryGitHub(t, &concurrentImportGitHub{
+				fakeFactoryGitHub: &fakeFactoryGitHub{pullRequest: checksStartupGitHubPullRequest()},
+				arrivals:          arrivals,
+				release:           release,
+			})
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			type outcome struct {
+				events []models.CanvasEvent
+				err    error
+			}
+			outcomes := make(chan outcome, 1)
+			finished := make(chan struct{})
+			go func() {
+				defer close(finished)
+				events, err := ProcessPullRequestChecksStartRequest(ctx, IntakeDependencies{}, request.ID)
+				outcomes <- outcome{events, err}
+			}()
+			t.Cleanup(func() {
+				cancel()
+				resume()
+				<-finished
+			})
+			select {
+			case <-arrivals:
+			case <-ctx.Done():
+				t.Fatal("checks startup did not reach provider lookup")
+			}
+
+			_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultArchived, Actor: &r.User})
+			require.NoError(t, err)
+			var replacement *models.FactoryPullRequest
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				if err := factory.ReleaseArchivedPullRequest(tx, models.FactoryPullRequestLookup{ID: pullRequest.ID}); err != nil {
+					return err
+				}
+				newOrder, err := factory.CreateWorkOrder(tx, "Review again", "", &r.User, nil, nil)
+				if err != nil {
+					return err
+				}
+				replacement, err = newOrder.CreatePullRequest(tx, models.FactoryPullRequestParams{URL: pullRequest.URL})
+				return err
+			}))
+			resume()
+			result := <-outcomes
+			require.NoError(t, result.err)
+			assert.Len(t, result.events, 0)
+			assert.Zero(t, countCanvasEvents(t, canvas.ID), "the archived import must not start a review")
+			saved, err := models.FindCanvasNodeRequest(db, request.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.NodeExecutionRequestStateCompleted, saved.State)
+
+			requests, err := models.ListPullRequestChecksStartRequests(db, replacement.ID)
+			require.NoError(t, err)
+			require.Len(t, requests, 1)
+			events, err := ProcessPullRequestChecksStartRequest(t.Context(), IntakeDependencies{}, requests[0].ID)
+			require.NoError(t, err)
+			require.Len(t, events, 1)
+			persisted, err := models.FindCanvasEventForCanvas(db, canvas.ID, events[0].ID)
+			require.NoError(t, err)
+			payload := models.RootEventSourcePayload(persisted.Data.Data()).(map[string]any)
+			assert.Equal(t, replacement.ID.String(), payload["pullRequest"].(map[string]any)["id"])
 			assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
 		})
 	}
