@@ -274,8 +274,7 @@ Bitbucket Forge uses the shared encrypted installation token in the database.
 API and worker processes must use the same encryption keys.
 Verify hosted chart values and Secret references before worker rollout.
 API-only credential configuration does not configure workers.
-Apply the publication-claim migration before deploying the new worker code.
-Claims serialize description updates without holding database connections during host requests.
+This change adds no database migration.
 The node request worker needs `START_NODE_REQUEST_WORKER=yes`.
 The direct connection also needs the node executor and event router.
 The local Compose file and repository chart enable these workers.
@@ -283,11 +282,15 @@ No new configuration keys or runner changes are required.
 
 Roll out in this order:
 
-1. Apply the migration and deploy the publication action with the node request worker.
+1. Deploy the publication action with the node request worker.
 2. Run the built-in admin reset for Merge confidence automations. Supported merge-check and agent settings survive this reset.
 3. Verify the direct agent connections for GitHub and Bitbucket. Then remove the dedicated publication consumer.
 
-Publication claims and report markers make overlapping deliveries safe.
+Report markers keep one managed section in the description. Before each
+write, SuperPlane rejects runs that are cancelled or that are not the newest
+assessment for the pull request. This change does not serialize publications
+from different runs. A separate automation change handles publication
+concurrency.
 The default rollout uses admin reset. Custom graph migration is outside this change.
 Existing automations need the reset to receive the publication action.
 The final code removes the dedicated publication consumer. Stage its removal
