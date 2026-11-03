@@ -1038,7 +1038,7 @@ func TestFactoryWorkOrder_FindArtifactByDisplayKey(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	_, userID, factoryModel := setupFactoryWithUser(t, "display-key")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	order, err := factoryModel.CreateWorkOrder(db, "Display key", "", &userID, nil, nil)
 	require.NoError(t, err)
 	createLink := func(key string) *FactoryWorkOrderArtifact {
