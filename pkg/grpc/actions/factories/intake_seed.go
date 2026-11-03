@@ -482,13 +482,12 @@ func seedSentryIssues(
 		return intakeSeedResult{}, err
 	}
 
-	return seedKnownSentryIssues(tx, canvasID, client, issues)
+	return seedKnownSentryIssues(tx, canvasID, issues)
 }
 
 func seedKnownSentryIssues(
 	tx *gorm.DB,
 	canvasID uuid.UUID,
-	client *sentry.Client,
 	issues []sentry.Issue,
 ) (intakeSeedResult, error) {
 	issues, err := filterSentryIssuesForSeed(tx, canvasID, issues)
@@ -496,7 +495,7 @@ func seedKnownSentryIssues(
 		return intakeSeedResult{}, err
 	}
 
-	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(client, issues)); err != nil {
+	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(issues)); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(issues)}, nil
@@ -566,16 +565,16 @@ func sentryIssueIDsOnTrigger(tx *gorm.DB, canvasID uuid.UUID) (map[string]bool, 
 // sentryIssueEvents shapes each issue of a newest-first page like the webhook
 // the trigger emits, so the rest of the graph cannot tell a seeded issue from
 // a received one.
-func sentryIssueEvents(client *sentry.Client, issues []sentry.Issue) []map[string]any {
+func sentryIssueEvents(issues []sentry.Issue) []map[string]any {
 	events := make([]map[string]any, 0, len(issues))
 	for _, issue := range issues {
-		events = append(events, sentryIssueEvent(client, issue))
+		events = append(events, sentryIssueEvent(issue))
 	}
 	slices.Reverse(events)
 	return events
 }
 
-func sentryIssueEvent(client *sentry.Client, issue sentry.Issue) map[string]any {
+func sentryIssueEvent(issue sentry.Issue) map[string]any {
 	encoded, err := json.Marshal(issue)
 	if err != nil {
 		payload := map[string]any{"id": issue.ID, "title": issue.Title}
@@ -583,7 +582,7 @@ func sentryIssueEvent(client *sentry.Client, issue sentry.Issue) map[string]any 
 			"resource":    "issue",
 			"action":      "created",
 			"data":        map[string]any{"issue": payload},
-			"description": sentry.FetchedIssueDescription(client, payload, log.StandardLogger()),
+			"description": sentry.IssueDescription(payload, nil),
 		}
 	}
 
@@ -602,7 +601,7 @@ func sentryIssueEvent(client *sentry.Client, issue sentry.Issue) map[string]any 
 		"action":      "created",
 		"data":        map[string]any{"issue": payload},
 		"timestamp":   timestamp,
-		"description": sentry.FetchedIssueDescription(client, payload, log.StandardLogger()),
+		"description": sentry.IssueDescription(payload, nil),
 	}
 }
 

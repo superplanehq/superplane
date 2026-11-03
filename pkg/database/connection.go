@@ -256,7 +256,9 @@ func TruncateTables() error {
 			hosted_llm_providers,
 			mcp_oauth_clients,
 			mcp_oauth_codes,
-			mcp_oauth_refresh_tokens
+			mcp_oauth_refresh_tokens,
+			sentry_webhook_receipts,
+			sentry_app_install_grants
 		restart identity cascade;
 	`).Error
 }
