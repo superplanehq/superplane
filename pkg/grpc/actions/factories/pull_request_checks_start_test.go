@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,6 +35,72 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+func TestPullRequestAttachmentBatchesVerificationTriggers(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	checks := createChecksStartupCanvas(t, r, factory, "acme/app")
+	expected := []uuid.UUID{checks.ID}
+
+	type queryCountKey struct{}
+	const callback = "test:pull_request_attachment_query_count"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if count, ok := tx.Statement.Context.Value(queryCountKey{}).(*atomic.Int64); ok {
+			count.Add(1)
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+	attach := func(number int) int64 {
+		t.Helper()
+		order, err := factory.CreateWorkOrder(db, "Review", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		var count atomic.Int64
+		measured := db.WithContext(context.WithValue(t.Context(), queryCountKey{}, &count))
+		pr, err := order.CreatePullRequest(measured, models.FactoryPullRequestParams{URL: fmt.Sprintf("https://github.com/acme/app/pull/%d", number)})
+		require.NoError(t, err)
+		queries := count.Load()
+		requests, err := models.ListPullRequestChecksStartRequests(db, pr.ID)
+		require.NoError(t, err)
+		canvases := make([]uuid.UUID, 0, len(requests))
+		for _, request := range requests {
+			canvases = append(canvases, request.WorkflowID)
+		}
+		assert.ElementsMatch(t, expected, canvases)
+		return queries
+	}
+	singleQueries := attach(41)
+	for range 8 {
+		support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, support.RandomName("unrelated"), "start")
+	}
+	for range 3 {
+		canvas := createChecksStartupCanvas(t, r, factory, "ACME/App")
+		expected = append(expected, canvas.ID)
+	}
+	for range 2 {
+		canvas := createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+		expected = append(expected, canvas.ID)
+	}
+	otherFactory := seedHandOffFactory(t, r, db)
+	createChecksStartupCanvas(t, r, otherFactory, "acme/app")
+	createMergeConfidenceStartupCanvas(t, r, factory, "other/app")
+	deleted := createChecksStartupCanvas(t, r, factory, "acme/app")
+	require.NoError(t, deleted.SoftDeleteInTransaction(db))
+	broken := createChecksStartupCanvas(t, r, factory, "acme/app")
+	require.NoError(t, db.Model(&models.CanvasNode{}).Where("workflow_id = ?", broken.ID).Update("state", models.CanvasNodeStateError).Error)
+	discussion := createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+	_, err := factory.CreatePRFeedbackHandler(db, discussion.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion)
+	require.NoError(t, err)
+	unpublished := createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, unpublished)
+	require.NoError(t, err)
+	version.Nodes[0].Metadata = nil
+	require.NoError(t, db.Save(version).Error)
+	batchQueries := attach(42)
+	t.Logf("Attachment queries: one canvas = %d, many canvases = %d", singleQueries, batchQueries)
+	require.Positive(t, singleQueries)
+	assert.Equal(t, singleQueries, batchQueries, "attachment queries must not grow with workspace canvases")
+}
 
 func TestAttachedPullRequestChecksUseCurrentResults(t *testing.T) {
 	for _, outcome := range []string{"failure", "success", "pending", "missing"} {
@@ -163,11 +231,12 @@ func (h *attachedChecksSnapshotHTTP) Do(request *http.Request) (*http.Response, 
 }
 
 func TestPullRequestChecksStartupOverlap(t *testing.T) {
-	for _, webhookFirst := range []bool{true, false} {
-		t.Run(fmt.Sprintf("webhook first %t", webhookFirst), func(t *testing.T) {
+	for _, scenario := range []struct{ mergeConfidence, webhookFirst bool }{{false, true}, {false, false}, {true, true}, {true, false}} {
+		t.Run(fmt.Sprintf("merge confidence %t webhook first %t", scenario.mergeConfidence, scenario.webhookFirst), func(t *testing.T) {
+			webhookFirst := scenario.webhookFirst
 			r := support.Setup(t)
 			db := database.DB(t.Context())
-			_, order, pullRequest, canvas, request := checksStartupFixture(t, r)
+			_, order, pullRequest, canvas, request := pullRequestStartupFixture(t, r, scenario.mergeConfidence)
 			current := checksStartupGitHubPullRequest()
 			current.Head.Repo.FullName = github.Ptr("contributor/app")
 			useGitHub(t, current)
@@ -213,11 +282,15 @@ func TestPullRequestChecksStartupOverlap(t *testing.T) {
 }
 
 func TestPullRequestChecksStartupRecovery(t *testing.T) {
-	for _, failure := range []string{"GitHub unavailable", "missing head branch"} {
-		t.Run(failure, func(t *testing.T) {
+	for _, scenario := range []struct {
+		mergeConfidence bool
+		failure         string
+	}{{false, "GitHub unavailable"}, {false, "missing head branch"}, {true, "GitHub unavailable"}, {true, "missing head branch"}} {
+		t.Run(fmt.Sprintf("merge confidence %t %s", scenario.mergeConfidence, scenario.failure), func(t *testing.T) {
+			failure := scenario.failure
 			r := support.Setup(t)
 			db := database.DB(t.Context())
-			_, _, _, canvas, request := checksStartupFixture(t, r)
+			_, _, _, canvas, request := pullRequestStartupFixture(t, r, scenario.mergeConfidence)
 			api := &fakeFactoryGitHub{pullRequest: checksStartupGitHubPullRequest()}
 			if failure == "GitHub unavailable" {
 				api.getPullErr = errors.New(failure)
@@ -320,6 +393,42 @@ func TestPullRequestChecksStartupEligibility(t *testing.T) {
 	}
 }
 
+func TestMergeConfidenceStartupEligibility(t *testing.T) {
+	for _, condition := range []string{"other repository", "draft", "closed", "canvas deleted", "template removed", "trigger error"} {
+		t.Run(condition, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			_, _, _, canvas, request := pullRequestStartupFixture(t, r, true)
+			current := checksStartupGitHubPullRequest()
+			switch condition {
+			case "other repository":
+				version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+				require.NoError(t, err)
+				version.Nodes[0].Configuration["repository"] = "other/app"
+				require.NoError(t, db.Save(version).Error)
+			case "draft":
+				current.Draft = github.Ptr(true)
+			case "closed":
+				current.State = github.Ptr("closed")
+			case "canvas deleted":
+				require.NoError(t, canvas.SoftDeleteInTransaction(db))
+			case "template removed":
+				require.NoError(t, canvas.StampFactoryAppTemplate(db, "renamed-pr-trigger", "custom-verification", 1))
+			case "trigger error":
+				require.NoError(t, db.Model(&models.CanvasNode{}).Where("workflow_id = ?", canvas.ID).Update("state", models.CanvasNodeStateError).Error)
+			}
+			useGitHub(t, current)
+			events, err := ProcessPullRequestChecksStartRequest(t.Context(), IntakeDependencies{}, request.ID)
+			require.NoError(t, err)
+			assert.Empty(t, events)
+			assert.Zero(t, countCanvasEvents(t, canvas.ID))
+			saved, err := models.FindCanvasNodeRequest(db, request.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.NodeExecutionRequestStateCompleted, saved.State)
+		})
+	}
+}
+
 func TestPullRequestChecksStartupRollsBackWithAttachment(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
@@ -356,9 +465,18 @@ func checksStartupGitHubPullRequest() *github.PullRequest {
 
 func checksStartupFixture(t *testing.T, r *support.ResourceRegistry) (*models.Factory, *models.FactoryWorkOrder, *models.FactoryPullRequest, *models.Canvas, *models.CanvasNodeRequest) {
 	t.Helper()
+	return pullRequestStartupFixture(t, r, false)
+}
+
+func pullRequestStartupFixture(t *testing.T, r *support.ResourceRegistry, mergeConfidence bool) (*models.Factory, *models.FactoryWorkOrder, *models.FactoryPullRequest, *models.Canvas, *models.CanvasNodeRequest) {
+	t.Helper()
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	canvas := createChecksStartupCanvas(t, r, factory, "acme/app")
+	createCanvas := createChecksStartupCanvas
+	if mergeConfidence {
+		createCanvas = createMergeConfidenceStartupCanvas
+	}
+	canvas := createCanvas(t, r, factory, "acme/app")
 	order, err := factory.CreateWorkOrder(db, "Review", "Fix refunds", &r.User, nil, nil)
 	require.NoError(t, err)
 	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/42"})
@@ -367,6 +485,21 @@ func checksStartupFixture(t *testing.T, r *support.ResourceRegistry) (*models.Fa
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	return factory, order, pullRequest, canvas, &requests[0]
+}
+
+// Merge confidence uses the same PR snapshot and recovery contract as checks,
+// but is identified by template metadata rather than a feedback handler.
+func createMergeConfidenceStartupCanvas(t *testing.T, r *support.ResourceRegistry, factory *models.Factory, repository string) *models.Canvas {
+	t.Helper()
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "renamed-pr-trigger", Type: models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{"repository": repository, "ignoreDrafts": true, "onlyFactoryPullRequests": true}),
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	require.NoError(t, canvas.StampFactoryAppTemplate(db, "renamed-pr-trigger", "risk-score", 1))
+	return canvas
 }
 
 func emitChecksStartupWebhook(t *testing.T, node *models.CanvasNode, payload map[string]any) {
