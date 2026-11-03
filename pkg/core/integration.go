@@ -142,24 +142,6 @@ type IntegrationMessageContext struct {
 	Integration       IntegrationContext
 	Events            EventContext
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
-
-	// Outcome is optional. A durable caller sets it to learn why a message
-	// emitted no event. Handlers must check for nil before they use it.
-	Outcome MessageOutcomeRecorder
-}
-
-// MessageOutcomeRecorder receives the explicit result of one integration
-// message. A nil error alone does not tell a durable caller that a message
-// was delivered: the handler reports a configured filter here, and the
-// caller treats a message with no event and no filter as unfinished.
-type MessageOutcomeRecorder interface {
-	// Filter records that a configured filter, for example an action or
-	// project filter, excluded the message.
-	Filter(reason string)
-
-	// Warn records a problem that did not stop delivery, for example an
-	// optional enrichment request that failed.
-	Warn(message string)
 }
 
 type IntegrationResource struct {

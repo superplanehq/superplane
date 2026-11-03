@@ -61,7 +61,6 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 		return
 	}
 
-	w.deleteExpiredSentryWebhookInbox()
 	w.deleteExpiredSentryWebhookReceipts()
 	w.deleteExpiredDatadogWebhookReceipts()
 	w.deleteExpiredLinearWebhookReceipts()
@@ -91,25 +90,6 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 	}
 
 	logger.Info("Deleted completed node requests")
-}
-
-// deleteExpiredSentryWebhookInbox removes finished inbox metadata after
-// the retention period. Unfinished deliveries stay until they finish.
-func (w *NodeRequestCleanupWorker) deleteExpiredSentryWebhookInbox() {
-	cutoff := time.Now().UTC().Add(-models.SentryWebhookInboxRetention)
-	deleted, err := models.DeleteExpiredSentryWebhookInbox(database.Conn(), cutoff, expiredRecordCleanupBatch)
-	if err != nil {
-		w.logger.Errorf("Error cleaning the Sentry webhook inbox: %v", err)
-		return
-	}
-	if deleted == 0 {
-		return
-	}
-
-	w.logger.WithFields(log.Fields{
-		"deleted":    deleted,
-		"older_than": cutoff.Format(time.RFC3339),
-	}).Info("Deleted finished Sentry webhook inbox entries")
 }
 
 func (w *NodeRequestCleanupWorker) deleteExpiredSentryWebhookReceipts() {

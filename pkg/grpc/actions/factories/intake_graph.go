@@ -18,6 +18,7 @@ type intakeGraph struct {
 	TriggerNodeID          string
 	AnalysisNodeID         string
 	FilterNodeID           string
+	EnrichIssueNodeID      string
 	AuthorPermissionNodeID string
 	AuthorFilterNodeID     string
 	CreateNodeID           string
@@ -269,6 +270,11 @@ func resolveIntakeGraph(source string, spec models.LiveCanvasSpec) intakeGraph {
 		return slices.Contains(intakeAnalysisComponents, node.ComponentName())
 	})
 	graph.FilterNodeID = resolveIntakeFilterNode(nodes)
+	if source == models.FactoryIntakeSourceSentryExceptions {
+		graph.EnrichIssueNodeID = resolveIntakeNode(nodes, intakeEnrichIssueNodeID, func(node *models.Node) bool {
+			return node.ComponentName() == intakeEnrichIssueComponent
+		})
+	}
 	graph.AuthorPermissionNodeID = resolveIntakeNode(nodes, intakeAuthorPermissionNodeID, isIntakeAuthorPermissionNode)
 	graph.AuthorFilterNodeID = resolveIntakeNode(nodes, intakeAuthorFilterNodeID, isIntakeAuthorFilterNode)
 	graph.CreateNodeID = resolveIntakeNode(nodes, intakeCreateNodeID, func(node *models.Node) bool {

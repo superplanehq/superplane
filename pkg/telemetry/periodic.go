@@ -55,7 +55,6 @@ func (p *Periodic) report() {
 	p.reportRunnerCounts()
 	p.reportRunnerTaskCounts()
 	p.reportBitbucketForgeDeliveries()
-	p.reportSentryWebhookInbox()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {

@@ -41,7 +41,7 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     triggerComponent: "sentry.onIssue",
     triggerName: "On Issue",
     createTitle: "{{ root().data.data.issue.title }}",
-    createDescription: "{{ root().data.description }}",
+    createDescription: '{{ $["Enrich Issue"].data.description }}',
     title: "Sentry exception intake",
   },
   "pagerduty-incidents": {
@@ -78,6 +78,9 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
   const spec = INTAKE_CANVAS_BY_SOURCE[source.id];
   const triggerId = `${source.id}-trigger`;
   const createId = `${source.id}-create`;
+  const filterId = `${source.id}-filter`;
+  const enrichId = `${source.id}-enrich`;
+  const sentry = source.id === "sentry-exceptions";
 
   const nodes: ComponentsNode[] = [
     {
@@ -87,6 +90,26 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
       component: spec.triggerComponent,
       position: { x: 160, y: 80 },
     },
+    ...(sentry
+      ? ([
+          {
+            id: filterId,
+            name: "Matches filters?",
+            type: "TYPE_ACTION",
+            component: "if",
+            configuration: { expression: "true" },
+            position: { x: 160, y: 260 },
+          },
+          {
+            id: enrichId,
+            name: "Enrich Issue",
+            type: "TYPE_ACTION",
+            component: "sentry.enrichIssue",
+            configuration: { issue: "{{ root().data.data.issue }}" },
+            position: { x: 160, y: 440 },
+          },
+        ] satisfies ComponentsNode[])
+      : []),
     {
       id: createId,
       name: "Create Task",
@@ -96,10 +119,16 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
         title: spec.createTitle,
         description: spec.createDescription,
       },
-      position: { x: 160, y: 260 },
+      position: { x: 160, y: sentry ? 620 : 260 },
     },
   ];
-  const edges: ComponentsEdge[] = [{ channel: "default", sourceId: triggerId, targetId: createId }];
+  const edges: ComponentsEdge[] = sentry
+    ? [
+        { channel: "default", sourceId: triggerId, targetId: filterId },
+        { channel: "true", sourceId: filterId, targetId: enrichId },
+        { channel: "default", sourceId: enrichId, targetId: createId },
+      ]
+    : [{ channel: "default", sourceId: triggerId, targetId: createId }];
 
   return {
     key: "intake",
@@ -108,6 +137,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
     edges,
     statuses: {
       [triggerId]: "passed",
+      ...(sentry ? { [filterId]: "passed", [enrichId]: "passed" } : {}),
       [createId]: "running",
     } satisfies Record<string, FactoryNodeStatus>,
     metrics: {},

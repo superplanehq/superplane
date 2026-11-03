@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -56,7 +55,7 @@ func (t *OnIssue) Documentation() string {
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
 - **data.issue**: the Sentry issue object from the webhook
-- **description**: Markdown of the Sentry issue and preferred event (event link, highlights, message, stack, request, user, tags, contexts, breadcrumbs). SuperPlane fetches this from the Sentry API. Use this instead of interpolating ` + "`data.issue`" + `, which renders as a Go map
+- **description**: A basic Markdown description built from the webhook issue. Add Enrich Issue after any filters when a workflow needs the issue details and stack trace
 - **actor**: the user or team that triggered the event when available
 
 ## Setup
@@ -197,9 +196,6 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 
 	if reason := issueFilterReason(ctx.Configuration, config, message); reason != "" {
 		logSkippedIssueEvent(reason, message, config)
-		if ctx.Outcome != nil {
-			ctx.Outcome.Filter("the trigger " + reason + " filter excluded the event")
-		}
 		return nil
 	}
 
@@ -210,24 +206,13 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"data":         message.Data,
 		"actor":        message.Actor,
 		"timestamp":    eventTimestamp(message),
-		"description":  t.issueDescription(ctx, message.Data["issue"]),
+		"description":  IssueDescription(message.Data["issue"], nil),
 	}
 	if receiptID := strings.TrimSpace(message.ReceiptID); receiptID != "" {
 		payload[SuperplaneReceiptField] = receiptID
 	}
 
-	return emitIssueEvent(ctx.Events, payload, message.DeliveryID)
-}
-
-// emitIssueEvent deduplicates on the durable delivery, so a retried
-// delivery does not start a second run for the same trigger.
-func emitIssueEvent(events core.EventContext, payload map[string]any, deliveryID string) error {
-	deliveryID = strings.TrimSpace(deliveryID)
-	deduplicated, ok := events.(core.DeduplicatedEventContext)
-	if deliveryID == "" || !ok {
-		return events.Emit("sentry.issue", payload)
-	}
-	return deduplicated.EmitDeduplicated("sentry.issue", payload, "sentry-delivery:"+deliveryID)
+	return ctx.Events.Emit(IssuePayloadType, payload)
 }
 
 // issueFilterReason names the configured filter that excludes a message.
@@ -243,37 +228,6 @@ func issueFilterReason(configuration any, config OnIssueConfiguration, message *
 		return "project"
 	}
 	return ""
-}
-
-func (t *OnIssue) issueDescription(ctx core.IntegrationMessageContext, issue any) string {
-	if ctx.HTTP == nil || ctx.Integration == nil {
-		return IssueDescription(issue, nil)
-	}
-
-	warnings := enrichmentWarnings{logger: ctx.Logger, outcome: ctx.Outcome}
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		warnings.Warnf("failed to create sentry client for issue enrichment: %v", err)
-		return IssueDescription(issue, nil)
-	}
-
-	return FetchedIssueDescription(client, issue, warnings)
-}
-
-// enrichmentWarnings logs a failed optional enrichment request and reports
-// it to a durable caller. The event still uses the original issue payload.
-type enrichmentWarnings struct {
-	logger  *logrus.Entry
-	outcome core.MessageOutcomeRecorder
-}
-
-func (w enrichmentWarnings) Warnf(format string, args ...any) {
-	if w.logger != nil {
-		w.logger.Warnf(format, args...)
-	}
-	if w.outcome != nil {
-		w.outcome.Warn(fmt.Sprintf(format, args...))
-	}
 }
 
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {

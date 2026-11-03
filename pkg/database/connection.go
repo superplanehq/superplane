@@ -258,10 +258,7 @@ func TruncateTables() error {
 			mcp_oauth_codes,
 			mcp_oauth_refresh_tokens,
 			sentry_webhook_receipts,
-			sentry_webhook_inbox,
-			sentry_webhook_delivery_targets,
-			sentry_app_install_grants,
-			sentry_app_installation_deletions
+			sentry_app_install_grants
 		restart identity cascade;
 	`).Error
 }

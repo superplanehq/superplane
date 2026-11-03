@@ -176,48 +176,6 @@ func Test__afterHostedAppSetup_codeExchangeFailed_doesNotMint(t *testing.T) {
 	assert.Equal(t, "authorization_code", decodeGrantType(t, httpContext.Requests[0]))
 }
 
-func Test__afterHostedAppSetup_waitsForTheInstallationWorkerGrant(t *testing.T) {
-	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
-	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
-	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
-	grants := useFakeHostedInstallGrants(t)
-	hostedInstallGrantWait.Timeout = 2 * time.Second
-
-	impl := &Sentry{}
-	integrationCtx := pendingHostedIntegration()
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			sentryMockResponse(http.StatusBadRequest, `{"detail":"invalid grant"}`),
-			sentryMockResponse(http.StatusOK, `{"id":"1","slug":"acme","name":"Acme"}`),
-			sentryMockResponse(http.StatusOK, `[{"id":"2","slug":"payments","name":"Payments"}]`),
-			sentryMockResponse(http.StatusOK, `[{"id":"3","slug":"platform","name":"Platform"}]`),
-		},
-	}
-
-	// The installation worker exchanged the code first. It stores the
-	// tokens while the callback waits.
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		_ = grants.Remember(hostedSentryInstall{
-			InstallationUUID: "install-1",
-			AccessToken:      "worker-token",
-			RefreshToken:     "worker-refresh",
-			Code:             "grant-code",
-		})
-	}()
-
-	recorder := httptest.NewRecorder()
-	req := hostedSetupRequest("/api/v1/sentry/app/setup?code=grant-code&installationId=install-1&orgSlug=acme", "csrf-state")
-
-	impl.afterHostedAppSetup(hostedSetupContext(req, recorder, httpContext, integrationCtx))
-
-	assert.Equal(t, http.StatusSeeOther, recorder.Code)
-	assert.Equal(t, "ready", integrationCtx.State)
-	accessToken, err := integrationCtx.Secrets().Get(SecretAccessToken)
-	require.NoError(t, err)
-	assert.Equal(t, "worker-token", accessToken)
-}
-
 func Test__afterHostedAppSetup_finishesInterruptedInstall(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")

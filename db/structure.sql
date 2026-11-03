@@ -1773,61 +1773,6 @@ CREATE TABLE public.sentry_app_install_grants (
 
 
 --
--- Name: sentry_app_installation_deletions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.sentry_app_installation_deletions (
-    installation_uuid text NOT NULL,
-    deleted_at timestamp with time zone NOT NULL
-);
-
-
---
--- Name: sentry_webhook_delivery_targets; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.sentry_webhook_delivery_targets (
-    id uuid NOT NULL,
-    inbox_id uuid NOT NULL,
-    integration_id uuid NOT NULL,
-    workflow_id uuid NOT NULL,
-    node_id text NOT NULL,
-    state text NOT NULL,
-    last_error text DEFAULT ''::text NOT NULL,
-    completed_at timestamp with time zone,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL
-);
-
-
---
--- Name: sentry_webhook_inbox; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.sentry_webhook_inbox (
-    id uuid NOT NULL,
-    receipt_id uuid,
-    source text NOT NULL,
-    integration_id uuid,
-    installation_uuid text DEFAULT ''::text NOT NULL,
-    hook_resource text DEFAULT ''::text NOT NULL,
-    action text DEFAULT ''::text NOT NULL,
-    priority integer DEFAULT 0 NOT NULL,
-    payload_ciphertext bytea,
-    state text NOT NULL,
-    targets_resolved boolean DEFAULT false NOT NULL,
-    attempts integer DEFAULT 0 NOT NULL,
-    next_attempt_at timestamp with time zone NOT NULL,
-    lease_owner uuid,
-    lease_expires_at timestamp with time zone,
-    last_error text DEFAULT ''::text NOT NULL,
-    received_at timestamp with time zone NOT NULL,
-    completed_at timestamp with time zone,
-    updated_at timestamp with time zone NOT NULL
-);
-
-
---
 -- Name: sentry_webhook_receipts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1844,8 +1789,7 @@ CREATE TABLE public.sentry_webhook_receipts (
     http_status integer NOT NULL,
     outcome text NOT NULL,
     integration_count integer DEFAULT 0 NOT NULL,
-    task_ids text DEFAULT ''::text NOT NULL,
-    processing_error text DEFAULT ''::text NOT NULL
+    task_ids text DEFAULT ''::text NOT NULL
 );
 
 
@@ -3319,30 +3263,6 @@ ALTER TABLE ONLY public.sentry_app_install_grants
 
 
 --
--- Name: sentry_app_installation_deletions sentry_app_installation_deletions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sentry_app_installation_deletions
-    ADD CONSTRAINT sentry_app_installation_deletions_pkey PRIMARY KEY (installation_uuid);
-
-
---
--- Name: sentry_webhook_delivery_targets sentry_webhook_delivery_targets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sentry_webhook_delivery_targets
-    ADD CONSTRAINT sentry_webhook_delivery_targets_pkey PRIMARY KEY (id);
-
-
---
--- Name: sentry_webhook_inbox sentry_webhook_inbox_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sentry_webhook_inbox
-    ADD CONSTRAINT sentry_webhook_inbox_pkey PRIMARY KEY (id);
-
-
---
 -- Name: sentry_webhook_receipts sentry_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3364,14 +3284,6 @@ ALTER TABLE ONLY public.group_metadata
 
 ALTER TABLE ONLY public.role_metadata
     ADD CONSTRAINT uq_role_metadata_key UNIQUE (role_name, domain_type, domain_id);
-
-
---
--- Name: sentry_webhook_delivery_targets uq_sentry_webhook_delivery_targets_identity; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sentry_webhook_delivery_targets
-    ADD CONSTRAINT uq_sentry_webhook_delivery_targets_identity UNIQUE (inbox_id, integration_id, workflow_id, node_id);
 
 
 --
@@ -4463,34 +4375,6 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 --
 
 CREATE INDEX idx_sentry_app_install_grants_expires_at ON public.sentry_app_install_grants USING btree (expires_at);
-
-
---
--- Name: idx_sentry_webhook_inbox_completed_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sentry_webhook_inbox_completed_at ON public.sentry_webhook_inbox USING btree (completed_at) WHERE (completed_at IS NOT NULL);
-
-
---
--- Name: idx_sentry_webhook_inbox_due; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sentry_webhook_inbox_due ON public.sentry_webhook_inbox USING btree (priority DESC, next_attempt_at, received_at) WHERE (completed_at IS NULL);
-
-
---
--- Name: idx_sentry_webhook_inbox_installation; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sentry_webhook_inbox_installation ON public.sentry_webhook_inbox USING btree (installation_uuid) WHERE ((completed_at IS NULL) AND (hook_resource = 'installation'::text));
-
-
---
--- Name: idx_sentry_webhook_inbox_receipt_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sentry_webhook_inbox_receipt_id ON public.sentry_webhook_inbox USING btree (receipt_id);
 
 
 --
@@ -6163,22 +6047,6 @@ ALTER TABLE ONLY public.runners
 
 
 --
--- Name: sentry_webhook_delivery_targets sentry_webhook_delivery_targets_inbox_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sentry_webhook_delivery_targets
-    ADD CONSTRAINT sentry_webhook_delivery_targets_inbox_id_fkey FOREIGN KEY (inbox_id) REFERENCES public.sentry_webhook_inbox(id) ON DELETE CASCADE;
-
-
---
--- Name: sentry_webhook_inbox sentry_webhook_inbox_receipt_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sentry_webhook_inbox
-    ADD CONSTRAINT sentry_webhook_inbox_receipt_id_fkey FOREIGN KEY (receipt_id) REFERENCES public.sentry_webhook_receipts(id) ON DELETE SET NULL;
-
-
---
 -- Name: usage_price_book_rates usage_price_book_rates_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6634,7 +6502,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261103130347	f
+20261102225827	f
 \.
 
 

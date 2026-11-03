@@ -27,7 +27,6 @@ type adminSentryWebhookReceipt struct {
 	IssueShortID     string   `json:"issue_short_id"`
 	HTTPStatus       int      `json:"http_status"`
 	Outcome          string   `json:"outcome"`
-	ProcessingError  string   `json:"processing_error"`
 	IntegrationCount int      `json:"integration_count"`
 	TaskIDs          []string `json:"task_ids"`
 }
@@ -81,7 +80,6 @@ func (s *Server) adminListSentryWebhooks(w http.ResponseWriter, r *http.Request)
 			IssueShortID:     receipt.IssueShortID,
 			HTTPStatus:       receipt.HTTPStatus,
 			Outcome:          receipt.Outcome,
-			ProcessingError:  receipt.ProcessingError,
 			IntegrationCount: receipt.IntegrationCount,
 			TaskIDs:          taskIDs,
 		})

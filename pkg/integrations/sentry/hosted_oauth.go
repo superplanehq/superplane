@@ -36,21 +36,6 @@ type InstallationGrant struct {
 	OrgID   string
 }
 
-// sentryAppAuthorizationError is a non-2xx answer of the Sentry token API.
-type sentryAppAuthorizationError struct {
-	StatusCode int
-}
-
-func (e *sentryAppAuthorizationError) Error() string {
-	return fmt.Sprintf("Sentry app authorization failed: status %d", e.StatusCode)
-}
-
-// Permanent reports whether a retry cannot succeed without a new install.
-// Rate limits and server errors can pass.
-func (e *sentryAppAuthorizationError) Permanent() bool {
-	return e.StatusCode >= 400 && e.StatusCode < 500 && e.StatusCode != http.StatusTooManyRequests
-}
-
 type sentryAppAuthorizationResponse struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refreshToken"`
@@ -303,52 +288,10 @@ func resolveHostedAppTokens(
 	}
 
 	tokens, err := hostedAppTokensFromSentry(httpCtx, app, installationUUID, code, knownInstallationUUID)
-	if err == nil {
-		return tokens, orgSlug, nil
-	}
-
-	// The durable installation worker can exchange the code first. It
-	// stores the tokens under the same code, so wait for that grant
-	// instead of failing the browser callback.
-	stored, waitErr := awaitHostedInstallGrant(installationUUID, code, integrationID)
-	if waitErr != nil || stored == nil {
+	if err != nil {
 		return nil, "", err
 	}
-	if stored.Organization != nil && orgSlug == "" {
-		orgSlug = stored.Organization.Slug
-	}
-	return &sentryAppAuthorizationResponse{
-		Token:        stored.AccessToken,
-		RefreshToken: stored.RefreshToken,
-		ExpiresAt:    stored.TokenExpiresAt,
-	}, orgSlug, nil
-}
-
-// hostedInstallGrantWait is how long a browser callback waits for the
-// installation worker to store tokens for a code that the callback could
-// not exchange.
-var hostedInstallGrantWait = struct {
-	Timeout  time.Duration
-	Interval time.Duration
-}{Timeout: 10 * time.Second, Interval: 500 * time.Millisecond}
-
-func awaitHostedInstallGrant(installationUUID, code, integrationID string) (*hostedSentryInstall, error) {
-	if strings.TrimSpace(code) == "" || strings.TrimSpace(integrationID) == "" {
-		return nil, nil
-	}
-
-	deadline := time.Now().Add(hostedInstallGrantWait.Timeout)
-	for time.Now().Before(deadline) {
-		time.Sleep(hostedInstallGrantWait.Interval)
-		install, err := hostedInstallGrants.Take(installationUUID, code, integrationID)
-		if err != nil {
-			return nil, err
-		}
-		if install != nil && strings.TrimSpace(install.AccessToken) != "" {
-			return install, nil
-		}
-	}
-	return nil, nil
+	return tokens, orgSlug, nil
 }
 
 func hostedAppTokensFromSentry(
@@ -471,7 +414,7 @@ func postSentryAppAuthorization(
 		return nil, err
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, &sentryAppAuthorizationError{StatusCode: response.StatusCode}
+		return nil, fmt.Errorf("Sentry app authorization failed: status %d", response.StatusCode)
 	}
 
 	var tokens sentryAppAuthorizationResponse

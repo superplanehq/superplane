@@ -122,22 +122,6 @@ function SentryWebhookTaskIDs({ ids }: { ids?: string[] }) {
   );
 }
 
-function SentryWebhookResult({ item }: { item: SentryWebhookReceipt }) {
-  return (
-    <div className="space-y-1">
-      <div>{sentryWebhookOutcomeLabel(item.outcome)}</div>
-      {item.processing_error ? (
-        <div
-          data-testid="sentry-webhook-processing-error"
-          className="break-words text-xs text-gray-500 dark:text-gray-400"
-        >
-          {item.processing_error}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function SentryWebhooksTable({ items }: { items: SentryWebhookReceipt[] }) {
   return (
     <div className="overflow-hidden rounded-md bg-white shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/70">
@@ -171,7 +155,7 @@ function SentryWebhooksTable({ items }: { items: SentryWebhookReceipt[] }) {
               <td className="px-4 py-2.5 text-gray-800 dark:text-gray-100">{item.project_slug || "—"}</td>
               <td className="px-4 py-2.5 text-gray-800 dark:text-gray-100">{sentryWebhookIssueLabel(item) || "—"}</td>
               <td className="px-4 py-2.5 text-gray-800 dark:text-gray-100">
-                <SentryWebhookResult item={item} />
+                {sentryWebhookOutcomeLabel(item.outcome)}
               </td>
               <td className="px-4 py-2.5 font-mono text-xs text-gray-800 dark:text-gray-100">
                 <SentryWebhookTaskIDs ids={item.task_ids} />

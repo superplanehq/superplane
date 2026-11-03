@@ -23,15 +23,8 @@ const hostedInstallGrantTTL = 20 * time.Minute
 // SuperPlane process, so every process reads the grants from one place.
 type hostedInstallGrantStore interface {
 	Remember(install hostedSentryInstall) error
-	// Find reads a grant with the same code without claiming it.
-	Find(installationUUID, code string) (*hostedSentryInstall, error)
 	Take(installationUUID, code, integrationID string) (*hostedSentryInstall, error)
-	// Forget drops a grant after the setup callback binds it.
 	Forget(installationUUID string) error
-	// Uninstall records that Sentry deleted the installation and drops its
-	// grant. Remember then refuses that installation.
-	Uninstall(installationUUID string) error
-	Deleted(installationUUID string) (bool, error)
 }
 
 var hostedInstallGrants hostedInstallGrantStore = databaseHostedInstallGrants{}
@@ -85,25 +78,6 @@ func (databaseHostedInstallGrants) Remember(install hostedSentryInstall) error {
 	})
 }
 
-func (databaseHostedInstallGrants) Find(installationUUID, code string) (*hostedSentryInstall, error) {
-	installationUUID = strings.TrimSpace(installationUUID)
-	code = strings.TrimSpace(code)
-	if installationUUID == "" || code == "" {
-		return nil, nil
-	}
-
-	encryptor, err := hostedInstallGrantEncryptor()
-	if err != nil {
-		return nil, err
-	}
-
-	grant, err := models.FindSentryAppInstallGrant(database.Conn(), installationUUID, hostedInstallCodeDigest(code), time.Now())
-	if err != nil || grant == nil {
-		return nil, err
-	}
-	return openHostedInstallGrant(encryptor, grant, code)
-}
-
 func (databaseHostedInstallGrants) Take(installationUUID, code, integrationID string) (*hostedSentryInstall, error) {
 	installationUUID = strings.TrimSpace(installationUUID)
 	code = strings.TrimSpace(code)
@@ -128,27 +102,11 @@ func (databaseHostedInstallGrants) Take(installationUUID, code, integrationID st
 		return nil, err
 	}
 
-	return openHostedInstallGrant(encryptor, grant, code)
-}
-
-func (databaseHostedInstallGrants) Forget(installationUUID string) error {
-	return models.DeleteSentryAppInstallGrant(database.Conn(), installationUUID)
-}
-
-func (databaseHostedInstallGrants) Uninstall(installationUUID string) error {
-	return models.ForgetSentryAppInstallation(database.Conn(), installationUUID, time.Now())
-}
-
-func (databaseHostedInstallGrants) Deleted(installationUUID string) (bool, error) {
-	return models.SentryAppInstallationDeleted(database.Conn(), installationUUID)
-}
-
-func openHostedInstallGrant(encryptor crypto.Encryptor, grant *models.SentryAppInstallGrant, code string) (*hostedSentryInstall, error) {
-	accessToken, err := openHostedGrantToken(encryptor, grant.InstallationUUID, grant.AccessToken)
+	accessToken, err := openHostedGrantToken(encryptor, installationUUID, grant.AccessToken)
 	if err != nil {
 		return nil, err
 	}
-	refreshToken, err := openHostedGrantToken(encryptor, grant.InstallationUUID, grant.RefreshToken)
+	refreshToken, err := openHostedGrantToken(encryptor, installationUUID, grant.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +123,10 @@ func openHostedInstallGrant(encryptor crypto.Encryptor, grant *models.SentryAppI
 		install.Organization = &OrganizationSummary{Slug: grant.OrganizationSlug}
 	}
 	return install, nil
+}
+
+func (databaseHostedInstallGrants) Forget(installationUUID string) error {
+	return models.DeleteSentryAppInstallGrant(database.Conn(), installationUUID)
 }
 
 // hostedInstallCodeDigest hides the one-time install code, which stays a

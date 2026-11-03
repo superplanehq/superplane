@@ -141,10 +141,11 @@ sentry:
   dsn: ""
   environment: ""
 
-sentryWebhooks:
-  # Store verified Sentry webhooks in PostgreSQL and answer before processing.
-  # Deploy workers with the Sentry webhook worker first, then enable this.
-  durableAcceptance: false
+# This Secret must contain SUPERPLANE_SENTRY_APP_SLUG,
+# SUPERPLANE_SENTRY_APP_CLIENT_ID, and SUPERPLANE_SENTRY_APP_CLIENT_SECRET.
+# Both API and workflow workers read it for hosted Sentry connections.
+sentryApp:
+  secretName: ""
 
 dash0Web:
   secretName: ""

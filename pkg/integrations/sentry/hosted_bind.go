@@ -179,13 +179,13 @@ func (s *Sentry) adoptKnownHostedInstall(ctx core.SyncContext, pending Metadata,
 	return s.adoptHostedInstall(ctx, pending, tokens, install.InstallationUUID, orgSlug)
 }
 
-// ForgetKnownHostedInstallation records that Sentry deleted an installation
-// and drops its grant. A delayed installation.created cannot restore it.
+// ForgetKnownHostedInstallation drops a Sentry install grant after Sentry
+// reports that the organization uninstalled the app.
 func ForgetKnownHostedInstallation(installationUUID string) error {
 	if strings.TrimSpace(installationUUID) == "" {
 		return nil
 	}
-	return hostedInstallGrants.Uninstall(installationUUID)
+	return hostedInstallGrants.Forget(installationUUID)
 }
 
 func lookupReadyHostedSentryInstall(organizationID, excludeID string) (*hostedSentryInstall, error) {

@@ -83,44 +83,6 @@ describe("SentryWebhooks", () => {
     expect(screen.getByText("6f1c2a40-1b2e-4c3d-9a8b-0e1f2a3b4c5d")).toBeInTheDocument();
   });
 
-  it("shows why an acknowledged delivery is blocked", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          items: [
-            {
-              id: "receipt-2",
-              received_at: "2026-09-29T11:14:00Z",
-              hook_resource: "issue",
-              action: "created",
-              installation_uuid: "install-2",
-              organization_slug: "acme",
-              project_slug: "web",
-              issue_id: "100",
-              issue_short_id: "WEB-1",
-              http_status: 200,
-              outcome: "blocked",
-              processing_error: 'no connection uses Sentry installation "install-2"',
-              integration_count: 0,
-              task_ids: [],
-            },
-          ],
-          total: 1,
-          page: 1,
-          limit: 50,
-        }),
-      }),
-    );
-
-    renderPage();
-
-    expect(await screen.findByText("Blocked")).toBeInTheDocument();
-    expect(screen.getByText("200")).toBeInTheDocument();
-    expect(screen.getByTestId("sentry-webhook-processing-error")).toHaveTextContent("install-2");
-  });
-
   it("keeps Previous when a later page is empty", async () => {
     vi.stubGlobal(
       "fetch",

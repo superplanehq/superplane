@@ -182,10 +182,6 @@ type WebhookMessage struct {
 	Data         map[string]any      `json:"data" mapstructure:"data"`
 	Actor        map[string]any      `json:"actor,omitempty" mapstructure:"actor,omitempty"`
 	ReceiptID    string              `json:"superplaneReceiptId,omitempty" mapstructure:"superplaneReceiptId"`
-	// DeliveryID is the durable inbox entry of this message. A trigger uses
-	// it as the deduplication key, so a worker retry cannot start a second
-	// run for the same target.
-	DeliveryID string `json:"superplaneDeliveryId,omitempty" mapstructure:"superplaneDeliveryId"`
 }
 
 // ErrWebhookNotAuthenticated means the request does not carry a valid
@@ -193,7 +189,7 @@ type WebhookMessage struct {
 var ErrWebhookNotAuthenticated = errors.New("sentry webhook is not authenticated")
 
 // ErrUnsupportedWebhook means a verified delivery has a format that
-// SuperPlane cannot read. The durable inbox keeps it as blocked work.
+// SuperPlane cannot read. The webhook request must fail before admission.
 var ErrUnsupportedWebhook = errors.New("unsupported sentry webhook payload")
 
 // IsWebhookPath reports whether a connection path receives Sentry webhooks.
@@ -345,6 +341,7 @@ func (s *Sentry) Actions() []core.Action {
 		&ListAlerts{},
 		&GetAlert{},
 		&GetIssue{},
+		&EnrichIssue{},
 		&CreateRelease{},
 		&CreateDeploy{},
 		&UpdateIssue{},
@@ -850,7 +847,13 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 }
 
 func (s *Sentry) dispatchWebhookMessage(ctx core.HTTPRequestContext, message WebhookMessage) error {
-	subscriptions, err := ctx.Integration.ListSubscriptions()
+	return DispatchWebhookMessage(ctx.Integration, message, ctx.Logger)
+}
+
+// DispatchWebhookMessage sends a verified message to the connected workflow
+// subscriptions. Callers can wrap it in a transaction with receipt creation.
+func DispatchWebhookMessage(integration core.IntegrationContext, message WebhookMessage, logger *logrus.Entry) error {
+	subscriptions, err := integration.ListSubscriptions()
 	if err != nil {
 		return fmt.Errorf("failed to list sentry subscriptions: %w", err)
 	}
@@ -859,7 +862,7 @@ func (s *Sentry) dispatchWebhookMessage(ctx core.HTTPRequestContext, message Web
 	for _, subscription := range subscriptions {
 		wanted, err := SubscriptionWantsResource(subscription.Configuration(), message.Resource)
 		if err != nil {
-			ctx.Logger.Warnf("failed to decode sentry subscription config: %v", err)
+			logger.Warnf("failed to decode sentry subscription config: %v", err)
 			continue
 		}
 		if !wanted {
@@ -867,7 +870,7 @@ func (s *Sentry) dispatchWebhookMessage(ctx core.HTTPRequestContext, message Web
 		}
 
 		if err := subscription.SendMessage(message); err != nil {
-			ctx.Logger.Errorf("failed to send sentry message to subscription: %v", err)
+			logger.Errorf("failed to send sentry message to subscription: %v", err)
 			sendErrors = append(sendErrors, err)
 		}
 	}

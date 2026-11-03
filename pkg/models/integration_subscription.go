@@ -105,27 +105,3 @@ func ListIntegrationSubscriptions(tx *gorm.DB, installationID uuid.UUID) ([]Node
 
 	return subscriptions, nil
 }
-
-// FindIntegrationNodeSubscription returns the subscription of one live node.
-// It returns gorm.ErrRecordNotFound when the node, its canvas, or the
-// subscription is gone.
-func FindIntegrationNodeSubscription(tx *gorm.DB, installationID, workflowID uuid.UUID, nodeID string) (*NodeSubscription, error) {
-	var subscriptions []NodeSubscription
-	err := tx.
-		Table("app_installation_subscriptions AS s").
-		Select("wn.workflow_id as workflow_id, wn.node_id as node_id, wn.type as node_type, wn.ref as node_ref, s.configuration as configuration").
-		Joins("INNER JOIN workflow_nodes AS wn ON wn.workflow_id = s.workflow_id AND wn.node_id = s.node_id").
-		Joins("JOIN workflows AS w ON w.id = s.workflow_id AND w.deleted_at IS NULL").
-		Where("s.installation_id = ? AND s.workflow_id = ? AND s.node_id = ?", installationID, workflowID, nodeID).
-		Where("wn.deleted_at IS NULL").
-		Limit(1).
-		Scan(&subscriptions).
-		Error
-	if err != nil {
-		return nil, err
-	}
-	if len(subscriptions) == 0 {
-		return nil, gorm.ErrRecordNotFound
-	}
-	return &subscriptions[0], nil
-}
