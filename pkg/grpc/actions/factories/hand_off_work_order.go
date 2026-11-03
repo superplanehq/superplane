@@ -33,6 +33,8 @@ const (
 
 	handOffPullRequestURLInvalid   = "pull_request_url must be a GitHub or Bitbucket pull request URL"
 	handOffPullRequestHostMismatch = "The pull request URL is not on this workspace GitHub host."
+
+	errPullRequestRepositoryNotInWorkspace = "The pull request repository is not in this workspace."
 )
 
 var bitbucketHandOffPullRequestURLPattern = regexp.MustCompile(
@@ -67,15 +69,23 @@ type HandOffWorkOrderRequest struct {
 	Plan           string
 	Column         string
 	PullRequestURL string
-	LineName       string
-	MCPClientID    string
-	MCPClientName  string
+	// PullRequestURLs adds pull requests in other workspace repositories.
+	PullRequestURLs []string
+	LineName        string
+	MCPClientID     string
+	MCPClientName   string
+}
+
+// pullRequestURLs returns every requested pull request URL, first URL first.
+func (r HandOffWorkOrderRequest) pullRequestURLs() []string {
+	return models.NormalizeHandOffPullRequestURLs(append([]string{r.PullRequestURL}, r.PullRequestURLs...))
 }
 
 type HandOffWorkOrderResult struct {
-	Order          *pb.WorkOrder
-	Column         string
-	PullRequestURL string
+	Order           *pb.WorkOrder
+	Column          string
+	PullRequestURL  string
+	PullRequestURLs []string
 }
 
 type handOffStage struct {
@@ -110,7 +120,8 @@ func HandOffWorkOrder(
 	if column != HandOffColumnImplement && column != HandOffColumnVerify {
 		return nil, factoryErrorToStatus(invalidArgument("column must be implement or verify"), "failed to hand off work order")
 	}
-	if column == HandOffColumnVerify && strings.TrimSpace(req.PullRequestURL) == "" {
+	pullRequestURLs := req.pullRequestURLs()
+	if column == HandOffColumnVerify && len(pullRequestURLs) == 0 {
 		return nil, factoryErrorToStatus(invalidArgument("pull_request_url is required"), "failed to hand off work order")
 	}
 
@@ -129,8 +140,10 @@ func HandOffWorkOrder(
 		return nil, factoryErrorToStatus(err, "failed to hand off work order")
 	}
 	if column == HandOffColumnVerify {
-		if _, err := validateHandOffPullRequestURL(factory, req.PullRequestURL); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to hand off work order")
+		for _, rawURL := range pullRequestURLs {
+			if _, err := validateHandOffPullRequestURL(factory, rawURL); err != nil {
+				return nil, factoryErrorToStatus(err, "failed to hand off work order")
+			}
 		}
 	}
 
@@ -166,9 +179,9 @@ func HandOffWorkOrder(
 		return nil, factoryErrorToStatus(err, "failed to choose task owner")
 	}
 	deferred := factory.OnboardingConfigValue().CodexSubscription && len(assigneeIDs) == 0
-	var pullRequest *handOffPullRequest
+	var pullRequests []*handOffPullRequest
 	if column == HandOffColumnVerify && !deferred {
-		pullRequest, err = loadHandOffPullRequest(ctx, db, deps, factory, strings.TrimSpace(req.PullRequestURL))
+		pullRequests, err = loadHandOffPullRequests(ctx, db, deps, factory, pullRequestURLs)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to hand off work order")
 		}
@@ -182,7 +195,7 @@ func HandOffWorkOrder(
 
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
-	var trackedPR *models.FactoryPullRequest
+	var trackedPRs []models.FactoryPullRequest
 	var dispatched *workOrderLineDispatchResult
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if !deferred {
@@ -219,7 +232,7 @@ func HandOffWorkOrder(
 			return bindErr
 		}
 		if deferred {
-			return order.SetPendingHandOff(tx, &models.PendingHandOff{LineID: line.ID, Column: column, PullRequestURL: strings.TrimSpace(req.PullRequestURL)})
+			return order.SetPendingHandOff(tx, models.NewPendingHandOff(line.ID, column, pullRequestURLs))
 		}
 		if column == HandOffColumnImplement {
 			started, err := dispatchWorkOrderOnLineTx(tx, factory, order.ID, line, &actor, implementIndex, false, "", "")
@@ -231,7 +244,7 @@ func HandOffWorkOrder(
 			order = started.order
 			return nil
 		}
-		return recordVerifyHandOff(tx, factory, order, line, &actor, pullRequest, verifyIndex, models.FactoryLineStartOptions{})
+		return recordVerifyHandOff(tx, factory, order, line, &actor, pullRequests, verifyIndex, models.FactoryLineStartOptions{})
 	})
 	if delErr := storedfiles.ApplyBindResult(ctx, db, blob.Current(), orgID, factory.ID, bound, err); delErr != nil {
 		log.WithError(delErr).Warn("Failed to delete file objects after bind")
@@ -273,7 +286,7 @@ func HandOffWorkOrder(
 			dispatched.startedSteps,
 		)
 	} else if !deferred {
-		trackedPR, err = publishVerificationHandOff(ctx, deps, db, factory, order)
+		trackedPRs, err = publishVerificationHandOff(ctx, deps, db, factory, order)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to hand off work order")
 		}
@@ -292,10 +305,13 @@ func HandOffWorkOrder(
 	result := &HandOffWorkOrderResult{Order: serialized, Column: column}
 	if deferred {
 		result.Column = "backlog"
-		result.PullRequestURL = strings.TrimSpace(req.PullRequestURL)
+		result.PullRequestURLs = pullRequestURLs
 	}
-	if trackedPR != nil {
-		result.PullRequestURL = trackedPR.URL
+	for i := range trackedPRs {
+		result.PullRequestURLs = append(result.PullRequestURLs, trackedPRs[i].URL)
+	}
+	if len(result.PullRequestURLs) > 0 {
+		result.PullRequestURL = result.PullRequestURLs[0]
 	}
 	return result, nil
 }
@@ -306,56 +322,17 @@ func recordVerifyHandOff(
 	order *models.FactoryWorkOrder,
 	line *models.FactoryLine,
 	actor *uuid.UUID,
-	pullRequest *handOffPullRequest,
+	pullRequests []*handOffPullRequest,
 	verifyIndex int,
 	options models.FactoryLineStartOptions,
 ) error {
-	if pullRequest == nil {
+	if len(pullRequests) == 0 {
 		return invalidArgument("pull_request_url is required")
 	}
-	taskRepo := ""
-	if order.Repository != nil {
-		taskRepo = strings.TrimSpace(*order.Repository)
-	}
-	if taskRepo == "" {
-		return invalidArgument("This workspace has no repository.")
-	}
-	if !strings.EqualFold(pullRequest.Repository, taskRepo) {
-		return invalidArgument("The pull request repository does not match the task repository.")
-	}
-	if !strings.EqualFold(strings.TrimSpace(pullRequest.State), models.FactoryPullRequestStateOpen) {
-		return grpcerrors.FailedPrecondition(errFactoryPullRequestNotOpen, "The pull request is not open.")
-	}
-
-	headRef := strings.TrimPrefix(strings.TrimSpace(pullRequest.HeadBranch), "refs/heads/")
-	if headRef == "" {
-		return invalidArgument("The pull request has no head branch.")
-	}
-	headRepo := strings.TrimSpace(pullRequest.HeadRepository)
-	if headRepo == "" {
-		headRepo = taskRepo
-	}
-
-	if _, err := order.CreatePullRequest(tx, models.FactoryPullRequestParams{
-		Provider:   pullRequest.Provider,
-		ExternalID: pullRequest.ExternalID,
-		Repository: pullRequest.Repository,
-		Number:     pullRequest.Number,
-		URL:        pullRequest.URL,
-		Title:      pullRequest.Title,
-		State:      models.FactoryPullRequestStateOpen,
-	}); err != nil {
-		return err
-	}
-
-	if _, err := order.CreateArtifact(tx, models.FactoryWorkOrderArtifactParams{
-		Type: models.FactoryWorkOrderArtifactTypeBranch,
-		Data: map[string]any{
-			"name":       headRef,
-			"repository": headRepo,
-		},
-	}); err != nil {
-		return err
+	for _, pullRequest := range pullRequests {
+		if err := attachVerifyHandOffPullRequest(tx, factory, order, pullRequest); err != nil {
+			return err
+		}
 	}
 
 	if err := order.TransitionOnDispatch(tx, actor); err != nil {
@@ -371,6 +348,84 @@ func recordVerifyHandOff(
 	}
 	_, _, err = currentLine.RecordPassedStageWithoutRun(tx, order, verifyIndex, options)
 	return err
+}
+
+// attachVerifyHandOffPullRequest stores one open pull request and its head
+// branch on the task. The pull request must be in a workspace repository.
+func attachVerifyHandOffPullRequest(
+	tx *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	pullRequest *handOffPullRequest,
+) error {
+	if pullRequest == nil {
+		return invalidArgument("pull_request_url is required")
+	}
+	repositories, err := factory.WorkspaceRepositories(tx)
+	if err != nil {
+		return err
+	}
+	if len(repositories) == 0 {
+		return invalidArgument("This workspace has no repository.")
+	}
+	inWorkspace, err := factory.IsWorkspaceRepository(tx, pullRequest.Repository)
+	if err != nil {
+		return err
+	}
+	if !inWorkspace {
+		return invalidArgument(errPullRequestRepositoryNotInWorkspace)
+	}
+	if !strings.EqualFold(strings.TrimSpace(pullRequest.State), models.FactoryPullRequestStateOpen) {
+		return grpcerrors.FailedPrecondition(errFactoryPullRequestNotOpen, "The pull request is not open.")
+	}
+
+	headRef := strings.TrimPrefix(strings.TrimSpace(pullRequest.HeadBranch), "refs/heads/")
+	if headRef == "" {
+		return invalidArgument("The pull request has no head branch.")
+	}
+	headRepo := strings.TrimSpace(pullRequest.HeadRepository)
+	if headRepo == "" {
+		headRepo = pullRequest.Repository
+	}
+
+	if _, err := order.CreatePullRequest(tx, models.FactoryPullRequestParams{
+		Provider:   pullRequest.Provider,
+		ExternalID: pullRequest.ExternalID,
+		Repository: pullRequest.Repository,
+		Number:     pullRequest.Number,
+		URL:        pullRequest.URL,
+		Title:      pullRequest.Title,
+		State:      models.FactoryPullRequestStateOpen,
+	}); err != nil {
+		return err
+	}
+
+	_, err = order.CreateArtifact(tx, models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeBranch,
+		Data: map[string]any{
+			"name":       headRef,
+			"repository": headRepo,
+		},
+	})
+	return err
+}
+
+func loadHandOffPullRequests(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	rawURLs []string,
+) ([]*handOffPullRequest, error) {
+	pullRequests := make([]*handOffPullRequest, 0, len(rawURLs))
+	for _, rawURL := range rawURLs {
+		pullRequest, err := loadHandOffPullRequest(ctx, db, deps, factory, rawURL)
+		if err != nil {
+			return nil, err
+		}
+		pullRequests = append(pullRequests, pullRequest)
+	}
+	return pullRequests, nil
 }
 
 func loadHandOffPullRequest(
@@ -697,19 +752,24 @@ func parseGitHubPullRequestURL(rawURL string) (host githubcommon.Host, repositor
 	return host, parts[0] + "/" + parts[1], number, true
 }
 
-func latestTrackedPullRequest(tx *gorm.DB, orderID uuid.UUID) (*models.FactoryPullRequest, error) {
+func trackedPullRequests(tx *gorm.DB, orderID uuid.UUID) ([]models.FactoryPullRequest, error) {
 	grouped, err := models.ListPullRequestsByWorkOrderIDs(tx, []uuid.UUID{orderID})
 	if err != nil {
 		return nil, err
 	}
-	prs := grouped[orderID]
-	if len(prs) == 0 {
-		return nil, nil
-	}
-	return &prs[0], nil
+	return grouped[orderID], nil
 }
 
-func publishVerificationHandOff(ctx context.Context, deps IntakeDependencies, db *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder) (*models.FactoryPullRequest, error) {
+func firstOpenPullRequest(pullRequests []models.FactoryPullRequest) *models.FactoryPullRequest {
+	for i := range pullRequests {
+		if pullRequests[i].State == models.FactoryPullRequestStateOpen {
+			return &pullRequests[i]
+		}
+	}
+	return nil
+}
+
+func publishVerificationHandOff(ctx context.Context, deps IntakeDependencies, db *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder) ([]models.FactoryPullRequest, error) {
 
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),
@@ -718,29 +778,14 @@ func publishVerificationHandOff(ctx context.Context, deps IntakeDependencies, db
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
-	tracked, err := latestTrackedPullRequest(db, order.ID)
+	tracked, err := trackedPullRequests(db, order.ID)
 	if err != nil {
 		return nil, err
 	}
-	trackedPR := tracked
-	if trackedPR != nil && trackedPR.Provider == models.FactoryPullRequestProviderGitHub {
-		ScheduleFactoryPullRequestMergeabilityRefresh(
-			ctx,
-			deps,
-			factory.OrganizationID,
-			factory.ID,
-			trackedPR.ID,
-		)
-		StartVisualEvidenceCapture(
-			ctx,
-			deps,
-			factory.OrganizationID,
-			factory.ID,
-			trackedPR.ID,
-		)
+	for i := range tracked {
+		startPullRequestFollowUps(ctx, deps, factory, &tracked[i])
 	}
-	if trackedPR != nil {
-		StartPullRequestChecks(ctx, deps, trackedPR.ID)
+	if len(tracked) > 0 {
 		if err := StartAutomaticCustomAutomations(ctx, deps, factory, order); err != nil {
 			log.WithError(err).Warnf("Failed to start custom automation for order %s", order.ID)
 		}
@@ -752,5 +797,27 @@ func publishVerificationHandOff(ctx context.Context, deps IntakeDependencies, db
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
-	return trackedPR, nil
+	return tracked, nil
+}
+
+// startPullRequestFollowUps starts the mergeability refresh, visual evidence,
+// and pull request checks for one pull request on the task.
+func startPullRequestFollowUps(ctx context.Context, deps IntakeDependencies, factory *models.Factory, pullRequest *models.FactoryPullRequest) {
+	if pullRequest.Provider == models.FactoryPullRequestProviderGitHub {
+		ScheduleFactoryPullRequestMergeabilityRefresh(
+			ctx,
+			deps,
+			factory.OrganizationID,
+			factory.ID,
+			pullRequest.ID,
+		)
+		StartVisualEvidenceCapture(
+			ctx,
+			deps,
+			factory.OrganizationID,
+			factory.ID,
+			pullRequest.ID,
+		)
+	}
+	StartPullRequestChecks(ctx, deps, pullRequest.ID)
 }

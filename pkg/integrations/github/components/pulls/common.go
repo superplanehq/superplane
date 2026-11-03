@@ -30,6 +30,7 @@ type prCommentTriggerConfiguration struct {
 	AllowedBots              []string `json:"allowedBots" mapstructure:"allowedBots"`
 	IncludeReviewSubmissions *bool    `json:"includeReviewSubmissions" mapstructure:"includeReviewSubmissions"`
 	CommentScope             string   `json:"commentScope" mapstructure:"commentScope"`
+	WorkspaceRepositories    bool     `json:"workspaceRepositories" mapstructure:"workspaceRepositories"`
 }
 
 func (c prCommentTriggerConfiguration) includeReviewSubmissions() bool {
@@ -49,7 +50,12 @@ func (c prCommentTriggerConfiguration) commentScope() string {
 }
 
 func prCommentConfigurationFields() []configuration.Field {
-	return append(prCommentBaseConfigurationFields(), ignoreBotsConfigurationField(), allowedBotsConfigurationField())
+	return append(
+		prCommentBaseConfigurationFields(),
+		ignoreBotsConfigurationField(),
+		allowedBotsConfigurationField(),
+		common.WorkspaceRepositoriesConfigurationField(),
+	)
 }
 
 func prReviewCommentConfigurationFields() []configuration.Field {
@@ -80,6 +86,7 @@ func prReviewCommentConfigurationFields() []configuration.Field {
 		},
 		ignoreBotsConfigurationField(),
 		allowedBotsConfigurationField(),
+		common.WorkspaceRepositoriesConfigurationField(),
 	)
 }
 
@@ -163,6 +170,10 @@ func setupPRCommentTrigger(ctx core.TriggerContext, webhookConfig common.Webhook
 	}
 
 	webhookConfig.Repository = config.Repository
+	webhookConfig, err = common.WorkspaceWebhookConfiguration(ctx.Factory, config.WorkspaceRepositories, webhookConfig)
+	if err != nil {
+		return err
+	}
 	return ctx.Integration.RequestWebhook(webhookConfig)
 }
 

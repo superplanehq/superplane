@@ -708,6 +708,16 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	if params.State == models.FactoryWorkOrderStateClosed && result == models.FactoryWorkOrderResultRejected {
 		result = models.FactoryWorkOrderResultManualRejected
 	}
+	if params.State == models.FactoryWorkOrderStateClosed && params.WhenAllPullRequestsDone {
+		pullRequestResult, done, err := order.PullRequestCloseOutcome(c.tx)
+		if err != nil {
+			return nil, false, err
+		}
+		if !done {
+			return workOrderToCore(order), false, nil
+		}
+		result = pullRequestResult
+	}
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:         params.State,
 		Result:          result,
@@ -1220,13 +1230,28 @@ func (c *FactoryContext) GitHubHost() (string, error) {
 	return host.WebHostname(), nil
 }
 
+func (c *FactoryContext) ListRepositories() ([]string, error) {
+	if c.canvas == nil || c.canvas.FactoryID == nil {
+		return nil, nil
+	}
+	factory, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
+	return factory.WorkspaceRepositories(c.tx)
+}
+
 func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {
 		return nil, err
 	}
+	factoryModel, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
 
-	pullRequest, err := order.CreatePullRequest(c.tx, models.FactoryPullRequestParams{
+	pullRequestParams := models.FactoryPullRequestParams{
 		Provider:   params.Provider,
 		ExternalID: params.ExternalID,
 		Repository: params.Repository,
@@ -1238,7 +1263,11 @@ func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core
 		ClosedAt:   params.ClosedAt,
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
-	})
+	}
+	if err := factoryModel.RequireWorkspacePullRequest(c.tx, pullRequestParams); err != nil {
+		return nil, err
+	}
+	pullRequest, err := order.CreatePullRequest(c.tx, pullRequestParams)
 	if err != nil {
 		return nil, err
 	}
