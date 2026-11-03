@@ -354,6 +354,16 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 	return artifacts, nil
 }
 
+// HasFileArtifact reports whether an artifact of this task stores the file.
+func (o *FactoryWorkOrder) HasFileArtifact(tx *gorm.DB, fileID uuid.UUID) (bool, error) {
+	var count int64
+	err := tx.Model(&FactoryWorkOrderArtifact{}).
+		Where("work_order_id = ? AND type = ? AND data->>'fileId' = ?", o.ID, FactoryWorkOrderArtifactTypeFile, fileID.String()).
+		Count(&count).
+		Error
+	return count > 0, err
+}
+
 // RemoveArtifact deletes one artifact. A key selects that artifact. A title
 // selects the newest unkeyed artifact with that title. It records one
 // timeline event and does not delete git branches.

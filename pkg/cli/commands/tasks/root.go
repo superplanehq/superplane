@@ -285,7 +285,9 @@ Example:
 
 --workspace is a workspace key or UUID. When omitted, the active workspace
 from "superplane workspace active" is used. --task is the task number, key, or UUID.
---type is one of: markdown, branch, link.
+--type is one of: markdown, branch, link, file.
+
+For type file, -f is the file to upload (PNG, JPEG, WebP, WebM, or MP4).
 
 Examples:
   superplane tasks artifacts list --workspace super --task 1823
@@ -313,15 +315,21 @@ Examples:
     --task 1823 \
     --type link \
     --url https://preview.example.com/pr-42 \
-    --title Preview`,
+    --title Preview
+
+  superplane tasks artifacts add \
+    --task 1823 \
+    --type file \
+    --title "Login screen" \
+    -f ./login.png`,
 		Args: cobra.NoArgs,
 	}
 	artifactAddCmd.Flags().StringVar(&artifactAddWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
 	artifactAddCmd.Flags().StringVar(&artifactAddTaskID, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
-	artifactAddCmd.Flags().StringVar(&artifactAddTypeName, "type", "", "artifact type: markdown, branch, or link")
+	artifactAddCmd.Flags().StringVar(&artifactAddTypeName, "type", "", "artifact type: markdown, branch, link, or file")
 	artifactAddCmd.Flags().StringVar(&artifactAddTitle, "title", "", "artifact title")
 	artifactAddCmd.Flags().StringVar(&artifactAddBody, "body", "", "markdown body (inline)")
-	artifactAddCmd.Flags().StringVarP(&artifactAddFile, "file", "f", "", "read markdown body from file (or - for stdin)")
+	artifactAddCmd.Flags().StringVarP(&artifactAddFile, "file", "f", "", "markdown body file (or - for stdin), or the file to upload for type file")
 	artifactAddCmd.Flags().StringVar(&artifactAddURL, "url", "", "artifact URL (required for link)")
 	artifactAddCmd.Flags().StringVar(&artifactAddName, "name", "", "branch name (required for branch)")
 	_ = artifactAddCmd.MarkFlagRequired("task")
@@ -395,9 +403,42 @@ Example:
 		title:     &artifactRemoveTitle,
 	}, options)
 
+	var (
+		artifactGetWorkspace string
+		artifactGetTaskID    string
+		artifactGetID        string
+		artifactGetKey       string
+	)
+	artifactGetCmd := &cobra.Command{
+		Use:   "get",
+		Short: "Show one artifact on a task",
+		Long: `Show one artifact on a task. Markdown artifacts print their body.
+Link and file artifacts print their URL.
+
+Pass --id or --key.
+
+Example:
+  superplane tasks artifacts get --task 1823 --key plan`,
+		Args: cobra.NoArgs,
+	}
+	artifactGetCmd.Flags().StringVar(&artifactGetWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	bindTaskIDFlag(artifactGetCmd, &artifactGetTaskID)
+	artifactGetCmd.Flags().StringVar(&artifactGetID, "id", "", "artifact id")
+	artifactGetCmd.Flags().StringVar(&artifactGetKey, "key", "", "artifact key")
+	_ = artifactGetCmd.MarkFlagRequired("task")
+	core.Bind(artifactGetCmd, &artifactGetCommand{
+		workspace: &artifactGetWorkspace,
+		taskID:    &artifactGetTaskID,
+		id:        &artifactGetID,
+		key:       &artifactGetKey,
+	}, options)
+
 	artifactCmd.AddCommand(artifactAddCmd)
+	artifactCmd.AddCommand(artifactGetCmd)
 	artifactCmd.AddCommand(artifactListCmd)
 	artifactCmd.AddCommand(artifactRemoveCmd)
+
+	root.AddCommand(newChecksCommand(options))
 
 	root.AddCommand(taskListCmd)
 	root.AddCommand(taskDescribeCmd)
