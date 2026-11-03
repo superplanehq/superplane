@@ -48,7 +48,11 @@ func searchBitbucketImportItems(db *gorm.DB, deps IntakeDependencies, factory *m
 		if base := current.Destination.Repository.FullName; base != "" && !strings.EqualFold(base, repository) {
 			continue
 		}
-		items = append(items, &pb.FactoryPullRequestImportItem{Url: importPullRequestURL(models.ProviderBitbucket, repository, current.ID), Title: current.Title, Description: current.Description, Number: current.ID, Draft: current.Draft, Repository: repository, Provider: models.ProviderBitbucket})
+		rawURL, err := importPullRequestURL(db, factory, current.ID)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, &pb.FactoryPullRequestImportItem{Url: rawURL, Title: current.Title, Description: current.Description, Number: current.ID, Draft: current.Draft, Repository: repository, Provider: models.ProviderBitbucket})
 	}
 	return items, nil
 }

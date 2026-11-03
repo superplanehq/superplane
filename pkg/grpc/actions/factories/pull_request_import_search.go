@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -67,7 +68,14 @@ func searchPullRequestImportItems(ctx context.Context, db *gorm.DB, deps IntakeD
 		number = parsed.Number
 	}
 	if number > 0 && (numericErr == nil || strings.Contains(query, "://")) {
-		rawURL := importPullRequestURL(provider, repository, int64(number))
+		rawURL := query
+		if numericErr == nil {
+			var err error
+			rawURL, err = importPullRequestURL(db, factory, int64(number))
+			if err != nil {
+				return nil, err
+			}
+		}
 		pr, err := loadHandOffPullRequest(ctx, db, deps, factory, rawURL)
 		if err != nil {
 			return nil, err
@@ -104,7 +112,7 @@ func searchPullRequestImportItems(ctx context.Context, db *gorm.DB, deps IntakeD
 			if base := pr.GetBase().GetRepo().GetFullName(); base != "" && !strings.EqualFold(base, repository) {
 				continue
 			}
-			items = append(items, &pb.FactoryPullRequestImportItem{Url: importPullRequestURL(provider, repository, int64(pr.GetNumber())), Title: pr.GetTitle(), Description: pr.GetBody(), Number: int64(pr.GetNumber()), Draft: pr.GetDraft(), Repository: repository, Provider: provider})
+			items = append(items, &pb.FactoryPullRequestImportItem{Url: pr.GetHTMLURL(), Title: pr.GetTitle(), Description: pr.GetBody(), Number: int64(pr.GetNumber()), Draft: pr.GetDraft(), Repository: repository, Provider: provider})
 		}
 		return items, nil
 	}
@@ -119,14 +127,19 @@ func searchPullRequestImportItems(ctx context.Context, db *gorm.DB, deps IntakeD
 		if err != nil || issue.GetPullRequestLinks() == nil || issue.GetState() != "open" {
 			continue
 		}
-		items = append(items, &pb.FactoryPullRequestImportItem{Url: importPullRequestURL(provider, repository, int64(parsed.Number)), Title: issue.GetTitle(), Description: issue.GetBody(), Number: int64(parsed.Number), Draft: issue.GetDraft(), Repository: repository, Provider: provider})
+		items = append(items, &pb.FactoryPullRequestImportItem{Url: issue.GetHTMLURL(), Title: issue.GetTitle(), Description: issue.GetBody(), Number: int64(parsed.Number), Draft: issue.GetDraft(), Repository: repository, Provider: provider})
 	}
 	return items, nil
 }
 
-func importPullRequestURL(provider, repository string, number int64) string {
-	if provider == models.ProviderBitbucket {
-		return fmt.Sprintf("https://bitbucket.org/%s/pull-requests/%d", repository, number)
+func importPullRequestURL(db *gorm.DB, factory *models.Factory, number int64) (string, error) {
+	config := factory.OnboardingConfigValue()
+	if config.EffectiveVCSProvider() == models.ProviderBitbucket {
+		return fmt.Sprintf("https://bitbucket.org/%s/pull-requests/%d", config.AppRepository, number), nil
 	}
-	return fmt.Sprintf("https://github.com/%s/pull/%d", repository, number)
+	host, err := githubcommon.HostFromFactoryOnboarding(db, factory.OrganizationID, config)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s/pull/%d", host.RepoURL(config.AppRepository), number), nil
 }
