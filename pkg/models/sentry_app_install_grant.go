@@ -30,22 +30,58 @@ func (SentryAppInstallGrant) TableName() string {
 	return "sentry_app_install_grants"
 }
 
+// ErrSentryAppInstallationDeleted means Sentry already deleted the
+// installation, so SuperPlane must not store a grant for it.
+var ErrSentryAppInstallationDeleted = errors.New("sentry app installation was deleted")
+
 // UpsertSentryAppInstallGrant replaces the grant of an installation. Sentry
 // sends installation.created again after a reinstall, and only the newest
-// grant can complete a connection.
+// grant can complete a connection. A second write of the same grant keeps
+// the tokens and the claim of the first write when it brings no tokens, so
+// a retry cannot erase working credentials. A deleted installation returns
+// ErrSentryAppInstallationDeleted and stores nothing.
 func UpsertSentryAppInstallGrant(tx *gorm.DB, grant SentryAppInstallGrant) error {
 	grant.InstallationUUID = strings.TrimSpace(grant.InstallationUUID)
 	if grant.InstallationUUID == "" || grant.CodeDigest == "" {
 		return nil
 	}
 
-	return tx.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "installation_uuid"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"code_digest", "organization_slug", "access_token", "refresh_token",
-			"token_expires_at", "claimed_integration_id", "expires_at", "updated_at",
-		}),
-	}).Create(&grant).Error
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if err := LockSentryAppInstallation(inner, grant.InstallationUUID); err != nil {
+			return err
+		}
+		deleted, err := SentryAppInstallationDeleted(inner, grant.InstallationUUID)
+		if err != nil {
+			return err
+		}
+		if deleted {
+			return ErrSentryAppInstallationDeleted
+		}
+
+		sameGrant := "sentry_app_install_grants.code_digest = excluded.code_digest"
+		keepWhenEmpty := func(column string) clause.Expr {
+			return gorm.Expr(
+				"CASE WHEN " + sameGrant + " AND excluded." + column + " IS NULL THEN sentry_app_install_grants." + column + " ELSE excluded." + column + " END",
+			)
+		}
+		return inner.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "installation_uuid"}},
+			DoUpdates: clause.Assignments(map[string]any{
+				"code_digest":       gorm.Expr("excluded.code_digest"),
+				"organization_slug": gorm.Expr("excluded.organization_slug"),
+				"access_token":      keepWhenEmpty("access_token"),
+				"refresh_token":     keepWhenEmpty("refresh_token"),
+				"token_expires_at": gorm.Expr(
+					"CASE WHEN " + sameGrant + " AND excluded.access_token IS NULL THEN sentry_app_install_grants.token_expires_at ELSE excluded.token_expires_at END",
+				),
+				"claimed_integration_id": gorm.Expr(
+					"CASE WHEN " + sameGrant + " THEN sentry_app_install_grants.claimed_integration_id ELSE NULL END",
+				),
+				"expires_at": gorm.Expr("excluded.expires_at"),
+				"updated_at": gorm.Expr("excluded.updated_at"),
+			}),
+		}).Create(&grant).Error
+	})
 }
 
 // FindSentryAppInstallGrant returns the grant of an installation when the
@@ -114,8 +150,28 @@ func ClaimSentryAppInstallGrant(tx *gorm.DB, installationUUID, codeDigest, integ
 	return &grants[0], nil
 }
 
+// ForgetSentryAppInstallation records that Sentry deleted an installation
+// and drops its grant in one transaction. A grant write that waits for the
+// same installation lock then sees the deletion and stores nothing.
+func ForgetSentryAppInstallation(tx *gorm.DB, installationUUID string, deletedAt time.Time) error {
+	installationUUID = strings.TrimSpace(installationUUID)
+	if installationUUID == "" {
+		return nil
+	}
+
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if err := LockSentryAppInstallation(inner, installationUUID); err != nil {
+			return err
+		}
+		if err := RecordSentryAppInstallationDeletion(inner, installationUUID, deletedAt); err != nil {
+			return err
+		}
+		return DeleteSentryAppInstallGrant(inner, installationUUID)
+	})
+}
+
 // DeleteSentryAppInstallGrant drops the grant of an installation, for example
-// after Sentry reports that the organization uninstalled the app.
+// after the setup callback binds it.
 func DeleteSentryAppInstallGrant(tx *gorm.DB, installationUUID string) error {
 	installationUUID = strings.TrimSpace(installationUUID)
 	if installationUUID == "" {

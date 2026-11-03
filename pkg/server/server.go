@@ -40,6 +40,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	githubintegration "github.com/superplanehq/superplane/pkg/integrations/github"
+	sentryintegration "github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/llm"
@@ -234,6 +235,16 @@ func startWorkers(
 
 		webhooksBaseURL := getWebhookBaseURL(baseURL)
 		w := workers.NewIntegrationRequestWorker(encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_SENTRY_WEBHOOK_WORKER") == "yes" {
+		log.Println("Starting Sentry Webhook Worker")
+
+		// A worker-only process never serves the browser install route, so
+		// it enables the install grant store here.
+		sentryintegration.EnableHostedInstallBind(encryptor)
+		w := workers.NewSentryWebhookWorker(encryptor, registry)
 		go w.Start(context.Background())
 	}
 

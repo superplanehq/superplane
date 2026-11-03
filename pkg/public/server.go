@@ -965,6 +965,11 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if isDurableSentryWebhook(r, integrationInstance) {
+		s.acceptSentryIntegrationWebhook(w, r, integrationInstance)
+		return
+	}
+
 	s.dispatchIntegrationRequest(w, r, integrationInstance)
 }
 

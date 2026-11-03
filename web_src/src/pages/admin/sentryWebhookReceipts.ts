@@ -1,5 +1,5 @@
 export const SENTRY_WEBHOOKS_HELP =
-  "Recent calls from Sentry. The list shows the event type, project, result, and task ID. It does not show the payload or tokens.";
+  "Recent calls from Sentry. The list shows the event type, project, result, and task ID. HTTP status is the answer that Sentry received. Result is the processing state. The list does not show the payload or tokens.";
 export const SENTRY_WEBHOOKS_EMPTY = "No Sentry webhooks have arrived.";
 export const SENTRY_WEBHOOKS_PROJECT_EMPTY = "No Sentry webhooks match this project.";
 export const SENTRY_WEBHOOKS_PAGE_EMPTY = "This page has no Sentry webhooks.";
@@ -18,6 +18,7 @@ export type SentryWebhookReceipt = {
   issue_short_id: string;
   http_status: number;
   outcome: string;
+  processing_error?: string;
   integration_count: number;
   task_ids?: string[];
 };
@@ -29,19 +30,23 @@ export type SentryWebhooksResponse = {
   limit: number;
 };
 
+// Accepted, No connection, Rejected, and Failed come from the synchronous
+// delivery path. The other outcomes come from the durable inbox.
+const SENTRY_WEBHOOK_OUTCOME_LABELS = new Map<string, string>([
+  ["accepted", "Accepted"],
+  ["no_connection", "No connection"],
+  ["rejected", "Rejected"],
+  ["failed", "Failed"],
+  ["queued", "Queued"],
+  ["processing", "Processing"],
+  ["retrying", "Retrying"],
+  ["blocked", "Blocked"],
+  ["processed", "Processed"],
+  ["filtered", "Filtered"],
+]);
+
 export function sentryWebhookOutcomeLabel(outcome: string) {
-  switch (outcome) {
-    case "accepted":
-      return "Accepted";
-    case "no_connection":
-      return "No connection";
-    case "rejected":
-      return "Rejected";
-    case "failed":
-      return "Failed";
-    default:
-      return outcome || "Unknown";
-  }
+  return SENTRY_WEBHOOK_OUTCOME_LABELS.get(outcome) ?? (outcome || "Unknown");
 }
 
 export function sentryWebhookIssueLabel(receipt: SentryWebhookReceipt) {
