@@ -212,7 +212,7 @@ describe("WorkOrderCard pull request pill", () => {
     expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
   });
 
-  it("keeps Mergeable when a merge confidence check is critical", () => {
+  it("hides Mergeable and shows Status checks passed when a merge confidence check is critical", () => {
     renderCard({
       entry: entryWithScores([{ key: "risk-review", name: "Blast radius", score: 4, maxScore: 5 }]),
       pullRequests: [{ ...openPullRequest, mergeable: true }],
@@ -220,8 +220,8 @@ describe("WorkOrderCard pull request pill", () => {
     });
 
     expect(screen.getByRole("link", { name: "Review pull request #2323." })).toBeInTheDocument();
-    expect(screen.getByTestId("work-order-mergeable-chip")).toHaveTextContent("Mergeable");
-    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
+    expect(screen.getByText("Status checks passed")).toBeInTheDocument();
   });
 
   it("keeps Mergeable when merge confidence scores are caution", () => {
@@ -248,5 +248,19 @@ describe("WorkOrderCard pull request pill", () => {
     });
 
     expect(screen.getByTestId("work-order-mergeable-chip")).toHaveTextContent("Mergeable");
+  });
+
+  it("uses merge confidence checks from the prop when the lines board passes them", () => {
+    renderCard({
+      entry: entryWithScores([{ key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 }]),
+      mergeConfidence: {
+        score: 2,
+        maxScore: 5,
+        checks: [{ key: "security-review", name: "Security", score: 2, maxScore: 5 }],
+      },
+      pullRequests: [{ ...openPullRequest, mergeable: true }],
+    });
+
+    expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
   });
 });

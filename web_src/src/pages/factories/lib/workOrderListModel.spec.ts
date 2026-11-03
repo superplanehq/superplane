@@ -415,7 +415,7 @@ describe("scope + filter + search + ordering", () => {
     ).toBe(1);
   });
 
-  it("Mergeable filter keeps a card when a merge confidence check is critical", () => {
+  it("Mergeable filter drops a card when a merge confidence check is critical", () => {
     const withScores = buildWorkOrderListEntries(
       [
         order({
@@ -449,7 +449,7 @@ describe("scope + filter + search + ordering", () => {
           showPullRequestMerge: true,
         },
       ).map((entry) => entry.id),
-    ).toEqual(["critical-risk", "caution", "unscored"]);
+    ).toEqual(["caution", "unscored"]);
   });
 
   it("search matches on title, description, line, and assignee names", () => {

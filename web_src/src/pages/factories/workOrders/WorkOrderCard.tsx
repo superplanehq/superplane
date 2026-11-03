@@ -11,7 +11,7 @@ import {
 import {
   selectWorkOrderCardPullRequest,
   visibleWorkOrderCardAttentionReasons,
-  workOrderCardPullRequestIsMergeable,
+  workOrderCardPullRequestShowsMergeable,
 } from "../lib/workOrderCardPullRequest";
 import { workOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
@@ -175,6 +175,7 @@ export function WorkOrderCard({
   );
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const source = workOrderCardSource(entry.order);
+  const mergeConfidenceChecks = mergeConfidence ? mergeConfidence.checks : entry.order.checkScores;
   const pullRequestMerge = useExperimentalFeature(organizationId ? organizationId : null);
   const showPullRequestMerge = pullRequestMerge.has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
@@ -186,6 +187,7 @@ export function WorkOrderCard({
     }),
     cardPullRequest,
     showPullRequestMerge,
+    mergeConfidenceChecks,
   );
   return (
     <article
@@ -228,6 +230,7 @@ export function WorkOrderCard({
           cardPullRequest={cardPullRequest}
           hasAgentQuestion={showAgentQuestion}
           showPullRequestMerge={showPullRequestMerge}
+          mergeConfidenceChecks={mergeConfidenceChecks}
         />
         <WorkOrderCardMetaRow
           entryId={entry.id}
@@ -358,6 +361,7 @@ function WorkOrderCardStatusRow({
   cardPullRequest,
   hasAgentQuestion,
   showPullRequestMerge,
+  mergeConfidenceChecks,
 }: {
   entryId: string;
   reasons: WorkOrderAttentionReason[];
@@ -368,6 +372,7 @@ function WorkOrderCardStatusRow({
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
   showPullRequestMerge?: boolean;
+  mergeConfidenceChecks?: { key?: string; score?: number }[];
 }) {
   const showCredit = Boolean(creditLabel) && !reasons.includes("failed");
   if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion && !showCredit) {
@@ -380,7 +385,8 @@ function WorkOrderCardStatusRow({
       {cardPullRequest ? (
         <>
           <WorkOrderPullRequestChip pullRequest={cardPullRequest.pullRequest} extraCount={cardPullRequest.extraCount} />
-          {showPullRequestMerge && workOrderCardPullRequestIsMergeable(cardPullRequest.pullRequest) ? (
+          {showPullRequestMerge &&
+          workOrderCardPullRequestShowsMergeable(cardPullRequest.pullRequest, mergeConfidenceChecks) ? (
             <WorkOrderMergeableChip />
           ) : null}
         </>

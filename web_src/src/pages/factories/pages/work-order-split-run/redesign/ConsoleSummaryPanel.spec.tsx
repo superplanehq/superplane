@@ -35,11 +35,11 @@ function renderPanel(checks: FactoriesWorkOrderCheck[]) {
 }
 
 describe("ConsoleSummaryPanel mergeable chip", () => {
-  it("shows Mergeable when a scored merge confidence metric is critical", () => {
+  it("hides Mergeable when a scored merge confidence metric is critical", () => {
     renderPanel([check("risk-review", 4), check("security-review", 5)]);
 
     expect(screen.getByRole("link", { name: "Review pull request #482." })).toBeInTheDocument();
-    expect(screen.getByTestId("work-order-mergeable-chip")).toHaveTextContent("Mergeable");
+    expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
   });
 
   it("shows Mergeable when scores are caution and other checks do not count", () => {
