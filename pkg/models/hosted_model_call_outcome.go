@@ -160,6 +160,8 @@ func InsertHostedModelCallOutcomes(tx *gorm.DB, inputs []HostedModelCallOutcomeI
 	if len(inputs) == 0 {
 		return nil
 	}
+	now := time.Now()
+	latest := now.Add(time.Minute)
 	rows := make([]HostedModelCallOutcome, 0, len(inputs))
 	for _, input := range inputs {
 		provider := strings.TrimSpace(input.Provider)
@@ -171,7 +173,10 @@ func InsertHostedModelCallOutcomes(tx *gorm.DB, inputs []HostedModelCallOutcomeI
 		}
 		occurredAt := input.OccurredAt
 		if occurredAt.IsZero() {
-			occurredAt = time.Now()
+			occurredAt = now
+		}
+		if occurredAt.After(latest) {
+			continue
 		}
 		rows = append(rows, HostedModelCallOutcome{
 			ID:           uuid.New(),

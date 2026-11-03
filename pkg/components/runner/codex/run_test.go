@@ -119,6 +119,41 @@ process.stdout.write('{"type":"turn.completed","usage":{"input_tokens":1,"output
 	assert.Equal(t, "attempt_1", rows[2].(map[string]any)["outcome"])
 }
 
+func TestCodexRunRecordsProviderErrorFromTheJSONStream(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	resultPath := filepath.Join(taskDir, "result.json")
+	require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	fakeCodex := filepath.Join(taskDir, "codex")
+	require.NoError(t, os.WriteFile(fakeCodex, []byte(`#!/usr/bin/env node
+process.stdout.write('{"type":"error","message":"Rate limit exceeded. Please retry shortly."}\n');
+process.exit(1);
+`), 0o700))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt, "gpt-5")
+	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+		"OPENAI_API_KEY=sk-test-openai-key",
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+resultPath,
+	)
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err, string(out))
+
+	content, err := os.ReadFile(resultPath)
+	require.NoError(t, err)
+	var result map[string]any
+	require.NoError(t, json.Unmarshal(content, &result))
+	rows, ok := result["modelCallOutcomes"].([]any)
+	require.True(t, ok)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "gpt-5", rows[0].(map[string]any)["model"])
+	assert.Equal(t, "error", rows[0].(map[string]any)["outcome"])
+}
+
 func TestCodexModelCallOutcomesMapsSuccessAndProviderFailures(t *testing.T) {
 	stamp := time.Now().UTC().Truncate(time.Millisecond).Format(time.RFC3339Nano)
 	assert.Equal(t, []any{

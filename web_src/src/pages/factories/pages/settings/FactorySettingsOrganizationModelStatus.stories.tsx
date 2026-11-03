@@ -33,3 +33,23 @@ export const ScoredAndEmptyCells: Story = {
     />
   ),
 };
+
+export const Loading: Story = {
+  name: "Loading",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={statusPath}
+      factoriesFixture={{ ...defaultFactoriesFixture, modelStatusDelayMs: 30000 }}
+    />
+  ),
+};
+
+export const CouldNotLoad: Story = {
+  name: "Could not load",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={statusPath}
+      factoriesFixture={{ ...defaultFactoriesFixture, modelStatusError: true }}
+    />
+  ),
+};

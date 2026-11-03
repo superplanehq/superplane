@@ -685,7 +685,7 @@ async function runPrompt(promptFile, model, thinking) {
   if (exitCode !== 0) {
     const failedOutcomes = codexModelCallOutcomes({
       failed: true,
-      errorText: `${codexErrorText(lastResult)}\n${stderr}`,
+      errorText: `${formatter.errorMessage()}\n${codexErrorText(lastResult)}\n${stderr}`,
       model: payload.model,
     });
     outcomes.push(...failedOutcomes);

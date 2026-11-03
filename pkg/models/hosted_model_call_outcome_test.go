@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
@@ -201,4 +202,26 @@ func TestInsertHostedModelCallOutcomesFromLogChunkIsIdempotent(t *testing.T) {
 	require.Len(t, rows, 1)
 	assert.Equal(t, "gpt-5", rows[0].Model)
 	assert.True(t, rows[0].OccurredAt.UTC().Equal(stamp))
+}
+
+func TestInsertHostedModelCallOutcomesRejectsFutureTimestamps(t *testing.T) {
+	_ = support.Setup(t)
+	db := database.DB(t.Context())
+	taskID := "task-future-" + uuid.NewString()
+	t.Cleanup(func() {
+		_ = db.Where("runner_task_id = ?", taskID).Delete(&models.HostedModelCallOutcome{}).Error
+	})
+
+	require.NoError(t, models.InsertHostedModelCallOutcomes(db, []models.HostedModelCallOutcomeInput{{
+		Provider:     models.UsageProviderOpenAI,
+		Model:        "gpt-5",
+		Outcome:      models.HostedModelCallOutcomeAttempt1,
+		OccurredAt:   time.Now().Add(2 * time.Hour),
+		RunnerTaskID: taskID,
+		Sequence:     1,
+	}}))
+
+	var count int64
+	require.NoError(t, db.Model(&models.HostedModelCallOutcome{}).Where("runner_task_id = ?", taskID).Count(&count).Error)
+	assert.Zero(t, count)
 }
