@@ -435,6 +435,10 @@ describe("WorkOrderSplitRunPopup", () => {
       executionId: "planning-execution",
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(
+      factoryQueryKeys.workOrderDetail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, DRAFT_WORK_ORDER.id!),
+      DRAFT_WORK_ORDER,
+    );
     client.setQueryData(canvasKeys.run("planning-canvas", "planning-run"), {
       run: { result: "RESULT_FAILED", errors: ["The selected model is unavailable."] },
     });
@@ -451,8 +455,9 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const alert = await screen.findByRole("alert", { name: "Planning failed" });
     expect(alert).toHaveTextContent("The selected model is unavailable.");
-    expect(alert).toHaveTextContent("Select a model in the task header, then send a new message to continue.");
-    expect(within(alert).queryByRole("button", { name: /Model:/ })).not.toBeInTheDocument();
+    expect(alert).toHaveTextContent("Select a model below, then send a new message to continue.");
+    expect(within(alert).getByRole("button", { name: /Model:/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Model:/ })).toHaveLength(1);
     expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
 
     act(() => {
