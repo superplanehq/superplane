@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	runnerpkg "github.com/superplanehq/superplane/pkg/components/runner"
 )
 
 func TestBitbucketFeedbackAcceptsAbbreviatedCommits(t *testing.T) {
@@ -66,7 +67,18 @@ esac
 			assert.Equal(t, head, string(stored))
 			repo := filepath.Join(dir, "repo")
 			assert.Equal(t, head, strings.TrimSpace(runGit(t, repo, "rev-parse", "HEAD")))
+			setup := exec.Command("bash", "-c", runnerpkg.FactoryRepoCommitSetup())
+			setup.Dir, setup.Env = repo, env
+			output, err = setup.CombinedOutput()
+			require.NoError(t, err, "%s", output)
 			require.NoError(t, os.WriteFile(filepath.Join(repo, "fix.txt"), []byte(test.name), 0o644))
+			if test.name == "full revision" {
+				runGit(t, repo, "add", "fix.txt")
+				signed := exec.Command("git", "commit", "-m", "fix: address feedback")
+				signed.Dir, signed.Env = repo, env
+				output, err = signed.CombinedOutput()
+				require.NoError(t, err, "%s", output)
+			}
 			command = exec.Command("bash", "-c", bitbucketCommitPushCommand("fix: address feedback"))
 			staleEnv := append([]string(nil), env...)
 			for i, value := range staleEnv {

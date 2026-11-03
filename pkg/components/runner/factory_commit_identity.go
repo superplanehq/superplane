@@ -93,20 +93,62 @@ func upsertTaskFile(files []TaskFile, file TaskFile) []TaskFile {
 }
 
 // FactoryRepoCommitSetup runs after clone, inside the repository.
-// It sets the local identity and installs the trailer hook so a later
-// factory reset cannot restore the old hook.
+// It sets the local identity and selects the hooks for ordinary Git commands.
 func FactoryRepoCommitSetup() string {
 	return strings.Join([]string{
+		`set -e`,
 		`git config user.email "` + FactoryAgentEmail + `"`,
 		`git config user.name "` + FactoryAgentName + `"`,
 		`export GIT_AUTHOR_NAME="` + FactoryAgentName + `"`,
 		`export GIT_AUTHOR_EMAIL="` + FactoryAgentEmail + `"`,
 		`export GIT_COMMITTER_NAME="` + FactoryAgentName + `"`,
 		`export GIT_COMMITTER_EMAIL="` + FactoryAgentEmail + `"`,
-		"cat > .git/hooks/prepare-commit-msg <<'HOOK'",
+		`HOOKS_DIR="$(git rev-parse --path-format=absolute --git-common-dir)/hooks"`,
+		`mkdir -p "${HOOKS_DIR}"`,
+		"cat > \"${HOOKS_DIR}/prepare-commit-msg\" <<'HOOK'",
 		FactoryPrepareCommitMessageHook() + "HOOK",
-		"chmod +x .git/hooks/prepare-commit-msg",
+		"chmod +x \"${HOOKS_DIR}/prepare-commit-msg\"",
+		"cat > \"${HOOKS_DIR}/pre-push\" <<'HOOK'",
+		FactoryPrePushHook() + "HOOK",
+		"chmod +x \"${HOOKS_DIR}/pre-push\"",
+		`git rev-parse --verify HEAD > "$(git rev-parse --git-path superplane-checkout-head)" 2>/dev/null || : > "$(git rev-parse --git-path superplane-checkout-head)"`,
+		`git config --local core.hooksPath "${HOOKS_DIR}"`,
 	}, "\n")
+}
+
+// FactoryPrePushHook rejects unsigned commits created after the checkout.
+func FactoryPrePushHook() string {
+	return `#!/bin/sh
+set -eu
+
+base_file=$(git rev-parse --git-path superplane-checkout-head)
+if [ ! -f "$base_file" ]; then
+  echo "Checkout commit is missing. Stop without pushing." >&2
+  exit 1
+fi
+base=$(cat "$base_file")
+signoff='Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>'
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in
+    0000000000000000000000000000000000000000) continue ;;
+  esac
+  if [ -n "$base" ]; then
+    if ! git merge-base --is-ancestor "$base" "$local_sha"; then
+      echo "Local commits do not descend from checkout. Stop without pushing." >&2
+      exit 1
+    fi
+    commits=$(git rev-list "$base..$local_sha")
+  else
+    commits=$(git rev-list "$local_sha")
+  fi
+  for commit in $commits; do
+    if ! git log -1 --format=%B "$commit" | git interpret-trailers --parse | grep -Fqx "$signoff"; then
+      echo "Unsigned commit $commit. Stop without pushing." >&2
+      exit 1
+    fi
+  done
+done
+`
 }
 
 // FactoryPrepareCommitMessageHook drops other agent trailers from the

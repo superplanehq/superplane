@@ -244,10 +244,7 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 }
 
 func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
-	steps := []any{}
-	if !request.OmitCommitIdentity {
-		steps = append(steps, prFeedbackCommitIdentitySteps()...)
-	}
+	steps := prFeedbackCommitIdentitySteps()
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return append(steps,
 			map[string]any{
@@ -275,7 +272,7 @@ func prFeedbackGitHubCommitPushStep() map[string]any {
 		"name":             "Commit and Push",
 		"type":             "bash",
 		"workingDirectory": "repo",
-		"command": strings.Join([]string{
+		"command": strings.Join(append([]string{
 			"set -euo pipefail",
 			`REMOTE_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${GITHUB_API_URL:-` + githubcommon.DotCom().APIURLEnv() + `}/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.sha)`,
 			`if [ -z "${REMOTE_HEAD}" ] || [ "${REMOTE_HEAD}" = "null" ]; then`,
@@ -286,12 +283,7 @@ func prFeedbackGitHubCommitPushStep() map[string]any {
 			`  echo "Remote pull request head changed. Stop without pushing."`,
 			"  exit 0",
 			"fi",
-			"git add -A",
-			"if ! git diff --cached --quiet; then",
-			`  git commit -s -m "fix: repair failing checks on PR #${PR_NUMBER}"`,
-			"  git push origin HEAD",
-			"fi",
-		}, "\n"),
+		}, prFeedbackCommitPushLines("fix: repair failing checks on PR #${PR_NUMBER}", "git push origin HEAD")...), "\n"),
 	}
 }
 

@@ -1002,7 +1002,6 @@ func materializePRFeedbackDefaults(
 		VCSProvider:            factoryVCSProviderOrDefault(factory),
 		AgentSettings:          prFeedbackAgentSettingsFromGraph(graph, spec, savedSettings),
 		TriggerSettings:        prFeedbackTriggerSettingsFromGraph(graph, savedSettings),
-		OmitCommitIdentity:     true,
 	}
 
 	templateID := prFeedbackDiscussionTemplateID
