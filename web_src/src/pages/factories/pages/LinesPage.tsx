@@ -1,3 +1,4 @@
+import { PullRequestImportPicker } from "./PullRequestImportPicker";
 import { IntakeOwnerCreationDialog } from "./IntakeOwnerCreationDialog";
 import { SubscriptionIntakeOwnerRecovery } from "./SubscriptionIntakeOwnerRecovery";
 import type {
@@ -1735,6 +1736,16 @@ function PhaseBoard({
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
         <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
         <VerifyColumn
+          importPicker={
+            lineId ? (
+              <PullRequestImportPicker
+                organizationId={organizationId}
+                factoryId={factoryId}
+                lineId={lineId}
+                onOpenTask={onOpenWorkOrder}
+              />
+            ) : undefined
+          }
           orders={verifyOrders}
           title={verifyTitle}
           scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "verify") : undefined}
@@ -1781,6 +1792,7 @@ function PhaseBoard({
 }
 
 function VerifyColumn({
+  importPicker,
   orders,
   title,
   listeners,
@@ -1800,6 +1812,7 @@ function VerifyColumn({
   cardsPending,
   scrollPersistenceKey,
 }: {
+  importPicker?: ReactNode;
   orders: FactoriesWorkOrder[];
   title: string;
   listeners: LaneListener[];
@@ -1842,6 +1855,7 @@ function VerifyColumn({
       className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
+          {importPicker}
           {automationRowCount ? null : (
             <ColumnAutomationsHeaderSlot
               title={title}
