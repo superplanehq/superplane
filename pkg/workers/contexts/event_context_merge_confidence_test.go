@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,8 @@ func TestBitbucketMergeConfidenceDoesNotRestartOnDescriptionUpdates(t *testing.T
 		Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata("risk-score", 1)),
 	}}, nil)
 	events := NewEventContext(db, &nodes[0], nil, nil)
-	emit := func(revision, base string) int64 {
+	updatedAt := time.Now().Add(-time.Hour)
+	emitAt := func(revision, base string, at time.Time) int64 {
 		t.Helper()
 		require.NoError(t, events.Emit("bitbucket.pullRequest", map[string]any{
 			"pullRequest": map[string]any{"id": "tracked-pr"},
@@ -28,11 +30,19 @@ func TestBitbucketMergeConfidenceDoesNotRestartOnDescriptionUpdates(t *testing.T
 				"head": map[string]any{"sha": revision},
 				"base": map[string]any{"ref": base},
 			},
-			"pullrequest": map[string]any{"description": "Updated merge confidence section"},
+			"pullrequest": map[string]any{
+				"description": "Updated merge confidence section",
+				"updated_on":  at.UTC().Format(time.RFC3339Nano),
+			},
 		}))
 		var count int64
 		require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&count).Error)
 		return count
+	}
+	emit := func(revision, base string) int64 {
+		t.Helper()
+		updatedAt = updatedAt.Add(time.Minute)
+		return emitAt(revision, base, updatedAt)
 	}
 	assert.EqualValues(t, 1, emit("abc", "main"))
 	assert.EqualValues(t, 1, emit("abc", "main"), "publication must not start an assessment for the same diff")
@@ -40,9 +50,11 @@ func TestBitbucketMergeConfidenceDoesNotRestartOnDescriptionUpdates(t *testing.T
 	assert.EqualValues(t, 3, emit("next", "develop"), "a retargeted PR starts an assessment")
 	assert.EqualValues(t, 3, emit("next", "develop"))
 	assert.EqualValues(t, 4, emit("next", "main"), "a return to an earlier target starts an assessment")
+	assert.EqualValues(t, 4, emitAt("abc", "main", updatedAt.Add(-time.Minute)), "a delayed webhook for an earlier state must not start an assessment")
+	assert.EqualValues(t, 5, emit("abc", "main"), "a later update to an earlier head starts an assessment")
 	// An explicit rerun bypasses webhook deduplication.
 	require.NoError(t, events.Emit("factory.mergeConfidence", map[string]any{}))
 	var count int64
 	require.NoError(t, db.Model(&models.CanvasEvent{}).Where("workflow_id = ?", canvas.ID).Count(&count).Error)
-	assert.EqualValues(t, 5, count)
+	assert.EqualValues(t, 6, count)
 }
