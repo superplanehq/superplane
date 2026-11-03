@@ -70,7 +70,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, liveVersion.Nodes, 15)
 		assert.Len(t, liveVersion.Edges, 12)
-		assertLivePRFeedbackOmitsCommitIdentity(t, liveVersion.Nodes,
+		assertLivePRFeedbackIncludesCommitIdentity(t, liveVersion.Nodes,
 			prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID)
 		for _, node := range liveVersion.Nodes {
 			assert.NotEqual(t, "noop", node.ComponentName())
@@ -234,7 +234,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		assert.Len(t, liveVersion.Nodes, 9)
-		assertLivePRFeedbackOmitsCommitIdentity(t, liveVersion.Nodes, prFeedbackRunnerNodeID)
+		assertLivePRFeedbackIncludesCommitIdentity(t, liveVersion.Nodes, prFeedbackRunnerNodeID)
 		var foundWait bool
 		for _, node := range liveVersion.Nodes {
 			if node.ID == prFeedbackWaitChecksNodeID {
@@ -245,6 +245,34 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		}
 		assert.True(t, foundWait)
 		assertLivePRFeedbackConcurrency(t, canvas.ID, liveVersion.Nodes)
+	})
+
+	t.Run("Bitbucket creation includes commit setup for both feedback sources", func(t *testing.T) {
+		for _, source := range []pb.FactoryPRFeedbackHandler_Source{
+			pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION,
+			pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS,
+		} {
+			t.Run(source.String(), func(t *testing.T) {
+				factory := newFactory(t)
+				appRepo, provider := "acme/app", models.ProviderBitbucket
+				require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+					AppRepository: &appRepo,
+					VCSProvider:   &provider,
+				}))
+				request := &pb.CreateFactoryPRFeedbackHandlerRequest{Source: source}
+				if source == pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS {
+					request.Settings = &pb.FactoryPRFeedbackHandler_Settings{
+						Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{Names: []string{"lint"}},
+					}
+				}
+				handler := create(t, factory, request)
+				canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
+				require.NoError(t, err)
+				version, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+				require.NoError(t, err)
+				assertLivePRFeedbackIncludesCommitIdentity(t, version.Nodes, prFeedbackRunnerNodeID)
+			})
+		}
 	})
 
 	t.Run("checks creation rejects an invalid attempt limit", func(t *testing.T) {
@@ -373,7 +401,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 	})
 }
 
-func assertLivePRFeedbackOmitsCommitIdentity(t *testing.T, nodes []models.Node, nodeIDs ...string) {
+func assertLivePRFeedbackIncludesCommitIdentity(t *testing.T, nodes []models.Node, nodeIDs ...string) {
 	t.Helper()
 
 	for _, nodeID := range nodeIDs {
@@ -385,13 +413,16 @@ func assertLivePRFeedbackOmitsCommitIdentity(t *testing.T, nodes []models.Node, 
 			found = true
 			steps, ok := node.Configuration["steps"].([]any)
 			require.True(t, ok, "runner %s has no steps", nodeID)
+			var hasGitUser, hasDCOSigning bool
 			for _, item := range steps {
 				step, ok := item.(map[string]any)
 				require.True(t, ok)
 				name, _ := step["name"].(string)
-				assert.NotEqual(t, "Set Up Git User", name)
-				assert.NotEqual(t, "Set Up DCO Signing", name)
+				hasGitUser = hasGitUser || name == "Set Up Git User"
+				hasDCOSigning = hasDCOSigning || name == "Set Up DCO Signing"
 			}
+			assert.True(t, hasGitUser)
+			assert.True(t, hasDCOSigning)
 		}
 		assert.Truef(t, found, "missing runner %s", nodeID)
 	}

@@ -92,21 +92,156 @@ func upsertTaskFile(files []TaskFile, file TaskFile) []TaskFile {
 	return append(files, file)
 }
 
+// factoryRepoHookNames lists the client hooks that the factory hooks
+// directory forwards to the repository hooks directory.
+var factoryRepoHookNames = []string{
+	"applypatch-msg",
+	"pre-applypatch",
+	"post-applypatch",
+	"pre-commit",
+	"pre-merge-commit",
+	"commit-msg",
+	"post-commit",
+	"pre-rebase",
+	"post-checkout",
+	"post-merge",
+	"post-rewrite",
+	"push-to-checkout",
+	"pre-auto-gc",
+	"reference-transaction",
+	"sendemail-validate",
+	"post-index-change",
+}
+
 // FactoryRepoCommitSetup runs after clone, inside the repository.
-// It sets the local identity and installs the trailer hook so a later
-// factory reset cannot restore the old hook.
+// It sets the local identity and points core.hooksPath at a factory hooks
+// directory. That directory chains the factory hooks with the hooks that
+// the repository already selected (core.hooksPath or .git/hooks), so
+// Husky, .githooks, and similar setups keep running. Running the setup
+// again keeps the first recorded repository hooks directory.
 func FactoryRepoCommitSetup() string {
 	return strings.Join([]string{
+		`set -e`,
 		`git config user.email "` + FactoryAgentEmail + `"`,
 		`git config user.name "` + FactoryAgentName + `"`,
 		`export GIT_AUTHOR_NAME="` + FactoryAgentName + `"`,
 		`export GIT_AUTHOR_EMAIL="` + FactoryAgentEmail + `"`,
 		`export GIT_COMMITTER_NAME="` + FactoryAgentName + `"`,
 		`export GIT_COMMITTER_EMAIL="` + FactoryAgentEmail + `"`,
-		"cat > .git/hooks/prepare-commit-msg <<'HOOK'",
+		`_sp_hooks_dir="$(git rev-parse --path-format=absolute --git-common-dir)/superplane-hooks"`,
+		`_sp_original_file="${_sp_hooks_dir}/original-hooks-path"`,
+		`_sp_original_hooks="$(git rev-parse --path-format=absolute --git-path hooks)"`,
+		`if [ "${_sp_original_hooks}" = "${_sp_hooks_dir}" ]; then`,
+		`  _sp_original_hooks="$(cat "${_sp_original_file}" 2>/dev/null || true)"`,
+		`fi`,
+		`if [ -z "${_sp_original_hooks}" ] || [ "${_sp_original_hooks}" = "${_sp_hooks_dir}" ]; then`,
+		`  _sp_original_hooks="$(git rev-parse --path-format=absolute --git-common-dir)/hooks"`,
+		`fi`,
+		`mkdir -p "${_sp_hooks_dir}"`,
+		`printf '%s\n' "${_sp_original_hooks}" > "${_sp_original_file}"`,
+		"cat > \"${_sp_hooks_dir}/superplane-prepare-commit-msg\" <<'HOOK'",
 		FactoryPrepareCommitMessageHook() + "HOOK",
-		"chmod +x .git/hooks/prepare-commit-msg",
+		"cat > \"${_sp_hooks_dir}/superplane-pre-push\" <<'HOOK'",
+		FactoryPrePushHook() + "HOOK",
+		"cat > \"${_sp_hooks_dir}/prepare-commit-msg\" <<'HOOK'",
+		factoryChainedPrepareCommitMessageHook() + "HOOK",
+		"cat > \"${_sp_hooks_dir}/pre-push\" <<'HOOK'",
+		factoryChainedPrePushHook() + "HOOK",
+		`for _sp_hook in ` + strings.Join(factoryRepoHookNames, " ") + `; do`,
+		"cat > \"${_sp_hooks_dir}/${_sp_hook}\" <<'HOOK'",
+		factoryForwardingHook() + "HOOK",
+		`done`,
+		`chmod +x "${_sp_hooks_dir}/superplane-prepare-commit-msg" "${_sp_hooks_dir}/superplane-pre-push" "${_sp_hooks_dir}/prepare-commit-msg" "${_sp_hooks_dir}/pre-push"`,
+		`for _sp_hook in ` + strings.Join(factoryRepoHookNames, " ") + `; do chmod +x "${_sp_hooks_dir}/${_sp_hook}"; done`,
+		`git rev-parse --verify HEAD > "$(git rev-parse --git-path superplane-checkout-head)" 2>/dev/null || : > "$(git rev-parse --git-path superplane-checkout-head)"`,
+		`git config --local core.hooksPath "${_sp_hooks_dir}"`,
+		`unset _sp_hooks_dir _sp_original_file _sp_original_hooks _sp_hook`,
 	}, "\n")
+}
+
+// factoryForwardingHook runs the repository hook with the same name when
+// the repository hooks directory has an executable hook.
+func factoryForwardingHook() string {
+	return `#!/bin/sh
+original="$(cat "$(dirname "$0")/original-hooks-path")/$(basename "$0")"
+[ -x "$original" ] || exit 0
+exec "$original" "$@"
+`
+}
+
+// factoryChainedPrepareCommitMessageHook runs the repository hook first.
+// The factory hook runs last, so it controls the final trailers.
+func factoryChainedPrepareCommitMessageHook() string {
+	return `#!/bin/sh
+set -u
+dir="$(dirname "$0")"
+original="$(cat "$dir/original-hooks-path")/prepare-commit-msg"
+if [ -x "$original" ]; then
+  "$original" "$@" || exit $?
+fi
+exec "$dir/superplane-prepare-commit-msg" "$@"
+`
+}
+
+// factoryChainedPrePushHook gives the same ref list on stdin to the
+// factory sign-off check and to the repository hook.
+func factoryChainedPrePushHook() string {
+	return `#!/bin/sh
+set -u
+dir="$(dirname "$0")"
+original="$(cat "$dir/original-hooks-path")/pre-push"
+refs="$(mktemp)" || exit 1
+trap 'rm -f "$refs"' EXIT
+cat > "$refs"
+"$dir/superplane-pre-push" "$@" < "$refs" || exit $?
+if [ -x "$original" ]; then
+  "$original" "$@" < "$refs" || exit $?
+fi
+exit 0
+`
+}
+
+// FactoryPrePushHook rejects unsigned SuperPlane Agent commits created
+// after the checkout. Commits that remote-tracking refs already contain
+// are not checked. Commits without the agent as author or committer are
+// imported history, for example a merge of the base branch, and are not
+// checked. The DCO check on the pull request still covers them.
+func FactoryPrePushHook() string {
+	return `#!/bin/sh
+set -eu
+
+base_file=$(git rev-parse --git-path superplane-checkout-head)
+if [ ! -f "$base_file" ]; then
+  echo "Checkout commit is missing. Stop without pushing." >&2
+  exit 1
+fi
+base=$(cat "$base_file")
+agent_email='superplaneagent@superplane.com'
+signoff="Signed-off-by: SuperPlane Agent <${agent_email}>"
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in
+    0000000000000000000000000000000000000000) continue ;;
+  esac
+  if [ -n "$base" ]; then
+    if ! git merge-base --is-ancestor "$base" "$local_sha"; then
+      echo "Local commits do not descend from checkout. Stop without pushing." >&2
+      exit 1
+    fi
+    commits=$(git rev-list "$local_sha" --not "$base" --remotes)
+  else
+    commits=$(git rev-list "$local_sha" --not --remotes)
+  fi
+  for commit in $commits; do
+    if ! git log -1 --format='%ae%n%ce' "$commit" | tr '[:upper:]' '[:lower:]' | grep -Fqx "$agent_email"; then
+      continue
+    fi
+    if ! git log -1 --format=%B "$commit" | git interpret-trailers --parse | grep -Fqx "$signoff"; then
+      echo "Unsigned commit $commit. Stop without pushing." >&2
+      exit 1
+    fi
+  done
+done
+`
 }
 
 // FactoryPrepareCommitMessageHook drops other agent trailers from the
@@ -195,6 +330,12 @@ ${line}"
 rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"
 trap 'rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"' EXIT
 : > "$kept_file"
+
+# Git writes a merge message without a final newline. Without it,
+# the sign-off lands on the subject paragraph and is not a trailer.
+if [ -s "$msg_file" ] && [ -n "$(tail -c 1 "$msg_file")" ]; then
+  printf '\n' >> "$msg_file"
+fi
 
 bounds=$(awk '
 function is_blank(line) { return line ~ /^[ \t]*$/ }
