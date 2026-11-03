@@ -78,14 +78,20 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	}
 
 	created := true
+	var mergeConfidence mergeConfidenceWebhookIdentity
 	if dedupKey == "" {
+		mergeConfidence = mergeConfidenceWebhookDedupKey(s.node, payloadType, payload)
+	}
+	if dedupKey == "" && mergeConfidence.Key == "" {
 		var suppress bool
 		dedupKey, suppress = customAutomationWebhookPolicy(s.tx, s.node, payloadType, payload)
 		if suppress {
 			return nil
 		}
 	}
-	if dedupKey != "" && s.run == nil {
+	if mergeConfidence.Key != "" && s.run == nil {
+		created, err = s.node.CreateRootEventUnlessLatestInScope(s.tx, &event, mergeConfidence.Scope, mergeConfidence.Key, mergeConfidence.isRedundantAfter)
+	} else if dedupKey != "" && s.run == nil {
 		created, err = s.node.CreateDeduplicatedRootEvent(s.tx, &event, dedupKey)
 	} else if payloadType == "github.pullRequest" && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.Ref.Data().Trigger != nil && s.node.Ref.Data().Trigger.Name == "github.onPullRequest" {
 		created, err = s.node.CreateGitHubChecksEvent(s.tx, &event)
@@ -115,6 +121,102 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	}
 
 	return nil
+}
+
+// mergeConfidenceWebhookIdentity identifies the diff that an automatic
+// Bitbucket merge confidence start assesses.
+type mergeConfidenceWebhookIdentity struct {
+	// Scope is the dedup key prefix for all starts of one pull request.
+	Scope string
+	// Key identifies the head commit and the destination branch.
+	Key string
+	// UpdatedAt is the Bitbucket update time of the pull request in the event.
+	UpdatedAt time.Time
+}
+
+// isRedundantAfter reports whether the newest start for the pull request makes
+// this start unnecessary. A start for the same diff is redundant, so a
+// description update cannot start a loop. A delayed webhook for an earlier
+// pull request state is also redundant. Without this check, an old head could
+// start after the current head and hide the current result.
+func (m mergeConfidenceWebhookIdentity) isRedundantAfter(latest models.CanvasEvent) bool {
+	if latest.DedupKey != nil && *latest.DedupKey == m.Key {
+		return true
+	}
+	latestUpdatedAt, ok := bitbucketPullRequestUpdatedAt(latest.Data.Data())
+	if !ok || m.UpdatedAt.IsZero() {
+		return false
+	}
+	return m.UpdatedAt.Before(latestUpdatedAt)
+}
+
+// bitbucketPullRequestUpdatedAt reads pullrequest.updated_on from a stored
+// event envelope.
+func bitbucketPullRequestUpdatedAt(stored any) (time.Time, bool) {
+	envelope, _ := stored.(map[string]any)
+	payload, _ := envelope["data"].(map[string]any)
+	return parseBitbucketPullRequestUpdatedAt(payload)
+}
+
+func parseBitbucketPullRequestUpdatedAt(payload map[string]any) (time.Time, bool) {
+	pullRequest, _ := payload["pullrequest"].(map[string]any)
+	value, _ := pullRequest["updated_on"].(string)
+	if strings.TrimSpace(value) == "" {
+		return time.Time{}, false
+	}
+	updatedAt, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(value))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return updatedAt, true
+}
+
+// Bitbucket emits PR updates for description edits and can deliver webhooks
+// late. Skip an automatic merge confidence start when the newest start for the
+// PR has the same head and destination branch, or when the newest start
+// reflects a later PR update. A retargeted PR gets a new assessment, also when
+// it returns to an earlier destination. Explicit reruns use a different
+// payload type and remain available.
+func mergeConfidenceWebhookDedupKey(node *models.CanvasNode, payloadType string, payload any) mergeConfidenceWebhookIdentity {
+	if node == nil || node.Type != models.NodeTypeTrigger || payloadType != "bitbucket.pullRequest" {
+		return mergeConfidenceWebhookIdentity{}
+	}
+	template, _ := node.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
+	if template["id"] != "risk-score" {
+		return mergeConfidenceWebhookIdentity{}
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return mergeConfidenceWebhookIdentity{}
+	}
+	var identity struct {
+		PullRequest struct {
+			ID string `json:"id"`
+		} `json:"pullRequest"`
+		View struct {
+			Head struct {
+				SHA string `json:"sha"`
+			} `json:"head"`
+			Base struct {
+				Ref string `json:"ref"`
+			} `json:"base"`
+		} `json:"pull_request"`
+		Raw map[string]any `json:"pullrequest"`
+	}
+	if err := json.Unmarshal(raw, &identity); err != nil {
+		return mergeConfidenceWebhookIdentity{}
+	}
+	if identity.PullRequest.ID == "" || identity.View.Head.SHA == "" {
+		return mergeConfidenceWebhookIdentity{}
+	}
+	// Git ref names cannot contain ":", so the key parts stay unambiguous.
+	scope := "merge-confidence:" + identity.PullRequest.ID + ":"
+	updatedAt, _ := parseBitbucketPullRequestUpdatedAt(map[string]any{"pullrequest": identity.Raw})
+	return mergeConfidenceWebhookIdentity{
+		Scope:     scope,
+		Key:       scope + identity.View.Head.SHA + ":" + identity.View.Base.Ref,
+		UpdatedAt: updatedAt,
+	}
 }
 
 func customAutomationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (string, bool) {

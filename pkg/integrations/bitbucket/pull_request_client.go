@@ -37,7 +37,7 @@ type CreatePullRequestRequest struct {
 
 type UpdatePullRequestRequest struct {
 	Title       string
-	Description string
+	Description *string
 }
 
 // APIError carries the Bitbucket HTTP status with the response message so
@@ -191,8 +191,8 @@ func (c *Client) UpdatePullRequest(repository string, id int64, request UpdatePu
 	if request.Title != "" {
 		body["title"] = request.Title
 	}
-	if request.Description != "" {
-		body["description"] = request.Description
+	if request.Description != nil {
+		body["description"] = *request.Description
 	}
 
 	var pullRequest map[string]any
@@ -280,6 +280,7 @@ type BitbucketPullRequest struct {
 	State               string `json:"state"`
 	Draft               bool   `json:"draft"`
 	Title               string `json:"title"`
+	Description         string `json:"description"`
 	HTMLURL             string
 	SourceRepository    string
 	SourceHash          string
@@ -297,11 +298,12 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 	}
 
 	var response struct {
-		ID    int64  `json:"id"`
-		State string `json:"state"`
-		Draft bool   `json:"draft"`
-		Title string `json:"title"`
-		Links struct {
+		ID          int64  `json:"id"`
+		State       string `json:"state"`
+		Draft       bool   `json:"draft"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Links       struct {
 			HTML struct {
 				Href string `json:"href"`
 			} `json:"html"`
@@ -339,6 +341,7 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 		State:               response.State,
 		Draft:               response.Draft,
 		Title:               response.Title,
+		Description:         response.Description,
 		HTMLURL:             response.Links.HTML.Href,
 		SourceRepository:    response.Source.Repository.FullName,
 		SourceHash:          response.Source.Commit.Hash,
