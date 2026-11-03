@@ -279,6 +279,7 @@ Example:
 		artifactAddFile      string
 		artifactAddURL       string
 		artifactAddName      string
+		artifactAddFileID    string
 	)
 
 	artifactAddCmd := &cobra.Command{
@@ -291,6 +292,8 @@ from "superplane workspace active" is used. --task is the task number, key, or U
 --type is one of: markdown, branch, link, file.
 
 For type file, -f is the file to upload (PNG, JPEG, WebP, WebM, or MP4).
+If the upload succeeds but the attach fails, pass --file-id to attach that
+file without a new upload.
 
 Examples:
   superplane tasks artifacts list --workspace super --task 1823
@@ -335,6 +338,7 @@ Examples:
 	artifactAddCmd.Flags().StringVarP(&artifactAddFile, "file", "f", "", "markdown body file (or - for stdin), or the file to upload for type file")
 	artifactAddCmd.Flags().StringVar(&artifactAddURL, "url", "", "artifact URL (required for link)")
 	artifactAddCmd.Flags().StringVar(&artifactAddName, "name", "", "branch name (required for branch)")
+	artifactAddCmd.Flags().StringVar(&artifactAddFileID, "file-id", "", "id of an uploaded file to attach (type file)")
 	_ = artifactAddCmd.MarkFlagRequired("type")
 	core.Bind(artifactAddCmd, &artifactAddCommand{
 		workspace: &artifactAddWorkspace,
@@ -345,6 +349,7 @@ Examples:
 		file:      &artifactAddFile,
 		url:       &artifactAddURL,
 		name:      &artifactAddName,
+		fileID:    &artifactAddFileID,
 	}, options)
 
 	var (

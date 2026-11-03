@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -135,6 +136,50 @@ func TestAddFileArtifactUploadsTheFile(t *testing.T) {
 	assert.Equal(t, "image/png", uploadType)
 	assert.Equal(t, "TYPE_FILE", artifactRequest.Type)
 	assert.Equal(t, map[string]any{"fileId": "file-1", "title": "Login screen"}, artifactRequest.Data)
+}
+
+func TestAddFileArtifactCanRetryTheAttachWithoutANewUpload(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "login.png")
+	require.NoError(t, os.WriteFile(path, []byte("png-bytes"), 0o600))
+	attachFails := true
+	var requests []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.Method+" "+r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/factories/factory-1/orders/1823/files":
+			_, _ = w.Write([]byte(`{"file":{"id":"file-1"}}`))
+		case "/api/v1/files/file-1/content":
+			w.WriteHeader(http.StatusNoContent)
+		case "/api/v1/factories/factory-1/orders/1823/artifacts":
+			if attachFails {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"message":"try again"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"artifact":{"id":"artifact-1","type":"TYPE_FILE"}}`))
+		}
+	}))
+	t.Cleanup(server.Close)
+	ctx, _ := newTasksTestContext(t, server.URL)
+	workspace, taskID, typ, noID, empty := "factory-1", "1823", "file", "", ""
+
+	err := (&artifactAddCommand{workspace: &workspace, taskID: &taskID, typ: &typ, file: &path, fileID: &noID}).Execute(ctx)
+	require.ErrorContains(t, err, "retry with --file-id file-1")
+
+	attachFails = false
+	requests = nil
+	fileID := "file-1"
+	err = (&artifactAddCommand{workspace: &workspace, taskID: &taskID, typ: &typ, file: &empty, fileID: &fileID}).Execute(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"POST /api/v1/factories/factory-1/orders/1823/artifacts"}, requests)
+}
+
+func TestAddFileArtifactRejectsALongTitleBeforeTheUpload(t *testing.T) {
+	workspace, taskID, typ, path := "factory-1", "1823", "file", "login.png"
+	title := strings.Repeat("a", maxFileArtifactTitleBytes+1)
+	err := (&artifactAddCommand{workspace: &workspace, taskID: &taskID, typ: &typ, file: &path, title: &title}).Execute(core.CommandContext{})
+	require.ErrorContains(t, err, "--title must be at most")
 }
 
 func TestAddFileArtifactRejectsAnUnsupportedFile(t *testing.T) {
