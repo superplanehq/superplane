@@ -44,12 +44,16 @@ func PublishMergeConfidenceWithOutcome(ctx context.Context, db *gorm.DB, deps In
 	if run.WorkflowID != canvasID || run.State != models.CanvasRunStateFinished {
 		return skippedMergeConfidence("Source run is not finished in this canvas."), nil
 	}
-	return publishMergeConfidenceRun(ctx, db, deps, run, run.Result == models.CanvasRunResultPassed, baseURL)
+	return publishMergeConfidenceRun(ctx, db, deps, run, run.Result == models.CanvasRunResultPassed, baseURL, nil)
 }
+
+// publicationStillActive reports whether the caller still wants the write.
+// The publication action uses it to stop after run or execution cancellation.
+type publicationStillActive func(*gorm.DB) (bool, error)
 
 // The direct continuation runs before the canvas run finishes. Its incoming
 // agent output supplies the assessment result independently of publication.
-func publishMergeConfidenceRun(ctx context.Context, db *gorm.DB, deps IntakeDependencies, run *models.CanvasRun, assessmentPassed bool, baseURL string) (outcome MergeConfidencePublicationOutcome, err error) {
+func publishMergeConfidenceRun(ctx context.Context, db *gorm.DB, deps IntakeDependencies, run *models.CanvasRun, assessmentPassed bool, baseURL string, stillActive publicationStillActive) (outcome MergeConfidencePublicationOutcome, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	db = db.WithContext(ctx)
@@ -152,10 +156,17 @@ func publishMergeConfidenceRun(ctx context.Context, db *gorm.DB, deps IntakeDepe
 	}
 	return publishMergeConfidenceDescription(ctx, client, pr, assessment, logger, func() (bool, error) {
 		// New assessments can attach while the provider reads the description.
+		// A user can also cancel the run during that read.
 		// Recheck immediately before writing, without holding a connection at I/O.
 		current, err := claim.IsCurrent(db)
 		if err != nil || !current {
 			return false, err
+		}
+		if stillActive != nil {
+			active, err := stillActive(db)
+			if err != nil || !active {
+				return false, err
+			}
 		}
 		latest, err := newestMergeConfidenceAssessment(db, pr, run.ID)
 		return latest != nil, err

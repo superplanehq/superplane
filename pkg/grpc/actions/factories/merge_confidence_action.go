@@ -65,9 +65,26 @@ func ProcessMergeConfidencePublicationRequest(ctx context.Context, deps IntakeDe
 	}
 
 	baseURL, _ := attempt.request.Spec.Data().InvokeAction.Parameters["baseURL"].(string)
-	outcome, publishErr := publishMergeConfidenceRun(ctx, db, deps, attempt.source, attempt.assessmentPassed, baseURL)
+	outcome, publishErr := publishMergeConfidenceRun(ctx, db, deps, attempt.source, attempt.assessmentPassed, baseURL, attempt.stillActive)
 	err = db.Transaction(func(tx *gorm.DB) error { return attempt.finish(tx, outcome, publishErr) })
 	return attempt.events, err
+}
+
+// stillActive rereads the run and the execution. A cancellation that arrives
+// while the provider reads the description must stop the write.
+func (a *mergeConfidenceActionAttempt) stillActive(db *gorm.DB) (bool, error) {
+	execution, err := models.FindNodeExecutionInTransaction(db, a.execution.WorkflowID, a.execution.ID)
+	if err != nil {
+		return false, err
+	}
+	if execution.State == models.CanvasNodeExecutionStateFinished || execution.State == models.CanvasNodeExecutionStateCancelling {
+		return false, nil
+	}
+	run, err := models.FindCanvasRunInTransaction(db, a.source.WorkflowID, a.source.ID)
+	if err != nil {
+		return false, err
+	}
+	return run.State == models.CanvasRunStateStarted, nil
 }
 
 func (a *mergeConfidenceActionAttempt) collectEvents(events []models.CanvasEvent) {

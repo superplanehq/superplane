@@ -147,3 +147,44 @@ func TestMergeConfidenceActionRecoversInterruptedAttempt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultFailed, result)
 }
+
+func TestMergeConfidenceActionSkipsWriteAfterCancellationDuringDescriptionRead(t *testing.T) {
+	cancellations := map[string]func(t *testing.T, f publicationFixture, execution *models.CanvasNodeExecution){
+		"run": func(t *testing.T, f publicationFixture, _ *models.CanvasNodeExecution) {
+			run, err := models.FindCanvasRunInTransaction(f.db, f.canvas.ID, f.run.ID)
+			require.NoError(t, err)
+			require.NoError(t, run.MarkAsCancelling(f.db, nil))
+		},
+		"execution": func(t *testing.T, f publicationFixture, execution *models.CanvasNodeExecution) {
+			current, err := models.FindNodeExecutionInTransaction(f.db, execution.WorkflowID, execution.ID)
+			require.NoError(t, err)
+			require.NoError(t, current.RequestCancellation(f.db, nil))
+		},
+	}
+	for name, cancel := range cancellations {
+		t.Run(name, func(t *testing.T) {
+			f := newPublicationFixture(t)
+			f.report(t, f.run, 4)
+			execution, request := f.publicationRequest(t, "passed")
+			host := &publicationHTTPContext{
+				HTTPContext: contexts.HTTPContext{Responses: []*http.Response{
+					publicationHTTPResponse(200, `{"state":"open","head":{"sha":"abc"},"body":"original"}`),
+					publicationHTTPResponse(200, `{}`),
+				}},
+				beforeRequest: func(request *http.Request) {
+					if request.Method == http.MethodGet {
+						cancel(t, f, execution)
+					}
+				},
+			}
+			previous := newFactoryGitHubAPI
+			t.Cleanup(func() { newFactoryGitHubAPI = previous })
+			newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+				return publicationGitHubClient(t, host), nil
+			}
+			_, err := ProcessMergeConfidencePublicationRequest(t.Context(), IntakeDependencies{}, request.ID, models.LockNodeRequestNow)
+			require.NoError(t, err)
+			require.Len(t, host.Requests, 1, "a cancellation during the description read must stop the write")
+		})
+	}
+}
