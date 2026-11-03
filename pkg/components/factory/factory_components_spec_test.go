@@ -72,6 +72,10 @@ func (f *fakeFactoryContext) GitHubHost() (string, error) {
 	return f.githubHost, f.vcsProviderErr
 }
 
+func (f *fakeFactoryContext) ListRepositories() ([]string, error) {
+	return nil, nil
+}
+
 func (f *fakeFactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
 	f.createParams = params
 	f.createCalls++

@@ -1031,6 +1031,65 @@ func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
 	assert.Len(t, statusEvents, 2, "no-op must not record a second status.updated event")
 }
 
+func TestFactoryContext_UpdateWorkOrderStatus_WhenAllPullRequestsDone(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Multi-repo task", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	_, _, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+
+	api, err := order.CreatePullRequest(database.Conn(), models.FactoryPullRequestParams{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/api",
+		Number:     1,
+		URL:        "https://github.com/acme/api/pull/1",
+		State:      models.FactoryPullRequestStateMerged,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, api)
+	web, err := order.CreatePullRequest(database.Conn(), models.FactoryPullRequestParams{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/web",
+		Number:     2,
+		URL:        "https://github.com/acme/web/pull/2",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+
+	closeWhenDone := core.UpdateWorkOrderStatusParams{
+		OrderID:                 order.ID.String(),
+		State:                   models.FactoryWorkOrderStateClosed,
+		Result:                  models.FactoryWorkOrderResultCompleted,
+		WhenAllPullRequestsDone: true,
+	}
+	updated, changed, err := ctx.UpdateWorkOrderStatus(closeWhenDone)
+	require.NoError(t, err)
+	assert.False(t, changed, "an open pull request must keep the task open")
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
+
+	closedState := models.FactoryPullRequestStateClosed
+	require.NoError(t, web.Update(database.Conn(), models.FactoryPullRequestPatch{State: &closedState}))
+
+	closeWhenDone.Result = models.FactoryWorkOrderResultPRClosed
+	updated, changed, err = ctx.UpdateWorkOrderStatus(closeWhenDone)
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, models.FactoryWorkOrderStateClosed, updated.State)
+	assert.Equal(t, models.FactoryWorkOrderResultCompleted, updated.Result, "one merged pull request completes the task")
+}
+
 func TestFactoryContext_UpdateWorkOrderStatus_CloseReportsRunCancellations(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

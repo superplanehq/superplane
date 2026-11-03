@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -461,8 +462,9 @@ func prFeedbackReplyTriggerConfiguration(repository, mention string, ignoreBots 
 
 func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, addressAllBots bool) map[string]any {
 	configuration := map[string]any{
-		"contentFilter": mention,
-		"ignoreBots":    ignoreBots,
+		"contentFilter":                         mention,
+		"ignoreBots":                            ignoreBots,
+		githubcommon.WorkspaceRepositoriesField: true,
 	}
 	if strings.TrimSpace(repository) != "" {
 		configuration["repository"] = repository
@@ -474,6 +476,13 @@ func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool,
 		configuration["addressAllBots"] = true
 	}
 	return configuration
+}
+
+// prFeedbackWorkspaceScope reports whether a node listens on every
+// workspace repository. Its repository then comes from the event.
+func prFeedbackWorkspaceScope(configuration map[string]any) bool {
+	scope, _ := configuration[githubcommon.WorkspaceRepositoriesField].(bool)
+	return scope
 }
 
 func prFeedbackCommentAcknowledgeCommentIDExpression() string {

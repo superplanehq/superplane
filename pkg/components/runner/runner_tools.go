@@ -13,19 +13,21 @@ const (
 	RunnerFlowTask            RunnerFlow = "task"
 	RunnerFlowMergeConfidence RunnerFlow = "merge_confidence"
 
-	ScopeMembersRead      RunnerToolScope = "members:read"
-	ScopeOwnerRead        RunnerToolScope = "owner:read"
-	ScopeOwnerWrite       RunnerToolScope = "owner:write"
-	ScopeTasksRead        RunnerToolScope = "tasks:read"
-	ScopeTasksCreate      RunnerToolScope = "tasks:create"
-	ScopeTasksClose       RunnerToolScope = "tasks:close"
-	ScopeChecksRead       RunnerToolScope = "checks:read"
-	ScopeChecksWrite      RunnerToolScope = "checks:write"
-	ScopeArtifactsRead    RunnerToolScope = "artifacts:read"
-	ScopeArtifactsWrite   RunnerToolScope = "artifacts:write"
-	ScopePlanWrite        RunnerToolScope = "plan:write"
-	ScopeEvidenceWrite    RunnerToolScope = "evidence:write"
-	ScopeMergeChecksWrite RunnerToolScope = "merge_checks:write"
+	ScopeMembersRead       RunnerToolScope = "members:read"
+	ScopeOwnerRead         RunnerToolScope = "owner:read"
+	ScopeOwnerWrite        RunnerToolScope = "owner:write"
+	ScopeTasksRead         RunnerToolScope = "tasks:read"
+	ScopeTasksCreate       RunnerToolScope = "tasks:create"
+	ScopeTasksClose        RunnerToolScope = "tasks:close"
+	ScopeChecksRead        RunnerToolScope = "checks:read"
+	ScopeChecksWrite       RunnerToolScope = "checks:write"
+	ScopeArtifactsRead     RunnerToolScope = "artifacts:read"
+	ScopeArtifactsWrite    RunnerToolScope = "artifacts:write"
+	ScopePlanWrite         RunnerToolScope = "plan:write"
+	ScopeEvidenceWrite     RunnerToolScope = "evidence:write"
+	ScopeMergeChecksWrite  RunnerToolScope = "merge_checks:write"
+	ScopePullRequestsRead  RunnerToolScope = "pull_requests:read"
+	ScopePullRequestsWrite RunnerToolScope = "pull_requests:write"
 )
 
 // RunnerTool is one tool of the global runner MCP server and the scope that
@@ -52,6 +54,8 @@ var runnerTools = []RunnerTool{
 	{Name: "propose_plan", Scope: ScopePlanWrite},
 	{Name: "report_visual_evidence_unavailable", Scope: ScopeEvidenceWrite},
 	{Name: "report_merge_check", Scope: ScopeMergeChecksWrite},
+	{Name: "open_pull_request", Scope: ScopePullRequestsWrite},
+	{Name: "list_pull_requests", Scope: ScopePullRequestsRead},
 }
 
 // Every flow receives these tools for now. Narrow the list here later.
@@ -72,7 +76,7 @@ var sharedRunnerScopes = []RunnerToolScope{
 // the run settings, see TaskCapabilityScopes.
 var runnerFlowScopes = map[RunnerFlow][]RunnerToolScope{
 	RunnerFlowPlanning:        withScopes(ScopePlanWrite),
-	RunnerFlowTask:            withScopes(),
+	RunnerFlowTask:            withScopes(ScopePullRequestsRead, ScopePullRequestsWrite),
 	RunnerFlowMergeConfidence: withScopes(ScopeMergeChecksWrite),
 }
 
