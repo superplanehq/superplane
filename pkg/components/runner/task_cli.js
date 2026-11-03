@@ -127,8 +127,9 @@ const COMMANDS = [
   },
   {
     words: ["task", "check", "list"],
-    usage: "superplane task check list --task TASK",
+    usage: "superplane task check list [--task TASK]",
     flags: ["task"],
+    env: { task: "SUPERPLANE_TASK_ID" },
     required: ["task"],
     tool: "list_checks",
   },
@@ -167,7 +168,8 @@ function findCommand(args) {
   return COMMANDS.find((command) => command.words.every((word, index) => args[index] === word));
 }
 
-function parseCommand(argv) {
+// env names the environment variable that fills a flag the caller omits.
+function parseCommand(argv, env = {}) {
   const args = Array.isArray(argv) ? argv : [];
   const command = findCommand(args);
   if (!command) throw new Error(usage());
@@ -193,6 +195,11 @@ function parseCommand(argv) {
       input[stored] = value;
     }
     index += 1;
+  }
+
+  for (const [name, variable] of Object.entries(command.env || {})) {
+    const value = String(env[variable] || "").trim();
+    if (input[name] === undefined && value) input[name] = value;
   }
 
   for (const name of command.required || []) {
@@ -275,7 +282,7 @@ async function main(argv, env = process.env, fetchImpl = fetch, stdout = process
     return 0;
   }
   try {
-    const { command, input } = parseCommand(argv);
+    const { command, input } = parseCommand(argv, env);
     if (!command.tool) {
       throw new Error(`superplane ${command.words.join(" ")} is not available yet`);
     }
