@@ -2,6 +2,7 @@ import { isCodexActionCancelled } from "../codex/codexActionContext";
 import { useIntakeOwnerDraft } from "./useIntakeOwnerDraft";
 import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import { Button } from "@/components/ui/button";
+import { useFactoryGitHubHost } from "@/hooks/useFactoryGitHubHost";
 import {
   useCreateFactoryIntake,
   useImportFactoryIntakeItem,
@@ -52,6 +53,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
   const updateIntake = useUpdateFactoryIntake(props.organizationId, props.factoryId);
   const importItem = useImportFactoryIntakeItem(props.organizationId, props.factoryId);
   const repository = props.repository || DEPENDABOT_INTAKE_SETUP_COPY.repositoryFallback;
+  const githubHost = useFactoryGitHubHost();
   const dependabotSeverities = normalizeDependabotSeverities(settings.dependabotSeverities);
 
   const finishWizard = async (packageIds: string[]) => {
@@ -110,6 +112,7 @@ export function DependabotIntakeSetupDialog(props: DependabotIntakeSetupDialogPr
           organizationId={props.organizationId}
           factoryId={props.factoryId}
           repository={repository}
+          githubHost={githubHost}
           dependabotSeverities={dependabotSeverities}
           importProgress={importProgress}
           error={error}

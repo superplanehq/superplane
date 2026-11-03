@@ -23,28 +23,32 @@ func (s *Server) runnerOwnerTarget(required runneraction.RunnerToolScope) ownerT
 		if !ok {
 			return nil, false
 		}
-		var target *taskOwnerTarget
-		if scope.Flow != runneraction.RunnerFlowPlanning {
-			loaded, found := s.openTaskOwnerTarget(w, r, scope.OrganizationID, scope.FactoryID, scope.WorkOrderID)
-			if !found {
-				return nil, false
-			}
-			target = loaded
-		} else {
-			loaded, err := s.loadPlanningTaskOwnerTarget(r, &runneraction.PlanningSessionScope{
-				OrganizationID: scope.OrganizationID,
-				FactoryID:      scope.FactoryID,
-				SessionID:      scope.PlanningSessionID,
-				CanvasRunID:    scope.CanvasRunID,
-			})
-			if err != nil {
-				writeRunnerPlanningError(w, r, sessionOf(loaded), err)
-				return nil, false
-			}
-			target = loaded
-		}
-		target.canvasID = scope.CanvasID
-		target.canvasRunID = scope.CanvasRunID
-		return target, true
+		return s.runnerTaskTarget(w, r, scope)
 	}
+}
+
+func (s *Server) runnerTaskTarget(w http.ResponseWriter, r *http.Request, scope *runneraction.RunnerScope) (*taskOwnerTarget, bool) {
+	var target *taskOwnerTarget
+	if scope.Flow != runneraction.RunnerFlowPlanning {
+		loaded, found := s.openTaskOwnerTarget(w, r, scope.OrganizationID, scope.FactoryID, scope.WorkOrderID)
+		if !found {
+			return nil, false
+		}
+		target = loaded
+	} else {
+		loaded, err := s.loadPlanningTaskOwnerTarget(r, &runneraction.PlanningSessionScope{
+			OrganizationID: scope.OrganizationID,
+			FactoryID:      scope.FactoryID,
+			SessionID:      scope.PlanningSessionID,
+			CanvasRunID:    scope.CanvasRunID,
+		})
+		if err != nil {
+			writeRunnerPlanningError(w, r, sessionOf(loaded), err)
+			return nil, false
+		}
+		target = loaded
+	}
+	target.canvasID = scope.CanvasID
+	target.canvasRunID = scope.CanvasRunID
+	return target, true
 }

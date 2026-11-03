@@ -1597,6 +1597,8 @@ func TestAdminListOrgExperimentalFeatures(t *testing.T) {
 			ids = append(ids, id)
 		}
 		assert.Contains(t, ids, features.FeatureFactories)
+		assert.Contains(t, ids, features.FeatureGitHubEnterprise)
+		assert.NotContains(t, ids, features.FeatureGitHubEnterpriseServer)
 	})
 
 	t.Run("returns an empty enabled list when none are on", func(t *testing.T) {
@@ -1654,6 +1656,19 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
+	})
+
+	t.Run("rejects hidden GitHub Enterprise Server", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureGitHubEnterpriseServer,
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+
+		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureGitHubEnterpriseServer)
 	})
 
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {

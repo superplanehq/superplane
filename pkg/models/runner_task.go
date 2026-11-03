@@ -71,6 +71,7 @@ type RunnerTask struct {
 
 	/*
 	 * PayloadCiphertext protects task inputs, which can contain credentials and other secrets.
+	 * Terminal transitions discard it; nil represents SQL NULL.
 	 */
 	PayloadCiphertext []byte
 
@@ -148,9 +149,10 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 		result := tx.Model(t).
 			Where("state IN ? AND runner_id IS NULL", []string{RunnerTaskStatePending, RunnerTaskStateQueued}).
 			Updates(map[string]any{
-				"state":       RunnerTaskStateCanceled,
-				"finished_at": now,
-				"updated_at":  now,
+				"state":              RunnerTaskStateCanceled,
+				"payload_ciphertext": nil,
+				"finished_at":        now,
+				"updated_at":         now,
 			})
 		if result.Error != nil {
 			return result.Error
@@ -159,6 +161,7 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 			return ErrRunnerTaskNotReservable
 		}
 		t.State = RunnerTaskStateCanceled
+		t.PayloadCiphertext = nil
 		t.FinishedAt = &now
 		t.UpdatedAt = now
 		return nil
@@ -229,10 +232,11 @@ func (t *RunnerTask) FailUnassigned(tx *gorm.DB, message string, now time.Time) 
 			Where("id = ? AND state IN ? AND runner_id IS NULL", t.ID,
 				[]string{RunnerTaskStatePending, RunnerTaskStateQueued}).
 			Updates(map[string]any{
-				"state":         RunnerTaskStateFailed,
-				"error_message": message,
-				"finished_at":   now,
-				"updated_at":    now,
+				"state":              RunnerTaskStateFailed,
+				"payload_ciphertext": nil,
+				"error_message":      message,
+				"finished_at":        now,
+				"updated_at":         now,
 			})
 		if result.Error != nil {
 			return result.Error
@@ -246,6 +250,7 @@ func (t *RunnerTask) FailUnassigned(tx *gorm.DB, message string, now time.Time) 
 		return err
 	}
 	t.State = RunnerTaskStateFailed
+	t.PayloadCiphertext = nil
 	t.ErrorMessage = &message
 	t.FinishedAt = &now
 	t.UpdatedAt = now
@@ -508,13 +513,14 @@ func (t *RunnerTask) Complete(
 		storedError = &errorMessage
 	}
 	taskResult := tx.Model(t).Updates(map[string]any{
-		"state":           state,
-		"result":          result,
-		"exit_code":       exitCode,
-		"error_message":   storedError,
-		"completion_hash": completionHash,
-		"finished_at":     now,
-		"updated_at":      now,
+		"state":              state,
+		"payload_ciphertext": nil,
+		"result":             result,
+		"exit_code":          exitCode,
+		"error_message":      storedError,
+		"completion_hash":    completionHash,
+		"finished_at":        now,
+		"updated_at":         now,
 	})
 	if taskResult.Error != nil {
 		return false, taskResult.Error
@@ -550,6 +556,7 @@ func (t *RunnerTask) Complete(
 		return false, ErrRunnerTaskNotCompletable
 	}
 	t.State = state
+	t.PayloadCiphertext = nil
 	t.Result = result
 	t.ExitCode = &exitCode
 	t.ErrorMessage = storedError

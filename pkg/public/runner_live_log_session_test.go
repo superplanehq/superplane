@@ -151,8 +151,9 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 			{"BYOK", "runnerCodex", "integration", false},
 		} {
 			t.Run(item.name, func(t *testing.T) {
+				task := createSessionRunnerTask(t, r)
 				canvasID, execID := createCanvasWithComponentExecution(t, r, item.component, "pricing-"+item.name, map[string]any{
-					runneraction.ExecutionMetadataBrokerTaskID: "task-pricing",
+					runneraction.ExecutionMetadataBrokerTaskID: task.ID.String(),
 					runneraction.ExecutionMetadataTaskBackend:  "integrated",
 				})
 				require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", execID).
@@ -165,6 +166,8 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 				require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 				var session runneraction.LiveLogSession
 				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
+				assert.Equal(t, models.RunnerTaskBackendIntegrated, session.Backend)
+				assert.Equal(t, fmt.Sprintf("/api/v1/canvases/%s/node-executions/%s/runner-logs", canvasID, execID), session.StreamURL)
 				if item.priced {
 					require.NotNil(t, session.HostedPricing)
 					assert.Equal(t, int64(250), session.HostedPricing.Rate.Input)
@@ -235,135 +238,14 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 		)
 		assert.Contains(t, rec.Body.String(), "not available for this execution")
 	})
+}
 
-	t.Run("live logs not configured", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "")
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "tb-x",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
-		assert.Contains(t, rec.Body.String(), "not configured")
-	})
-
-	t.Run("returns stream session with public broker URL", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "http://task-broker:8081")
-		t.Setenv("TASK_BROKER_PUBLIC_URL", "http://localhost:8091")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-public-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-public-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "http://localhost:8091/v1/tasks/task-public-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns organization-authorized integrated stream", func(t *testing.T) {
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-integrated-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-integrated",
-			runneraction.ExecutionMetadataTaskBackend:  "integrated",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "integrated", session.Backend)
-		assert.Equal(
-			t,
-			fmt.Sprintf(
-				"/api/v1/canvases/%s/node-executions/%s/runner-logs",
-				canvasID,
-				execID,
-			),
-			session.StreamURL,
-		)
-		assert.Empty(t, session.Token)
-	})
-
-	t.Run("returns stream session for runnerBash", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerBash", "runner-runbash-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-runbash-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-runbash-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns stream session for runnerJS", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerJS", "runner-runjs-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-runjs-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-runjs-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns stream session for runnerPython", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerPython", "runner-runpy-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-runpy-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-runpy-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns stream session for runnerClaudeCode", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerClaudeCode", "runner-claude-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-claude-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-claude-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns stream session", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-ok/live-logs", session.StreamURL)
-		assert.NotEmpty(t, session.Token)
-		assert.False(t, session.ExpiresAt.IsZero())
-
-		err := runneraction.ValidateLiveLogStreamToken(session.Token, "task-ok", "live-log-secret")
-		require.NoError(t, err)
-	})
+func createSessionRunnerTask(t *testing.T, r *support.ResourceRegistry) models.RunnerTask {
+	t.Helper()
+	fleet := models.RunnerFleet{
+		ID: uuid.New(), Slug: "session-" + uuid.NewString(), ScopeType: models.RunnerFleetScopeInstallation,
+		Enabled: true, Spec: datatypes.NewJSONType(models.RunnerFleetSpec{}), RunnerVersion: "0.1.0",
+	}
+	require.NoError(t, fleet.Create(database.DB(t.Context())))
+	return createRunnerTaskForLogTest(t, r, fleet.ID, models.RunnerTaskStateSucceeded)
 }

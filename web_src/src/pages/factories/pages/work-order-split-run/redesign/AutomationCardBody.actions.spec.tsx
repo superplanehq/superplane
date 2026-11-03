@@ -10,6 +10,10 @@ import type { SplitRunPhase } from "../splitRunMocks";
 
 const shown: { on: boolean; rows: StepActionRow[]; error: boolean } = { on: false, rows: [], error: false };
 
+vi.mock("@/hooks/useFactoryGitHubHost", () => ({
+  useFactoryGitHubHost: () => "",
+}));
+
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: (id: string) => shown.on && id === "factory_step_actions",

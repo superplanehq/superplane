@@ -5,12 +5,10 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
@@ -49,7 +47,7 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	access, err := runneraction.ResolveLiveLogAccess(user.OrganizationID, canvasID, executionID)
+	access, err := runneraction.ResolveLiveLogAccess(database.DB(r.Context()), user.OrganizationID, canvasID, executionID)
 	if err != nil {
 		writeRunnerLiveLogSessionError(w, r, err)
 		return
@@ -59,43 +57,14 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		writeRunnerLiveLogSessionError(w, r, err)
 		return
 	}
-	if access.TaskBackend == core.RunnerTaskBackendIntegrated {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"backend":        "integrated",
-			"hosted_pricing": pricing,
-			"stream_url": "/api/v1/canvases/" +
-				canvasID.String() +
-				"/node-executions/" +
-				executionID.String() +
-				"/runner-logs",
-		})
-		return
-	}
-
-	session, err := runneraction.NewLiveLogSession(access.BrokerTaskID, time.Now())
-	if err != nil {
-		if errors.Is(err, runneraction.ErrLiveLogNotConfigured) {
-			http.Error(w, "Live logs are not configured on this installation", http.StatusServiceUnavailable)
-			return
-		}
-		http.Error(w, "Could not create live log session", http.StatusInternalServerError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	response := map[string]any{
-		"backend":        "legacy",
-		"hosted_pricing": pricing,
-		"stream_url":     session.StreamURL,
-		"token":          session.Token,
-		"expires_at":     session.ExpiresAt,
-	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
+	_ = json.NewEncoder(w).Encode(runneraction.LiveLogSession{
+		Backend:       access.Task.Backend,
+		HostedPricing: pricing,
+		StreamURL: "/api/v1/canvases/" + canvasID.String() +
+			"/node-executions/" + executionID.String() + "/runner-logs",
+	})
 }
 
 func writeRunnerLiveLogSessionError(w http.ResponseWriter, r *http.Request, err error) {
@@ -108,7 +77,7 @@ func writeRunnerLiveLogSessionError(w http.ResponseWriter, r *http.Request, err 
 		http.Error(w, "Node not found", http.StatusNotFound)
 	case errors.Is(err, runneraction.ErrLiveLogNotRunner):
 		http.Error(w, "Live logs are only available for Runner components", http.StatusBadRequest)
-	case errors.Is(err, runneraction.ErrLiveLogBrokerTaskMissing):
+	case errors.Is(err, runneraction.ErrLiveLogTaskMissing):
 		w.Header().Set(runneraction.LiveLogErrorCodeHeader, runneraction.LiveLogSessionNotReadyErrorCode)
 		http.Error(
 			w,

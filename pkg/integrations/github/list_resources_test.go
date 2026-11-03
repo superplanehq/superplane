@@ -15,6 +15,7 @@ import (
 )
 
 func TestListResourcesHostedBindingReturnsOnlyGrantedRepositories(t *testing.T) {
+	t.Cleanup(withGitHubEnterpriseFlagForTest(func(uuid.UUID) bool { return false }))
 	require.NoError(t, database.TruncateTables())
 	organization, err := models.CreateOrganization("resources-"+uuid.NewString(), "")
 	require.NoError(t, err)
@@ -35,6 +36,9 @@ func TestListResourcesHostedBindingReturnsOnlyGrantedRepositories(t *testing.T) 
 		Integration: &contexts.IntegrationContext{
 			IntegrationID: integration.ID.String(),
 			Metadata:      common.Metadata{HostedApp: true},
+			CurrentProperties: map[string]any{
+				common.PropertyHost: "acme.ghe.com",
+			},
 		},
 	})
 

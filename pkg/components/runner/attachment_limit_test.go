@@ -17,7 +17,7 @@ func TestAttachmentLimitMatchesSharedMaxFileBytes(t *testing.T) {
 	runnerLimit := attachmentLimitMiB(t, AttachmentLimitFile().Content, `const MAX_ATTACHMENT_BYTES = (\d+) \* 1024 \* 1024;`)
 	assert.Equal(t, int64(models.MaxFileBytes), runnerLimit<<20)
 
-	globalSource, err := os.ReadFile("superplane_mcp/modules/plan.js")
+	globalSource, err := os.ReadFile("superplane_mcp/modules/files.js")
 	require.NoError(t, err)
 	globalLimit := attachmentLimitMiB(t, string(globalSource), `const MAX_ATTACHMENT_BYTES = (\d+) \* 1024 \* 1024;`)
 	assert.Equal(t, int64(models.MaxFileBytes), globalLimit<<20)
