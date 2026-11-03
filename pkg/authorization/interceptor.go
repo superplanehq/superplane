@@ -20,6 +20,8 @@ type AuthorizationRule struct {
 	Action             string
 	DomainType         string
 	ResourcePathParams []string
+	// RequiredActions must all be granted in addition to Action.
+	RequiredActions []string
 	// LegacyActions keeps persisted grants working during permission migrations.
 	// Prefer Action for new checks, and scope legacy actions to the smallest route set possible.
 	LegacyActions                []string

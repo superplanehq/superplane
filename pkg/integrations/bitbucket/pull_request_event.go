@@ -127,6 +127,7 @@ func pullRequestView(action string, payload, pullRequest map[string]any) map[str
 		}
 	}
 	updated, _ := pullRequest["updated_on"].(string)
+	view["updated_at"] = updated
 	switch action {
 	case "merged":
 		view["state"] = "closed"

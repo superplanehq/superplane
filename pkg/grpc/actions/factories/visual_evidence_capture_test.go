@@ -40,6 +40,17 @@ func TestStartVisualEvidenceCaptureEmitsTheAttachedRevision(t *testing.T) {
 	assert.Equal(t, headSHA, head["sha"])
 	assert.Equal(t, "Closes the checkout gap.", pullRequestPayload["body"])
 	assert.Equal(t, order.ID.String(), payload["workOrder"].(map[string]any)["id"])
+
+	// A new import needs its own evidence even when the PR head is unchanged.
+	_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultArchived, Actor: &r.User})
+	require.NoError(t, err)
+	require.NoError(t, factoryModel.ReleaseArchivedPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID}))
+	next, err := factoryModel.CreateWorkOrder(db, "Review again", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	attached, err := next.CreatePullRequest(db, models.FactoryPullRequestParams{URL: pullRequest.URL})
+	require.NoError(t, err)
+	require.NoError(t, startVisualEvidenceCapture(t.Context(), IntakeDependencies{}, r.Organization.ID, factoryModel.ID, attached.ID))
+	assert.EqualValues(t, 2, countCanvasEvents(t, node.WorkflowID))
 }
 
 func TestStartVisualEvidenceCaptureRetriesAfterGitHubFailure(t *testing.T) {
