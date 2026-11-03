@@ -12,7 +12,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/superplanehq/superplane/pkg/blob"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -55,27 +54,12 @@ func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid execution id", http.StatusBadRequest)
 		return
 	}
-	access, err := runneraction.ResolveLiveLogAccess(user.OrganizationID, canvasID, executionID)
+	access, err := runneraction.ResolveLiveLogAccess(database.DB(r.Context()), user.OrganizationID, canvasID, executionID)
 	if err != nil {
 		writeRunnerLiveLogSessionError(w, r, err)
 		return
 	}
-	if access.TaskBackend != core.RunnerTaskBackendIntegrated {
-		http.Error(w, "Logs use the legacy runner backend", http.StatusNotFound)
-		return
-	}
-	taskID, err := uuid.Parse(access.BrokerTaskID)
-	if err != nil {
-		http.Error(w, "Logs are not available for this execution", http.StatusNotFound)
-		return
-	}
-	task, err := models.FindRunnerTask(database.Conn(), taskID)
-	if err != nil || task.OrganizationID != user.OrganizationID {
-		http.Error(w, "Logs are not available for this execution", http.StatusNotFound)
-		return
-	}
-
-	s.serveRunnerTaskLogs(w, r, task, r.URL.Query().Get("after"))
+	s.serveRunnerTaskLogs(w, r, access.Task, r.URL.Query().Get("after"))
 }
 
 func (s *Server) serveRunnerTaskLogs(
@@ -227,6 +211,12 @@ func (s *Server) serveFinalRunnerTaskLog(
 	}
 	if err != nil {
 		writeCouldNotReadTaskLogs(w, r, err)
+		return
+	}
+
+	if info.Size == 0 {
+		writeRunnerLogState(w, models.RunnerTaskLogStateArchived, cursor)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 

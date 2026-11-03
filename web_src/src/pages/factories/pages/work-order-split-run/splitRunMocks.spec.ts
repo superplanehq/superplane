@@ -398,6 +398,36 @@ describe("splitRunFixtureForWorkOrder", () => {
     ]);
   });
 
+  it("puts the checks that an agent reported on the step of its run", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Agent checks",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-impl",
+              step: "Implement",
+              stepIndex: 0,
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              run: { id: "run-impl" },
+            },
+          ]),
+        ],
+      }),
+      {
+        demoArtifacts: false,
+        checks: [
+          { id: "c-plan", key: "clarity", name: "Clarity score", level: "LEVEL_POSITIVE", score: 3, runId: "run-plan" },
+          { id: "c-spec", key: "spec", name: "Spec coverage", level: "LEVEL_POSITIVE", score: 5, runId: "run-impl" },
+        ],
+      },
+    );
+    const implement = fixture.phases.find((phase) => phase.id === "implement-0");
+    expect(implement?.checks?.map((check) => check.name)).toEqual(["Spec coverage"]);
+  });
+
   it("shows no verify checks when the API supplies none", () => {
     const verify = splitRunFixtureForWorkOrder(
       order({

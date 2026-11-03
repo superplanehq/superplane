@@ -33,7 +33,7 @@ func TestRunnerToolsFollowTheTokenScopes(t *testing.T) {
 	readOnly, err := runner.MintRunnerToken(jwt.NewSigner("test"), *scope, time.Minute)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"suggest_owners"}, listRunnerTools(t, server, readOnly))
+	assert.Equal(t, []string{"suggest_task_owner"}, listRunnerTools(t, server, readOnly))
 	rec := suggestRunnerOwners(t, server, readOnly, `{}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	rec = assignRunnerOwner(t, server, readOnly, `{"user":"`+r.User.String()+`","reason":"Owns pkg."}`)
@@ -106,8 +106,15 @@ func TestPlanningRunnerTokenOwnsTheDraftTask(t *testing.T) {
 	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, env, 60, nil)))
 }
 
+// everyGlobalRunnerTool lists the tools that every run receives.
 var everyGlobalRunnerTool = []string{
-	"suggest_owners", "assign_owner", "list_tasks", "create_task", "close_task", "remove_artifact",
+	"list_members", "assign_task_owner", "suggest_task_owner", "list_tasks", "create_task", "close_task",
+	"list_checks", "add_checks", "remove_checks",
+	"list_artifacts", "get_artifact", "add_artifact", "remove_artifact",
+}
+
+func globalRunnerToolsWith(tools ...string) []string {
+	return append(append([]string{}, everyGlobalRunnerTool...), tools...)
 }
 
 func listRunnerTools(t *testing.T, server *Server, token string) []string {

@@ -1,5 +1,15 @@
 import { vi } from "bun:test";
 
+vi.mock("./useFirstRunGitHubEnterprise", () => ({
+  useFirstRunGitHubEnterprise: () => ({
+    connect: vi.fn(),
+    submitOwner: vi.fn(),
+    resume: vi.fn(),
+    ready: false,
+    currentStepName: "",
+  }),
+}));
+
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({
     data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },

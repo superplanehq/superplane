@@ -1,4 +1,5 @@
 import type { OrganizationsIntegrationResourceRef } from "@/api-client";
+import { isKnownGitHubHostname } from "@/lib/githubHost";
 
 export type ChecksPRFeedbackSetupStep = "checks" | "tools";
 
@@ -46,7 +47,7 @@ export function isGitHubActionsCheckURL(rawURL: string | undefined): boolean {
   if (!parsed) {
     return false;
   }
-  if (!hostHasSuffix(parsed.hostname, "github.com")) {
+  if (!isKnownGitHubHostname(parsed.hostname)) {
     return false;
   }
   return parsed.pathname.toLowerCase().includes("/actions/");

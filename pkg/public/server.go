@@ -456,6 +456,12 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerListTasks).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerCreateTask).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/close", s.handleRunnerCloseTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/members", s.handleRunnerListMembers).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/checks", s.handleRunnerListChecks).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/task/checks", s.handleRunnerAddChecks).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/checks", s.handleRunnerRemoveChecks).Methods(http.MethodDelete)
+	s.Router.HandleFunc("/api/v1/runner/task/artifacts", s.handleRunnerListArtifacts).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/task/artifact", s.handleRunnerGetArtifact).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/task/artifacts", s.handleRunnerRemoveArtifact).Methods(http.MethodDelete)
 	s.Router.HandleFunc("/api/v1/runner/task/suggest-owners", s.handleRunnerGlobalSuggestOwners).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/owner", s.handleRunnerGlobalAssignOwner).Methods(http.MethodPut)
@@ -2257,6 +2263,14 @@ func (l *lazyWebhookFactory) VCSProvider() (string, error) {
 		return "", err
 	}
 	return inner.VCSProvider()
+}
+
+func (l *lazyWebhookFactory) GitHubHost() (string, error) {
+	inner, err := l.load()
+	if err != nil {
+		return "", err
+	}
+	return inner.GitHubHost()
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {
