@@ -151,7 +151,14 @@ describe("workspace policy replacement", () => {
         />,
       );
       expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("unavailable");
-      expect(screen.getByRole("alert")).toHaveTextContent("Select an available model to replace the saved model.");
+      expect(screen.getByRole(scenario.source === "subscription" ? "status" : "alert")).toHaveTextContent(
+        scenario.source === "subscription"
+          ? "Your Codex account cannot run this model. Choose an available model here or for a specific task."
+          : "Select an available model to replace the saved model.",
+      );
+      if (scenario.source === "subscription") {
+        expect(screen.getByTestId("field-model-hosted-model")).not.toHaveAttribute("aria-invalid");
+      }
       expect(onChange).not.toHaveBeenCalled();
       await user.click(screen.getByTestId("field-model-hosted-model"));
       expect(screen.queryByRole("menuitem", { name: scenario.excluded })).not.toBeInTheDocument();

@@ -7,15 +7,23 @@ import (
 )
 
 func TestAllowedRunnerTools(t *testing.T) {
-	assert.Equal(t, []string{"suggest_owners", "assign_owner"}, AllowedRunnerTools([]RunnerToolScope{ScopeOwnerWrite, ScopeOwnerRead}))
-	assert.Equal(t, []string{"suggest_owners"}, AllowedRunnerTools([]RunnerToolScope{ScopeOwnerRead}))
+	assert.Equal(t,
+		[]string{"assign_task_owner", "suggest_task_owner"},
+		AllowedRunnerTools([]RunnerToolScope{ScopeOwnerWrite, ScopeOwnerRead}),
+	)
+	assert.Equal(t, []string{"suggest_task_owner"}, AllowedRunnerTools([]RunnerToolScope{ScopeOwnerRead}))
 	assert.Empty(t, AllowedRunnerTools(nil))
 }
 
 func TestFlowTools(t *testing.T) {
-	shared := []string{"suggest_owners", "assign_owner", "list_tasks", "create_task", "close_task", "remove_artifact"}
+	// The agent tools docs page lists these tools for every run.
+	shared := []string{
+		"list_members", "assign_task_owner", "suggest_task_owner", "list_tasks", "create_task", "close_task",
+		"list_checks", "add_checks", "remove_checks",
+		"list_artifacts", "get_artifact", "add_artifact", "remove_artifact",
+	}
 	for flow, extra := range map[RunnerFlow][]string{
-		RunnerFlowPlanning:        {"propose_update", "inspect_attachment"},
+		RunnerFlowPlanning:        {"propose_plan"},
 		RunnerFlowTask:            nil,
 		RunnerFlowMergeConfidence: {"report_merge_check"},
 	} {
@@ -36,8 +44,8 @@ func TestTaskCapabilityScopes(t *testing.T) {
 		"no artifact settings":          {nil, []RunnerToolScope{}},
 		"visual evidence":               {[]TaskEnvironmentVariable{artifactToken, visualEvidence}, []RunnerToolScope{ScopeEvidenceWrite}},
 		"artifact token without links":  {[]TaskEnvironmentVariable{artifactToken}, []RunnerToolScope{ScopeEvidenceWrite}},
-		"links only":                    {[]TaskEnvironmentVariable{artifactToken, publishLinks}, []RunnerToolScope{ScopeLinksWrite}},
-		"visual evidence and the links": {[]TaskEnvironmentVariable{artifactToken, visualEvidence, publishLinks}, []RunnerToolScope{ScopeEvidenceWrite, ScopeLinksWrite}},
+		"links only":                    {[]TaskEnvironmentVariable{artifactToken, publishLinks}, []RunnerToolScope{}},
+		"visual evidence and the links": {[]TaskEnvironmentVariable{artifactToken, visualEvidence, publishLinks}, []RunnerToolScope{ScopeEvidenceWrite}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, test.want, TaskCapabilityScopes(test.environment))

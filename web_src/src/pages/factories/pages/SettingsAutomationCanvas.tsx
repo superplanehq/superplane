@@ -56,10 +56,8 @@ export function SettingsAutomationCanvas({
       readOnly
       hidePageChrome
       hideAddControls
-      hideCanvasToolSidebar
       hideRightSideControls
       buildingBlocks={[]}
-      activeCanvasVersionId=""
       isRunInspectionMode={isRunInspectionMode}
       runCanvasLoading={runCanvasLoading}
       runNodeDetailRun={selectedRun}

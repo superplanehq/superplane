@@ -226,7 +226,7 @@ func TestBuildClaudeCodeTaskRewritesPlanningImagePromptPaths(t *testing.T) {
 
 	prompt := requireTaskFile(t, task.Files, "prompts/01-fix-panic.txt").Content
 	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
-	assert.Contains(t, prompt, "inspect_attachment")
+	assert.Contains(t, prompt, "get_artifact")
 	assert.Contains(t, prompt, runner.AttachmentAgentInstructions)
 	assert.NotContains(t, prompt, signed)
 	assert.Contains(t, requireTaskFile(t, task.Files, "attachments/manifest.json").Content, "sp_file=1")
@@ -262,7 +262,7 @@ func TestBuildClaudeCodeTaskKeepsLineImageURLs(t *testing.T) {
 	prompt := requireTaskFile(t, task.Files, "prompts/01-fix-panic.txt").Content
 	assert.Contains(t, prompt, signed)
 	assert.Contains(t, prompt, runner.AttachmentAgentInstructions)
-	assert.NotContains(t, prompt, "inspect_attachment")
+	assert.NotContains(t, prompt, "get_artifact")
 	assert.Contains(t, requireTaskFile(t, task.Files, "attachments/manifest.json").Content, "sp_file=1")
 }
 

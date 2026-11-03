@@ -8,12 +8,12 @@
  */
 
 const MODULES = [
-  require("./modules/owner"),
+  require("./modules/members"),
   require("./modules/tasks"),
+  require("./modules/checks"),
   require("./modules/artifacts"),
   require("./modules/plan"),
   require("./modules/evidence"),
-  require("./modules/links"),
   require("./modules/merge"),
 ];
 

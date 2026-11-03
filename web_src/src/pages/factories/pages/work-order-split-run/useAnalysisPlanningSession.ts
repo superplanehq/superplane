@@ -234,7 +234,8 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     onError: onMutationError,
   });
 
-  const view = usePlanningSessionLiveRun(organizationId, analysisView(session, composer), analysisDelivered);
+  const liveRun = usePlanningSessionLiveRun(organizationId, analysisView(session, composer), analysisDelivered);
+  const view = liveRun.view;
   const { isLive, canSend } = analysisSendState(
     session,
     view.machineStatus,
@@ -285,6 +286,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     queryError: query.error,
     isLoading: query.isLoading,
     view,
+    run: liveRun.run,
     composer,
     composerError,
     canSend,

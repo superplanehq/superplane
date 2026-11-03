@@ -157,6 +157,8 @@ function SubscriptionModelField(props: FieldRendererProps) {
         isDefault: model.isDefault,
       }))}
       modelOnly={props.modelOnly ?? false}
+      unavailableSeverity="warning"
+      unavailableMessage="Your Codex account cannot run this model. Choose an available model here or for a specific task."
       triggerClassName={props.triggerClassName}
       onCommit={(model, thinking) =>
         commitModelAndThinking(props.field.name, model, thinking, props.onChange, props.onValuesChange)
@@ -271,6 +273,8 @@ function ModelThinkingSelect({
   readOnly,
   options,
   modelOnly,
+  unavailableSeverity = "error",
+  unavailableMessage = "Select an available model to replace the saved model.",
   triggerClassName,
   onCommit,
 }: {
@@ -282,6 +286,8 @@ function ModelThinkingSelect({
   readOnly?: boolean;
   options: ModelOption[];
   modelOnly: boolean;
+  unavailableSeverity?: "warning" | "error";
+  unavailableMessage?: string;
   triggerClassName?: string;
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
@@ -306,7 +312,7 @@ function ModelThinkingSelect({
             type="button"
             variant="outline"
             disabled={readOnly || options.length === 0}
-            aria-invalid={unavailable || undefined}
+            aria-invalid={(unavailable && unavailableSeverity === "error") || undefined}
             data-testid={modelFieldTestId(fieldName, "model")}
             className={cn(
               "h-8 w-full justify-between !rounded-md border-gray-300 bg-white px-2.5 font-normal shadow-xs dark:border-gray-600/70 dark:bg-gray-800",
@@ -354,8 +360,14 @@ function ModelThinkingSelect({
         </DropdownMenuContent>
       </DropdownMenu>
       {unavailable ? (
-        <Text role="alert" className="text-sm text-content-error">
-          Select an available model to replace the saved model.
+        <Text
+          role={unavailableSeverity === "warning" ? "status" : "alert"}
+          className={cn(
+            "text-sm",
+            unavailableSeverity === "warning" ? "text-amber-700 dark:text-amber-400" : "text-content-error",
+          )}
+        >
+          {unavailableMessage}
         </Text>
       ) : null}
     </>

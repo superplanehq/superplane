@@ -19,6 +19,6 @@ blocks:
             - cd web_src && npm install && cd ..
             - cd web_src && npx prettier --write . && cd ..
             - git add .
-            - git commit -m "[skip ci] fix formatting for PR $PR_NUMBER"
+            - git commit -s -m "[skip ci] fix formatting for PR $PR_NUMBER"
             - git push origin local-fix-branch
             

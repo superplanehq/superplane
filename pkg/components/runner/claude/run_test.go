@@ -254,11 +254,11 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
-	assert.Contains(t, analysis, "propose_update")
+	assert.Contains(t, analysis, "propose_plan")
 	assert.Contains(t, analysis, "integer from 1 through 3")
 	assert.NotContains(t, analysis, "Call propose_clarity")
 	assert.NotContains(t, analysis, "Call propose_confidence")
-	assert.NotContains(t, analysis, "propose_plan")
+	assert.NotContains(t, analysis, "propose_update")
 	assert.Contains(t, analysis, "Use the managed refinement guidance")
 	assert.Contains(t, analysis, "Use only the analysis tools")
 	assert.Contains(t, analysis, "Do not call propose_spec, propose_clarity, propose_confidence, or survey")
@@ -266,7 +266,7 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	assert.Contains(t, analysis, "does not publish the specification or the scores")
 	assert.NotContains(t, analysis, "Do not leave a written plan unpublished")
 	assert.NotContains(t, analysis, "Call propose_spec when the task prompt says")
-	assert.Contains(t, analysis, "inspect_attachment")
+	assert.Contains(t, analysis, "get_artifact")
 	assert.Contains(t, analysis, "Do not curl a signed URL")
 	assert.Contains(t, analysis, "Do not use OCR")
 	assert.Contains(t, analysis, "Do not name files")

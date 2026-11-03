@@ -166,14 +166,21 @@ func httpTargets(markdown string, imagesOnly bool) []string {
 func IsGitHubImageHost(host string) bool {
 	host = strings.ToLower(strings.TrimSpace(host))
 	switch host {
-	case "user-images.githubusercontent.com",
-		"private-user-images.githubusercontent.com",
-		"objects.githubusercontent.com",
-		"github.com":
+	case "github.com", "www.github.com", "api.github.com", "uploads.github.com", "codeload.github.com":
 		return true
-	default:
-		return strings.HasSuffix(host, ".githubusercontent.com")
 	}
+	if strings.HasSuffix(host, ".githubusercontent.com") {
+		return true
+	}
+	return strings.HasSuffix(host, ".ghe.com") && host != "ghe.com"
+}
+
+func isGitHubWebHostname(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "github.com" || host == "www.github.com" {
+		return true
+	}
+	return strings.HasSuffix(host, ".ghe.com") && host != "ghe.com"
 }
 
 func IsGitHubImageURL(raw string) bool {
@@ -187,7 +194,7 @@ func IsGitHubImageURL(raw string) bool {
 	if !IsGitHubImageHost(parsed.Host) {
 		return false
 	}
-	if parsed.Host != "github.com" {
+	if !isGitHubWebHostname(parsed.Hostname()) {
 		return true
 	}
 	path := strings.ToLower(parsed.Path)

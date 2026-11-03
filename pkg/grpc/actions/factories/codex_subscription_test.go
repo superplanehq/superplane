@@ -21,6 +21,56 @@ import (
 	"gorm.io/datatypes"
 )
 
+func TestPersonalCodexConnectionRequiresFactories(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		refreshCatalog bool
+		expectedStatus string
+	}{
+		{name: "sign in", expectedStatus: models.CodexConnectionStatusPending},
+		{name: "catalog refresh", refreshCatalog: true, expectedStatus: models.CodexConnectionStatusReady},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			fleet := models.DefaultInstallationRunnerFleets(models.DefaultRunnerVersion)[0]
+			require.NoError(t, fleet.Create(db))
+			t.Setenv("JWT_SECRET", "personal-codex-test")
+			t.Setenv("RUNNER_API_BASE_URL", "https://superplane.example")
+			if test.refreshCatalog {
+				connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+				require.NoError(t, err)
+				require.NoError(t, db.Model(connection).Updates(map[string]any{
+					"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("saved-bundle"),
+				}).Error)
+			}
+			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+			ctx := onboardingContext(r)
+			req := &pb.StartFactoryCodexConnectionRequest{RefreshCatalog: test.refreshCatalog}
+
+			response, err := StartFactoryCodexConnection(ctx, r.Encryptor, r.Organization.ID.String(), req)
+			require.Error(t, err)
+			assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+			assert.Nil(t, response)
+			var tasks, leases int64
+			require.NoError(t, db.Model(&models.RunnerTask{}).Where("organization_id = ?", r.Organization.ID).Count(&tasks).Error)
+			require.NoError(t, db.Model(&models.FactoryCodexLease{}).Count(&leases).Error)
+			assert.Zero(t, tasks, "denied requests must not start a runner task")
+			assert.Zero(t, leases, "denied requests must not reserve the connection")
+
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+			response, err = StartFactoryCodexConnection(ctx, r.Encryptor, r.Organization.ID.String(), req)
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedStatus, response.Connection.Status)
+			connection, err := models.FindCodexConnection(db, r.Organization.ID, r.User)
+			require.NoError(t, err)
+			lease, err := models.FindCodexLoginLease(db, connection.ID)
+			require.NoError(t, err)
+			require.NotNil(t, lease)
+		})
+	}
+}
+
 func TestStartCodexConnectionWithoutCreditReportsRecovery(t *testing.T) {
 	for _, refreshCatalog := range []bool{false, true} {
 		name := "sign in"
@@ -32,7 +82,6 @@ func TestStartCodexConnectionWithoutCreditReportsRecovery(t *testing.T) {
 			r := support.Setup(t)
 			defer r.Close()
 			db := database.DB(t.Context())
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 			require.NoError(t, db.Model(&billingmodels.OrganizationLLMCreditGrant{}).
 				Where("organization_id = ?", r.Organization.ID).
 				Update("expires_at", time.Now().Add(-time.Minute)).Error)
@@ -72,7 +121,6 @@ func TestStartCodexConnectionWithoutCreditReportsRecovery(t *testing.T) {
 func TestPersonalCodexConnectionDoesNotActivateWorkspace(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	ctx := onboardingContext(r)
@@ -115,7 +163,6 @@ func TestCancelFactoryCodexConnectionReportsCancellationUntilRunnerDeletion(t *t
 		t.Run(test.status, func(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 			require.NoError(t, err)
 			fleet := models.DefaultInstallationRunnerFleets("test")[0]

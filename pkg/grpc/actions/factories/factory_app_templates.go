@@ -608,6 +608,7 @@ func deriveFactoryTemplateInput(
 	if template.id == scheduledIntakeTemplateID {
 		config := factory.OnboardingConfigValue()
 		input.installParams["appRepository"] = config.AppRepository
+		input.installParams["githubHost"] = githubHostForFactory(tx, factory)
 		if settings != nil {
 			input.installParams["prompt"] = scheduledIntakePromptFromSteps(settings.agentSteps["scheduled-agent"])
 		}
@@ -1001,7 +1002,6 @@ func materializePRFeedbackDefaults(
 		VCSProvider:            factoryVCSProviderOrDefault(factory),
 		AgentSettings:          prFeedbackAgentSettingsFromGraph(graph, spec, savedSettings),
 		TriggerSettings:        prFeedbackTriggerSettingsFromGraph(graph, savedSettings),
-		OmitCommitIdentity:     true,
 	}
 
 	templateID := prFeedbackDiscussionTemplateID

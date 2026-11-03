@@ -270,7 +270,7 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	assert.NotContains(t, text, "Publish the specification and the scores only when this turn updates the plan")
 	assert.Contains(t, text, "End an answer, and the first plan, with how to update the plan or the scores")
 	assert.NotContains(t, text, "every turn")
-	assert.Contains(t, text, "include spec on propose_update")
+	assert.Contains(t, text, "include spec on propose_plan")
 	assert.NotContains(t, text, "propose_spec")
 	assert.NotContains(t, text, "If Clarity is still 1 or 2")
 	assert.Contains(t, text, "Stop double charges.")
@@ -283,7 +283,7 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: false}))
 	text, err = AnalysisContinuationText(db, session)
 	require.NoError(t, err)
-	assert.Contains(t, text, "Call propose_update with scores and any updated spec in one call")
+	assert.Contains(t, text, "Call propose_plan with scores and any updated spec in one call")
 	assert.Contains(t, text, "When every required score is 3, publish each required score on that plan turn")
 	assert.NotContains(t, text, "Publish the Clarity score when the plan changes")
 	assert.Contains(t, text, "Current Confidence: 3/5\nThis issue is a mixed fit for an agent.")
@@ -790,6 +790,79 @@ func TestFactory_MaybeAttachAnalysisSessionForSystemCreatedWorkOrder(t *testing.
 	stale, err := ListStaleOpenPlanningSessions(db, time.Now().Add(10*time.Minute), 10)
 	require.NoError(t, err)
 	assert.Empty(t, stale)
+}
+
+func TestFactory_MaybeAttachAnalysisSessionLinksRejectedModelRun(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-model-rejected")
+	db := database.DB(t.Context())
+	connection, err := CreateCodexConnection(db, org.ID, userID, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.StoreUsage(db, nil, []CodexModel{{Model: "gpt-5.4"}}, time.Now()))
+	require.NoError(t, db.Model(connection).Updates(map[string]any{
+		"status": CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle"),
+	}).Error)
+	subscription := true
+	require.NoError(t, factoryModel.UpdateOnboarding(db, FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	version, err := FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	nodes := version.Nodes
+	nodes = append(nodes, Node{
+		ID:   "plan",
+		Type: NodeTypeComponent,
+		Ref:  NodeRef{Component: &ComponentRef{Name: "runnerCodex"}},
+		Configuration: map[string]any{
+			"credentials": map[string]any{"source": "subscription"},
+			"model":       "gpt-6.1-terra",
+		},
+	})
+	require.NoError(t, db.Model(version).Update("nodes", nodes).Error)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, []uuid.UUID{userID}, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	event := analysisWorkOrderCreatedEvent(canvas.ID, run.ID, order.ID, true)
+
+	err = MaybeAttachAnalysisSession(db, canvas, event, run)
+	require.ErrorIs(t, err, ErrSubscriptionModelUnavailable)
+	assert.True(t, IsPermanentSubscriptionAdmissionError(err))
+	assert.Contains(t, err.Error(), "gpt-6.1-terra")
+	_, err = FindPlanningSessionByRun(db, run.ID)
+	assert.ErrorIs(t, err, ErrFactoryPlanningSessionNotFound)
+	runs, err := order.ListRuns(db)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, run.ID, runs[0].ID)
+}
+
+func TestFactory_AttachAnalysisSessionDoesNotLinkAnotherTasksRun(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-run-owner")
+	db := database.DB(t.Context())
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	first, err := factoryModel.CreateWorkOrder(db, "First task", "", &userID, nil, nil)
+	require.NoError(t, err)
+	second, err := factoryModel.CreateWorkOrder(db, "Second task", "", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	_, err = factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		CanvasID: canvas.ID, CanvasRunID: run.ID, WorkOrderID: first.ID,
+	})
+	require.NoError(t, err)
+	// Older sessions can exist without a refinement-run link.
+	require.NoError(t, db.Where("run_id = ?", run.ID).Delete(&FactoryWorkOrderRefinementRun{}).Error)
+	var links []FactoryWorkOrderRefinementRun
+	require.NoError(t, db.Where("run_id = ?", run.ID).Find(&links).Error)
+	require.Empty(t, links)
+
+	_, err = factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		CanvasID: canvas.ID, CanvasRunID: run.ID, WorkOrderID: second.ID,
+	})
+	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	require.NoError(t, db.Where("run_id = ?", run.ID).Find(&links).Error)
+	assert.Empty(t, links)
 }
 
 func TestFactory_MaybeAttachAnalysisSessionRequiresFeatureAtCreation(t *testing.T) {

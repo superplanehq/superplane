@@ -22,7 +22,8 @@ import {
 } from "@/hooks/useFactoryData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useFactoryCustomAutomations } from "@/hooks/useFactoryCustomAutomationData";
-import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
+import { githubHostFromIntegration, isGitHubEnterpriseServerHost } from "@/lib/githubHost";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
@@ -39,7 +40,7 @@ import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
-import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
@@ -392,13 +393,19 @@ export function LinesPage() {
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
     [configuredIntakes],
   );
-  const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
   const [ownerIntakeTemplate, setOwnerIntakeTemplate] = useState<AddIntakeTemplate>();
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const githubIntegration = useIntegration(organizationId, githubIntegrationId);
+  const githubHost = githubHostFromIntegration(githubIntegration.data);
+  const hideDependabot = isGitHubEnterpriseServerHost(githubHost);
+  const addIntakeTemplates = useMemo(
+    () => addIntakeTemplatesForOrg(hasExperimentalFeature, { hideDependabot }),
+    [hasExperimentalFeature, hideDependabot],
+  );
   const vcsProvider = factory?.onboarding?.vcsProvider;
   const supportsReviewBots = vcsProvider !== "bitbucket";
   const catalogParameters = appRepository ? { repository: appRepository } : undefined;
@@ -815,6 +822,7 @@ export function LinesPage() {
                 key={intake.intakeId}
                 message={intake.healthMessage}
                 repository={intake.resourceId}
+                host={githubHost}
                 retrying={intakeWebhookRetry.retrying}
                 onRetry={() => intakeWebhookRetry.retryIntake(intake)}
               />
@@ -1373,6 +1381,7 @@ function LineBoardSplitRunPopup({
           resolveUser,
           columnAppRuns: columnAppCheckRuns.lookup,
         })}
+        analysisRuns={analysisRuns}
         canDispatch={canDispatch && Boolean(resolvedLineName)}
         canUpdate={canUpdate}
         isDispatching={isDispatching}

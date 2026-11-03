@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -488,6 +487,17 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 					for id, timeout := range expected {
 						node := findIntakeNode(version.Nodes, id)
 						require.NotNil(t, node)
+						steps, ok := node.Configuration["steps"].([]any)
+						require.True(t, ok)
+						var hasGitUser, hasDCOSigning bool
+						for _, item := range steps {
+							step, ok := item.(map[string]any)
+							require.True(t, ok)
+							hasGitUser = hasGitUser || step["name"] == "Set Up Git User"
+							hasDCOSigning = hasDCOSigning || step["name"] == "Set Up DCO Signing"
+						}
+						assert.True(t, hasGitUser)
+						assert.True(t, hasDCOSigning)
 						assert.EqualValues(t, timeout, node.Configuration["executionTimeoutSeconds"])
 						assert.Equal(t, evidence[id], node.Configuration["includeVisualEvidence"])
 						assert.Equal(t, model, node.Configuration["model"])
@@ -658,7 +668,6 @@ func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing
 	r, factory := resetTestFactory(t)
 	db := database.DB(t.Context())
 	enableHostedSuperPlaneAgent(t, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	otherOwner := support.CreateUser(t, r, r.Organization.ID)
 	otherConnection, err := models.CreateCodexConnection(db, r.Organization.ID, otherOwner.ID, time.Now())
 	require.NoError(t, err)

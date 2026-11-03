@@ -167,6 +167,29 @@ describe("IntegrationSetupReturn", () => {
     expect(screen.queryByText("onboarding")).not.toBeInTheDocument();
   });
 
+  it("returns to workspace setup from the factory integrations page", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/pay/settings/organization/integrations/int-ghe"]}>
+        <Routes>
+          <Route
+            path="/:organizationId/workspaces/:factoryKey/settings/organization/integrations/:integrationId"
+            element={
+              <IntegrationSetupReturn organizationId={ORGANIZATION_ID}>
+                <div>integration details</div>
+              </IntegrationSetupReturn>
+            }
+          />
+          <Route path="/org-1/workspaces/APP/setup" element={<SetupLanding />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.queryByText("integration details")).not.toBeInTheDocument();
+  });
+
   it("stays on factory organization integrations when no return path is stored", () => {
     featureHas.mockImplementation((featureId) => featureId === FEATURE_FACTORIES);
 

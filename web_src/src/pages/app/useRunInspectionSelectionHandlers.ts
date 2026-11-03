@@ -1,7 +1,7 @@
 import { startTransition, useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import type { SetURLSearchParams } from "react-router";
 
-import type { CanvasFocusRequest } from "./useAgentNodeFocusRequest";
+import type { CanvasFocusRequest } from "@/hooks/useCanvasNodeFocusRequest";
 import { applyRunInspectionNavigationSearchParams, clearRunInspectionSearchParams } from "./viewState";
 
 export type RunSelectionHandlersOptions = {

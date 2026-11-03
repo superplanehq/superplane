@@ -165,7 +165,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "url",
 			Label:                "URL",
-			Description:          "Link to the branch or external resource (must be http or https). Required for links. For branches, optional: when empty, SuperPlane writes a GitHub tree URL from repository and name. Example: https://github.com/{owner}/{repo}/tree/{branch}.",
+			Description:          "Link to the branch or external resource (must be http or https). Required for links. For branches, optional: when empty, SuperPlane writes a GitHub tree URL from repository and name. Example: " + exampleGitHubHost().TreeURL("{owner}/{repo}", "{branch}") + ".",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: linkableTypes,
@@ -266,11 +266,11 @@ func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	provider, err := workOrderArtifactProvider(config.ArtifactType, ctx.Factory)
+	provider, githubHost, err := workOrderArtifactHosts(config.ArtifactType, ctx.Factory)
 	if err != nil {
 		return err
 	}
-	data, err := buildArtifactData(config, provider)
+	data, err := buildArtifactData(config, provider, githubHost)
 	if err != nil {
 		return err
 	}
@@ -344,14 +344,19 @@ func validateUpdateExistingArtifactConfiguration(config AddWorkOrderArtifactConf
 	return nil
 }
 
-func workOrderArtifactProvider(artifactType string, factory core.FactoryContext) (string, error) {
+func workOrderArtifactHosts(artifactType string, factory core.FactoryContext) (provider, githubHost string, err error) {
 	if artifactType != "branch" || factory == nil {
-		return "", nil
+		return "", "", nil
 	}
-	return factory.VCSProvider()
+	provider, err = factory.VCSProvider()
+	if err != nil {
+		return "", "", err
+	}
+	githubHost, err = factory.GitHubHost()
+	return provider, githubHost, err
 }
 
-func buildArtifactData(config AddWorkOrderArtifactConfiguration, provider string) (map[string]any, error) {
+func buildArtifactData(config AddWorkOrderArtifactConfiguration, provider, githubHost string) (map[string]any, error) {
 	data := artifactDataToMap(config.Data)
 
 	typed := map[string]string{
@@ -371,7 +376,7 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration, provider string
 		data[key] = value
 	}
 
-	data = applyBranchTreeURL(provider, config, data)
+	data = applyBranchTreeURL(provider, githubHost, config, data)
 	if err := requireReachableBranchURL(config.ArtifactType, data); err != nil {
 		return nil, err
 	}

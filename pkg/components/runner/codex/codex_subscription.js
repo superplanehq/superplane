@@ -189,22 +189,47 @@ function readBundle(env = process.env) {
   }
 }
 
-async function requestJSON(env, method, pathname, body) {
+function readAccessToken(env = process.env) {
+  return readBundle(env)?.tokens?.access_token || "";
+}
+
+function accessTokenNeedsRefresh(env = process.env) {
+  const token = readAccessToken(env);
+  try {
+    const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+    return !Number.isFinite(payload.exp) || payload.exp * 1000 <= Date.now() + 10 * 60 * 1000;
+  } catch (_error) {
+    return true;
+  }
+}
+
+async function requestJSON(env, method, pathname, body, timeoutMs) {
   const base = String(env.SUPERPLANE_BASE_URL || "").replace(/\/$/, "");
   const token = String(env.SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN || "").trim();
   if (!base || !token) {
     throw new Error("ChatGPT subscription endpoint is not configured");
   }
-  const response = await fetchWithRetry(`${base}${pathname}`, {
+  const options = {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  };
+  const response = timeoutMs
+    ? await fetch(`${base}${pathname}`, { ...options, signal: AbortSignal.timeout(timeoutMs) })
+    : await fetchWithRetry(`${base}${pathname}`, options);
   if (!response.ok) {
-    throw new Error(`ChatGPT subscription request failed (${response.status})`);
+    let code = "";
+    try {
+      code = String((await response.json()).error || "");
+    } catch (_error) {
+      // Never put provider response text in an error or run result.
+    }
+    const failure = new Error(`ChatGPT subscription request failed (${response.status})`);
+    failure.code = code;
+    throw failure;
   }
   try {
     return await response.json();
@@ -232,11 +257,13 @@ async function fetchWithRetry(url, options) {
   }
 }
 
-async function restore(env = process.env) {
+async function restore(env = process.env, timeoutMs) {
   const payload = await requestJSON(
     env,
     "GET",
     "/api/v1/runner/codex-subscription/credentials",
+    undefined,
+    timeoutMs,
   );
   const bundle = payload && payload.bundle;
   if (!bundle || typeof bundle !== "object") {
@@ -249,6 +276,20 @@ async function restore(env = process.env) {
   const file = authPath(env);
   fs.writeFileSync(file, `${JSON.stringify(bundle)}\n`, { mode: 0o600 });
   fs.chmodSync(file, 0o600);
+}
+
+async function refreshRejectedCredentials(rejectedAccessToken, timeoutMs, env = process.env) {
+  const bundle = readBundle(env);
+  const refreshToken = bundle?.tokens?.refresh_token;
+  if (!refreshToken) {
+    const failure = new Error("ChatGPT subscription credentials are missing");
+    failure.code = "temporarily_unavailable";
+    throw failure;
+  }
+  await requestJSON(env, "POST", "/api/v1/runner/codex-subscription/refresh", {
+    refresh_token: refreshToken,
+    rejected_access_token: rejectedAccessToken,
+  }, timeoutMs);
 }
 
 async function checkpoint(options = {}) {
@@ -521,10 +562,24 @@ async function main(argv = process.argv.slice(2)) {
   throw new Error("usage: node codex_subscription.js restore|refresh|checkpoint|usage|login");
 }
 
+function authenticationFailure(error) {
+  if (["refresh_token_invalidated", "refresh_token_expired", "refresh_token_reused", "invalid_grant", "invalid_refresh_token", "token_expired"].includes(error?.code)) {
+    return { code: "chatgpt_reconnect_required", message: "SuperPlane could not refresh your ChatGPT connection. Reconnect ChatGPT to continue." };
+  }
+  if (error?.code === "connection_busy") {
+    return { code: "chatgpt_connection_busy", message: "Your ChatGPT connection is busy. Try again." };
+  }
+  if (error?.code === "temporarily_unavailable") {
+    return { code: "chatgpt_refresh_failed", message: "SuperPlane could not refresh your ChatGPT connection. Try again." };
+  }
+  return null;
+}
+
 if (require.main === module) {
   main().catch((err) => {
+    const failure = authenticationFailure(err);
     const message = sanitizeErrorMessage(
-      `ChatGPT subscription ${process.argv[2] || "command"} failed: ${err && err.message ? err.message : "Unknown error"}`,
+      failure?.message || `ChatGPT subscription ${process.argv[2] || "command"} failed: ${err && err.message ? err.message : "Unknown error"}`,
     );
     process.stderr.write(`${message}\n`);
     const resultFile = process.env.SUPERPLANE_RESULT_FILE;
@@ -532,7 +587,7 @@ if (require.main === module) {
       try {
         fs.writeFileSync(
           resultFile,
-          `${JSON.stringify({ type: "result", is_error: true, error: message })}\n`,
+          `${JSON.stringify({ type: "result", is_error: true, error: message, ...(failure ? { authentication_code: failure.code } : {}) })}\n`,
         );
       } catch (writeError) {
         const writeMessage = sanitizeErrorMessage(
@@ -552,6 +607,10 @@ module.exports = {
   createSecretRedactor,
   setCredentialFailureHandler,
   restore,
+  readAccessToken,
+  accessTokenNeedsRefresh,
+  authenticationFailure,
+  refreshRejectedCredentials,
   checkpoint,
   reportUsage,
   parseDeviceAuth,

@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -23,7 +23,6 @@ import (
 func TestSubscriptionConnectionsAndCatalogsFollowTheTaskOwner(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	subscription := true
@@ -147,7 +146,6 @@ func requireCodexConnectionRequired(t *testing.T, err error) {
 func TestSubscriptionStartReassignsOpenTasksAndStepRetries(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	subscription := true
@@ -212,6 +210,118 @@ func TestSubscriptionStartReassignsOpenTasksAndStepRetries(t *testing.T) {
 			assert.Equal(t, scenario.index, response.Order.LineDispatches[0].StepExecutions[0].StepIndex)
 		})
 	}
+}
+
+func TestSubscriptionStartTakesDraftWhilePlanningRunnerStops(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	subscription := true
+	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	previous := support.CreateUser(t, r, r.Organization.ID)
+	connections := map[uuid.UUID]*models.FactoryCodexConnection{}
+	for _, userID := range []uuid.UUID{previous.ID, r.User} {
+		connection, err := models.CreateCodexConnection(db, r.Organization.ID, userID, time.Now())
+		require.NoError(t, err)
+		require.NoError(t, db.Model(connection).Updates(map[string]any{
+			"status": models.CodexConnectionStatusReady, "credential_version": 1,
+			"bundle_ciphertext": []byte("bundle"),
+		}).Error)
+		require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "shared-model"}}, time.Now()))
+		connections[userID] = connection
+	}
+	order, err := f.CreateWorkOrder(db, "Draft", "", &previous.ID, []uuid.UUID{previous.ID}, nil)
+	require.NoError(t, err)
+	planningCanvas := createOnWorkOrderCanvas(t, r, f.ID)
+	planningRun, err := models.CreateCanvasRunInTransaction(db, planningCanvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := f.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		CanvasID: planningCanvas.ID, CanvasRunID: planningRun.ID, WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+	event := support.EmitCanvasEventForNode(t, planningCanvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, planningCanvas.ID, backlogRefinementNodeID, event.ID, event.ID)
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
+		"run_id": planningRun.ID, "state": models.CanvasNodeExecutionStateStarted,
+	}).Error)
+	fleet := models.DefaultInstallationRunnerFleets("test")[0]
+	fleet.Slug = support.RandomName("planning")
+	require.NoError(t, fleet.Create(db))
+	oldTask := &models.RunnerTask{ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleet.ID,
+		Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateRunning,
+		QueuedAt: time.Now(), PayloadCiphertext: []byte("encrypted")}
+	require.NoError(t, db.Create(oldTask).Error)
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, planningCanvas.ID, backlogRefinementNodeID, execution.ID, "task_id", oldTask.ID.String()))
+	_, err = models.ReserveFactoryCodexConnection(db, f.OrganizationID, f.ID, planningRun.ID, oldTask.ID, time.Now(), crypto.NewNoOpEncryptor())
+	require.NoError(t, err)
+
+	app := createLineAppWithRunner(t, r, f.ID, runnerCodex, "subscription", "shared-model")
+	line, err := f.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"}})
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	eligibility, err := ListFactoryOwnerEligibility(ctx, r.Organization.ID.String(), &pb.ListFactoryOwnerEligibilityRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
+	require.NoError(t, err)
+	assert.False(t, eligibility.OwnershipChangeAllowed)
+	_, err = UpdateWorkOrderAssignees(ctx, r.Organization.ID.String(), &pb.UpdateWorkOrderAssigneesRequest{FactoryId: f.ID.String(), OrderId: order.ID.String(), AssigneeIds: []string{r.User.String()}})
+	require.Error(t, err)
+	assert.Equal(t, models.ErrSubscriptionOwnerBusy.Error(), grpcerrors.StatusMessage(err))
+
+	request := &pb.DispatchWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String(), LineName: line.Name}
+	request.Model = "unavailable-model"
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), request)
+	require.Error(t, err)
+	unchanged, err := f.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, unchanged.State)
+	assert.Equal(t, []uuid.UUID{previous.ID}, unchanged.AssigneeIDs())
+	stillPlanning, err := models.FindPlanningSession(db, f.OrganizationID, f.ID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateRunning, stillPlanning.State)
+	stillRunning, err := models.FindRunnerTask(db, oldTask.ID)
+	require.NoError(t, err)
+	assert.Nil(t, stillRunning.CancelRequestedAt)
+	unrelatedRun, err := models.CreateCanvasRunInTransaction(db, planningCanvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, order.RecordRefinementRun(db, unrelatedRun.ID))
+	request.Model = "shared-model"
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), request)
+	require.Error(t, err)
+	assert.Equal(t, models.ErrSubscriptionOwnerBusy.Error(), grpcerrors.StatusMessage(err))
+	stillPlanning, err = models.FindPlanningSession(db, f.OrganizationID, f.ID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateRunning, stillPlanning.State)
+	require.NoError(t, db.Delete(&models.FactoryWorkOrderRefinementRun{}, "run_id = ?", unrelatedRun.ID).Error)
+
+	started, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	require.Len(t, started.Order.Assignees, 1)
+	assert.Equal(t, r.User.String(), started.Order.Assignees[0].Id)
+	completedPlanning, err := models.FindPlanningSession(db, f.OrganizationID, f.ID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, completedPlanning.State)
+	completedRun, err := models.FindUnscopedCanvasRun(db, planningRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, completedRun.State)
+	assert.Equal(t, models.CanvasRunResultPassed, completedRun.Result)
+	stoppingTask, err := models.FindRunnerTask(db, oldTask.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, stoppingTask.CancelRequestedAt)
+	assert.ErrorIs(t, stoppingTask.RequireSubscriptionLeaseContinuation(db), models.ErrSubscriptionOwnerInvalid)
+
+	implementationRun, err := models.CreateCanvasRunInTransaction(db, app.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).
+		Where("work_order_id = ? AND line_dispatch_id = ?", order.ID, uuid.MustParse(started.Order.LineDispatches[0].Id)).
+		Update("run_id", implementationRun.ID).Error)
+	newTask := &models.RunnerTask{ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleet.ID,
+		Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStatePending,
+		QueuedAt: time.Now(), PayloadCiphertext: []byte("encrypted")}
+	require.NoError(t, db.Create(newTask).Error)
+	reserved, err := models.ReserveFactoryCodexConnection(db, f.OrganizationID, f.ID, implementationRun.ID, newTask.ID, time.Now(), crypto.NewNoOpEncryptor())
+	require.NoError(t, err)
+	assert.Equal(t, connections[r.User].ID, reserved.ID)
+	assert.NotEqual(t, connections[previous.ID].ID, reserved.ID)
 }
 
 func codexLineModelIDs(list []*pb.FactoryLLMModel) []string {

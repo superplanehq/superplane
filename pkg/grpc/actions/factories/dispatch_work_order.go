@@ -104,6 +104,7 @@ type workOrderLineDispatchResult struct {
 	factory      *models.Factory
 	order        *models.FactoryWorkOrder
 	startedSteps []*models.FactoryLineStepResult
+	planningStop *models.RunCancellationResult
 	fromState    string
 	logger       *log.Entry
 }
@@ -127,6 +128,14 @@ func DispatchWorkOrderOnLine(
 	})
 	if err != nil {
 		return nil, nil, err
+	}
+	if result.planningStop != nil && result.planningStop.Run != nil {
+		messages.PublishRunCancellationDrain(result.planningStop.Run.WorkflowID, result.planningStop.Drain)
+		if result.planningStop.NewlyCancelling {
+			if err := messages.NewCanvasRunMessage(result.planningStop.Run.WorkflowID.String(), result.planningStop.Run.ID.String()).Publish(); err != nil {
+				result.logger.WithError(err).Warn("Failed to publish planning run completion")
+			}
+		}
 	}
 
 	publishDispatchedWorkOrder(
@@ -183,6 +192,10 @@ func dispatchWorkOrderOnLineTx(
 		return nil, models.ErrFactoryWorkOrderNotDispatchable
 	}
 
+	planningStop, err := order.CompletePlanningForStart(tx, actor)
+	if err != nil {
+		return nil, err
+	}
 	if err := assignWorkOrderStarter(tx, factory, order, actor); err != nil {
 		return nil, err
 	}
@@ -247,6 +260,7 @@ func dispatchWorkOrderOnLineTx(
 			factory:      factory,
 			order:        order,
 			startedSteps: startedSteps,
+			planningStop: planningStop,
 			fromState:    fromState,
 			logger:       logger,
 		}, nil
@@ -275,6 +289,7 @@ func dispatchWorkOrderOnLineTx(
 		factory:      factory,
 		order:        order,
 		startedSteps: append(abandoned, result),
+		planningStop: planningStop,
 		fromState:    fromState,
 		logger:       logger,
 	}, nil

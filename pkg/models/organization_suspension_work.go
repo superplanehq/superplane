@@ -69,29 +69,7 @@ func (e *OrganizationSuspensionEvent) CancelRunnerTasks(tx *gorm.DB, after uuid.
 		return nil, err
 	}
 	// Runner-before-task, after organization/event, matches reservation and completion.
-	var runnerIDs []uuid.UUID
-	for _, task := range tasks {
-		if task.RunnerID != nil {
-			runnerIDs = append(runnerIDs, *task.RunnerID)
-		}
-	}
-	if len(runnerIDs) > 0 {
-		var runners []Runner
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id IN ?", runnerIDs).Order("id").Find(&runners).Error; err != nil {
-			return nil, err
-		}
-	}
-	for i := range tasks {
-		current, err := FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE"}), tasks[i].ID)
-		if err != nil {
-			return nil, err
-		}
-		if err := current.RequestCancel(tx, time.Now()); err != nil {
-			return nil, err
-		}
-		tasks[i] = *current
-	}
-	return tasks, nil
+	return RequestCancelRunnerTasks(tx, tasks, time.Now())
 }
 
 func (e *OrganizationSuspensionEvent) DiscardQueuedWork(tx *gorm.DB) error {
