@@ -28,7 +28,6 @@ Example:
 	}
 	listCmd.Flags().StringVar(&listWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
 	bindTaskIDFlag(listCmd, &listTaskID)
-	_ = listCmd.MarkFlagRequired("task")
 	core.Bind(listCmd, &checkListCommand{workspace: &listWorkspace, taskID: &listTaskID}, options)
 
 	var (
@@ -67,7 +66,7 @@ Example:
 	addCmd.Flags().Float64Var(&addMaxScore, "max-score", 0, "maximum score")
 	addCmd.Flags().StringVar(&addLevel, "level", "", "check level: positive, caution, or critical")
 	addCmd.Flags().StringVar(&addReason, "reason", "", "why the check has this score")
-	for _, name := range []string{"task", "key", "name", "score", "max-score", "level", "reason"} {
+	for _, name := range []string{"key", "name", "score", "max-score", "level", "reason"} {
 		_ = addCmd.MarkFlagRequired(name)
 	}
 	core.Bind(addCmd, &checkAddCommand{
@@ -99,7 +98,6 @@ Example:
 	removeCmd.Flags().StringVar(&removeWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
 	bindTaskIDFlag(removeCmd, &removeTaskID)
 	removeCmd.Flags().StringSliceVar(&removeKeys, "key", nil, "check key (repeat for more keys)")
-	_ = removeCmd.MarkFlagRequired("task")
 	_ = removeCmd.MarkFlagRequired("key")
 	core.Bind(removeCmd, &checkRemoveCommand{
 		workspace: &removeWorkspace,

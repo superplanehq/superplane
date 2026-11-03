@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 // does not start.
 func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int, merge *MergeConfidenceScope) []TaskEnvironmentVariable {
 	environment = withoutEnvironmentName(environment, EnvSuperplaneRunnerToken)
+	environment = withoutEnvironmentName(environment, EnvSuperplaneTaskID)
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
 	if secret == "" || baseURL == "" {
@@ -29,7 +31,7 @@ func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVar
 	}
 
 	signer := jwt.NewSigner(secret)
-	scope, err := resolveRunnerScope(database.DB(context.Background()), ctx, environment, merge)
+	scope, order, err := resolveRunnerScope(database.DB(context.Background()), ctx, environment, merge)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.WithError(err).Debug("skip runner token")
@@ -41,23 +43,33 @@ func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVar
 		return environment
 	}
 	environment = withoutEnvironmentName(environment, EnvSuperplaneBaseURL)
-	return append(environment,
+	environment = append(environment,
 		TaskEnvironmentVariable{Name: EnvSuperplaneBaseURL, Value: strings.TrimRight(baseURL, "/")},
 		TaskEnvironmentVariable{Name: EnvSuperplaneRunnerToken, Value: token},
 	)
+	if order != nil {
+		environment = append(environment, TaskEnvironmentVariable{Name: EnvSuperplaneTaskID, Value: strconv.FormatInt(order.Number, 10)})
+	}
+	return environment
 }
 
-func resolveRunnerScope(db *gorm.DB, ctx core.ExecutionContext, environment []TaskEnvironmentVariable, merge *MergeConfidenceScope) (*RunnerScope, error) {
+// resolveRunnerScope returns the open task of the run. A planning run has no task.
+func resolveRunnerScope(
+	db *gorm.DB,
+	ctx core.ExecutionContext,
+	environment []TaskEnvironmentVariable,
+	merge *MergeConfidenceScope,
+) (*RunnerScope, *models.FactoryWorkOrder, error) {
 	if ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
-		return nil, fmt.Errorf("run is missing")
+		return nil, nil, fmt.Errorf("run is missing")
 	}
 	canvasID, err := uuid.Parse(ctx.WorkflowID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid canvas: %w", err)
+		return nil, nil, fmt.Errorf("invalid canvas: %w", err)
 	}
 	orgID, err := uuid.Parse(ctx.OrganizationID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid organization: %w", err)
+		return nil, nil, fmt.Errorf("invalid organization: %w", err)
 	}
 	scope := &RunnerScope{
 		OrganizationID:  orgID,
@@ -76,22 +88,23 @@ func resolveRunnerScope(db *gorm.DB, ctx core.ExecutionContext, environment []Ta
 		err = resolveTaskRunnerScope(db, scope)
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	scope.Scopes = ScopesForFlow(scope.Flow)
 	if scope.Flow == RunnerFlowTask {
 		scope.Scopes = append(scope.Scopes, TaskCapabilityScopes(environment)...)
 	}
 	if err := validateRunnerTokenScope(db, scope); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if scope.Flow == RunnerFlowPlanning {
-		return scope, nil
+		return scope, nil, nil
 	}
-	if err := requireOpenTask(db, scope); err != nil {
-		return nil, err
+	order, err := findOpenTask(db, scope)
+	if err != nil {
+		return nil, nil, err
 	}
-	return scope, nil
+	return scope, order, nil
 }
 
 func resolvePlanningRunnerScope(db *gorm.DB, scope *RunnerScope) error {
@@ -131,17 +144,17 @@ func resolveTaskRunnerScope(db *gorm.DB, scope *RunnerScope) error {
 	return nil
 }
 
-func requireOpenTask(db *gorm.DB, scope *RunnerScope) error {
+func findOpenTask(db *gorm.DB, scope *RunnerScope) (*models.FactoryWorkOrder, error) {
 	factory, err := models.FindFactory(db, scope.OrganizationID, scope.FactoryID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	order, err := factory.FindWorkOrder(db, scope.WorkOrderID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if order.State == models.FactoryWorkOrderStateClosed || order.IsArchived() {
-		return fmt.Errorf("task is closed or archived")
+		return nil, fmt.Errorf("task is closed or archived")
 	}
-	return nil
+	return order, nil
 }

@@ -22,9 +22,9 @@ func (c *artifactGetCommand) Execute(ctx core.CommandContext) error {
 	if (id == "") == (key == "") {
 		return fmt.Errorf("pass --id or --key")
 	}
-	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	rawTaskID := taskRef(c.taskID)
 	if rawTaskID == "" {
-		return fmt.Errorf("--task is required")
+		return errTaskRequired
 	}
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)
 	if err != nil {

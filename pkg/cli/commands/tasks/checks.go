@@ -129,9 +129,9 @@ func (c *checkRemoveCommand) Execute(ctx core.CommandContext) error {
 }
 
 func resolveCheckTask(ctx core.CommandContext, workspace, rawTaskID *string) (string, string, error) {
-	ref := strings.TrimSpace(stringValue(rawTaskID))
+	ref := taskRef(rawTaskID)
 	if ref == "" {
-		return "", "", fmt.Errorf("--task is required")
+		return "", "", errTaskRequired
 	}
 	workspaceID, err := resolveWorkspace(ctx, workspace)
 	if err != nil {

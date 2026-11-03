@@ -22,11 +22,11 @@ type artifactAddCommand struct {
 }
 
 func (c *artifactAddCommand) Execute(ctx core.CommandContext) error {
-	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	rawTaskID := taskRef(c.taskID)
 	artifactType := strings.ToLower(strings.TrimSpace(stringValue(c.typ)))
 
 	if rawTaskID == "" {
-		return fmt.Errorf("--task is required")
+		return errTaskRequired
 	}
 
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)

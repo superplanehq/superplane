@@ -58,6 +58,27 @@ func TestAddCheckSendsTheCheck(t *testing.T) {
 	assert.Contains(t, stdout.String(), "9/10")
 }
 
+func TestCheckListUsesTheTaskFromTheEnvironment(t *testing.T) {
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"order":{"id":"order-1"}}`))
+	}))
+	t.Cleanup(server.Close)
+	ctx, _ := newTasksTestContext(t, server.URL)
+	t.Setenv(TaskIDEnv, "42")
+
+	workspace, empty, explicit := "factory-1", "", "7"
+	require.NoError(t, (&checkListCommand{workspace: &workspace, taskID: &empty}).Execute(ctx))
+	require.NoError(t, (&checkListCommand{workspace: &workspace, taskID: &explicit}).Execute(ctx))
+
+	assert.Equal(t, []string{
+		"/api/v1/factories/factory-1/orders/42",
+		"/api/v1/factories/factory-1/orders/7",
+	}, paths)
+}
+
 func TestAddCheckRejectsAnUnknownLevel(t *testing.T) {
 	level := "great"
 	err := (&checkAddCommand{level: &level}).Execute(core.CommandContext{})

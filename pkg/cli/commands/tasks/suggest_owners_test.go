@@ -64,7 +64,8 @@ func TestSuggestOwnersPrintsRankedOwners(t *testing.T) {
 }
 
 func TestSuggestOwnersRequiresTask(t *testing.T) {
+	t.Setenv(TaskIDEnv, "")
 	workspace := "factory-1"
 	err := (&taskSuggestOwnersCommand{workspace: &workspace}).Execute(core.CommandContext{})
-	require.EqualError(t, err, "--task is required")
+	require.EqualError(t, err, "--task is required (or set SUPERPLANE_TASK_ID)")
 }
