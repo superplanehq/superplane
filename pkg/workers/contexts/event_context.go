@@ -87,8 +87,8 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	}
 	if dedupKey != "" && s.run == nil {
 		created, err = s.node.CreateDeduplicatedRootEvent(s.tx, &event, dedupKey)
-	} else if payloadType == "github.pullRequest" && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.Ref.Data().Trigger != nil && s.node.Ref.Data().Trigger.Name == "github.onPullRequest" {
-		created, err = s.node.CreateGitHubChecksEvent(s.tx, &event)
+	} else if (payloadType == "github.pullRequest" || payloadType == "bitbucket.pullRequest") && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.ComponentName() == strings.TrimSuffix(payloadType, ".pullRequest")+".onPullRequest" {
+		created, err = s.node.CreatePullRequestChecksEvent(s.tx, &event)
 	} else {
 		err = s.tx.Create(&event).Error
 	}
