@@ -107,7 +107,7 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 	if err != nil {
 		return nil, err
 	}
-	if pullRequest.SupersededAt != nil || pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
+	if pullRequest.SupersededAt != nil || (pullRequest.Provider != models.FactoryPullRequestProviderGitHub && pullRequest.Provider != models.FactoryPullRequestProviderBitbucket) || pullRequest.State != models.FactoryPullRequestStateOpen {
 		return nil, request.Complete(db)
 	}
 	node, err := checksStartupTrigger(db, request, factory, pullRequest)
@@ -116,6 +116,37 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 	}
 	if node == nil {
 		return nil, request.Complete(db)
+	}
+	payload, err := checksStartupPayload(ctx, db, deps, factory, pullRequest, node)
+	if err != nil {
+		return nil, err
+	}
+	if payload == nil {
+		return nil, request.Complete(db)
+	}
+	var events []models.CanvasEvent
+	err = db.Transaction(func(tx *gorm.DB) error {
+		current, err := checksStartupTrigger(tx, request, factory, pullRequest)
+		if err != nil {
+			return err
+		}
+		if current == nil {
+			return request.Complete(tx)
+		}
+		if err := contexts.NewEventContext(tx, current, nil, func(created []models.CanvasEvent) { events = append(events, created...) }).Emit(pullRequest.Provider+".pullRequest", payload); err != nil {
+			return err
+		}
+		return request.Complete(tx)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+
+func checksStartupPayload(ctx context.Context, db *gorm.DB, deps IntakeDependencies, factory *models.Factory, pullRequest *models.FactoryPullRequest, node *models.CanvasNode) (map[string]any, error) {
+	if pullRequest.Provider == models.FactoryPullRequestProviderBitbucket {
+		return bitbucketChecksStartupPayload(db, deps, factory, pullRequest)
 	}
 	client, err := newFactoryGitHubAPI(db, deps, factory)
 	if err != nil {
@@ -130,7 +161,7 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 	}
 	ignoreDrafts, _ := node.Configuration.Data()["ignoreDrafts"].(bool)
 	if githubPR.GetState() != models.FactoryPullRequestStateOpen || (githubPR.GetDraft() && ignoreDrafts) {
-		return nil, request.Complete(db)
+		return nil, nil
 	}
 	if strings.TrimSpace(githubPR.GetHead().GetSHA()) == "" || strings.TrimSpace(githubPR.GetHead().GetRef()) == "" || strings.TrimSpace(githubPR.GetHead().GetRepo().GetFullName()) == "" || strings.TrimSpace(githubPR.GetBase().GetRef()) == "" {
 		return nil, fmt.Errorf("pull request %s has incomplete head revision, branch, repository, or base branch", pullRequest.ID)
@@ -139,28 +170,34 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 	if err != nil {
 		return nil, err
 	}
-	payload, err := pullRequestChecksEventData(pullRequest, order, githubPR)
+	return pullRequestChecksEventData(pullRequest, order, githubPR)
+}
+
+func bitbucketChecksStartupPayload(db *gorm.DB, deps IntakeDependencies, factory *models.Factory, pullRequest *models.FactoryPullRequest) (map[string]any, error) {
+	client, err := newFactoryBitbucketAPI(db, deps, factory)
 	if err != nil {
 		return nil, err
 	}
-	var events []models.CanvasEvent
-	err = db.Transaction(func(tx *gorm.DB) error {
-		current, err := checksStartupTrigger(tx, request, factory, pullRequest)
-		if err != nil {
-			return err
-		}
-		if current == nil {
-			return request.Complete(tx)
-		}
-		if err := contexts.NewEventContext(tx, current, nil, func(created []models.CanvasEvent) { events = append(events, created...) }).Emit("github.pullRequest", payload); err != nil {
-			return err
-		}
-		return request.Complete(tx)
-	})
+	payload, err := client.GetPullRequestEvent(pullRequest.Repository, pullRequest.Number)
+	if err != nil {
+		return nil, fmt.Errorf("get current Bitbucket pull request: %w", err)
+	}
+	current := payload["pullrequest"].(map[string]any)
+	draft, _ := current["draft"].(bool)
+	if nestedString(current, "state") != "OPEN" || draft {
+		return nil, nil
+	}
+	if nestedString(current, "source", "commit", "hash") == "" || nestedString(current, "source", "branch", "name") == "" || nestedString(current, "source", "repository", "full_name") == "" || nestedString(current, "destination", "branch", "name") == "" {
+		return nil, fmt.Errorf("pull request %s has incomplete head revision, branch, repository, or base branch", pullRequest.ID)
+	}
+	order, err := factory.FindWorkOrder(db, pullRequest.WorkOrderID)
 	if err != nil {
 		return nil, err
 	}
-	return events, nil
+	tracking := bitbucketCustomAutomationEventData(pullRequest, order, nestedString(current, "source", "branch", "name"), nestedString(current, "source", "commit", "hash"))
+	payload["pullRequest"] = tracking["pullRequest"]
+	payload["workOrder"] = tracking["workOrder"]
+	return payload, nil
 }
 
 func checksStartupTrigger(tx *gorm.DB, request *models.CanvasNodeRequest, factory *models.Factory, pullRequest *models.FactoryPullRequest) (*models.CanvasNode, error) {
@@ -174,7 +211,7 @@ func checksStartupTrigger(tx *gorm.DB, request *models.CanvasNodeRequest, factor
 	if canvas.FactoryID == nil || *canvas.FactoryID != factory.ID {
 		return nil, nil
 	}
-	node, err := canvas.GitHubVerificationTrigger(tx, pullRequest.Repository)
+	node, err := canvas.VerificationTrigger(tx, pullRequest.Provider, pullRequest.Repository)
 	if err != nil || node == nil {
 		return nil, err
 	}
