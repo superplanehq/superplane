@@ -156,7 +156,7 @@ func (s *Server) uploadRunnerArtifact(w http.ResponseWriter, r *http.Request, sc
 		return
 	}
 
-	publicURL, err := artifactPublicURL(file)
+	publicURL, err := storedfiles.ArtifactPublicURL(file)
 	if err != nil {
 		cleanupRunnerArtifact(provider, file, logger)
 		logger.WithError(err).Error("failed to create runner artifact URL")
@@ -697,13 +697,6 @@ func artifactAutomationRef(context *runnerArtifactContext) *factory.AutomationRe
 		ref.LineName = context.Line.Name
 	}
 	return ref
-}
-
-func artifactPublicURL(file *models.File) (string, error) {
-	if file.PublicID == nil || *file.PublicID == uuid.Nil {
-		return "", fmt.Errorf("artifact public id is missing")
-	}
-	return fmt.Sprintf("%s/api/v1/public/artifacts/%s/%s", blob.PublicBaseURL(), file.PublicID, url.PathEscape(file.Filename)), nil
 }
 
 func artifactMarkdown(title, contentType, publicURL string) string {

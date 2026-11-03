@@ -286,6 +286,20 @@ func (o *FactoryWorkOrder) FindArtifactByKey(tx *gorm.DB, key string) (*FactoryW
 	return &artifact, nil
 }
 
+// FindArtifactByDisplayKey finds an artifact by the key that lists show.
+// Runs store their artifact keys as "<task id>:<key>".
+func (o *FactoryWorkOrder) FindArtifactByDisplayKey(tx *gorm.DB, key string) (*FactoryWorkOrderArtifact, error) {
+	key = strings.TrimSpace(key)
+	scoped := o.ID.String() + ":" + key
+	if key != "" && len(scoped) <= MaxFactoryWorkOrderArtifactKeyBytes {
+		artifact, err := o.FindArtifactByKey(tx, scoped)
+		if !errors.Is(err, ErrFactoryWorkOrderArtifactNotFound) {
+			return artifact, err
+		}
+	}
+	return o.FindArtifactByKey(tx, key)
+}
+
 func (o *FactoryWorkOrder) FindArtifactByID(tx *gorm.DB, id uuid.UUID) (*FactoryWorkOrderArtifact, error) {
 	var artifact FactoryWorkOrderArtifact
 	err := tx.
@@ -352,6 +366,16 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 	}
 
 	return artifacts, nil
+}
+
+// HasFileArtifact reports whether an artifact of this task stores the file.
+func (o *FactoryWorkOrder) HasFileArtifact(tx *gorm.DB, fileID uuid.UUID) (bool, error) {
+	var count int64
+	err := tx.Model(&FactoryWorkOrderArtifact{}).
+		Where("work_order_id = ? AND type = ? AND data->>'fileId' = ?", o.ID, FactoryWorkOrderArtifactTypeFile, fileID.String()).
+		Count(&count).
+		Error
+	return count > 0, err
 }
 
 // RemoveArtifact deletes one artifact. A key selects that artifact. A title
