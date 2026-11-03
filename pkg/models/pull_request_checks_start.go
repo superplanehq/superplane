@@ -14,95 +14,79 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// GitHubChecksTrigger resolves registered checks triggers from the live graph,
-// including graphs whose trigger IDs have been renamed.
-func (h *FactoryPRFeedbackHandler) GitHubChecksTrigger(tx *gorm.DB, repository string) (*CanvasNode, error) {
-	if h.Source != FactoryPRFeedbackHandlerSourcePullRequestChecks || h.Subject != FactoryPRFeedbackHandlerSubjectGitHubPullRequest {
-		return nil, nil
-	}
-	if _, err := FindOrganizationByIDInTransaction(tx, h.OrganizationID.String()); errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	canvas, err := FindCanvasInTransaction(tx, h.OrganizationID, h.CanvasID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if canvas.FactoryID == nil || *canvas.FactoryID != h.FactoryID {
-		return nil, nil
-	}
-	return liveGitHubPullRequestTrigger(tx, canvas, repository)
-}
-
-// GitHubVerificationTrigger identifies PR checks and merge confidence. Both
-// need an initial snapshot after attachment because the open webhook may have
-// arrived before the PR belonged to this factory.
+// GitHubVerificationTrigger identifies PR checks and merge confidence from
+// the live graph. Attachment and delivery use the same eligibility rules.
 func (c *Canvas) GitHubVerificationTrigger(tx *gorm.DB, repository string) (*CanvasNode, error) {
 	if c.FactoryID == nil || c.DeletedAt.Valid {
 		return nil, nil
 	}
-	handler, err := FindPRFeedbackHandlerByCanvasID(tx, c.ID)
-	if err != nil {
+	nodes, err := githubVerificationTriggers(tx.Where(
+		"workflows.organization_id = ? AND workflows.factory_id = ? AND workflows.id = ?",
+		c.OrganizationID, *c.FactoryID, c.ID,
+	), repository)
+	if err != nil || len(nodes) == 0 {
 		return nil, err
 	}
-	if handler != nil {
-		return handler.GitHubChecksTrigger(tx, repository)
-	}
-	mergeConfidence, err := CanvasHasFactoryAppTemplate(tx, c.ID, "risk-score")
-	if err != nil || !mergeConfidence {
-		return nil, err
-	}
-	if _, err := FindOrganizationByIDInTransaction(tx, c.OrganizationID.String()); errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	version, err := FindLiveCanvasVersionByCanvasInTransaction(tx, c)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if FactoryAppTemplateID(version.Nodes) != "risk-score" {
-		return nil, nil
-	}
-	return liveGitHubPullRequestTrigger(tx, c, repository)
+	return &nodes[0], nil
 }
 
-func liveGitHubPullRequestTrigger(tx *gorm.DB, canvas *Canvas, repository string) (*CanvasNode, error) {
-	version, err := FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
+type githubVerificationTriggerRow struct {
+	CanvasNode    `gorm:"embedded"`
+	LiveNodes     datatypes.JSONSlice[Node]
+	ChecksHandler bool
+}
+
+// Load candidate triggers and their live graphs together. The caller scopes
+// workflows to the organization and factory, optionally to one canvas.
+func githubVerificationTriggers(tx *gorm.DB, repository string) ([]CanvasNode, error) {
+	var rows []githubVerificationTriggerRow
+	err := tx.Model(&CanvasNode{}).
+		Select("workflow_nodes.*", "live_version.nodes AS live_nodes", "handler.id IS NOT NULL AS checks_handler").
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id AND workflows.deleted_at IS NULL").
+		Joins("JOIN organizations ON organizations.id = workflows.organization_id AND organizations.deleted_at IS NULL").
+		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id AND live_version.workflow_id = workflows.id").
+		Joins("LEFT JOIN factory_pr_feedback_handlers handler ON handler.canvas_id = workflows.id").
+		Where("workflow_nodes.type = ? AND workflow_nodes.state <> ?", NodeTypeTrigger, CanvasNodeStateError).
+		Where(`(
+			(handler.organization_id = workflows.organization_id AND handler.factory_id = workflows.factory_id
+			 AND handler.subject = ? AND handler.source = ?)
+			OR (handler.id IS NULL AND EXISTS (
+				SELECT 1 FROM workflow_nodes template_node
+				WHERE template_node.workflow_id = workflows.id AND template_node.deleted_at IS NULL
+				  AND template_node.metadata -> 'factoryTemplate' ->> 'id' = ?
+			))
+		)`, FactoryPRFeedbackHandlerSubjectGitHubPullRequest, FactoryPRFeedbackHandlerSourcePullRequestChecks, "risk-score").
+		Find(&rows).Error
 	if err != nil {
 		return nil, err
 	}
-	for _, candidate := range version.Nodes {
+
+	nodes := make([]CanvasNode, 0, len(rows))
+	for _, row := range rows {
+		if row.ComponentName() != "github.onPullRequest" {
+			continue
+		}
+		if !row.ChecksHandler && FactoryAppTemplateID(row.LiveNodes) != "risk-score" {
+			continue
+		}
+		if liveGitHubPullRequestTriggerID(row.LiveNodes, repository) == row.NodeID {
+			nodes = append(nodes, row.CanvasNode)
+		}
+	}
+	return nodes, nil
+}
+
+func liveGitHubPullRequestTriggerID(nodes []Node, repository string) string {
+	for _, candidate := range nodes {
 		if candidate.Type != NodeTypeTrigger || candidate.ComponentName() != "github.onPullRequest" {
 			continue
 		}
 		configured, _ := candidate.Configuration["repository"].(string)
-		if !strings.EqualFold(strings.TrimSpace(configured), repository) {
-			continue
+		if strings.EqualFold(strings.TrimSpace(configured), repository) {
+			return candidate.ID
 		}
-		node, err := FindCanvasNode(tx, canvas.ID, candidate.ID)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-		if node.State == CanvasNodeStateError || node.Type != NodeTypeTrigger || node.ComponentName() != "github.onPullRequest" {
-			return nil, nil
-		}
-		return node, nil
 	}
-	return nil, nil
+	return ""
 }
 
 // Include requests whose canvas was deleted so the processor can retire them.
@@ -198,33 +182,25 @@ func (p *FactoryPullRequest) enqueueChecksStart(tx *gorm.DB) error {
 	if p.Provider != FactoryPullRequestProviderGitHub || p.State != FactoryPullRequestStateOpen {
 		return nil
 	}
-	factory := &Factory{ID: p.FactoryID, OrganizationID: p.OrganizationID}
-	canvases, err := factory.ListCanvases(tx)
-	if err != nil {
+	nodes, err := githubVerificationTriggers(tx.Where(
+		"workflows.organization_id = ? AND workflows.factory_id = ?", p.OrganizationID, p.FactoryID,
+	), p.Repository)
+	if err != nil || len(nodes) == 0 {
 		return err
 	}
-	for i := range canvases {
-		node, err := canvases[i].GitHubVerificationTrigger(tx, p.Repository)
-		if err != nil {
-			return err
-		}
-		if node == nil {
-			continue
-		}
-		now := time.Now()
-		request := CanvasNodeRequest{
+	now := time.Now()
+	requests := make([]CanvasNodeRequest, 0, len(nodes))
+	for _, node := range nodes {
+		requests = append(requests, CanvasNodeRequest{
 			ID: uuid.New(), WorkflowID: node.WorkflowID, NodeID: node.NodeID,
 			Type: NodeRequestTypePullRequestChecksStart, State: NodeExecutionRequestStatePending,
 			Spec: datatypes.NewJSONType(NodeExecutionRequestSpec{PullRequestChecksStart: &PullRequestChecksStartRequest{
 				OrganizationID: p.OrganizationID.String(), FactoryID: p.FactoryID.String(), PullRequestID: p.ID.String(),
 			}}),
 			RunAt: now, CreatedAt: now, UpdatedAt: now,
-		}
-		if err := tx.Create(&request).Error; err != nil {
-			return err
-		}
+		})
 	}
-	return nil
+	return tx.Create(&requests).Error
 }
 
 type checksEventIdentity struct {

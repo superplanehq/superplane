@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,6 +35,72 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+func TestPullRequestAttachmentBatchesVerificationTriggers(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	checks := createChecksStartupCanvas(t, r, factory, "acme/app")
+	expected := []uuid.UUID{checks.ID}
+
+	type queryCountKey struct{}
+	const callback = "test:pull_request_attachment_query_count"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if count, ok := tx.Statement.Context.Value(queryCountKey{}).(*atomic.Int64); ok {
+			count.Add(1)
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+	attach := func(number int) int64 {
+		t.Helper()
+		order, err := factory.CreateWorkOrder(db, "Review", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		var count atomic.Int64
+		measured := db.WithContext(context.WithValue(t.Context(), queryCountKey{}, &count))
+		pr, err := order.CreatePullRequest(measured, models.FactoryPullRequestParams{URL: fmt.Sprintf("https://github.com/acme/app/pull/%d", number)})
+		require.NoError(t, err)
+		queries := count.Load()
+		requests, err := models.ListPullRequestChecksStartRequests(db, pr.ID)
+		require.NoError(t, err)
+		canvases := make([]uuid.UUID, 0, len(requests))
+		for _, request := range requests {
+			canvases = append(canvases, request.WorkflowID)
+		}
+		assert.ElementsMatch(t, expected, canvases)
+		return queries
+	}
+	singleQueries := attach(41)
+	for range 8 {
+		support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, support.RandomName("unrelated"), "start")
+	}
+	for range 3 {
+		canvas := createChecksStartupCanvas(t, r, factory, "ACME/App")
+		expected = append(expected, canvas.ID)
+	}
+	for range 2 {
+		canvas := createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+		expected = append(expected, canvas.ID)
+	}
+	otherFactory := seedHandOffFactory(t, r, db)
+	createChecksStartupCanvas(t, r, otherFactory, "acme/app")
+	createMergeConfidenceStartupCanvas(t, r, factory, "other/app")
+	deleted := createChecksStartupCanvas(t, r, factory, "acme/app")
+	require.NoError(t, deleted.SoftDeleteInTransaction(db))
+	broken := createChecksStartupCanvas(t, r, factory, "acme/app")
+	require.NoError(t, db.Model(&models.CanvasNode{}).Where("workflow_id = ?", broken.ID).Update("state", models.CanvasNodeStateError).Error)
+	discussion := createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+	_, err := factory.CreatePRFeedbackHandler(db, discussion.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion)
+	require.NoError(t, err)
+	unpublished := createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, unpublished)
+	require.NoError(t, err)
+	version.Nodes[0].Metadata = nil
+	require.NoError(t, db.Save(version).Error)
+	batchQueries := attach(42)
+	t.Logf("Attachment queries: one canvas = %d, many canvases = %d", singleQueries, batchQueries)
+	require.Positive(t, singleQueries)
+	assert.Equal(t, singleQueries, batchQueries, "attachment queries must not grow with workspace canvases")
+}
 
 func TestAttachedPullRequestChecksUseCurrentResults(t *testing.T) {
 	for _, outcome := range []string{"failure", "success", "pending", "missing"} {
