@@ -131,6 +131,7 @@ export function useRunFactoryCustomAutomation(organizationId: string, factoryId:
       return response.data;
     },
     onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["canvases", "runs"] });
       void queryClient.invalidateQueries({
         queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, variables.workOrderId),
       });

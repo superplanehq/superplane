@@ -86,6 +86,11 @@ func resolveRunnerScope(
 		err = applyMergeConfidenceScope(scope, merge)
 	default:
 		err = resolveTaskRunnerScope(db, scope)
+		if err != nil {
+			if scheduleErr := resolveScheduleRunnerScope(db, ctx, scope); scheduleErr == nil {
+				err = nil
+			}
+		}
 	}
 	if err != nil {
 		return nil, nil, err
@@ -97,7 +102,7 @@ func resolveRunnerScope(
 	if err := validateRunnerTokenScope(db, scope); err != nil {
 		return nil, nil, err
 	}
-	if scope.Flow == RunnerFlowPlanning {
+	if scope.Flow == RunnerFlowPlanning || scope.Flow == RunnerFlowSchedule {
 		return scope, nil, nil
 	}
 	order, err := findOpenTask(db, scope)
@@ -130,6 +135,27 @@ func applyMergeConfidenceScope(scope *RunnerScope, merge *MergeConfidenceScope) 
 	scope.WorkOrderID = merge.WorkOrderID
 	scope.MergeChecks = merge.EnabledChecks
 	scope.MergeCheckLabels = merge.CheckLabels
+	return nil
+}
+
+func resolveScheduleRunnerScope(db *gorm.DB, ctx core.ExecutionContext, scope *RunnerScope) error {
+	node, err := models.FindCanvasNode(db, scope.CanvasID, ctx.NodeID)
+	if err != nil {
+		return err
+	}
+	template, _ := node.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
+	mode, _ := template["startMode"].(string)
+	id, _ := template["id"].(string)
+	if id != models.FactoryAppTemplateCustomAutomationID || mode != "scheduled" {
+		return fmt.Errorf("not a schedule automation")
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, scope.CanvasID)
+	if err != nil || canvas.OrganizationID != scope.OrganizationID || canvas.FactoryID == nil {
+		return fmt.Errorf("runner canvas does not match")
+	}
+	scope.Flow = RunnerFlowSchedule
+	scope.FactoryID = *canvas.FactoryID
+	scope.WorkOrderID = uuid.Nil
 	return nil
 }
 

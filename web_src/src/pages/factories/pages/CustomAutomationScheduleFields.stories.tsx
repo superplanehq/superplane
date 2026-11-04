@@ -6,7 +6,7 @@ import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import { CustomAutomationScheduleFields } from "./CustomAutomationScheduleFields";
 
-const scheduleError = "Enter a valid cron expression and a UTC offset from -12 to 14.";
+const scheduleError = "Enter a cron expression and choose a timezone.";
 
 const meta = {
   title: "Factories/Components/CustomAutomationScheduleFields",
