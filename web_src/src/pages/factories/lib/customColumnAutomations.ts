@@ -12,6 +12,7 @@ export type ColumnAutomationApp = {
   templateId?: string;
   customAutomationMode?: CustomAutomationMode;
   customAutomationIcon?: string;
+  customAutomationCronExpression?: string;
 };
 
 export function customColumnAutomations(
