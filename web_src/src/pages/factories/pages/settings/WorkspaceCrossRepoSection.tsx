@@ -68,7 +68,7 @@ type ContextRepoListProps = {
   canUpdate: boolean;
   isSaving: boolean;
   onRemove: (resourceId: string) => void;
-  onUpdate: (resourceId: string, settings: WorkspaceRepositorySettings) => void;
+  onUpdate: (resourceId: string, changed: Partial<WorkspaceRepositorySettings>) => void;
 };
 
 function ContextRepoList(props: ContextRepoListProps) {
@@ -115,9 +115,10 @@ function ContextRepoRow({
   return (
     <li className="group min-w-0" data-testid={`agent-cross-repo-row-${resource.id}`}>
       <div className="flex min-w-0 items-center gap-1 pr-2 transition-colors hover:bg-accent/40">
-        <button
+        <Button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          variant="ghost"
+          className="h-auto min-w-0 flex-1 justify-start gap-3 rounded-none px-3 py-2.5 text-left font-normal hover:bg-transparent"
           aria-expanded={expanded}
           aria-controls={panelId}
           aria-label={AGENT_RESOURCES_COPY.editRepository(name)}
@@ -133,7 +134,7 @@ function ContextRepoRow({
             className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")}
             aria-hidden
           />
-        </button>
+        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -157,12 +158,24 @@ function ContextRepoRow({
             value={settings}
             showAccess={props.showAccess}
             disabled={!props.canUpdate || props.isSaving}
-            onChange={(next) => resource.id && props.onUpdate(resource.id, next)}
+            onChange={(next) => resource.id && props.onUpdate(resource.id, changedRepositorySettings(settings, next))}
           />
         </div>
       ) : null}
     </li>
   );
+}
+
+// Each save sends only the changed field. A second change can start before
+// the first save refetches the row, so the other field may be stale.
+function changedRepositorySettings(
+  current: WorkspaceRepositorySettings,
+  next: WorkspaceRepositorySettings,
+): Partial<WorkspaceRepositorySettings> {
+  const changed: Partial<WorkspaceRepositorySettings> = {};
+  if (next.ref !== current.ref) changed.ref = next.ref;
+  if (next.access !== current.access) changed.access = next.access;
+  return changed;
 }
 
 function contextRepoSettings(resource: ContextRepoResource): WorkspaceRepositorySettings {
@@ -218,9 +231,10 @@ export function CrossRepoContextCard({
     }
   };
 
-  const update = async (resourceId: string, settings: WorkspaceRepositorySettings) => {
+  const update = async (resourceId: string, changed: Partial<WorkspaceRepositorySettings>) => {
+    if (changed.ref === undefined && changed.access === undefined) return;
     try {
-      await updateResource.mutateAsync({ resourceId, ref: settings.ref, access: settings.access });
+      await updateResource.mutateAsync({ resourceId, ...changed });
       showSuccessToast(AGENT_RESOURCES_COPY.crossRepoUpdated);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.crossRepoUpdateFailed));

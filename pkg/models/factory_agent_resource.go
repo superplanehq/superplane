@@ -402,7 +402,9 @@ const (
 	FactoryContextRepoAccessRead  = "read"
 )
 
-var contextRepoRefPattern = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,255}$`)
+// contextRepoRefInvalidPattern follows git check-ref-format: no
+// whitespace, control characters, or ~^:?*[\ characters.
+var contextRepoRefInvalidPattern = regexp.MustCompile(`[\x00-\x20\x7f~^:?*\[\\]`)
 
 func NormalizeContextRepoAccess(access string) string {
 	if strings.ToLower(strings.TrimSpace(access)) == FactoryContextRepoAccessWrite {
@@ -419,11 +421,16 @@ func validContextRepoRef(ref string) bool {
 	if ref == "" {
 		return true
 	}
-	return contextRepoRefPattern.MatchString(ref) &&
-		!strings.Contains(ref, "..") &&
-		!strings.HasPrefix(ref, "-") &&
-		!strings.HasPrefix(ref, "/") &&
-		!strings.HasSuffix(ref, "/")
+	if len(ref) > 255 || contextRepoRefInvalidPattern.MatchString(ref) {
+		return false
+	}
+	for _, part := range []string{"..", "@{", "//"} {
+		if strings.Contains(ref, part) {
+			return false
+		}
+	}
+	return !strings.HasPrefix(ref, "-") && !strings.HasPrefix(ref, "/") && !strings.HasPrefix(ref, ".") &&
+		!strings.HasSuffix(ref, "/") && !strings.HasSuffix(ref, ".") && !strings.HasSuffix(ref, ".lock")
 }
 
 func (c FactoryAgentResourceConfig) ValidateContextRepo() error {

@@ -467,11 +467,11 @@ func Test__FactoryAgentResourceContextRepos(t *testing.T) {
 		require.NoError(t, err)
 		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 			Repository: "acme/web",
-			Ref:        " release/v2 ",
+			Ref:        " release/café+1.0 ",
 			Access:     "Write",
 		})
 		require.NoError(t, err)
-		assert.Equal(t, "release/v2", resource.Config.Data().Ref)
+		assert.Equal(t, "release/café+1.0", resource.Config.Data().Ref)
 		assert.True(t, resource.Config.Data().ContextRepoWritable())
 
 		legacy, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
@@ -482,6 +482,7 @@ func Test__FactoryAgentResourceContextRepos(t *testing.T) {
 
 		for _, config := range []models.FactoryAgentResourceConfig{
 			{Repository: "acme/bad-ref", Ref: "main..dev"},
+			{Repository: "acme/bad-space", Ref: "main dev"},
 			{Repository: "acme/bad-access", Access: "admin"},
 		} {
 			_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, config)
