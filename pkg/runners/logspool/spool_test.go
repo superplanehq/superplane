@@ -357,3 +357,22 @@ func TestSpoolWaitHonorsContext(t *testing.T) {
 		t.Fatal("expected context error")
 	}
 }
+
+func TestEncodeRecordKeepsHostedModelCall(t *testing.T) {
+	stamp := time.Now().UTC().Truncate(time.Millisecond).Format(time.RFC3339Nano)
+	encoded := encodeRecord([]byte(`{"type":"model_call","provider":" openai ","model":"gpt-5","outcome":"attempt_1","occurredAt":"` + stamp + `","sequence":2,"secret":"no"}`))
+	var record map[string]any
+	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(string(encoded))), &record))
+	assert.Equal(t, "model_call", record["type"])
+	assert.Equal(t, "openai", record["provider"])
+	assert.Equal(t, "gpt-5", record["model"])
+	assert.Equal(t, "attempt_1", record["outcome"])
+	assert.Equal(t, stamp, record["occurredAt"])
+	assert.EqualValues(t, 2, record["sequence"])
+	_, hasSecret := record["secret"]
+	assert.False(t, hasSecret)
+
+	wrapped := encodeRecord([]byte(`{"type":"model_call","provider":"openai","model":"gpt-5","outcome":"attempt_1","sequence":0}`))
+	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(string(wrapped))), &record))
+	assert.Equal(t, "line", record["type"])
+}
