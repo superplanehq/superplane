@@ -117,6 +117,7 @@ function toolResult(result) {
 
 if (require.main === module) {
   stdio.start(createHandler());
+  registry.stopOnExit(process.stdin);
 }
 
 module.exports = { SERVER_NAME, createHandler };

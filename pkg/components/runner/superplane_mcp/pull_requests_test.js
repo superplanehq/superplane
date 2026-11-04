@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
 const os = require("node:os");
@@ -173,6 +173,35 @@ test("open_pull_request stops a push that the remote never answers", async (t) =
   );
   await waitFor(() => sockets.size === 0);
   assert.deepEqual(client.requests, []);
+});
+
+test("the server stops a running push when the agent closes its input", async (t) => {
+  const { env, checkout, root } = workspace("repo", { BASE: "main" });
+  featureCommit(checkout, env);
+  const sockets = await remoteServer(t, checkout, env, () => {});
+  const backend = http.createServer((_request, response) => response.end('{"tools":["open_pull_request"]}'));
+  await new Promise((resolve) => backend.listen(0, "127.0.0.1", resolve));
+  t.after(() => backend.close());
+  const server = spawn(process.execPath, [path.join(__dirname, "server.js")], {
+    env: {
+      ...env,
+      SUPERPLANE_BASE_URL: `http://127.0.0.1:${backend.address().port}`,
+      SUPERPLANE_RUNNER_TOKEN: "token",
+      SUPERPLANE_TASK_DIR: root,
+    },
+    stdio: ["pipe", "ignore", "ignore"],
+  });
+  const exited = new Promise((resolve) => server.on("exit", resolve));
+  t.after(() => server.kill("SIGKILL"));
+
+  server.stdin.write(
+    `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "open_pull_request", arguments: { title: "Change" } } })}\n`,
+  );
+  await waitFor(() => sockets.size > 0);
+  server.stdin.end();
+
+  await exited;
+  await waitFor(() => sockets.size === 0);
 });
 
 async function waitFor(condition, timeoutMs = 5000) {

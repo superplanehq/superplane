@@ -324,6 +324,7 @@ async function main(argv, env = process.env, fetchImpl = fetch, stdout = process
 }
 
 if (require.main === module) {
+  registry.stopOnExit();
   main(process.argv.slice(2)).then((code) => process.exit(code));
 }
 

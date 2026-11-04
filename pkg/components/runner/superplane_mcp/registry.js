@@ -34,4 +34,24 @@ function prepare(allowed, client, modules = MODULES) {
   }
 }
 
-module.exports = { MODULES, allTools, findTool, prepare };
+// stop ends work that a tool runs outside this process group, for example a
+// git push in its own session. A module can export stop() for that work.
+function stop(modules = MODULES) {
+  for (const module of modules) {
+    if (typeof module.stop === "function") module.stop();
+  }
+}
+
+// stopOnExit stops that work when this process ends, on a termination signal,
+// or when the agent closes the input stream.
+function stopOnExit(input, modules = MODULES) {
+  const shutdown = (code) => () => {
+    stop(modules);
+    process.exit(code);
+  };
+  if (input) input.on("end", shutdown(0));
+  for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.once(signal, shutdown(1));
+  process.once("exit", () => stop(modules));
+}
+
+module.exports = { MODULES, allTools, findTool, prepare, stop, stopOnExit };

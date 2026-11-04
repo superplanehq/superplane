@@ -26,6 +26,10 @@ function nonInteractiveEnv(env) {
   return result;
 }
 
+// Git commands that are still running. They run outside the process group of
+// the server, so stopGitCommands must end them when the server stops.
+const running = new Set();
+
 // git runs in its own session, without a controlling terminal. A timeout
 // kills the whole process group, so a git-remote-https helper cannot stay
 // behind.
@@ -33,6 +37,7 @@ function git(directory, args, env, timeoutMs) {
   return new Promise((resolve, reject) => {
     let settled = false;
     const settle = (fn, value) => {
+      running.delete(child);
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -44,6 +49,7 @@ function git(directory, args, env, timeoutMs) {
       detached: true,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    running.add(child);
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
@@ -63,6 +69,13 @@ function killProcessGroup(child) {
   } catch (_error) {
     child.kill("SIGKILL");
   }
+}
+
+// stopGitCommands kills every running git command, for example when the task
+// is cancelled and the agent stops the server.
+function stopGitCommands() {
+  for (const child of running) killProcessGroup(child);
+  running.clear();
 }
 
 async function gitOutput(directory, args, env, timeoutMs) {
@@ -222,4 +235,5 @@ const LIST_PULL_REQUESTS = {
 module.exports = {
   tools: [OPEN_PULL_REQUEST, LIST_PULL_REQUESTS],
   openPullRequest,
+  stop: stopGitCommands,
 };
