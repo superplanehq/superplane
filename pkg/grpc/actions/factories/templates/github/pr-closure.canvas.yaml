@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Canvas
 metadata:
   name: PR Closure
-  description: Close the task when the attached pull request merges or is closed without a merge.
+  description: Close the task when every attached pull request is merged or closed without a merge.
 spec:
   edges:
     - channel: default
@@ -41,7 +41,7 @@ spec:
         actions:
           - closed
         onlyFactoryPullRequests: true
-        repository: '{{ install_params.appRepository }}'
+        repository: '{{ workspace().repositories }}'
       position:
         x: 1272
         'y': 72
@@ -101,6 +101,7 @@ spec:
         orderId: '{{ root().data.workOrder.id }}'
         result: completed
         status: closed
+        whenAllPullRequestsDone: true
       position:
         x: 1132
         'y': 1332
@@ -113,6 +114,7 @@ spec:
         orderId: '{{ root().data.workOrder.id }}'
         result: pr_closed
         status: closed
+        whenAllPullRequestsDone: true
       position:
         x: 1600
         'y': 1332

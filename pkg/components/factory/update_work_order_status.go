@@ -18,9 +18,10 @@ func init() {
 type UpdateWorkOrderStatus struct{}
 
 type UpdateWorkOrderStatusConfiguration struct {
-	OrderID string `json:"orderId" mapstructure:"orderId"`
-	Status  string `json:"status" mapstructure:"status"`
-	Result  string `json:"result" mapstructure:"result"`
+	OrderID                 string `json:"orderId" mapstructure:"orderId"`
+	Status                  string `json:"status" mapstructure:"status"`
+	Result                  string `json:"result" mapstructure:"result"`
+	WhenAllPullRequestsDone bool   `json:"whenAllPullRequestsDone" mapstructure:"whenAllPullRequestsDone"`
 }
 
 func (c *UpdateWorkOrderStatus) Name() string {
@@ -36,7 +37,7 @@ func (c *UpdateWorkOrderStatus) Description() string {
 }
 
 func (c *UpdateWorkOrderStatus) Documentation() string {
-	return `The Update Task Status component transitions a task through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open completed / rejected / failed / pr_closed / archived is valid, from draft rejected / archived is valid. A task whose pull request closes without a merge uses pr_closed. Archived tasks are hidden from the UI.
+	return `The Update Task Status component transitions a task through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open completed / rejected / failed / pr_closed / archived is valid, from draft rejected / archived is valid. A task whose pull request closes without a merge uses pr_closed. Archived tasks are hidden from the UI. Turn on ` + "`whenAllPullRequestsDone`" + ` for tasks with pull requests in more than one repository: the task stays open while a pull request is open, and the result comes from all pull requests.
 
 ` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, replace it with ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
 }
@@ -118,6 +119,17 @@ func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "whenAllPullRequestsDone",
+			Label:       "Wait for all pull requests",
+			Description: "Close the task only when every attached pull request is merged or closed. The result is Completed when one pull request merged, and Closed otherwise.",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "status", Values: []string{"closed"}},
+			},
+		},
 	}
 }
 
@@ -128,9 +140,10 @@ func (c *UpdateWorkOrderStatus) Execute(ctx core.ExecutionContext) error {
 	}
 
 	workOrder, changed, err := ctx.Factory.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		OrderID: config.OrderID,
-		State:   config.Status,
-		Result:  config.Result,
+		OrderID:                 config.OrderID,
+		State:                   config.Status,
+		Result:                  config.Result,
+		WhenAllPullRequestsDone: config.WhenAllPullRequestsDone,
 	})
 	if err != nil {
 		return err

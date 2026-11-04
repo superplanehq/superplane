@@ -145,6 +145,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "factory pull request not found")
 	case errors.Is(err, models.ErrFactoryPullRequestInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPullRequestRepositoryNotInWorkspace):
+		return grpcerrors.InvalidArgument(err, errPullRequestRepositoryNotInWorkspace)
 	case errors.Is(err, models.ErrFactoryPullRequestActivityNotFound):
 		return grpcerrors.NotFound(err, "pull request activity not found")
 	case errors.Is(err, models.ErrFactoryPullRequestFixesNotPaused):
@@ -227,6 +229,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "repository is required")
 	case errors.Is(err, models.ErrFactoryAgentResourceRepositoryInvalid):
 		return grpcerrors.InvalidArgument(err, "repository must use the owner/name format")
+	case errors.Is(err, models.ErrFactoryAgentResourceRefInvalid):
+		return grpcerrors.InvalidArgument(err, "branch name is not valid")
+	case errors.Is(err, models.ErrFactoryAgentResourceAccessInvalid):
+		return grpcerrors.InvalidArgument(err, "access must be write or read")
 	case errors.Is(err, models.ErrFactoryAgentResourceRepositoryTaken):
 		return grpcerrors.AlreadyExists(err, "this repository is already added")
 	case errors.Is(err, models.ErrFactoryAgentResourceContextRepoCapReached):

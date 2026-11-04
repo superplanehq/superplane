@@ -78,6 +78,21 @@ export function pullRequestLabel(pullRequest: FactoriesFactoryPullRequest): stri
   return "Pull request";
 }
 
+/** `owner/repo #N`. Numbers repeat across repositories, so a task with several repositories needs the name. */
+export function pullRequestRepositoryLabel(pullRequest: FactoriesFactoryPullRequest): string {
+  const repository = pullRequest.repository?.trim();
+  const label = pullRequestLabel(pullRequest);
+  if (!repository || !label.startsWith("#")) {
+    return label;
+  }
+  return `${repository} ${label}`;
+}
+
+export function pullRequestsSpanRepositories(pullRequests: readonly FactoriesFactoryPullRequest[]): boolean {
+  const repositories = new Set(pullRequests.map((pullRequest) => pullRequest.repository?.trim()).filter(Boolean));
+  return repositories.size > 1;
+}
+
 /** Sidebar list label: number plus title when both exist. */
 export function pullRequestListLabel(pullRequest: FactoriesFactoryPullRequest): string {
   const numberLabel = pullRequestLabel(pullRequest);

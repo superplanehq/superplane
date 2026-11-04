@@ -36,7 +36,6 @@ func TestGitHub__ResolveSecrets__PAT(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []byte("ghp_test_token"), secrets.Values[integrationSecretGitHubToken])
-	assert.NotContains(t, secrets.Values, integrationSecretGitHubContextToken)
 	assert.Contains(t, secrets.Usage, "GITHUB_TOKEN")
 	assert.Contains(t, secrets.Usage, "The gh CLI is already installed")
 	assert.Contains(t, secrets.Usage, "Do not download or install gh")
@@ -92,10 +91,9 @@ func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	body, err := io.ReadAll(httpCtx.Requests[0].Body)
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"repository_ids":[601]}`, string(body))
-	assert.NotContains(t, secrets.Values, integrationSecretGitHubContextToken)
 }
 
-func TestGitHub__ResolveSecrets__HostedContextRepositoriesAreReadOnly(t *testing.T) {
+func TestGitHub__ResolveSecrets__HostedTokensFollowContextRepositoryAccess(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	organization, err := models.CreateOrganization("org-"+uuid.NewString(), "")
 	require.NoError(t, err)
@@ -121,12 +119,18 @@ func TestGitHub__ResolveSecrets__HostedContextRepositoriesAreReadOnly(t *testing
 		{RepositoryID: 603, FullName: "acme/secret"},
 		{RepositoryID: 604, FullName: "acme/other"},
 		{RepositoryID: 605, FullName: "acme/bb"},
+		{RepositoryID: 606, FullName: "acme/docs"},
 	}))
-	require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), integration.ID, models.ProviderGitHub, 601))
 
 	factory := createContextRepoWorkspace(t, organization.ID, integration.ID)
 	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 		Repository: "acme/web",
+		Access:     models.FactoryContextRepoAccessWrite,
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/docs",
+		Access:     models.FactoryContextRepoAccessRead,
 	})
 	require.NoError(t, err)
 	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", false, models.FactoryAgentResourceConfig{
@@ -142,8 +146,10 @@ func TestGitHub__ResolveSecrets__HostedContextRepositoriesAreReadOnly(t *testing
 	otherFactory := createContextRepoWorkspace(t, other.ID, otherIntegration.ID)
 	_, err = otherFactory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 		Repository: "acme/other",
+		Access:     models.FactoryContextRepoAccessWrite,
 	})
 	require.NoError(t, err)
+	require.NoError(t, models.SyncVCSProviderBindingRepositories(database.Conn(), integration.ID, models.ProviderGitHub))
 
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
@@ -161,15 +167,12 @@ func TestGitHub__ResolveSecrets__HostedContextRepositoriesAreReadOnly(t *testing
 	assert.Equal(t, runner.GitHubContextTokenEnv, integrationSecretGitHubContextToken)
 	assert.Equal(t, []byte("ghs_write"), secrets.Values[integrationSecretGitHubToken])
 	assert.Equal(t, []byte("ghs_read"), secrets.Values[integrationSecretGitHubContextToken])
-	assert.Contains(t, secrets.Usage, "read-only token")
 	require.Len(t, httpCtx.Requests, 2)
-	writeBody := readRequestBody(t, httpCtx.Requests[0])
-	readBody := readRequestBody(t, httpCtx.Requests[1])
-	assert.JSONEq(t, `{"repository_ids":[601]}`, writeBody)
-	assert.JSONEq(t, `{"repository_ids":[602],"permissions":{"contents":"read","metadata":"read"}}`, readBody)
+	assert.JSONEq(t, `{"repository_ids":[601,602]}`, readRequestBody(t, httpCtx.Requests[0]))
+	assert.JSONEq(t, `{"repository_ids":[606],"permissions":{"contents":"read","metadata":"read"}}`, readRequestBody(t, httpCtx.Requests[1]))
 }
 
-func TestGitHub__ResolveSecrets__HostedContextRepositoryRefresh(t *testing.T) {
+func TestGitHub__ResolveSecrets__HostedWriteTokenCoversContextRepositoriesWithoutGrants(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	organization, err := models.CreateOrganization("org-"+uuid.NewString(), "")
 	require.NoError(t, err)
@@ -189,23 +192,23 @@ func TestGitHub__ResolveSecrets__HostedContextRepositoryRefresh(t *testing.T) {
 		{RepositoryID: 601, FullName: "acme/api"},
 		{RepositoryID: 602, FullName: "acme/web"},
 	}))
+	// A connection saved before agents changed context repositories has a
+	// grant for the primary repository only.
 	require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), integration.ID, models.ProviderGitHub, 601))
 
 	factory := createContextRepoWorkspace(t, organization.ID, integration.ID)
-	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
-		Repository: "acme/web",
-	})
-	require.NoError(t, err)
-	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
-		Repository: "acme/missing",
-	})
-	require.NoError(t, err)
+	for _, repository := range []string{"acme/web", "acme/missing"} {
+		_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: repository,
+			Access:     models.FactoryContextRepoAccessWrite,
+		})
+		require.NoError(t, err)
+	}
 
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
-		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_read","expires_at":"2030-01-01T00:00:00Z"}`),
 	}}
-	secrets, err := (&GitHub{}).ResolveSecrets(core.IntegrationSecretContext{
+	_, err = (&GitHub{}).ResolveSecrets(core.IntegrationSecretContext{
 		HTTP: httpCtx,
 		Integration: &contexts.IntegrationContext{
 			IntegrationID: integration.ID.String(),
@@ -214,14 +217,13 @@ func TestGitHub__ResolveSecrets__HostedContextRepositoryRefresh(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []byte("ghs_read"), secrets.Values[integrationSecretGitHubContextToken])
-	require.Len(t, httpCtx.Requests, 2)
-	assert.JSONEq(t, `{"repository_ids":[602],"permissions":{"contents":"read","metadata":"read"}}`, readRequestBody(t, httpCtx.Requests[1]))
+	require.Len(t, httpCtx.Requests, 1)
+	assert.JSONEq(t, `{"repository_ids":[601,602]}`, readRequestBody(t, httpCtx.Requests[0]))
 	var jobs int64
 	require.NoError(t, database.Conn().Model(&models.VCSProviderInstallationReconcileJob{}).
 		Where("provider = ? AND installation_id = ?", models.ProviderGitHub, int64(501)).
 		Count(&jobs).Error)
-	assert.Equal(t, int64(1), jobs)
+	assert.Equal(t, int64(1), jobs, "a context repository missing from the catalog refreshes the installation")
 }
 
 func createContextRepoWorkspace(t *testing.T, organizationID, integrationID uuid.UUID) *models.Factory {
@@ -229,8 +231,12 @@ func createContextRepoWorkspace(t *testing.T, organizationID, integrationID uuid
 	factory, err := models.CreateFactory(database.Conn(), organizationID, "workspace-"+uuid.NewString(), "", "")
 	require.NoError(t, err)
 	integration := integrationID.String()
+	repository := "acme/api"
+	repositoryID := int64(601)
 	require.NoError(t, factory.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
 		VCSIntegrationID: &integration,
+		AppRepository:    &repository,
+		AppRepositoryID:  &repositoryID,
 	}))
 	return factory
 }

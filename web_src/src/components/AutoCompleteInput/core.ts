@@ -126,7 +126,8 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "workspace",
     snippet: "workspace().",
-    description: "Returns the factory workspace, including its repository and default branch.",
+    description:
+      "Returns the factory workspace, including its repository, repositories (every repository the workspace may change), and default branch.",
     example: "workspace().repository",
   },
   // String

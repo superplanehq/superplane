@@ -77,6 +77,8 @@ var (
 	ErrFactoryAgentResourceRepositoryRequired    = errors.New("repository is required")
 	ErrFactoryAgentResourceRepositoryInvalid     = errors.New("repository must use the owner/name format")
 	ErrFactoryAgentResourceRepositoryTaken       = errors.New("this repository is already added")
+	ErrFactoryAgentResourceRefInvalid            = errors.New("branch name is not valid")
+	ErrFactoryAgentResourceAccessInvalid         = errors.New("access must be write or read")
 	ErrFactoryAgentResourceContextRepoCapReached = errors.New("workspace already has the maximum number of context repositories")
 )
 
@@ -111,6 +113,7 @@ type FactoryAgentResourceConfig struct {
 	Source              string                       `json:"source,omitempty"`
 	Repository          string                       `json:"repository,omitempty"`
 	Ref                 string                       `json:"ref,omitempty"`
+	Access              string                       `json:"access,omitempty"`
 	Path                string                       `json:"path,omitempty"`
 	Markdown            string                       `json:"markdown,omitempty"`
 	Commands            []string                     `json:"commands,omitempty"`
@@ -321,6 +324,7 @@ func (c FactoryAgentResourceConfig) NormalizedSetup() FactoryAgentResourceConfig
 	c.Source = ""
 	c.Repository = ""
 	c.Ref = ""
+	c.Access = ""
 	c.Path = ""
 	c.Markdown = ""
 	c.VCSProvider = ""
@@ -391,6 +395,37 @@ func (f *Factory) uniqueFactoryAgentResourceName(tx *gorm.DB, base string, excep
 	}
 }
 
+// Context repository access. An empty access is read: context repositories
+// were read-only before agents could change them.
+const (
+	FactoryContextRepoAccessWrite = "write"
+	FactoryContextRepoAccessRead  = "read"
+)
+
+var contextRepoRefPattern = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,255}$`)
+
+func NormalizeContextRepoAccess(access string) string {
+	if strings.ToLower(strings.TrimSpace(access)) == FactoryContextRepoAccessWrite {
+		return FactoryContextRepoAccessWrite
+	}
+	return FactoryContextRepoAccessRead
+}
+
+func (c FactoryAgentResourceConfig) ContextRepoWritable() bool {
+	return NormalizeContextRepoAccess(c.Access) == FactoryContextRepoAccessWrite
+}
+
+func validContextRepoRef(ref string) bool {
+	if ref == "" {
+		return true
+	}
+	return contextRepoRefPattern.MatchString(ref) &&
+		!strings.Contains(ref, "..") &&
+		!strings.HasPrefix(ref, "-") &&
+		!strings.HasPrefix(ref, "/") &&
+		!strings.HasSuffix(ref, "/")
+}
+
 func (c FactoryAgentResourceConfig) ValidateContextRepo() error {
 	repository := strings.TrimSpace(c.Repository)
 	if repository == "" {
@@ -404,6 +439,14 @@ func (c FactoryAgentResourceConfig) ValidateContextRepo() error {
 			return err
 		}
 	}
+	if !validContextRepoRef(strings.TrimSpace(c.Ref)) {
+		return ErrFactoryAgentResourceRefInvalid
+	}
+	switch strings.ToLower(strings.TrimSpace(c.Access)) {
+	case "", FactoryContextRepoAccessWrite, FactoryContextRepoAccessRead:
+	default:
+		return ErrFactoryAgentResourceAccessInvalid
+	}
 	return nil
 }
 
@@ -413,12 +456,13 @@ func (c FactoryAgentResourceConfig) NormalizedContextRepo() FactoryAgentResource
 	if c.VCSProvider == "" {
 		c.VCSProvider = ProviderGitHub
 	}
+	c.Ref = strings.TrimSpace(c.Ref)
+	c.Access = NormalizeContextRepoAccess(c.Access)
 	c.Transport = ""
 	c.URL = ""
 	c.Auth = ""
 	c.Headers = nil
 	c.Source = ""
-	c.Ref = ""
 	c.Path = ""
 	c.Markdown = ""
 	c.Commands = nil
@@ -719,9 +763,10 @@ func (f *Factory) ListEnabledContextRepos(tx *gorm.DB) ([]FactoryAgentResource, 
 }
 
 // ListEnabledGitHubContextRepositoryNames returns owner/name values for
-// enabled GitHub context repositories on workspaces that use this integration.
-// Disabled resources, other providers, and deleted workspaces are omitted.
-func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUID) ([]string, error) {
+// enabled GitHub context repositories with access on workspaces that use
+// this integration. Disabled resources, other providers, and deleted
+// workspaces are omitted.
+func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUID, access string) ([]string, error) {
 	if integrationID == uuid.Nil {
 		return nil, nil
 	}
@@ -743,7 +788,10 @@ func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUI
 				COALESCE(resource.config ->> 'vcsProvider', '') = ''
 				OR LOWER(resource.config ->> 'vcsProvider') = ?
 			)
-	`, integrationID.String(), FactoryAgentResourceKindContextRepo, ProviderGitHub).Scan(&rows).Error
+			AND (CASE WHEN LOWER(COALESCE(resource.config ->> 'access', '')) = ? THEN ? ELSE ? END) = ?
+	`, integrationID.String(), FactoryAgentResourceKindContextRepo, ProviderGitHub,
+		FactoryContextRepoAccessWrite, FactoryContextRepoAccessWrite, FactoryContextRepoAccessRead,
+		NormalizeContextRepoAccess(access)).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
