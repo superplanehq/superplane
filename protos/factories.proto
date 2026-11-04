@@ -2716,6 +2716,9 @@ message WorkOrderCheck {
   // automation for a SuperPlane check, agent for a check from add_checks
   // or from a person.
   string source = 16;
+  // Pull request repository of a merge confidence check. Empty for a check
+  // of the whole task.
+  string repository = 17;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.

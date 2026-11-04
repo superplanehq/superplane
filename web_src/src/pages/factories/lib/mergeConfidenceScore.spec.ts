@@ -76,6 +76,19 @@ describe("mergeConfidenceHeadline", () => {
     });
   });
 
+  it("lists a check once with its weakest score across repositories", () => {
+    const headline = mergeConfidenceHeadline([
+      { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+      { key: "risk-review", name: "Blast radius", score: 4, maxScore: 5 },
+    ]);
+
+    expect(headline).toMatchObject({
+      score: 2,
+      checks: [{ key: "risk-review", score: 4 }],
+    });
+    expect(headline?.checks).toHaveLength(1);
+  });
+
   it("drops checks that omit a score and still scores the rest", () => {
     const headline = mergeConfidenceHeadline([
       { key: "security-review", name: "Security" },
