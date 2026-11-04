@@ -209,7 +209,10 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "findPullRequest")
 	assert.NotContains(t, result.canvasYAML, "reportWorkOrderCheck")
 	assert.NotContains(t, result.canvasYAML, "merge-confidence.json")
-	assert.Len(t, canvas.Spec.Nodes, 2)
+	for _, channel := range []string{"passed", "failed"} {
+		assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "assess-risk", TargetID: "publish-merge-confidence", Channel: channel})
+	}
+	assert.Equal(t, true, findYAMLNode(t, canvas, "publish-merge-confidence").Configuration["enabled"])
 
 	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
 	assert.NotContains(t, result.canvasYAML, "github.publishCommitStatus")
@@ -269,6 +272,10 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	assert.Contains(t, result.canvasYAML, "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID")
 	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
 
+	for _, channel := range []string{"passed", "failed"} {
+		assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "assess-risk", TargetID: "publish-merge-confidence", Channel: channel})
+	}
+	assert.Equal(t, true, findYAMLNode(t, canvas, "publish-merge-confidence").Configuration["enabled"])
 	requireValidCanvasExpressions(t, canvas)
 }
 

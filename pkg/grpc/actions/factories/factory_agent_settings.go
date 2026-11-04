@@ -141,6 +141,7 @@ type factoryAutomationSettings struct {
 	triggers     map[string]*factoryTriggerSettings
 	pullRequests map[string]map[string]any
 	agentSteps   map[string]any
+	bodySections map[string]map[string]any
 }
 
 func factoryAutomationSettingsFromVersion(version *models.CanvasVersion) *factoryAutomationSettings {
@@ -149,12 +150,18 @@ func factoryAutomationSettingsFromVersion(version *models.CanvasVersion) *factor
 		triggers:     map[string]*factoryTriggerSettings{},
 		pullRequests: map[string]map[string]any{},
 		agentSteps:   map[string]any{},
+		bodySections: map[string]map[string]any{},
 	}
 	for i := range version.Nodes {
 		node := &version.Nodes[i]
 		if agent := factoryAgentSettingsFromNode(node); agent != nil {
 			settings.agents[node.ID] = agent
 			settings.agentSteps[node.ID] = node.Configuration["steps"]
+		}
+		if node.ComponentName() == "updatePullRequestBodySection" {
+			if enabled, present := node.Configuration["enabled"]; present {
+				settings.bodySections[node.ID] = map[string]any{"enabled": enabled}
+			}
 		}
 		if node.Type == models.NodeTypeTrigger {
 			settings.triggers[node.ID] = factoryTriggerSettingsFromNode(node)

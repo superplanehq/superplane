@@ -2,6 +2,17 @@ import { describe, expect, it } from "bun:test";
 import { evaluateExpr, formatExprResult } from "@/lib/exprEvaluator";
 
 describe("exprEvaluator", () => {
+  it("escapes values for Markdown text and link destinations", () => {
+    expect(
+      evaluateExpr("markdownText(root().data.text)", {
+        __root: { data: { text: "a|b\n<script> **bold** \u0085\u2028\u2029" } },
+      }),
+    ).toBe("a&#124;b &#60;script&#62; &#42;&#42;bold&#42;&#42;    ");
+    expect(
+      evaluateExpr("markdownLink(root().data.url)", { __root: { data: { url: "https://example.com/a b>\n\r<" } } }),
+    ).toBe("https://example.com/a%20b%3E%0A%0D%3C");
+    expect(() => evaluateExpr("markdownText(1)", {})).toThrow();
+  });
   it("evaluates expression functions and field access", () => {
     expect(evaluateExpr('upper("hello")', {})).toBe("HELLO");
     expect(evaluateExpr('$["node"].data.name', { node: { data: { name: "test" } } })).toBe("test");
