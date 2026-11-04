@@ -25,6 +25,8 @@ const (
 	prFeedbackChecksDefaultName        = "Fix pull request checks"
 	prFeedbackChecksDefaultDescription = "Wait for pull request checks and start one agent run when selected checks fail."
 	prFeedbackWaitChecksNodeName       = "Wait For Pull Request Checks"
+
+	prFeedbackEventRepositoryExpression = "{{ root().data.repository.full_name }}"
 )
 
 func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
@@ -51,17 +53,13 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 			},
 			Nodes: []yaml.Node{
 				request.TriggerSettings[prFeedbackPullRequestTriggerNodeID].configure(yaml.Node{
-					ID:        prFeedbackPullRequestTriggerNodeID,
-					Name:      "On Pull Request",
-					Type:      yaml.NodeTypeTrigger,
-					Component: prFeedbackTriggerComponent(provider),
-					Configuration: map[string]any{
-						"repository":              request.Repository,
-						"actions":                 prFeedbackTriggerActions(provider),
-						"onlyFactoryPullRequests": true,
-					},
-					Integration: request.Binding.integrationRef(),
-					Position:    yaml.Position{X: 80, Y: 260},
+					ID:            prFeedbackPullRequestTriggerNodeID,
+					Name:          "On Pull Request",
+					Type:          yaml.NodeTypeTrigger,
+					Component:     prFeedbackTriggerComponent(provider),
+					Configuration: prFeedbackPullRequestTriggerConfiguration(request),
+					Integration:   request.Binding.integrationRef(),
+					Position:      yaml.Position{X: 80, Y: 260},
 				}),
 				{
 					ID:        prFeedbackActivityNodeID,
@@ -185,10 +183,24 @@ func prFeedbackWaitChecksConfiguration(request prFeedbackBuildRequest) map[strin
 		}
 	}
 	return map[string]any{
-		"repository": request.Repository,
-		"ref":        prFeedbackPRHeadSHAExpression(),
-		"checkNames": checkNamesNodeValue(request.CheckNames),
+		"repository":                            prFeedbackEventRepositoryExpression,
+		"ref":                                   prFeedbackPRHeadSHAExpression(),
+		"checkNames":                            checkNamesNodeValue(request.CheckNames),
+		githubcommon.WorkspaceRepositoriesField: true,
 	}
+}
+
+func prFeedbackPullRequestTriggerConfiguration(request prFeedbackBuildRequest) map[string]any {
+	provider := prFeedbackVCSProvider(request)
+	configuration := map[string]any{
+		"repository":              request.Repository,
+		"actions":                 prFeedbackTriggerActions(provider),
+		"onlyFactoryPullRequests": true,
+	}
+	if provider == models.ProviderGitHub {
+		configuration[githubcommon.WorkspaceRepositoriesField] = true
+	}
+	return configuration
 }
 
 func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[string]any {

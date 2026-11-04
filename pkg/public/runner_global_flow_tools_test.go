@@ -220,7 +220,7 @@ func TestRunnerGlobalArtifactUpload(t *testing.T) {
 	require.True(t, runner.HasVisualEvidence(env))
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60, nil))
 	require.NotEmpty(t, token)
-	assert.ElementsMatch(t, globalRunnerToolsWith("report_visual_evidence_unavailable"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, globalRunnerToolsWith("report_visual_evidence_unavailable", "open_pull_request", "list_pull_requests"), listRunnerTools(t, server, token))
 
 	png := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0}, 16)...)
 	rec := postRunnerArtifactFile(t, server, token, png)
@@ -260,7 +260,7 @@ func TestRunnerGlobalArtifactLink(t *testing.T) {
 		{Name: runner.EnvSuperplanePublishLinks, Value: "yes"},
 	}, 60, nil))
 	require.NotEmpty(t, token)
-	assert.ElementsMatch(t, everyGlobalRunnerTool, listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, taskRunnerTools, listRunnerTools(t, server, token))
 
 	body := `{"url":"https://staging.example.com/pr-42","title":"Staging","key":"staging"}`
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/links", body)

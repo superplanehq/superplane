@@ -411,10 +411,11 @@ func handleSignedPullRequest(body []byte, configuration map[string]any, factoryC
 }
 
 type recordingFactory struct {
-	calls  int
-	params core.FindPullRequestParams
-	match  *core.PullRequestMatch
-	err    error
+	calls        int
+	params       core.FindPullRequestParams
+	match        *core.PullRequestMatch
+	err          error
+	repositories []string
 }
 
 func (f *recordingFactory) FindPullRequest(params core.FindPullRequestParams) (*core.PullRequestMatch, error) {
@@ -475,6 +476,10 @@ func (f *recordingFactory) GitHubHost() (string, error) {
 	return "", nil
 }
 
+func (f *recordingFactory) ListRepositories() ([]string, error) {
+	return f.repositories, nil
+}
+
 func Test__OnPullRequest__Setup(t *testing.T) {
 	trigger := OnPullRequest{}
 
@@ -503,4 +508,37 @@ func Test__OnPullRequest__Setup(t *testing.T) {
 		assert.Equal(t, webhookRequest.EventType, "pull_request")
 		assert.Equal(t, webhookRequest.Repository, "hello")
 	})
+
+	for _, tc := range []struct {
+		name         string
+		enabled      bool
+		repositories []string
+		want         []string
+	}{
+		{name: "workspace scope lists every workspace repository", enabled: true, repositories: []string{"testhq/hello", "testhq/world"}, want: []string{"testhq/hello", "testhq/world"}},
+		{name: "workspace scope keeps one repository webhook", enabled: true, repositories: []string{"testhq/hello"}},
+		{name: "repository scope ignores the workspace", enabled: false, repositories: []string{"testhq/hello", "testhq/world"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+			httpCtx := &contexts.HTTPContext{
+				Responses: []*http.Response{
+					mocks.GitHubResponse(http.StatusOK, `{"id": 123456, "full_name": "testhq/hello", "html_url": "https://github.com/testhq/hello"}`),
+				},
+			}
+
+			require.NoError(t, trigger.Setup(core.TriggerContext{
+				Integration:   integrationCtx,
+				HTTP:          httpCtx,
+				Metadata:      &contexts.MetadataContext{},
+				Factory:       &recordingFactory{repositories: tc.repositories},
+				Configuration: map[string]any{"repository": "testhq/hello", "workspaceRepositories": tc.enabled},
+			}))
+
+			require.Len(t, integrationCtx.WebhookRequests, 1)
+			webhookRequest := integrationCtx.WebhookRequests[0].(common.WebhookConfiguration)
+			assert.Equal(t, "testhq/hello", webhookRequest.Repository)
+			assert.Equal(t, tc.want, webhookRequest.Repositories)
+		})
+	}
 }

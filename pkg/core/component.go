@@ -100,6 +100,8 @@ type SetupContext struct {
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
 	Apps          AppContext
+	// Factory is set only for apps that a factory owns.
+	Factory FactoryContext
 }
 
 type CanvasMemoryContext interface {

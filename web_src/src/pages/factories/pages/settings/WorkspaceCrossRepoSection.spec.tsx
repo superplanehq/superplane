@@ -6,7 +6,11 @@ import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
+} from "../../__fixtures__/factoryPageResponses";
 import {
   CONNECTED_SETUP_INTEGRATIONS,
   SETUP_ANSWERS,
@@ -103,6 +107,34 @@ describe("cross-repo context picker", () => {
     const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
     expect(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 })).toBeInTheDocument();
     expect(within(picker).queryByRole("option", { name: /^acme\/api$/ })).not.toBeInTheDocument();
+  }, 15000);
+
+  it("lists the primary repository once, first, without a remove action", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository),
+          agentResourcesByFactoryId: {
+            [PRIMARY_FACTORY_ID]: [
+              { id: "ctx-primary", kind: "KIND_CONTEXT_REPO", enabled: true, repository: "ACME/api" },
+              { id: "ctx-web", kind: "KIND_CONTEXT_REPO", enabled: true, repository: "acme/web" },
+            ],
+          },
+        }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
+    const rows = await within(list).findAllByRole("listitem", {}, { timeout: 8000 });
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("acme/api"),
+      expect.stringContaining("acme/web"),
+    ]);
+    const primary = rows[0]!;
+    expect(within(primary).queryByRole("button", { name: AGENT_RESOURCES_COPY.removeRepository })).toBeNull();
   }, 15000);
 
   it("hides the workspace repository when only the letter case differs", async () => {
