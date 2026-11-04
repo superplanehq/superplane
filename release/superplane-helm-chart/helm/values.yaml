@@ -141,6 +141,12 @@ sentry:
   dsn: ""
   environment: ""
 
+# This Secret must contain SUPERPLANE_SENTRY_APP_SLUG,
+# SUPERPLANE_SENTRY_APP_CLIENT_ID, and SUPERPLANE_SENTRY_APP_CLIENT_SECRET.
+# Both API and workflow workers read it for hosted Sentry connections.
+sentryApp:
+  secretName: ""
+
 dash0Web:
   secretName: ""
   enabled: false
