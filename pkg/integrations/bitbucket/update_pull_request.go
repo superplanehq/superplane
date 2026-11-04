@@ -116,9 +116,13 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize Bitbucket client: %w", err)
 	}
 
+	var description *string
+	if config.Body != "" {
+		description = &config.Body
+	}
 	pullRequest, err := client.UpdatePullRequest(config.Repository, id, UpdatePullRequestRequest{
 		Title:       config.Title,
-		Description: config.Body,
+		Description: description,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update pull request: %w", err)

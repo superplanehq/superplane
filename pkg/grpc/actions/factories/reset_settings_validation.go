@@ -40,7 +40,7 @@ func validateBuiltInResetNode(node yaml.Node, registry *registry.Registry) error
 			return err
 		}
 		fields = trigger.Configuration()
-	} else if isFactoryAgentHarness(node.Component) || node.Component == "github.createPullRequest" || node.Component == "bitbucket.createPullRequest" || isPrFeedbackWaitComponent(node.Component) {
+	} else if isFactoryAgentHarness(node.Component) || node.Component == "github.createPullRequest" || node.Component == "bitbucket.createPullRequest" || isPrFeedbackWaitComponent(node.Component) || node.Component == "updatePullRequestBodySection" {
 		action, err := registry.GetAction(node.Component)
 		if err != nil {
 			return err
@@ -55,7 +55,7 @@ func validateBuiltInResetNode(node yaml.Node, registry *registry.Registry) error
 		if value, present := node.Configuration[field.Name]; !present || value == nil {
 			continue
 		}
-		if node.Type != yaml.NodeTypeTrigger && !slices.Contains(factoryAgentSettingFields, field.Name) && field.Name != "draft" && !isPrFeedbackWaitComponent(node.Component) {
+		if node.Type != yaml.NodeTypeTrigger && !slices.Contains(factoryAgentSettingFields, field.Name) && field.Name != "draft" && field.Name != "enabled" && !isPrFeedbackWaitComponent(node.Component) {
 			continue
 		}
 		selected = append(selected, field)
