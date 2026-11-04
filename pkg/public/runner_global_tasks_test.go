@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestRunnerListsTasksByState(t *testing.T) {
@@ -55,6 +56,49 @@ func TestRunnerListsTasksByState(t *testing.T) {
 	rec = runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/tasks?limit=100000", "")
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.NotContains(t, rec.Body.String(), "Stop the retry loop.")
+}
+
+func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("JWT_SECRET", "test")
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "agent", Name: "Run automation", Type: models.NodeTypeComponent},
+	}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "agent", "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, event)
+	require.NoError(t, err)
+	execution := createExecutionForCanvasRun(t, run, event.ID, "agent")
+	ctx := core.ExecutionContext{
+		ID: execution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(),
+		OrganizationID: r.Organization.ID.String(), NodeID: "agent", BaseURL: "http://app.test",
+	}
+	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
+	assert.Empty(t, runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil)))
+
+	node, err := models.FindCanvasNode(db, canvas.ID, "agent")
+	require.NoError(t, err)
+	node.Metadata = datatypes.NewJSONType(map[string]any{
+		models.FactoryAppTemplateMetadataKey: map[string]any{
+			"id":        models.FactoryAppTemplateCustomAutomationID,
+			"startMode": "scheduled",
+		},
+	})
+	require.NoError(t, db.Save(node).Error)
+
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	require.NotEmpty(t, token)
+	assert.Equal(t, []string{"list_tasks", "create_task"}, listRunnerTools(t, server, token))
+	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"Fix the lint","description":"Clean the reported errors."}`)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	created := decodeRunnerTask(t, rec.Body.Bytes())
+	assert.Equal(t, "Fix the lint", created.Title)
+	assert.Equal(t, "draft", created.State)
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/close", `{}`)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
 func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {
