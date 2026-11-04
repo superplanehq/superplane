@@ -71,7 +71,7 @@ func Test__Client__ProjectTeamIDs__Missing(t *testing.T) {
 	require.ErrorContains(t, err, "selected projects were not found")
 }
 
-func Test__Client__SearchOpenProjectIssues__Identifiers(t *testing.T) {
+func Test__Client__SearchOpenIssues__Identifiers(t *testing.T) {
 	for _, query := range []string{"ENG-123", "eng-123", "ENG 123", "please find eng-123 for me", "https://linear.app/acme/issue/eng-123/fix"} {
 		t.Run(query, func(t *testing.T) {
 			httpContext := &contexts.HTTPContext{Responses: []*http.Response{
@@ -80,7 +80,7 @@ func Test__Client__SearchOpenProjectIssues__Identifiers(t *testing.T) {
 			}}
 			client, err := NewClient(httpContext, newAuthorizedIntegration())
 			require.NoError(t, err)
-			issues, err := client.SearchOpenProjectIssues([]string{"p1"}, query, 2)
+			issues, err := client.SearchOpenIssues(IssueScope{ProjectIDs: []string{"p1"}}, query, 2)
 			require.NoError(t, err)
 			require.Len(t, issues, 2)
 			assert.Equal(t, "exact", issues[0].ID)
@@ -90,7 +90,7 @@ func Test__Client__SearchOpenProjectIssues__Identifiers(t *testing.T) {
 	}
 }
 
-func Test__Client__SearchProjectIssues__BareNumber(t *testing.T) {
+func Test__Client__SearchIssues__BareNumber(t *testing.T) {
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		jsonResponse(`{"data":{"issues":{"nodes":[{"id":"text","identifier":"ENG-9"}]}}}`),
 		jsonResponse(`{"data":{"projects":{"nodes":[{"id":"p1","teams":{"nodes":[{"id":"t1","key":"eng"},{"id":"t2","key":"OPS"}]}},{"id":"p2","teams":{"nodes":[{"id":"t1","key":"ENG"}]}}],"pageInfo":{"hasNextPage":false}}}}`),
@@ -98,7 +98,7 @@ func Test__Client__SearchProjectIssues__BareNumber(t *testing.T) {
 	}}
 	client, err := NewClient(httpContext, newAuthorizedIntegration())
 	require.NoError(t, err)
-	issues, err := client.SearchProjectIssues([]string{"p1", "p2"}, "123", 3)
+	issues, err := client.SearchIssues(IssueScope{ProjectIDs: []string{"p1", "p2"}}, "123", 3)
 	require.NoError(t, err)
 	require.Len(t, issues, 3)
 	assert.Equal(t, "ENG-123", issues[0].Identifier)
@@ -113,7 +113,7 @@ func Test__Client__SearchProjectIssues__BareNumber(t *testing.T) {
 	assert.Equal(t, []any{"p1", "p2"}, variablesFromRequest(t, httpContext, 1)["ids"])
 }
 
-func Test__Client__SearchProjectIssues__PartialIdentifiers(t *testing.T) {
+func Test__Client__SearchIssues__PartialIdentifiers(t *testing.T) {
 	for _, query := range []string{"ENG-", "ENG-12"} {
 		t.Run(query, func(t *testing.T) {
 			responses := []*http.Response{jsonResponse(`{"data":{"issues":{"nodes":[{"id":"text","identifier":"OPS-7"}]}}}`)}
@@ -124,7 +124,7 @@ func Test__Client__SearchProjectIssues__PartialIdentifiers(t *testing.T) {
 			httpContext := &contexts.HTTPContext{Responses: responses}
 			client, err := NewClient(httpContext, newAuthorizedIntegration())
 			require.NoError(t, err)
-			issues, err := client.SearchProjectIssues([]string{"p1"}, query, 5)
+			issues, err := client.SearchIssues(IssueScope{ProjectIDs: []string{"p1"}}, query, 5)
 			require.NoError(t, err)
 			require.Len(t, issues, 1)
 			assert.Equal(t, "text", issues[0].ID)
@@ -136,7 +136,7 @@ func Test__Client__SearchProjectIssues__PartialIdentifiers(t *testing.T) {
 	}
 }
 
-func Test__Client__SearchProjectIssues__ScopeAndLimit(t *testing.T) {
+func Test__Client__SearchIssues__ScopeAndLimit(t *testing.T) {
 	for _, scope := range []string{
 		`"project":{"id":"other"}`,
 		`"project":null`,
@@ -152,7 +152,7 @@ func Test__Client__SearchProjectIssues__ScopeAndLimit(t *testing.T) {
 				}}
 				client, err := NewClient(httpContext, newAuthorizedIntegration())
 				require.NoError(t, err)
-				issues, err := client.SearchProjectIssues([]string{"p1"}, query, 1)
+				issues, err := client.SearchIssues(IssueScope{ProjectIDs: []string{"p1"}}, query, 1)
 				require.NoError(t, err)
 				require.Len(t, issues, 1)
 				assert.Equal(t, "exact", issues[0].ID)
@@ -163,13 +163,129 @@ func Test__Client__SearchProjectIssues__ScopeAndLimit(t *testing.T) {
 	}
 }
 
-func Test__Client__SearchProjectIssues__LookupFailure(t *testing.T) {
+func Test__Client__SearchIssues__LookupFailure(t *testing.T) {
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		jsonResponse(`{"data":{"issues":{"nodes":[]}}}`),
 		jsonResponse(`{"errors":[{"message":"Rate limit exceeded"}]}`),
 	}}
 	client, err := NewClient(httpContext, newAuthorizedIntegration())
 	require.NoError(t, err)
-	_, err = client.SearchProjectIssues([]string{"p1"}, "ENG-123", 5)
+	_, err = client.SearchIssues(IssueScope{ProjectIDs: []string{"p1"}}, "ENG-123", 5)
 	require.ErrorContains(t, err, "Rate limit exceeded")
+}
+
+func Test__Client__SearchIssues__SendsScopeFilter(t *testing.T) {
+	open := map[string]any{"type": map[string]any{"nin": []any{"completed", "canceled"}}}
+	team := map[string]any{"id": map[string]any{"eq": "t1"}}
+	inProjects := map[string]any{"id": map[string]any{"in": []any{"p1", "p2"}}}
+	noProject := map[string]any{"project": map[string]any{"null": true}}
+	projectOrNone := []any{map[string]any{"project": inProjects}, noProject}
+	text := []any{
+		map[string]any{"title": map[string]any{"containsIgnoreCase": "crash"}},
+		map[string]any{"description": map[string]any{"containsIgnoreCase": "crash"}},
+	}
+
+	for _, tc := range []struct {
+		name   string
+		scope  IssueScope
+		query  string
+		filter map[string]any
+	}{
+		{
+			name:   "team only",
+			scope:  IssueScope{TeamID: "t1"},
+			filter: map[string]any{"state": open, "team": team},
+		},
+		{
+			name:   "team with projects",
+			scope:  IssueScope{TeamID: "t1", ProjectIDs: []string{"p1", "p2"}},
+			filter: map[string]any{"state": open, "team": team, "project": inProjects},
+		},
+		{
+			name:   "team with projects and issues without a project",
+			scope:  IssueScope{TeamID: "t1", ProjectIDs: []string{"p1", "p2"}, IncludeNoProject: true},
+			filter: map[string]any{"state": open, "team": team, "or": projectOrNone},
+		},
+		{
+			name:   "team with text search",
+			scope:  IssueScope{TeamID: "t1"},
+			query:  "crash",
+			filter: map[string]any{"state": open, "team": team, "or": text},
+		},
+		{
+			name:  "both alternatives hold",
+			scope: IssueScope{TeamID: "t1", ProjectIDs: []string{"p1", "p2"}, IncludeNoProject: true},
+			query: "crash",
+			filter: map[string]any{
+				"state": open,
+				"team":  team,
+				"and":   []any{map[string]any{"or": projectOrNone}, map[string]any{"or": text}},
+			},
+		},
+		{
+			name:   "projects without a team never match issues without a project",
+			scope:  IssueScope{ProjectIDs: []string{"p1", "p2"}, IncludeNoProject: true},
+			filter: map[string]any{"state": open, "project": inProjects},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+				jsonResponse(`{"data":{"issues":{"nodes":[]}}}`),
+			}}
+			client, err := NewClient(httpContext, newAuthorizedIntegration())
+			require.NoError(t, err)
+
+			_, err = client.SearchIssues(tc.scope, tc.query, 7)
+			require.NoError(t, err)
+			variables := variablesFromRequest(t, httpContext, 0)
+			assert.Equal(t, tc.filter, variables["filter"])
+			assert.EqualValues(t, 7, variables["first"])
+		})
+	}
+}
+
+func Test__Client__SearchIssues__RequiresTeamOrProject(t *testing.T) {
+	httpContext := &contexts.HTTPContext{}
+	client, err := NewClient(httpContext, newAuthorizedIntegration())
+	require.NoError(t, err)
+
+	_, err = client.SearchIssues(IssueScope{IncludeNoProject: true}, "", 5)
+	require.ErrorContains(t, err, "a team or at least one project is required")
+	assert.Empty(t, httpContext.Requests)
+}
+
+func Test__Client__SearchIssues__BareNumberUsesTheScopeTeamKey(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":{"issues":{"nodes":[{"id":"text","identifier":"ENG-9"}]}}}`),
+		jsonResponse(`{"data":{"team":{"key":"eng"}}}`),
+		jsonResponse(`{"data":{"issues":{"nodes":[{"id":"exact","identifier":"ENG-123","team":{"id":"t1"}}]}}}`),
+	}}
+	client, err := NewClient(httpContext, newAuthorizedIntegration())
+	require.NoError(t, err)
+
+	issues, err := client.SearchIssues(IssueScope{TeamID: "t1"}, "123", 3)
+	require.NoError(t, err)
+	require.Len(t, issues, 2)
+	assert.Equal(t, "exact", issues[0].ID)
+	assert.True(t, issues[0].ExactMatch)
+	assert.False(t, issues[0].ExplicitIdentifier)
+	assert.Equal(t, "t1", variablesFromRequest(t, httpContext, 1)["teamId"])
+	assert.Equal(t, []any{"ENG-123"}, variablesFromRequest(t, httpContext, 2)["identifiers"])
+}
+
+func Test__Client__SearchOpenIssues__DropsExactMatchesOutsideTheTeam(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":{"issues":{"nodes":[]}}}`),
+		jsonResponse(`{"data":{"issues":{"nodes":[
+			{"id":"no-project","identifier":"ENG-1","team":{"id":"t1"},"project":null},
+			{"id":"other-team","identifier":"ENG-2","team":{"id":"t2"}}
+		]}}}`),
+	}}
+	client, err := NewClient(httpContext, newAuthorizedIntegration())
+	require.NoError(t, err)
+
+	issues, err := client.SearchOpenIssues(IssueScope{TeamID: "t1"}, "ENG-1", 5)
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Equal(t, "no-project", issues[0].ID)
 }
