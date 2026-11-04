@@ -221,7 +221,23 @@ func FindVCSProviderInstallation(tx *gorm.DB, provider string, installationID in
 }
 
 func DeleteVCSProviderInstallation(tx *gorm.DB, provider string, installationID int64) error {
-	return tx.Where("provider = ? AND installation_id = ?", provider, installationID).Delete(&VCSProviderInstallation{}).Error
+	return tx.Transaction(func(tx *gorm.DB) error {
+		// Bindings disappear with the catalog installation, so update the
+		// surviving integrations before the foreign keys cascade.
+		bindings := tx.Model(&VCSProviderIntegrationBinding{}).
+			Select("integration_id").
+			Where("provider = ? AND installation_id = ?", provider, installationID)
+		if err := tx.Model(&Integration{}).
+			Where("id IN (?)", bindings).
+			Updates(map[string]any{
+				"state":             IntegrationStateError,
+				"state_description": "App was uninstalled",
+				"updated_at":        time.Now(),
+			}).Error; err != nil {
+			return err
+		}
+		return tx.Where("provider = ? AND installation_id = ?", provider, installationID).Delete(&VCSProviderInstallation{}).Error
+	})
 }
 
 func DeleteVCSProviderInstallationsMissingFromSnapshot(
