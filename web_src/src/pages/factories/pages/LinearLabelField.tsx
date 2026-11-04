@@ -1,13 +1,7 @@
+import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
-import { Plus } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
 
-import { addIntakeLabel, toggleIntakeLabel } from "./intakeSourceSettingsModel";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 
 export function LinearLabelField({
@@ -28,26 +22,7 @@ export function LinearLabelField({
   const labelsQuery = useIntegrationResources(organizationId, integrationId, "label", labelScope);
   const choices = [
     ...new Set([...(labelsQuery.data ?? []).map((resource) => resource.name ?? "").filter(Boolean), ...labels]),
-  ];
-  const [draft, setDraft] = useState("");
-  const [typing, setTyping] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (typing) {
-      inputRef.current?.focus();
-    }
-  }, [typing]);
-
-  function close() {
-    setDraft("");
-    setTyping(false);
-  }
-
-  function addDraft() {
-    onChange(addIntakeLabel(labels, draft));
-    close();
-  }
+  ].map((id) => ({ id }));
 
   return (
     <div className="flex flex-col gap-2" data-testid="linear-intake-label-options">
@@ -65,90 +40,24 @@ export function LinearLabelField({
       {!labelsQuery.isLoading && !labelsQuery.isError && choices.length === 0 ? (
         <p className="workspace-body-text text-muted-foreground">{LINEAR_INTAKE_SETUP_COPY.labelsEmpty}</p>
       ) : null}
-      {choices.length > 0 ? <LinearLabelChoiceList choices={choices} labels={labels} onChange={onChange} /> : null}
-      {typing ? (
-        <div className="flex items-center gap-2">
-          <Input
-            ref={inputRef}
-            value={draft}
-            aria-label={LINEAR_INTAKE_SETUP_COPY.labelInput}
-            placeholder={LINEAR_INTAKE_SETUP_COPY.labelPlaceholder}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                close();
-                return;
-              }
-              if (event.key !== "Enter") {
-                return;
-              }
-              event.preventDefault();
-              addDraft();
-            }}
-            data-testid="linear-intake-label-input"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            className="shrink-0"
-            disabled={draft.trim().length === 0}
-            onClick={() => addDraft()}
-          >
-            {LINEAR_INTAKE_SETUP_COPY.labelAdd}
-          </Button>
-          <Button type="button" variant="ghost" className="shrink-0" onClick={() => close()}>
-            {LINEAR_INTAKE_SETUP_COPY.labelCancel}
-          </Button>
-        </div>
-      ) : (
-        <div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setTyping(true)}>
-            <Plus className="size-3.5" aria-hidden />
-            {LINEAR_INTAKE_SETUP_COPY.labelNew}
-          </Button>
-        </div>
-      )}
+      {!labelsQuery.isLoading && !labelsQuery.isError ? (
+        <MultiCombobox
+          aria-label={LINEAR_INTAKE_SETUP_COPY.labelSearch}
+          placeholder={LINEAR_INTAKE_SETUP_COPY.labelSearch}
+          options={choices}
+          value={labels.map((id) => ({ id }))}
+          displayValue={(option) => option.id}
+          filter={(option, query) => option.id.toLowerCase().includes(query.trim().toLowerCase())}
+          allowCustomValues
+          createCustomValue={(query) => ({ id: query.trim() })}
+          validateInput={(query) =>
+            query.trim().length > 0 && !choices.some((option) => option.id.toLowerCase() === query.trim().toLowerCase())
+          }
+          onChange={(options) => onChange(options.map((option) => option.id))}
+        >
+          {(option) => <MultiComboboxLabel>{option.id}</MultiComboboxLabel>}
+        </MultiCombobox>
+      ) : null}
     </div>
-  );
-}
-
-function LinearLabelChoiceList({
-  choices,
-  labels,
-  onChange,
-}: {
-  choices: string[];
-  labels: string[];
-  onChange: (labels: string[]) => void;
-}) {
-  const choiceIdPrefix = useId();
-
-  return (
-    <ul className="flex flex-wrap items-center gap-1.5">
-      {choices.map((label) => {
-        const choiceId = `${choiceIdPrefix}-${encodeURIComponent(label)}`;
-        return (
-          <li key={label}>
-            <Label
-              htmlFor={choiceId}
-              className={cn(
-                "inline-flex max-w-full cursor-pointer items-center gap-2 rounded-md border px-2 py-1 text-[13px] font-normal",
-                labels.includes(label)
-                  ? "border-foreground/20 bg-accent/50 text-foreground"
-                  : "border-border bg-card text-muted-foreground hover:border-foreground/15 dark:text-muted-foreground",
-              )}
-            >
-              <Checkbox
-                id={choiceId}
-                checked={labels.includes(label)}
-                onChange={() => onChange(toggleIntakeLabel(labels, label))}
-              />
-              <span className="min-w-0 truncate">{label}</span>
-            </Label>
-          </li>
-        );
-      })}
-    </ul>
   );
 }

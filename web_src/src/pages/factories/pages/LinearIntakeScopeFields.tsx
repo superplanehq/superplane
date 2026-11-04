@@ -10,7 +10,6 @@ import { LinearTeamPicker } from "./LinearTeamPicker";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 import {
   selectLinearTeam,
-  toggleLinearProject,
   type LinearFilterChoices,
   type LinearIntakeScope,
 } from "./linearIntakeScope";
@@ -61,20 +60,10 @@ export function LinearIntakeScopeFields({
     scope.teamId ? { team: scope.teamId } : undefined,
     { enabled: connected && showFilters },
   );
-  // A saved project that Linear no longer returns stays selected and visible,
-  // so the user removes it or picks a replacement. Dropping it silently could
-  // widen the intake: an empty project list accepts every ticket in the team.
-  const missingProjectIds = missingLinearProjectIds(
-    scope.projectIds,
-    projectsQuery.data ?? [],
-    linearProjectsSettled(connected, showFilters, projectsQuery.isPending, projectsQuery.isError),
-  );
-
   return (
     <div className="flex flex-col gap-6" data-testid="linear-intake-filters">
       {settingsLayout ? <h3 className="workspace-section-title">Which issues to include</h3> : null}
       <LinearScopeTeam
-        settingsLayout={settingsLayout}
         teams={teamsQuery.data ?? []}
         selectedId={scope.teamId}
         loading={teamsQuery.isLoading}
@@ -89,7 +78,6 @@ export function LinearIntakeScopeFields({
             onChange={onChange}
             settingsFilters={settingsFilters}
             projects={projectsQuery.data ?? []}
-            missingProjectIds={missingProjectIds}
             loading={projectsQuery.isLoading}
             error={projectsQuery.isError}
             onRetry={() => void projectsQuery.refetch()}
@@ -109,22 +97,7 @@ export function LinearIntakeScopeFields({
   );
 }
 
-function missingLinearProjectIds(
-  selectedIds: string[],
-  projects: Array<{ id?: string }>,
-  projectsSettled: boolean,
-): string[] {
-  if (!projectsSettled) return [];
-  const fetchedIds = new Set(projects.map((project) => project.id).filter((id): id is string => Boolean(id)));
-  return selectedIds.filter((id) => !fetchedIds.has(id));
-}
-
-function linearProjectsSettled(connected: boolean, showFilters: boolean, pending: boolean, error: boolean): boolean {
-  return connected && showFilters && !pending && !error;
-}
-
 function LinearScopeTeam({
-  settingsLayout,
   teams,
   selectedId,
   loading,
@@ -132,7 +105,6 @@ function LinearScopeTeam({
   onSelect,
   onRetry,
 }: {
-  settingsLayout: boolean;
   teams: Array<{ id?: string; name?: string }>;
   selectedId: string;
   loading: boolean;
@@ -141,21 +113,16 @@ function LinearScopeTeam({
   onRetry: () => void;
 }) {
   return (
-    <fieldset className="min-w-0">
-      <legend className={settingsLayout ? "text-sm font-medium" : "workspace-section-title"}>
-        {LINEAR_INTAKE_SETUP_COPY.teamLabel}
-      </legend>
-      <div className="mt-2">
-        <LinearTeamPicker
-          teams={teams}
-          selectedId={selectedId}
-          loading={loading}
-          error={error}
-          onSelect={onSelect}
-          onRetry={onRetry}
-        />
-      </div>
-    </fieldset>
+    <div className="min-w-0">
+      <LinearTeamPicker
+        teams={teams}
+        selectedId={selectedId}
+        loading={loading}
+        error={error}
+        onSelect={onSelect}
+        onRetry={onRetry}
+      />
+    </div>
   );
 }
 
@@ -208,7 +175,6 @@ function LinearScopeProjects({
   onChange,
   settingsFilters,
   projects,
-  missingProjectIds,
   loading,
   error,
   onRetry,
@@ -217,7 +183,6 @@ function LinearScopeProjects({
   onChange: (scope: LinearIntakeScope) => void;
   settingsFilters?: LinearSettingsFilters;
   projects: Array<{ id?: string; name?: string }>;
-  missingProjectIds: string[];
   loading: boolean;
   error: boolean;
   onRetry: () => void;
@@ -259,7 +224,6 @@ function LinearScopeProjects({
                 scope={scope}
                 onChange={onChange}
                 projects={projects}
-                missingProjectIds={missingProjectIds}
                 loading={loading}
                 error={error}
                 onRetry={onRetry}
@@ -280,7 +244,6 @@ function LinearScopeProjects({
               scope={scope}
               onChange={onChange}
               projects={projects}
-              missingProjectIds={missingProjectIds}
               loading={loading}
               error={error}
               onRetry={onRetry}
@@ -296,7 +259,6 @@ function LinearProjectChoices({
   scope,
   onChange,
   projects,
-  missingProjectIds,
   loading,
   error,
   onRetry,
@@ -304,7 +266,6 @@ function LinearProjectChoices({
   scope: LinearIntakeScope;
   onChange: (scope: LinearIntakeScope) => void;
   projects: Array<{ id?: string; name?: string }>;
-  missingProjectIds: string[];
   loading: boolean;
   error: boolean;
   onRetry: () => void;
@@ -314,10 +275,9 @@ function LinearProjectChoices({
       <LinearProjectPicker
         projects={projects}
         selectedIds={scope.projectIds}
-        missingSelectedIds={missingProjectIds}
         loading={loading}
         error={error}
-        onToggle={(projectId) => onChange(toggleLinearProject(scope, projectId))}
+        onChange={(projectIds) => onChange({ ...scope, projectIds })}
         onRetry={onRetry}
       />
       {scope.teamId && scope.projectIds.length > 0 ? (

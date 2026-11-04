@@ -112,6 +112,7 @@ function SetupStepBody({ setup }: { setup: LinearIntakeSetupModel }) {
       integrationId={setup.integrationId}
       scope={setup.scope}
       onChange={setup.setScope}
+      showLabels={false}
     />
   );
 }
