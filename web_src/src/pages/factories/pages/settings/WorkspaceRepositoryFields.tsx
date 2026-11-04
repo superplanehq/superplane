@@ -10,47 +10,46 @@ import { BranchPicker } from "./BranchPicker";
 import { branchNames, repositoryBranchChoices } from "./useFactoryRepositoryDraft";
 import { workspaceRepositoryAccess, type WorkspaceRepositorySettings } from "./workspaceRepositorySettings";
 
-export function WorkspaceRepositoryFields({
-  idPrefix,
-  organizationId,
-  integrationId,
-  repository,
-  value,
-  showAccess,
-  disabled,
-  onChange,
-}: {
-  idPrefix: string;
+type RepositoryBranchProps = {
+  id: string;
   organizationId: string;
   integrationId: string;
   repository: string;
+  /** Saved branch. Empty means the default branch of the repository. */
+  branch: string;
+  /** Default branch of the repository on the host, when known. */
+  defaultBranch: string;
+  disabled: boolean;
+  onChange: (branch: string) => void;
+};
+
+export function WorkspaceRepositoryFields({
+  idPrefix,
+  value,
+  showAccess,
+  onChange,
+  ...branch
+}: Omit<RepositoryBranchProps, "id" | "branch" | "onChange"> & {
+  idPrefix: string;
   value: WorkspaceRepositorySettings;
   showAccess: boolean;
-  disabled: boolean;
   onChange: (next: WorkspaceRepositorySettings) => void;
 }) {
-  const branchId = `${idPrefix}-branch`;
   const accessId = `${idPrefix}-access`;
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="min-w-0 space-y-2">
-        <Label htmlFor={branchId}>{AGENT_RESOURCES_COPY.branchLabel}</Label>
-        <RepositoryBranchControl
-          id={branchId}
-          organizationId={organizationId}
-          integrationId={integrationId}
-          repository={repository}
-          branch={value.ref}
-          disabled={disabled}
-          onChange={(ref) => onChange({ ...value, ref })}
-        />
-      </div>
+      <RepositoryBranchField
+        {...branch}
+        id={`${idPrefix}-branch`}
+        branch={value.ref}
+        onChange={(ref) => onChange({ ...value, ref })}
+      />
       {showAccess ? (
         <div className="min-w-0 space-y-2">
           <Label htmlFor={accessId}>{AGENT_RESOURCES_COPY.accessLabel}</Label>
           <Select
             value={value.access}
-            disabled={disabled}
+            disabled={branch.disabled}
             onValueChange={(access) => onChange({ ...value, access: workspaceRepositoryAccess(access) })}
           >
             <SelectTrigger id={accessId} className="w-full" data-testid={accessId}>
@@ -70,15 +69,16 @@ export function WorkspaceRepositoryFields({
   );
 }
 
-function RepositoryBranchControl(props: {
-  id: string;
-  organizationId: string;
-  integrationId: string;
-  repository: string;
-  branch: string;
-  disabled: boolean;
-  onChange: (branch: string) => void;
-}) {
+export function RepositoryBranchField(props: RepositoryBranchProps) {
+  return (
+    <div className="min-w-0 space-y-2">
+      <Label htmlFor={props.id}>{AGENT_RESOURCES_COPY.branchLabel}</Label>
+      <RepositoryBranchControl {...props} />
+    </div>
+  );
+}
+
+function RepositoryBranchControl(props: RepositoryBranchProps) {
   const branches = useIntegrationResources(
     props.organizationId,
     props.integrationId,
@@ -86,31 +86,32 @@ function RepositoryBranchControl(props: {
     { repository: props.repository },
     { enabled: Boolean(props.integrationId && props.repository) },
   );
+  const shown = props.branch || props.defaultBranch;
   const listed = useMemo(() => branchNames(branches.data), [branches.data]);
-  const choices = useMemo(() => repositoryBranchChoices(listed, props.branch), [listed, props.branch]);
+  const choices = useMemo(() => repositoryBranchChoices(listed, shown), [listed, shown]);
 
-  if (listed.length > 0) {
+  if (branches.isLoading || listed.length > 0) {
     return (
       <BranchPicker
         id={props.id}
-        branch={props.branch}
+        branch={shown}
         choices={choices}
-        disabled={props.disabled}
+        disabled={props.disabled || branches.isLoading}
         onChange={props.onChange}
-        emptyChoiceLabel={AGENT_RESOURCES_COPY.defaultBranch}
+        emptyChoiceLabel={props.defaultBranch ? undefined : AGENT_RESOURCES_COPY.defaultBranch}
       />
     );
   }
   return (
     <Input
-      key={props.branch}
+      key={shown}
       id={props.id}
-      defaultValue={props.branch}
+      defaultValue={shown}
       placeholder={AGENT_RESOURCES_COPY.defaultBranch}
       disabled={props.disabled}
       onBlur={(event) => {
         const next = event.target.value.trim();
-        if (next !== props.branch) props.onChange(next);
+        if (next !== shown) props.onChange(next);
       }}
       data-testid={props.id}
     />

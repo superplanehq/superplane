@@ -22,7 +22,9 @@ import { useGitHubOnboarding } from "../onboarding/useGitHubOnboarding";
 import { navigateGitHubWindow, openGitHubWindow } from "../onboarding/useFirstRunGitHub";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard } from "./FactorySettingsCard";
+import { useRepositoryDefaultBranch } from "./useRepositoryDefaultBranch";
 import { useWorkspaceRepositoryChoices } from "./useWorkspaceRepositoryChoices";
+import { WorkspacePrimaryRepoRow } from "./WorkspacePrimaryRepoRow";
 import { WorkspaceRepositoryFields } from "./WorkspaceRepositoryFields";
 import {
   workspaceRepositoryAccess,
@@ -35,6 +37,7 @@ type RepositoryWorkspace = {
     vcsIntegrationId?: string;
     vcsProvider?: string;
     appRepository?: string;
+    defaultBranch?: string;
     appRepositoryId?: string;
     backlogRepositoryId?: string;
   } | null;
@@ -42,6 +45,10 @@ type RepositoryWorkspace = {
 
 function contextRepoName(resource: { name?: string | null; repository?: string | null }): string {
   return resource.repository ?? resource.name ?? "";
+}
+
+function workspaceDefaultBranch(factory: RepositoryWorkspace | null | undefined): string {
+  return factory?.onboarding?.defaultBranch?.trim() ?? "";
 }
 
 function isWorkspaceMainRepository(name: string, appRepository: string | undefined): boolean {
@@ -58,10 +65,15 @@ type ContextRepoResource = {
   access?: string | null;
 };
 
+type CatalogRepositories = ReturnType<typeof useWorkspaceRepositoryChoices>["catalogRepositories"];
+
 type ContextRepoListProps = {
   organizationId: string;
+  factoryId: string;
   integrationId: string;
   primaryRepository: string;
+  primaryBranch: string;
+  catalogRepositories: CatalogRepositories;
   resources: ContextRepoResource[];
   host: VcsHostId;
   showAccess: boolean;
@@ -71,6 +83,8 @@ type ContextRepoListProps = {
   onUpdate: (resourceId: string, changed: Partial<WorkspaceRepositorySettings>) => void;
 };
 
+const PRIMARY_ROW_ID = "primary";
+
 function ContextRepoList(props: ContextRepoListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   return (
@@ -79,16 +93,18 @@ function ContextRepoList(props: ContextRepoListProps) {
       data-testid="agent-cross-repo-list"
     >
       {props.primaryRepository ? (
-        <li className="flex min-w-0 items-center gap-3 px-3 py-2.5" data-testid="agent-cross-repo-primary">
-          <IntegrationChoiceIcon name={props.host} />
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{props.primaryRepository}</span>
-          <span
-            className="shrink-0 text-[12px] text-muted-foreground"
-            title={AGENT_RESOURCES_COPY.primaryRepositoryHint}
-          >
-            {AGENT_RESOURCES_COPY.primaryRepository}
-          </span>
-        </li>
+        <WorkspacePrimaryRepoRow
+          organizationId={props.organizationId}
+          factoryId={props.factoryId}
+          integrationId={props.integrationId}
+          repository={props.primaryRepository}
+          savedBranch={props.primaryBranch}
+          catalogRepositories={props.catalogRepositories}
+          host={props.host}
+          canUpdate={props.canUpdate}
+          expanded={expandedId === PRIMARY_ROW_ID}
+          onToggle={() => setExpandedId((current) => (current === PRIMARY_ROW_ID ? null : PRIMARY_ROW_ID))}
+        />
       ) : null}
       {props.resources.map((resource) => (
         <ContextRepoRow
@@ -111,6 +127,7 @@ function ContextRepoRow({
 }: ContextRepoListProps & { resource: ContextRepoResource; expanded: boolean; onToggle: () => void }) {
   const name = contextRepoName(resource);
   const settings = contextRepoSettings(resource);
+  const defaultBranch = useRepositoryDefaultBranch({ ...props, repository: name });
   const panelId = `agent-cross-repo-panel-${resource.id}`;
   return (
     <li className="group min-w-0" data-testid={`agent-cross-repo-row-${resource.id}`}>
@@ -128,7 +145,7 @@ function ContextRepoRow({
           <IntegrationChoiceIcon name={props.host} />
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{name}</span>
           <span className="shrink-0 truncate text-[12px] text-muted-foreground">
-            {workspaceRepositorySummary(settings, props.showAccess)}
+            {workspaceRepositorySummary(settings, props.showAccess, defaultBranch)}
           </span>
           <ChevronDown
             className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")}
@@ -155,6 +172,7 @@ function ContextRepoRow({
             organizationId={props.organizationId}
             integrationId={props.integrationId}
             repository={name}
+            defaultBranch={defaultBranch}
             value={settings}
             showAccess={props.showAccess}
             disabled={!props.canUpdate || props.isSaving}
@@ -184,52 +202,9 @@ function contextRepoSettings(resource: ContextRepoResource): WorkspaceRepository
 
 const NEW_REPOSITORY_SETTINGS: WorkspaceRepositorySettings = { ref: "", access: "write" };
 
-export function CrossRepoContextCard({
-  organizationId,
-  factoryId,
-  factory,
-  canUpdate,
-}: {
-  organizationId: string;
-  factoryId: string;
-  factory: RepositoryWorkspace | null | undefined;
-  canUpdate: boolean;
-}) {
-  const [adding, setAdding] = useState(false);
-  const [addAttempt, setAddAttempt] = useState(0);
-  const contextRepos = useFactoryAgentResources(organizationId, factoryId, "KIND_CONTEXT_REPO");
-  const createResource = useCreateFactoryAgentResource(organizationId, factoryId);
+function useContextRepoEdits(organizationId: string, factoryId: string) {
   const updateResource = useUpdateFactoryAgentResource(organizationId, factoryId);
   const deleteResource = useDeleteFactoryAgentResource(organizationId, factoryId);
-  const choices = useWorkspaceRepositoryChoices(organizationId, factory);
-
-  const added = (contextRepos.data ?? []).map(contextRepoName).filter(Boolean);
-  const mainRepository = factory?.onboarding?.appRepository;
-  const primaryRepository = mainRepository?.trim() ?? "";
-  const otherRepos = (contextRepos.data ?? []).filter(
-    (resource) => !isWorkspaceMainRepository(contextRepoName(resource), mainRepository),
-  );
-  const available = choices.repositories.filter(
-    (name) => !added.includes(name) && !isWorkspaceMainRepository(name, mainRepository),
-  );
-  const isSaving = createResource.isPending || updateResource.isPending || deleteResource.isPending;
-
-  const create = async (repository: string, settings: WorkspaceRepositorySettings) => {
-    try {
-      await createResource.mutateAsync({
-        kind: "KIND_CONTEXT_REPO",
-        enabled: true,
-        repository,
-        ref: settings.ref,
-        access: choices.bitbucket ? "read" : settings.access,
-        vcsProvider: choices.bitbucket ? "bitbucket" : "github",
-      });
-      showSuccessToast(AGENT_RESOURCES_COPY.crossRepoAdded);
-      setAdding(false);
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.crossRepoAddFailed));
-    }
-  };
 
   const update = async (resourceId: string, changed: Partial<WorkspaceRepositorySettings>) => {
     if (changed.ref === undefined && changed.access === undefined) return;
@@ -247,6 +222,55 @@ export function CrossRepoContextCard({
       showSuccessToast(AGENT_RESOURCES_COPY.crossRepoRemoved);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.crossRepoRemoveFailed));
+    }
+  };
+
+  return { update, remove, isSaving: updateResource.isPending || deleteResource.isPending };
+}
+
+export function CrossRepoContextCard({
+  organizationId,
+  factoryId,
+  factory,
+  canUpdate,
+}: {
+  organizationId: string;
+  factoryId: string;
+  factory: RepositoryWorkspace | null | undefined;
+  canUpdate: boolean;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [addAttempt, setAddAttempt] = useState(0);
+  const contextRepos = useFactoryAgentResources(organizationId, factoryId, "KIND_CONTEXT_REPO");
+  const createResource = useCreateFactoryAgentResource(organizationId, factoryId);
+  const edits = useContextRepoEdits(organizationId, factoryId);
+  const choices = useWorkspaceRepositoryChoices(organizationId, factory);
+
+  const added = (contextRepos.data ?? []).map(contextRepoName).filter(Boolean);
+  const mainRepository = factory?.onboarding?.appRepository;
+  const primaryRepository = mainRepository?.trim() ?? "";
+  const otherRepos = (contextRepos.data ?? []).filter(
+    (resource) => !isWorkspaceMainRepository(contextRepoName(resource), mainRepository),
+  );
+  const available = choices.repositories.filter(
+    (name) => !added.includes(name) && !isWorkspaceMainRepository(name, mainRepository),
+  );
+  const isSaving = createResource.isPending || edits.isSaving;
+
+  const create = async (repository: string, settings: WorkspaceRepositorySettings) => {
+    try {
+      await createResource.mutateAsync({
+        kind: "KIND_CONTEXT_REPO",
+        enabled: true,
+        repository,
+        ref: settings.ref,
+        access: choices.bitbucket ? "read" : settings.access,
+        vcsProvider: choices.bitbucket ? "bitbucket" : "github",
+      });
+      showSuccessToast(AGENT_RESOURCES_COPY.crossRepoAdded);
+      setAdding(false);
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.crossRepoAddFailed));
     }
   };
 
@@ -286,15 +310,18 @@ export function CrossRepoContextCard({
         ) : primaryRepository || otherRepos.length > 0 ? (
           <ContextRepoList
             organizationId={organizationId}
+            factoryId={factoryId}
             integrationId={choices.integrationId}
             primaryRepository={primaryRepository}
+            primaryBranch={workspaceDefaultBranch(factory)}
+            catalogRepositories={choices.catalogRepositories}
             resources={otherRepos}
             host={choices.host}
             showAccess={!choices.bitbucket}
             canUpdate={canUpdate}
             isSaving={isSaving}
-            onRemove={remove}
-            onUpdate={update}
+            onRemove={edits.remove}
+            onUpdate={edits.update}
           />
         ) : null}
       </FactorySettingsCard>
@@ -328,6 +355,12 @@ function AddRepositoryDialog(props: {
   const [selected, setSelected] = useState<string | null>(null);
   const [settings, setSettings] = useState(NEW_REPOSITORY_SETTINGS);
   const { choices } = props;
+  const defaultBranch = useRepositoryDefaultBranch({
+    organizationId: props.organizationId,
+    integrationId: choices.integrationId,
+    repository: selected ?? "",
+    catalogRepositories: choices.catalogRepositories,
+  });
 
   const choose = (name: string) => {
     const repository = name.trim();
@@ -360,6 +393,7 @@ function AddRepositoryDialog(props: {
               organizationId={props.organizationId}
               integrationId={choices.integrationId}
               repository={selected}
+              defaultBranch={defaultBranch}
               value={settings}
               showAccess={!choices.bitbucket}
               disabled={props.disabled}
@@ -372,7 +406,7 @@ function AddRepositoryDialog(props: {
               <Button
                 type="button"
                 disabled={props.disabled}
-                onClick={() => props.onAdd(selected, settings)}
+                onClick={() => props.onAdd(selected, { ...settings, ref: settings.ref || defaultBranch })}
                 data-testid="agent-cross-repo-confirm"
               >
                 {AGENT_RESOURCES_COPY.addRepository}

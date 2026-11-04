@@ -162,11 +162,7 @@ describe("cross-repo context picker", () => {
 
     const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
     expect(
-      await within(list).findByText(
-        `${AGENT_RESOURCES_COPY.defaultBranch} · ${AGENT_RESOURCES_COPY.accessWrite}`,
-        {},
-        { timeout: 8000 },
-      ),
+      await within(list).findByText(`main · ${AGENT_RESOURCES_COPY.accessWrite}`, {}, { timeout: 8000 }),
     ).toBeInTheDocument();
   }, 15000);
 
@@ -198,6 +194,34 @@ describe("cross-repo context picker", () => {
     expect(await screen.findByTestId("agent-cross-repo-ctx-web-access", {}, { timeout: 8000 })).toHaveTextContent(
       AGENT_RESOURCES_COPY.accessRead,
     );
+  }, 15000);
+
+  it("changes the primary repository branch", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository),
+          agentResourcesByFactoryId: {},
+        }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    const toggle = await screen.findByTestId("agent-cross-repo-toggle-primary", {}, { timeout: 8000 });
+    expect(toggle).toHaveTextContent(`main · ${AGENT_RESOURCES_COPY.primaryRepository}`);
+    await user.click(toggle);
+    const branch = await screen.findByTestId("agent-cross-repo-primary-branch", {}, { timeout: 8000 });
+    await waitFor(() => expect(branch).toBeEnabled(), { timeout: 8000 });
+    await user.click(branch);
+    await user.click(await screen.findByRole("option", { name: "develop" }));
+    await user.click(await screen.findByTestId("factory-settings-update-tasks-confirm"));
+
+    await waitFor(() => expect(toggle).toHaveTextContent(`develop · ${AGENT_RESOURCES_COPY.primaryRepository}`), {
+      timeout: 8000,
+    });
   }, 15000);
 
   it("hides the workspace repository when only the letter case differs", async () => {

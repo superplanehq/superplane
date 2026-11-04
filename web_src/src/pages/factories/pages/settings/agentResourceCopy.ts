@@ -69,7 +69,7 @@ export const AGENT_RESOURCES_COPY = {
   crossRepoHelper: "The agent clones these repositories on each run.",
   crossRepoHelperReadOnly: "Extra repositories cloned into the workspace on each run.",
   primaryRepository: "Primary",
-  primaryRepositoryHint: "Change the primary repository in the Repository settings.",
+  primaryRepositoryHint: "Tasks start from this branch. Pull requests target this branch.",
   add: "Add",
   addRepository: "Add repository",
   removeRepository: "Remove repository",

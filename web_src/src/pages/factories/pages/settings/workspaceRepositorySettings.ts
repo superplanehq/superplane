@@ -11,8 +11,12 @@ export function workspaceRepositoryAccess(access: string | null | undefined): Wo
   return access === "write" ? "write" : "read";
 }
 
-export function workspaceRepositorySummary(settings: WorkspaceRepositorySettings, showAccess: boolean): string {
-  const branch = settings.ref || AGENT_RESOURCES_COPY.defaultBranch;
+export function workspaceRepositorySummary(
+  settings: WorkspaceRepositorySettings,
+  showAccess: boolean,
+  defaultBranch = "",
+): string {
+  const branch = settings.ref || defaultBranch || AGENT_RESOURCES_COPY.defaultBranch;
   if (!showAccess) return branch;
   const access = settings.access === "write" ? AGENT_RESOURCES_COPY.accessWrite : AGENT_RESOURCES_COPY.accessRead;
   return `${branch} · ${access}`;
