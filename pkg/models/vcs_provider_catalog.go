@@ -1500,7 +1500,7 @@ func ListVCSProviderIntegrationBindings(
 }
 
 // matchBindingContextRepositoryIDs returns the catalog IDs of the enabled
-// GitHub context repositories on workspaces that use the binding. Agents
+// write-access GitHub context repositories on workspaces that use the binding. Agents
 // change and open pull requests in these repositories, so the write token
 // must cover them. Names missing from the catalog are skipped until the
 // installation reconcile adds them.
@@ -1513,10 +1513,10 @@ func matchBindingContextRepositoryIDs(tx *gorm.DB, integrationID uuid.UUID, prov
 }
 
 // MatchBindingContextRepositoryIDs returns the catalog IDs of the enabled
-// GitHub context repositories that use the integration, and the names that
+// write-access GitHub context repositories that use the integration, and the names that
 // the installation catalog does not have yet.
 func MatchBindingContextRepositoryIDs(tx *gorm.DB, integrationID uuid.UUID, installationID int64) ([]int64, []string, error) {
-	names, err := ListEnabledGitHubContextRepositoryNames(tx, integrationID)
+	names, err := ListEnabledGitHubContextRepositoryNames(tx, integrationID, FactoryContextRepoAccessWrite)
 	if err != nil || len(names) == 0 {
 		return nil, nil, err
 	}

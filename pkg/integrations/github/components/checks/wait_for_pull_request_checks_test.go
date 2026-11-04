@@ -168,15 +168,14 @@ func Test__WaitForPullRequestChecks__Execute(t *testing.T) {
 		assert.Equal(t, waitChecksFailedChannel, executionState.Channel)
 	})
 
-	t.Run("workspace scope keys the wait by the lowercase full repository name", func(t *testing.T) {
+	t.Run("keys the wait by the lowercase full repository name", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: WaitForPullRequestChecksConfiguration{
-				Repository:            "TestHQ/World",
-				Ref:                   sha,
-				CheckNames:            []string{"DCO"},
-				WorkspaceRepositories: true,
+				Repository: "TestHQ/World",
+				Ref:        sha,
+				CheckNames: []string{"DCO"},
 			},
 			HTTP:           newSnapshotHTTP(passingCheckRunsBody(sha), passingStatusesBody(sha)),
 			Integration:    mocks.IntegrationContextForNewSetupFlow(),
@@ -297,10 +296,9 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-GitHub-Event", "check_run")
 		workspaceConfig := WaitForPullRequestChecksConfiguration{
-			Repository:            "{{ root().data.repository.full_name }}",
-			Ref:                   sha,
-			CheckNames:            []string{"build"},
-			WorkspaceRepositories: true,
+			Repository: "{{ root().data.repository.full_name }}",
+			Ref:        sha,
+			CheckNames: []string{"build"},
 		}
 
 		code, _, err := component.HandleWebhook(signedWaitChecksRequest(

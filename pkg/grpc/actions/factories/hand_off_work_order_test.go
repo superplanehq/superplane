@@ -429,6 +429,7 @@ func Test__HandOffWorkOrder__VerifyAttachesPullRequestsFromEveryWorkspaceReposit
 	factoryModel := seedHandOffFactory(t, r, db)
 	_, err := factoryModel.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 		Repository: "acme/web",
+		Access:     models.FactoryContextRepoAccessWrite,
 	})
 	require.NoError(t, err)
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "review", "start-review")

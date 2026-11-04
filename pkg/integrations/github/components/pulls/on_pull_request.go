@@ -19,7 +19,6 @@ type OnPullRequestConfiguration struct {
 	Actions                 []string `json:"actions" mapstructure:"actions"`
 	IgnoreDrafts            bool     `json:"ignoreDrafts" mapstructure:"ignoreDrafts"`
 	OnlyFactoryPullRequests bool     `json:"onlyFactoryPullRequests" mapstructure:"onlyFactoryPullRequests"`
-	WorkspaceRepositories   bool     `json:"workspaceRepositories" mapstructure:"workspaceRepositories"`
 }
 
 func (p *OnPullRequest) Name() string {
@@ -140,7 +139,6 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 			Default:     false,
 			Description: "Start a run only when the pull request belongs to this factory.",
 		},
-		common.WorkspaceRepositoriesConfigurationField(),
 	}
 }
 
@@ -161,7 +159,7 @@ func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	webhookConfig, err := common.WorkspaceWebhookConfiguration(ctx.Factory, config.WorkspaceRepositories, common.WebhookConfiguration{
+	webhookConfig, err := common.WorkspaceWebhookConfiguration(ctx.Factory, common.WebhookConfiguration{
 		EventType:  "pull_request",
 		Repository: config.Repository,
 	})

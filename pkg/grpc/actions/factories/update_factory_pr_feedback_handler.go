@@ -153,7 +153,9 @@ func applyPRFeedbackSettings(
 				if configuration == nil {
 					configuration = map[string]any{}
 				}
-				configuration["repository"] = updated.Repository
+				if !prFeedbackWorkspaceScope(configuration) {
+					configuration["repository"] = updated.Repository
+				}
 				if !graph.isChecks() {
 					configuration["contentFilter"] = updated.Mention
 					configuration["ignoreBots"] = updated.IgnoreBots

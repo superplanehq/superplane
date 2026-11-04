@@ -21,8 +21,7 @@ spec:
           - ready_for_review
         ignoreDrafts: true
         onlyFactoryPullRequests: true
-        repository: '{{ install_params.appRepository }}'
-        workspaceRepositories: true
+        repository: '{{ workspace().repositories }}'
       position:
         x: 80
         "y": 80

@@ -183,10 +183,9 @@ func prFeedbackWaitChecksConfiguration(request prFeedbackBuildRequest) map[strin
 		}
 	}
 	return map[string]any{
-		"repository":                            prFeedbackEventRepositoryExpression,
-		"ref":                                   prFeedbackPRHeadSHAExpression(),
-		"checkNames":                            checkNamesNodeValue(request.CheckNames),
-		githubcommon.WorkspaceRepositoriesField: true,
+		"repository": prFeedbackEventRepositoryExpression,
+		"ref":        prFeedbackPRHeadSHAExpression(),
+		"checkNames": checkNamesNodeValue(request.CheckNames),
 	}
 }
 
@@ -198,7 +197,7 @@ func prFeedbackPullRequestTriggerConfiguration(request prFeedbackBuildRequest) m
 		"onlyFactoryPullRequests": true,
 	}
 	if provider == models.ProviderGitHub {
-		configuration[githubcommon.WorkspaceRepositoriesField] = true
+		configuration["repository"] = models.WorkspaceRepositoriesExpression
 	}
 	return configuration
 }

@@ -123,7 +123,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 				found = true
 				require.NotNil(t, node.IntegrationID)
 				assert.Equal(t, integrationID, *node.IntegrationID)
-				assert.Equal(t, "acme/app", node.Configuration["repository"])
+				assert.Equal(t, models.WorkspaceRepositoriesExpression, node.Configuration["repository"])
 			}
 			assert.True(t, found, "missing trigger %s", nodeID)
 		}
@@ -155,7 +155,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "Address review comments", response.GetHandler().GetName())
-		assert.Equal(t, "acme/other", response.GetHandler().GetSettings().GetSubject().GetRepository())
+		assert.Equal(t, "acme/app", response.GetHandler().GetSettings().GetSubject().GetRepository(), "workspace triggers report the primary repository")
 		assert.True(t, response.GetHandler().GetHealthy())
 		assert.Equal(t, []string{"coderabbitai", "bugbot"}, response.GetHandler().GetSettings().GetDiscussion().GetAllowedBots())
 
@@ -171,7 +171,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			if node.ID != prFeedbackCommentTriggerNodeID && node.ID != prFeedbackReviewTriggerNodeID && node.ID != prFeedbackReplyTriggerNodeID {
 				continue
 			}
-			assert.Equal(t, "acme/other", node.Configuration["repository"])
+			assert.Equal(t, models.WorkspaceRepositoriesExpression, node.Configuration["repository"])
 			assert.Equal(t, "@superplaneagent", node.Configuration["contentFilter"])
 			assert.Equal(t, []any{"coderabbitai", "bugbot"}, node.Configuration["allowedBots"])
 		}
@@ -355,7 +355,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		require.NoError(t, err)
 		for _, node := range liveVersion.Nodes {
 			if node.ID == prFeedbackPullRequestTriggerNodeID {
-				assert.Equal(t, "acme/other", node.Configuration["repository"])
+				assert.Equal(t, models.WorkspaceRepositoriesExpression, node.Configuration["repository"])
 			}
 			if node.ID == prFeedbackWaitChecksNodeID {
 				assert.Equal(t, prFeedbackEventRepositoryExpression, node.Configuration["repository"], "a workspace-scope wait reads the repository from the event")

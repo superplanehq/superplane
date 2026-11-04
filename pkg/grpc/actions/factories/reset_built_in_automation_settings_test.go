@@ -446,7 +446,8 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 			for _, source := range []string{models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, models.FactoryPRFeedbackHandlerSourcePullRequestChecks} {
 				t.Run(model+"/"+provider+"/"+source, func(t *testing.T) {
 					r, factory := resetTestFactory(t)
-					require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
+					repository := "acme/app"
+					require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider, AppRepository: &repository}))
 					request := prFeedbackBuildRequest{
 						Repository: "acme/app", Mention: "@review", IgnoreBots: false, AddressAllBots: true, AllowedBots: []string{},
 						CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
@@ -488,7 +489,7 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 					require.NoError(t, resetTestOrganization(t, r))
 					version := resetTestLiveVersion(t, canvas)
 					spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
-					actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
+					actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec).withPrimaryRepository(factory)
 					assert.Equal(t, "acme/app", actual.Repository)
 					if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
 						assert.Equal(t, "@review", actual.Mention)

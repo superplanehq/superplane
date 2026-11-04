@@ -1,46 +1,36 @@
 package common
 
 import (
+	"errors"
 	"slices"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const WorkspaceRepositoriesField = "workspaceRepositories"
-
-// WorkspaceRepositoriesConfigurationField lets a node in a factory-owned
-// app listen on every repository of the workspace.
-func WorkspaceRepositoriesConfigurationField() configuration.Field {
-	return configuration.Field{
-		Name:        WorkspaceRepositoriesField,
-		Label:       "All workspace repositories",
-		Type:        configuration.FieldTypeBool,
-		Required:    false,
-		Default:     false,
-		Description: "Also listen on the other repositories of the workspace. Use this only in apps that a workspace owns.",
-	}
+// ListensOnWorkspace reports whether a node in a workspace app listens on
+// every workspace repository. Triggers use {{ workspace().repositories }}.
+// Actions take their repository from the event, so any expression there
+// can name any workspace repository.
+func ListensOnWorkspace(factory core.FactoryContext, repository string) bool {
+	return factory != nil && IsExpression(repository)
 }
 
-// WorkspaceWebhookRepositories returns the repositories for a webhook of a
-// node that listens on the whole workspace: the configured repository
-// first, then the other workspace repositories.
-func WorkspaceWebhookRepositories(factory core.FactoryContext, enabled bool, repository string) ([]string, error) {
-	if !enabled || factory == nil {
-		return nil, nil
+// WorkspaceWebhookConfiguration points the webhook at every workspace
+// repository when the node listens on the whole workspace. A workspace with
+// one repository keeps a single-repository webhook, so its existing webhook
+// stays in place.
+func WorkspaceWebhookConfiguration(factory core.FactoryContext, config WebhookConfiguration) (WebhookConfiguration, error) {
+	if !ListensOnWorkspace(factory, config.Repository) {
+		return config, nil
 	}
 
 	listed, err := factory.ListRepositories()
 	if err != nil {
-		return nil, err
+		return config, err
 	}
 
-	repositories := make([]string, 0, len(listed)+1)
-	repository = strings.TrimSpace(repository)
-	if repository != "" && !IsExpression(repository) {
-		repositories = append(repositories, repository)
-	}
+	repositories := make([]string, 0, len(listed))
 	for _, candidate := range listed {
 		candidate = strings.TrimSpace(candidate)
 		if candidate == "" || slices.ContainsFunc(repositories, func(existing string) bool {
@@ -50,22 +40,11 @@ func WorkspaceWebhookRepositories(factory core.FactoryContext, enabled bool, rep
 		}
 		repositories = append(repositories, candidate)
 	}
-	return repositories, nil
-}
-
-// WorkspaceWebhookConfiguration adds the workspace repositories to a
-// webhook request when the node listens on the whole workspace. A
-// workspace with one repository keeps a single-repository webhook, so its
-// existing webhook stays in place.
-func WorkspaceWebhookConfiguration(factory core.FactoryContext, enabled bool, config WebhookConfiguration) (WebhookConfiguration, error) {
-	repositories, err := WorkspaceWebhookRepositories(factory, enabled, config.Repository)
-	if err != nil {
-		return config, err
-	}
 	if len(repositories) == 0 {
-		return config, nil
+		return config, errors.New("the workspace has no repository")
 	}
 	config.Repository = repositories[0]
+	config.Repositories = nil
 	if len(repositories) > 1 {
 		config.Repositories = repositories
 	}

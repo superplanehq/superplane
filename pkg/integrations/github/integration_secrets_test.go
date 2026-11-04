@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -92,7 +93,7 @@ func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	assert.JSONEq(t, `{"repository_ids":[601]}`, string(body))
 }
 
-func TestGitHub__ResolveSecrets__HostedWriteTokenCoversWorkspaceRepositories(t *testing.T) {
+func TestGitHub__ResolveSecrets__HostedTokensFollowContextRepositoryAccess(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	organization, err := models.CreateOrganization("org-"+uuid.NewString(), "")
 	require.NoError(t, err)
@@ -118,11 +119,18 @@ func TestGitHub__ResolveSecrets__HostedWriteTokenCoversWorkspaceRepositories(t *
 		{RepositoryID: 603, FullName: "acme/secret"},
 		{RepositoryID: 604, FullName: "acme/other"},
 		{RepositoryID: 605, FullName: "acme/bb"},
+		{RepositoryID: 606, FullName: "acme/docs"},
 	}))
 
 	factory := createContextRepoWorkspace(t, organization.ID, integration.ID)
 	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 		Repository: "acme/web",
+		Access:     models.FactoryContextRepoAccessWrite,
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/docs",
+		Access:     models.FactoryContextRepoAccessRead,
 	})
 	require.NoError(t, err)
 	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", false, models.FactoryAgentResourceConfig{
@@ -138,12 +146,14 @@ func TestGitHub__ResolveSecrets__HostedWriteTokenCoversWorkspaceRepositories(t *
 	otherFactory := createContextRepoWorkspace(t, other.ID, otherIntegration.ID)
 	_, err = otherFactory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 		Repository: "acme/other",
+		Access:     models.FactoryContextRepoAccessWrite,
 	})
 	require.NoError(t, err)
 	require.NoError(t, models.SyncVCSProviderBindingRepositories(database.Conn(), integration.ID, models.ProviderGitHub))
 
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_read","expires_at":"2030-01-01T00:00:00Z"}`),
 	}}
 	secrets, err := (&GitHub{}).ResolveSecrets(core.IntegrationSecretContext{
 		HTTP: httpCtx,
@@ -154,9 +164,12 @@ func TestGitHub__ResolveSecrets__HostedWriteTokenCoversWorkspaceRepositories(t *
 	})
 
 	require.NoError(t, err)
+	assert.Equal(t, runner.GitHubContextTokenEnv, integrationSecretGitHubContextToken)
 	assert.Equal(t, []byte("ghs_write"), secrets.Values[integrationSecretGitHubToken])
-	require.Len(t, httpCtx.Requests, 1)
+	assert.Equal(t, []byte("ghs_read"), secrets.Values[integrationSecretGitHubContextToken])
+	require.Len(t, httpCtx.Requests, 2)
 	assert.JSONEq(t, `{"repository_ids":[601,602]}`, readRequestBody(t, httpCtx.Requests[0]))
+	assert.JSONEq(t, `{"repository_ids":[606],"permissions":{"contents":"read","metadata":"read"}}`, readRequestBody(t, httpCtx.Requests[1]))
 }
 
 func TestGitHub__ResolveSecrets__HostedWriteTokenCoversContextRepositoriesWithoutGrants(t *testing.T) {
@@ -187,6 +200,7 @@ func TestGitHub__ResolveSecrets__HostedWriteTokenCoversContextRepositoriesWithou
 	for _, repository := range []string{"acme/web", "acme/missing"} {
 		_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 			Repository: repository,
+			Access:     models.FactoryContextRepoAccessWrite,
 		})
 		require.NoError(t, err)
 	}

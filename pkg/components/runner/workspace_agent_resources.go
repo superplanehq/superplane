@@ -38,6 +38,10 @@ const (
 	// Implement sets it on the node environment. Pull request checkouts
 	// leave it off so the helper never pushes an initial commit.
 	WorkspaceCheckoutCommitSetupEnv = "CHECKOUT_COMMIT_SETUP"
+	// GitHubContextTokenEnv is the read-only installation token used to
+	// clone read-access workspace repositories. The GitHub integration sets
+	// it. GITHUB_TOKEN writes to the other workspace repositories.
+	GitHubContextTokenEnv = "SUPERPLANE_GITHUB_CONTEXT_TOKEN"
 )
 
 type workspaceMCPServer struct {
@@ -60,6 +64,8 @@ type workspaceContextRepository struct {
 	Repository string `json:"repository"`
 	URL        string `json:"url"`
 	Directory  string `json:"directory"`
+	Branch     string `json:"branch,omitempty"`
+	ReadOnly   bool   `json:"readOnly,omitempty"`
 }
 
 type workspaceContextFile struct {
@@ -327,6 +333,8 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 			Repository: repository,
 			URL:        WorkspaceContextRepoURL(provider, repository, githubHost),
 			Directory:  WorkspaceContextRepoDirectory(repository),
+			Branch:     strings.TrimSpace(config.Ref),
+			ReadOnly:   !config.ContextRepoWritable(),
 		})
 	}
 	if len(repos) == 0 {
@@ -353,7 +361,8 @@ func workspacePrimaryContextRepository(factory *models.Factory, provider, github
 	if factory == nil {
 		return workspaceContextRepository{}, false
 	}
-	repository := strings.TrimSpace(factory.OnboardingConfigValue().AppRepository)
+	onboarding := factory.OnboardingConfigValue()
+	repository := strings.TrimSpace(onboarding.AppRepository)
 	if repository == "" {
 		return workspaceContextRepository{}, false
 	}
@@ -362,6 +371,7 @@ func workspacePrimaryContextRepository(factory *models.Factory, provider, github
 		Repository: repository,
 		URL:        WorkspaceContextRepoURL(provider, repository, githubHost),
 		Directory:  WorkspaceContextRepoDirectory(repository),
+		Branch:     strings.TrimSpace(onboarding.DefaultBranch),
 	}, true
 }
 
@@ -371,8 +381,11 @@ func workspacePrimaryContextRepository(factory *models.Factory, provider, github
 // workspace_context.json entry. Setup commands are separate steps.
 // Authentication for every repository comes from the VCS integration
 // setup that already ran (gh auth setup-git / Bitbucket credential
-// helper), so the agent can push to each workspace repository. The entry
-// for the repository already checked out in repo/ is skipped.
+// helper), so the agent can push to each workspace repository. Read-only
+// GitHub entries use the read-only token from SUPERPLANE_GITHUB_CONTEXT_TOKEN
+// and skip the write credential helper. An entry with a branch clones that
+// branch and makes it origin/HEAD. The entry for the repository already
+// checked out in repo/ is skipped.
 // The script uses plain HTTPS URLs and never embeds tokens. It is idempotent: directories
 // that already contain a checkout are reused, never wiped. The factory
 // commit setup (agent git identity, trailer hook, branch handling) runs
@@ -660,9 +673,30 @@ if [ -f "$ctx" ]; then
     echo "node not found on PATH; skipping context repositories" >&2
   else
     _sp_tab="$(printf '\t')"
-    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];const main=(process.argv[2]||"").trim().toLowerCase();for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();const repo=((e&&e.repository)||"").trim().toLowerCase();if(main&&repo===main){continue;}if(u&&dir){console.log(u+"\t"+dir);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx" "${REPO:-}")" || exit 1
+    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];const main=(process.argv[2]||"").trim().toLowerCase();for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();const repo=((e&&e.repository)||"").trim().toLowerCase();const b=((e&&e.branch)||"").trim()||"-";const ro=e&&e.readOnly?"1":"0";if(main&&repo===main){continue;}if(u&&dir){console.log(u+"\t"+dir+"\t"+ro+"\t"+b);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx" "${REPO:-}")" || exit 1
     if [ -n "$_sp_ctx_list" ]; then
-      printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir; do
+      clone_context_repository() {
+        _sp_branch="$4"
+        if [ "$_sp_branch" = "-" ]; then
+          _sp_branch=""
+        fi
+        if [ "$3" = "1" ] && [ -n "${` + GitHubContextTokenEnv + `:-}" ]; then
+          case "$1" in
+            ` + githubcommon.DotCom().WebURL() + `/*|https://www.` + githubcommon.DotCom().WebHostname() + `/*)
+              git -c credential.helper= -c 'credential.helper=!f() { echo username=superplane; echo "password=$` + GitHubContextTokenEnv + `"; }; f' clone --depth 1 ${_sp_branch:+--branch "$_sp_branch"} "$1" "$2" || return 1
+              ;;
+            *)
+              git clone --depth 1 ${_sp_branch:+--branch "$_sp_branch"} "$1" "$2" || return 1
+              ;;
+          esac
+        else
+          git clone --depth 1 ${_sp_branch:+--branch "$_sp_branch"} "$1" "$2" || return 1
+        fi
+        if [ -n "$_sp_branch" ]; then
+          git -C "$2" remote set-head origin "$_sp_branch" || return 1
+        fi
+      }
+      printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir readonly branch; do
         case "$dir" in
           ""|"."|"/"|*..*)
             echo "Skipping context repository with unsafe directory: $dir" >&2
@@ -681,7 +715,7 @@ if [ -f "$ctx" ]; then
         fi
         mkdir -p "$(dirname "$dir")"
         rm -rf "$dir"
-        git clone --depth 1 "$url" "$dir" || exit 1
+        clone_context_repository "$url" "$dir" "$readonly" "$branch" || exit 1
       done
     fi
     unset _sp_tab _sp_ctx_list
@@ -1137,7 +1171,11 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 			if repository == "" {
 				repository = contextRepos[i].Name
 			}
-			names = append(names, repository+" (../"+WorkspaceContextRepoDirectory(repository)+")")
+			label := repository + " (../" + WorkspaceContextRepoDirectory(repository) + ")"
+			if !contextRepos[i].Config.Data().ContextRepoWritable() {
+				label += " (read only)"
+			}
+			names = append(names, label)
 		}
 		builder.WriteString(contextHintPending)
 		builder.WriteString(strings.Join(names, ", "))

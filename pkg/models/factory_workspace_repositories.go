@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 
 	"gorm.io/gorm"
@@ -9,9 +10,20 @@ import (
 
 var ErrFactoryPullRequestRepositoryNotInWorkspace = errors.New("pull request repository is not in this workspace")
 
+// WorkspaceRepositoriesExpression is the repository value of a node that
+// listens on every repository the workspace may change.
+const WorkspaceRepositoriesExpression = "{{ workspace().repositories }}"
+
+var workspaceRepositoriesExpressionPattern = regexp.MustCompile(`^\{\{\s*workspace\(\)\.repositories\s*\}\}$`)
+
+func IsWorkspaceRepositoriesExpression(value string) bool {
+	return workspaceRepositoriesExpressionPattern.MatchString(strings.TrimSpace(value))
+}
+
 // WorkspaceRepositories returns the owner/name values that the workspace may
 // change. The primary repository comes first. Only GitHub workspaces add the
-// enabled context repositories; other providers keep one repository.
+// enabled write-access context repositories; other providers keep one
+// repository.
 func (f *Factory) WorkspaceRepositories(tx *gorm.DB) ([]string, error) {
 	config := f.OnboardingConfigValue()
 	repositories := []string{}
@@ -40,7 +52,7 @@ func (f *Factory) WorkspaceRepositories(tx *gorm.DB) ([]string, error) {
 	}
 	for i := range resources {
 		resourceConfig := resources[i].Config.Data()
-		if !isGitHubContextRepo(resourceConfig) {
+		if !isGitHubContextRepo(resourceConfig) || !resourceConfig.ContextRepoWritable() {
 			continue
 		}
 		add(resourceConfig.Repository)

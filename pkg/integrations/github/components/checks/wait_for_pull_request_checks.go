@@ -39,9 +39,6 @@ type WaitForPullRequestChecksConfiguration struct {
 	Ref            string   `json:"ref" mapstructure:"ref"`
 	CheckNames     []string `json:"checkNames" mapstructure:"checkNames"`
 	TimeoutSeconds *int     `json:"timeoutSeconds" mapstructure:"timeoutSeconds"`
-	// WorkspaceRepositories listens on every workspace repository. The
-	// repository then usually comes from the event that started the run.
-	WorkspaceRepositories bool `json:"workspaceRepositories" mapstructure:"workspaceRepositories"`
 }
 
 type WaitForPullRequestChecksMetadata struct {
@@ -174,7 +171,6 @@ func (c *WaitForPullRequestChecks) Configuration() []configuration.Field {
 			Default:     waitChecksDefaultTimeoutSeconds,
 			Description: "Maximum seconds to wait for checks.",
 		},
-		common.WorkspaceRepositoriesConfigurationField(),
 	}
 }
 
@@ -188,7 +184,7 @@ func (c *WaitForPullRequestChecks) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	webhookConfig, err := common.WorkspaceWebhookConfiguration(ctx.Factory, config.WorkspaceRepositories, common.WebhookConfiguration{
+	webhookConfig, err := common.WorkspaceWebhookConfiguration(ctx.Factory, common.WebhookConfiguration{
 		EventTypes: []string{"check_run", "check_suite", "status"},
 		Repository: config.Repository,
 	})
@@ -296,7 +292,10 @@ func (c *WaitForPullRequestChecks) HandleWebhook(ctx core.WebhookRequestContext)
 		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - missing repository or commit SHA")
 		return http.StatusOK, nil, nil
 	}
-	if !config.WorkspaceRepositories && !repositoryMatches(config.Repository, repository) {
+	// The stored configuration keeps the expression. An expression in a
+	// workspace app takes the repository from the event.
+	fromEvent := common.IsExpression(config.Repository)
+	if !fromEvent && !repositoryMatches(config.Repository, repository) {
 		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - repository does not match")
 		return http.StatusOK, nil, nil
 	}
@@ -307,10 +306,10 @@ func (c *WaitForPullRequestChecks) HandleWebhook(ctx core.WebhookRequestContext)
 	}
 
 	refRepository := config.Repository
-	if config.WorkspaceRepositories {
+	if fromEvent {
 		refRepository = waitChecksFullNameFromPayload(payload)
 	}
-	executionCtx, err := ctx.FindExecutionByKV(waitChecksRefKV, waitChecksRefKey(config, refRepository, sha))
+	executionCtx, err := ctx.FindExecutionByKV(waitChecksRefKV, waitChecksRefKey(refRepository, sha))
 	if err != nil || executionCtx == nil {
 		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - no waiting execution for this commit")
 		return http.StatusOK, nil, nil
@@ -387,7 +386,7 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 	metadata.SelectedChecks = evaluation.SelectedChecks
 	metadata.FailedChecks = evaluation.FailedChecks
 
-	if err := ctx.ExecutionState.SetKV(waitChecksRefKV, waitChecksRefKey(ctx.Configuration, ctx.Configuration.Repository, sha)); err != nil {
+	if err := ctx.ExecutionState.SetKV(waitChecksRefKV, waitChecksRefKey(ctx.Configuration.Repository, sha)); err != nil {
 		return err
 	}
 
@@ -600,13 +599,10 @@ func waitChecksRefValue(repository, sha string) string {
 	return repository + "@" + sha
 }
 
-// waitChecksRefKey keys a workspace-scope wait by the lowercase full name
-// of the repository. The webhook then finds it from the event payload.
-func waitChecksRefKey(config WaitForPullRequestChecksConfiguration, repository, sha string) string {
-	if config.WorkspaceRepositories {
-		return waitChecksRefValue(strings.ToLower(strings.TrimSpace(repository)), sha)
-	}
-	return waitChecksRefValue(repository, sha)
+// waitChecksRefKey keys a wait by the lowercase full name of the
+// repository, so a webhook finds it from the event payload in any case.
+func waitChecksRefKey(repository, sha string) string {
+	return waitChecksRefValue(strings.ToLower(strings.TrimSpace(repository)), sha)
 }
 
 func waitChecksFullNameFromPayload(payload map[string]any) string {

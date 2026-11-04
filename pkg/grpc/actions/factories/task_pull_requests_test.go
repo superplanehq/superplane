@@ -83,6 +83,7 @@ func TestOpenTaskPullRequest(t *testing.T) {
 	}))
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 		Repository: "acme/web",
+		Access:     models.FactoryContextRepoAccessWrite,
 	})
 	require.NoError(t, err)
 	originURL := "https://github.com/acme/api/issues/12"

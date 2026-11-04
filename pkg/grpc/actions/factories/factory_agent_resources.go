@@ -68,7 +68,7 @@ func CreateFactoryAgentResource(
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
 
-	config, err := protoAgentResourceConfig(req.GetKind(), req.GetUrl(), req.GetAuth(), req.GetHeaders(), req.GetMarkdown(), req.GetRepository(), req.GetCommands(), req.GetVcsProvider())
+	config, err := protoAgentResourceConfig(req)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
@@ -157,13 +157,19 @@ func UpdateFactoryAgentResource(
 			config = &merged
 		}
 	} else if resource.Kind == models.FactoryAgentResourceKindContextRepo {
-		if req.Repository != nil || req.VcsProvider != nil {
+		if req.Repository != nil || req.VcsProvider != nil || req.Ref != nil || req.Access != nil {
 			merged := resource.Config.Data()
 			if req.Repository != nil {
 				merged.Repository = req.GetRepository()
 			}
 			if req.VcsProvider != nil {
 				merged.VCSProvider = req.GetVcsProvider()
+			}
+			if req.Ref != nil {
+				merged.Ref = req.GetRef()
+			}
+			if req.Access != nil {
+				merged.Access = req.GetAccess()
 			}
 			config = &merged
 		}
@@ -352,6 +358,8 @@ func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.Fa
 	}
 	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
 		out.Repository = config.Repository
+		out.Ref = config.Ref
+		out.Access = models.NormalizeContextRepoAccess(config.Access)
 	}
 	if resource.OAuthConnectedBy != nil {
 		out.OauthConnectedByUserId = resource.OAuthConnectedBy.String()
@@ -362,34 +370,26 @@ func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.Fa
 	return out
 }
 
-func protoAgentResourceConfig(
-	kind pb.FactoryAgentResource_Kind,
-	rawURL string,
-	auth pb.FactoryAgentResource_Auth,
-	headers []*pb.FactoryAgentResource_Header,
-	markdown string,
-	repository string,
-	commands []string,
-	vcsProvider string,
-) (models.FactoryAgentResourceConfig, error) {
-	if kind == pb.FactoryAgentResource_KIND_SKILL {
+func protoAgentResourceConfig(req *pb.CreateFactoryAgentResourceRequest) (models.FactoryAgentResourceConfig, error) {
+	switch req.GetKind() {
+	case pb.FactoryAgentResource_KIND_SKILL:
 		return models.FactoryAgentResourceConfig{
 			Source:   models.FactoryAgentResourceSourceInline,
-			Markdown: markdown,
+			Markdown: req.GetMarkdown(),
 		}, nil
-	}
-	if kind == pb.FactoryAgentResource_KIND_SETUP_COMMAND {
+	case pb.FactoryAgentResource_KIND_SETUP_COMMAND:
 		return models.FactoryAgentResourceConfig{
-			Commands: models.NormalizeSetupCommands(commands),
+			Commands: models.NormalizeSetupCommands(req.GetCommands()),
 		}, nil
-	}
-	if kind == pb.FactoryAgentResource_KIND_CONTEXT_REPO {
+	case pb.FactoryAgentResource_KIND_CONTEXT_REPO:
 		return models.FactoryAgentResourceConfig{
-			Repository:  repository,
-			VCSProvider: vcsProvider,
+			Repository:  req.GetRepository(),
+			VCSProvider: req.GetVcsProvider(),
+			Ref:         req.GetRef(),
+			Access:      req.GetAccess(),
 		}, nil
 	}
-	return protoMCPConfig(rawURL, auth, headers)
+	return protoMCPConfig(req.GetUrl(), req.GetAuth(), req.GetHeaders())
 }
 
 func protoMCPConfig(rawURL string, auth pb.FactoryAgentResource_Auth, headers []*pb.FactoryAgentResource_Header) (models.FactoryAgentResourceConfig, error) {

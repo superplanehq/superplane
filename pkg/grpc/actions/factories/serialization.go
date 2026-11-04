@@ -371,6 +371,11 @@ func serializeFactoryPRFeedbackHandlers(tx *gorm.DB, orgID uuid.UUID, handlers [
 func serializeFactoryPRFeedbackHandler(tx *gorm.DB, orgID uuid.UUID, handler *models.FactoryPRFeedbackHandler, spec models.LiveCanvasSpec) *pb.FactoryPRFeedbackHandler {
 	graph := resolvePRFeedbackGraph(spec)
 	settings := prFeedbackSettingsFromGraph(graph, spec)
+	if settings.Repository == "" && tx != nil {
+		if factory, err := models.FindFactory(tx, orgID, handler.FactoryID); err == nil {
+			settings = settings.withPrimaryRepository(factory)
+		}
+	}
 	if handler.MaximumAttempts != nil {
 		settings.MaximumAttempts = *handler.MaximumAttempts
 	}

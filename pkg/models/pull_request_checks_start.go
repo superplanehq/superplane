@@ -102,11 +102,10 @@ func livePullRequestTriggerID(nodes []Node, provider, repository string, workspa
 		if candidate.Type != NodeTypeTrigger || candidate.ComponentName() != provider+".onPullRequest" {
 			continue
 		}
-		workspaceScope, _ := candidate.Configuration["workspaceRepositories"].(bool)
-		if workspaceScope && workspaceRepository {
+		configured, _ := candidate.Configuration["repository"].(string)
+		if IsWorkspaceRepositoriesExpression(configured) && workspaceRepository {
 			return candidate.ID
 		}
-		configured, _ := candidate.Configuration["repository"].(string)
 		if strings.EqualFold(strings.TrimSpace(configured), repository) {
 			return candidate.ID
 		}

@@ -124,7 +124,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Name:          "On PR Comment",
 			Type:          yaml.NodeTypeTrigger,
 			Component:     "github.onPRComment",
-			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
+			Configuration: prFeedbackTriggerConfiguration(mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
 			Integration:   request.Binding.integrationRef(),
 		},
 		FindID:       prFeedbackFindNodeID,
@@ -150,7 +150,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Name:          "On PR Review",
 			Type:          yaml.NodeTypeTrigger,
 			Component:     "github.onPRReview",
-			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
+			Configuration: prFeedbackTriggerConfiguration(mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
 			Integration:   request.Binding.integrationRef(),
 		},
 		FindID:       prFeedbackReviewFindNodeID,
@@ -177,7 +177,6 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Type:      yaml.NodeTypeTrigger,
 			Component: "github.onPRReviewComment",
 			Configuration: prFeedbackReplyTriggerConfiguration(
-				request.Repository,
 				mention,
 				request.IgnoreBots,
 				request.AllowedBots,
@@ -453,21 +452,18 @@ func prFeedbackDiscussionFlowNodes(
 	}
 }
 
-func prFeedbackReplyTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, addressAllBots bool, includeReviewSubmissions bool) map[string]any {
-	configuration := prFeedbackTriggerConfiguration(repository, mention, ignoreBots, allowedBots, addressAllBots)
+func prFeedbackReplyTriggerConfiguration(mention string, ignoreBots bool, allowedBots []string, addressAllBots bool, includeReviewSubmissions bool) map[string]any {
+	configuration := prFeedbackTriggerConfiguration(mention, ignoreBots, allowedBots, addressAllBots)
 	configuration["includeReviewSubmissions"] = includeReviewSubmissions
 	configuration["commentScope"] = prFeedbackCommentScopeReplies
 	return configuration
 }
 
-func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, addressAllBots bool) map[string]any {
+func prFeedbackTriggerConfiguration(mention string, ignoreBots bool, allowedBots []string, addressAllBots bool) map[string]any {
 	configuration := map[string]any{
-		"contentFilter":                         mention,
-		"ignoreBots":                            ignoreBots,
-		githubcommon.WorkspaceRepositoriesField: true,
-	}
-	if strings.TrimSpace(repository) != "" {
-		configuration["repository"] = repository
+		"repository":    models.WorkspaceRepositoriesExpression,
+		"contentFilter": mention,
+		"ignoreBots":    ignoreBots,
 	}
 	if len(allowedBots) > 0 {
 		configuration["allowedBots"] = allowedBotsNodeValue(allowedBots)
@@ -479,10 +475,11 @@ func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool,
 }
 
 // prFeedbackWorkspaceScope reports whether a node listens on every
-// workspace repository. Its repository then comes from the event.
+// workspace repository: a trigger uses the workspace expression and a wait
+// node takes its repository from the event.
 func prFeedbackWorkspaceScope(configuration map[string]any) bool {
-	scope, _ := configuration[githubcommon.WorkspaceRepositoriesField].(bool)
-	return scope
+	repository, _ := configuration["repository"].(string)
+	return githubcommon.IsExpression(repository)
 }
 
 func prFeedbackCommentAcknowledgeCommentIDExpression() string {

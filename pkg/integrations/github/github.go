@@ -1511,9 +1511,19 @@ func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (core.Integra
 		values["GH_HOST"] = []byte(host.GitHost())
 		values["GH_ENTERPRISE_TOKEN"] = []byte(token)
 	}
+	usage := githubSecretUsage(host)
+	contextToken, err := resolveContextAccessToken(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return core.IntegrationSecrets{}, err
+	}
+	if contextToken != "" {
+		values[integrationSecretGitHubContextToken] = []byte(contextToken)
+		usage += "\nRead-only workspace repositories are checked out with a read-only token. GITHUB_TOKEN writes to the other workspace repositories."
+	}
+
 	return core.IntegrationSecrets{
 		Values:    values,
-		Usage:     githubSecretUsage(host),
+		Usage:     usage,
 		Setup:     githubSetupScript(host),
 		SetupName: githubSetupName,
 	}, nil

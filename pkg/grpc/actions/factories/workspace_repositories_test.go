@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
-	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -58,6 +57,7 @@ func TestRefreshWorkspaceRepositoryAutomationsListensOnEveryRepository(t *testin
 
 	_, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 		Repository: "acme/web",
+		Access:     models.FactoryContextRepoAccessWrite,
 	})
 	require.NoError(t, err)
 
@@ -66,14 +66,13 @@ func TestRefreshWorkspaceRepositoryAutomationsListensOnEveryRepository(t *testin
 	live := liveRepositoryCanvas(t, db, r.Organization.ID, closure)
 	trigger := findIntakeNode(live.Nodes, prClosureTriggerNodeID)
 	require.NotNil(t, trigger)
-	assert.Equal(t, true, trigger.Configuration[githubcommon.WorkspaceRepositoriesField])
-	assert.Equal(t, "acme/api", trigger.Configuration["repository"])
+	assert.Equal(t, models.WorkspaceRepositoriesExpression, trigger.Configuration["repository"])
 	complete := findIntakeNode(live.Nodes, "complete-work-order")
 	require.NotNil(t, complete)
 	assert.Equal(t, true, complete.Configuration[allPullRequestsDoneField], "the task must stay open until every pull request is done")
 	riskTrigger := findIntakeNode(liveRepositoryCanvas(t, db, r.Organization.ID, risk).Nodes, riskScoreTriggerNodeID)
 	require.NotNil(t, riskTrigger)
-	assert.Equal(t, true, riskTrigger.Configuration[githubcommon.WorkspaceRepositoriesField])
+	assert.Equal(t, models.WorkspaceRepositoriesExpression, riskTrigger.Configuration["repository"])
 
 	node, err := models.FindCanvasNode(db, closure.ID, prClosureTriggerNodeID)
 	require.NoError(t, err)

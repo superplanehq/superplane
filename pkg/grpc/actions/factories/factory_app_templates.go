@@ -983,7 +983,7 @@ func materializePRFeedbackDefaults(
 ) (*materializedFactoryTemplate, error) {
 	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 	graph := resolvePRFeedbackGraph(spec)
-	settings := prFeedbackSettingsFromGraph(graph, spec)
+	settings := prFeedbackSettingsFromGraph(graph, spec).withPrimaryRepository(factory)
 	request := prFeedbackBuildRequest{
 		Name:                   canvas.Name,
 		Repository:             settings.Repository,

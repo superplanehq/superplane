@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
-	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -159,27 +158,27 @@ func workspaceScopeNodeIDs(spec models.LiveCanvasSpec, prFeedback bool) []string
 	})
 }
 
-// withWorkspaceScope turns on the workspace scope for the given nodes. A
-// wait node also reads its repository from the event that started the run.
+// withWorkspaceScope points the given nodes at every workspace repository.
+// A trigger uses the workspace expression. A wait node reads its repository
+// from the event that started the run.
 func withWorkspaceScope(nodes []models.Node, nodeIDs []string) ([]models.Node, bool) {
 	changed := false
 	for i := range nodes {
 		if !slices.Contains(nodeIDs, nodes[i].ID) {
 			continue
 		}
+		repository := models.WorkspaceRepositoriesExpression
+		if nodes[i].ComponentName() == prFeedbackWaitChecksComponent {
+			repository = prFeedbackEventRepositoryExpression
+		}
+		if nodes[i].Configuration["repository"] == repository {
+			continue
+		}
 		configuration := maps.Clone(nodes[i].Configuration)
 		if configuration == nil {
 			configuration = map[string]any{}
 		}
-		nodeChanged := !prFeedbackWorkspaceScope(configuration)
-		configuration[githubcommon.WorkspaceRepositoriesField] = true
-		if nodes[i].ComponentName() == prFeedbackWaitChecksComponent && configuration["repository"] != prFeedbackEventRepositoryExpression {
-			configuration["repository"] = prFeedbackEventRepositoryExpression
-			nodeChanged = true
-		}
-		if !nodeChanged {
-			continue
-		}
+		configuration["repository"] = repository
 		nodes[i].Configuration = configuration
 		changed = true
 	}

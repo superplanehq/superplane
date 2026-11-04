@@ -206,6 +206,24 @@ func TestWorkspaceCheckoutScriptSkipsRepositoryInRepoDirectory(t *testing.T) {
 	assert.NoDirExists(t, filepath.Join(dir, "context", "acme", "web"))
 }
 
+func TestWorkspaceCheckoutScriptClonesContextBranch(t *testing.T) {
+	main := initBareRepo(t, "main")
+	extra := initBareRepo(t, "main")
+	pushCommit(t, extra, "refs/heads/release", "release", "release\n")
+	dir := t.TempDir()
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]any{
+		{"repository": "acme/extra", "url": "file://" + extra, "directory": "context/acme/extra", "branch": "release", "readOnly": true},
+	}})
+	require.NoError(t, err)
+
+	output, err := runCheckoutScript(t, dir, "file://"+main, "main", string(payload))
+
+	require.NoError(t, err, output)
+	clone := filepath.Join(dir, "context", "acme", "extra")
+	assert.Equal(t, "release", runGitQuiet(t, "", clone, "rev-parse", "--abbrev-ref", "HEAD"))
+	assert.Equal(t, "origin/release", runGitQuiet(t, "", clone, "rev-parse", "--abbrev-ref", "origin/HEAD"))
+}
+
 func TestWorkspaceCheckoutScriptReusesExistingCheckouts(t *testing.T) {
 	main := initBareRepo(t, "main")
 	dir := t.TempDir()

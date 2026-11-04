@@ -511,13 +511,13 @@ func Test__OnPullRequest__Setup(t *testing.T) {
 
 	for _, tc := range []struct {
 		name         string
-		enabled      bool
+		repository   string
 		repositories []string
 		want         []string
 	}{
-		{name: "workspace scope lists every workspace repository", enabled: true, repositories: []string{"testhq/hello", "testhq/world"}, want: []string{"testhq/hello", "testhq/world"}},
-		{name: "workspace scope keeps one repository webhook", enabled: true, repositories: []string{"testhq/hello"}},
-		{name: "repository scope ignores the workspace", enabled: false, repositories: []string{"testhq/hello", "testhq/world"}},
+		{name: "workspace expression lists every workspace repository", repository: "{{ workspace().repositories }}", repositories: []string{"testhq/hello", "testhq/world"}, want: []string{"testhq/hello", "testhq/world"}},
+		{name: "workspace expression keeps one repository webhook", repository: "{{ workspace().repositories }}", repositories: []string{"testhq/hello"}},
+		{name: "a named repository ignores the workspace", repository: "testhq/hello", repositories: []string{"testhq/hello", "testhq/world"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			integrationCtx := mocks.IntegrationContextForNewSetupFlow()
@@ -532,7 +532,7 @@ func Test__OnPullRequest__Setup(t *testing.T) {
 				HTTP:          httpCtx,
 				Metadata:      &contexts.MetadataContext{},
 				Factory:       &recordingFactory{repositories: tc.repositories},
-				Configuration: map[string]any{"repository": "testhq/hello", "workspaceRepositories": tc.enabled},
+				Configuration: map[string]any{"repository": tc.repository},
 			}))
 
 			require.Len(t, integrationCtx.WebhookRequests, 1)

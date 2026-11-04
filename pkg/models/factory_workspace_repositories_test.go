@@ -32,12 +32,17 @@ func Test__FactoryWorkspaceRepositories(t *testing.T) {
 		return factory
 	}
 
-	addContextRepo := func(t *testing.T, factory *models.Factory, repository string, enabled bool) {
+	addRepo := func(t *testing.T, factory *models.Factory, repository string, enabled bool, access string) {
 		t.Helper()
 		_, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", enabled, models.FactoryAgentResourceConfig{
 			Repository: repository,
+			Access:     access,
 		})
 		require.NoError(t, err)
+	}
+	addContextRepo := func(t *testing.T, factory *models.Factory, repository string, enabled bool) {
+		t.Helper()
+		addRepo(t, factory, repository, enabled, models.FactoryContextRepoAccessWrite)
 	}
 
 	t.Run("lists the primary repository first and then enabled context repositories", func(t *testing.T) {
@@ -49,6 +54,17 @@ func Test__FactoryWorkspaceRepositories(t *testing.T) {
 		repositories, err := factory.WorkspaceRepositories(db)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"acme/app", "acme/lib", "acme/web"}, repositories)
+	})
+
+	t.Run("leaves out read-only context repositories", func(t *testing.T) {
+		factory := newWorkspace(t, "")
+		addContextRepo(t, factory, "acme/web", true)
+		addRepo(t, factory, "acme/docs", true, models.FactoryContextRepoAccessRead)
+		addRepo(t, factory, "acme/legacy", true, "")
+
+		repositories, err := factory.WorkspaceRepositories(db)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"acme/app", "acme/web"}, repositories)
 	})
 
 	t.Run("matches workspace repositories without case", func(t *testing.T) {
