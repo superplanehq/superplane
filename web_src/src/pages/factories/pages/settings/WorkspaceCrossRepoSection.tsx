@@ -122,6 +122,9 @@ export function CrossRepoContextCard({
   const added = (contextRepos.data ?? []).map(contextRepoName).filter(Boolean);
   const mainRepository = factory?.onboarding?.appRepository;
   const primaryRepository = mainRepository?.trim() ?? "";
+  const otherRepos = (contextRepos.data ?? []).filter(
+    (resource) => !isWorkspaceMainRepository(contextRepoName(resource), mainRepository),
+  );
   const available = choices.repositories.filter(
     (name) => !added.includes(name) && !isWorkspaceMainRepository(name, mainRepository),
   );
@@ -189,10 +192,10 @@ export function CrossRepoContextCard({
           <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.crossRepoLoadingResources}</p>
         ) : contextRepos.isError ? (
           <p className="text-[13px] text-destructive">{AGENT_RESOURCES_COPY.crossRepoResourcesLoadError}</p>
-        ) : primaryRepository || added.length > 0 ? (
+        ) : primaryRepository || otherRepos.length > 0 ? (
           <ContextRepoList
             primaryRepository={primaryRepository}
-            resources={contextRepos.data ?? []}
+            resources={otherRepos}
             host={choices.host}
             canUpdate={canUpdate}
             isSaving={isSaving}
