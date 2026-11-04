@@ -1,8 +1,11 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/uuid"
@@ -10,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	runner "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -54,4 +58,12 @@ func TestRunnerTaskPullRequests(t *testing.T) {
 	rec = runnerRequest(t, server, http.MethodPost, readOnly, "/api/v1/runner/task/pull-requests",
 		`{"repository":"acme/api","head":"feature","base":"main","title":"Change"}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+}
+
+func TestRunnerPullRequestErrorReportsAGitHubTimeout(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	writeRunnerPullRequestError(rec, fmt.Errorf("%w: %w", factoryactions.ErrTaskPullRequestGitHubTimeout, context.DeadlineExceeded))
+
+	assert.Equal(t, http.StatusGatewayTimeout, rec.Code)
 }

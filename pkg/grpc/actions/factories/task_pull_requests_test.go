@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -23,9 +24,9 @@ type fakeTaskPullRequestGitHub struct {
 	calls         int
 }
 
-func (f *fakeTaskPullRequestGitHub) FindRepository(repository string) (*github.Repository, error) {
+func (f *fakeTaskPullRequestGitHub) GetRepository(_ context.Context, repository string) (*github.Repository, *github.Response, error) {
 	f.calls++
-	return &github.Repository{FullName: github.Ptr(repository), DefaultBranch: github.Ptr(f.defaultBranch)}, nil
+	return &github.Repository{FullName: github.Ptr(repository), DefaultBranch: github.Ptr(f.defaultBranch)}, nil, nil
 }
 
 func (f *fakeTaskPullRequestGitHub) ListPullRequests(_ context.Context, repository string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
@@ -171,4 +172,32 @@ func TestOpenTaskPullRequest(t *testing.T) {
 		require.ErrorIs(t, err, ErrTaskPullRequestOtherTask)
 		assert.Len(t, fake.edited, edits)
 	})
+
+	t.Run("stops waiting for GitHub after the deadline", func(t *testing.T) {
+		timeout := taskPullRequestGitHubTimeout
+		taskPullRequestGitHubTimeout = 20 * time.Millisecond
+		newTaskPullRequestGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (taskPullRequestGitHubAPI, error) {
+			return stalledTaskPullRequestGitHub{fake}, nil
+		}
+		t.Cleanup(func() { taskPullRequestGitHubTimeout = timeout })
+		before, err := ListTaskPullRequests(db, order)
+		require.NoError(t, err)
+
+		_, err = open(TaskPullRequestInput{Repository: "acme/api", Head: "stalled", Title: "Stalled"})
+
+		require.ErrorIs(t, err, ErrTaskPullRequestGitHubTimeout)
+		after, err := ListTaskPullRequests(db, order)
+		require.NoError(t, err)
+		assert.Len(t, after, len(before))
+	})
+}
+
+// stalledTaskPullRequestGitHub never answers the pull request lookup.
+type stalledTaskPullRequestGitHub struct {
+	*fakeTaskPullRequestGitHub
+}
+
+func (stalledTaskPullRequestGitHub) ListPullRequests(ctx context.Context, _ string, _ *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
+	<-ctx.Done()
+	return nil, nil, ctx.Err()
 }

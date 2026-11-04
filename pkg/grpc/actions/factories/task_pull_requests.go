@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	log "github.com/sirupsen/logrus"
@@ -20,7 +21,12 @@ var (
 	ErrTaskPullRequestGitHubOnly         = errors.New("pull requests open only in GitHub workspaces")
 	ErrTaskPullRequestGitHubNotConnected = errors.New("the workspace GitHub integration is not connected")
 	ErrTaskPullRequestOtherTask          = errors.New("the pull request belongs to another task")
+	ErrTaskPullRequestGitHubTimeout      = errors.New("GitHub did not answer in time")
 )
+
+// taskPullRequestGitHubTimeout bounds the GitHub calls of one open request,
+// so the runner tool call returns before the agent stops waiting for it.
+var taskPullRequestGitHubTimeout = 45 * time.Second
 
 // TaskPullRequestInputError is an invalid open request. Its message is safe
 // to show to the agent.
@@ -48,7 +54,7 @@ type TaskPullRequestInput struct {
 }
 
 type taskPullRequestGitHubAPI interface {
-	FindRepository(repository string) (*github.Repository, error)
+	GetRepository(ctx context.Context, repository string) (*github.Repository, *github.Response, error)
 	ListPullRequests(ctx context.Context, repository string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
 	CreatePullRequest(ctx context.Context, repository string, pullRequest *github.NewPullRequest) (*github.PullRequest, *github.Response, error)
 	EditPullRequest(ctx context.Context, repository string, pullNumber int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error)
@@ -80,24 +86,13 @@ func OpenTaskPullRequest(
 	if err != nil {
 		return nil, ErrTaskPullRequestGitHubNotConnected
 	}
-	if input.Base == "" {
-		repository, err := client.FindRepository(input.Repository)
-		if err != nil {
-			return nil, err
-		}
-		input.Base = repository.GetDefaultBranch()
-	}
 
-	open, err := findOpenTaskPullRequest(ctx, client, input)
-	if err != nil {
-		return nil, err
+	githubCtx, cancel := context.WithTimeout(ctx, taskPullRequestGitHubTimeout)
+	defer cancel()
+	input, remote, err := openRemoteTaskPullRequest(githubCtx, db, client, baseURL, factory, order, input)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return nil, fmt.Errorf("%w: %w", ErrTaskPullRequestGitHubTimeout, err)
 	}
-	if open != nil {
-		if err := requireTaskOwnsPullRequest(db, factory, order, input.Repository, open); err != nil {
-			return nil, err
-		}
-	}
-	remote, err := createOrUpdateTaskPullRequest(ctx, client, input, open, taskPullRequestBody(baseURL, factory, order, input.Body))
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +118,38 @@ func OpenTaskPullRequest(
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
 	return pullRequest, nil
+}
+
+// openRemoteTaskPullRequest opens the pull request on GitHub, or updates the
+// open one of the same branch, and returns the input with its base branch.
+func openRemoteTaskPullRequest(
+	ctx context.Context,
+	db *gorm.DB,
+	client taskPullRequestGitHubAPI,
+	baseURL string,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	input TaskPullRequestInput,
+) (TaskPullRequestInput, *github.PullRequest, error) {
+	if input.Base == "" {
+		repository, _, err := client.GetRepository(ctx, input.Repository)
+		if err != nil {
+			return input, nil, err
+		}
+		input.Base = repository.GetDefaultBranch()
+	}
+
+	open, err := findOpenTaskPullRequest(ctx, client, input)
+	if err != nil {
+		return input, nil, err
+	}
+	if open != nil {
+		if err := requireTaskOwnsPullRequest(db, factory, order, input.Repository, open); err != nil {
+			return input, nil, err
+		}
+	}
+	remote, err := createOrUpdateTaskPullRequest(ctx, client, input, open, taskPullRequestBody(baseURL, factory, order, input.Body))
+	return input, remote, err
 }
 
 // ListTaskPullRequests returns the pull requests on the task, oldest first.

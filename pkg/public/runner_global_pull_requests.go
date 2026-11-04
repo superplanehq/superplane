@@ -98,6 +98,8 @@ func writeRunnerPullRequestError(w http.ResponseWriter, err error) {
 		errors.Is(err, factoryactions.ErrTaskPullRequestOtherTask),
 		errors.Is(err, models.ErrFactoryPullRequestAlreadyExists):
 		http.Error(w, err.Error(), http.StatusConflict)
+	case errors.Is(err, factoryactions.ErrTaskPullRequestGitHubTimeout):
+		http.Error(w, "GitHub did not answer in time. Try again later.", http.StatusGatewayTimeout)
 	case errors.As(err, &githubErr):
 		http.Error(w, "GitHub rejected the pull request: "+githubErr.Message, http.StatusBadGateway)
 	default:

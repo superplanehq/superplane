@@ -4,10 +4,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
+const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 
 const registry = require("./registry");
+const { openPullRequest } = require("./modules/pull_requests");
 
 function call(name, input, client) {
   return registry.findTool(name).handler(input, client);
@@ -119,6 +121,67 @@ test("open_pull_request fails before the backend call when nothing changed", asy
   await assert.rejects(call("open_pull_request", {}, client), /title is required/);
   assert.deepEqual(client.requests, []);
 });
+
+// remoteServer serves the push URL of the checkout and tracks open
+// connections, so a test can see when git lets go of the remote.
+async function remoteServer(t, checkout, env, respond) {
+  const sockets = new Set();
+  const server = http.createServer(respond);
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  run(checkout, ["remote", "set-url", "--push", "origin", `http://127.0.0.1:${server.address().port}/acme/repo.git`], env);
+  return sockets;
+}
+
+function featureCommit(checkout, env) {
+  run(checkout, ["checkout", "-b", "feature"], env);
+  fs.writeFileSync(path.join(checkout, "change.txt"), "change\n");
+}
+
+test("open_pull_request fails at once when git has no credential for the remote", async (t) => {
+  const { env, checkout } = workspace("repo", { BASE: "main" });
+  featureCommit(checkout, env);
+  await remoteServer(t, checkout, env, (_request, response) => {
+    response.writeHead(401, { "WWW-Authenticate": 'Basic realm="GitHub"' });
+    response.end();
+  });
+  const client = recordingClient(env);
+
+  await assert.rejects(
+    call("open_pull_request", { title: "Change" }, client),
+    /git push could not authenticate to the remote\..*A retry will not help/,
+  );
+  assert.deepEqual(client.requests, []);
+});
+
+test("open_pull_request stops a push that the remote never answers", async (t) => {
+  const { env, checkout } = workspace("repo", { BASE: "main" });
+  featureCommit(checkout, env);
+  const sockets = await remoteServer(t, checkout, env, () => {});
+  const client = recordingClient(env);
+
+  await assert.rejects(
+    openPullRequest({ title: "Change" }, client, { local: 30000, fetch: 30000, push: 500 }),
+    /git push did not finish in 0.5s and was stopped/,
+  );
+  await waitFor(() => sockets.size === 0);
+  assert.deepEqual(client.requests, []);
+});
+
+async function waitFor(condition, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error("condition was not met in time");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
 
 test("list_pull_requests reads the pull requests of the task", async () => {
   const client = recordingClient({});
