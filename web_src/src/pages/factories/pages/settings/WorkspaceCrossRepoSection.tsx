@@ -43,12 +43,14 @@ function isWorkspaceMainRepository(name: string, appRepository: string | undefin
 }
 
 function ContextRepoList({
+  primaryRepository,
   resources,
   host,
   canUpdate,
   isSaving,
   onRemove,
 }: {
+  primaryRepository: string;
   resources: { id?: string | null; name?: string | null; repository?: string | null }[];
   host: VcsHostId;
   canUpdate: boolean;
@@ -60,6 +62,18 @@ function ContextRepoList({
       className="divide-y divide-border overflow-hidden rounded-lg border border-border"
       data-testid="agent-cross-repo-list"
     >
+      {primaryRepository ? (
+        <li className="flex min-w-0 items-center gap-3 px-3 py-2.5" data-testid="agent-cross-repo-primary">
+          <IntegrationChoiceIcon name={host} />
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{primaryRepository}</span>
+          <span
+            className="shrink-0 text-[12px] text-muted-foreground"
+            title={AGENT_RESOURCES_COPY.primaryRepositoryHint}
+          >
+            {AGENT_RESOURCES_COPY.primaryRepository}
+          </span>
+        </li>
+      ) : null}
       {resources.map((resource) => {
         const name = contextRepoName(resource);
         return (
@@ -107,6 +121,7 @@ export function CrossRepoContextCard({
 
   const added = (contextRepos.data ?? []).map(contextRepoName).filter(Boolean);
   const mainRepository = factory?.onboarding?.appRepository;
+  const primaryRepository = mainRepository?.trim() ?? "";
   const available = choices.repositories.filter(
     (name) => !added.includes(name) && !isWorkspaceMainRepository(name, mainRepository),
   );
@@ -174,8 +189,9 @@ export function CrossRepoContextCard({
           <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.crossRepoLoadingResources}</p>
         ) : contextRepos.isError ? (
           <p className="text-[13px] text-destructive">{AGENT_RESOURCES_COPY.crossRepoResourcesLoadError}</p>
-        ) : added.length > 0 ? (
+        ) : primaryRepository || added.length > 0 ? (
           <ContextRepoList
+            primaryRepository={primaryRepository}
             resources={contextRepos.data ?? []}
             host={choices.host}
             canUpdate={canUpdate}

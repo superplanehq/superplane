@@ -105,6 +105,22 @@ describe("cross-repo context picker", () => {
     expect(within(picker).queryByRole("option", { name: /^acme\/api$/ })).not.toBeInTheDocument();
   }, 15000);
 
+  it("lists the primary repository first without a remove action", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository)}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
+    const primary = within(list).getAllByRole("listitem")[0]!;
+    expect(primary).toHaveTextContent("acme/api");
+    expect(within(primary).queryByRole("button", { name: AGENT_RESOURCES_COPY.removeRepository })).toBeNull();
+  }, 15000);
+
   it("hides the workspace repository when only the letter case differs", async () => {
     const user = userEvent.setup();
     render(
