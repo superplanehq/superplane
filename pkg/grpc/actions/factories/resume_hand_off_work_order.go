@@ -40,16 +40,13 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		return nil, grpcFailedPrecondition("This task has no pending handoff.")
 	}
 	intent := order.PendingHandOff.Data()
-	var pullRequest *handOffPullRequest
+	var pullRequests []*handOffPullRequest
 	if intent.Column == HandOffColumnVerify {
-		pullRequest, err = loadHandOffPullRequest(ctx, db, deps, factory, intent.PullRequestURL)
-		if isHandOffPullRequestGone(err) {
-			return discardStaleHandOff(ctx, factory, order, intent)
-		}
+		pullRequests, err = loadOpenPendingHandOffPullRequests(ctx, db, deps, factory, intent)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to load pull request")
 		}
-		if !strings.EqualFold(strings.TrimSpace(pullRequest.State), models.FactoryPullRequestStateOpen) {
+		if len(pullRequests) == 0 {
 			return discardStaleHandOff(ctx, factory, order, intent)
 		}
 	}
@@ -58,7 +55,7 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		if err := order.LockForUpdate(tx); err != nil {
 			return err
 		}
-		if order.PendingHandOff == nil || !order.IsDispatchable() || order.PendingHandOff.Data() != intent {
+		if order.PendingHandOff == nil || !order.IsDispatchable() || !order.PendingHandOff.Data().Equal(intent) {
 			return grpcFailedPrecondition("This handoff changed. Reload the task and try again.")
 		}
 		if err := assignWorkOrderStarter(tx, factory, order, &actor); err != nil {
@@ -104,7 +101,7 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		if err != nil {
 			return err
 		}
-		return recordVerifyHandOff(tx, factory, order, line, &actor, pullRequest, index, models.FactoryLineStartOptions{Model: req.GetModel(), ThinkingLevel: normalizedThinking})
+		return recordVerifyHandOff(tx, factory, order, line, &actor, pullRequests, index, models.FactoryLineStartOptions{Model: req.GetModel(), ThinkingLevel: normalizedThinking})
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to resume handoff")
@@ -121,6 +118,33 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		return nil, factoryErrorToStatus(err, "failed to load task")
 	}
 	return &pb.ResumeHandOffWorkOrderResponse{Order: serialized, Column: intent.Column}, nil
+}
+
+// loadOpenPendingHandOffPullRequests loads the saved pull requests and keeps
+// the open ones. A pull request that was deleted or closed after the handoff
+// was saved is skipped.
+func loadOpenPendingHandOffPullRequests(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	intent models.PendingHandOff,
+) ([]*handOffPullRequest, error) {
+	open := []*handOffPullRequest{}
+	for _, rawURL := range intent.URLs() {
+		pullRequest, err := loadHandOffPullRequest(ctx, db, deps, factory, rawURL)
+		if isHandOffPullRequestGone(err) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !strings.EqualFold(strings.TrimSpace(pullRequest.State), models.FactoryPullRequestStateOpen) {
+			continue
+		}
+		open = append(open, pullRequest)
+	}
+	return open, nil
 }
 
 // isHandOffPullRequestGone reports whether the provider confirmed that the
@@ -156,7 +180,7 @@ func discardStaleHandOff(ctx context.Context, factory *models.Factory, order *mo
 		if err := order.LockForUpdate(tx); err != nil {
 			return err
 		}
-		if order.PendingHandOff == nil || !order.IsDispatchable() || order.PendingHandOff.Data() != intent {
+		if order.PendingHandOff == nil || !order.IsDispatchable() || !order.PendingHandOff.Data().Equal(intent) {
 			return grpcFailedPrecondition("This handoff changed. Reload the task and try again.")
 		}
 		return order.SetPendingHandOff(tx, nil)

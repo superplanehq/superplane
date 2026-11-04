@@ -46,17 +46,50 @@ export function ConsoleCheckRows({
           aria-hidden
         />
       </button>
-      {open ? (
-        <ul className="mt-3 flex flex-col border-t border-border/70">
-          {checks.map((check) => (
-            <li key={check.id} className="border-b border-border/60 last:border-b-0">
-              <ConsoleCheckRow check={check} />
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {open ? <CheckList checks={checks} /> : null}
     </div>
   );
+}
+
+/** Merge confidence scores each pull request repository on its own. Several repositories get one labeled list each. */
+function CheckList({ checks }: { checks: WorkOrderCheckPresentation[] }) {
+  const groups = checksByRepository(checks);
+  if (groups.length <= 1) {
+    return <CheckRowList checks={checks} className="mt-3 border-t border-border/70" />;
+  }
+  return (
+    <div className="mt-3 flex flex-col gap-3 border-t border-border/70 pt-3">
+      {groups.map((group) => (
+        <section key={group.repository} aria-label={group.repository || "Task"}>
+          <p className="truncate text-[12px] leading-4 text-muted-foreground">{group.repository || "Task"}</p>
+          <CheckRowList checks={group.checks} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function CheckRowList({ checks, className }: { checks: WorkOrderCheckPresentation[]; className?: string }) {
+  return (
+    <ul className={cn("flex flex-col", className)}>
+      {checks.map((check) => (
+        <li key={check.id} className="border-b border-border/60 last:border-b-0">
+          <ConsoleCheckRow check={check} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function checksByRepository(
+  checks: WorkOrderCheckPresentation[],
+): Array<{ repository: string; checks: WorkOrderCheckPresentation[] }> {
+  const groups = new Map<string, WorkOrderCheckPresentation[]>();
+  for (const check of checks) {
+    const repository = check.repository ?? "";
+    groups.set(repository, [...(groups.get(repository) ?? []), check]);
+  }
+  return [...groups].map(([repository, grouped]) => ({ repository, checks: grouped }));
 }
 
 function checksSummary(checks: WorkOrderCheckPresentation[]): string {

@@ -6,7 +6,11 @@ import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
+} from "../../__fixtures__/factoryPageResponses";
 import {
   CONNECTED_SETUP_INTEGRATIONS,
   SETUP_ANSWERS,
@@ -103,6 +107,97 @@ describe("cross-repo context picker", () => {
     const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
     expect(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 })).toBeInTheDocument();
     expect(within(picker).queryByRole("option", { name: /^acme\/api$/ })).not.toBeInTheDocument();
+  }, 15000);
+
+  it("lists the primary repository once, first, without a remove action", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository),
+          agentResourcesByFactoryId: {
+            [PRIMARY_FACTORY_ID]: [
+              { id: "ctx-primary", kind: "KIND_CONTEXT_REPO", enabled: true, repository: "ACME/api" },
+              { id: "ctx-web", kind: "KIND_CONTEXT_REPO", enabled: true, repository: "acme/web" },
+            ],
+          },
+        }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
+    const rows = await within(list).findAllByRole("listitem", {}, { timeout: 8000 });
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("acme/api"),
+      expect.stringContaining("acme/web"),
+    ]);
+    const primary = rows[0]!;
+    expect(within(primary).queryByRole("button", { name: AGENT_RESOURCES_COPY.removeRepository })).toBeNull();
+  }, 15000);
+
+  it("asks for the branch and access before it adds a repository", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository),
+          agentResourcesByFactoryId: {},
+        }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
+    const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
+    await user.click(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 }));
+    const settings = await within(picker).findByTestId("agent-cross-repo-settings", {}, { timeout: 8000 });
+    expect(within(settings).getByTestId("agent-cross-repo-new-access")).toHaveTextContent(
+      AGENT_RESOURCES_COPY.accessWrite,
+    );
+    await user.click(within(settings).getByTestId("agent-cross-repo-confirm"));
+
+    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
+    expect(
+      await within(list).findByText(
+        `${AGENT_RESOURCES_COPY.defaultBranch} · ${AGENT_RESOURCES_COPY.accessWrite}`,
+        {},
+        { timeout: 8000 },
+      ),
+    ).toBeInTheDocument();
+  }, 15000);
+
+  it("treats a repository without access as read only and edits it in place", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository),
+          agentResourcesByFactoryId: {
+            [PRIMARY_FACTORY_ID]: [
+              { id: "ctx-web", kind: "KIND_CONTEXT_REPO", enabled: true, repository: "acme/web", ref: "release" },
+            ],
+          },
+        }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    const toggle = await screen.findByTestId("agent-cross-repo-toggle-ctx-web", {}, { timeout: 8000 });
+    expect(toggle).toHaveTextContent(`release · ${AGENT_RESOURCES_COPY.accessRead}`);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByTestId("agent-cross-repo-ctx-web-access", {}, { timeout: 8000 })).toHaveTextContent(
+      AGENT_RESOURCES_COPY.accessRead,
+    );
   }, 15000);
 
   it("hides the workspace repository when only the letter case differs", async () => {

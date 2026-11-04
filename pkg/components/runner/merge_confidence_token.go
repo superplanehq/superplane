@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const (
@@ -38,6 +40,10 @@ type MergeConfidenceScope struct {
 	// CheckLabels maps a check id to the step name. Built-in checks use their
 	// own names when this map has no entry.
 	CheckLabels map[string]string
+	// Repository is the pull request repository from the run trigger. A task
+	// can have one pull request in each of several repositories, and each
+	// run scores only its own. Empty when the trigger names no repository.
+	Repository string
 }
 
 var (
@@ -194,6 +200,11 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvir
 		return nil, nil, fmt.Errorf("merge confidence requires a SuperPlane URL")
 	}
 
+	repository, err := mergeConfidenceRepository(database.DB(context.Background()), ctx.RunID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("merge confidence repository: %w", err)
+	}
+
 	enabled, labels := MergeConfidenceChecksFromSteps(steps)
 	if _, exists := environmentValue(environment, EnvSuperplaneBaseURL); !exists {
 		environment = append(environment, TaskEnvironmentVariable{
@@ -209,7 +220,29 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []TaskEnvir
 		NodeExecutionID: ctx.ID,
 		EnabledChecks:   enabled,
 		CheckLabels:     labels,
+		Repository:      repository,
 	}, nil
+}
+
+// mergeConfidenceRepository reads the pull request repository from the run
+// trigger, not from the task environment, so the agent cannot change it.
+func mergeConfidenceRepository(db *gorm.DB, runID uuid.UUID) (string, error) {
+	event, err := models.FindRootEventForRun(db, runID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	payload, ok := objectMap(models.RootEventSourcePayload(event.Data.Data()))
+	if !ok {
+		return "", nil
+	}
+	lookup, ok := customAutomationPullRequestLookup(payload)
+	if !ok {
+		return "", nil
+	}
+	return lookup.Repository, nil
 }
 
 func agentStepPrompts(steps []AgentStep) []string {

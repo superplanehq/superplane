@@ -49,7 +49,11 @@ func (c prCommentTriggerConfiguration) commentScope() string {
 }
 
 func prCommentConfigurationFields() []configuration.Field {
-	return append(prCommentBaseConfigurationFields(), ignoreBotsConfigurationField(), allowedBotsConfigurationField())
+	return append(
+		prCommentBaseConfigurationFields(),
+		ignoreBotsConfigurationField(),
+		allowedBotsConfigurationField(),
+	)
 }
 
 func prReviewCommentConfigurationFields() []configuration.Field {
@@ -163,6 +167,10 @@ func setupPRCommentTrigger(ctx core.TriggerContext, webhookConfig common.Webhook
 	}
 
 	webhookConfig.Repository = config.Repository
+	webhookConfig, err = common.WorkspaceWebhookConfiguration(ctx.Factory, webhookConfig)
+	if err != nil {
+		return err
+	}
 	return ctx.Integration.RequestWebhook(webhookConfig)
 }
 
