@@ -1089,6 +1089,11 @@ func materializeNonIntakeFactoryAppDefaults(
 	if handler != nil && handler.FactoryID == factory.ID {
 		return materializePRFeedbackDefaults(tx, factory, canvas, version, handler, savedSettings)
 	}
+	// A custom automation can start from a task. That trigger is not the
+	// built-in Backlog app, so reset must leave the canvas unchanged.
+	if models.FactoryAppTemplateID(version.Nodes) == models.FactoryAppTemplateCustomAutomationID {
+		return nil, invalidArgument("factory app has no bundled defaults")
+	}
 	if onWorkOrderNodeIDFromSpec(models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}) != "" {
 		return materializeBacklogDefaults(tx, factory, canvas, version, savedSettings)
 	}

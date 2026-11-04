@@ -452,9 +452,40 @@ func reconcileFactoryRepository(
 	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
 }
 
+func sharedTaskCheckout(environment []any) bool {
+	for _, value := range environment {
+		entry, ok := value.(map[string]any)
+		if ok && configString(entry, "name") == "REPO" && strings.Contains(configString(entry, "value"), "workOrder?.repository") {
+			return true
+		}
+	}
+	return false
+}
+
+func checkoutNamesUseExpressions(environment []any, names ...string) bool {
+	for _, value := range environment {
+		entry, ok := value.(map[string]any)
+		if !ok || !slices.Contains(names, configString(entry, "name")) {
+			continue
+		}
+		if strings.Contains(configString(entry, "value"), "{{") {
+			return true
+		}
+	}
+	return false
+}
+
 func refreshCustomAutomationCheckout(node *models.Node, factory *models.Factory, githubHost string) bool {
 	current, _ := node.Configuration["environment"].([]any)
+	shared := sharedTaskCheckout(current)
+	// A task trigger checks out the task repository. Keep those expressions.
+	if checkoutNamesUseExpressions(current, "REPO", "BASE") && !shared {
+		return false
+	}
 	checkout := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHost)
+	if shared {
+		checkout = backlogSharedCheckoutEnvironment(factory, githubHost)
+	}
 	// Only checkout variables belong to the workspace. Preserve user-added values.
 	updated := slices.DeleteFunc(slices.Clone(current), func(value any) bool {
 		entry, ok := value.(map[string]any)

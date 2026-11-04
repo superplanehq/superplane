@@ -13,6 +13,7 @@ export type ColumnAutomationApp = {
   customAutomationMode?: CustomAutomationMode;
   customAutomationIcon?: string;
   customAutomationCronExpression?: string;
+  customAutomationTriggers?: Array<{ mode: CustomAutomationMode; cronExpression?: string }>;
 };
 
 export function customColumnAutomations(
@@ -35,7 +36,7 @@ export function customColumnAutomations(
       {
         id: `custom-${id}`,
         kind: "custom",
-        name: app.name?.trim() || EVENT_CUSTOM_ENTRY.name,
+        name: app.name?.trim() || "Custom automation",
         iconName: columnKey === "backlog" ? "alarm-clock" : undefined,
         trigger: columnKey === "backlog" ? "On schedule" : EVENT_CUSTOM_ENTRY.trigger,
         action: columnKey === "backlog" ? "Proposes a task" : EVENT_CUSTOM_ENTRY.action,
