@@ -20,6 +20,8 @@ func (c *EnrichIssue) Description() string {
 func (c *EnrichIssue) Documentation() string {
 	return `Enrich Issue fetches the latest issue details and a preferred event from Sentry. Add it after filters so rejected issues do not make API requests.
 
+New factory intakes use HTTP Request to fetch issue and event data. Existing workflows can continue to use Enrich Issue.
+
 ## Configuration
 
 - **Issue**: The issue object from On Issue Event, usually ` + "`{{ root().data.data.issue }}`" + `

@@ -296,6 +296,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   runnerOpenRouter: { title: "Run OpenRouter Agent", iconSlug: "code" },
   runnerJS: { title: "Run JavaScript", iconSlug: "code" },
   if: { title: "If", iconSlug: "split" },
+  http: { title: "HTTP Request", iconSlug: "globe" },
   filter: { title: "Filter", iconSlug: "funnel" },
   addWorkOrderArtifact: { title: "Add Task Artifact", iconSlug: "factory" },
   addPullRequest: { title: "Add Pull Request", iconSlug: "factory" },

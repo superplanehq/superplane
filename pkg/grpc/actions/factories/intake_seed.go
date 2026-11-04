@@ -482,20 +482,21 @@ func seedSentryIssues(
 		return intakeSeedResult{}, err
 	}
 
-	return seedKnownSentryIssues(tx, canvasID, issues)
+	return seedKnownSentryIssues(tx, canvasID, issues, client.IssueAPIURL)
 }
 
 func seedKnownSentryIssues(
 	tx *gorm.DB,
 	canvasID uuid.UUID,
 	issues []sentry.Issue,
+	issueAPIURL func(string) string,
 ) (intakeSeedResult, error) {
 	issues, err := filterSentryIssuesForSeed(tx, canvasID, issues)
 	if err != nil {
 		return intakeSeedResult{}, err
 	}
 
-	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(issues)); err != nil {
+	if err := emitIntakeEvents(tx, canvasID, intakeSentryIssuePayloadType, sentryIssueEvents(issues, issueAPIURL)); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(issues)}, nil
@@ -565,16 +566,16 @@ func sentryIssueIDsOnTrigger(tx *gorm.DB, canvasID uuid.UUID) (map[string]bool, 
 // sentryIssueEvents shapes each issue of a newest-first page like the webhook
 // the trigger emits, so the rest of the graph cannot tell a seeded issue from
 // a received one.
-func sentryIssueEvents(issues []sentry.Issue) []map[string]any {
+func sentryIssueEvents(issues []sentry.Issue, issueAPIURL func(string) string) []map[string]any {
 	events := make([]map[string]any, 0, len(issues))
 	for _, issue := range issues {
-		events = append(events, sentryIssueEvent(issue))
+		events = append(events, sentryIssueEvent(issue, issueAPIURL(issue.ID)))
 	}
 	slices.Reverse(events)
 	return events
 }
 
-func sentryIssueEvent(issue sentry.Issue) map[string]any {
+func sentryIssueEvent(issue sentry.Issue, issueAPIURL string) map[string]any {
 	encoded, err := json.Marshal(issue)
 	if err != nil {
 		payload := map[string]any{"id": issue.ID, "title": issue.Title}
@@ -583,6 +584,7 @@ func sentryIssueEvent(issue sentry.Issue) map[string]any {
 			"action":      "created",
 			"data":        map[string]any{"issue": payload},
 			"description": sentry.IssueDescription(payload, nil),
+			"issueApiUrl": issueAPIURL,
 		}
 	}
 
@@ -602,6 +604,7 @@ func sentryIssueEvent(issue sentry.Issue) map[string]any {
 		"data":        map[string]any{"issue": payload},
 		"timestamp":   timestamp,
 		"description": sentry.IssueDescription(payload, nil),
+		"issueApiUrl": issueAPIURL,
 	}
 }
 

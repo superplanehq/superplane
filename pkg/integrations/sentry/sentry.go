@@ -886,8 +886,18 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	switch resourceType {
 	case ResourceTypeProject:
-		resources := make([]core.IntegrationResource, 0, len(metadata.Projects))
-		for _, project := range metadata.Projects {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sentry client: %w", err)
+		}
+
+		projects, err := client.ListProjects()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list projects: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(projects))
+		for _, project := range projects {
 			resources = append(resources, core.IntegrationResource{
 				Type: ResourceTypeProject,
 				ID:   project.Slug,

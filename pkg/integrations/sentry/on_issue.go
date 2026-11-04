@@ -55,7 +55,8 @@ func (t *OnIssue) Documentation() string {
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
 - **data.issue**: the Sentry issue object from the webhook
-- **description**: A basic Markdown description built from the webhook issue. Add Enrich Issue after any filters when a workflow needs the issue details and stack trace
+- **description**: A basic Markdown description built from the webhook issue
+- **issueApiUrl**: The Sentry API URL for this issue. Use HTTP Request after filters to get current issue details and events
 - **actor**: the user or team that triggered the event when available
 
 ## Setup
@@ -130,7 +131,8 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 	if config.Project != "" {
 		project := findProject(ctx.Integration, config.Project)
 		if project == nil {
-			return fmt.Errorf("project %q was not found in the connected Sentry organization", config.Project)
+			// Connection metadata can predate a project selected from the live project list.
+			project = &ProjectSummary{Slug: config.Project, Name: config.Project}
 		}
 		metadata.Project = project
 	} else {
@@ -207,6 +209,7 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"actor":        message.Actor,
 		"timestamp":    eventTimestamp(message),
 		"description":  IssueDescription(message.Data["issue"], nil),
+		"issueApiUrl":  IssueAPIURL(ctx.Integration, issueID(message.Data["issue"])),
 	}
 	if receiptID := strings.TrimSpace(message.ReceiptID); receiptID != "" {
 		payload[SuperplaneReceiptField] = receiptID

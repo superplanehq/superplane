@@ -15,14 +15,16 @@ import (
 // identifiers are an implementation detail of the generated graph, so they are
 // resolved on read and never stored on the intake row or sent over the API.
 type intakeGraph struct {
-	TriggerNodeID          string
-	AnalysisNodeID         string
-	FilterNodeID           string
-	EnrichIssueNodeID      string
-	AuthorPermissionNodeID string
-	AuthorFilterNodeID     string
-	CreateNodeID           string
-	ConfidencePct          int
+	TriggerNodeID            string
+	AnalysisNodeID           string
+	FilterNodeID             string
+	EnrichIssueNodeID        string
+	SentryIssueRequestNodeID string
+	SentryEventRequestNodeID string
+	AuthorPermissionNodeID   string
+	AuthorFilterNodeID       string
+	CreateNodeID             string
+	ConfidencePct            int
 }
 
 // Healthy reports whether the graph can still do the intake's job: receive an
@@ -273,6 +275,12 @@ func resolveIntakeGraph(source string, spec models.LiveCanvasSpec) intakeGraph {
 	if source == models.FactoryIntakeSourceSentryExceptions {
 		graph.EnrichIssueNodeID = resolveIntakeNode(nodes, intakeEnrichIssueNodeID, func(node *models.Node) bool {
 			return node.ComponentName() == intakeEnrichIssueComponent
+		})
+		graph.SentryIssueRequestNodeID = resolveIntakeNode(nodes, intakeSentryIssueRequestNodeID, func(node *models.Node) bool {
+			return node.ComponentName() == intakeHTTPRequestComponent && node.Name == "Get Sentry Issue"
+		})
+		graph.SentryEventRequestNodeID = resolveIntakeNode(nodes, intakeSentryEventRequestNodeID, func(node *models.Node) bool {
+			return node.ComponentName() == intakeHTTPRequestComponent && node.Name == "Get Sentry Event"
 		})
 	}
 	graph.AuthorPermissionNodeID = resolveIntakeNode(nodes, intakeAuthorPermissionNodeID, isIntakeAuthorPermissionNode)

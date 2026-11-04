@@ -41,7 +41,8 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     triggerComponent: "sentry.onIssue",
     triggerName: "On Issue",
     createTitle: "{{ root().data.data.issue.title }}",
-    createDescription: '{{ $["Enrich Issue"].data.description }}',
+    createDescription:
+      '{{ root().data.description }}{{ $["Get Sentry Issue"].data.body?.count ? "\n\nOccurrences: " + string($["Get Sentry Issue"].data.body.count) : "" }}',
     title: "Sentry exception intake",
   },
   "pagerduty-incidents": {
@@ -79,7 +80,8 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
   const triggerId = `${source.id}-trigger`;
   const createId = `${source.id}-create`;
   const filterId = `${source.id}-filter`;
-  const enrichId = `${source.id}-enrich`;
+  const issueRequestId = `${source.id}-issue-request`;
+  const eventRequestId = `${source.id}-event-request`;
   const sentry = source.id === "sentry-exceptions";
 
   const nodes: ComponentsNode[] = [
@@ -101,12 +103,36 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
             position: { x: 160, y: 260 },
           },
           {
-            id: enrichId,
-            name: "Enrich Issue",
+            id: issueRequestId,
+            name: "Get Sentry Issue",
             type: "TYPE_ACTION",
-            component: "sentry.enrichIssue",
-            configuration: { issue: "{{ root().data.data.issue }}" },
+            component: "http",
+            configuration: {
+              method: "GET",
+              url: "{{ root().data.issueApiUrl }}",
+              authorization: {
+                type: "integration_bearer",
+                integration: { name: "Sentry" },
+                integrationKey: "SENTRY_AUTH_TOKEN",
+              },
+            },
             position: { x: 160, y: 440 },
+          },
+          {
+            id: eventRequestId,
+            name: "Get Sentry Event",
+            type: "TYPE_ACTION",
+            component: "http",
+            configuration: {
+              method: "GET",
+              url: "{{ root().data.issueApiUrl }}events/latest/",
+              authorization: {
+                type: "integration_bearer",
+                integration: { name: "Sentry" },
+                integrationKey: "SENTRY_AUTH_TOKEN",
+              },
+            },
+            position: { x: 160, y: 620 },
           },
         ] satisfies ComponentsNode[])
       : []),
@@ -119,14 +145,17 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
         title: spec.createTitle,
         description: spec.createDescription,
       },
-      position: { x: 160, y: sentry ? 620 : 260 },
+      position: { x: 160, y: sentry ? 800 : 260 },
     },
   ];
   const edges: ComponentsEdge[] = sentry
     ? [
         { channel: "default", sourceId: triggerId, targetId: filterId },
-        { channel: "true", sourceId: filterId, targetId: enrichId },
-        { channel: "default", sourceId: enrichId, targetId: createId },
+        { channel: "true", sourceId: filterId, targetId: issueRequestId },
+        { channel: "success", sourceId: issueRequestId, targetId: eventRequestId },
+        { channel: "failure", sourceId: issueRequestId, targetId: eventRequestId },
+        { channel: "success", sourceId: eventRequestId, targetId: createId },
+        { channel: "failure", sourceId: eventRequestId, targetId: createId },
       ]
     : [{ channel: "default", sourceId: triggerId, targetId: createId }];
 
@@ -137,7 +166,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
     edges,
     statuses: {
       [triggerId]: "passed",
-      ...(sentry ? { [filterId]: "passed", [enrichId]: "passed" } : {}),
+      ...(sentry ? { [filterId]: "passed", [issueRequestId]: "passed", [eventRequestId]: "passed" } : {}),
       [createId]: "running",
     } satisfies Record<string, FactoryNodeStatus>,
     metrics: {},

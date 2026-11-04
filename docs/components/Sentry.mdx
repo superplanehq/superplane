@@ -64,7 +64,8 @@ The On Issue Event trigger starts a workflow execution when Sentry sends issue w
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
 - **data.issue**: the Sentry issue object from the webhook
-- **description**: A basic Markdown description built from the webhook issue. Add Enrich Issue after any filters when a workflow needs the issue details and stack trace
+- **description**: A basic Markdown description built from the webhook issue
+- **issueApiUrl**: The Sentry API URL for this issue. Use HTTP Request after filters to get current issue details and events
 - **actor**: the user or team that triggered the event when available
 
 ### Setup
@@ -353,6 +354,8 @@ Returns the deleted alert ID and name so downstream steps can record the removal
 **Component key:** `sentry.enrichIssue`
 
 Enrich Issue fetches the latest issue details and a preferred event from Sentry. Add it after filters so rejected issues do not make API requests.
+
+New factory intakes use HTTP Request to fetch issue and event data. Existing workflows can continue to use Enrich Issue.
 
 ### Configuration
 

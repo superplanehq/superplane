@@ -325,13 +325,18 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			}
 			binding := &intakeBinding{Configuration: map[string]any{"repository": "acme/app", "project": "APP"}}
 			var sentryIntegrationID string
+			var sentryIntegrationName string
 			if source == models.FactoryIntakeSourceGitHubIssues {
 				id := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 				binding.Integration = &yaml.IntegrationRef{ID: id}
 			}
 			if source == models.FactoryIntakeSourceSentryExceptions {
 				sentryIntegrationID = createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
-				binding.Integration = &yaml.IntegrationRef{ID: sentryIntegrationID}
+				id := uuid.MustParse(sentryIntegrationID)
+				integration, err := models.FindIntegrationInTransaction(database.DB(t.Context()), r.Organization.ID, id)
+				require.NoError(t, err)
+				sentryIntegrationName = integration.InstallationName
+				binding.Integration = &yaml.IntegrationRef{ID: sentryIntegrationID, Name: sentryIntegrationName}
 			}
 			doc, err := buildIntakeCanvas(intakeCanvasRequest{
 				OrganizationID: r.Organization.ID, FactoryID: factory.ID, Source: source,
@@ -407,12 +412,18 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				require.NotNil(t, trigger)
 				require.NotNil(t, trigger.IntegrationID)
 				assert.Equal(t, sentryIntegrationID, *trigger.IntegrationID)
-				enrich := findIntakeNode(version.Nodes, intakeEnrichIssueNodeID)
-				require.NotNil(t, enrich)
-				require.NotNil(t, enrich.IntegrationID)
-				assert.Equal(t, sentryIntegrationID, *enrich.IntegrationID)
-				assert.True(t, hasCanvasPath(spec.Edges, intakeFilterNodeID, enrich.ID))
-				assert.True(t, hasCanvasPath(spec.Edges, enrich.ID, create.ID))
+				issueRequest := findIntakeNode(version.Nodes, intakeSentryIssueRequestNodeID)
+				eventRequest := findIntakeNode(version.Nodes, intakeSentryEventRequestNodeID)
+				require.NotNil(t, issueRequest)
+				require.NotNil(t, eventRequest)
+				for _, request := range []*models.Node{issueRequest, eventRequest} {
+					authorization, ok := request.Configuration["authorization"].(map[string]any)
+					require.True(t, ok)
+					assert.Equal(t, map[string]any{"name": sentryIntegrationName}, authorization["integration"])
+				}
+				assert.True(t, hasCanvasPath(spec.Edges, intakeFilterNodeID, issueRequest.ID))
+				assert.True(t, hasCanvasPath(spec.Edges, issueRequest.ID, eventRequest.ID))
+				assert.True(t, hasCanvasPath(spec.Edges, eventRequest.ID, create.ID))
 			}
 			if tc.restrictAuthors {
 				require.NotNil(t, findIntakeNode(version.Nodes, intakeAuthorPermissionNodeID))

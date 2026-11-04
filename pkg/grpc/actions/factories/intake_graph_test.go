@@ -141,19 +141,25 @@ func Test__IntakeTriggerBinding(t *testing.T) {
 	assert.Equal(t, "payments", graph.TriggerResourceID(spec))
 }
 
-func TestSentryIntakeConnectionBindsEnrichment(t *testing.T) {
+func TestSentryIntakeConnectionUpdatesRequestCredentials(t *testing.T) {
 	nodes := []models.Node{
 		triggerNode(intakeTriggerNodeID, "sentry.onIssue"),
-		componentNode(intakeEnrichIssueNodeID, intakeEnrichIssueComponent),
+		componentNode(intakeSentryIssueRequestNodeID, intakeHTTPRequestComponent),
+		componentNode(intakeSentryEventRequestNodeID, intakeHTTPRequestComponent),
 		componentNode(intakeCreateNodeID, intakeCreateComponent),
 	}
 	graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, models.LiveCanvasSpec{Nodes: nodes})
 	updated, err := applyIntakeBindingToGraph(graph, &intakeBinding{
-		Integration: &yaml.IntegrationRef{ID: "new-sentry"},
+		Integration: &yaml.IntegrationRef{ID: "new-sentry", Name: "New Sentry"},
 	}, nodes)
 	require.NoError(t, err)
 	assert.Equal(t, "new-sentry", *findModelNode(t, updated, intakeTriggerNodeID).IntegrationID)
-	assert.Equal(t, "new-sentry", *findModelNode(t, updated, intakeEnrichIssueNodeID).IntegrationID)
+	for _, id := range []string{intakeSentryIssueRequestNodeID, intakeSentryEventRequestNodeID} {
+		request := findModelNode(t, updated, id)
+		authorization, ok := request.Configuration["authorization"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{"name": "New Sentry"}, authorization["integration"])
+	}
 }
 
 func Test__IntakeTriggerBinding_DatadogService(t *testing.T) {
