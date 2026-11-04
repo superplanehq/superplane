@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 
 import type { ColumnAutomation } from "../lib/columnAutomations";
+import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogColumn } from "./BacklogColumn";
 
 const runAutomation = vi.fn();
@@ -70,7 +71,7 @@ function renderColumn() {
                   canRename={false}
                   onRename={() => undefined}
                   onCreateWorkOrder={() => undefined}
-                  workOrderCardContext={{ organizationId: "org-1", factoryKey: "newws" }}
+                  workOrderCardContext={{ organizationId: "org-1", factoryKey: "newws" } as WorkOrderCardContext}
                   onOpenWorkOrder={() => undefined}
                   automations={[AUTOMATION]}
                   automationRowCount={1}

@@ -188,7 +188,9 @@ describe("Line board job popup", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("lines-verify-column-scroll")).getAllByRole("button", { name: /^Open (?!automation:)/ }),
+      within(screen.getByTestId("lines-verify-column-scroll")).getAllByRole("button", {
+        name: /^Open (?!automation:)/,
+      }),
     ).toHaveLength(1);
     expect(
       within(screen.getByLabelText("Verify phase")).getByRole("button", {
