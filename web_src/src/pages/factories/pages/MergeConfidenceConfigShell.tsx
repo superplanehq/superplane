@@ -274,11 +274,19 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
   } = props;
   const implementSettings = useImplementSettingsDraft(graph?.specNodes);
   const mergeConfidenceAgent = mergeConfidenceSettingsNode(graph);
-  const mergeConfidenceSettings = useMergeConfidenceSettingsDraft(mergeConfidenceAgent, {
-    organizationId,
-    factoryId,
-    canvasId,
-  });
+  const publishing = graph?.specNodes?.find(
+    (node) =>
+      node.component === "updatePullRequestBodySection" && node.configuration?.sectionKey === "merge-confidence",
+  );
+  const mergeConfidenceSettings = useMergeConfidenceSettingsDraft(
+    mergeConfidenceAgent,
+    {
+      organizationId,
+      factoryId,
+      canvasId,
+    },
+    publishing,
+  );
   const implementAgent = implementSettingsNode(props);
   if (implementAgent && implementSettings.draft) {
     return <ImplementSettingsScreen settings={implementSettings} body={props} />;
@@ -287,6 +295,7 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     return (
       <MergeConfidenceConfiguration
         agent={mergeConfidenceAgent}
+        publishing={publishing}
         settings={mergeConfidenceSettings}
         organizationId={organizationId}
         factoryId={factoryId}

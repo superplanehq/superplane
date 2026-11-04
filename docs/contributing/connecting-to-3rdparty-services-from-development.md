@@ -234,6 +234,73 @@ If Connect cannot create the app, confirm `BASE_URL` and
 CI sets dummy GitHub App values so factory E2E can skip create-app.
 Local `make test.e2e` needs the same dummy values or a real app.
 
+## Merge confidence publication
+
+Merge confidence publishes saved assessment checks to the PR description.
+The built-in templates connect the assessment agent directly to publication:
+
+`On Pull Request → Assess Merge Confidence → Publish Merge Confidence`
+
+Both Passed and Failed agent outputs connect to the publication action.
+The action uses the current run. Failed agent outputs publish an incomplete
+assessment and keep the run failed. Transient host failures retry through
+scheduled action requests in that same run. Execution details show attempts,
+the next retry, the last error, and skipped outcomes.
+
+Cancellation and failures before the agent emits an output do not publish.
+Publication retries keep the run open until publication completes or skips.
+
+The worker process needs `BASE_URL`, database and RabbitMQ access, and
+`ENCRYPTION_MASTER_KEYS` for the workspace integration credentials.
+GitHub requires pull request write permission. Bitbucket requires pull request
+write access, or the equivalent API token or Forge scope.
+The runner does not publish descriptions and needs no additional credentials.
+
+Local Docker Compose supplies these dependencies to the app process.
+The repository Helm chart supplies database, RabbitMQ, encryption, and base URL
+configuration to workers. Self-hosted GitHub Apps use the encrypted installation
+record. Hosted GitHub Apps also require these keys on API and worker processes:
+
+- `SUPERPLANE_GITHUB_APP_ID`
+- `SUPERPLANE_GITHUB_APP_SLUG`
+- `SUPERPLANE_GITHUB_APP_PRIVATE_KEY`
+- `SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET`
+
+For Helm, put hosted GitHub App keys in the existing
+`authentication.secretName` Secret. Both API and worker pods load that Secret.
+Do not put credential values in chart files.
+
+Bitbucket Forge uses the shared encrypted installation token in the database.
+API and worker processes must use the same encryption keys.
+Verify hosted chart values and Secret references before worker rollout.
+API-only credential configuration does not configure workers.
+This change adds no database migration.
+The node request worker needs `START_NODE_REQUEST_WORKER=yes`.
+The direct connection also needs the node executor and event router.
+The local Compose file and repository chart enable these workers.
+No new configuration keys or runner changes are required.
+
+Roll out in this order:
+
+1. Deploy the publication action with the node request worker.
+2. Run the built-in admin reset for Merge confidence automations. Supported merge-check and agent settings survive this reset.
+3. Verify the direct agent connections for GitHub and Bitbucket. Then remove the dedicated publication consumer.
+
+Report markers keep one managed section in the description. Before each
+write, SuperPlane rejects runs that are cancelled or that are not the newest
+assessment for the pull request. This change does not serialize publications
+from different runs. A separate automation change handles publication
+concurrency.
+The default rollout uses admin reset. Custom graph migration is outside this change.
+Existing automations need the reset to receive the publication action.
+The final code removes the dedicated publication consumer. Stage its removal
+separately so saved automations receive the action before the consumer stops.
+
+The hosted `superplanehq/helm-chart` and `superplanehq/launchpad` repositories were
+unavailable during implementation. Their worker values and Secret references still
+need verification before activating publication. No companion deployment change was
+published or live configuration verified.
+
 ## Bitbucket Forge local development
 
 Create a separate Forge app for your local instance. Keep the shared manifest unchanged when you configure your app and tunnel.

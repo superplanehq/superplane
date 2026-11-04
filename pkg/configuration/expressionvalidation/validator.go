@@ -196,6 +196,7 @@ func compileWithStubEnv(body string, knownNodeNames map[string]struct{}, extraEn
 		expr.Function("workspace", func(params ...any) (any, error) { return nil, nil }),
 	}
 
+	opts = append(opts, exprruntime.MarkdownFunctionOptions()...)
 	if _, err := expr.Compile(body, opts...); err != nil {
 		return fmt.Errorf("compile error: %s", firstLine(err.Error()))
 	}

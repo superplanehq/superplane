@@ -8,6 +8,12 @@ spec:
     - channel: default
       sourceId: on-pr-risk
       targetId: assess-risk
+    - channel: passed
+      sourceId: assess-risk
+      targetId: publish-merge-confidence
+    - channel: failed
+      sourceId: assess-risk
+      targetId: publish-merge-confidence
   nodes:
     - id: on-pr-risk
       name: On Pull Request
@@ -268,5 +274,32 @@ spec:
               Do not repeat the score. Do not write a second sentence.
       position:
         x: 640
+        "y": 80
+      isCollapsed: true
+    - id: publish-merge-confidence
+      name: Publish Merge Confidence
+      type: TYPE_ACTION
+      component: updatePullRequestBodySection
+      configuration:
+        pullRequestId: '{{ $["Assess Merge Confidence"].data.mergeConfidence.pullRequestId }}'
+        sectionKey: merge-confidence
+        body: |-
+          ## SuperPlane merge confidence
+
+          {{ let report = $["Assess Merge Confidence"].data.mergeConfidence;
+             (!report.complete ? "**Incomplete**\n\n" : (report.overallScore == nil ? "" : "**Overall score: " + string(report.overallScore) + "/5**\n\n"))
+             + (len(report.checks) == 0
+               ? "No checks are enabled.\n\n"
+               : (report.complete && report.overallScore == nil ? "No built-in checks are enabled.\n\n" : "")
+                 + "| Check | Score | Summary |\n| --- | --- | --- |\n"
+                 + join(map(report.checks, { "| " + markdownText(#.label) + " | " +
+                     (#.missing ? "Missing | No result was reported." : string(#.score) + "/" + string(#.maxScore) + " | " + markdownText(#.summary))
+                     + " |\n" }), "")
+                 + "\n")
+             + "Reviewed commit: " + markdownText(report.reviewedCommit) + "\n\n[View task](<" + markdownLink(report.taskUrl) + ">)" }}
+        expectedHeadSha: '{{ $["Assess Merge Confidence"].data.mergeConfidence.reviewedCommit }}'
+        enabled: true
+      position:
+        x: 1200
         "y": 80
       isCollapsed: true

@@ -1,3 +1,5 @@
+import { markdownText, markdownLink } from "@/lib/markdownExpressions";
+
 /**
  * Client-side expression evaluator compatible with expr-lang syntax.
  * Supports path resolution, function calls, method chaining, and operators.
@@ -892,6 +894,9 @@ const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
   },
   toBase64: (v: unknown) => btoa(String(v)),
   fromBase64: (v: unknown) => atob(String(v)),
+
+  markdownText,
+  markdownLink,
 
   // Misc
   get: (obj: unknown, key: unknown) => {
