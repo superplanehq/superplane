@@ -166,6 +166,36 @@ describe("cross-repo context picker", () => {
     ).toBeInTheDocument();
   }, 15000);
 
+  it("keeps the access chosen before the repository", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository),
+          agentResourcesByFactoryId: {},
+        }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
+    const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
+    await user.click(await within(picker).findByTestId("agent-cross-repo-new-list-access", {}, { timeout: 8000 }));
+    await user.click(await screen.findByRole("option", { name: AGENT_RESOURCES_COPY.accessRead }));
+    await user.click(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 }));
+    expect(await within(picker).findByTestId("agent-cross-repo-new-access", {}, { timeout: 8000 })).toHaveTextContent(
+      AGENT_RESOURCES_COPY.accessRead,
+    );
+    await user.click(within(picker).getByTestId("agent-cross-repo-confirm"));
+
+    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
+    expect(
+      await within(list).findByText(`main · ${AGENT_RESOURCES_COPY.accessRead}`, {}, { timeout: 8000 }),
+    ).toBeInTheDocument();
+  }, 15000);
+
   it("adds a repository on a branch that the branch list does not show", async () => {
     const user = userEvent.setup();
     render(

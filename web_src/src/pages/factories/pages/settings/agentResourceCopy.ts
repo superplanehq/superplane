@@ -92,7 +92,7 @@ export const AGENT_RESOURCES_COPY = {
   accessReadHint: "The agent can read the repository. It cannot push changes.",
   crossRepoLoadingResources: "Loading repositories...",
   crossRepoResourcesLoadError: "SuperPlane could not load the repositories. Try again.",
-  crossRepoDialogHelper: "Choose a repository. Agents clone it during work and can open a pull request in it.",
+  crossRepoDialogHelper: "Choose what the agent can do, then choose a repository. Agents clone it during work.",
   crossRepoDialogHelperReadOnly: "Choose a repository. Agents clone it during work.",
   crossRepoConnectGitHub: "Connect GitHub during workspace setup before you select a repository.",
   crossRepoConnectBitbucket: "Connect Bitbucket during workspace setup before you select a repository.",

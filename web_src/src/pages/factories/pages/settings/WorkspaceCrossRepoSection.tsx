@@ -25,7 +25,7 @@ import { FactorySettingsCard } from "./FactorySettingsCard";
 import { useRepositoryBranchesPrefetch, useRepositoryDefaultBranch } from "./useRepositoryDefaultBranch";
 import { useWorkspaceRepositoryChoices } from "./useWorkspaceRepositoryChoices";
 import { WorkspacePrimaryRepoRow } from "./WorkspacePrimaryRepoRow";
-import { WorkspaceRepositoryFields } from "./WorkspaceRepositoryFields";
+import { RepositoryAccessField, WorkspaceRepositoryFields } from "./WorkspaceRepositoryFields";
 import {
   workspaceRepositoryAccess,
   workspaceRepositorySummary,
@@ -416,17 +416,29 @@ function AddRepositoryDialog(props: {
             </div>
           </div>
         ) : (
-          <RepositoryChoice
-            organizationId={props.organizationId}
-            host={choices.host}
-            bitbucket={choices.bitbucket}
-            connected={Boolean(choices.integrationId)}
-            loading={choices.isLoading}
-            error={choices.isError}
-            catalog={props.catalog}
-            disabled={props.disabled}
-            onSelect={choose}
-          />
+          <div className="flex flex-col gap-6">
+            {choices.integrationId && !choices.bitbucket ? (
+              <div className="sm:max-w-xs">
+                <RepositoryAccessField
+                  id="agent-cross-repo-new-list-access"
+                  value={settings.access}
+                  disabled={props.disabled}
+                  onChange={(access) => setSettings((current) => ({ ...current, access }))}
+                />
+              </div>
+            ) : null}
+            <RepositoryChoice
+              organizationId={props.organizationId}
+              host={choices.host}
+              bitbucket={choices.bitbucket}
+              connected={Boolean(choices.integrationId)}
+              loading={choices.isLoading}
+              error={choices.isError}
+              catalog={props.catalog}
+              disabled={props.disabled}
+              onSelect={choose}
+            />
+          </div>
         )}
       </DialogContent>
     </Dialog>

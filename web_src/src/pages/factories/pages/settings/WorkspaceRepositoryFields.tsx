@@ -7,7 +7,11 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { BranchPicker } from "./BranchPicker";
 import { branchNames, repositoryBranchChoices } from "./useFactoryRepositoryDraft";
-import { workspaceRepositoryAccess, type WorkspaceRepositorySettings } from "./workspaceRepositorySettings";
+import {
+  workspaceRepositoryAccess,
+  type WorkspaceRepositoryAccess,
+  type WorkspaceRepositorySettings,
+} from "./workspaceRepositorySettings";
 
 type RepositoryBranchProps = {
   id: string;
@@ -44,26 +48,42 @@ export function WorkspaceRepositoryFields({
         onChange={(ref) => onChange({ ...value, ref })}
       />
       {showAccess ? (
-        <div className="min-w-0 space-y-2">
-          <Label htmlFor={accessId}>{AGENT_RESOURCES_COPY.accessLabel}</Label>
-          <Select
-            value={value.access}
-            disabled={branch.disabled}
-            onValueChange={(access) => onChange({ ...value, access: workspaceRepositoryAccess(access) })}
-          >
-            <SelectTrigger id={accessId} className="w-full" data-testid={accessId}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="write">{AGENT_RESOURCES_COPY.accessWrite}</SelectItem>
-              <SelectItem value="read">{AGENT_RESOURCES_COPY.accessRead}</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-[12px] text-muted-foreground">
-            {value.access === "write" ? AGENT_RESOURCES_COPY.accessWriteHint : AGENT_RESOURCES_COPY.accessReadHint}
-          </p>
-        </div>
+        <RepositoryAccessField
+          id={accessId}
+          value={value.access}
+          disabled={branch.disabled}
+          onChange={(access) => onChange({ ...value, access })}
+        />
       ) : null}
+    </div>
+  );
+}
+
+export function RepositoryAccessField(props: {
+  id: string;
+  value: WorkspaceRepositoryAccess;
+  disabled: boolean;
+  onChange: (access: WorkspaceRepositoryAccess) => void;
+}) {
+  return (
+    <div className="min-w-0 space-y-2">
+      <Label htmlFor={props.id}>{AGENT_RESOURCES_COPY.accessLabel}</Label>
+      <Select
+        value={props.value}
+        disabled={props.disabled}
+        onValueChange={(access) => props.onChange(workspaceRepositoryAccess(access))}
+      >
+        <SelectTrigger id={props.id} className="w-full" data-testid={props.id}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="write">{AGENT_RESOURCES_COPY.accessWrite}</SelectItem>
+          <SelectItem value="read">{AGENT_RESOURCES_COPY.accessRead}</SelectItem>
+        </SelectContent>
+      </Select>
+      <p className="text-[12px] text-muted-foreground">
+        {props.value === "write" ? AGENT_RESOURCES_COPY.accessWriteHint : AGENT_RESOURCES_COPY.accessReadHint}
+      </p>
     </div>
   );
 }
