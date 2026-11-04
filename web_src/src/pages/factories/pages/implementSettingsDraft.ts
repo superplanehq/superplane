@@ -14,7 +14,7 @@ const IMPLEMENT_SETTINGS_SAVE_ERROR = "Could not save Implement settings.";
 const DEFAULT_TIMEOUT_SECONDS = 3600;
 const PULL_REQUEST_COMPONENTS = ["github.createPullRequest", "bitbucket.createPullRequest"];
 
-type ImplementSettingsDraft = {
+export type ImplementSettingsDraft = {
   agentBase: SuperplaneComponentsNode;
   agentDraft: PlanningReviewDraft;
   pullRequestNode?: SuperplaneComponentsNode;
@@ -26,8 +26,42 @@ type ImplementSettingsDraft = {
 
 type SaveNode = (update: NodeConfigurationSave) => Promise<void> | void;
 
+// The agent opens the pull requests in GitHub workspaces. This agent
+// environment variable holds the draft setting there.
+const DRAFT_PULL_REQUESTS_ENV = "DRAFT_PULL_REQUESTS";
+
+type EnvironmentEntry = { name?: unknown; value?: unknown };
+
 export function findImplementPullRequest(nodes: SuperplaneComponentsNode[]) {
   return nodes.find((node) => PULL_REQUEST_COMPONENTS.includes(node.component ?? ""));
+}
+
+function environmentEntries(configuration: Record<string, unknown> | undefined): EnvironmentEntry[] {
+  const environment = configuration?.environment;
+  return Array.isArray(environment) ? (environment as EnvironmentEntry[]) : [];
+}
+
+function agentDraftPullRequests(configuration: Record<string, unknown> | undefined): boolean | undefined {
+  const entry = environmentEntries(configuration).find((item) => item?.name === DRAFT_PULL_REQUESTS_ENV);
+  return entry ? String(entry.value ?? "").trim() === "true" : undefined;
+}
+
+function withAgentDraftPullRequests(agentDraft: PlanningReviewDraft, draftPullRequests: boolean): PlanningReviewDraft {
+  const [component, ...rest] = agentDraft.components;
+  if (!component) return agentDraft;
+  const environment = environmentEntries(component.configuration).map((item) =>
+    item?.name === DRAFT_PULL_REQUESTS_ENV ? { ...item, value: String(draftPullRequests) } : item,
+  );
+  return {
+    ...agentDraft,
+    components: [{ ...component, configuration: { ...component.configuration, environment } }, ...rest],
+  };
+}
+
+/** Returns the draft pull request setting, or undefined when the app has none. */
+export function implementPullRequestDraft(draft: ImplementSettingsDraft): boolean | undefined {
+  if (draft.pullRequestNode) return draft.pullRequestNode.configuration?.draft === true;
+  return agentDraftPullRequests(draft.agentDraft.components[0]?.configuration);
 }
 
 export function implementDurationMinutes(seconds: unknown): string {
@@ -132,8 +166,14 @@ export function useImplementSettingsDraft(nodes: SuperplaneComponentsNode[] | un
   };
 
   const updatePullRequestDraft = (draftPullRequest: boolean) => {
-    const pullRequest = draftRef.current?.pullRequestNode;
-    if (!pullRequest) return;
+    const current = draftRef.current;
+    if (!current) return;
+    const pullRequest = current.pullRequestNode;
+    if (!pullRequest) {
+      if (implementPullRequestDraft(current) === undefined) return;
+      patchDraft({ agentDraft: withAgentDraftPullRequests(current.agentDraft, draftPullRequest) });
+      return;
+    }
     patchDraft({
       pullRequestNode: {
         ...pullRequest,
