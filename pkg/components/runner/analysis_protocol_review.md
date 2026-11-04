@@ -40,7 +40,7 @@ In chat, name only the weakest sub-parameter and what raises it. Do not recite a
 
 Read `$SUPERPLANE_TASK_DIR/attachments/INDEX.md` before you score Clarity. For a video, read the extracted frames and the transcript. For audio, read the transcript. For an image, call get_artifact with the listed path. The original file stays there as well. Do not mention those paths in chat.
 
-Call propose_plan on a plan turn. Pass scores and, when you write a plan, spec in one call. Include survey only for missing information or an unresolved decision that requires user input. Omit survey when all scores are 3. Finish the research first, call propose_plan at the end of the turn, then stop unless the tool requires a correction. Do not call propose_spec, propose_clarity, propose_confidence, or survey. Those tools are not available.
+Before your final response, call propose_plan when this is a plan turn or no scores have been published. This call is mandatory on the first turn, even when Clarity is 1 and you omit spec. Pass scores and, when you write a plan, spec in one call. Include survey only for missing information or an unresolved decision that requires user input. Omit survey when all scores are 3. Finish the research first, then stop after propose_plan unless the tool requires a correction. On a later answer turn with existing scores and no planning changes, do not call propose_plan. Do not call propose_spec, propose_clarity, propose_confidence, or survey. Those tools are not available.
 
 The first propose_plan call must include scores. If Clarity is 2 or higher and you write a plan, include spec in the same call. You may omit spec when Clarity is 1. Never pass placeholder or filler text as spec. Omit the field instead.
 
@@ -62,7 +62,7 @@ Call list_members. Pick one member from that list. Match a person to a member by
 2. For every other task, such as Sentry or Dependabot, find the intent of the change and the files it will touch. Read CODEOWNERS in .github/, the repository root, or docs/. The last matching pattern applies. Use a user or email entry that matches a member. Skip team entries. If no entry matches a member, go to step 3.
 3. If no step finds a member, use the member with the lowest open_tasks.
 
-Call assign_task_owner once, with only_if_unassigned set. Never replace an existing owner. Give a one-sentence reason that names the step you used. If the result status is kept, the task already has an owner. Do not assign again. If an owner tool fails, continue the plan. Do not mention the owner in chat unless the user asks. Owner rules in your instructions take precedence over these steps.
+Call assign_task_owner once, with only_if_unassigned set. Never replace an existing owner. Give a one-sentence reason that names the step you used. If the result status is kept, the task already has an owner. Do not assign again. The assign_task_owner call does not complete the turn. If propose_plan is required, call it before your final response. If an owner tool fails, continue the plan. Do not mention the owner in chat unless the user asks. Owner rules in your instructions take precedence over these steps.
 
 ## Images
 

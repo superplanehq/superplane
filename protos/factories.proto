@@ -487,6 +487,19 @@ service Factories {
     };
   }
 
+  rpc SearchFactoryPullRequestImportItems(SearchFactoryPullRequestImportItemsRequest) returns (SearchFactoryPullRequestImportItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/pull-request-imports/candidates"
+    };
+  }
+
+  rpc ImportFactoryPullRequest(ImportFactoryPullRequestRequest) returns (ImportFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/pull-request-imports"
+      body: "*"
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -707,6 +720,30 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove one work order artifact";
       description: "Removes one artifact from a work order by key or title";
+      tags: "Factory";
+    };
+  }
+
+  rpc AddWorkOrderChecks(AddWorkOrderChecksRequest) returns (AddWorkOrderChecksResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add work order checks";
+      description: "Adds or replaces checks on a work order. A check that SuperPlane owns cannot change.";
+      tags: "Factory";
+    };
+  }
+
+  rpc RemoveWorkOrderChecks(RemoveWorkOrderChecksRequest) returns (RemoveWorkOrderChecksResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/checks/remove"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove work order checks";
+      description: "Removes checks by key. Checks that SuperPlane owns stay.";
       tags: "Factory";
     };
   }
@@ -2174,6 +2211,13 @@ message WorkOrder {
   WorkOrderMcpClient mcp_client = 26;
   string refinement_model = 27;
   PendingHandOff pending_handoff = 28;
+  // Person who first moved this task from draft to open. Independent of ownership.
+  // Empty when the first start was automated or the task has not started.
+  UserRef started_by = 29;
+  // True when the first start was automatic. False before the task starts.
+  bool auto_started = 30;
+  // Timestamp of the first start. Empty before the task starts.
+  google.protobuf.Timestamp started_at = 31;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -2589,6 +2633,35 @@ message RemoveWorkOrderArtifactResponse {
   string title = 2;
 }
 
+message AddWorkOrderChecksRequest {
+  message Check {
+    string key = 1;
+    string name = 2;
+    double score = 3;
+    double max_score = 4;
+    WorkOrderCheck.Level level = 5;
+    string reason = 6;
+  }
+
+  string factory_id = 1;
+  string order_id = 2;
+  repeated Check checks = 3;
+}
+
+message AddWorkOrderChecksResponse {
+  repeated WorkOrderCheck checks = 1;
+}
+
+message RemoveWorkOrderChecksRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  repeated string keys = 3;
+}
+
+message RemoveWorkOrderChecksResponse {
+  repeated string removed = 1;
+}
+
 message WorkOrderArtifact {
   enum Type {
     TYPE_UNSPECIFIED = 0;
@@ -2603,6 +2676,8 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
+  // Stable id that an agent gave the artifact, if any.
+  string key = 6;
 }
 
 // WorkOrderCheck is a scored assessment an automation reported on a work
@@ -2645,6 +2720,9 @@ message WorkOrderCheck {
   // Recent report scores, oldest first, ending with the current score.
   // Capped server-side; powers the run-history strip on boolean checks.
   repeated double recent_scores = 15;
+  // automation for a SuperPlane check, agent for a check from add_checks
+  // or from a person.
+  string source = 16;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.
@@ -3529,4 +3607,36 @@ message CodexUsageWindow {
   double used_percent = 1;
   optional int64 window_duration_mins = 2;
   google.protobuf.Timestamp resets_at = 3;
+}
+
+message SearchFactoryPullRequestImportItemsRequest {
+  string factory_id = 1;
+  string query = 2;
+  int32 limit = 3;
+}
+
+message FactoryPullRequestImportItem {
+  string url = 1;
+  string title = 2;
+  string description = 3;
+  int64 number = 4;
+  bool draft = 5;
+  string repository = 6;
+  string provider = 7;
+  WorkOrderSummary existing_task = 8;
+}
+
+message SearchFactoryPullRequestImportItemsResponse {
+  repeated FactoryPullRequestImportItem items = 1;
+}
+
+message ImportFactoryPullRequestRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  string pull_request_url = 3;
+}
+
+message ImportFactoryPullRequestResponse {
+  WorkOrder order = 1;
+  bool created = 2;
 }

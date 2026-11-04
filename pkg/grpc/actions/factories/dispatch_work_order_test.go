@@ -67,7 +67,7 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
-	assert.Equal(t, []uuid.UUID{r.User}, reloaded.AssigneeIDs())
+	assert.ElementsMatch(t, []uuid.UUID{creator.ID, owner.ID}, reloaded.AssigneeIDs())
 
 	active, err := order.FindActiveLineDispatch(db)
 	require.NoError(t, err)
@@ -283,7 +283,7 @@ func Test__DispatchWorkOrder__ClearsAutoStartLine(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
 	assert.Nil(t, reloaded.AutoStartLineID)
-	assert.Equal(t, []uuid.UUID{r.User}, reloaded.AssigneeIDs())
+	assert.ElementsMatch(t, []uuid.UUID{creator.ID, owner.ID}, reloaded.AssigneeIDs())
 }
 
 func Test__DispatchWorkOrder__CompletesActiveAnalysisRun(t *testing.T) {

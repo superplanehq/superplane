@@ -25,9 +25,9 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
 };
 
 /**
- * Picks the runner model and thinking for Start. Start assigns the task to
- * the caller, so the list is the caller's catalog and not the saved owner's
- * catalog. `icon` is the chevron fused to Start,
+ * Picks the runner model and thinking for Start. Use the saved owner's
+ * catalog, or the caller's catalog when the task has no owner.
+ * `icon` is the chevron fused to Start,
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
  * strip settings row. Closed labeled and ghost triggers show the model name
  * and the thinking word when one is chosen. Thinking lists the levels of the
@@ -37,6 +37,7 @@ export function DraftStartModelSelect({
   organizationId,
   factoryId,
   lineName,
+  orderId,
   model,
   thinkingLevel,
   onChange,
@@ -46,14 +47,14 @@ export function DraftStartModelSelect({
   organizationId?: string;
   factoryId?: string;
   lineName?: string;
+  orderId?: string;
   model: string;
   thinkingLevel: string;
   onChange: (next: { model: string; thinkingLevel: string }) => void;
   disabled?: boolean;
   appearance?: Appearance;
 }) {
-  // Omit the task ID. Start assigns the task to the caller before it checks the model.
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true);
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId);
   const runnerModels = models.data?.models;
   const catalogName = (runnerModels ?? []).find((item) => item.id === model)?.name;
   const selectedName =

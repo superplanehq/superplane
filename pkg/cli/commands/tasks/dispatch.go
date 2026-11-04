@@ -16,9 +16,9 @@ type taskDispatchCommand struct {
 }
 
 func (c *taskDispatchCommand) Execute(ctx core.CommandContext) error {
-	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	rawTaskID := taskRef(c.taskID)
 	if rawTaskID == "" {
-		return fmt.Errorf("--task is required")
+		return errTaskRequired
 	}
 
 	lineName := strings.TrimSpace(stringValue(c.line))

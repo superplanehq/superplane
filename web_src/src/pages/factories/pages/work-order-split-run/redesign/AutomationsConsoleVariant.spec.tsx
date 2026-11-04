@@ -355,6 +355,13 @@ describe("AutomationsConsoleVariant summary strip", () => {
 });
 
 describe("AutomationsConsoleVariant intake", () => {
+  it("labels an automatic start without a person avatar", () => {
+    renderConsole(splitRunFixtureForWorkOrder({ ...OPEN_WORK_ORDER, startedBy: undefined, autoStarted: true }));
+    const summary = within(screen.getByTestId("redesign-console-summary"));
+    expect(summary.getByText("Auto-started")).toBeVisible();
+    expect(summary.queryByRole("img", { name: /^Started by / })).not.toBeInTheDocument();
+  });
+
   it("shows Intake with the source icon and the task description", () => {
     renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "Users see duplicate refund entries." });
 
@@ -373,6 +380,7 @@ describe("AutomationsConsoleVariant intake", () => {
     expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(
       "Intake GitHub issues",
     );
+    expect(screen.queryByRole("img", { name: /^Started by / })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Toggle Ingest details" })).not.toBeInTheDocument();
     expect(
       intake.compareDocumentPosition(screen.getByTestId("redesign-console-column-backlog")) &
@@ -455,14 +463,19 @@ describe("AutomationsConsoleVariant intake", () => {
     expect(within(description).queryByTestId("split-run-source-ticket")).not.toBeInTheDocument();
   });
 
-  it("shows who imported a task in the Intake description", () => {
+  it("keeps import attribution and identifies the starter beside the start time", async () => {
     const imported = splitRunFixtureForWorkOrder({
       ...OPEN_WORK_ORDER,
+      startedBy: { id: "reviewer", name: "Casey Reviewer" },
       createdBy: { user: { id: SPLIT_RUN_RUNNING.owner.id, name: SPLIT_RUN_RUNNING.owner.name } },
       origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
     });
     renderConsole(imported, { taskDescription: "Users see duplicate refund entries." });
 
+    const starter = screen.getByRole("img", { name: "Started by Casey Reviewer" });
+    expect(starter).toBeVisible();
+    fireEvent.focus(starter);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Started by Casey Reviewer");
     const description = screen.getByTestId("redesign-console-task-description");
     expect(within(description).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments#12");
     expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(

@@ -108,6 +108,9 @@ message CreateWorkOrderFileRequest {
   string order_id = 2;
   string filename = 3;
   string content_type = 4;
+  // attachment (the default) or artifact. Attach an artifact file to the
+  // task with CreateWorkOrderArtifact after the upload.
+  string purpose = 5;
 }
 
 message CreateWorkOrderFileResponse {
