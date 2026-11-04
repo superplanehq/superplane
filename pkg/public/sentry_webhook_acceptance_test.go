@@ -119,6 +119,38 @@ func TestSentryHostedWebhookAdmitsWorkflowEvents(t *testing.T) {
 	assert.Equal(t, models.SentryWebhookOutcomeAccepted, receipt.Outcome)
 }
 
+func TestSentryHostedWebhookRecordsNoConnection(t *testing.T) {
+	_, server := sentryAdmissionServer(t)
+
+	recorder := httptest.NewRecorder()
+	server.HandleSentryAppWebhook(recorder, signedSentryRequest("/api/v1/sentry/app/webhook", []byte(issueWebhookBody), "csecret"))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var receipt models.SentryWebhookReceipt
+	require.NoError(t, database.Conn().Where("id = ?", recorder.Header().Get(sentryintegration.HeaderWebhookReceipt)).First(&receipt).Error)
+	assert.Equal(t, models.SentryWebhookOutcomeNoConnection, receipt.Outcome)
+	assert.Zero(t, receipt.IntegrationCount)
+}
+
+func TestSentryHostedWebhookRecordsSkippedEventWithoutLiveCanvas(t *testing.T) {
+	resources, server := sentryAdmissionServer(t)
+	_, node := sentryAdmissionConnection(t, resources, map[string]any{"hostedApp": true, "installationUUID": "install-1"})
+	other, _ := support.CreateCanvas(t, resources.Organization.ID, resources.User, nil, nil)
+	require.NoError(t, database.Conn().Model(&models.Canvas{}).
+		Where("id = ?", node.WorkflowID).
+		Update("live_version_id", other.LiveVersionID).Error)
+
+	recorder := httptest.NewRecorder()
+	server.HandleSentryAppWebhook(recorder, signedSentryRequest("/api/v1/sentry/app/webhook", []byte(issueWebhookBody), "csecret"))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.Empty(t, sentryNodeEvents(t, node))
+	var receipt models.SentryWebhookReceipt
+	require.NoError(t, database.Conn().Where("id = ?", recorder.Header().Get(sentryintegration.HeaderWebhookReceipt)).First(&receipt).Error)
+	assert.Equal(t, "skipped", receipt.Outcome)
+	assert.Equal(t, 1, receipt.IntegrationCount)
+}
+
 func TestSentryHostedWebhookRejectsBadSignatureAndFailedPersistence(t *testing.T) {
 	resources, server := sentryAdmissionServer(t)
 	_, node := sentryAdmissionConnection(t, resources, map[string]any{"hostedApp": true, "installationUUID": "install-1"})

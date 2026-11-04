@@ -33,8 +33,8 @@ func (s *Server) acceptSentryWebhook(w http.ResponseWriter, r *http.Request, bod
 	summary := sentryintegration.SummarizeWebhook(resource, body)
 	newEvents := []models.CanvasEvent{}
 	var receiptID uuid.UUID
+	outcome := models.SentryWebhookOutcomeAccepted
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		outcome := models.SentryWebhookOutcomeAccepted
 		if len(integrations) == 0 {
 			outcome = models.SentryWebhookOutcomeNoConnection
 		}
@@ -65,6 +65,12 @@ func (s *Server) acceptSentryWebhook(w http.ResponseWriter, r *http.Request, bod
 				return fmt.Errorf("dispatch Sentry webhook to integration %s: %w", integration.ID, err)
 			}
 		}
+		if len(integrations) > 0 && len(newEvents) == 0 {
+			outcome = models.SentryWebhookOutcomeSkipped
+			if err := models.UpdateSentryWebhookReceiptResult(tx, receiptID, http.StatusOK, outcome, len(integrations)); err != nil {
+				return fmt.Errorf("mark Sentry webhook receipt skipped: %w", err)
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -78,9 +84,10 @@ func (s *Server) acceptSentryWebhook(w http.ResponseWriter, r *http.Request, bod
 
 	w.Header().Set(sentryintegration.HeaderWebhookReceipt, receiptID.String())
 	w.WriteHeader(http.StatusOK)
-	logging.LogSentryWebhookInfo("Sentry webhook accepted", log.Fields{
+	logging.LogSentryWebhookInfo("Sentry webhook recorded", log.Fields{
 		"hook_resource":     message.Resource,
 		"action":            message.Action,
+		"outcome":           outcome,
 		"integration_count": len(integrations),
 		"event_count":       len(newEvents),
 		"duration_ms":       time.Since(started).Milliseconds(),
