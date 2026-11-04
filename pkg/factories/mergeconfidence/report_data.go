@@ -21,6 +21,7 @@ type ReportData struct {
 	PullRequestID  string        `json:"pullRequestId"`
 	Complete       bool          `json:"complete"`
 	OverallScore   *float64      `json:"overallScore"`
+	OverallLevel   string        `json:"overallLevel"`
 	Checks         []ReportCheck `json:"checks"`
 	ReviewedCommit string        `json:"reviewedCommit"`
 	TaskURL        string        `json:"taskUrl"`
@@ -32,6 +33,7 @@ type ReportCheck struct {
 	Score    float64 `json:"score"`
 	MaxScore float64 `json:"maxScore"`
 	Summary  string  `json:"summary"`
+	Level    string  `json:"level"`
 	Missing  bool    `json:"missing"`
 }
 
@@ -48,20 +50,28 @@ func (a Assessment) ReportData() ReportData {
 		if missing {
 			report.Complete = false
 		}
-		report.Checks = append(report.Checks, ReportCheck{ID: id, Label: label, Score: check.Score, MaxScore: check.MaxScore, Summary: check.Summary, Missing: missing})
+		report.Checks = append(report.Checks, ReportCheck{ID: id, Label: label, Score: check.Score, MaxScore: check.MaxScore, Summary: check.Summary, Level: check.Level, Missing: missing})
 	}
 	if report.Complete {
-		if score, ok := a.overallScore(); ok {
+		if score, level, ok := a.overallRating(); ok {
 			report.OverallScore = &score
+			report.OverallLevel = level
 		}
 	}
 	return report
 }
 
 // Match the UI headline: invert risk and drift, then take the weakest built-in
-// score. Custom checks are visible but do not contribute to the aggregate.
-func (a Assessment) overallScore() (float64, bool) {
+// score and the most severe reported level. Custom checks do not contribute.
+func (a Assessment) overallRating() (float64, string, bool) {
 	weakest, found := 1.0, false
+	level := factory.CheckLevelPositive
+	severity := map[string]int{
+		factory.CheckLevelPositive: 0,
+		factory.CheckLevelNeutral:  1,
+		factory.CheckLevelCaution:  2,
+		factory.CheckLevelCritical: 3,
+	}
 	for _, id := range a.Enabled {
 		switch id {
 		case "risk", "performance", "security", "drift", "reversibility":
@@ -77,9 +87,16 @@ func (a Assessment) overallScore() (float64, bool) {
 			points = check.MaxScore + 1 - points
 		}
 		weakest = math.Min(weakest, math.Max(0, math.Min(check.MaxScore, points))/check.MaxScore)
+		checkLevel := check.Level
+		if _, known := severity[checkLevel]; !known {
+			checkLevel = factory.CheckLevelNeutral
+		}
+		if severity[checkLevel] > severity[level] {
+			level = checkLevel
+		}
 		found = true
 	}
-	return math.Round(weakest * 5), found
+	return math.Round(weakest * 5), level, found
 }
 
 func validCheck(check factory.CheckRef) bool {

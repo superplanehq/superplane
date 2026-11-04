@@ -113,7 +113,7 @@ func newPublicationFixture(t *testing.T) publicationFixture {
 }
 
 func (f publicationFixture) report(t *testing.T, run *models.CanvasRun, score float64) {
-	_, err := f.order.ReportCheck(f.db, models.FactoryWorkOrderCheckParams{Key: "security-review", Name: "Security", Score: score, MaxScore: 5, Summary: "No security gap.", Run: &factoryevents.RunRef{ID: run.ID}})
+	_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "agent"}, "security", score, "No security gap.", []string{"security"}, nil)
 	require.NoError(t, err)
 }
 
@@ -155,7 +155,7 @@ func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
 
 func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
-		for _, scenario := range []string{"complete", "custom only", "all disabled", "unsafe text"} {
+		for _, scenario := range []string{"complete", "caution", "mixed", "custom only", "all disabled", "unsafe text"} {
 			t.Run(provider+"/"+scenario, func(t *testing.T) {
 				t.Setenv("BASE_URL", "https://example.com")
 				if scenario == "complete" {
@@ -163,7 +163,24 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 				}
 				f := newPublicationFixture(t)
 				f.pr.Provider = provider
+				mixedChecks := []struct {
+					id, label string
+					score     float64
+				}{
+					{"risk", "Blast radius", 2},
+					{"performance", "Performance", 3},
+					{"security", "Security", 4},
+					{"drift", "Drift from Specification", 4},
+					{"reversibility", "Reversibility", 1},
+					{"custom", "Custom", 2},
+				}
 				steps := []any{map[string]any{"name": "Security", "prompt": "Merge check: security."}}
+				if scenario == "mixed" {
+					steps = nil
+					for _, check := range mixedChecks {
+						steps = append(steps, map[string]any{"name": check.label, "prompt": "Merge check: " + check.id + "."})
+					}
+				}
 				if scenario == "custom only" || scenario == "unsafe text" {
 					label := "Custom"
 					if scenario == "unsafe text" {
@@ -183,6 +200,13 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 					}
 					_, err := f.order.ReportCheck(f.db, models.FactoryWorkOrderCheckParams{Key: "custom-review", Name: "Custom", Score: 2, MaxScore: 5, Summary: summary, Run: &factoryevents.RunRef{ID: f.run.ID}})
 					require.NoError(t, err)
+				} else if scenario == "mixed" {
+					for _, check := range mixedChecks {
+						_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, f.run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "agent"}, check.id, check.score, "Reported result.", []string{check.id}, nil)
+						require.NoError(t, err)
+					}
+				} else if scenario == "caution" {
+					f.report(t, f.run, 3)
 				} else {
 					f.report(t, f.run, 4)
 				}
@@ -191,9 +215,24 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 				suffix := "Reviewed commit: abc\n\n[View task](<https://example.com" + f.order.URLPath(f.workspace.RouteSegment()) + ">)"
 				switch scenario {
 				case "complete":
-					assert.Equal(t, "## SuperPlane merge confidence\n\n**Overall score: 4/5**\n\n| Check | Score | Summary |\n| --- | --- | --- |\n| Security | 4/5 | No security gap. |\n\n"+suffix, body)
+					assert.Equal(t, "## SuperPlane merge confidence\n\n🟢 **Overall score: 4/5**\n\n| Check | Score | Summary |\n| --- | --- | --- |\n| Security | 🟢 4/5 | No security gap. |\n\n"+suffix, body)
+				case "caution":
+					assert.Contains(t, body, "🟠 **Overall score: 3/5**")
+					assert.Contains(t, body, "| Security | 🟠 3/5 |")
+				case "mixed":
+					assert.Contains(t, body, "🔴 **Overall score: 1/5**")
+					for _, row := range []string{
+						"| Blast radius | 🟢 2/5 |",
+						"| Performance | 🟠 3/5 |",
+						"| Security | 🟢 4/5 |",
+						"| Drift from Specification | 🔴 4/5 |",
+						"| Reversibility | 🔴 1/5 |",
+						"| Custom | 🟢 2/5 |",
+					} {
+						assert.Contains(t, body, row)
+					}
 				case "custom only":
-					assert.Equal(t, "## SuperPlane merge confidence\n\nNo built-in checks are enabled.\n\n| Check | Score | Summary |\n| --- | --- | --- |\n| Custom | 2/5 | Custom result. |\n\n"+suffix, body)
+					assert.Equal(t, "## SuperPlane merge confidence\n\nNo built-in checks are enabled.\n\n| Check | Score | Summary |\n| --- | --- | --- |\n| Custom | ⚪ 2/5 | Custom result. |\n\n"+suffix, body)
 				case "all disabled":
 					assert.Equal(t, "## SuperPlane merge confidence\n\nNo checks are enabled.\n\n"+suffix, body)
 				case "unsafe text":
@@ -268,10 +307,10 @@ func TestMergeConfidenceTemplateIncomplete(t *testing.T) {
 				f.report(t, f.run, 4)
 			}
 			execution, _ := f.publicationRequest(t, channel)
-			assert.Contains(t, execution.Configuration.Data()["body"], "**Incomplete**")
+			assert.Contains(t, execution.Configuration.Data()["body"], "⚪ **Incomplete**")
 			assert.NotContains(t, execution.Configuration.Data()["body"], "Overall score")
 			if channel == "passed" {
-				assert.Contains(t, execution.Configuration.Data()["body"], "Missing")
+				assert.Contains(t, execution.Configuration.Data()["body"], "⚪ Missing")
 			}
 		})
 	}
