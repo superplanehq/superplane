@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import { LinearIntakeScopeFields } from "./LinearIntakeScopeFields";
-import { linearScopeFromSettings, linearSettingsFromScope } from "./linearIntakeScope";
+import { linearScopeFromSettings, linearSettingsFromScope, type LinearFilterChoices } from "./linearIntakeScope";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 export function LinearIntakeFilterFields({
@@ -11,16 +11,16 @@ export function LinearIntakeFilterFields({
   onSettingsChange,
   organizationId,
   integrationId,
-  onLabelFilterChange,
-  onProjectFilterChange,
+  filterChoices,
+  onFilterChoicesChange,
 }: {
   sourceId: LineIntakeSourceId;
   settings: IntakeSourceSettings;
   onSettingsChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   organizationId?: string;
   integrationId?: string;
-  onLabelFilterChange?: (enabled: boolean) => void;
-  onProjectFilterChange?: (enabled: boolean) => void;
+  filterChoices: LinearFilterChoices;
+  onFilterChoicesChange: (choices: LinearFilterChoices) => void;
 }) {
   if (sourceId !== "linear-issues") {
     return null;
@@ -32,9 +32,7 @@ export function LinearIntakeFilterFields({
       integrationId={integrationId ?? ""}
       scope={linearScopeFromSettings(settings)}
       onChange={(scope) => onSettingsChange((current) => ({ ...current, ...linearSettingsFromScope(scope) }))}
-      settingsLayout
-      onLabelFilterChange={onLabelFilterChange}
-      onProjectFilterChange={onProjectFilterChange}
+      settingsFilters={{ choices: filterChoices, onChoicesChange: onFilterChoicesChange }}
     />
   );
 }

@@ -1,14 +1,28 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
-import { useId, useState } from "react";
+import { useId } from "react";
 
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { LinearLabelField } from "./LinearLabelField";
 import { LinearProjectPicker } from "./LinearProjectPicker";
 import { LinearTeamPicker } from "./LinearTeamPicker";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
-import { selectLinearTeam, toggleLinearProject, type LinearIntakeScope } from "./linearIntakeScope";
+import {
+  selectLinearTeam,
+  toggleLinearProject,
+  type LinearFilterChoices,
+  type LinearIntakeScope,
+} from "./linearIntakeScope";
+
+/**
+ * The intake settings layout. The settings popup keeps the filter choices with
+ * its draft, so they survive a tab change.
+ */
+export interface LinearSettingsFilters {
+  choices: LinearFilterChoices;
+  onChoicesChange: (choices: LinearFilterChoices) => void;
+}
 
 /**
  * Team, projects, and labels of a Linear intake. The setup dialog, the intake
@@ -24,19 +38,17 @@ export function LinearIntakeScopeFields({
   scope,
   onChange,
   showLabels = true,
-  settingsLayout = false,
-  onLabelFilterChange,
-  onProjectFilterChange,
+  settingsFilters,
 }: {
   organizationId: string;
   integrationId: string;
   scope: LinearIntakeScope;
   onChange: (scope: LinearIntakeScope) => void;
   showLabels?: boolean;
-  settingsLayout?: boolean;
-  onLabelFilterChange?: (enabled: boolean) => void;
-  onProjectFilterChange?: (enabled: boolean) => void;
+  /** Set for the intake settings layout. It shows all-or-selected choices for projects and labels. */
+  settingsFilters?: LinearSettingsFilters;
 }) {
+  const settingsLayout = Boolean(settingsFilters);
   const connected = Boolean(organizationId && integrationId);
   const showFilters = Boolean(scope.teamId) || scope.projectIds.length > 0;
   const teamsQuery = useIntegrationResources(organizationId, integrationId, "team", undefined, {
@@ -75,8 +87,7 @@ export function LinearIntakeScopeFields({
           <LinearScopeProjects
             scope={scope}
             onChange={onChange}
-            settingsLayout={settingsLayout}
-            onProjectFilterChange={onProjectFilterChange}
+            settingsFilters={settingsFilters}
             projects={projectsQuery.data ?? []}
             missingProjectIds={missingProjectIds}
             loading={projectsQuery.isLoading}
@@ -89,8 +100,7 @@ export function LinearIntakeScopeFields({
               integrationId={integrationId}
               scope={scope}
               onChange={onChange}
-              settingsLayout={settingsLayout}
-              onLabelFilterChange={onLabelFilterChange}
+              settingsFilters={settingsFilters}
             />
           ) : null}
         </>
@@ -154,28 +164,26 @@ function LinearScopeLabels({
   integrationId,
   scope,
   onChange,
-  settingsLayout,
-  onLabelFilterChange,
+  settingsFilters,
 }: {
   organizationId: string;
   integrationId: string;
   scope: LinearIntakeScope;
   onChange: (scope: LinearIntakeScope) => void;
-  settingsLayout: boolean;
-  onLabelFilterChange?: (enabled: boolean) => void;
+  settingsFilters?: LinearSettingsFilters;
 }) {
   return (
     <fieldset className="min-w-0">
-      <legend className={settingsLayout ? "text-sm font-medium" : "workspace-section-title"}>
+      <legend className={settingsFilters ? "text-sm font-medium" : "workspace-section-title"}>
         {LINEAR_INTAKE_SETUP_COPY.labelsLabel}
       </legend>
-      {settingsLayout ? (
+      {settingsFilters ? (
         <LinearSettingsLabels
           organizationId={organizationId}
           integrationId={integrationId}
           scope={scope}
           onChange={onChange}
-          onLabelFilterChange={onLabelFilterChange}
+          settingsFilters={settingsFilters}
         />
       ) : (
         <>
@@ -198,8 +206,7 @@ function LinearScopeLabels({
 function LinearScopeProjects({
   scope,
   onChange,
-  settingsLayout,
-  onProjectFilterChange,
+  settingsFilters,
   projects,
   missingProjectIds,
   loading,
@@ -208,8 +215,7 @@ function LinearScopeProjects({
 }: {
   scope: LinearIntakeScope;
   onChange: (scope: LinearIntakeScope) => void;
-  settingsLayout: boolean;
-  onProjectFilterChange?: (enabled: boolean) => void;
+  settingsFilters?: LinearSettingsFilters;
   projects: Array<{ id?: string; name?: string }>;
   missingProjectIds: string[];
   loading: boolean;
@@ -217,15 +223,14 @@ function LinearScopeProjects({
   onRetry: () => void;
 }) {
   const choiceName = useId();
-  const [filterByProject, setFilterByProject] = useState(scope.projectIds.length > 0);
-  const selectedProjects = filterByProject || scope.projectIds.length > 0;
+  const selectedProjects = Boolean(settingsFilters?.choices.projects) || scope.projectIds.length > 0;
 
   return (
     <fieldset className="min-w-0">
-      <legend className={settingsLayout ? "text-sm font-medium" : "workspace-section-title"}>
+      <legend className={settingsFilters ? "text-sm font-medium" : "workspace-section-title"}>
         {LINEAR_INTAKE_SETUP_COPY.projectsLabel}
       </legend>
-      {settingsLayout ? (
+      {settingsFilters ? (
         <div className="mt-3 flex flex-col gap-3">
           <IntakeSettingsRadioOption
             variant="plain"
@@ -234,8 +239,7 @@ function LinearScopeProjects({
             title="All projects"
             checked={!selectedProjects}
             onChange={() => {
-              setFilterByProject(false);
-              onProjectFilterChange?.(false);
+              settingsFilters.onChoicesChange({ ...settingsFilters.choices, projects: false });
               onChange({ ...scope, projectIds: [] });
             }}
           />
@@ -246,8 +250,7 @@ function LinearScopeProjects({
             title="Only issues in selected projects"
             checked={selectedProjects}
             onChange={() => {
-              setFilterByProject(true);
-              onProjectFilterChange?.(true);
+              settingsFilters.onChoicesChange({ ...settingsFilters.choices, projects: true });
             }}
           />
           {selectedProjects ? (
@@ -340,17 +343,16 @@ function LinearSettingsLabels({
   integrationId,
   scope,
   onChange,
-  onLabelFilterChange,
+  settingsFilters,
 }: {
   organizationId: string;
   integrationId: string;
   scope: LinearIntakeScope;
   onChange: (scope: LinearIntakeScope) => void;
-  onLabelFilterChange?: (enabled: boolean) => void;
+  settingsFilters: LinearSettingsFilters;
 }) {
   const labelChoiceName = useId();
-  const [filterByLabel, setFilterByLabel] = useState(scope.labels.length > 0);
-  const selectedLabels = filterByLabel || scope.labels.length > 0;
+  const selectedLabels = settingsFilters.choices.labels || scope.labels.length > 0;
 
   return (
     <div className="mt-3 flex flex-col gap-3">
@@ -361,8 +363,7 @@ function LinearSettingsLabels({
         title="All issues"
         checked={!selectedLabels}
         onChange={() => {
-          setFilterByLabel(false);
-          onLabelFilterChange?.(false);
+          settingsFilters.onChoicesChange({ ...settingsFilters.choices, labels: false });
           onChange({ ...scope, labels: [] });
         }}
       />
@@ -373,8 +374,7 @@ function LinearSettingsLabels({
         title="Only issues with selected labels"
         checked={selectedLabels}
         onChange={() => {
-          setFilterByLabel(true);
-          onLabelFilterChange?.(true);
+          settingsFilters.onChoicesChange({ ...settingsFilters.choices, labels: true });
         }}
       />
       {selectedLabels ? (

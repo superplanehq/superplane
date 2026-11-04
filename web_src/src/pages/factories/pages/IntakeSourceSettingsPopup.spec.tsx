@@ -510,19 +510,26 @@ describe("IntakeSourceSettingsPopup", () => {
     );
   });
 
-  it("requires a project after selecting the project filter", async () => {
+  it.each([
+    ["Only issues in selected projects", "All projects"],
+    ["Only issues with selected labels", "All issues"],
+  ] as const)("requires a selection for %s, also after a tab change", async (choice, allChoice) => {
     const user = userEvent.setup();
     renderPopup({
       sourceId: "linear-issues",
       settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearTeamId: "team-1" },
     });
 
-    const save = screen.getByTestId("intake-source-settings-save");
-    expect(save).toBeEnabled();
-    await user.click(screen.getByRole("radio", { name: "Only issues in selected projects" }));
-    expect(save).toBeDisabled();
-    await user.click(screen.getByRole("radio", { name: "All projects" }));
-    expect(save).toBeEnabled();
+    const save = () => screen.getByTestId("intake-source-settings-save");
+    expect(save()).toBeEnabled();
+    await user.click(screen.getByRole("radio", { name: choice }));
+    expect(save()).toBeDisabled();
+    await user.click(screen.getByRole("tab", { name: "Runs" }));
+    await user.click(screen.getByRole("tab", { name: "General" }));
+    expect(screen.getByRole("radio", { name: choice })).toBeChecked();
+    expect(save()).toBeDisabled();
+    await user.click(screen.getByRole("radio", { name: allChoice }));
+    expect(save()).toBeEnabled();
   });
 
   it("saves an older Linear intake that has projects and no team unchanged", async () => {

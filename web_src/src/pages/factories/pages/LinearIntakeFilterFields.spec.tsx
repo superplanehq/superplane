@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { LinearIntakeFilterFields } from "./LinearIntakeFilterFields";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import { linearFilterChoicesFromSettings } from "./linearIntakeScope";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 
 const resourceCalls = vi.hoisted(() => [] as Array<{ type: string; parameters?: Record<string, string> }>);
@@ -51,6 +52,7 @@ function Fields({
     linearLabels: [],
     ...initial,
   });
+  const [filterChoices, setFilterChoices] = useState(() => linearFilterChoicesFromSettings(settings));
   onChange?.(settings);
   return (
     <LinearIntakeFilterFields
@@ -59,6 +61,8 @@ function Fields({
       onSettingsChange={setSettings}
       organizationId="org-1"
       integrationId="integration-1"
+      filterChoices={filterChoices}
+      onFilterChoicesChange={setFilterChoices}
     />
   );
 }

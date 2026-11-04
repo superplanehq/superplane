@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 import { IntakeAutomaticIntakeSetting } from "./IntakeAutomaticIntakeSetting";
 import { IntakeSettingsHeader } from "./IntakeSettingsHeader";
@@ -7,7 +7,6 @@ import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
 import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
 import { NodeConfigRepositoryLine } from "./NodeConfigPanel";
 import {
-  intakeSettingsContentKey,
   intakeSourceSettingsTitle,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
@@ -23,6 +22,8 @@ import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { PopupShell } from "./work-order-popup-redesign/popupShared";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
+import type { LinearFilterChoices } from "./linearIntakeScope";
+import { useIntakeSettingsDraft } from "./useIntakeSettingsDraft";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 interface IntakeSourceSettingsPopupProps {
@@ -88,7 +89,8 @@ export function IntakeSourceSettingsPopup({
   page = false,
   initialTab = "general",
 }: IntakeSourceSettingsPopupProps) {
-  const { draft, onDraftChange, getDraft } = useIntakeSettingsDraft(settings);
+  const { draft, onDraftChange, getDraft, linearFilterChoices, setLinearFilterChoices } =
+    useIntakeSettingsDraft(settings);
   const editableAgent = editableAgentSlot(agent, canEdit);
   const history = useFactoryAutomationNavigation({
     organizationId,
@@ -142,6 +144,8 @@ export function IntakeSourceSettingsPopup({
           labelOptions={labelOptions}
           labelOptionsLoading={labelOptionsLoading}
           draft={draft}
+          linearFilterChoices={linearFilterChoices}
+          onLinearFilterChoicesChange={setLinearFilterChoices}
           canEdit={canEdit}
           accessLoading={accessLoading}
           agent={editableAgent}
@@ -185,37 +189,6 @@ function editableAgentSlot(agent: PlanningReviewAgentSlot | undefined, canEdit: 
   return agent;
 }
 
-/**
- * Keeps unsaved edits while the parent passes equal settings in a new object.
- * `getDraft` returns the latest edit even before React re-renders.
- */
-function useIntakeSettingsDraft(settings: IntakeSourceSettings) {
-  const [draft, setDraft] = useState(settings);
-  const draftRef = useRef(settings);
-  const settingsContentKey = intakeSettingsContentKey(settings);
-  const syncedSettingsKey = useRef(settingsContentKey);
-
-  const onDraftChange = useCallback((update: SetStateAction<IntakeSourceSettings>) => {
-    setDraft((current) => {
-      const next = typeof update === "function" ? update(current) : update;
-      draftRef.current = next;
-      return next;
-    });
-  }, []);
-  const getDraft = useCallback(() => draftRef.current, []);
-
-  useEffect(() => {
-    if (syncedSettingsKey.current === settingsContentKey) {
-      return;
-    }
-    syncedSettingsKey.current = settingsContentKey;
-    setDraft(settings);
-    draftRef.current = settings;
-  }, [settings, settingsContentKey]);
-
-  return { draft, onDraftChange, getDraft };
-}
-
 function IntakeSettingsTabPanel({
   automaticIntakeSetting,
   repository,
@@ -227,6 +200,8 @@ function IntakeSettingsTabPanel({
   labelOptions,
   labelOptionsLoading,
   draft,
+  linearFilterChoices,
+  onLinearFilterChoicesChange,
   canEdit,
   accessLoading,
   agent,
@@ -270,6 +245,8 @@ function IntakeSettingsTabPanel({
       labelOptions={labelOptions}
       labelOptionsLoading={labelOptionsLoading}
       draft={draft}
+      linearFilterChoices={linearFilterChoices}
+      onLinearFilterChoicesChange={onLinearFilterChoicesChange}
       canEdit={canEdit}
       accessLoading={accessLoading}
       savePending={savePending}
@@ -295,6 +272,8 @@ type IntakeGeneralTabProps = {
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
   draft: IntakeSourceSettings;
+  linearFilterChoices: LinearFilterChoices;
+  onLinearFilterChoicesChange: (choices: LinearFilterChoices) => void;
   canEdit: boolean;
   accessLoading: boolean;
   savePending?: boolean;
@@ -318,6 +297,8 @@ function IntakeGeneralTab({
   labelOptions,
   labelOptionsLoading,
   draft,
+  linearFilterChoices,
+  onLinearFilterChoicesChange,
   canEdit,
   accessLoading,
   savePending,
@@ -330,8 +311,6 @@ function IntakeGeneralTab({
   onSave,
   onClose,
 }: IntakeGeneralTabProps) {
-  const [linearLabelFilterEnabled, setLinearLabelFilterEnabled] = useState(draft.linearLabels.length > 0);
-  const [linearProjectFilterEnabled, setLinearProjectFilterEnabled] = useState(draft.linearProjectIds.length > 0);
   const ownerField = (
     <IntakeSourceDefaultOwner
       sourceId={sourceId}
@@ -374,8 +353,8 @@ function IntakeGeneralTab({
               labelOptions={labelOptions}
               labelOptionsLoading={labelOptionsLoading}
               canEdit={canEdit}
-              onLabelFilterChange={setLinearLabelFilterEnabled}
-              onProjectFilterChange={setLinearProjectFilterEnabled}
+              linearFilterChoices={linearFilterChoices}
+              onLinearFilterChoicesChange={onLinearFilterChoicesChange}
             />
             {ownerAtBottom && organizationId ? <div className="border-t border-border pt-4">{ownerField}</div> : null}
           </fieldset>
@@ -385,10 +364,10 @@ function IntakeGeneralTab({
         sourceId={sourceId}
         draft={draft}
         linearLabelsRequired={
-          sourceId === "linear-issues" && linearLabelFilterEnabled && draft.linearLabels.length === 0
+          sourceId === "linear-issues" && linearFilterChoices.labels && draft.linearLabels.length === 0
         }
         linearProjectsRequired={
-          sourceId === "linear-issues" && linearProjectFilterEnabled && draft.linearProjectIds.length === 0
+          sourceId === "linear-issues" && linearFilterChoices.projects && draft.linearProjectIds.length === 0
         }
         canEdit={canEdit}
         savePending={savePending}
@@ -418,8 +397,8 @@ function IntakeFilterFields({
   labelOptions,
   labelOptionsLoading,
   canEdit,
-  onLabelFilterChange,
-  onProjectFilterChange,
+  linearFilterChoices,
+  onLinearFilterChoicesChange,
 }: Pick<
   IntakeGeneralTabProps,
   | "sourceId"
@@ -431,10 +410,9 @@ function IntakeFilterFields({
   | "labelOptions"
   | "labelOptionsLoading"
   | "canEdit"
-> & {
-  onLabelFilterChange: (enabled: boolean) => void;
-  onProjectFilterChange: (enabled: boolean) => void;
-}) {
+  | "linearFilterChoices"
+  | "onLinearFilterChoicesChange"
+>) {
   return (
     <>
       <GitHubIntakeFilterFields
@@ -483,8 +461,8 @@ function IntakeFilterFields({
         onSettingsChange={onDraftChange}
         organizationId={organizationId}
         integrationId={integrationId}
-        onLabelFilterChange={onLabelFilterChange}
-        onProjectFilterChange={onProjectFilterChange}
+        filterChoices={linearFilterChoices}
+        onFilterChoicesChange={onLinearFilterChoicesChange}
       />
     </>
   );

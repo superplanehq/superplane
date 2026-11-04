@@ -63,6 +63,22 @@ export function linearScopeFromSettings(settings: LinearScopeSettings): LinearIn
   };
 }
 
+/**
+ * The "selected projects" and "selected labels" choices of the intake
+ * settings. A choice can be on while its list is still empty. Save stays
+ * blocked until the user selects an item or goes back to all items.
+ */
+export interface LinearFilterChoices {
+  projects: boolean;
+  labels: boolean;
+}
+
+export function linearFilterChoicesFromSettings(
+  settings: Pick<IntakeSourceSettings, "linearProjectIds" | "linearLabels">,
+): LinearFilterChoices {
+  return { projects: settings.linearProjectIds.length > 0, labels: settings.linearLabels.length > 0 };
+}
+
 export function linearSettingsFromScope(scope: LinearIntakeScope): LinearScopeSettings {
   return {
     linearTeamId: scope.teamId,
