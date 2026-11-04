@@ -6,9 +6,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dro
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import { modelNameWithThinking, supportedThinkingLevel, thinkingOptions } from "@/lib/thinkingLevel";
+import { modelNameWithThinking, supportedThinkingLevel } from "@/lib/thinkingLevel";
 
-import { DRAFT_START_MODEL_AUTO, draftStartThinkingLevels } from "./draftStartModel";
+import { DRAFT_START_MODEL_AUTO, draftStartThinkingLevels, draftStartThinkingOptions } from "./draftStartModel";
 
 type Appearance = "icon" | "labeled" | "ghost";
 
@@ -31,7 +31,8 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
  * strip settings row. Closed labeled and ghost triggers show the model name
  * and the thinking word when one is chosen. Thinking lists the levels of the
- * selected model and is hidden for Auto or a model without levels.
+ * selected model and is hidden for Auto or a model without levels. Its
+ * Agent setting choice clears the override and keeps the selected model.
  */
 export function DraftStartModelSelect({
   organizationId,
@@ -60,7 +61,7 @@ export function DraftStartModelSelect({
   const selectedName =
     model === DRAFT_START_MODEL_AUTO ? "Auto" : catalogName || (models.isLoading ? model : `${model} (unavailable)`);
   const levels = draftStartThinkingLevels(runnerModels, model);
-  const thinking = thinkingOptions(levels, { withDefault: false });
+  const thinking = draftStartThinkingOptions(levels);
   const selectedThinking = supportedThinkingLevel(thinkingLevel, levels);
   const closedLabel = modelNameWithThinking(selectedName, selectedThinking);
   const catalogLoaded = runnerModels !== undefined;

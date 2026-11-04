@@ -403,6 +403,25 @@ describe("MobileTaskDetailPage model select", () => {
     expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toBeInTheDocument();
   });
 
+  it("starts without a thinking override after the user picks the agent setting", async () => {
+    const user = userEvent.setup();
+    renderDraft();
+
+    await user.click(startModelButton("Model: Auto"));
+    await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6" }));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6 High" }));
+    await user.click(screen.getByRole("menuitem", { name: "Agent setting" }));
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+      lineName: PLAN_LINE_NAME,
+      model: "claude-opus-4-6",
+      thinkingLevel: undefined,
+    });
+  });
+
   it("keeps the full model name in the accessible label", async () => {
     const user = userEvent.setup();
     renderDraft();

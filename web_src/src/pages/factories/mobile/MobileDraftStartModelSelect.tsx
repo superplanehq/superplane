@@ -3,7 +3,7 @@ import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import { modelNameWithThinking, supportedThinkingLevel, thinkingOptions } from "@/lib/thinkingLevel";
+import { modelNameWithThinking, supportedThinkingLevel } from "@/lib/thinkingLevel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +13,11 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
-import { DRAFT_START_MODEL_AUTO, draftStartThinkingLevels } from "../pages/work-order-split-run/draftStartModel";
+import {
+  DRAFT_START_MODEL_AUTO,
+  draftStartThinkingLevels,
+  draftStartThinkingOptions,
+} from "../pages/work-order-split-run/draftStartModel";
 
 const MENU_ITEM_CLASS = "cursor-pointer text-[13px]";
 
@@ -48,7 +52,7 @@ export function MobileDraftStartModelSelect({
   const catalogName = modelOptions.find((option) => option.value === model)?.label;
   const selectedName = catalogName || (models.isLoading || !lineName ? model : `${model} (unavailable)`);
   const levelsFor = (value: string) => draftStartThinkingLevels(models.data?.models, value);
-  const thinking = thinkingOptions(levelsFor(model), { withDefault: false });
+  const thinking = draftStartThinkingOptions(levelsFor(model));
   const selectedThinking = supportedThinkingLevel(thinkingLevel, levelsFor(model));
   const closedLabel = modelNameWithThinking(selectedName, selectedThinking);
   const catalogLoaded = models.data?.models !== undefined;

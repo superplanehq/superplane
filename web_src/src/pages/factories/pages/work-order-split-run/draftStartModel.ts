@@ -1,6 +1,9 @@
 import { concreteClaudeModelId, displayModelName } from "@/lib/hostedLLMModels";
+import { thinkingOptions, type ThinkingOption } from "@/lib/thinkingLevel";
 
 export const DRAFT_START_MODEL_AUTO = "auto";
+
+const DRAFT_START_THINKING_AGENT_SETTING: ThinkingOption = { value: "", label: "Agent setting" };
 
 export function draftStartModelPayload(selected: string): string | undefined {
   const trimmed = selected.trim();
@@ -22,6 +25,19 @@ export function draftStartThinkingLevels(
     return [];
   }
   return models?.find((model) => model.id === selected)?.thinkingLevels ?? [];
+}
+
+/**
+ * Thinking menu options for Start. The first option sends no thinking
+ * override, so each agent keeps its saved thinking setting. A model without
+ * levels has no options, so the caller hides the menu.
+ */
+export function draftStartThinkingOptions(levels: ReadonlyArray<string> | undefined): ThinkingOption[] {
+  const options = thinkingOptions(levels, { withDefault: false });
+  if (options.length === 0) {
+    return [];
+  }
+  return [DRAFT_START_THINKING_AGENT_SETTING, ...options];
 }
 
 /** Short label for a stored runner model id. Aliases use a versioned id from modelIds. */

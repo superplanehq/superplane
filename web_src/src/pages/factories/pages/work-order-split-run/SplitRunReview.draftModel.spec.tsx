@@ -193,6 +193,16 @@ describe("SplitRunReview draft model select", () => {
     expect(onChange).toHaveBeenNthCalledWith(4, { model: "claude-haiku-4-5", thinkingLevel: "" });
   });
 
+  it("clears a chosen thinking level back to the agent setting and keeps the model", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderDraftFooter(vi.fn(), "claude-opus-4-6", onChange, false, "max");
+
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6 Max" }));
+    await selectFlyoutOption(user, "split-run-draft-thinking", "Agent setting");
+    expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: "" });
+  });
+
   it("clears a stored thinking level that the model does not support", () => {
     const onChange = vi.fn();
     renderDraftFooter(vi.fn(), "claude-sonnet-4-6", onChange, false, "max");
