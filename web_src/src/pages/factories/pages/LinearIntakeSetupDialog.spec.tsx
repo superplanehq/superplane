@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { LinearIntakeSetupDialog } from "./LinearIntakeSetupDialog";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
+import { selectLinearProject } from "./linearScopeFields.testHelpers";
 
 const mocks = vi.hoisted(() => ({
   createIntake: vi.fn(),
@@ -115,16 +116,15 @@ describe("LinearIntakeSetupDialog", () => {
     expect(onCreated).toHaveBeenCalled();
   });
 
-  it("creates the intake with the projects, labels, and no-project choice of the team", async () => {
+  it("creates the intake with the projects and no-project choice of the team", async () => {
     const user = userEvent.setup();
     renderDialog();
 
     await user.click(await screen.findByTestId("linear-team-team-1"));
-    await user.click(screen.getByTestId("linear-project-project-1"));
-    await user.click(screen.getByTestId("linear-project-project-2"));
+    await selectLinearProject(user, "Checkout");
+    await selectLinearProject(user, "Billing");
     expect(screen.getByTestId("linear-include-no-project")).toBeChecked();
     await user.click(screen.getByTestId("linear-include-no-project"));
-    await user.click(screen.getByRole("checkbox", { name: "bug" }));
     await user.click(screen.getByTestId("linear-setup-finish"));
 
     await waitFor(() => {
@@ -135,29 +135,28 @@ describe("LinearIntakeSetupDialog", () => {
           linearTeamId: "team-1",
           linearProjectIds: ["project-1", "project-2"],
           linearIncludeIssuesWithoutProject: false,
-          linearLabels: ["bug"],
+          linearLabels: [],
         },
       });
     });
   });
 
-  it("loads the projects and labels of the selected team", async () => {
+  it("loads the projects of the selected team without a label filter", async () => {
     const user = userEvent.setup();
     renderDialog();
 
     await user.click(await screen.findByTestId("linear-team-team-2"));
 
     expect(mocks.resourceCalls).toContainEqual({ type: "project", parameters: { team: "team-2" } });
-    expect(mocks.resourceCalls).toContainEqual({ type: "label", parameters: { team: "team-2" } });
+    expect(screen.queryByTestId("linear-intake-label-options")).not.toBeInTheDocument();
   });
 
-  it("clears the projects and labels when the user picks another team", async () => {
+  it("clears the projects when the user picks another team", async () => {
     const user = userEvent.setup();
     renderDialog();
 
     await user.click(await screen.findByTestId("linear-team-team-1"));
-    await user.click(screen.getByTestId("linear-project-project-1"));
-    await user.click(screen.getByRole("checkbox", { name: "bug" }));
+    await selectLinearProject(user, "Checkout");
     await user.click(screen.getByTestId("linear-team-team-2"));
     await user.click(screen.getByTestId("linear-setup-finish"));
 

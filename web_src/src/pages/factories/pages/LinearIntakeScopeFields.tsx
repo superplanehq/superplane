@@ -8,11 +8,7 @@ import { LinearLabelField } from "./LinearLabelField";
 import { LinearProjectPicker } from "./LinearProjectPicker";
 import { LinearTeamPicker } from "./LinearTeamPicker";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
-import {
-  selectLinearTeam,
-  type LinearFilterChoices,
-  type LinearIntakeScope,
-} from "./linearIntakeScope";
+import { selectLinearTeam, type LinearFilterChoices, type LinearIntakeScope } from "./linearIntakeScope";
 
 /**
  * The intake settings layout. The settings popup keeps the filter choices with

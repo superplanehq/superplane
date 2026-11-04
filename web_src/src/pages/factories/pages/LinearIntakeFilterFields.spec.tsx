@@ -7,6 +7,12 @@ import { LinearIntakeFilterFields } from "./LinearIntakeFilterFields";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import { linearFilterChoicesFromSettings } from "./linearIntakeScope";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
+import {
+  linearSelectedChip,
+  queryLinearSelectedChip,
+  selectLinearLabel,
+  selectLinearProject,
+} from "./linearScopeFields.testHelpers";
 
 const resourceCalls = vi.hoisted(() => [] as Array<{ type: string; parameters?: Record<string, string> }>);
 
@@ -83,19 +89,26 @@ describe("LinearIntakeFilterFields", () => {
     await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
     expect(resourceCalls).toContainEqual({ type: "label", parameters: { team: "team-1" } });
 
-    expect(screen.getByTestId("linear-project-project-1")).toHaveAttribute("aria-selected", "true");
-    await user.click(screen.getByTestId("linear-project-project-2"));
-    expect(screen.getByTestId("linear-project-project-2")).toHaveAttribute("aria-selected", "true");
+    expect(linearSelectedChip("Checkout")).toBeInTheDocument();
+    await selectLinearProject(user, "Billing");
+    expect(linearSelectedChip("Billing")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("checkbox", { name: "bug" }));
-    expect(screen.getByRole("checkbox", { name: "bug" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "feature" })).not.toBeChecked();
-    await user.click(screen.getByRole("checkbox", { name: "bug" }));
-    expect(screen.getByRole("checkbox", { name: "bug" })).not.toBeChecked();
-    await user.click(screen.getByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelNew }));
-    await user.type(screen.getByTestId("linear-intake-label-input"), "bug");
-    await user.click(screen.getByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelAdd }));
-    expect(screen.getByText("bug")).toBeInTheDocument();
+    await selectLinearLabel(user, "bug");
+    expect(linearSelectedChip("bug")).toBeInTheDocument();
+    expect(queryLinearSelectedChip("feature")).not.toBeInTheDocument();
+    await user.click(linearSelectedChip("bug"));
+    expect(queryLinearSelectedChip("bug")).not.toBeInTheDocument();
+  });
+
+  it("adds a label that Linear does not return", async () => {
+    const user = userEvent.setup();
+    let latest: IntakeSourceSettings | undefined;
+    render(<Fields initial={{ linearLabels: ["bug"] }} onChange={(next) => (latest = next)} />);
+
+    await user.type(screen.getByRole("combobox", { name: LINEAR_INTAKE_SETUP_COPY.labelSearch }), "needs-triage");
+    await user.click(await screen.findByRole("option", { name: "needs-triage" }));
+
+    expect(latest?.linearLabels).toEqual(["bug", "needs-triage"]);
   });
 
   it("uses the issue settings label choice without widening the intake accidentally", async () => {
@@ -107,7 +120,7 @@ describe("LinearIntakeFilterFields", () => {
     await user.click(screen.getByRole("radio", { name: "All issues" }));
     expect(latest?.linearLabels).toEqual([]);
     await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
-    await user.click(screen.getByRole("checkbox", { name: "feature" }));
+    await selectLinearLabel(user, "feature");
     expect(latest?.linearLabels).toEqual(["feature"]);
   });
 
@@ -134,7 +147,7 @@ describe("LinearIntakeFilterFields", () => {
     expect(screen.queryByTestId("linear-include-no-project")).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "All projects" })).toBeChecked();
     await user.click(screen.getByRole("radio", { name: "Only issues in selected projects" }));
-    await user.click(screen.getByTestId("linear-project-project-1"));
+    await selectLinearProject(user, "Checkout");
     const include = screen.getByRole("checkbox", { name: LINEAR_INTAKE_SETUP_COPY.includeNoProjectLabel });
     expect(include).toBeChecked();
     await user.click(include);
@@ -158,7 +171,7 @@ describe("LinearIntakeFilterFields", () => {
     resourceCalls.length = 0;
     render(<Fields initial={{ linearTeamId: "", linearProjectIds: ["project-1"] }} />);
 
-    expect(screen.getByTestId("linear-project-project-1")).toHaveAttribute("aria-selected", "true");
+    expect(linearSelectedChip("Checkout")).toBeInTheDocument();
     expect(screen.getByTestId("linear-team-team-1")).toHaveAttribute("aria-selected", "false");
     expect(resourceCalls).toContainEqual({ type: "project", parameters: undefined });
   });
@@ -176,15 +189,13 @@ describe("LinearIntakeFilterFields", () => {
       <Fields initial={{ linearProjectIds: ["project-1", "project-gone"] }} onChange={(next) => (latest = next)} />,
     );
 
-    const missing = screen.getByTestId("linear-missing-project-project-gone");
-    expect(missing).toHaveAttribute("aria-selected", "true");
-    expect(missing).toHaveTextContent(LINEAR_INTAKE_SETUP_COPY.projectMissingLabel);
-    expect(screen.getByTestId("linear-project-project-1")).toHaveAttribute("aria-selected", "true");
+    expect(linearSelectedChip("project-gone")).toBeInTheDocument();
+    expect(linearSelectedChip("Checkout")).toBeInTheDocument();
 
-    await user.click(missing);
+    await user.click(linearSelectedChip("project-gone"));
 
     expect(latest).toMatchObject({ linearProjectIds: ["project-1"] });
-    expect(screen.queryByTestId("linear-missing-project-project-gone")).not.toBeInTheDocument();
+    expect(queryLinearSelectedChip("project-gone")).not.toBeInTheDocument();
   });
 
   it("shows no projects or labels until a team is chosen", () => {

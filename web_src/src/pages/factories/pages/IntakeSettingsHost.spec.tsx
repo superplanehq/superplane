@@ -19,6 +19,7 @@ import {
 } from "./IntakeSettingsHost.spec.fixtures";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS, INTAKE_SETTINGS_COPY, intakeSettingsToApi } from "./intakeSourceSettingsModel";
 import "./intakeSettingsHostSentryCases";
+import { selectLinearProject } from "./linearScopeFields.testHelpers";
 
 describe("IntakeSettingsHost", () => {
   beforeEach(() => {
@@ -235,7 +236,7 @@ describe("IntakeSettingsHost", () => {
 
     expect(screen.getByTestId("linear-team-team-1")).toHaveAttribute("aria-selected", "true");
     await user.click(screen.getByRole("radio", { name: "Only issues in selected projects" }));
-    await user.click(screen.getByTestId("linear-project-ENG"));
+    await selectLinearProject(user, "Engineering");
     await user.click(screen.getByRole("checkbox", { name: "Include issues without a project" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
@@ -259,7 +260,7 @@ describe("IntakeSettingsHost", () => {
       },
     });
 
-    await user.click(screen.getByTestId("linear-project-OPS"));
+    await selectLinearProject(user, "Operations");
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     expect(updateIntake).toHaveBeenCalledWith({

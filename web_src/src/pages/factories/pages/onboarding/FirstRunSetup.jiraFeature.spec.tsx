@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
+import { selectLinearProject } from "../linearScopeFields.testHelpers";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -297,7 +298,7 @@ describe("FirstRunSetup Jira intake", () => {
     expect(screen.getByTestId("first-run-linear-scope")).toBeInTheDocument();
     expect(setupRef.current?.issuesChoice).toBe("linear");
 
-    await user.click(screen.getByTestId("linear-project-project-1"));
+    await selectLinearProject(user, "Checkout");
     expect(model.changeLinearScope).toHaveBeenCalledWith({
       ...EMPTY_LINEAR_INTAKE_SCOPE,
       teamId: "team-1",
