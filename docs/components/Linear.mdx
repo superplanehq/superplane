@@ -32,13 +32,24 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-Click **Connect** to authorize SuperPlane in your Linear workspace. The person who authorizes the connection must be a member of each private team you want to listen to.
+SuperPlane connects to Linear with OAuth. The person who authorizes the connection must be a member of each private team you want to listen to.
 
-The connection requests the **read** and **write** scopes. Write covers creating and editing issues.
+1. Open Linear, then **Settings**, then **Administration**, then **API**.
+2. Under **OAuth applications**, click **Create new**.
+3. Set the callback URL to the address SuperPlane shows.
+4. Set the webhook URL to the SuperPlane address plus `/api/v1/linear/webhook`.
+5. Select **Issues**, **Comments**, and **Issue attachments**.
+6. Create the application.
+7. Copy the **Client ID** into the **Client ID** field.
+8. Copy the **Client Secret** into the **Client Secret** field.
+9. Copy the **Webhook signing secret** into the **Webhook signing secret** field.
+10. Click **Save**. SuperPlane opens Linear so you can authorize the connection.
 
-On the Linear OAuth application, set the webhook URL to the SuperPlane address plus `/api/v1/linear/webhook`. Select **Issues**, **Comments**, and **Issue attachments**. Copy the webhook signing secret into `SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET`.
+You can also leave the fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL and the webhook URL filled in. Copy the **Client ID**, the **Client Secret**, and the **Webhook signing secret** into the fields above, then click **Save** again.
 
-To use your own OAuth application instead, open the manual setup and paste its **Client ID**, **Client Secret**, and **Webhook signing secret**.
+When the webhook signing secret is set, the connection requests the **read** and **write** scopes. Write covers creating and editing issues, comments, attachments, and reactions. When the secret is empty, the connection also requests the **admin** scope so SuperPlane can create a webhook for each trigger. A workspace admin must authorize that connection.
+
+Linear lets only a comment's own author edit it, so **Update Issue Comment** can only change comments that this same connection posted.
 
 <a id="on-issue"></a>
 
