@@ -287,9 +287,10 @@ spec:
     - id: publish-merge-confidence
       name: Publish Merge Confidence
       type: TYPE_ACTION
-      component: updatePullRequestBodySection
+      component: bitbucket.updatePullRequestBodySection
       configuration:
-        pullRequestId: '{{ $["Assess Merge Confidence"].data.mergeConfidence.pullRequestId }}'
+        repository: '{{ root().data.repository.full_name }}'
+        pullNumber: '{{ root().data.pull_request.number }}'
         sectionKey: merge-confidence
         body: |-
           ## SuperPlane merge confidence
@@ -299,7 +300,7 @@ spec:
              (!report.complete ? "➖ **Incomplete**\n\n" : "")
              + (len(report.checks) == 0
                ? "No checks are enabled.\n\n"
-               : "| Check | Status | Summary |\n| --- | --- | --- |\n"
+               : "| Check | Status | Summary |\n| --- | :---: | --- |\n"
                  + join(map(report.checks, { "| " + markdownText(#.label) + " | " +
                      (#.missing ? "➖ | No result was reported." : (indicators[#.level] ?? "➖") + " | " + markdownText(#.summary))
                      + " |\n" }), "")

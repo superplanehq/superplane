@@ -4,19 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
-type bodySectionPublicationOutcome struct {
-	Status string `json:"status"`
-	Reason string `json:"reason,omitempty"`
-}
+type bodySectionPublicationOutcome = prbody.Outcome
 
 func skippedBodySection(reason string) bodySectionPublicationOutcome {
 	return bodySectionPublicationOutcome{Status: "skipped", Reason: reason}
@@ -36,7 +35,7 @@ func publishBodySection(ctx context.Context, db *gorm.DB, deps IntakeDependencie
 	defer cancel()
 	db = db.WithContext(ctx)
 	cfg := publication.configuration
-	if err := vcs.ValidateBodySectionKey(cfg.SectionKey); err != nil {
+	if err := prbody.ValidateBodySectionKey(cfg.SectionKey); err != nil {
 		return bodySectionPublicationOutcome{}, err
 	}
 	if !cfg.IsEnabled() {
@@ -80,33 +79,14 @@ func publishBodySection(ctx context.Context, db *gorm.DB, deps IntakeDependencie
 		return skippedBodySection("Pull request provider is unavailable."), nil
 	}
 	ref := vcs.PullRequestRef{Provider: pr.Provider, Repository: pr.Repository, Number: pr.Number}
-	latest, err := client.ReadDescription(ctx, ref)
+	outcome, err := prbody.Publish(ctx, factoryBodySectionClient{client: client, ref: ref}, prbody.Configuration{
+		Repository: ref.Repository, PullNumber: strconv.FormatInt(ref.Number, 10), SectionKey: cfg.SectionKey,
+		Body: cfg.Body, ExpectedHeadSHA: cfg.ExpectedHeadSHA, Enabled: cfg.Enabled,
+	}, eligible)
 	if err != nil {
 		return bodySectionPublicationError(err)
 	}
-	if latest.State != models.FactoryPullRequestStateOpen || (cfg.ExpectedHeadSHA != "" && latest.HeadSHA != cfg.ExpectedHeadSHA) {
-		return skippedBodySection("Pull request is closed or its expected commit changed."), nil
-	}
-	description, err := vcs.UpdateBodySection(latest.Description, cfg.SectionKey, cfg.Body)
-	if err != nil {
-		return skippedBodySection("Description contains invalid section markers."), nil
-	}
-	if description == latest.Description {
-		return skippedBodySection("Section is already current."), nil
-	}
-	// Settings, cancellation, and newer PR activity can change during the read.
-	// Recheck immediately before the write. An already-started write may finish.
-	active, err = eligible()
-	if err != nil {
-		return bodySectionPublicationOutcome{}, err
-	}
-	if !active {
-		return skippedBodySection("Publication was disabled, cancelled, or superseded before writing."), nil
-	}
-	if err := client.UpdateDescription(ctx, ref, description); err != nil {
-		return bodySectionPublicationError(err)
-	}
-	return bodySectionPublicationOutcome{Status: "published"}, nil
+	return outcome, nil
 }
 
 func (p sectionPublication) eligible(db *gorm.DB, pr *models.FactoryPullRequest) (bool, error) {
@@ -116,23 +96,9 @@ func (p sectionPublication) eligible(db *gorm.DB, pr *models.FactoryPullRequest)
 			return false, err
 		}
 	}
-	version, err := models.FindCanvasVersionInTransaction(db, p.run.WorkflowID, p.run.VersionID)
-	if err != nil {
+	enabled, err := p.nodesEnabled(db)
+	if err != nil || !enabled {
 		return false, err
-	}
-	if !publicationNodeEnabled(version, p.nodeID, p.configuration.SectionKey) {
-		return false, nil
-	}
-	canvas, err := models.FindCanvasInTransaction(db, pr.OrganizationID, p.run.WorkflowID)
-	if err != nil {
-		return false, err
-	}
-	live, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
-	if err != nil {
-		return false, err
-	}
-	if !publicationNodeEnabled(live, p.nodeID, p.configuration.SectionKey) {
-		return false, nil
 	}
 	activity, err := models.FindPullRequestActivityByRunID(db, p.run.ID)
 	if errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
@@ -156,7 +122,7 @@ func (p sectionPublication) eligible(db *gorm.DB, pr *models.FactoryPullRequest)
 		for _, node := range saved.Nodes {
 			// A newer applicable run supersedes this one even when disabled or failed
 			// before its publishing node started. Unrelated section keys do not.
-			if node.ComponentName() == factorycomponent.UpdatePullRequestBodySectionComponentName && node.Configuration["sectionKey"] == p.configuration.SectionKey {
+			if prbody.IsComponent(node.ComponentName()) && node.Configuration["sectionKey"] == p.configuration.SectionKey {
 				return run.ID == p.run.ID, nil
 			}
 		}
@@ -164,9 +130,31 @@ func (p sectionPublication) eligible(db *gorm.DB, pr *models.FactoryPullRequest)
 	return false, nil
 }
 
+func (p sectionPublication) nodesEnabled(db *gorm.DB) (bool, error) {
+	version, err := models.FindCanvasVersionInTransaction(db, p.run.WorkflowID, p.run.VersionID)
+	if err != nil {
+		return false, err
+	}
+	if !publicationNodeEnabled(version, p.nodeID, p.configuration.SectionKey) {
+		return false, nil
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, p.run.WorkflowID)
+	if err != nil {
+		return false, err
+	}
+	live, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	if err != nil {
+		return false, err
+	}
+	if !publicationNodeEnabled(live, p.nodeID, p.configuration.SectionKey) {
+		return false, nil
+	}
+	return true, nil
+}
+
 func publicationNodeEnabled(version *models.CanvasVersion, nodeID, sectionKey string) bool {
 	for _, node := range version.Nodes {
-		if node.ID != nodeID || node.ComponentName() != factorycomponent.UpdatePullRequestBodySectionComponentName || node.Configuration["sectionKey"] != sectionKey {
+		if node.ID != nodeID || !prbody.IsComponent(node.ComponentName()) || node.Configuration["sectionKey"] != sectionKey {
 			continue
 		}
 		return node.Configuration["enabled"] != false
@@ -175,8 +163,28 @@ func publicationNodeEnabled(version *models.CanvasVersion, nodeID, sectionKey st
 }
 
 func bodySectionPublicationError(err error) (bodySectionPublicationOutcome, error) {
+	if errors.Is(err, errBodySectionIntegrationUnavailable) {
+		return skippedBodySection("Publication integration is unavailable."), nil
+	}
 	if retryableDescriptionError(err) {
 		return bodySectionPublicationOutcome{}, fmt.Errorf("publish pull request body section: %w", err)
 	}
 	return skippedBodySection("Host rejected publication: " + err.Error()), nil
+}
+
+// The legacy action resolves its credentials through the workspace connection.
+type factoryBodySectionClient struct {
+	client vcs.DescriptionClient
+	ref    vcs.PullRequestRef
+}
+
+func (c factoryBodySectionClient) Read(ctx context.Context, _ string, _ int64) (prbody.Description, error) {
+	latest, err := c.client.ReadDescription(ctx, c.ref)
+	if err != nil {
+		return prbody.Description{}, err
+	}
+	return prbody.Description{Body: latest.Description, Open: latest.State == models.FactoryPullRequestStateOpen, HeadSHA: latest.HeadSHA}, nil
+}
+func (c factoryBodySectionClient) Write(ctx context.Context, _ string, _ int64, body string) error {
+	return c.client.UpdateDescription(ctx, c.ref, body)
 }

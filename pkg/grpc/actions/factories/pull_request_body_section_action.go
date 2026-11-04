@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
@@ -29,12 +30,15 @@ type bodySectionPublicationState struct {
 }
 
 type bodySectionActionAttempt struct {
-	request       *models.CanvasNodeRequest
-	execution     *models.CanvasNodeExecution
-	source        *models.CanvasRun
-	configuration factorycomponent.UpdatePullRequestBodySectionConfiguration
-	state         bodySectionPublicationState
-	events        []models.CanvasEvent
+	request                  *models.CanvasNodeRequest
+	execution                *models.CanvasNodeExecution
+	source                   *models.CanvasRun
+	configuration            factorycomponent.UpdatePullRequestBodySectionConfiguration
+	integrationConfiguration prbody.Configuration
+	component                string
+	node                     *models.CanvasNode
+	state                    bodySectionPublicationState
+	events                   []models.CanvasEvent
 }
 
 // ProcessBodySectionPublicationRequest releases the request transaction
@@ -63,7 +67,7 @@ func ProcessBodySectionPublicationRequest(ctx context.Context, deps IntakeDepend
 		return attempt.events, nil
 	}
 
-	outcome, publishErr := publishBodySection(ctx, db, deps, sectionPublication{run: attempt.source, nodeID: attempt.execution.NodeID, configuration: attempt.configuration, stillActive: attempt.stillActive})
+	outcome, publishErr := attempt.publish(ctx, db, deps)
 	err = db.Transaction(func(tx *gorm.DB) error { return attempt.finish(tx, outcome, publishErr) })
 	return attempt.events, err
 }
@@ -117,9 +121,10 @@ func (a *bodySectionActionAttempt) claim(tx *gorm.DB) error {
 	if component == "" && node.Ref.Data().Component != nil {
 		component = node.Ref.Data().Component.Name
 	}
-	if component != factorycomponent.UpdatePullRequestBodySectionComponentName {
+	if !prbody.IsComponent(component) {
 		return a.reject(tx, "Publication request has an invalid component.")
 	}
+	a.component, a.node = component, node
 	encoded, err := execution.Metadata.MarshalJSON()
 	if err != nil {
 		return err
@@ -156,6 +161,16 @@ func (a *bodySectionActionAttempt) resolveSource(tx *gorm.DB) error {
 	}
 	if a.source.State != models.CanvasRunStateStarted {
 		return a.reject(tx, "The source run is no longer active.")
+	}
+	if a.component != factorycomponent.UpdatePullRequestBodySectionComponentName {
+		a.integrationConfiguration, err = prbody.Decode(a.execution.Configuration.Data())
+		if err == nil {
+			err = a.integrationConfiguration.Validate()
+		}
+		if err != nil {
+			return a.reject(tx, "Publication configuration is invalid: "+err.Error())
+		}
+		return nil
 	}
 	a.configuration, err = factorycomponent.DecodeBodySectionConfiguration(a.execution.Configuration.Data())
 	if err != nil {

@@ -48,6 +48,10 @@ func (f publicationFixture) publicationRequest(t *testing.T, channel string) (*m
 	template, err := yaml.CanvasFromYAML(raw)
 	require.NoError(t, err)
 	configuration := findYAMLNode(t, template, "publish-merge-confidence").Configuration
+	// Saved core nodes use the factory PR ID instead of a provider PR number.
+	delete(configuration, "repository")
+	delete(configuration, "pullNumber")
+	configuration["pullRequestId"] = `{{ $["Assess Merge Confidence"].data.mergeConfidence.pullRequestId }}`
 	resolved, err := workercontexts.NewNodeConfigurationBuilder(f.db, f.canvas.ID).
 		WithRunID(f.run.ID).WithNodeID("publish").WithRootEvent(&root.ID).
 		WithPreviousExecution(&agent.ID).WithIncomingEventID(&output.ID).
@@ -392,4 +396,37 @@ func TestMergeConfidenceOptOutKeepsAssessmentResults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultFailed, result)
 	assert.Empty(t, host.Requests)
+}
+
+func TestIntegrationBodySectionSkipsSupersededFactoryRun(t *testing.T) {
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) {
+			f := newPublicationFixture(t)
+			require.NoError(t, f.db.Model(f.pr).Update("provider", provider).Error)
+			f.publishVersion(t, func(version *models.CanvasVersion) {
+				node := findIntakeNode(version.Nodes, "publish")
+				node.Ref.Component.Name = provider + ".updatePullRequestBodySection"
+				node.Configuration = map[string]any{"repository": "acme/app", "pullNumber": "42", "sectionKey": "merge-confidence", "body": "old report"}
+			})
+			f.startRun(t)
+			root, err := f.run.RootEvent(f.db)
+			require.NoError(t, err)
+			execution := support.CreateCanvasNodeExecution(t, f.canvas.ID, "publish", root.ID, root.ID)
+			execution.State = models.CanvasNodeExecutionStateStarted
+			execution.Metadata = datatypes.NewJSONType(map[string]any{models.CanvasNodeExecutionFrozenComponentKey: provider + ".updatePullRequestBodySection"})
+			execution.Configuration = datatypes.NewJSONType(map[string]any{"repository": "acme/app", "pullNumber": "42", "sectionKey": "merge-confidence", "body": "old report"})
+			require.NoError(t, f.db.Save(execution).Error)
+			action, err := f.deps.Registry.GetAction(provider + ".updatePullRequestBodySection")
+			require.NoError(t, err)
+			require.NoError(t, action.Execute(core.ExecutionContext{RunID: execution.RunID, Configuration: execution.Configuration.Data(), Metadata: workercontexts.NewExecutionMetadataContext(f.db, execution), Requests: workercontexts.NewExecutionRequestContext(f.db, execution)}))
+			var request models.CanvasNodeRequest
+			require.NoError(t, f.db.Where("execution_id = ?", execution.ID).First(&request).Error)
+			f.startRun(t)
+			_, err = ProcessBodySectionPublicationRequest(t.Context(), f.deps, request.ID, models.LockNodeRequestNow)
+			require.NoError(t, err)
+			require.NoError(t, f.db.First(execution, "id = ?", execution.ID).Error)
+			assert.Equal(t, "skipped", execution.Metadata.Data()["status"])
+			assert.Contains(t, execution.Metadata.Data()["reason"], "superseded")
+		})
+	}
 }

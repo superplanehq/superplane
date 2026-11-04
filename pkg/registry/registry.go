@@ -258,6 +258,10 @@ func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 func (r *Registry) ListActions() []core.Action {
 	actions := make([]core.Action, 0, len(r.Actions))
 	for _, action := range r.Actions {
+		// Existing factory canvases can still execute this retired core action.
+		if action.Name() == "updatePullRequestBodySection" {
+			continue
+		}
 		actions = append(actions, action)
 	}
 

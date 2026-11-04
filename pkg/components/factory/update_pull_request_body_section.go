@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/factories/vcs"
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -91,7 +91,7 @@ func (c *UpdatePullRequestBodySection) Setup(ctx core.SetupContext) error {
 	if configuration.ExpressionPlaceholderRegex.MatchString(config.SectionKey) {
 		return fmt.Errorf("sectionKey does not support expressions; use a literal key such as merge-confidence")
 	}
-	return vcs.ValidateBodySectionKey(config.SectionKey)
+	return prbody.ValidateBodySectionKey(config.SectionKey)
 }
 
 func (c *UpdatePullRequestBodySection) Execute(ctx core.ExecutionContext) error {
@@ -102,7 +102,7 @@ func (c *UpdatePullRequestBodySection) Execute(ctx core.ExecutionContext) error 
 	if err != nil {
 		return err
 	}
-	if err := vcs.ValidateBodySectionKey(config.SectionKey); err != nil {
+	if err := prbody.ValidateBodySectionKey(config.SectionKey); err != nil {
 		return err
 	}
 	if _, err := uuid.Parse(config.PullRequestID); err != nil {

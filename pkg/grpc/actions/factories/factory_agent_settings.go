@@ -3,6 +3,7 @@ package factories
 import (
 	"maps"
 
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -158,7 +159,7 @@ func factoryAutomationSettingsFromVersion(version *models.CanvasVersion) *factor
 			settings.agents[node.ID] = agent
 			settings.agentSteps[node.ID] = node.Configuration["steps"]
 		}
-		if node.ComponentName() == "updatePullRequestBodySection" {
+		if prbody.IsComponent(node.ComponentName()) {
 			if enabled, present := node.Configuration["enabled"]; present {
 				settings.bodySections[node.ID] = map[string]any{"enabled": enabled}
 			}

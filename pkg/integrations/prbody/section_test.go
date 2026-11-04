@@ -1,4 +1,4 @@
-package vcs
+package prbody
 
 import (
 	"github.com/stretchr/testify/assert"

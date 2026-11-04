@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -121,7 +122,8 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		consoleFile:      "templates/github/risk-score.console.yaml",
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
-			"github.onPullRequest": "github",
+			"github.onPullRequest":                "github",
+			"github.updatePullRequestBodySection": "github",
 		},
 	}),
 	{id: "visual-evidence", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -143,7 +145,8 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		consoleFile:      "templates/bitbucket/risk-score.console.yaml",
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
-			"bitbucket.onPullRequest": "bitbucket",
+			"bitbucket.onPullRequest":                "bitbucket",
+			"bitbucket.updatePullRequestBodySection": "bitbucket",
 		},
 	}),
 }
@@ -254,7 +257,7 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	if template.id == "risk-score" {
 		for i := range canvas.Spec.Nodes {
 			node := &canvas.Spec.Nodes[i]
-			if node.Component == "updatePullRequestBodySection" {
+			if prbody.IsComponent(node.Component) {
 				maps.Copy(node.Configuration, input.bodySectionSettings[node.ID])
 			}
 		}

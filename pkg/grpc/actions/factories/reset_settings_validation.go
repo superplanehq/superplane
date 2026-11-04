@@ -6,6 +6,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -40,7 +41,7 @@ func validateBuiltInResetNode(node yaml.Node, registry *registry.Registry) error
 			return err
 		}
 		fields = trigger.Configuration()
-	} else if isFactoryAgentHarness(node.Component) || node.Component == "github.createPullRequest" || node.Component == "bitbucket.createPullRequest" || isPrFeedbackWaitComponent(node.Component) || node.Component == "updatePullRequestBodySection" {
+	} else if isFactoryAgentHarness(node.Component) || node.Component == "github.createPullRequest" || node.Component == "bitbucket.createPullRequest" || isPrFeedbackWaitComponent(node.Component) || prbody.IsComponent(node.Component) {
 		action, err := registry.GetAction(node.Component)
 		if err != nil {
 			return err

@@ -212,12 +212,12 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 				}
 				execution, _ := f.publicationRequest(t, "passed")
 				body := execution.Configuration.Data()["body"].(string)
-				assert.NotContains(t, body, "Overall score")
-				assert.NotContains(t, body, "/5")
 				suffix := "Reviewed commit: abc\n\n[View task](<https://example.com" + f.order.URLPath(f.workspace.RouteSegment()) + ">)"
+				assert.NotContains(t, body, "Overall score")
+				assert.NotContains(t, strings.TrimSuffix(body, suffix), "/5")
 				switch scenario {
 				case "complete":
-					assert.Equal(t, "## SuperPlane merge confidence\n\n| Check | Status | Summary |\n| --- | --- | --- |\n| Security | ✅ | No security gap. |\n\n"+suffix, body)
+					assert.Equal(t, "## SuperPlane merge confidence\n\n| Check | Status | Summary |\n| --- | :---: | --- |\n| Security | ✅ | No security gap. |\n\n"+suffix, body)
 				case "caution":
 					assert.Contains(t, body, "| Security | ⚠️ |")
 				case "mixed":
@@ -232,7 +232,7 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 						assert.Contains(t, body, row)
 					}
 				case "custom only":
-					assert.Equal(t, "## SuperPlane merge confidence\n\n| Check | Status | Summary |\n| --- | --- | --- |\n| Custom | ➖ | Custom result. |\n\n"+suffix, body)
+					assert.Equal(t, "## SuperPlane merge confidence\n\n| Check | Status | Summary |\n| --- | :---: | --- |\n| Custom | ➖ | Custom result. |\n\n"+suffix, body)
 				case "all disabled":
 					assert.Equal(t, "## SuperPlane merge confidence\n\nNo checks are enabled.\n\n"+suffix, body)
 				case "unsafe text":

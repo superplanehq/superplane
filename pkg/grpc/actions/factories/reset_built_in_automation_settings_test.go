@@ -178,7 +178,7 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 				if templateID == "risk-score" {
 					publication := findIntakeNode(version.Nodes, "publish-merge-confidence")
 					require.NotNil(t, publication)
-					assert.Equal(t, "updatePullRequestBodySection", publication.ComponentName())
+					assert.Equal(t, provider+".updatePullRequestBodySection", publication.ComponentName())
 					assert.Equal(t, false, publication.Configuration["enabled"])
 				}
 				assert.Equal(t, false, trigger.Configuration["onlyFactoryPullRequests"])

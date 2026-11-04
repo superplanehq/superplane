@@ -87,7 +87,7 @@ describe("Merge confidence configuration", () => {
   it("loads a saved opt-out and permits publishing again", async () => {
     const { onSave } = renderSettings(steps, vi.fn(), vi.fn(), {
       id: "publication",
-      component: "updatePullRequestBodySection",
+      component: "bitbucket.updatePullRequestBodySection",
       configuration: { sectionKey: "merge-confidence", enabled: false },
     });
     const publishing = screen.getByRole("switch", { name: "Publish results to pull request" });
@@ -109,7 +109,7 @@ describe("Merge confidence configuration", () => {
     const { onClose } = renderSettings(steps, onSave, vi.fn(), {
       id: "publish-merge-confidence",
       name: "Publish results",
-      component: "updatePullRequestBodySection",
+      component: "github.updatePullRequestBodySection",
       configuration: { sectionKey: "merge-confidence", body: "{{ event.data.body }}", pullRequestId: "pr" },
     });
     const publishing = screen.getByRole("switch", { name: "Publish results to pull request" });

@@ -118,7 +118,7 @@ describe("MergeConfidenceConfigModal", () => {
       graph.specNodes![1].concurrency = { max: 5, key: "pr" };
       graph.specNodes!.push({
         id: "publish-merge-confidence",
-        component: "updatePullRequestBodySection",
+        component: "bitbucket.updatePullRequestBodySection",
         configuration: { sectionKey: "merge-confidence", enabled: false },
       });
       const user = userEvent.setup();

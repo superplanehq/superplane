@@ -275,7 +275,12 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	for _, channel := range []string{"passed", "failed"} {
 		assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "assess-risk", TargetID: "publish-merge-confidence", Channel: channel})
 	}
-	assert.Equal(t, true, findYAMLNode(t, canvas, "publish-merge-confidence").Configuration["enabled"])
+	publication := findYAMLNode(t, canvas, "publish-merge-confidence")
+	assert.Equal(t, "bitbucket.updatePullRequestBodySection", publication.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, publication.Integration)
+	assert.Equal(t, "{{ root().data.repository.full_name }}", publication.Configuration["repository"])
+	assert.Equal(t, "{{ root().data.pull_request.number }}", publication.Configuration["pullNumber"])
+	assert.Equal(t, true, publication.Configuration["enabled"])
 	requireValidCanvasExpressions(t, canvas)
 }
 
