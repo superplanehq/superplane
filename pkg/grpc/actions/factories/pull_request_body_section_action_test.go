@@ -120,7 +120,7 @@ func TestBodySectionActionRetriesAndRechecksEligibility(t *testing.T) {
 				var update map[string]string
 				require.NoError(t, json.Unmarshal(body, &update))
 				assert.True(t, strings.HasPrefix(update["body"], "latest user edit"))
-				assert.Contains(t, update["body"], "**Overall score: 4/5**")
+				assert.Contains(t, update["body"], "| Security | ✅ | No security gap. |")
 				assert.NotContains(t, update["body"], "Changed body template")
 			}
 			_, err = ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, retry.ID, models.LockNodeRequestNow)

@@ -212,27 +212,27 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 				}
 				execution, _ := f.publicationRequest(t, "passed")
 				body := execution.Configuration.Data()["body"].(string)
+				assert.NotContains(t, body, "Overall score")
+				assert.NotContains(t, body, "/5")
 				suffix := "Reviewed commit: abc\n\n[View task](<https://example.com" + f.order.URLPath(f.workspace.RouteSegment()) + ">)"
 				switch scenario {
 				case "complete":
-					assert.Equal(t, "## SuperPlane merge confidence\n\n✅ **Overall score: 4/5**\n\n| Check | Score | Summary |\n| --- | --- | --- |\n| Security | ✅ 4/5 | No security gap. |\n\n"+suffix, body)
+					assert.Equal(t, "## SuperPlane merge confidence\n\n| Check | Status | Summary |\n| --- | --- | --- |\n| Security | ✅ | No security gap. |\n\n"+suffix, body)
 				case "caution":
-					assert.Contains(t, body, "⚠️ **Overall score: 3/5**")
-					assert.Contains(t, body, "| Security | ⚠️ 3/5 |")
+					assert.Contains(t, body, "| Security | ⚠️ |")
 				case "mixed":
-					assert.Contains(t, body, "❌ **Overall score: 1/5**")
 					for _, row := range []string{
-						"| Blast radius | ✅ 2/5 |",
-						"| Performance | ⚠️ 3/5 |",
-						"| Security | ✅ 4/5 |",
-						"| Drift from Specification | ❌ 4/5 |",
-						"| Reversibility | ❌ 1/5 |",
-						"| Custom | ✅ 2/5 |",
+						"| Blast radius | ✅ |",
+						"| Performance | ⚠️ |",
+						"| Security | ✅ |",
+						"| Drift from Specification | ❌ |",
+						"| Reversibility | ❌ |",
+						"| Custom | ✅ |",
 					} {
 						assert.Contains(t, body, row)
 					}
 				case "custom only":
-					assert.Equal(t, "## SuperPlane merge confidence\n\nNo built-in checks are enabled.\n\n| Check | Score | Summary |\n| --- | --- | --- |\n| Custom | ➖ 2/5 | Custom result. |\n\n"+suffix, body)
+					assert.Equal(t, "## SuperPlane merge confidence\n\n| Check | Status | Summary |\n| --- | --- | --- |\n| Custom | ➖ | Custom result. |\n\n"+suffix, body)
 				case "all disabled":
 					assert.Equal(t, "## SuperPlane merge confidence\n\nNo checks are enabled.\n\n"+suffix, body)
 				case "unsafe text":
@@ -294,7 +294,7 @@ func TestMergeConfidenceTemplateUsesRunSnapshots(t *testing.T) {
 	_, err = ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, request.ID, models.LockNodeRequestNow)
 	require.NoError(t, err)
 	require.NoError(t, f.db.First(execution, "id = ?", execution.ID).Error)
-	assert.Contains(t, execution.Configuration.Data()["body"], "**Overall score: 4/5**")
+	assert.Contains(t, execution.Configuration.Data()["body"], "| Security | ✅ | No security gap. |")
 	assert.Contains(t, execution.Configuration.Data()["body"], f.order.URLPath(f.workspace.RouteSegment()))
 	require.Len(t, host.Requests, 2)
 }
@@ -310,7 +310,7 @@ func TestMergeConfidenceTemplateIncomplete(t *testing.T) {
 			assert.Contains(t, execution.Configuration.Data()["body"], "➖ **Incomplete**")
 			assert.NotContains(t, execution.Configuration.Data()["body"], "Overall score")
 			if channel == "passed" {
-				assert.Contains(t, execution.Configuration.Data()["body"], "➖ Missing")
+				assert.Contains(t, execution.Configuration.Data()["body"], "| Security | ➖ | No result was reported. |")
 			}
 		})
 	}
