@@ -58,6 +58,11 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), config.MaxEmitCount())
 	}
 
+	payloads, err := s.prepareMergeConfidenceOutput(channel, payloadType, payloads)
+	if err != nil {
+		return err
+	}
+
 	outputs := map[string][]any{
 		channel: {},
 	}

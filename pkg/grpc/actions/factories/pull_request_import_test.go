@@ -522,17 +522,19 @@ func TestBitbucketImportStartsMergeConfidence(t *testing.T) {
 			assert.False(t, again.Created)
 			assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
 			if scenario == "open" || scenario == "legacy webhook" || scenario == "keyed legacy webhook" {
-				// A later Bitbucket update at the same head still needs a new review.
+				// Merge confidence publication edits the description and Bitbucket
+				// sends an update. An update at the same head must not start a loop.
 				updated := strings.Replace(current, updatedAt.Format(time.RFC3339), updatedAt.Add(time.Minute).Format(time.RFC3339), 1)
 				updated = strings.Replace(updated, "Review refunds", "Review updated refunds", 1)
 				emitWebhook("updated", updated)
-				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
-				emitWebhook("updated", updated)
-				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
+				assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
 				emitWebhook("updated", current)
-				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID), "an older snapshot must remain a duplicate")
-				emitWebhook("updated", strings.ReplaceAll(updated, "def456", "fedcba"))
-				assert.EqualValues(t, 3, countCanvasEvents(t, canvas.ID))
+				assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID), "an older snapshot must remain a duplicate")
+				newHead := strings.ReplaceAll(updated, "def456", "fedcba")
+				emitWebhook("updated", newHead)
+				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
+				emitWebhook("updated", newHead)
+				assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
 			}
 		})
 	}

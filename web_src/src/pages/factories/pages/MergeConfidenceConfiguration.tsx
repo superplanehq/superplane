@@ -1,5 +1,7 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import { ImplementDurationDraftProvider } from "./ImplementDurationDraft";
 import { MergeConfidenceCheckList } from "./MergeConfidenceCheckList";
@@ -9,6 +11,7 @@ import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 
 type ConfigurationProps = {
   agent: SuperplaneComponentsNode;
+  publishing?: SuperplaneComponentsNode;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
@@ -25,7 +28,7 @@ export function MergeConfidenceConfiguration(
 }
 
 function OwnedMergeConfidenceConfiguration(props: ConfigurationProps) {
-  const settings = useMergeConfidenceSettingsDraft(props.agent, props);
+  const settings = useMergeConfidenceSettingsDraft(props.agent, props, props.publishing);
   return <MergeConfidenceConfigurationView {...props} settings={settings} />;
 }
 
@@ -81,6 +84,23 @@ function MergeConfidenceConfigurationView({
                 disabled={saving}
               />
             </section>
+            {draft.publishingBase ? (
+              <div className="flex items-start justify-between gap-6">
+                <div className="space-y-1">
+                  <Label htmlFor="merge-confidence-publish">Publish results to pull request</Label>
+                  <p id="merge-confidence-publish-help" className="workspace-body-text text-muted-foreground">
+                    When off, results stay in SuperPlane. Any existing pull request report stays in place.
+                  </p>
+                </div>
+                <Switch
+                  id="merge-confidence-publish"
+                  aria-describedby="merge-confidence-publish-help"
+                  checked={draft.publishResults}
+                  onCheckedChange={settings.updatePublishResults}
+                  disabled={saving}
+                />
+              </div>
+            ) : null}
           </div>
         </section>
         <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
