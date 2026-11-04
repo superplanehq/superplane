@@ -150,6 +150,7 @@ func (b *Bitbucket) Actions() []core.Action {
 		&FindPullRequest{},
 		&CreatePullRequest{},
 		&UpdatePullRequest{},
+		&UpdatePullRequestBodySection{},
 		&CreatePullRequestComment{},
 		&WaitForBuilds{},
 	}
