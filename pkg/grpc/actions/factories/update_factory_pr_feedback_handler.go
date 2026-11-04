@@ -168,7 +168,9 @@ func applyPRFeedbackSettings(
 				if configuration == nil {
 					configuration = map[string]any{}
 				}
-				configuration["repository"] = updated.Repository
+				if !prFeedbackWorkspaceScope(configuration) {
+					configuration["repository"] = updated.Repository
+				}
 				// ponytail: wait nodes name required builds per provider
 				delete(configuration, "checkNames")
 				delete(configuration, "buildKeys")

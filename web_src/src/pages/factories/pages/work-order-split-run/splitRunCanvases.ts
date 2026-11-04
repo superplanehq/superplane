@@ -29,6 +29,8 @@ import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamKind, SplitRunSt
 
 export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "implementation" | "risk" | "closure";
 
+const IMPLEMENT_AGENT_NODE_ID = "implementation-agent-no-issue";
+
 const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "sentry", "slack", "implementation", "risk", "closure"];
 
 const CANVAS_HINTS: { needles: string[]; key: SplitRunCanvasKey }[] = [
@@ -421,7 +423,7 @@ function appendRichStreamNode({
     componentName: kind === "check" ? checkName(node.id, componentName) : componentName,
     status: lineStatus,
     artifact: skipOutputs ? undefined : artifactForNode(node.id, canvas.key, description, showDemo),
-    pullRequest: skipOutputs ? undefined : pullRequestForNode(node.id, showDemo),
+    pullRequest: skipOutputs ? undefined : pullRequestForNode(node.id, nodeStatus, showDemo),
     kind: streamKind,
     componentType: componentTypeLabel(node.component),
     action: actionForStreamLine(streamKind, nodeStatus, node.id),
@@ -630,11 +632,17 @@ function artifactForNode(
   return undefined;
 }
 
-function pullRequestForNode(nodeId: string, demoArtifacts: boolean): FactoriesFactoryPullRequest | undefined {
+function pullRequestForNode(
+  nodeId: string,
+  nodeStatus: string,
+  demoArtifacts: boolean,
+): FactoriesFactoryPullRequest | undefined {
   if (!demoArtifacts) {
     return undefined;
   }
-  if (nodeId === "attach-pr-artifact") {
+  // The Implement agent opens its pull requests. Older canvases attach them
+  // in a separate node.
+  if (nodeId === "attach-pr-artifact" || (nodeId === IMPLEMENT_AGENT_NODE_ID && nodeStatus === "passed")) {
     return OPEN_WORK_ORDER_PULL_REQUESTS[0];
   }
   if (nodeId === "stamp-pr-merged") {
