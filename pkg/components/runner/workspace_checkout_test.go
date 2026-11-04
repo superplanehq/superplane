@@ -185,46 +185,25 @@ func TestWorkspaceCheckoutScriptClonesMainAndContext(t *testing.T) {
 	assert.Contains(t, output, "Checkout complete")
 }
 
-func TestWorkspaceCheckoutScriptClonesGitHubContextReadOnly(t *testing.T) {
-	gitPath := requireGitAndNode(t)
+func TestWorkspaceCheckoutScriptSkipsRepositoryInRepoDirectory(t *testing.T) {
 	main := initBareRepo(t, "main")
+	other := initBareRepo(t, "main")
 	dir := t.TempDir()
-	logPath := filepath.Join(dir, "git-args")
-	const readToken = "read-token-secret"
-	output, err := runCheckoutScriptFull(t, dir, "file://"+main, "main", checkoutScriptOptions{
-		context: contextJSON(t, map[string]string{
-			"context/acme/extra": "https://github.com/acme/extra.git",
-		}),
-		extraEnv: []string{
-			runner.GitHubContextTokenEnv + "=" + readToken,
-			"GIT_ARGV_LOG=" + logPath,
-			"REAL_GIT=" + gitPath,
-		},
-		prepare: func(binDir string) {
-			wrapper := `#!/bin/bash
-printf '%s\n' "$*" >> "$GIT_ARGV_LOG"
-for arg in "$@"; do
-  case "$arg" in
-    https://github.com/*|https://www.github.com/*)
-      mkdir -p "${@: -1}/.git"
-      exit 0
-      ;;
-  esac
-done
-exec "$REAL_GIT" "$@"
-`
-			require.NoError(t, os.WriteFile(filepath.Join(binDir, "git"), []byte(wrapper), 0o755))
-		},
-	})
-	require.NoError(t, err, output)
-	assert.DirExists(t, filepath.Join(dir, "context", "acme", "extra", ".git"))
-	logged, err := os.ReadFile(logPath)
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]string{
+		{"repository": "acme/app", "url": "file://" + main, "directory": "context/acme/app"},
+		{"repository": "acme/web", "url": "file://" + other, "directory": "context/acme/web"},
+	}})
 	require.NoError(t, err)
-	commands := string(logged)
-	assert.Contains(t, commands, "credential.helper=")
-	assert.Contains(t, commands, "password=$"+runner.GitHubContextTokenEnv)
-	assert.NotContains(t, commands, readToken)
-	assert.NotContains(t, commands, "x-access-token")
+
+	output, err := runCheckoutScriptFull(t, dir, "file://"+other, "main", checkoutScriptOptions{
+		context:  string(payload),
+		extraEnv: []string{"REPO=ACME/web"},
+	})
+
+	require.NoError(t, err, output)
+	assert.DirExists(t, filepath.Join(dir, "repo", ".git"))
+	assert.DirExists(t, filepath.Join(dir, "context", "acme", "app", ".git"))
+	assert.NoDirExists(t, filepath.Join(dir, "context", "acme", "web"))
 }
 
 func TestWorkspaceCheckoutScriptReusesExistingCheckouts(t *testing.T) {
@@ -654,7 +633,7 @@ func TestApplyFactoryCheckoutMarksInstructionsDone(t *testing.T) {
 	require.Len(t, out, 2)
 	assert.Equal(t, "Checkout", out[0].Name)
 	assert.Contains(t, files[0].Content, "Setup commands already ran in repo/ after checkout, in order: npm ci")
-	assert.Contains(t, files[0].Content, "Context repositories are already checked out next to repo/. From repo/, read: acme/extra (../context/acme/extra)")
+	assert.Contains(t, files[0].Content, "The other workspace repositories are already checked out next to repo/. From repo/, they are at: acme/extra (../context/acme/extra)")
 	assert.NotContains(t, files[0].Content, "run `checkout`")
 }
 
@@ -664,7 +643,7 @@ func checkoutHintFiles() []runner.TaskFile {
 			Path: "prompts/implement.txt",
 			Content: "Implement.\nYou can use these resources." +
 				"\nSetup commands (run in repo/ after clone, in order): npm ci" +
-				"\nCheckout: run `checkout` to check out repo/ and the context repositories. From repo/, read: acme/extra (../context/acme/extra)\n",
+				"\nCheckout: run `checkout` to check out repo/ and the other workspace repositories. From repo/, they are at: acme/extra (../context/acme/extra)\n",
 		},
 		{Path: runner.WorkspaceCheckoutScriptPath, Content: "#!/bin/bash\n"},
 	}

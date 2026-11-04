@@ -22,6 +22,7 @@ spec:
         ignoreDrafts: true
         onlyFactoryPullRequests: true
         repository: '{{ install_params.appRepository }}'
+        workspaceRepositories: true
       position:
         x: 80
         "y": 80

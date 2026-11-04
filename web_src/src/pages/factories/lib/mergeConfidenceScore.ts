@@ -103,14 +103,16 @@ export type MergeConfidenceCard = {
 export function mergeConfidenceHeadline(
   checks: readonly MergeConfidenceHeadlineInput[] | undefined,
 ): MergeConfidenceCard | undefined {
-  const metrics = (checks ?? []).flatMap((check): MergeConfidenceCardCheck[] => {
-    const score = check.score;
-    const maxScore = check.maxScore ?? 0;
-    if (!isMergeConfidenceMetric(check) || score == null || maxScore <= 0) {
-      return [];
-    }
-    return [{ key: check.key, name: check.name, score, maxScore }];
-  });
+  const metrics = weakestPerKey(
+    (checks ?? []).flatMap((check): MergeConfidenceCardCheck[] => {
+      const score = check.score;
+      const maxScore = check.maxScore ?? 0;
+      if (!isMergeConfidenceMetric(check) || score == null || maxScore <= 0) {
+        return [];
+      }
+      return [{ key: check.key, name: check.name, score, maxScore }];
+    }),
+  );
   if (metrics.length === 0) {
     return undefined;
   }
@@ -120,6 +122,28 @@ export function mergeConfidenceHeadline(
     return undefined;
   }
   return { ...headline, checks: ordered };
+}
+
+/** Each pull request repository reports its own scores. The card lists each check once, with its weakest score. */
+function weakestPerKey(metrics: MergeConfidenceCardCheck[]): MergeConfidenceCardCheck[] {
+  const byKey = new Map<string, MergeConfidenceCardCheck>();
+  for (const metric of metrics) {
+    const key = metric.key ?? metric.name ?? "";
+    const current = byKey.get(key);
+    if (!current || confidenceRatio(metric) < confidenceRatio(current)) {
+      byKey.set(key, metric);
+    }
+  }
+  return [...byKey.values()];
+}
+
+/** Merge confidence scores each repository in its own run. A check without a repository applies to every pull request. */
+export function checksForRepository<Check extends { repository?: string }>(
+  checks: readonly Check[],
+  repository: string | undefined,
+): Check[] {
+  const name = repository?.trim();
+  return checks.filter((check) => !check.repository || !name || check.repository === name);
 }
 
 /**
