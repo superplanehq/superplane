@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  checksForRepository,
   consoleCheckList,
   mergeConfidenceCheckLevel,
   mergeConfidenceHeadline,
@@ -100,6 +101,18 @@ describe("mergeConfidenceHeadline", () => {
       score: 5,
       checks: [{ key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 }],
     });
+  });
+});
+
+describe("checksForRepository", () => {
+  it("matches the repository without case and keeps checks of the whole task", () => {
+    const checks = [
+      { id: "api", repository: "Acme/API" },
+      { id: "docs", repository: "acme/docs" },
+      { id: "task", repository: undefined },
+    ];
+
+    expect(checksForRepository(checks, "acme/api").map((check) => check.id)).toEqual(["api", "task"]);
   });
 });
 

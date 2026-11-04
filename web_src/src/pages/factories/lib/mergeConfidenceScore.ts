@@ -137,13 +137,16 @@ function weakestPerKey(metrics: MergeConfidenceCardCheck[]): MergeConfidenceCard
   return [...byKey.values()];
 }
 
-/** Merge confidence scores each repository in its own run. A check without a repository applies to every pull request. */
+/**
+ * Merge confidence scores each repository in its own run. A check without a
+ * repository applies to every pull request. GitHub repository names ignore case.
+ */
 export function checksForRepository<Check extends { repository?: string }>(
   checks: readonly Check[],
   repository: string | undefined,
 ): Check[] {
-  const name = repository?.trim();
-  return checks.filter((check) => !check.repository || !name || check.repository === name);
+  const name = repository?.trim().toLowerCase();
+  return checks.filter((check) => !check.repository || !name || check.repository.toLowerCase() === name);
 }
 
 /**
