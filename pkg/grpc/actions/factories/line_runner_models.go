@@ -2,11 +2,14 @@ package factories
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -37,18 +40,37 @@ func ListFactoryLineRunnerModels(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to resolve model owner")
 	}
-	ids, usesHostedFunding, err := listLineRunnerModels(db, orgID, factory.ID, req.GetLineName(), ownerID)
+	options, usesHostedFunding, err := listLineRunnerModelOptions(db, orgID, factory.ID, req.GetLineName(), ownerID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list line runner models")
 	}
 
 	return &pb.ListFactoryLineRunnerModelsResponse{
-		Models:            serializeLineRunnerModels(ids),
+		Models:            serializeLineRunnerModels(options),
 		UsesHostedFunding: usesHostedFunding,
 	}, nil
 }
 
+// lineRunnerModel is one model that a line runner can use, with the thinking
+// levels that the runner can send to it.
+type lineRunnerModel struct {
+	ID             string
+	ThinkingLevels []string
+}
+
 func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName string, ownerIDs ...uuid.UUID) ([]string, bool, error) {
+	options, usesHostedFunding, err := listLineRunnerModelOptions(tx, orgID, factoryID, lineName, ownerIDs...)
+	if err != nil {
+		return nil, false, err
+	}
+	var ids []string
+	for _, option := range options {
+		ids = append(ids, option.ID)
+	}
+	return ids, usesHostedFunding, nil
+}
+
+func listLineRunnerModelOptions(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName string, ownerIDs ...uuid.UUID) ([]lineRunnerModel, bool, error) {
 	lineName = strings.TrimSpace(lineName)
 	if lineName == "" {
 		return nil, false, invalidArgument("line_name is required")
@@ -62,10 +84,13 @@ func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName stri
 	if err != nil {
 		return nil, false, err
 	}
+	catalog, err := llmcatalog.LoadThinkingCatalog(tx)
+	if err != nil {
+		return nil, false, err
+	}
 
-	seen := map[string]struct{}{}
 	usesHostedFunding := false
-	var out []string
+	var out []lineRunnerModel
 	for _, step := range line.Steps {
 		if step.AppID == uuid.Nil {
 			continue
@@ -82,17 +107,82 @@ func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName stri
 			if err != nil {
 				return nil, false, err
 			}
+			thinkingLevels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, catalog, ownerIDs...)
+			if err != nil {
+				return nil, false, err
+			}
 			for _, id := range ids {
-				if _, dup := seen[id]; dup {
-					continue
-				}
-				seen[id] = struct{}{}
-				out = append(out, id)
+				out = append(out, lineRunnerModel{ID: id, ThinkingLevels: thinkingLevels(id)})
 			}
 		}
 	}
-	sort.Strings(out)
-	return out, usesHostedFunding, nil
+	merged := mergeLineRunnerModels(out)
+	sort.Slice(merged, func(i, j int) bool { return merged[i].ID < merged[j].ID })
+	return merged, usesHostedFunding, nil
+}
+
+// mergeLineRunnerModels keeps one entry per model id in first-seen order.
+// Two runners can offer the same model. Start sends one level to both, so the
+// entry keeps only the levels that every runner accepts.
+func mergeLineRunnerModels(options []lineRunnerModel) []lineRunnerModel {
+	merged := map[string]int{}
+	var out []lineRunnerModel
+	for _, option := range options {
+		index, seen := merged[option.ID]
+		if !seen {
+			merged[option.ID] = len(out)
+			out = append(out, lineRunnerModel{ID: option.ID, ThinkingLevels: runner.SupportedThinkingLevels(option.ThinkingLevels)})
+			continue
+		}
+		shared := runner.SupportedThinkingLevels(option.ThinkingLevels)
+		out[index].ThinkingLevels = slices.DeleteFunc(out[index].ThinkingLevels, func(level string) bool {
+			return !slices.Contains(shared, level)
+		})
+	}
+	return out
+}
+
+// lineRunnerThinkingLevels returns a lookup of the thinking levels that a
+// runner node can send to each of its models. A ChatGPT subscription reports
+// its levels in the Codex model catalog. The other runners use the model
+// catalog for the provider of their CLI.
+func lineRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, catalog *llmcatalog.ThinkingCatalog, ownerIDs ...uuid.UUID) (func(string) []string, error) {
+	credentials, _ := node.Configuration["credentials"].(map[string]any)
+	if node.ComponentName() == runnerCodex && credentials["source"] == "subscription" {
+		if len(ownerIDs) != 1 {
+			return func(string) []string { return nil }, nil
+		}
+		catalog, err := models.FactoryCodexSubscriptionCatalog(tx, orgID, factoryID, ownerIDs[0])
+		if err != nil {
+			return nil, err
+		}
+		return codexSubscriptionThinkingLevels(catalog), nil
+	}
+	if node.ComponentName() == models.SuperPlaneRunnerComponent {
+		return func(key string) []string {
+			parsed, err := models.ParseSelectableLLMModelKey(key)
+			if err != nil {
+				return nil
+			}
+			return catalog.ThinkingLevels(parsed.Provider.ID, parsed.Model.ID, parsed.Source.ID)
+		}, nil
+	}
+	provider, ok := runnerNodeProvider(node)
+	if !ok {
+		return func(string) []string { return nil }, nil
+	}
+	return func(id string) []string {
+		return catalog.ThinkingLevels(provider, id, runnerFundingSource(node.Configuration))
+	}, nil
+}
+
+func codexSubscriptionThinkingLevels(catalog []models.CodexModel) func(string) []string {
+	levels := make(map[string][]string, len(catalog))
+	for _, model := range catalog {
+		id := strings.TrimSpace(model.Model)
+		levels[id] = runner.SupportedThinkingLevels(append(levels[id], model.ReasoningEfforts()...))
+	}
+	return func(id string) []string { return levels[strings.TrimSpace(id)] }
 }
 
 // lineRunnerNodeUsesHostedFunding reports whether a runner node spends
