@@ -369,7 +369,7 @@ func TestCustomAutomationMultipleTriggers(t *testing.T) {
 		Steps: []*pb.FactoryCustomAutomation_Step{
 			{Name: "Find a rule", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Find a task.", WorkingDirectory: "repo"},
 		},
-		Triggers: []*pb.FactoryCustomAutomation_Trigger{
+		Triggers: []*pb.FactoryCustomAutomation_StartTrigger{
 			{StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED, Schedule: &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *", UtcOffset: 1}},
 			{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC},
 			{StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED, Schedule: &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 18 * * *", UtcOffset: 1}},
@@ -437,7 +437,7 @@ func TestCustomAutomationMultipleTriggers(t *testing.T) {
 	})
 	require.Error(t, err, "a task event does not allow a manual start")
 
-	settings.Triggers = append([]*pb.FactoryCustomAutomation_Trigger{
+	settings.Triggers = append([]*pb.FactoryCustomAutomation_StartTrigger{
 		{StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL},
 	}, settings.GetTriggers()...)
 	updated, err := UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
@@ -463,7 +463,7 @@ func TestCustomAutomationMultipleTriggers(t *testing.T) {
 	require.NotEmpty(t, started.GetRunId())
 
 	duplicate := proto.Clone(settings).(*pb.FactoryCustomAutomation_Settings)
-	duplicate.Triggers = append(duplicate.Triggers, &pb.FactoryCustomAutomation_Trigger{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC})
+	duplicate.Triggers = append(duplicate.Triggers, &pb.FactoryCustomAutomation_StartTrigger{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC})
 	_, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
 		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "ESLint tasks", Settings: duplicate,
 	})
@@ -515,7 +515,7 @@ func TestCustomAutomationMultipleTriggers(t *testing.T) {
 	assert.Contains(t, env["BASE"], branch)
 }
 
-func assertCustomAutomationTriggers(t *testing.T, settings *pb.FactoryCustomAutomation_Settings, want []*pb.FactoryCustomAutomation_Trigger) {
+func assertCustomAutomationTriggers(t *testing.T, settings *pb.FactoryCustomAutomation_Settings, want []*pb.FactoryCustomAutomation_StartTrigger) {
 	t.Helper()
 	require.Len(t, settings.GetTriggers(), len(want))
 	for i, trigger := range want {

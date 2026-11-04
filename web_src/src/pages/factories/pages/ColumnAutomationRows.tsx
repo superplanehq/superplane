@@ -130,12 +130,12 @@ function ColumnAutomationRow({
       title={`${automation.name}: ${automation.trigger} → ${automation.action}`}
       className={className}
       data-testid={`${testId}-row-${automation.id}`}
+      onClick={onRowAction ? () => onRowAction(automation, "settings") : undefined}
     >
       {onRowAction ? (
         <button
           type="button"
           aria-label={`${COLUMN_AUTOMATIONS_COPY.rowMenu}: ${automation.name}`}
-          onClick={() => onRowAction(automation, "settings")}
           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
         >
           {details}
@@ -150,7 +150,10 @@ function ColumnAutomationRow({
           disabled={runPending}
           aria-busy={starting}
           data-testid={`${testId}-run-${automation.id}`}
-          onClick={() => onRun?.(automation)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRun?.(automation);
+          }}
           className="flex size-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
         >
           {starting ? (
@@ -165,7 +168,10 @@ function ColumnAutomationRow({
           type="button"
           tabIndex={-1}
           aria-hidden
-          onClick={() => onRowAction(automation, "settings")}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRowAction(automation, "settings");
+          }}
           className="flex size-4 shrink-0 items-center justify-center text-muted-foreground"
         >
           <Settings2 className="size-3.5" aria-hidden data-testid={`${testId}-settings-${automation.id}`} />

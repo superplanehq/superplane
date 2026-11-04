@@ -156,7 +156,9 @@ describe("Line board job popup", () => {
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).toHaveTextContent("Confidence");
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-845-confidence")).not.toHaveTextContent(/\d/);
     expect(screen.queryByLabelText("Plan phase")).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("Implement phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(3);
+    expect(
+      within(screen.getByLabelText("Implement phase")).getAllByRole("button", { name: /^Open (?!automation:)/ }),
+    ).toHaveLength(3);
     expect(
       within(screen.getByLabelText("Implement phase")).getByRole("button", {
         name: "Open Add refund reconciliation test",
@@ -186,14 +188,16 @@ describe("Line board job popup", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("lines-verify-column-scroll")).getAllByRole("button", { name: /^Open / }),
+      within(screen.getByTestId("lines-verify-column-scroll")).getAllByRole("button", { name: /^Open (?!automation:)/ }),
     ).toHaveLength(1);
     expect(
       within(screen.getByLabelText("Verify phase")).getByRole("button", {
         name: "Open Add refund reason enum to schema",
       }),
     ).toBeInTheDocument();
-    expect(within(screen.getByTestId("lines-done-column")).getAllByRole("button", { name: /^Open / })).toHaveLength(4);
+    expect(
+      within(screen.getByTestId("lines-done-column")).getAllByRole("button", { name: /^Open (?!automation:)/ }),
+    ).toHaveLength(4);
     expect(
       within(screen.getByTestId("lines-done-column")).getByRole("button", {
         name: "Open Send refund receipts after provider confirm",

@@ -2,7 +2,7 @@ import type {
   FactoriesFactoryCustomAutomation,
   FactoriesFactoryCustomAutomationSettings,
   FactoriesFactoryCustomAutomationStep,
-  FactoriesFactoryCustomAutomationTrigger,
+  FactoryCustomAutomationStartTrigger,
   FactoryCustomAutomationStartMode,
 } from "@/api-client";
 
@@ -237,7 +237,7 @@ export function customAutomationSettingsForTriggers(
   };
 }
 
-function triggerToApi(trigger: CustomAutomationTrigger): FactoriesFactoryCustomAutomationTrigger {
+function triggerToApi(trigger: CustomAutomationTrigger): FactoryCustomAutomationStartTrigger {
   return {
     startMode: CUSTOM_AUTOMATION_START_MODES[trigger.mode],
     schedule: trigger.mode === "scheduled" ? trigger.schedule : undefined,

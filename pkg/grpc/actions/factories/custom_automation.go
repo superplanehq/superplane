@@ -1227,10 +1227,10 @@ func serializeCustomAutomation(
 		settings.Schedule = triggers[0].schedule
 	} else {
 		settings.StartMode = pb.FactoryCustomAutomation_START_MODE_MANUAL
-		settings.Triggers = make([]*pb.FactoryCustomAutomation_Trigger, 0, len(triggers))
+		settings.Triggers = make([]*pb.FactoryCustomAutomation_StartTrigger, 0, len(triggers))
 		scheduled := 0
 		for _, trigger := range triggers {
-			settings.Triggers = append(settings.Triggers, &pb.FactoryCustomAutomation_Trigger{
+			settings.Triggers = append(settings.Triggers, &pb.FactoryCustomAutomation_StartTrigger{
 				StartMode: trigger.mode, Schedule: trigger.schedule,
 			})
 			switch trigger.mode {
