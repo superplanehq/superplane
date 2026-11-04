@@ -106,12 +106,14 @@ function watchesGitHubInstallation(flow: FirstRunSetupFlow, hasDestination: bool
 }
 
 function TicketsScreenHost({
+  organizationId,
   flow,
   model,
   chrome,
   sphere,
   initialWorkspace,
 }: {
+  organizationId: string;
   initialWorkspace: boolean;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
@@ -156,17 +158,15 @@ function TicketsScreenHost({
       jiraProjectsError={model.jiraProjectsError}
       jiraProjectId={model.jiraProjectId}
       linearConnected={model.setup.connected.has("linear")}
-      linearProjects={model.linearProjects}
-      linearProjectsLoading={model.linearProjectsLoading}
-      linearProjectsError={model.linearProjectsError}
-      linearProjectIds={model.linearProjectIds}
+      organizationId={organizationId}
+      linearIntegrationId={model.linearIntegrationId}
+      linearScope={model.linearScope}
       onSelectTicketSource={flow.selectTicketSource}
       onConnectJira={() => void flow.connectJira()}
       onSelectJiraProject={model.setJiraProjectId}
       onRetryJiraProjects={model.retryJiraProjects}
       onConnectLinear={() => void flow.connectLinear()}
-      onToggleLinearProject={model.toggleLinearProject}
-      onRetryLinearProjects={model.retryLinearProjects}
+      onChangeLinearScope={model.changeLinearScope}
       onAnalyzeTickets={() => void flow.continueFromTickets()}
     />
   );
@@ -274,6 +274,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "tickets") {
     return (
       <TicketsScreenHost
+        organizationId={organizationId}
         initialWorkspace={initialWorkspace}
         flow={flow}
         model={model}
