@@ -16,9 +16,9 @@ type taskCloseCommand struct {
 }
 
 func (c *taskCloseCommand) Execute(ctx core.CommandContext) error {
-	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	rawTaskID := taskRef(c.taskID)
 	if rawTaskID == "" {
-		return fmt.Errorf("--task is required")
+		return errTaskRequired
 	}
 
 	result, err := closeTaskResult(stringValue(c.result))

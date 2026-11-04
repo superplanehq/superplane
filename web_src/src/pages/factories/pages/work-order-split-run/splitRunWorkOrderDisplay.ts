@@ -14,11 +14,12 @@ export function tokensLabelForDisplay(order: FactoriesWorkOrder): string {
   return formatTokenCount(order.totalTokens) ?? "0 tokens";
 }
 
-export function startedLabelForOrder(order: Pick<FactoriesWorkOrder, "createdAt">): string {
-  if (!order.createdAt) {
+export function startedLabelForOrder(order: Pick<FactoriesWorkOrder, "createdAt" | "startedAt">): string {
+  const startedAt = order.startedAt || order.createdAt;
+  if (!startedAt) {
     return "";
   }
-  return formatWorkOrderDateTime(new Date(order.createdAt));
+  return formatWorkOrderDateTime(new Date(startedAt));
 }
 
 export function lineStatusForDisplay(status: WorkOrderDisplayStatus): SplitRunPhaseStatus {

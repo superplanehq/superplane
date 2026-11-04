@@ -1,4 +1,3 @@
-import { TaskRefinementModelSelect } from "../../TaskRefinementModelSelect";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -110,9 +109,6 @@ export function AnalysisPopupHeader({
           view={planningSpend.view}
           saved={{ tokens: planningSpend.savedTokens, cents: planningSpend.savedCostCents }}
         />
-      ) : null}
-      {fixture.footer.kind === "draft" ? (
-        <TaskRefinementModelSelect organizationId={organizationId} canEdit={edits.canEdit} />
       ) : null}
       {showOwnerRow ? (
         <LiveOwnerTimeCostRow

@@ -508,6 +508,30 @@ test("each global tool command calls that tool", async () => {
   assert.equal(JSON.parse(local).mimeType, "image/png");
 });
 
+test("superplane task check list uses SUPERPLANE_TASK_ID when --task is omitted", async () => {
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(url);
+    return { ok: true, status: 200, text: async () => "{}" };
+  };
+  const quiet = { write() {} };
+
+  assert.equal(await main(["task", "check", "list"], { ...env, SUPERPLANE_TASK_ID: "12" }, fetchImpl, quiet, quiet), 0);
+  assert.equal(
+    await main(["task", "check", "list", "--task", "SP-3"], { ...env, SUPERPLANE_TASK_ID: "12" }, fetchImpl, quiet, quiet),
+    0,
+  );
+  assert.deepEqual(urls, [
+    "https://app.example/api/v1/runner/checks?task=12",
+    "https://app.example/api/v1/runner/checks?task=SP-3",
+  ]);
+
+  let stderr = "";
+  const code = await main(["task", "check", "list"], env, fetchImpl, quiet, { write: (chunk) => { stderr += chunk; } });
+  assert.equal(code, 1);
+  assert.match(stderr, /usage: superplane task check list \[--task TASK\]/);
+});
+
 test("a placeholder with a missing flag does not claim to run", async () => {
   let stderr = "";
   const code = await main(

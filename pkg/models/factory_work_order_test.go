@@ -491,7 +491,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 }
 
-func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
+func TestFactoryWorkOrder_StartFillsMissingOwner(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	org, creatorID, factoryModel := setupFactoryWithUser(t, "assign-on-start")
@@ -513,7 +513,7 @@ func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
 		assert.Equal(t, starter.ID, loaded.Assignees[0].UserID)
 	})
 
-	t.Run("replaces the creator when someone else starts the draft", func(t *testing.T) {
+	t.Run("preserves the owner when someone else starts the draft", func(t *testing.T) {
 		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Manual draft", "", &creatorID, []uuid.UUID{creatorID}, nil)
 		require.NoError(t, err)
 
@@ -526,7 +526,7 @@ func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
 		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
 		require.NoError(t, err)
 		require.Len(t, loaded.Assignees, 1)
-		assert.Equal(t, starter.ID, loaded.Assignees[0].UserID)
+		assert.Equal(t, creatorID, loaded.Assignees[0].UserID)
 	})
 
 	t.Run("leaves assignees unchanged when no person opens the draft", func(t *testing.T) {
@@ -1032,6 +1032,34 @@ func TestFactoryWorkOrder_DeleteArtifacts(t *testing.T) {
 	assert.Equal(t, 2, payload.Count)
 	require.NotNil(t, payload.User)
 	assert.Equal(t, userID, payload.User.ID)
+}
+
+func TestFactoryWorkOrder_FindArtifactByDisplayKey(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "display-key")
+	db := database.DB(t.Context())
+	order, err := factoryModel.CreateWorkOrder(db, "Display key", "", &userID, nil, nil)
+	require.NoError(t, err)
+	createLink := func(key string) *FactoryWorkOrderArtifact {
+		artifact, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Key:  key,
+			Data: map[string]any{"url": "https://preview.example.com/" + key},
+		})
+		require.NoError(t, err)
+		return artifact
+	}
+	runArtifact := createLink(order.ID.String() + ":preview")
+	userArtifact := createLink("notes")
+
+	found, err := order.FindArtifactByDisplayKey(db, "preview")
+	require.NoError(t, err)
+	assert.Equal(t, runArtifact.ID, found.ID)
+
+	found, err = order.FindArtifactByDisplayKey(db, "notes")
+	require.NoError(t, err)
+	assert.Equal(t, userArtifact.ID, found.ID)
 }
 
 func TestFactoryWorkOrder_PaddedArtifactTitleStillMatches(t *testing.T) {
