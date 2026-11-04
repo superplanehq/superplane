@@ -11,6 +11,7 @@ import type {
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import {
   UNKNOWN_ORG_USER_NAME,
+  createOrgUserDisplayLookup,
   getUserInitials,
   type OrgUserDisplay,
   type OrgUserDisplayLookup,
@@ -232,6 +233,8 @@ export interface SplitRunFixture {
   assigneeIds?: string[];
   elapsed: string;
   startedLabel: string;
+  startedBy?: OrgUserDisplay;
+  autoStarted?: boolean;
   costUsd: string;
   tokensLabel: string;
   savedTokens?: number;
@@ -261,6 +264,15 @@ const UNKNOWN_OWNER: OrgUserDisplay = {
   name: UNKNOWN_ORG_USER_NAME,
   initials: getUserInitials(UNKNOWN_ORG_USER_NAME) || "U",
 };
+
+function splitRunStarterDisplay(
+  order: FactoriesWorkOrder,
+  resolveUser?: OrgUserDisplayLookup,
+): OrgUserDisplay | undefined {
+  const starter = order.startedBy;
+  const lookup = resolveUser ?? createOrgUserDisplayLookup(new Map());
+  return lookup(starter?.id, starter?.name, starter?.deleted, starter?.formerMember) ?? undefined;
+}
 
 function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {
   const assignee = order.assignees?.[0];
@@ -517,6 +529,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
     elapsed: elapsedForDisplay(displayStatus, order),
     startedLabel: startedLabelForOrder(order),
+    startedBy: splitRunStarterDisplay(order, options?.resolveUser),
+    autoStarted: order.autoStarted,
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
     savedTokens: parseWorkOrderMetric(order.totalTokens),
