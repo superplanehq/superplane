@@ -460,7 +460,14 @@ func scopedCodexLease(tx *gorm.DB, connection *models.FactoryCodexConnection, sc
 }
 
 func writeCodexSubscriptionError(w http.ResponseWriter, err error) {
+	var busy *models.CodexConnectionBusyError
 	switch {
+	case errors.As(err, &busy):
+		_ = writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "connection_busy"})
+	case errors.Is(err, models.ErrSubscriptionOwnerRequired),
+		errors.Is(err, models.ErrSubscriptionOwnerInvalid),
+		errors.Is(err, models.ErrSubscriptionTaskAssociation):
+		http.Error(w, err.Error(), http.StatusConflict)
 	case errors.Is(err, models.ErrCodexConnectionNotFound):
 		http.Error(w, "ChatGPT subscription connection not found", http.StatusNotFound)
 	case errors.Is(err, models.ErrCodexConnectionStale):
