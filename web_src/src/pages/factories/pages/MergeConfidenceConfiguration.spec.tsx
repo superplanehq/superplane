@@ -48,7 +48,12 @@ const legacyReview = [
   "",
 ].join("\n");
 
-function renderSettings(savedSteps = steps, onSave = vi.fn(), onClose = vi.fn()) {
+function renderSettings(
+  savedSteps = steps,
+  onSave = vi.fn(),
+  onClose = vi.fn(),
+  publishing?: SuperplaneComponentsNode,
+) {
   const agent: SuperplaneComponentsNode = {
     id: "assess-risk",
     name: "Assess risk",
@@ -63,6 +68,7 @@ function renderSettings(savedSteps = steps, onSave = vi.fn(), onClose = vi.fn())
       <MemoryRouter>
         <MergeConfidenceConfiguration
           agent={agent}
+          publishing={publishing}
           organizationId="org"
           factoryId="factory"
           canvasId="automation"
@@ -78,6 +84,58 @@ function renderSettings(savedSteps = steps, onSave = vi.fn(), onClose = vi.fn())
 beforeEach(() => loadDefaults.mockReset());
 
 describe("Merge confidence configuration", () => {
+  it("loads a saved opt-out and permits publishing again", async () => {
+    const { onSave } = renderSettings(steps, vi.fn(), vi.fn(), {
+      id: "publication",
+      component: "bitbucket.updatePullRequestBodySection",
+      configuration: { sectionKey: "merge-confidence", enabled: false },
+    });
+    const publishing = screen.getByRole("switch", { name: "Publish results to pull request" });
+    expect(publishing).not.toBeChecked();
+    fireEvent.click(publishing);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenCalledWith([
+      expect.objectContaining({ nodeId: "assess-risk" }),
+      expect.objectContaining({
+        nodeId: "publication",
+        configuration: { sectionKey: "merge-confidence", enabled: true },
+      }),
+    ]);
+  });
+
+  it("saves publication with agent settings and retains the opt-out after a failed save", async () => {
+    const onSave = vi.fn().mockRejectedValueOnce(new Error("Network error")).mockResolvedValue(undefined);
+    const { onClose } = renderSettings(steps, onSave, vi.fn(), {
+      id: "publish-merge-confidence",
+      name: "Publish results",
+      component: "github.updatePullRequestBodySection",
+      configuration: { sectionKey: "merge-confidence", body: "{{ event.data.body }}", pullRequestId: "pr" },
+    });
+    const publishing = screen.getByRole("switch", { name: "Publish results to pull request" });
+    expect(publishing).toBeChecked();
+    fireEvent.click(publishing);
+    fireEvent.change(screen.getByDisplayValue("sonnet"), { target: { value: "opus" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(publishing).not.toBeChecked();
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenLastCalledWith([
+      expect.objectContaining({ configuration: expect.objectContaining({ model: "opus" }) }),
+      expect.objectContaining({
+        nodeId: "publish-merge-confidence",
+        configuration: {
+          enabled: false,
+          sectionKey: "merge-confidence",
+          body: "{{ event.data.body }}",
+          pullRequestId: "pr",
+        },
+      }),
+    ]);
+  });
+
   it("saves runner options without rewriting stored prompts and retries a failed save", async () => {
     const stored = [steps[2], custom, { name: "Setup", type: "bash" as const, command: "git status" }, steps[0]];
     let rejectSave = (_error: Error) => {};
