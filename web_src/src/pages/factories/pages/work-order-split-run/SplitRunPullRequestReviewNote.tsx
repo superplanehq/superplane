@@ -8,10 +8,12 @@ import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequest
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
+import { ContinueFixesButton, MultiPullRequestReviewNote } from "./SplitRunMultiPullRequestReview";
 import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 import {
   isMergedPullRequest,
+  openReviewPullRequests,
   PULL_REQUEST_REVIEW_COPY,
   pullRequestForReviewHref,
   pullRequestReviewCopy,
@@ -264,32 +266,6 @@ function ReviewCallToAction({
   );
 }
 
-/** Resumes paused automatic fixes. Renders nothing when fixes are not paused. */
-function ContinueFixesButton({
-  onContinue,
-  disabled,
-  size = "sm",
-}: {
-  onContinue?: () => void;
-  disabled: boolean;
-  size?: "sm" | "lg";
-}) {
-  if (!onContinue) {
-    return null;
-  }
-  return (
-    <Button
-      type="button"
-      size={size}
-      disabled={disabled}
-      onClick={onContinue}
-      data-testid="split-run-footer-continue-fixes"
-    >
-      Continue fixes
-    </Button>
-  );
-}
-
 function MoreActionsMenu({
   actions,
   disabled,
@@ -374,6 +350,21 @@ export function WaitingPullRequestReview({
   const continueAction = actions.find((action) => action.kind === "continue-fixes");
   if (actionsOnly) {
     return <MoreActionsMenu actions={actions} disabled={actionBusy} onAction={onAction} />;
+  }
+  const openPullRequests = openReviewPullRequests(pullRequests);
+  if (openPullRequests.length > 1) {
+    return (
+      <MultiPullRequestReviewNote
+        pullRequests={openPullRequests}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+        canAct={canAct}
+        stacked={stacked}
+        continueFixes={continueAction ? () => onAction?.(continueAction) : undefined}
+        actionBusy={actionBusy}
+      />
+    );
   }
   return (
     <SplitRunPullRequestReviewNote

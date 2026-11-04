@@ -113,6 +113,8 @@ export interface AutomationStage {
   tokens?: string;
   model?: string;
   checks: WorkOrderCheckPresentation[];
+  /** Pull request repository the run scored. Known once it reports a check. */
+  repository?: string;
   outputs: StageOutputs;
   plumbing: PlumbingNode[];
   /** Agent transcript steps only. Empty for plumbing-only runs. */
@@ -306,6 +308,7 @@ export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
     tokens: tokens > 0 ? formatCompactTokens(tokens) : undefined,
     model: modelDisplayName(phase.model),
     checks: phase.checks ?? [],
+    repository: checkedRepository(phase.checks ?? []),
     outputs: {
       pullRequests: uniquePullRequests(nodes.map((node) => node.pullRequest)),
       artifacts: uniqueArtifacts([...phase.artifacts, ...nodes.map((node) => node.artifact)]),
@@ -317,6 +320,11 @@ export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
     columnKey: phase.columnKey,
     pullRequestActivity: phase.pullRequestActivity,
   };
+}
+
+function checkedRepository(checks: WorkOrderCheckPresentation[]): string | undefined {
+  const repositories = new Set(checks.map((check) => check.repository).filter(Boolean));
+  return repositories.size === 1 ? [...repositories][0] : undefined;
 }
 
 function plumbingNodeFromGroup({ line }: StreamNodeGroup): PlumbingNode {

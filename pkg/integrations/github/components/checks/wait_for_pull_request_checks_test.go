@@ -168,6 +168,27 @@ func Test__WaitForPullRequestChecks__Execute(t *testing.T) {
 		assert.Equal(t, waitChecksFailedChannel, executionState.Channel)
 	})
 
+	t.Run("keys the wait by the lowercase full repository name", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: WaitForPullRequestChecksConfiguration{
+				Repository: "TestHQ/World",
+				Ref:        sha,
+				CheckNames: []string{"DCO"},
+			},
+			HTTP:           newSnapshotHTTP(passingCheckRunsBody(sha), passingStatusesBody(sha)),
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			ExecutionState: executionState,
+			Requests:       &contexts.RequestContext{},
+			Metadata:       &contexts.MetadataContext{},
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "testhq/world@"+sha, executionState.KVs[waitChecksRefKV])
+	})
+
 	t.Run("schedules evaluate while checks are pending", func(t *testing.T) {
 		httpCtx := newSnapshotHTTP(
 			fmt.Sprintf(`{
@@ -268,6 +289,38 @@ func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 		assert.Equal(t, waitChecksEvaluateHook, requests.Action)
 		assert.Equal(t, waitChecksWebhookDelay, requests.Duration)
 		assert.Empty(t, httpCtx.Requests)
+	})
+
+	t.Run("workspace scope finds the wait in any workspace repository", func(t *testing.T) {
+		requests := &contexts.RequestContext{}
+		headers := http.Header{}
+		headers.Set("X-GitHub-Event", "check_run")
+		workspaceConfig := WaitForPullRequestChecksConfiguration{
+			Repository: "{{ root().data.repository.full_name }}",
+			Ref:        sha,
+			CheckNames: []string{"build"},
+		}
+
+		code, _, err := component.HandleWebhook(signedWaitChecksRequest(
+			[]byte(fmt.Sprintf(`{
+				"repository": {"name": "world", "full_name": "TestHQ/World"},
+				"check_run": {"head_sha": %q, "name": "build"}
+			}`, sha)),
+			headers,
+			workspaceConfig,
+			func(key, value string) (*core.ExecutionContext, error) {
+				assert.Equal(t, "testhq/world@"+sha, value)
+				return &core.ExecutionContext{
+					Requests:       requests,
+					ExecutionState: &contexts.ExecutionStateContext{},
+				}, nil
+			},
+			httpCtx,
+		))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, waitChecksEvaluateHook, requests.Action)
 	})
 
 	t.Run("does not schedule evaluate when the execution is cancelling", func(t *testing.T) {

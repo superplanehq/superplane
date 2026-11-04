@@ -49,6 +49,7 @@ func (p *OnPullRequest) Documentation() string {
 - **Actions**: Select which PR actions to listen for (opened, edited, closed, synchronize, etc.)
 - **Ignore draft pull requests**: Do not start a run when the pull request is a draft.
 - **Only pull requests in this factory**: Start a run only when the pull request belongs to this factory. The event then includes the factory pull request and the task.
+- **All workspace repositories**: Also listen on the other repositories of the workspace. Use this only in apps that a workspace owns.
 
 ## Event Data
 
@@ -158,10 +159,14 @@ func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(common.WebhookConfiguration{
+	webhookConfig, err := common.WorkspaceWebhookConfiguration(ctx.Factory, common.WebhookConfiguration{
 		EventType:  "pull_request",
 		Repository: config.Repository,
 	})
+	if err != nil {
+		return err
+	}
+	return ctx.Integration.RequestWebhook(webhookConfig)
 }
 
 func (p *OnPullRequest) Hooks() []core.Hook {
