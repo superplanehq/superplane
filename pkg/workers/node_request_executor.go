@@ -67,8 +67,8 @@ func (e *NodeRequestExecutor) execute(
 ) error {
 	defer e.publishExecution(request)
 	if request.Type == models.NodeRequestTypeInvokeAction && request.Spec.Data().InvokeAction != nil &&
-		request.Spec.Data().InvokeAction.ActionName == factorycomponent.PublishMergeConfidenceHook {
-		events, err := factoryactions.ProcessMergeConfidencePublicationRequest(context.Background(), e.factoryIntakeDeps(), request.ID, lockRequest)
+		request.Spec.Data().InvokeAction.ActionName == factorycomponent.UpdatePullRequestBodySectionHook {
+		events, err := factoryactions.ProcessBodySectionPublicationRequest(context.Background(), e.factoryIntakeDeps(), request.ID, lockRequest)
 		if err != nil {
 			return err
 		}

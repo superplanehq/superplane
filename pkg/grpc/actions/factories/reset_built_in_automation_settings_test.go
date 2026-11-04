@@ -143,6 +143,9 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 			t.Run(provider+"/"+templateID, func(t *testing.T) {
 				r, factory := resetTestFactory(t)
 				canvas := resetTestTemplate(t, r, factory, templateID, provider, func(doc *yaml.Canvas) {
+					if templateID == "risk-score" {
+						findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"] = false
+					}
 					trigger := findYAMLNode(t, doc, template.entrypointNodeID)
 					trigger.Configuration["onlyFactoryPullRequests"] = false
 					trigger.Configuration["ignoreDrafts"] = false
@@ -175,7 +178,8 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 				if templateID == "risk-score" {
 					publication := findIntakeNode(version.Nodes, "publish-merge-confidence")
 					require.NotNil(t, publication)
-					assert.Equal(t, "publishMergeConfidence", publication.ComponentName())
+					assert.Equal(t, "updatePullRequestBodySection", publication.ComponentName())
+					assert.Equal(t, false, publication.Configuration["enabled"])
 				}
 				assert.Equal(t, false, trigger.Configuration["onlyFactoryPullRequests"])
 				assert.Equal(t, false, trigger.Configuration["ignoreDrafts"])
@@ -718,4 +722,35 @@ func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing
 	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 	require.NoError(t, err)
 	assert.Equal(t, defaultOwnerID, reloaded.OnboardingConfigValue().CodexDefaultOwnerID)
+}
+
+func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	var saved []*models.Canvas
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := resetTestTemplate(t, r, factory, "risk-score", provider, func(doc *yaml.Canvas) {
+			findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"] = false
+		})
+		saved = append(saved, canvas)
+	}
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	result, err := resetBuiltInAutomationForOrganizations(ctx, []models.Organization{*r.Organization}, "risk-score", testIntakeDependencies(r))
+	require.NoError(t, err)
+	require.Empty(t, result.Failed)
+	assert.Equal(t, 2, result.Reset)
+	for _, canvas := range saved {
+		version := resetTestLiveVersion(t, canvas)
+		assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
+		factory, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
+		require.NoError(t, err)
+		// The user-facing restore-defaults path supplies no saved settings.
+		restored, err := materializeNonIntakeFactoryAppDefaults(db, factory, canvas, version, nil)
+		require.NoError(t, err)
+		doc, err := yaml.CanvasFromYAML([]byte(restored.canvasYAML))
+		require.NoError(t, err)
+		assert.Equal(t, true, findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"])
+	}
 }

@@ -285,7 +285,7 @@ import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
 import { onRunTriggerRenderer } from "./messages/on_run";
-import { publishMergeConfidenceMapper } from "./publishMergeConfidence";
+import { updatePullRequestBodySectionMapper } from "./updatePullRequestBodySection";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
 import { registerMapperLookups } from "./mapperLookup";
@@ -331,7 +331,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   merge: mergeMapper,
   runApp: runAppMapper,
   addRunError: addRunErrorMapper,
-  publishMergeConfidence: publishMergeConfidenceMapper,
+  updatePullRequestBodySection: updatePullRequestBodySectionMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {

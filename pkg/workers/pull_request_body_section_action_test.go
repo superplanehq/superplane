@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"github.com/google/uuid"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestNodeRequestExecutorDispatchesMergeConfidencePublication(t *testing.T) {
+func TestNodeRequestExecutorDispatchesBodySectionPublication(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	db := database.DB(t.Context())
@@ -22,20 +23,16 @@ func TestNodeRequestExecutorDispatchesMergeConfidencePublication(t *testing.T) {
 	require.NoError(t, err)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
 		{NodeID: "assessment", Type: models.NodeTypeTrigger},
-		{NodeID: "agent", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}})},
-		{NodeID: "publish", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: factorycomponent.PublishMergeConfidenceComponentName}})},
+		{NodeID: "publish", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: factorycomponent.UpdatePullRequestBodySectionComponentName}})},
 	}, nil)
 	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
 	root := support.EmitCanvasEventForNode(t, canvas.ID, "assessment", "default", nil)
-	agent := support.CreateCanvasNodeExecution(t, canvas.ID, "agent", root.ID, root.ID)
-	outputs, err := agent.PassInTransaction(db, map[string][]any{"passed": {map[string]any{"type": "runnerClaudeCode.finished"}}})
-	require.NoError(t, err)
-	require.Len(t, outputs, 1)
-	execution := support.CreateNextNodeExecution(t, canvas.ID, "publish", root.ID, outputs[0].ID, &agent.ID)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "publish", root.ID, root.ID)
+	execution.Configuration = datatypes.NewJSONType(map[string]any{"pullRequestId": uuid.NewString(), "sectionKey": "release-notes", "body": "arbitrary"})
 	execution.State = models.CanvasNodeExecutionStateStarted
 	require.NoError(t, db.Save(execution).Error)
-	require.NoError(t, (&factorycomponent.PublishMergeConfidence{}).Execute(core.ExecutionContext{
-		RunID: execution.RunID, Metadata: contexts.NewExecutionMetadataContext(db, execution), Requests: contexts.NewExecutionRequestContext(db, execution),
+	require.NoError(t, (&factorycomponent.UpdatePullRequestBodySection{}).Execute(core.ExecutionContext{
+		RunID: execution.RunID, Configuration: execution.Configuration.Data(), Metadata: contexts.NewExecutionMetadataContext(db, execution), Requests: contexts.NewExecutionRequestContext(db, execution),
 	}))
 	var request models.CanvasNodeRequest
 	require.NoError(t, db.Where("execution_id = ?", execution.ID).First(&request).Error)

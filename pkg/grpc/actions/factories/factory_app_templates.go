@@ -168,6 +168,7 @@ type factoryTemplateInput struct {
 	triggerSettings       *factoryTriggerSettings
 	pullRequestSettings   map[string]any
 	mergeCheckSteps       any
+	bodySectionSettings   map[string]map[string]any
 }
 
 type factoryTemplateIntegration struct {
@@ -251,6 +252,12 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 		return nil, fmt.Errorf("parse factory app template: %w", err)
 	}
 	if template.id == "risk-score" {
+		for i := range canvas.Spec.Nodes {
+			node := &canvas.Spec.Nodes[i]
+			if node.Component == "updatePullRequestBodySection" {
+				maps.Copy(node.Configuration, input.bodySectionSettings[node.ID])
+			}
+		}
 		filterDisabledMergeChecks(canvas, params["enabledChecks"])
 		if input.mergeCheckSteps != nil {
 			for i := range canvas.Spec.Nodes {
@@ -602,6 +609,7 @@ func deriveFactoryTemplateInput(
 		input.pullRequestSettings = settings.pullRequests["create-pr"]
 		if template.id == "risk-score" {
 			input.mergeCheckSteps = settings.agentSteps["assess-risk"]
+			input.bodySectionSettings = settings.bodySections
 		}
 	}
 

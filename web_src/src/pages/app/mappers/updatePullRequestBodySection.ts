@@ -10,7 +10,7 @@ interface PublicationMetadata {
   nextRetryAt?: string;
 }
 
-export const publishMergeConfidenceMapper: ComponentBaseMapper = {
+export const updatePullRequestBodySectionMapper: ComponentBaseMapper = {
   ...noopMapper,
   getExecutionDetails: ({ execution }) => {
     const publication = execution.metadata as PublicationMetadata | undefined;

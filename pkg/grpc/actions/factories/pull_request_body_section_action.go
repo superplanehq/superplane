@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,9 +16,9 @@ import (
 	"gorm.io/gorm"
 )
 
-const mergeConfidenceRequestLease = 5 * time.Minute
+const bodySectionRequestLease = 5 * time.Minute
 
-type mergeConfidencePublicationState struct {
+type bodySectionPublicationState struct {
 	SourceRunID string     `json:"sourceRunId"`
 	Status      string     `json:"status"`
 	Attempts    int        `json:"attempts"`
@@ -29,23 +28,23 @@ type mergeConfidencePublicationState struct {
 	LeaseUntil  *time.Time `json:"leaseUntil,omitempty"`
 }
 
-type mergeConfidenceActionAttempt struct {
-	request          *models.CanvasNodeRequest
-	execution        *models.CanvasNodeExecution
-	source           *models.CanvasRun
-	assessmentPassed bool
-	state            mergeConfidencePublicationState
-	events           []models.CanvasEvent
+type bodySectionActionAttempt struct {
+	request       *models.CanvasNodeRequest
+	execution     *models.CanvasNodeExecution
+	source        *models.CanvasRun
+	configuration factorycomponent.UpdatePullRequestBodySectionConfiguration
+	state         bodySectionPublicationState
+	events        []models.CanvasEvent
 }
 
-// ProcessMergeConfidencePublicationRequest releases the request transaction
+// ProcessBodySectionPublicationRequest releases the request transaction
 // before provider I/O. A lease recovers interrupted attempts through the same
 // scheduled action queue used by other components.
-func ProcessMergeConfidencePublicationRequest(ctx context.Context, deps IntakeDependencies, requestID uuid.UUID,
+func ProcessBodySectionPublicationRequest(ctx context.Context, deps IntakeDependencies, requestID uuid.UUID,
 	lockRequest func(*gorm.DB, uuid.UUID) (*models.CanvasNodeRequest, error),
 ) ([]models.CanvasEvent, error) {
 	db := database.DB(ctx)
-	attempt := &mergeConfidenceActionAttempt{}
+	attempt := &bodySectionActionAttempt{}
 	err := db.Transaction(func(tx *gorm.DB) error {
 		request, err := lockRequest(tx, requestID)
 		if err != nil {
@@ -64,15 +63,14 @@ func ProcessMergeConfidencePublicationRequest(ctx context.Context, deps IntakeDe
 		return attempt.events, nil
 	}
 
-	baseURL, _ := attempt.request.Spec.Data().InvokeAction.Parameters["baseURL"].(string)
-	outcome, publishErr := publishMergeConfidenceRun(ctx, db, deps, attempt.source, attempt.assessmentPassed, baseURL, attempt.stillActive)
+	outcome, publishErr := publishBodySection(ctx, db, deps, sectionPublication{run: attempt.source, nodeID: attempt.execution.NodeID, configuration: attempt.configuration, stillActive: attempt.stillActive})
 	err = db.Transaction(func(tx *gorm.DB) error { return attempt.finish(tx, outcome, publishErr) })
 	return attempt.events, err
 }
 
 // stillActive rereads the run and the execution. A cancellation that arrives
 // while the provider reads the description must stop the write.
-func (a *mergeConfidenceActionAttempt) stillActive(db *gorm.DB) (bool, error) {
+func (a *bodySectionActionAttempt) stillActive(db *gorm.DB) (bool, error) {
 	execution, err := models.FindNodeExecutionInTransaction(db, a.execution.WorkflowID, a.execution.ID)
 	if err != nil {
 		return false, err
@@ -87,14 +85,14 @@ func (a *mergeConfidenceActionAttempt) stillActive(db *gorm.DB) (bool, error) {
 	return run.State == models.CanvasRunStateStarted, nil
 }
 
-func (a *mergeConfidenceActionAttempt) collectEvents(events []models.CanvasEvent) {
+func (a *bodySectionActionAttempt) collectEvents(events []models.CanvasEvent) {
 	a.events = append(a.events, events...)
 }
 
-func (a *mergeConfidenceActionAttempt) claim(tx *gorm.DB) error {
+func (a *bodySectionActionAttempt) claim(tx *gorm.DB) error {
 	request := a.request
 	hook := request.Spec.Data().InvokeAction
-	if request.Type != models.NodeRequestTypeInvokeAction || hook == nil || hook.ActionName != factorycomponent.PublishMergeConfidenceHook || request.ExecutionID == nil {
+	if request.Type != models.NodeRequestTypeInvokeAction || hook == nil || hook.ActionName != factorycomponent.UpdatePullRequestBodySectionHook || request.ExecutionID == nil {
 		return fmt.Errorf("invalid publication action request")
 	}
 	execution, err := models.LockNodeExecution(tx, request.WorkflowID, *request.ExecutionID)
@@ -119,7 +117,7 @@ func (a *mergeConfidenceActionAttempt) claim(tx *gorm.DB) error {
 	if component == "" && node.Ref.Data().Component != nil {
 		component = node.Ref.Data().Component.Name
 	}
-	if component != factorycomponent.PublishMergeConfidenceComponentName {
+	if component != factorycomponent.UpdatePullRequestBodySectionComponentName {
 		return a.reject(tx, "Publication request has an invalid component.")
 	}
 	encoded, err := execution.Metadata.MarshalJSON()
@@ -142,57 +140,34 @@ func (a *mergeConfidenceActionAttempt) claim(tx *gorm.DB) error {
 	}
 	// PostgreSQL timestamps have microsecond precision. Persist and compare the
 	// same value when fencing a completed attempt against a newer lease.
-	until := time.Now().Add(mergeConfidenceRequestLease).Truncate(time.Microsecond)
+	until := time.Now().Add(bodySectionRequestLease).Truncate(time.Microsecond)
 	a.state.Status, a.state.LeaseUntil, a.state.NextRetryAt = "publishing", &until, nil
-	if err := setMergeConfidencePublicationState(tx, execution, a.state); err != nil {
+	if err := setBodySectionPublicationState(tx, execution, a.state); err != nil {
 		return err
 	}
 	return request.Reschedule(tx, until)
 }
 
-func (a *mergeConfidenceActionAttempt) resolveSource(tx *gorm.DB) error {
+func (a *bodySectionActionAttempt) resolveSource(tx *gorm.DB) error {
 	var err error
 	a.source, err = models.FindCanvasRunInTransaction(tx, a.execution.WorkflowID, a.execution.RunID)
 	if err != nil {
 		return err
 	}
 	if a.source.State != models.CanvasRunStateStarted {
-		return a.reject(tx, "The assessment run is no longer active.")
+		return a.reject(tx, "The source run is no longer active.")
 	}
-	input, err := models.FindCanvasEventInTransaction(tx, a.execution.EventID)
+	a.configuration, err = factorycomponent.DecodeBodySectionConfiguration(a.execution.Configuration.Data())
 	if err != nil {
-		return err
+		return a.reject(tx, "Publication configuration is invalid: "+err.Error())
 	}
-	if input.ExecutionID == nil || input.RunID != a.source.ID || (input.Channel != "passed" && input.Channel != "failed") {
-		return a.reject(tx, "Connect publication to the assessment agent output.")
-	}
-	agent, err := models.FindNodeExecutionInTransaction(tx, a.execution.WorkflowID, *input.ExecutionID)
-	if err != nil {
-		return err
-	}
-	if agent.State != models.CanvasNodeExecutionStateFinished {
-		return a.reject(tx, "The assessment agent is not finished.")
-	}
-	component := agent.FrozenComponentName()
-	if component == "" {
-		node, err := models.FindCanvasNode(tx, agent.WorkflowID, agent.NodeID)
-		if err != nil {
-			return err
-		}
-		if node.Ref.Data().Component != nil {
-			component = node.Ref.Data().Component.Name
-		}
-	}
-	if !strings.HasPrefix(component, "runner") {
-		return a.reject(tx, "Connect publication to the assessment agent output.")
-	}
-	a.assessmentPassed = input.Channel == "passed" && len(a.source.Errors) == 0
+
 	return nil
 }
 
-func (a *mergeConfidenceActionAttempt) reject(tx *gorm.DB, message string) error {
+func (a *bodySectionActionAttempt) reject(tx *gorm.DB, message string) error {
 	a.state.Status, a.state.Reason = "rejected", message
-	if err := setMergeConfidencePublicationState(tx, a.execution, a.state); err != nil {
+	if err := setBodySectionPublicationState(tx, a.execution, a.state); err != nil {
 		return err
 	}
 	if err := contexts.NewExecutionStateContext(tx, a.execution, a.collectEvents).Fail(models.CanvasNodeExecutionResultReasonError, message); err != nil {
@@ -201,7 +176,7 @@ func (a *mergeConfidenceActionAttempt) reject(tx *gorm.DB, message string) error
 	return a.request.Complete(tx)
 }
 
-func (a *mergeConfidenceActionAttempt) finish(tx *gorm.DB, outcome MergeConfidencePublicationOutcome, publishErr error) error {
+func (a *bodySectionActionAttempt) finish(tx *gorm.DB, outcome bodySectionPublicationOutcome, publishErr error) error {
 	current, err := models.LockNodeRequestNow(tx, a.request.ID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil
@@ -225,33 +200,29 @@ func (a *mergeConfidenceActionAttempt) finish(tx *gorm.DB, outcome MergeConfiden
 		return a.scheduleRetry(tx, current, execution, publishErr)
 	}
 	a.state.Status, a.state.Reason, a.state.NextRetryAt = outcome.Status, outcome.Reason, nil
-	if err := setMergeConfidencePublicationState(tx, execution, a.state); err != nil {
+	if err := setBodySectionPublicationState(tx, execution, a.state); err != nil {
 		return err
 	}
-	channel := "default"
-	if !a.assessmentPassed {
-		channel = "failed"
-	}
-	if err := contexts.NewExecutionStateContext(tx, execution, a.collectEvents).Emit(channel, factorycomponent.MergeConfidencePublishedPayloadType, []any{a.state}); err != nil {
+	if err := contexts.NewExecutionStateContext(tx, execution, a.collectEvents).Emit("default", factorycomponent.PullRequestBodySectionUpdatedPayloadType, []any{a.state}); err != nil {
 		return err
 	}
 	return current.Complete(tx)
 }
 
-func (a *mergeConfidenceActionAttempt) scheduleRetry(tx *gorm.DB, current *models.CanvasNodeRequest, execution *models.CanvasNodeExecution, publishErr error) error {
+func (a *bodySectionActionAttempt) scheduleRetry(tx *gorm.DB, current *models.CanvasNodeRequest, execution *models.CanvasNodeExecution, publishErr error) error {
 	delay := min(time.Duration(a.state.Attempts)*10*time.Second, 5*time.Minute)
 	next := time.Now().Add(delay)
 	a.state.Status, a.state.LastError, a.state.NextRetryAt = "retrying", publishErr.Error(), &next
-	if err := setMergeConfidencePublicationState(tx, execution, a.state); err != nil {
+	if err := setBodySectionPublicationState(tx, execution, a.state); err != nil {
 		return err
 	}
 	if err := current.Complete(tx); err != nil {
 		return err
 	}
-	return contexts.NewExecutionRequestContext(tx, execution).ScheduleActionCall(factorycomponent.PublishMergeConfidenceHook, current.Spec.Data().InvokeAction.Parameters, delay)
+	return contexts.NewExecutionRequestContext(tx, execution).ScheduleActionCall(factorycomponent.UpdatePullRequestBodySectionHook, current.Spec.Data().InvokeAction.Parameters, delay)
 }
 
-func setMergeConfidencePublicationState(tx *gorm.DB, execution *models.CanvasNodeExecution, state mergeConfidencePublicationState) error {
+func setBodySectionPublicationState(tx *gorm.DB, execution *models.CanvasNodeExecution, state bodySectionPublicationState) error {
 	encoded, err := json.Marshal(state)
 	if err != nil {
 		return err
