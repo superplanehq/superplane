@@ -41,7 +41,7 @@ func GenerateFiles() ([]File, error) {
 
 	files := make([]File, 0, len(integrations)+1)
 
-	coreDoc, err := renderCoreComponentsDoc(reg.ListActions(), reg.ListTriggers())
+	coreDoc, err := renderCoreComponentsDoc(reg.ListSelectableActions(), reg.ListTriggers())
 	if err != nil {
 		return nil, err
 	}

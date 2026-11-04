@@ -12,10 +12,11 @@ export type BuildBuildingBlockCategoriesOptions = {
 
 export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
-  components: ActionsAction[],
+  allComponents: ActionsAction[],
   integrations: IntegrationsIntegrationDefinition[],
   options: BuildBuildingBlockCategoriesOptions = {},
 ): BuildingBlockCategory[] {
+  const components = allComponents.filter((c) => !isRetiredBlock(c));
   const runnerCategory = runners(triggers, components);
   const superplaneCategory = superplane(triggers, components, options.isFactoryApp ?? false);
 
@@ -227,12 +228,20 @@ const FACTORY_BLOCK_NAMES = new Set([
   "addWorkOrderArtifact",
   "addPullRequest",
   "updatePullRequest",
-  "updatePullRequestBodySection",
   "findPullRequest",
   "addPullRequestActivity",
   "updatePullRequestActivity",
   "reportWorkOrderCheck",
 ]);
+
+// Saved canvases can still contain retired core actions. The API keeps their
+// definitions so that existing nodes keep their settings, but new nodes must
+// use the integration actions.
+const RETIRED_BLOCK_NAMES = new Set(["updatePullRequestBodySection"]);
+
+function isRetiredBlock(component: { name?: string }): boolean {
+  return RETIRED_BLOCK_NAMES.has(component.name || "");
+}
 
 function isSuperPlaneBlock(component: { name?: string }): boolean {
   return SUPERPLANE_BLOCK_NAMES.has(component.name || "");
