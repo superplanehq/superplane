@@ -116,6 +116,11 @@ describe("MergeConfidenceConfigModal", () => {
         })),
       };
       graph.specNodes![1].concurrency = { max: 5, key: "pr" };
+      graph.specNodes!.push({
+        id: "publish-merge-confidence",
+        component: "updatePullRequestBodySection",
+        configuration: { sectionKey: "merge-confidence", enabled: false },
+      });
       const user = userEvent.setup();
       const view = renderModal(vi.fn(), vi.fn(), graph);
       expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
@@ -124,6 +129,7 @@ describe("MergeConfidenceConfigModal", () => {
         expect(screen.getByRole("switch", { name: label })).toBeChecked();
       }
       expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();
+      expect(screen.getByRole("switch", { name: "Publish results to pull request" })).not.toBeChecked();
       expect(screen.getByText("The model used for each run.")).toBeInTheDocument();
       expect(screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" })).toHaveValue(5);
       const duration = screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" });
