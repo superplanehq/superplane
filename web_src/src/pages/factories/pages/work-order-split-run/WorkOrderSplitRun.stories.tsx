@@ -16,6 +16,7 @@ import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFacto
 import { prReadyFactoriesFixture } from "../../__fixtures__/prReadyFactoriesFixture";
 import { LINE_BOARD_VERIFY_PR_REVIEW_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { refineChatBoardFixture } from "../../__fixtures__/refineChatBoardFixture";
+import { ARNOLD_USER, TWO_HOURS_AGO } from "../../__fixtures__/factoryPageIds";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
 
 /**
@@ -99,6 +100,44 @@ export const AutomationRun: Story = {
       />
     );
   },
+};
+
+function startedTask(autoStarted: boolean) {
+  return (
+    <FactoriesHarness
+      mode="app"
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/106?lineId=${REFUND_FACTORY_LINES[0].id}`}
+      factoriesFixture={{
+        ...lineMetricsFactoriesFixture,
+        workOrdersByFactoryId: {
+          ...lineMetricsFactoriesFixture.workOrdersByFactoryId,
+          [PRIMARY_FACTORY_ID]: [
+            {
+              ...BOARD_IMPLEMENT_FAILED_ORDER,
+              state: "STATE_OPEN",
+              result: undefined,
+              origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
+              createdBy: { user: { id: "importer", name: "Alex Importer" } },
+              startedBy: autoStarted ? undefined : { id: ARNOLD_USER.id, name: ARNOLD_USER.name },
+              autoStarted,
+              startedAt: TWO_HOURS_AGO,
+            },
+          ],
+        },
+      }}
+      appFixture={failedImplementationCanvasFixture()}
+    />
+  );
+}
+
+export const StartedByReviewer: Story = {
+  name: "Started by a different person",
+  render: () => startedTask(false),
+};
+
+export const AutoStarted: Story = {
+  name: "Auto-started without a person",
+  render: () => startedTask(true),
 };
 
 export const FailedImplementation: Story = {

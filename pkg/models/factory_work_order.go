@@ -364,7 +364,7 @@ func (o *FactoryWorkOrder) AssignStarter(tx *gorm.DB, userID uuid.UUID) error {
 // (actor / automation / run + app). On the initial `draft → open` we also
 // snapshot the originating run/app from `o.SourceRunID`, so the timeline
 // can always trace an order back to the run that created it. When a
-// person opens the draft, they become the owner.
+// person opens an unassigned draft, they become the owner.
 //
 // The bool return reports whether a transition was actually recorded:
 // `true` on a real state change, `false` when SkipSame swallowed a no-op
@@ -457,7 +457,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		}
 
 		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && update.Actor != nil {
-			if err := o.assignPersonWhoOpened(tx, *update.Actor); err != nil {
+			if err := o.assignStarterIfUnassigned(tx, *update.Actor); err != nil {
 				return err
 			}
 		}
@@ -674,7 +674,7 @@ func (o *FactoryWorkOrder) AddAssignee(tx *gorm.DB, userID uuid.UUID, actor uuid
 	return true, nil
 }
 
-func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) error {
+func (o *FactoryWorkOrder) assignStarterIfUnassigned(tx *gorm.DB, actor uuid.UUID) error {
 	subscription, err := o.UsesCodexSubscription(tx)
 	if err != nil || subscription {
 		return err
@@ -682,7 +682,7 @@ func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) e
 	if err := tx.Preload("User").Where("work_order_id = ?", o.ID).Find(&o.Assignees).Error; err != nil {
 		return err
 	}
-	if len(o.Assignees) == 1 && o.Assignees[0].UserID == actor {
+	if len(o.Assignees) > 0 {
 		return nil
 	}
 	if err := o.UpdateAssignees(tx, []uuid.UUID{actor}, actor); err != nil {
