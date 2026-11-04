@@ -2,6 +2,7 @@ import type {
   FactoriesFactoryCustomAutomation,
   FactoriesFactoryCustomAutomationSettings,
   FactoriesFactoryCustomAutomationStep,
+  FactoriesFactoryCustomAutomationTrigger,
   FactoryCustomAutomationStartMode,
 } from "@/api-client";
 
@@ -17,6 +18,48 @@ const CUSTOM_AUTOMATION_START_MODES: Record<CustomAutomationMode, FactoryCustomA
 };
 export type CustomAutomationSchedule = { cronExpression: string; utcOffset: number };
 export type CustomAutomationColumn = "backlog" | "verify";
+export type CustomAutomationTrigger = {
+  id: string;
+  mode: CustomAutomationMode;
+  schedule: CustomAutomationSchedule;
+};
+
+export function newCustomAutomationTrigger(
+  mode: CustomAutomationMode = "manual",
+  schedule: CustomAutomationSchedule = customAutomationSchedule(),
+): CustomAutomationTrigger {
+  return { id: crypto.randomUUID(), mode, schedule };
+}
+
+export function customAutomationTriggers(automation?: FactoriesFactoryCustomAutomation): CustomAutomationTrigger[] {
+  const saved = automation?.settings?.triggers;
+  if (saved && saved.length > 0) {
+    return saved.map((trigger) =>
+      newCustomAutomationTrigger(
+        customAutomationMode(trigger.startMode),
+        trigger.startMode === "START_MODE_SCHEDULED"
+          ? {
+              cronExpression: trigger.schedule?.cronExpression ?? "",
+              utcOffset: trigger.schedule?.utcOffset ?? 0,
+            }
+          : customAutomationSchedule(),
+      ),
+    );
+  }
+  return [
+    newCustomAutomationTrigger(
+      customAutomationMode(automation?.settings?.startMode),
+      customAutomationSchedule(automation),
+    ),
+  ];
+}
+
+export function customAutomationAllowsManualStart(settings?: FactoriesFactoryCustomAutomationSettings): boolean {
+  if (settings?.triggers && settings.triggers.length > 0) {
+    return settings.triggers.some((trigger) => trigger.startMode === "START_MODE_MANUAL");
+  }
+  return customAutomationMode(settings?.startMode) === "manual";
+}
 
 export function customAutomationSchedule(automation?: FactoriesFactoryCustomAutomation): CustomAutomationSchedule {
   if (automation?.settings?.startMode === "START_MODE_SCHEDULED") {
@@ -50,7 +93,10 @@ export function customAutomationModeCopy(
   action: string;
 } {
   if (mode === "scheduled") {
-    return { trigger: "On schedule", action: "Run automation on the repository default branch" };
+    return {
+      trigger: "On schedule",
+      action: columnKey === "backlog" ? "Creates a task" : "Run automation on the repository default branch",
+    };
   }
   if (mode === "automatic") {
     return {
@@ -165,6 +211,36 @@ function stepFromApi(step: FactoriesFactoryCustomAutomationStep): PlanningReview
     command: step.command,
     workingDirectory: step.workingDirectory,
     secrets: step.secrets,
+  };
+}
+
+export function customAutomationSettingsForTriggers(
+  triggers: CustomAutomationTrigger[],
+  draft: PlanningReviewDraft,
+  icon = DEFAULT_CUSTOM_AUTOMATION_ICON,
+): FactoriesFactoryCustomAutomationSettings {
+  const current = triggers.length > 0 ? triggers : [newCustomAutomationTrigger()];
+  const scheduled = current.filter((trigger) => trigger.mode === "scheduled");
+  const primary = current.some((trigger) => trigger.mode === "automatic")
+    ? "automatic"
+    : scheduled.length > 0
+      ? "scheduled"
+      : "manual";
+  const settings = customAutomationSettings(primary, draft, icon, scheduled[0]?.schedule);
+  if (current.length === 1) {
+    return customAutomationSettings(current[0]!.mode, draft, icon, current[0]!.schedule);
+  }
+  return {
+    ...settings,
+    schedule: scheduled.length === 1 ? scheduled[0]!.schedule : undefined,
+    triggers: current.map(triggerToApi),
+  };
+}
+
+function triggerToApi(trigger: CustomAutomationTrigger): FactoriesFactoryCustomAutomationTrigger {
+  return {
+    startMode: CUSTOM_AUTOMATION_START_MODES[trigger.mode],
+    schedule: trigger.mode === "scheduled" ? trigger.schedule : undefined,
   };
 }
 
