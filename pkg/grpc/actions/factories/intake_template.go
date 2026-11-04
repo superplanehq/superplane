@@ -65,15 +65,21 @@ const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 
 // The webhook description remains the fallback when either API request fails.
 // HTTP Request returns parsed JSON, so the expression adds current issue data
-// and exception frames without another Sentry action.
+// and exception frames without another Sentry action. HTTP Request returns a
+// string body for a non-JSON response, such as a proxy error page. Each block
+// reads fields only from an object body, so an error page cannot stop task
+// creation.
 const sentryIntakeDescriptionExpression = `{{ root().data.description ?? "" }}{{
-  ($["Get Sentry Issue"].data.body?.count ?? "") != "" ?
-    "\n\n## Latest issue details\n\nOccurrences: " + string($["Get Sentry Issue"].data.body.count) : ""
+  let issue = $["Get Sentry Issue"].data.body;
+  type(issue) == "map" && (issue.count ?? "") != "" ?
+    "\n\n## Latest issue details\n\nOccurrences: " + string(issue.count) : ""
 }}{{
-  ($["Get Sentry Event"].data.body?.message ?? "") != "" ?
-    "\n\n## Latest event\n\n" + $["Get Sentry Event"].data.body.message : ""
+  let event = $["Get Sentry Event"].data.body;
+  type(event) == "map" && (event.message ?? "") != "" ?
+    "\n\n## Latest event\n\n" + string(event.message) : ""
 }}{{
-  join(map(filter($["Get Sentry Event"].data.body?.entries ?? [], {#.type == "exception"}),
+  let event = $["Get Sentry Event"].data.body;
+  join(map(filter(type(event) == "map" ? event.entries ?? [] : [], {#.type == "exception"}),
     join(map(filter(#.data.values ?? [], {len(#.stacktrace.frames ?? []) > 0}),
       "\n\n## Stack Trace\n\n" +
       join(map(#.stacktrace.frames, "    " + (#.function ?? "unknown") + " (" + (#.filename ?? "") + ":" + string(#.lineNo ?? "") + ")"), "\n")), "\n\n")), "\n\n")

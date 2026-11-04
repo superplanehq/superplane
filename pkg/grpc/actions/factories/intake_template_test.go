@@ -33,6 +33,9 @@ func TestSentryIntakeCreatesTaskFromGenericResponses(t *testing.T) {
 	}{
 		{"API data", "Handle (app.go:22)", issue, event},
 		{"API unavailable", "[View in Sentry](https://sentry.io/issues/123/)", map[string]any{"data": map[string]any{}}, map[string]any{"data": map[string]any{}}},
+		{"API error page", "[View in Sentry](https://sentry.io/issues/123/)",
+			map[string]any{"data": map[string]any{"body": "<html>502 Bad Gateway</html>"}},
+			map[string]any{"data": map[string]any{"body": "<html>502 Bad Gateway</html>"}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			env := map[string]any{"$": map[string]any{"Get Sentry Issue": test.issue, "Get Sentry Event": test.event}}
@@ -46,7 +49,7 @@ func TestSentryIntakeCreatesTaskFromGenericResponses(t *testing.T) {
 				actual.WriteString(value.(string))
 			}
 			assert.Contains(t, actual.String(), test.want)
-			if test.name == "API unavailable" {
+			if test.name != "API data" {
 				assert.Equal(t, root["data"].(map[string]any)["description"], actual.String())
 			}
 		})
