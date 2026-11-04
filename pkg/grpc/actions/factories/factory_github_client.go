@@ -26,6 +26,11 @@ type factoryGitHubAPI interface {
 var newFactoryGitHubAPI = githubClientForFactory
 
 func githubClientForFactory(db *gorm.DB, deps IntakeDependencies, factory *models.Factory) (factoryGitHubAPI, error) {
+	return githubIntegrationClient(db, deps, factory)
+}
+
+// githubIntegrationClient opens a client on the workspace GitHub integration.
+func githubIntegrationClient(db *gorm.DB, deps IntakeDependencies, factory *models.Factory) (*common.Client, error) {
 	if deps.Registry == nil || deps.Encryptor == nil {
 		return nil, errFactoryGitHubNotConnected
 	}

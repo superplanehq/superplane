@@ -113,33 +113,29 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		"value":       "1",
 		"valueSource": "literal",
 	})
-	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
+	assert.Contains(t, environment, map[string]any{
+		"name":        factoryDraftPullRequestsEnv,
+		"value":       "false",
+		"valueSource": "literal",
+	})
 
-	createPR := findYAMLNode(t, canvas, "create-pr")
-	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
-	assert.Equal(t, "{{ task().default_branch }}", createPR.Configuration["base"])
-	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, createPR.Integration)
-
-	body, ok := createPR.Configuration["body"].(string)
-	require.True(t, ok, "expected create-pr body to be a string")
-	assert.Contains(t, body, `task().origin != nil ? "Closes " + task().origin.label : ""`)
-	assert.Contains(t, body, "[{{ task().key }}]({{ task().url }})")
-	assert.Less(t, strings.Index(body, "Closes"), strings.Index(body, "task().key"), "body: %s", body)
-	assert.NotContains(t, body, "[Task](")
+	assert.Contains(t, implementationPrompt, "../context/<owner>/<name>")
+	assert.Contains(t, implementationPrompt, "open_pull_request")
+	assert.Contains(t, implementationPrompt, "Do not add GitHub closing keywords")
+	checkCommand, _ := implementationStep(t, agent, "Check pull requests")["command"].(string)
+	assert.Contains(t, checkCommand, "superplane task pr list")
+	assert.NotContains(t, result.canvasYAML, "git push")
+	for _, component := range []string{"github.findPullRequest", "github.createPullRequest", "github.updatePullRequest", "addPullRequest", "addWorkOrderArtifact"} {
+		assert.NotContains(t, result.canvasYAML, component)
+	}
+	assert.ElementsMatch(t, []yaml.Edge{
+		{SourceID: "onrun-implement", TargetID: "implementation-agent-no-issue", Channel: "default"},
+		{SourceID: "implementation-agent-no-issue", TargetID: "add-run-error", Channel: "failed"},
+	}, canvas.Spec.Edges)
 	assert.NotContains(t, result.canvasYAML, "visualEvidence")
 	assert.NotContains(t, result.canvasYAML, "has-visual-evidence")
 	assert.NotContains(t, result.canvasYAML, "comment-visual-evidence")
 	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
-
-	attach := findYAMLNode(t, canvas, "attach-pr-artifact")
-	assert.Equal(t, "addPullRequest", attach.Component)
-	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "create-pr", TargetID: "attach-pr-artifact", Channel: "default"})
-	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "update-pr", TargetID: "attach-pr-artifact-updated", Channel: "default"})
-
-	updatePR := findYAMLNode(t, canvas, "update-pr")
-	updateBody, ok := updatePR.Configuration["body"].(string)
-	require.True(t, ok, "expected update-pr body to be a string")
-	assert.Contains(t, updateBody, `task().origin != nil ? "Closes " + task().origin.label : ""`)
 
 	console, err := yaml.ConsoleFromYML([]byte(result.consoleYAML))
 	require.NoError(t, err)
@@ -181,6 +177,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
 	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
 	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
+	assert.Equal(t, true, entrypoint.Configuration["workspaceRepositories"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
 	assert.NotContains(t, result.canvasYAML, "should-assess")
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "on-pr-risk", TargetID: "assess-risk", Channel: "default"})

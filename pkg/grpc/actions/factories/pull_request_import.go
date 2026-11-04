@@ -45,7 +45,7 @@ func ImportFactoryPullRequest(ctx context.Context, deps IntakeDependencies, orga
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to import pull request")
 	}
-	if _, err := validateImportPullRequestURL(factory, req.GetPullRequestUrl()); err != nil {
+	if _, err := validateImportPullRequestURL(db, factory, req.GetPullRequestUrl()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to import pull request")
 	}
 	// An existing task, including an archived task, keeps ownership of the PR.
@@ -102,7 +102,7 @@ func ImportFactoryPullRequest(ctx context.Context, deps IntakeDependencies, orga
 		if err != nil {
 			return err
 		}
-		return recordVerifyHandOff(tx, factory, order, line, &actor, pr, verifyIndex, models.FactoryLineStartOptions{})
+		return recordVerifyHandOff(tx, factory, order, line, &actor, []*handOffPullRequest{pr}, verifyIndex, models.FactoryLineStartOptions{})
 	})
 	if errors.Is(err, models.ErrFactoryPullRequestAlreadyExists) {
 		// The losing transaction rolled back the task and sequence allocation.
@@ -158,19 +158,23 @@ func pullRequestImportFactory(db *gorm.DB, organizationID, factoryID string) (*m
 	return factory, nil
 }
 
-func validateImportPullRequestURL(factory *models.Factory, rawURL string) (parsedHandOffPullRequestURL, error) {
+func validateImportPullRequestURL(db *gorm.DB, factory *models.Factory, rawURL string) (parsedHandOffPullRequestURL, error) {
 	parsed, err := validateHandOffPullRequestURL(factory, rawURL)
 	if err != nil {
 		return parsed, err
 	}
-	if !strings.EqualFold(parsed.Repository, factory.OnboardingConfigValue().AppRepository) {
-		return parsed, invalidArgument("The pull request repository does not match the workspace repository.")
+	inWorkspace, err := factory.IsWorkspaceRepository(db, parsed.Repository)
+	if err != nil {
+		return parsed, err
+	}
+	if !inWorkspace {
+		return parsed, invalidArgument(errPullRequestRepositoryNotInWorkspace)
 	}
 	return parsed, nil
 }
 
 func existingPullRequestImport(db *gorm.DB, factory *models.Factory, rawURL string) (*models.FactoryWorkOrder, error) {
-	parsed, err := validateImportPullRequestURL(factory, rawURL)
+	parsed, err := validateImportPullRequestURL(db, factory, rawURL)
 	if err != nil {
 		return nil, err
 	}

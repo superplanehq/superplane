@@ -10,13 +10,17 @@ import { type ReactNode } from "react";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
-import { consoleCheckList, isMergeConfidenceMetric } from "../../../lib/mergeConfidenceScore";
+import { checksForRepository, consoleCheckList, isMergeConfidenceMetric } from "../../../lib/mergeConfidenceScore";
 import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
 import { workOrderCardPullRequestShowsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
-import { pullRequestLabel } from "../../../lib/workOrderPullRequest";
+import {
+  pullRequestLabel,
+  pullRequestRepositoryLabel,
+  pullRequestsSpanRepositories,
+} from "../../../lib/workOrderPullRequest";
 import { OrgUserReference, EmptyOwnerMark } from "../../../OrgUserReference";
 import { OwnerAssignTrigger } from "../../../WorkOrderAssigneesPopover";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
@@ -26,7 +30,7 @@ import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
 import { ConsoleCheckRows } from "./consoleCheckRows";
 import type { SplitRunFixture } from "../splitRunMocks";
 import { splitRunPanelArtifacts } from "../splitRunPopupModel";
-import { isPullRequestReviewFooter, pullRequestReviewNote } from "../splitRunPullRequestReview";
+import { isPullRequestReviewFooter, openReviewPullRequests, pullRequestReviewNote } from "../splitRunPullRequestReview";
 import type { SplitRunSource } from "../splitRunSource";
 import type { AutomationStage, outcomeSummary } from "./automationsViewModel";
 import { StaticStatusGlyph } from "./redesignShared";
@@ -109,6 +113,7 @@ export function ConsoleSummaryPanel({
                 key={pullRequest.id ?? pullRequest.url ?? index}
                 pullRequest={pullRequest}
                 checks={fixture.checks}
+                showRepository={panel.showsPullRequestRepository}
               />
             ))}
           </FramePanel>
@@ -186,12 +191,10 @@ function consolePanelFacts({
   const hasDecision = Boolean(fixture.footer.attentionCard && fixture.footer.note);
   const liveStage = stages.find((stage) => stage.status === "running");
   const isLive = fixture.footer.kind === "running" || Boolean(liveStage);
-  const reviewedHref = panelReview ? reviewStripPullRequestHref(fixture) : undefined;
-  const panelPullRequests = withoutPullRequest(
-    pullRequests?.length ? pullRequests : outcome.pullRequests,
-    reviewedHref,
-  );
-  const hasPullRequest = panelPullRequests.length > 0 || Boolean(reviewedHref);
+  const taskPullRequests = pullRequests?.length ? pullRequests : outcome.pullRequests;
+  const reviewedHrefs = panelReview ? reviewStripPullRequestHrefs(fixture, taskPullRequests) : [];
+  const panelPullRequests = withoutPullRequests(taskPullRequests, reviewedHrefs);
+  const hasPullRequest = panelPullRequests.length > 0 || reviewedHrefs.length > 0;
   const taskArtifacts = artifacts ?? [];
   const taskArtifactIds = new Set(taskArtifacts.map((artifact) => artifact.id).filter(Boolean));
   const stageArtifacts = stages
@@ -211,6 +214,7 @@ function consolePanelFacts({
         )
       : undefined,
     panelPullRequests,
+    showsPullRequestRepository: pullRequestsSpanRepositories(taskPullRequests),
     panelArtifacts,
     // Merge confidence stays on its own list. Other non-planning checks stay
     // reachable here when no verify card copied them.
@@ -313,23 +317,32 @@ function ConsoleWaitingNote() {
   );
 }
 
-/** The pull request the decision strip already shows. The panel lists it only once. */
-function reviewStripPullRequestHref(fixture: SplitRunFixture): string | undefined {
+/** The pull requests the decision strip already shows. The panel lists each only once. */
+function reviewStripPullRequestHrefs(fixture: SplitRunFixture, pullRequests: FactoriesFactoryPullRequest[]): string[] {
   if (!fixture.footer.note || !isPullRequestReviewFooter(fixture.footer)) {
-    return undefined;
+    return [];
   }
-  return pullRequestReviewNote(fixture.footer.note)?.href;
+  const open = openReviewPullRequests(pullRequests);
+  if (open.length > 1) {
+    return open.map((pullRequest) => pullRequest.url ?? "");
+  }
+  const href = pullRequestReviewNote(fixture.footer.note)?.href;
+  return href ? [href] : [];
 }
 
-function withoutPullRequest(
+function withoutPullRequests(
   pullRequests: FactoriesFactoryPullRequest[],
-  href: string | undefined,
+  hrefs: string[],
 ): FactoriesFactoryPullRequest[] {
-  if (!href) {
+  if (hrefs.length === 0) {
     return pullRequests;
   }
-  const normalized = href.replace(/\/$/, "");
-  return pullRequests.filter((pullRequest) => (pullRequest.url ?? "").replace(/\/$/, "") !== normalized);
+  const shown = new Set(hrefs.map(normalizedPullRequestUrl));
+  return pullRequests.filter((pullRequest) => !shown.has(normalizedPullRequestUrl(pullRequest.url ?? "")));
+}
+
+function normalizedPullRequestUrl(url: string): string {
+  return url.replace(/\/$/, "");
 }
 
 /** The pull request supersedes its branch, so a listed branch would repeat it. */
@@ -344,14 +357,21 @@ function isBranchArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
 function PanelPullRequest({
   pullRequest,
   checks,
+  showRepository,
 }: {
   pullRequest: FactoriesFactoryPullRequest;
   checks: SplitRunFixture["checks"];
+  showRepository: boolean;
 }) {
   const href = safeExternalUrl(pullRequest.url);
   const title = pullRequest.title?.trim() || pullRequestLabel(pullRequest);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
+      {showRepository ? (
+        <span className="truncate text-[12px] leading-4 text-muted-foreground">
+          {pullRequestRepositoryLabel(pullRequest)}
+        </span>
+      ) : null}
       {href ? (
         <a
           href={href}
@@ -366,7 +386,9 @@ function PanelPullRequest({
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         <WorkOrderPullRequestChip pullRequest={pullRequest} />
-        {workOrderCardPullRequestShowsMergeable(pullRequest, checks) ? <WorkOrderMergeableChip /> : null}
+        {workOrderCardPullRequestShowsMergeable(pullRequest, checksForRepository(checks, pullRequest.repository)) ? (
+          <WorkOrderMergeableChip />
+        ) : null}
       </div>
     </div>
   );

@@ -43,12 +43,14 @@ function isWorkspaceMainRepository(name: string, appRepository: string | undefin
 }
 
 function ContextRepoList({
+  primaryRepository,
   resources,
   host,
   canUpdate,
   isSaving,
   onRemove,
 }: {
+  primaryRepository: string;
   resources: { id?: string | null; name?: string | null; repository?: string | null }[];
   host: VcsHostId;
   canUpdate: boolean;
@@ -60,6 +62,18 @@ function ContextRepoList({
       className="divide-y divide-border overflow-hidden rounded-lg border border-border"
       data-testid="agent-cross-repo-list"
     >
+      {primaryRepository ? (
+        <li className="flex min-w-0 items-center gap-3 px-3 py-2.5" data-testid="agent-cross-repo-primary">
+          <IntegrationChoiceIcon name={host} />
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{primaryRepository}</span>
+          <span
+            className="shrink-0 text-[12px] text-muted-foreground"
+            title={AGENT_RESOURCES_COPY.primaryRepositoryHint}
+          >
+            {AGENT_RESOURCES_COPY.primaryRepository}
+          </span>
+        </li>
+      ) : null}
       {resources.map((resource) => {
         const name = contextRepoName(resource);
         return (
@@ -107,6 +121,10 @@ export function CrossRepoContextCard({
 
   const added = (contextRepos.data ?? []).map(contextRepoName).filter(Boolean);
   const mainRepository = factory?.onboarding?.appRepository;
+  const primaryRepository = mainRepository?.trim() ?? "";
+  const otherRepos = (contextRepos.data ?? []).filter(
+    (resource) => !isWorkspaceMainRepository(contextRepoName(resource), mainRepository),
+  );
   const available = choices.repositories.filter(
     (name) => !added.includes(name) && !isWorkspaceMainRepository(name, mainRepository),
   );
@@ -149,7 +167,9 @@ export function CrossRepoContextCard({
       <FactorySettingsCard
         title={AGENT_RESOURCES_COPY.crossRepoTitle}
         titleClassName="text-sm font-semibold"
-        description={AGENT_RESOURCES_COPY.crossRepoHelper}
+        description={
+          choices.bitbucket ? AGENT_RESOURCES_COPY.crossRepoHelperReadOnly : AGENT_RESOURCES_COPY.crossRepoHelper
+        }
         icon={<GitBranch className="size-4" strokeWidth={1.75} aria-hidden />}
         iconClassName="border-border bg-muted/60 text-foreground"
         className="shadow-sm"
@@ -172,9 +192,10 @@ export function CrossRepoContextCard({
           <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.crossRepoLoadingResources}</p>
         ) : contextRepos.isError ? (
           <p className="text-[13px] text-destructive">{AGENT_RESOURCES_COPY.crossRepoResourcesLoadError}</p>
-        ) : added.length > 0 ? (
+        ) : primaryRepository || otherRepos.length > 0 ? (
           <ContextRepoList
-            resources={contextRepos.data ?? []}
+            primaryRepository={primaryRepository}
+            resources={otherRepos}
             host={choices.host}
             canUpdate={canUpdate}
             isSaving={isSaving}
@@ -186,7 +207,11 @@ export function CrossRepoContextCard({
         <DialogContent className="p-8 sm:max-w-2xl" data-testid="agent-cross-repo-picker">
           <DialogHeader>
             <DialogTitle>{AGENT_RESOURCES_COPY.addRepository}</DialogTitle>
-            <DialogDescription>{AGENT_RESOURCES_COPY.crossRepoDialogHelper}</DialogDescription>
+            <DialogDescription>
+              {choices.bitbucket
+                ? AGENT_RESOURCES_COPY.crossRepoDialogHelperReadOnly
+                : AGENT_RESOURCES_COPY.crossRepoDialogHelper}
+            </DialogDescription>
           </DialogHeader>
           <RepositoryChoice
             organizationId={organizationId}
