@@ -11,7 +11,7 @@ import type { VcsHostId } from "../onboarding/onboardingFixtures";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { UpdateUnfinishedTasksDialog } from "./UpdateUnfinishedTasksDialog";
 import { useFactoryRepository } from "./useFactoryRepository";
-import { useRepositoryDefaultBranch } from "./useRepositoryDefaultBranch";
+import { useRepositoryBranchesPrefetch, useRepositoryDefaultBranch } from "./useRepositoryDefaultBranch";
 import { RepositoryBranchField } from "./WorkspaceRepositoryFields";
 
 const PANEL_ID = "agent-cross-repo-panel-primary";
@@ -31,6 +31,7 @@ export function WorkspacePrimaryRepoRow(props: {
   const updateRepository = useFactoryRepository(props.organizationId, props.factoryId);
   const [pendingBranch, setPendingBranch] = useState<string | null>(null);
   const hostDefaultBranch = useRepositoryDefaultBranch(props);
+  const prefetchBranches = useRepositoryBranchesPrefetch(props);
   const branch = props.savedBranch || hostDefaultBranch;
 
   const save = async (retargetTasks: boolean) => {
@@ -55,6 +56,7 @@ export function WorkspacePrimaryRepoRow(props: {
         aria-controls={PANEL_ID}
         aria-label={AGENT_RESOURCES_COPY.editRepository(props.repository)}
         onClick={props.onToggle}
+        {...prefetchBranches}
         data-testid="agent-cross-repo-toggle-primary"
       >
         <IntegrationChoiceIcon name={props.host} />

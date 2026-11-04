@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
@@ -90,30 +89,16 @@ function RepositoryBranchControl(props: RepositoryBranchProps) {
   const listed = useMemo(() => branchNames(branches.data), [branches.data]);
   const choices = useMemo(() => repositoryBranchChoices(listed, shown), [listed, shown]);
 
-  if (branches.isLoading || listed.length > 0) {
-    return (
-      <BranchPicker
-        id={props.id}
-        branch={shown}
-        choices={choices}
-        disabled={props.disabled || branches.isLoading}
-        onChange={props.onChange}
-        emptyChoiceLabel={props.defaultBranch ? undefined : AGENT_RESOURCES_COPY.defaultBranch}
-      />
-    );
-  }
   return (
-    <Input
-      key={shown}
+    <BranchPicker
       id={props.id}
-      defaultValue={shown}
-      placeholder={AGENT_RESOURCES_COPY.defaultBranch}
+      branch={shown}
+      choices={choices}
       disabled={props.disabled}
-      onBlur={(event) => {
-        const next = event.target.value.trim();
-        if (next !== shown) props.onChange(next);
-      }}
-      data-testid={props.id}
+      loading={branches.isLoading}
+      allowCustomBranch
+      onChange={props.onChange}
+      emptyChoiceLabel={props.defaultBranch ? undefined : AGENT_RESOURCES_COPY.defaultBranch}
     />
   );
 }

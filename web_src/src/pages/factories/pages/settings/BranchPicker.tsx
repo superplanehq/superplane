@@ -14,12 +14,19 @@ export function BranchPicker(props: {
   onChange: (branch: string) => void;
   /** Label of an extra first choice that clears the branch. */
   emptyChoiceLabel?: string;
+  loading?: boolean;
+  /** Offers the search text as a branch when no listed branch matches it. */
+  allowCustomBranch?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const selectBranch = (name: string) => {
     props.onChange(name);
     setOpen(false);
+    setSearch("");
   };
+  const customBranch = search.trim();
+  const showCustomBranch = Boolean(props.allowCustomBranch && customBranch && !props.choices.includes(customBranch));
   const label = props.branch || props.emptyChoiceLabel || "Select a branch";
 
   return (
@@ -49,9 +56,13 @@ export function BranchPicker(props: {
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command>
-          <CommandInput placeholder="Find a branch" autoFocus />
+          <CommandInput placeholder="Find a branch" autoFocus value={search} onValueChange={setSearch} />
           <CommandList>
-            <CommandEmpty>No branch found.</CommandEmpty>
+            {props.loading ? (
+              <p className="px-2 py-1.5 text-[13px] text-muted-foreground">Loading branches...</p>
+            ) : (
+              <CommandEmpty>No branch found.</CommandEmpty>
+            )}
             <CommandGroup>
               {props.emptyChoiceLabel ? (
                 <BranchChoice
@@ -59,6 +70,11 @@ export function BranchPicker(props: {
                   selected={!props.branch}
                   onSelect={() => selectBranch("")}
                 />
+              ) : null}
+              {showCustomBranch ? (
+                <CommandItem value={`custom:${customBranch}`} onSelect={() => selectBranch(customBranch)}>
+                  <span className="min-w-0 flex-1 truncate">Use "{customBranch}"</span>
+                </CommandItem>
               ) : null}
               {props.choices.map((name) => (
                 <BranchChoice

@@ -22,7 +22,7 @@ import { useGitHubOnboarding } from "../onboarding/useGitHubOnboarding";
 import { navigateGitHubWindow, openGitHubWindow } from "../onboarding/useFirstRunGitHub";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard } from "./FactorySettingsCard";
-import { useRepositoryDefaultBranch } from "./useRepositoryDefaultBranch";
+import { useRepositoryBranchesPrefetch, useRepositoryDefaultBranch } from "./useRepositoryDefaultBranch";
 import { useWorkspaceRepositoryChoices } from "./useWorkspaceRepositoryChoices";
 import { WorkspacePrimaryRepoRow } from "./WorkspacePrimaryRepoRow";
 import { WorkspaceRepositoryFields } from "./WorkspaceRepositoryFields";
@@ -128,6 +128,7 @@ function ContextRepoRow({
   const name = contextRepoName(resource);
   const settings = contextRepoSettings(resource);
   const defaultBranch = useRepositoryDefaultBranch({ ...props, repository: name });
+  const prefetchBranches = useRepositoryBranchesPrefetch({ ...props, repository: name });
   const panelId = `agent-cross-repo-panel-${resource.id}`;
   return (
     <li className="group min-w-0" data-testid={`agent-cross-repo-row-${resource.id}`}>
@@ -140,6 +141,7 @@ function ContextRepoRow({
           aria-controls={panelId}
           aria-label={AGENT_RESOURCES_COPY.editRepository(name)}
           onClick={onToggle}
+          {...prefetchBranches}
           data-testid={`agent-cross-repo-toggle-${resource.id}`}
         >
           <IntegrationChoiceIcon name={props.host} />
