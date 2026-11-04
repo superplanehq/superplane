@@ -183,6 +183,7 @@ export function CrossRepoContextCard({
   canUpdate: boolean;
 }) {
   const [adding, setAdding] = useState(false);
+  const [addAttempt, setAddAttempt] = useState(0);
   const contextRepos = useFactoryAgentResources(organizationId, factoryId, "KIND_CONTEXT_REPO");
   const createResource = useCreateFactoryAgentResource(organizationId, factoryId);
   const updateResource = useUpdateFactoryAgentResource(organizationId, factoryId);
@@ -252,7 +253,10 @@ export function CrossRepoContextCard({
               type="button"
               size="sm"
               disabled={!canUpdate}
-              onClick={() => setAdding(true)}
+              onClick={() => {
+                setAddAttempt((attempt) => attempt + 1);
+                setAdding(true);
+              }}
               data-testid="agent-cross-repo-add"
             >
               {AGENT_RESOURCES_COPY.add}
@@ -281,6 +285,7 @@ export function CrossRepoContextCard({
         ) : null}
       </FactorySettingsCard>
       <AddRepositoryDialog
+        key={addAttempt}
         open={adding}
         onOpenChange={setAdding}
         organizationId={organizationId}
@@ -310,26 +315,19 @@ function AddRepositoryDialog(props: {
   const [settings, setSettings] = useState(NEW_REPOSITORY_SETTINGS);
   const { choices } = props;
 
-  const openChange = (open: boolean) => {
-    if (!open) {
-      setSelected(null);
-      setSettings(NEW_REPOSITORY_SETTINGS);
-    }
-    props.onOpenChange(open);
-  };
   const choose = (name: string) => {
     const repository = name.trim();
     if (!repository || isWorkspaceMainRepository(repository, props.mainRepository)) return;
     if (props.added.includes(repository)) {
       showInfoToast(AGENT_RESOURCES_COPY.crossRepoAlreadyAdded);
-      openChange(false);
+      props.onOpenChange(false);
       return;
     }
     setSelected(repository);
   };
 
   return (
-    <Dialog open={props.open} onOpenChange={openChange}>
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="p-8 sm:max-w-2xl" data-testid="agent-cross-repo-picker">
         <DialogHeader>
           <DialogTitle>{selected ?? AGENT_RESOURCES_COPY.addRepository}</DialogTitle>
