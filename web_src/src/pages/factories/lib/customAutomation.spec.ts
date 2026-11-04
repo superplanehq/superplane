@@ -131,6 +131,7 @@ describe("custom automation settings", () => {
   it("uses concise mode copy for board rows", () => {
     expect(customAutomationModeCopy("manual").trigger).toBe("Manual start on a Verify task");
     expect(customAutomationModeCopy("automatic").action).toBe("Run automation automatically");
+    expect(customAutomationModeCopy("scheduled", "backlog").action).toBe("Creates a task");
   });
 
   it("classifies managed rows by template id and start mode", () => {
@@ -178,6 +179,24 @@ describe("custom automation settings", () => {
         trigger: "On schedule: 0 9 * * *",
       }),
     ]);
+  });
+
+  it("names every trigger on a managed row", () => {
+    const [automation] = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      apps: [
+        {
+          id: "eslint",
+          name: "ESLint tasks",
+          columnKey: "backlog",
+          templateId: "custom-verification",
+          customAutomationTriggers: [{ mode: "scheduled", cronExpression: "0 9 * * *" }, { mode: "automatic" }],
+        },
+      ],
+    });
+
+    expect(automation?.trigger).toBe("On schedule: 0 9 * * *, When a task enters Backlog");
+    expect(automation?.canRunNow).toBe(true);
   });
 
   it("opens an existing managed row in the focused editor", () => {

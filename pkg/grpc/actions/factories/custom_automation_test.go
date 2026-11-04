@@ -2,7 +2,9 @@ package factories
 
 import (
 	"math"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -163,13 +165,6 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 		FactoryId: factory.ID.String(), ColumnKey: "done", Settings: settings,
 	})
 	require.Error(t, err)
-	scheduled := proto.Clone(settings).(*pb.FactoryCustomAutomation_Settings)
-	scheduled.StartMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
-	scheduled.Schedule = &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *"}
-	_, err = CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), ColumnKey: "backlog", Settings: scheduled,
-	})
-	require.Error(t, err)
 	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
 		FactoryId: factory.ID.String(), Name: "Inspect task", ColumnKey: "backlog", Settings: settings,
 	})
@@ -275,6 +270,270 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: otherOrder.ID.String(),
 	})
 	require.Error(t, err, "tasks from another factory are not eligible")
+}
+
+func TestBacklogScheduledCustomAutomationCreatesATask(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	prompt := "Look up broken ESLint rules and create a task for the simplest one."
+	settings := &pb.FactoryCustomAutomation_Settings{
+		StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED,
+		Schedule:  &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *", UtcOffset: 1},
+		Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+		Steps: []*pb.FactoryCustomAutomation_Step{
+			{Name: "Find a rule", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: prompt, WorkingDirectory: "repo"},
+		},
+	}
+	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), Name: "ESLint tasks", ColumnKey: "backlog", Settings: settings,
+	})
+	require.NoError(t, err)
+	described := created.GetCustomAutomation().GetSettings()
+	require.Len(t, described.GetSteps(), 1)
+	assert.Equal(t, prompt, described.GetSteps()[0].GetPrompt())
+	assert.NotContains(t, described.GetSteps()[0].GetPrompt(), "/tmp/proposal.json")
+
+	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId()))
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	trigger := findComponentNode(t, version.Nodes, "schedule")
+	assert.Equal(t, "cron", trigger.Configuration["type"])
+	now := time.Now()
+	require.NoError(t, db.Create(&models.CanvasNode{
+		WorkflowID: canvas.ID, NodeID: "schedule-orphan", Name: "Schedule", Type: models.NodeTypeTrigger,
+		State: models.CanvasNodeStateReady, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{}), Metadata: datatypes.NewJSONType(map[string]any{}),
+		Position: datatypes.NewJSONType(models.Position{}), CreatedAt: &now, UpdatedAt: &now,
+	}).Error)
+	started, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, started.GetRunId())
+	run, err := models.FindCanvasRunInTransaction(db, canvas.ID, uuid.MustParse(started.GetRunId()))
+	require.NoError(t, err)
+	assert.Equal(t, trigger.ID, run.NodeID)
+	assert.Equal(t, "0 9 * * *", trigger.Configuration["cronExpression"])
+	agent := findComponentNode(t, version.Nodes, "runnerClaudeCode")
+	assert.Equal(t, backlogTaskRunnerName, agent.Name)
+	env := environmentVars(t, agent.Configuration["environment"])
+	assert.Equal(t, "main", env["BASE"])
+	assert.NotContains(t, env, "PR_NUMBER")
+	steps, _ := agent.Configuration["steps"].([]any)
+	require.Len(t, steps, 1)
+	publishedPrompt, _ := steps[0].(map[string]any)["prompt"].(string)
+	assert.Contains(t, publishedPrompt, prompt)
+	assert.Contains(t, publishedPrompt, "create_task")
+	assert.NotContains(t, publishedPrompt, "/tmp/proposal.json")
+	for _, node := range version.Nodes {
+		assert.NotEqual(t, "if", node.ComponentName())
+		assert.NotEqual(t, "createWorkOrder", node.ComponentName())
+		assert.NotEqual(t, "addRunError", node.ComponentName())
+		assert.NotEqual(t, "onWorkOrder", node.ComponentName())
+	}
+	for _, edge := range version.Edges {
+		assert.Equal(t, customAutomationRunnerID, edge.TargetID)
+	}
+
+	settings.Steps[0].Prompt = "Find the next ESLint rule."
+	updated, err := UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(), Name: "ESLint tasks", Settings: settings,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Find the next ESLint rule.", updated.GetCustomAutomation().GetSettings().GetSteps()[0].GetPrompt())
+	version, err = models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	agent = findComponentNode(t, version.Nodes, "runnerClaudeCode")
+	steps, _ = agent.Configuration["steps"].([]any)
+	require.Len(t, steps, 1)
+	publishedPrompt, _ = steps[0].(map[string]any)["prompt"].(string)
+	assert.Equal(t, 1, strings.Count(publishedPrompt, "call the create_task tool."))
+}
+
+func TestCustomAutomationMultipleTriggers(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	settings := &pb.FactoryCustomAutomation_Settings{
+		Agent: &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+		Steps: []*pb.FactoryCustomAutomation_Step{
+			{Name: "Find a rule", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Find a task.", WorkingDirectory: "repo"},
+		},
+		Triggers: []*pb.FactoryCustomAutomation_Trigger{
+			{StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED, Schedule: &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *", UtcOffset: 1}},
+			{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC},
+			{StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED, Schedule: &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 18 * * *", UtcOffset: 1}},
+		},
+	}
+	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), Name: "ESLint tasks", ColumnKey: "backlog", Settings: settings,
+	})
+	require.NoError(t, err)
+	automationID := created.GetCustomAutomation().GetAutomation().GetId()
+	assertCustomAutomationTriggers(t, created.GetCustomAutomation().GetSettings(), settings.GetTriggers())
+	assert.Equal(t, "Find a task.", created.GetCustomAutomation().GetSettings().GetSteps()[0].GetPrompt())
+	assert.NotContains(t, created.GetCustomAutomation().GetSettings().GetSteps()[0].GetPrompt(), "/tmp/proposal.json")
+
+	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(automationID))
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	schedules := 0
+	var runner *models.Node
+	for i := range version.Nodes {
+		node := &version.Nodes[i]
+		if node.ComponentName() == "schedule" {
+			schedules++
+		}
+		if node.ComponentName() != "runnerClaudeCode" {
+			continue
+		}
+		require.Nil(t, runner)
+		runner = node
+	}
+	assert.Equal(t, 2, schedules)
+	require.NotNil(t, runner)
+	assert.Equal(t, backlogTaskRunnerName, runner.Name)
+	assert.Equal(t, customAutomationRunnerID, runner.ID)
+	env := environmentVars(t, runner.Configuration["environment"])
+	assert.Contains(t, env["REPO"], "workOrder?.repository")
+	assert.Contains(t, env["BASE"], "main")
+	assert.NotContains(t, env, "PR_NUMBER")
+	steps, _ := runner.Configuration["steps"].([]any)
+	require.Len(t, steps, 1)
+	assert.Contains(t, steps[0].(map[string]any)["prompt"], "create_task")
+	assert.NotContains(t, steps[0].(map[string]any)["prompt"], "/tmp/proposal.json")
+	for _, node := range version.Nodes {
+		assert.NotEqual(t, "if", node.ComponentName())
+		assert.NotEqual(t, "createWorkOrder", node.ComponentName())
+		assert.NotEqual(t, "addRunError", node.ComponentName())
+	}
+	for _, edge := range version.Edges {
+		assert.Equal(t, runner.ID, edge.TargetID)
+	}
+	trigger := customAutomationNode([]models.Node(version.Nodes), customAutomationTaskTriggerID)
+	require.NotNil(t, trigger)
+	template, _ := trigger.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+	assert.Equal(t, "automatic", template["startMode"])
+
+	order, err := factory.CreateWorkOrder(db, "Inspect this task", "Task context", &r.User, nil, nil)
+	require.NoError(t, err)
+	contexts.EmitWorkOrderCreated(db, factory, order)
+	runs, err := order.ListRuns(db)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: order.ID.String(),
+	})
+	require.Error(t, err, "a task event does not allow a manual start")
+
+	settings.Triggers = append([]*pb.FactoryCustomAutomation_Trigger{
+		{StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL},
+	}, settings.GetTriggers()...)
+	updated, err := UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "ESLint tasks", Settings: settings,
+	})
+	require.NoError(t, err)
+	assertCustomAutomationTriggers(t, updated.GetCustomAutomation().GetSettings(), settings.GetTriggers())
+
+	canvas, err = models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+	version, err = models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	renamed, err := UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "ESLint Error Fixer", Settings: settings,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "ESLint Error Fixer", renamed.GetCustomAutomation().GetAutomation().GetName())
+	assertCustomAutomationTriggers(t, renamed.GetCustomAutomation().GetSettings(), settings.GetTriggers())
+	started, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, started.GetRunId())
+
+	duplicate := proto.Clone(settings).(*pb.FactoryCustomAutomation_Settings)
+	duplicate.Triggers = append(duplicate.Triggers, &pb.FactoryCustomAutomation_Trigger{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC})
+	_, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "ESLint tasks", Settings: duplicate,
+	})
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	require.Equal(t, codes.InvalidArgument, code)
+	described, err := DescribeFactoryCustomAutomation(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	require.NoError(t, err)
+	assertCustomAutomationTriggers(t, described.GetCustomAutomation().GetSettings(), settings.GetTriggers())
+
+	_, err = ResetOrganizationBuiltInAutomations(ctx, r.Organization.ID, deps)
+	require.NoError(t, err)
+	described, err = DescribeFactoryCustomAutomation(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	require.NoError(t, err)
+	assertCustomAutomationTriggers(t, described.GetCustomAutomation().GetSettings(), settings.GetTriggers())
+
+	previous := factory.OnboardingConfigValue()
+	repository := "acme/new-app"
+	branch := "develop"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
+	}))
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return reconcileFactoryRepository(ctx, tx, deps, factory, r.User,
+			previous.VCSIntegrationID, previous.VCSIntegrationID, previous.AppRepository,
+			previous.BacklogRepository, previous.DefaultBranch, repository, true)
+	}))
+	canvas, err = models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+	version, err = models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	runner = nil
+	for i := range version.Nodes {
+		node := &version.Nodes[i]
+		if node.ComponentName() != "runnerClaudeCode" {
+			continue
+		}
+		require.Nil(t, runner)
+		runner = node
+	}
+	require.NotNil(t, runner)
+	env = environmentVars(t, runner.Configuration["environment"])
+	assert.Contains(t, env["REPO"], "workOrder?.repository")
+	assert.Contains(t, env["REPO"], repository)
+	assert.Contains(t, env["BASE"], branch)
+}
+
+func assertCustomAutomationTriggers(t *testing.T, settings *pb.FactoryCustomAutomation_Settings, want []*pb.FactoryCustomAutomation_Trigger) {
+	t.Helper()
+	require.Len(t, settings.GetTriggers(), len(want))
+	for i, trigger := range want {
+		assert.Equal(t, trigger.GetStartMode(), settings.GetTriggers()[i].GetStartMode())
+		assert.Equal(t, trigger.GetSchedule().GetCronExpression(), settings.GetTriggers()[i].GetSchedule().GetCronExpression())
+		assert.Equal(t, trigger.GetSchedule().GetUtcOffset(), settings.GetTriggers()[i].GetSchedule().GetUtcOffset())
+	}
+}
+
+func findComponentNode(t *testing.T, nodes []models.Node, name string) *models.Node {
+	t.Helper()
+	for i := range nodes {
+		if nodes[i].ComponentName() == name {
+			return &nodes[i]
+		}
+	}
+	t.Fatalf("component %s not found", name)
+	return nil
 }
 
 func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
@@ -424,6 +683,47 @@ func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
 	assert.Equal(t, "Review the changed files.", saved.GetCustomAutomation().GetSettings().GetSteps()[0].GetPrompt())
 	assert.Equal(t, "runnerCodex", saved.GetCustomAutomation().GetSettings().GetAgent().GetComponent())
 	assert.Equal(t, runner.CredentialsSourceSubscription, saved.GetCustomAutomation().GetSettings().GetAgent().GetCredentialSource())
+}
+
+func TestCustomAutomationUsesTheWorkspaceAgentWhenTheHarnessDiffers(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	customID := createReadyOnboardingIntegration(t, r.Organization.ID, models.CustomLLMAppName)
+	claudeID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID:   &vcsID,
+		AgentIntegrationID: &customID,
+	}))
+	custom, err := models.FindIntegrationInTransaction(db, r.Organization.ID, uuid.MustParse(customID))
+	require.NoError(t, err)
+	claude, err := models.FindIntegrationInTransaction(db, r.Organization.ID, uuid.MustParse(claudeID))
+	require.NoError(t, err)
+	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	settings := &pb.FactoryCustomAutomation_Settings{
+		StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED,
+		Schedule:  &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *", UtcOffset: 1},
+		Agent: &pb.FactoryAppTemplateAgent{
+			Component:                 "runnerClaudeCode",
+			Model:                     "claude-sonnet-5",
+			CredentialSource:          runner.CredentialsSourceIntegration,
+			CredentialIntegrationName: claude.InstallationName,
+		},
+		Steps: []*pb.FactoryCustomAutomation_Step{
+			{Name: "Find a rule", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Find a task.", WorkingDirectory: "repo"},
+		},
+	}
+	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), Name: "ESLint tasks", ColumnKey: models.CanvasColumnKeyBacklog, Settings: settings,
+	})
+	require.NoError(t, err)
+	agent := created.GetCustomAutomation().GetSettings().GetAgent()
+	assert.Equal(t, "runnerClaudeCode", agent.GetComponent())
+	assert.Equal(t, "claude-sonnet-5", agent.GetModel())
+	assert.Equal(t, claude.InstallationName, agent.GetCredentialIntegrationName())
+	assert.NotEqual(t, custom.InstallationName, agent.GetCredentialIntegrationName())
 }
 
 func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {

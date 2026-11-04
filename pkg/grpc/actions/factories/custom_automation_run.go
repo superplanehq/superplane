@@ -36,15 +36,18 @@ func RunFactoryCustomAutomation(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
+	if strings.TrimSpace(req.GetWorkOrderId()) == "" {
+		return startScheduledCustomAutomation(db, canvas)
+	}
 	order, err := findWorkOrder(db, factory, req.GetWorkOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	mode, err := customAutomationCanvasMode(db, canvas)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	if mode != pb.FactoryCustomAutomation_START_MODE_MANUAL {
+	if !customAutomationAllowsManualStart(version) {
 		return nil, factoryErrorToStatus(invalidArgument("automation does not use manual start"), "failed to run custom automation")
 	}
 
@@ -110,6 +113,58 @@ func StartAutomaticCustomAutomations(
 		}
 	}
 	return nil
+}
+
+// startScheduledCustomAutomation starts the schedule chain. That chain creates a
+// task from the prompt result, so it does not need a task to already exist.
+func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.RunFactoryCustomAutomationResponse, error) {
+	if canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyBacklog {
+		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
+	}
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
+	}
+	scheduleID := scheduledCustomAutomationTriggerID(version)
+	if scheduleID == "" {
+		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
+	}
+	trigger, err := models.FindCanvasNode(db, canvas.ID, scheduleID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
+	}
+
+	var created []models.CanvasEvent
+	events := contexts.NewEventContext(db, trigger, nil, func(newEvents []models.CanvasEvent) {
+		created = append(created, newEvents...)
+	})
+	if err := events.Emit("scheduler.tick", map[string]any{}); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
+	}
+	if len(created) == 0 {
+		return nil, factoryErrorToStatus(errors.New("custom automation did not create a run"), "failed to run custom automation")
+	}
+	event := &created[0]
+	if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
+		log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
+	}
+	return &pb.RunFactoryCustomAutomationResponse{
+		RunId:   event.RunID.String(),
+		EventId: event.ID.String(),
+	}, nil
+}
+
+func scheduledCustomAutomationTriggerID(version *models.CanvasVersion) string {
+	connected := map[string]bool{}
+	for _, edge := range version.Edges {
+		connected[edge.SourceID] = true
+	}
+	for _, node := range version.Nodes {
+		if node.Type == models.NodeTypeTrigger && node.ComponentName() == "schedule" && connected[node.ID] {
+			return node.ID
+		}
+	}
+	return ""
 }
 
 func startCustomAutomation(
@@ -292,16 +347,59 @@ func customAutomationCanvasMode(tx *gorm.DB, canvas *models.Canvas) (pb.FactoryC
 }
 
 func customAutomationCanvasModeFromVersion(version *models.CanvasVersion) (pb.FactoryCustomAutomation_StartMode, error) {
+	found := pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED
+	sawTrigger := false
+	for i := range version.Nodes {
+		node := version.Nodes[i]
+		if node.Type != models.NodeTypeTrigger {
+			continue
+		}
+		sawTrigger = true
+		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+		if triggerMetadataHasMode(template, "automatic") {
+			return pb.FactoryCustomAutomation_START_MODE_AUTOMATIC, nil
+		}
+		if triggerMetadataHasMode(template, "manual") {
+			found = pb.FactoryCustomAutomation_START_MODE_MANUAL
+			continue
+		}
+		if found != pb.FactoryCustomAutomation_START_MODE_MANUAL {
+			found = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
+		}
+	}
+	if !sawTrigger || found == pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED {
+		return pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED, errors.New("custom automation trigger is missing")
+	}
+	return found, nil
+}
+
+func customAutomationAllowsManualStart(version *models.CanvasVersion) bool {
+	if version == nil {
+		return false
+	}
 	for i := range version.Nodes {
 		node := version.Nodes[i]
 		if node.Type != models.NodeTypeTrigger {
 			continue
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
-		mode, _ := template["startMode"].(string)
-		return customAutomationStartMode(mode), nil
+		if triggerMetadataHasMode(template, "manual") {
+			return true
+		}
 	}
-	return pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED, errors.New("custom automation trigger is missing")
+	return false
+}
+
+func triggerMetadataHasMode(template map[string]any, mode string) bool {
+	if template["startMode"] == mode {
+		return true
+	}
+	for _, kind := range metadataStrings(template, "triggerKinds") {
+		if kind == mode {
+			return true
+		}
+	}
+	return mode == "manual" && template["manualStart"] == true
 }
 
 func grpcFailedPrecondition(message string) error {

@@ -3,13 +3,13 @@ import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { CustomAutomationMode, CustomAutomationColumn } from "../lib/customAutomation";
+import type { CustomAutomationColumn, CustomAutomationTrigger } from "../lib/customAutomation";
 import { mergeCheckPromptBody } from "./mergeConfidenceSteps";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
 
 export function AutomationFlow({
   columnKey = "verify",
-  mode,
+  triggers,
   steps,
   selectedStep,
   onSelectTrigger,
@@ -19,7 +19,7 @@ export function AutomationFlow({
   onAddStep,
 }: {
   columnKey?: CustomAutomationColumn;
-  mode: CustomAutomationMode;
+  triggers: CustomAutomationTrigger[];
   steps: PlanningReviewStep[];
   selectedStep: number | null;
   onSelectTrigger: () => void;
@@ -34,24 +34,8 @@ export function AutomationFlow({
       <div className="relative mx-auto flex w-full max-w-lg flex-col items-center px-8 py-10">
         <FlowCard selected={selectedStep === null} onClick={onSelectTrigger}>
           <FlowBadge kind="trigger" />
-          <p className="mt-3 text-sm font-semibold text-foreground">
-            {mode === "scheduled"
-              ? "Schedule"
-              : mode === "automatic"
-                ? columnKey === "backlog"
-                  ? "When a task enters Backlog"
-                  : "Every pull request commit"
-                : "Manual"}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {mode === "scheduled"
-              ? "Runs on the repository default branch."
-              : mode === "automatic"
-                ? columnKey === "backlog"
-                  ? "Runs when a task enters Backlog."
-                  : "Runs for every new pull request commit."
-                : "Runs when you start it from a task."}
-          </p>
+          <p className="mt-3 text-sm font-semibold text-foreground">{sidebarTriggerTitle(triggers, columnKey)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{sidebarTriggerDescription(triggers, columnKey)}</p>
         </FlowCard>
         {steps.map((step, index) => (
           <div className="flex w-full flex-col items-center" key={index}>
@@ -183,6 +167,49 @@ function StepCardActions({
       </Button>
     </>
   );
+}
+
+function sidebarTriggerTitle(triggers: CustomAutomationTrigger[], columnKey: CustomAutomationColumn): string {
+  const trigger = triggers[0];
+  if (!trigger || triggers.length > 1) {
+    return "Triggers";
+  }
+  return triggerTitle(trigger.mode, columnKey);
+}
+
+function sidebarTriggerDescription(triggers: CustomAutomationTrigger[], columnKey: CustomAutomationColumn): string {
+  const trigger = triggers[0];
+  if (!trigger) {
+    return "Add a trigger.";
+  }
+  if (triggers.length === 1) {
+    return triggerDescription(trigger.mode, columnKey);
+  }
+  const titles = triggers.map((item) => triggerTitle(item.mode, columnKey));
+  const titlesRepeat = new Set(titles).size !== titles.length;
+  return triggers
+    .map((item, index) =>
+      titlesRepeat && item.mode === "scheduled" && item.schedule.cronExpression
+        ? item.schedule.cronExpression
+        : titles[index],
+    )
+    .join(", ");
+}
+
+function triggerTitle(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
+  if (mode === "scheduled") return "Schedule";
+  if (mode === "automatic") return columnKey === "backlog" ? "When a task enters Backlog" : "Every pull request commit";
+  return "Manual";
+}
+
+function triggerDescription(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
+  if (mode === "scheduled") {
+    return columnKey === "backlog" ? "Run automation on a schedule." : "Runs on the repository default branch.";
+  }
+  if (mode === "automatic") {
+    return columnKey === "backlog" ? "Runs when a task enters Backlog." : "Runs for every new pull request commit.";
+  }
+  return "Runs when you start it from a task.";
 }
 
 function FlowConnector() {
