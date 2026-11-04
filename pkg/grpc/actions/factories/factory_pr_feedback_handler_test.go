@@ -354,10 +354,11 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		for _, node := range liveVersion.Nodes {
-			if node.ID == prFeedbackPullRequestTriggerNodeID || node.ID == prFeedbackWaitChecksNodeID {
+			if node.ID == prFeedbackPullRequestTriggerNodeID {
 				assert.Equal(t, "acme/other", node.Configuration["repository"])
 			}
 			if node.ID == prFeedbackWaitChecksNodeID {
+				assert.Equal(t, prFeedbackEventRepositoryExpression, node.Configuration["repository"], "a workspace-scope wait reads the repository from the event")
 				assert.Equal(t, []any{"lint", "unit"}, node.Configuration["checkNames"])
 			}
 			if node.ID == prFeedbackActivityNodeID {

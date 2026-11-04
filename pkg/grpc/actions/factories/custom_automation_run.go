@@ -127,14 +127,15 @@ func startCustomAutomation(
 	if err := requireWorkOrderInVerify(db, order); err != nil {
 		return nil, err
 	}
-	pullRequest, err := latestTrackedPullRequest(db, order.ID)
+	pullRequests, err := trackedPullRequests(db, order.ID)
 	if err != nil {
 		return nil, err
 	}
-	if pullRequest == nil {
+	if len(pullRequests) == 0 {
 		return nil, grpcFailedPrecondition("The task has no pull request.")
 	}
-	if pullRequest.State != models.FactoryPullRequestStateOpen {
+	pullRequest := firstOpenPullRequest(pullRequests)
+	if pullRequest == nil {
 		return nil, grpcFailedPrecondition("The pull request is not open.")
 	}
 
