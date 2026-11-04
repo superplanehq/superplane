@@ -806,6 +806,24 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	assert.NotContains(t, repaired.Configuration.Data(), "credentials")
 }
 
+func TestTaskCustomAutomationTriggerSkipsTheSchedule(t *testing.T) {
+	version := &models.CanvasVersion{Nodes: []models.Node{
+		{ID: "schedule-1", Type: models.NodeTypeTrigger, Ref: models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}},
+		{ID: "on-pull-request", Type: models.NodeTypeTrigger, Ref: models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}}},
+	}}
+	assert.Equal(t, "on-pull-request", taskCustomAutomationTriggerID(version))
+}
+
+func TestCustomAutomationKeepsAUserStepNamedWriteTaskResult(t *testing.T) {
+	steps, err := customAutomationProtoSteps([]any{
+		map[string]any{"name": backlogTaskResultStepName, "type": "prompt", "prompt": "Write the task result in the pull request."},
+		map[string]any{"name": backlogTaskResultStepName, "type": "bash", "command": "cat /tmp/proposal.json"},
+	})
+	require.NoError(t, err)
+	require.Len(t, steps, 1)
+	assert.Equal(t, "Write the task result in the pull request.", steps[0].GetPrompt())
+}
+
 func customAutomationNode(nodes []models.Node, id string) *models.Node {
 	for i := range nodes {
 		if nodes[i].ID == id {

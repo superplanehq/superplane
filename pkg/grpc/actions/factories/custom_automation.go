@@ -1132,7 +1132,10 @@ func selectCustomAutomationAgent(nodes []models.Node) *models.Node {
 		managed := false
 		for _, step := range steps {
 			value, _ := step.(map[string]any)
-			if value["name"] == backlogTaskResultStepName {
+			name, _ := value["name"].(string)
+			stepType, _ := value["type"].(string)
+			command, _ := value["command"].(string)
+			if managedBacklogTaskResultStep(name, stepType, command) {
 				managed = true
 			}
 		}
@@ -1274,7 +1277,11 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 			WorkingDirectory: step.WorkingDirectory,
 			Secrets:          step.Secrets,
 		}
-		if step.Name == backlogTaskResultStepName {
+		command := ""
+		if step.Command != nil {
+			command = *step.Command
+		}
+		if managedBacklogTaskResultStep(step.Name, step.Type, command) {
 			continue
 		}
 		if runner.NormalizeAgentStepType(step.Type) == runner.AgentStepBash {
@@ -1291,6 +1298,12 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 		result = append(result, value)
 	}
 	return result, nil
+}
+
+func managedBacklogTaskResultStep(name, stepType, command string) bool {
+	return name == backlogTaskResultStepName &&
+		runner.NormalizeAgentStepType(stepType) == runner.AgentStepBash &&
+		strings.Contains(command, "/tmp/proposal.json")
 }
 
 func configInt(configuration map[string]any, key string) int {

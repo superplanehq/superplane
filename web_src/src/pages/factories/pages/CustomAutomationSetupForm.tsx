@@ -353,9 +353,10 @@ function TriggerEditor({
             <div className="rounded-lg border border-border bg-background" key={trigger.id}>
               <div className="flex items-center gap-1 pr-2">
                 {configurable ? (
-                  <button
+                  <Button
                     type="button"
-                    className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left"
+                    variant="ghost"
+                    className="h-auto min-w-0 flex-1 justify-start gap-2 px-3 py-2.5 text-left font-normal"
                     aria-expanded={expanded}
                     onClick={() => setExpandedId(expanded ? null : trigger.id)}
                   >
@@ -364,7 +365,7 @@ function TriggerEditor({
                       className={cn("ml-auto size-4 shrink-0 text-muted-foreground", !expanded && "-rotate-90")}
                       aria-hidden
                     />
-                  </button>
+                  </Button>
                 ) : (
                   <div className="min-w-0 flex-1 px-3 py-2.5">
                     <TriggerOption mode={trigger.mode} columnKey={columnKey} />

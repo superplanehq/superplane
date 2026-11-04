@@ -154,6 +154,15 @@ func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.Run
 	}, nil
 }
 
+func taskCustomAutomationTriggerID(version *models.CanvasVersion) string {
+	for _, node := range version.Nodes {
+		if node.Type == models.NodeTypeTrigger && node.ComponentName() != "schedule" {
+			return node.ID
+		}
+	}
+	return ""
+}
+
 func scheduledCustomAutomationTriggerID(version *models.CanvasVersion) string {
 	connected := map[string]bool{}
 	for _, edge := range version.Edges {
@@ -201,13 +210,7 @@ func startCustomAutomation(
 	if err != nil {
 		return nil, err
 	}
-	triggerID := ""
-	for _, node := range version.Nodes {
-		if node.Type == models.NodeTypeTrigger {
-			triggerID = node.ID
-			break
-		}
-	}
+	triggerID := taskCustomAutomationTriggerID(version)
 	trigger, err := models.FindCanvasNode(db, canvas.ID, triggerID)
 	if err != nil {
 		return nil, err
