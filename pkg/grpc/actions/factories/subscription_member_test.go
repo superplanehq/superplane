@@ -72,6 +72,13 @@ func TestSubscriptionConnectionsAndCatalogsFollowTheTaskOwner(t *testing.T) {
 	app := createLineAppWithRunner(t, r, f.ID, runnerCodex, "subscription", "owner-model")
 	_, err = f.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"}})
 	require.NoError(t, err)
+	filled, err := DispatchWorkOrder(ownerContext, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: f.ID.String(), OrderId: unassignedTask.Order.Id, LineName: "ship", Model: "owner-model",
+	})
+	require.NoError(t, err)
+	require.Len(t, filled.Order.Assignees, 1)
+	assert.Equal(t, owner.ID.String(), filled.Order.Assignees[0].Id)
+	assert.Equal(t, owner.ID.String(), filled.Order.GetStartedBy().GetId())
 	unassigned, err := ListFactoryLineRunnerModels(caller, r.Organization.ID.String(), &pb.ListFactoryLineRunnerModelsRequest{FactoryId: f.ID.String(), LineName: "ship", OrderId: created.Order.Id})
 	require.NoError(t, err)
 	assert.Empty(t, unassigned.Models)
@@ -96,26 +103,26 @@ func TestSubscriptionConnectionsAndCatalogsFollowTheTaskOwner(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, db.Model(callerConnection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("caller-bundle")}).Error)
 	require.NoError(t, callerConnection.StoreUsage(db, nil, []models.CodexModel{{Model: "starter-model"}}, time.Now()))
-	_, err = DispatchWorkOrder(caller, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{FactoryId: f.ID.String(), OrderId: created.Order.Id, LineName: "ship", Model: "owner-model"})
-	require.Error(t, err, "Start must validate the starter's model catalog")
+	_, err = DispatchWorkOrder(caller, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{FactoryId: f.ID.String(), OrderId: created.Order.Id, LineName: "ship", Model: "starter-model"})
+	require.Error(t, err, "Start must validate the saved owner's model catalog")
 	persisted, err = f.FindWorkOrder(db, uuid.MustParse(created.Order.Id))
 	require.NoError(t, err)
-	assert.Equal(t, []uuid.UUID{owner.ID}, persisted.AssigneeIDs(), "a failed dispatch must roll back its ownership change")
-	started, err := DispatchWorkOrder(caller, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{FactoryId: f.ID.String(), OrderId: created.Order.Id, LineName: "ship", Model: "starter-model"})
+	assert.Equal(t, []uuid.UUID{owner.ID}, persisted.AssigneeIDs(), "a failed dispatch must preserve ownership")
+	started, err := DispatchWorkOrder(caller, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{FactoryId: f.ID.String(), OrderId: created.Order.Id, LineName: "ship", Model: "owner-model"})
 	require.NoError(t, err)
 	require.Len(t, started.Order.Assignees, 1)
-	assert.Equal(t, r.User.String(), started.Order.Assignees[0].Id)
-	require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusDisconnected).Error)
+	assert.Equal(t, owner.ID.String(), started.Order.Assignees[0].Id)
+	require.NoError(t, db.Model(callerConnection).Update("status", models.CodexConnectionStatusDisconnected).Error)
 	for _, action := range []struct {
 		name string
 		run  func() error
 	}{
 		{name: "Start", run: func() error {
-			_, err := DispatchWorkOrder(ownerContext, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{FactoryId: f.ID.String(), OrderId: created.Order.Id, LineName: "ship", ReplaceActive: true})
+			_, err := DispatchWorkOrder(caller, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{FactoryId: f.ID.String(), OrderId: created.Order.Id, LineName: "ship", ReplaceActive: true})
 			return err
 		}},
 		{name: "self-assignment", run: func() error {
-			_, err := UpdateWorkOrderAssignees(ownerContext, r.Organization.ID.String(), &pb.UpdateWorkOrderAssigneesRequest{FactoryId: f.ID.String(), OrderId: created.Order.Id, AssigneeIds: []string{owner.ID.String()}})
+			_, err := UpdateWorkOrderAssignees(caller, r.Organization.ID.String(), &pb.UpdateWorkOrderAssigneesRequest{FactoryId: f.ID.String(), OrderId: created.Order.Id, AssigneeIds: []string{r.User.String()}})
 			return err
 		}},
 	} {
@@ -127,7 +134,7 @@ func TestSubscriptionConnectionsAndCatalogsFollowTheTaskOwner(t *testing.T) {
 			assert.Empty(t, status.Convert(err).Details())
 			persisted, err := f.FindWorkOrder(db, uuid.MustParse(created.Order.Id))
 			require.NoError(t, err)
-			assert.Equal(t, []uuid.UUID{r.User}, persisted.AssigneeIDs())
+			assert.Equal(t, []uuid.UUID{owner.ID}, persisted.AssigneeIDs())
 		})
 	}
 }
@@ -143,7 +150,7 @@ func requireCodexConnectionRequired(t *testing.T, err error) {
 	assert.Equal(t, "CODEX_CONNECTION_REQUIRED", info.Reason)
 }
 
-func TestSubscriptionStartReassignsOpenTasksAndStepRetries(t *testing.T) {
+func TestSubscriptionStartPreservesOwnersOfOpenTasksAndStepRetries(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -176,10 +183,10 @@ func TestSubscriptionStartReassignsOpenTasksAndStepRetries(t *testing.T) {
 	}{
 		{name: "open task"},
 		{name: "step retry", index: 1, retry: true},
-		{name: "saved retry model is unavailable to the starter", index: 1, retry: true, savedRetryModel: "previous-owner-model"},
+		{name: "uses the saved retry model from the task owner", index: 1, retry: true, savedRetryModel: "previous-owner-model"},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			order, err := f.CreateWorkOrder(db, "Start as the new owner", "", &previous.ID, []uuid.UUID{previous.ID}, nil)
+			order, err := f.CreateWorkOrder(db, "Start with the saved owner", "", &previous.ID, []uuid.UUID{previous.ID}, nil)
 			require.NoError(t, err)
 			require.NoError(t, order.TransitionOnDispatch(db, &previous.ID))
 			var prior *models.FactoryWorkOrderLineDispatch
@@ -190,29 +197,22 @@ func TestSubscriptionStartReassignsOpenTasksAndStepRetries(t *testing.T) {
 			response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
 				FactoryId: f.ID.String(), OrderId: order.ID.String(), LineName: line.Name, StartStepIndex: scenario.index, ReplaceActive: scenario.retry, Model: "shared-model",
 			})
-			if prior != nil {
-				require.ErrorIs(t, err, models.ErrSubscriptionModelUnavailable)
-				persisted, err := f.FindWorkOrder(db, order.ID)
-				require.NoError(t, err)
-				assert.Equal(t, []uuid.UUID{previous.ID}, persisted.AssigneeIDs())
-				persistedDispatch, err := models.FindWorkOrderLineDispatch(db, prior.ID)
-				require.NoError(t, err)
-				assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, persistedDispatch.State)
-				assert.Equal(t, scenario.savedRetryModel, persistedDispatch.Model)
-				assert.Equal(t, "low", persistedDispatch.ThinkingLevel)
-				return
-			}
+
 			require.NoError(t, err)
 			require.Len(t, response.Order.Assignees, 1)
-			assert.Equal(t, r.User.String(), response.Order.Assignees[0].Id)
+			assert.Equal(t, previous.ID.String(), response.Order.Assignees[0].Id)
 			require.Len(t, response.Order.LineDispatches, 1)
+			if prior != nil {
+				assert.Equal(t, scenario.savedRetryModel, response.Order.LineDispatches[0].Model)
+				assert.Equal(t, "low", response.Order.LineDispatches[0].ThinkingLevel)
+			}
 			require.Len(t, response.Order.LineDispatches[0].StepExecutions, 1)
 			assert.Equal(t, scenario.index, response.Order.LineDispatches[0].StepExecutions[0].StepIndex)
 		})
 	}
 }
 
-func TestSubscriptionStartTakesDraftWhilePlanningRunnerStops(t *testing.T) {
+func TestSubscriptionStartKeepsDraftOwnerWhilePlanningRunnerStops(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	f, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -296,7 +296,8 @@ func TestSubscriptionStartTakesDraftWhilePlanningRunnerStops(t *testing.T) {
 	started, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), request)
 	require.NoError(t, err)
 	require.Len(t, started.Order.Assignees, 1)
-	assert.Equal(t, r.User.String(), started.Order.Assignees[0].Id)
+	assert.Equal(t, previous.ID.String(), started.Order.Assignees[0].Id)
+	assert.Equal(t, r.User.String(), started.Order.GetStartedBy().GetId())
 	completedPlanning, err := models.FindPlanningSession(db, f.OrganizationID, f.ID, session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.PlanningSessionStateEnded, completedPlanning.State)
@@ -307,7 +308,7 @@ func TestSubscriptionStartTakesDraftWhilePlanningRunnerStops(t *testing.T) {
 	stoppingTask, err := models.FindRunnerTask(db, oldTask.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, stoppingTask.CancelRequestedAt)
-	assert.ErrorIs(t, stoppingTask.RequireSubscriptionLeaseContinuation(db), models.ErrSubscriptionOwnerInvalid)
+	require.NoError(t, stoppingTask.RequireSubscriptionLeaseContinuation(db))
 
 	implementationRun, err := models.CreateCanvasRunInTransaction(db, app.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
@@ -320,8 +321,8 @@ func TestSubscriptionStartTakesDraftWhilePlanningRunnerStops(t *testing.T) {
 	require.NoError(t, db.Create(newTask).Error)
 	reserved, err := models.ReserveFactoryCodexConnection(db, f.OrganizationID, f.ID, implementationRun.ID, newTask.ID, time.Now(), crypto.NewNoOpEncryptor())
 	require.NoError(t, err)
-	assert.Equal(t, connections[r.User].ID, reserved.ID)
-	assert.NotEqual(t, connections[previous.ID].ID, reserved.ID)
+	assert.Equal(t, connections[previous.ID].ID, reserved.ID)
+	assert.NotEqual(t, connections[r.User].ID, reserved.ID)
 }
 
 func codexLineModelIDs(list []*pb.FactoryLLMModel) []string {
