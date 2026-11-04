@@ -1,6 +1,8 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useState } from "react";
 
+import { EMPTY_LINEAR_INTAKE_SCOPE, type LinearIntakeScope } from "../../linearIntakeScope";
+
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketSourceList } from "./firstRunTicketChoices";
 import { FirstRunTicketIntakeStepper } from "./FirstRunTicketIntakeStepper";
@@ -53,10 +55,9 @@ type FirstRunTicketsScreenProps = {
   jiraProjectsError?: boolean;
   jiraProjectId?: string;
   linearConnected?: boolean;
-  linearProjects?: FirstRunJiraProject[];
-  linearProjectsLoading?: boolean;
-  linearProjectsError?: boolean;
-  linearProjectIds?: string[];
+  organizationId?: string;
+  linearIntegrationId?: string;
+  linearScope?: LinearIntakeScope;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
   onConnectGitHub?: () => void;
@@ -65,8 +66,7 @@ type FirstRunTicketsScreenProps = {
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
   onConnectLinear?: () => void;
-  onToggleLinearProject?: (id: string) => void;
-  onRetryLinearProjects?: () => void;
+  onChangeLinearScope?: (scope: LinearIntakeScope) => void;
 };
 
 const TICKET_SCREEN_DEFAULTS = {
@@ -89,10 +89,9 @@ const TICKET_SCREEN_DEFAULTS = {
   jiraProjectsError: false,
   jiraProjectId: "",
   linearConnected: false,
-  linearProjects: [] as FirstRunJiraProject[],
-  linearProjectsLoading: false,
-  linearProjectsError: false,
-  linearProjectIds: [] as string[],
+  organizationId: "",
+  linearIntegrationId: "",
+  linearScope: EMPTY_LINEAR_INTAKE_SCOPE,
 };
 
 function ticketScanAllowed(args: {
@@ -103,13 +102,10 @@ function ticketScanAllowed(args: {
   linearAvailable: boolean;
   linearChoiceBlock: FirstRunFlaggedChoiceBlock | null;
   linearConnected: boolean;
-  linearProjectIds: string[];
-  linearProjectsLoading: boolean;
-  linearProjectsError: boolean;
+  linearScope: LinearIntakeScope;
 }): boolean {
   const linearSelectionBlocked =
     Boolean(args.linearChoiceBlock) || (args.ticketSource === "linear" && !args.linearAvailable);
-  if (args.ticketSource === "linear" && (args.linearProjectsLoading || args.linearProjectsError)) return false;
   return (
     !linearSelectionBlocked &&
     canAnalyzeTicketSource({
@@ -118,7 +114,7 @@ function ticketScanAllowed(args: {
       jiraConnected: args.jiraConnected,
       jiraProjectId: args.jiraProjectId,
       linearConnected: args.linearConnected,
-      linearProjectIds: args.linearProjectIds,
+      linearScope: args.linearScope,
     })
   );
 }
@@ -259,9 +255,7 @@ function TicketIntakeCard({
     linearAvailable: p.linearAvailable,
     linearChoiceBlock: p.linearChoiceBlock,
     linearConnected: p.linearConnected,
-    linearProjectIds: p.linearProjectIds,
-    linearProjectsLoading: p.linearProjectsLoading,
-    linearProjectsError: p.linearProjectsError,
+    linearScope: p.linearScope,
   });
   const continueButton = ticketContinueButton({
     canAnalyze,
@@ -274,10 +268,7 @@ function TicketIntakeCard({
     jiraProjectsLoading: p.jiraProjectsLoading,
     jiraProjectsError: p.jiraProjectsError,
     jiraProjectId: p.jiraProjectId,
-    linearProjects: p.linearProjects,
-    linearProjectsLoading: p.linearProjectsLoading,
-    linearProjectsError: p.linearProjectsError,
-    linearProjectIds: p.linearProjectIds,
+    linearScope: p.linearScope,
   };
   const connectFor: Record<FirstRunTicketSource, (() => void) | undefined> = {
     "github-issues": p.onConnectGitHub,
@@ -324,8 +315,9 @@ function TicketIntakeCard({
       onSelectRepository={p.onSelectRepository}
       onSelectJiraProject={p.onSelectJiraProject}
       onRetryJiraProjects={p.onRetryJiraProjects}
-      onToggleLinearProject={p.onToggleLinearProject}
-      onRetryLinearProjects={p.onRetryLinearProjects}
+      organizationId={p.organizationId}
+      linearIntegrationId={p.linearIntegrationId}
+      onChangeLinearScope={p.onChangeLinearScope}
       onConfirmProjects={phase.confirmProjects}
     />
   );
