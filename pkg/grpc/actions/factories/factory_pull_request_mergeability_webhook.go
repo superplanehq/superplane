@@ -299,13 +299,16 @@ func ensureFactoryMergeabilityWebhook(
 	if factory == nil {
 		return nil
 	}
-	return ensureFactoryMergeabilityWebhookForRepository(
-		ctx,
-		tx,
-		deps,
-		factory,
-		factory.OnboardingConfigValue().AppRepository,
-	)
+	repositories, err := factory.WorkspaceRepositories(tx)
+	if err != nil {
+		return err
+	}
+	for _, repository := range repositories {
+		if err := ensureFactoryMergeabilityWebhookForRepository(ctx, tx, deps, factory, repository); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ensureFactoryMergeabilityWebhookForRepository(

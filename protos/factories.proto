@@ -3516,6 +3516,7 @@ message PendingHandOff {
   string line_id = 1;
   string column = 2;
   string pull_request_url = 3;
+  repeated string pull_request_urls = 4;
 }
 
 message ResumeHandOffWorkOrderRequest {

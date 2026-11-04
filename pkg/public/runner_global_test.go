@@ -25,7 +25,7 @@ func TestRunnerToolsFollowTheTokenScopes(t *testing.T) {
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	require.NotEmpty(t, token)
 
-	assert.Equal(t, everyGlobalRunnerTool, listRunnerTools(t, server, token))
+	assert.Equal(t, taskRunnerTools, listRunnerTools(t, server, token))
 
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
 	require.NoError(t, err)
@@ -112,6 +112,9 @@ var everyGlobalRunnerTool = []string{
 	"list_checks", "add_checks", "remove_checks",
 	"list_artifacts", "get_artifact", "add_artifact", "remove_artifact",
 }
+
+// taskRunnerTools lists the tools of a task run.
+var taskRunnerTools = globalRunnerToolsWith("open_pull_request", "list_pull_requests")
 
 func globalRunnerToolsWith(tools ...string) []string {
 	return append(append([]string{}, everyGlobalRunnerTool...), tools...)

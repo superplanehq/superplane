@@ -75,15 +75,29 @@ func CreateFactoryAgentResource(
 	if err := authorizeContextRepository(ctx, db, organizationID, factory, config); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
-	resource, err := factory.CreateAgentResource(
-		db,
-		protoKindToModel(req.GetKind()),
-		req.GetName(),
-		req.GetEnabled(),
-		config,
-	)
+	var resource *models.FactoryAgentResource
+	err = db.Transaction(func(tx *gorm.DB) error {
+		created, err := factory.CreateAgentResource(
+			tx,
+			protoKindToModel(req.GetKind()),
+			req.GetName(),
+			req.GetEnabled(),
+			config,
+		)
+		if err != nil {
+			return err
+		}
+		resource = created
+		if created.Kind != models.FactoryAgentResourceKindContextRepo {
+			return nil
+		}
+		return syncWorkspaceRepositoryAccess(tx, factory)
+	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
+	}
+	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
+		refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
 	}
 	if resource.Kind == models.FactoryAgentResourceKindMCPServer && resource.Config.Data().MCPAuth() == models.FactoryAgentResourceAuthHeaders {
 		applyDefaultMCPWriteTools(ctx, deps, db, resource)
@@ -188,15 +202,27 @@ func UpdateFactoryAgentResource(
 	if config != nil && resource.Config.Data().InvalidatesOAuth(*config) {
 		revocation = captureOAuthRevocation(ctx, deps, db, resource)
 	}
-	if err := resource.Update(db, name, enabled, config); err != nil {
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := resource.Update(tx, name, enabled, config); err != nil {
+			return err
+		}
+		if resource.Kind != models.FactoryAgentResourceKindContextRepo {
+			return nil
+		}
+		return syncWorkspaceRepositoryAccess(tx, factory)
+	})
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update agent resource")
 	}
 	revocation.run(ctx, deps)
+	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
+		refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
+	}
 	return &pb.UpdateFactoryAgentResourceResponse{Resource: serializeFactoryAgentResource(resource)}, nil
 }
 
 // authorizeContextRepository rejects a GitHub context repository the caller
-// cannot access. The read token later covers every saved name on the
+// cannot access. The write token later covers every saved name on the
 // installation, so the save must use the same access check as workspace
 // repository selection. Workspaces that are not connected yet do not receive
 // that token.
@@ -225,7 +251,7 @@ func authorizeContextRepository(
 	binding, err := models.FindVCSProviderIntegrationBinding(db, bindingID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// A personal token or a customer GitHub App has no installation
-		// binding. Those automations do not receive the read-only token.
+		// binding. Its token already covers the whole installation.
 		return nil
 	}
 	if err != nil {
@@ -275,10 +301,22 @@ func DeleteFactoryAgentResource(
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}
 	revocation := captureOAuthRevocation(ctx, deps, db, resource)
-	if err := resource.Delete(db); err != nil {
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := resource.Delete(tx); err != nil {
+			return err
+		}
+		if resource.Kind != models.FactoryAgentResourceKindContextRepo {
+			return nil
+		}
+		return syncWorkspaceRepositoryAccess(tx, factory)
+	})
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}
 	revocation.run(ctx, deps)
+	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
+		refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
+	}
 	return &pb.DeleteFactoryAgentResourceResponse{}, nil
 }
 

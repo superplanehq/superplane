@@ -145,6 +145,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "factory pull request not found")
 	case errors.Is(err, models.ErrFactoryPullRequestInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPullRequestRepositoryNotInWorkspace):
+		return grpcerrors.InvalidArgument(err, errPullRequestRepositoryNotInWorkspace)
 	case errors.Is(err, models.ErrFactoryPullRequestActivityNotFound):
 		return grpcerrors.NotFound(err, "pull request activity not found")
 	case errors.Is(err, models.ErrFactoryPullRequestFixesNotPaused):

@@ -192,7 +192,7 @@ func TestCodexExecArgsStartsOnlyTheGlobalMCPWithARunnerToken(t *testing.T) {
 
 			assert.Contains(t, args, `mcp_servers.superplane_global.command="node"`)
 			assert.Contains(t, args, `mcp_servers.superplane_global.args=["/task/superplane_mcp/server.js"]`)
-			assert.Contains(t, args, `mcp_servers.superplane_global.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ANALYSIS_SPEC_FILE"]`)
+			assert.Subset(t, globalMCPEnvVars(t, args), []string{"SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ANALYSIS_SPEC_FILE"})
 			for _, tool := range []string{
 				"list_members", "assign_task_owner", "add_checks", "get_artifact", "add_artifact", "propose_plan", "report_merge_check",
 			} {
@@ -202,6 +202,48 @@ func TestCodexExecArgsStartsOnlyTheGlobalMCPWithARunnerToken(t *testing.T) {
 			assert.NotContains(t, joined, "runner-token-secret")
 		})
 	}
+}
+
+func TestCodexExecArgsForwardsTheAgentEnvironmentToTheGlobalMCP(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_RUNNER_TOKEN": "runner-token-secret",
+		"GITHUB_TOKEN":            "github-token-secret",
+		"BITBUCKET_TOKEN":         "bitbucket-token-secret",
+		"BITBUCKET_GIT_USERNAME":  "bitbucket-user",
+		"GIT_AUTHOR_NAME":         "SuperPlane Agent",
+		"BASE":                    "main",
+		"DRAFT_PULL_REQUESTS":     "true",
+		"CODEX_API_KEY":           "codex-key-secret",
+		"OPENAI_API_KEY":          "openai-key-secret",
+		"BASH_FUNC_x%%":           "() { :; }",
+	}, "gpt-5", "/task/planning_session_mcp.js")
+
+	names := globalMCPEnvVars(t, args)
+	assert.Subset(t, names, []string{
+		"GITHUB_TOKEN", "BITBUCKET_TOKEN", "BITBUCKET_GIT_USERNAME", "GIT_AUTHOR_NAME", "BASE", "DRAFT_PULL_REQUESTS",
+	})
+	assert.NotContains(t, names, "CODEX_API_KEY")
+	assert.NotContains(t, names, "OPENAI_API_KEY")
+	assert.NotContains(t, names, "BASH_FUNC_x%%")
+	joined := strings.Join(args, " ")
+	for _, secret := range []string{"runner-token-secret", "github-token-secret", "bitbucket-token-secret"} {
+		assert.NotContains(t, joined, secret)
+	}
+}
+
+func globalMCPEnvVars(t *testing.T, args []string) []string {
+	t.Helper()
+	const prefix = "mcp_servers.superplane_global.env_vars="
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, prefix) {
+			continue
+		}
+		var names []string
+		require.NoError(t, json.Unmarshal([]byte(strings.TrimPrefix(arg, prefix)), &names))
+		return names
+	}
+	require.FailNow(t, "global MCP env_vars override is missing")
+	return nil
 }
 
 func TestCodexExecArgsBypassesSandboxForAnalysis(t *testing.T) {

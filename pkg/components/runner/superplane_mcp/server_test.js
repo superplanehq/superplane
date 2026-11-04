@@ -98,6 +98,25 @@ test("tools/call returns a backend error as a tool error", async () => {
   assert.equal(transport.replies[0].result.content[0].text, "Task is closed or archived");
 });
 
+test("tools/call returns a tool error when a tool does not finish in time and keeps serving", async () => {
+  const transport = recorder();
+  const stuck = { definition: { name: "stuck_tool" }, handler: () => new Promise(() => {}) };
+  const quick = { definition: { name: "quick_tool" }, handler: async () => ({ status: "ok" }) };
+  const handle = createHandler({
+    client: fakeClient(["stuck_tool", "quick_tool"]),
+    tools: [stuck, quick],
+    prepare: () => {},
+    toolCallTimeoutMs: 20,
+  });
+
+  await handle({ id: 1, method: "tools/call", params: { name: "stuck_tool", arguments: {} } }, transport);
+  await handle({ id: 2, method: "tools/call", params: { name: "quick_tool", arguments: {} } }, transport);
+
+  assert.equal(transport.replies[0].result.isError, true);
+  assert.match(transport.replies[0].result.content[0].text, /stuck_tool did not finish/);
+  assert.equal(transport.replies[1].result.structuredContent.status, "ok");
+});
+
 test("initialize names the global server", async () => {
   const transport = recorder();
   await createHandler({ client: fakeClient([]) })({ id: 1, method: "initialize" }, transport);
