@@ -4,6 +4,7 @@ import (
 	"context"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -51,7 +52,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
 			agent.Configuration["enabledAgentResourceTools"] = map[string]any{"github-resource": []any{"get_issue"}}
 			implementationStep(t, agent, "Implementation")["prompt"] = "Retired implementation prompt"
-			findYAMLNode(t, doc, "create-pr").Configuration["draft"] = true
+			setResetTestDraftPullRequests(t, doc, true)
 		})
 	}
 	require.NoError(t, resetTestOrganization(t, r))
@@ -71,10 +72,38 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			require.NotNil(t, agent.Concurrency)
 			assert.Equal(t, tc.max, agent.Concurrency.EffectiveMax())
 			assert.Equal(t, "team", agent.Concurrency.Key)
-			assert.Equal(t, true, findIntakeNode(version.Nodes, "create-pr").Configuration["draft"])
+			assert.True(t, resetTestDraftPullRequests(t, version.Nodes))
 			assert.NotContains(t, liveCanvasJSON(t, tc.canvas), "retired implementation prompt")
 		})
 	}
+}
+
+// setResetTestDraftPullRequests sets the "Create draft pull requests" setting.
+// Bitbucket holds it on the pull request node. GitHub holds it in the agent
+// environment.
+func setResetTestDraftPullRequests(t *testing.T, doc *yaml.Canvas, draft bool) {
+	t.Helper()
+	for i := range doc.Spec.Nodes {
+		node := &doc.Spec.Nodes[i]
+		if isFactoryPullRequestComponent(node.Component) {
+			node.Configuration["draft"] = draft
+			return
+		}
+	}
+	entry := factoryEnvironmentEntry(findYAMLNode(t, doc, implementationAgentNodeID).Configuration, factoryDraftPullRequestsEnv)
+	require.NotNil(t, entry, "expected the agent to declare %s", factoryDraftPullRequestsEnv)
+	entry["value"] = strconv.FormatBool(draft)
+}
+
+func resetTestDraftPullRequests(t *testing.T, nodes []models.Node) bool {
+	t.Helper()
+	for _, node := range nodes {
+		if draft, present := factoryDraftPullRequests(node.ComponentName(), node.Configuration); present {
+			return draft
+		}
+	}
+	require.Fail(t, "expected a draft pull request setting")
+	return false
 }
 
 func resetTestTemplate(t *testing.T, r *support.ResourceRegistry, factory *models.Factory, templateID, provider string, configure func(*yaml.Canvas)) *models.Canvas {
@@ -241,7 +270,7 @@ func TestResetBuiltInSettingsFailureRollsBackOrganization(t *testing.T) {
 	r, factory := resetTestFactory(t)
 	for range 2 {
 		resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
-			findYAMLNode(t, doc, "create-pr").Configuration["draft"] = true
+			setResetTestDraftPullRequests(t, doc, true)
 		})
 	}
 	canvases, err := factory.ListCanvases(database.DB(t.Context()))
@@ -417,7 +446,8 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 			for _, source := range []string{models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, models.FactoryPRFeedbackHandlerSourcePullRequestChecks} {
 				t.Run(model+"/"+provider+"/"+source, func(t *testing.T) {
 					r, factory := resetTestFactory(t)
-					require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
+					repository := "acme/app"
+					require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider, AppRepository: &repository}))
 					request := prFeedbackBuildRequest{
 						Repository: "acme/app", Mention: "@review", IgnoreBots: false, AddressAllBots: true, AllowedBots: []string{},
 						CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
@@ -459,7 +489,7 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 					require.NoError(t, resetTestOrganization(t, r))
 					version := resetTestLiveVersion(t, canvas)
 					spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
-					actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
+					actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec).withPrimaryRepository(factory)
 					assert.Equal(t, "acme/app", actual.Repository)
 					if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
 						assert.Equal(t, "@review", actual.Mention)
@@ -480,6 +510,17 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 						assert.Contains(t, prompt, "Ignore comments SuperPlane already wrote.")
 					} else {
 						assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
+					}
+					if provider == models.ProviderGitHub {
+						scoped := workspaceScopeNodeIDs(spec, true)
+						require.NotEmpty(t, scoped)
+						for _, id := range scoped {
+							node := findIntakeNode(version.Nodes, id)
+							assert.True(t, prFeedbackWorkspaceScope(node.Configuration), "node %s must listen on all workspace repositories", id)
+							if node.ComponentName() == prFeedbackWaitChecksComponent {
+								assert.Equal(t, prFeedbackEventRepositoryExpression, node.Configuration["repository"])
+							}
+						}
 					}
 					reloaded, err := models.FindPRFeedbackHandlerByCanvasID(database.DB(t.Context()), canvas.ID)
 					require.NoError(t, err)
@@ -625,7 +666,10 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 		agent := findYAMLNode(t, doc, implementationAgentNodeID)
 		delete(agent.Configuration, "executionTimeoutSeconds")
 		agent.Concurrency = nil
-		delete(findYAMLNode(t, doc, "create-pr").Configuration, "draft")
+		environment := agent.Configuration["environment"].([]any)
+		agent.Configuration["environment"] = slices.DeleteFunc(environment, func(item any) bool {
+			return item.(map[string]any)["name"] == factoryDraftPullRequestsEnv
+		})
 	})
 	require.NoError(t, resetTestOrganization(t, r))
 	version := resetTestLiveVersion(t, canvas)
@@ -634,7 +678,30 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 	assert.EqualValues(t, 3600, agent.Configuration["executionTimeoutSeconds"])
 	require.NotNil(t, agent.Concurrency)
 	assert.Equal(t, 5, agent.Concurrency.EffectiveMax())
-	assert.Equal(t, false, findIntakeNode(version.Nodes, "create-pr").Configuration["draft"])
+	assert.False(t, resetTestDraftPullRequests(t, version.Nodes))
+}
+
+func TestResetMovesLegacyDraftPullRequestSettingToAgent(t *testing.T) {
+	r, factory := resetTestFactory(t)
+	canvas := resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
+		agent := findYAMLNode(t, doc, implementationAgentNodeID)
+		agent.Configuration["environment"] = slices.DeleteFunc(agent.Configuration["environment"].([]any), func(item any) bool {
+			return item.(map[string]any)["name"] == factoryDraftPullRequestsEnv
+		})
+	})
+	version := resetTestLiveVersion(t, canvas)
+	version.Nodes = append(version.Nodes, models.Node{
+		ID: "create-pr", Name: "Create Pull Request", Type: models.NodeTypeComponent,
+		Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "github.createPullRequest"}},
+		Configuration: map[string]any{"draft": true},
+	})
+	require.NoError(t, database.DB(t.Context()).Model(version).Update("nodes", datatypes.NewJSONSlice(version.Nodes)).Error)
+
+	require.NoError(t, resetTestOrganization(t, r))
+
+	current := resetTestLiveVersion(t, canvas)
+	assert.Nil(t, findIntakeNode(current.Nodes, "create-pr"))
+	assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
 }
 
 func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {

@@ -244,6 +244,10 @@ func Test_NodeConfigurationBuilder_WorkspaceFunction(t *testing.T) {
 	assert.Equal(t, repository, payload["repository"])
 	assert.Equal(t, defaultBranch, payload["default_branch"])
 
+	repositories, err := builder.ResolveExpression(`workspace().repositories`)
+	require.NoError(t, err)
+	assert.Equal(t, []string{repository}, repositories)
+
 	_, err = builder.ResolveExpression(`workspace(1)`)
 	require.ErrorContains(t, err, "workspace() takes no arguments")
 }
