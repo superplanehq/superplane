@@ -16,7 +16,6 @@ import {
   TWO_HOURS_AGO,
   YESTERDAY,
 } from "./factoryPageResponses";
-import { factoryAgentChatMessages } from "./factoryAgentChatMessages";
 import {
   SIMPLE_FACTORY_RUN_EVENT_AT,
   mergeSimpleFactoryRunActions,
@@ -160,7 +159,6 @@ export function refundLineCanvasFixture(
       executionsByEventId: {
         [LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID]: { executions: simpleFactoryRunExecutions() },
       },
-      agentMessages: factoryAgentChatMessages(),
       canvas: {
         canvas: {
           spec: simpleFactoryRunCanvasSpec(),

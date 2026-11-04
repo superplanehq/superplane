@@ -9,7 +9,31 @@ import { isFactoryOnboardingComplete } from "./onboardingStatus";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 function isWorkspaceSetupRoute(pathname: string) {
-  return pathname.endsWith("/setup") || pathname.endsWith("/onboarding");
+  return /\/workspaces\/[^/]+\/(?:setup|onboarding)\/?$/.test(pathname);
+}
+
+function isWorkspaceIntegrationSetupRoute(pathname: string) {
+  return /\/workspaces\/[^/]+\/settings\/organization\/integrations(?:\/|$)/.test(pathname);
+}
+
+function incompleteWorkspaceGate(args: {
+  pathname: string;
+  isSetupRoute: boolean;
+  storybookOnboarding: boolean;
+  initial: boolean;
+  outlet: ReactNode;
+  setupPath: string;
+}) {
+  if (isWorkspaceIntegrationSetupRoute(args.pathname)) {
+    return args.outlet;
+  }
+  if (!args.storybookOnboarding && args.initial) {
+    return <Navigate to="/onboarding" replace />;
+  }
+  if (args.isSetupRoute) {
+    return args.outlet;
+  }
+  return <Navigate to={args.setupPath} replace />;
 }
 
 /**
@@ -65,13 +89,12 @@ export function OnboardingGate({ children }: { children?: ReactNode }) {
     return outlet;
   }
 
-  if (!onboarding && factory?.onboarding?.initial === true) {
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  if (isSetupRoute) {
-    return outlet;
-  }
-
-  return <Navigate to={factorySetupPath(organizationId, workspaceSegment)} replace />;
+  return incompleteWorkspaceGate({
+    pathname: location.pathname,
+    isSetupRoute,
+    storybookOnboarding: Boolean(onboarding),
+    initial: factory?.onboarding?.initial === true,
+    outlet,
+    setupPath: factorySetupPath(organizationId, workspaceSegment),
+  });
 }

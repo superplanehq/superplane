@@ -48,9 +48,8 @@ func updateInteractiveWorkOrderAssignees(tx *gorm.DB, factory *models.Factory, o
 	return err
 }
 
-// assignWorkOrderStarter makes the caller the only owner of the task. Only
-// subscription workspaces need this, because the caller's Codex connection
-// runs the task. Other workspaces keep the saved owners.
+// assignWorkOrderStarter fills missing ownership in subscription workspaces.
+// Start still checks the caller's connection, while execution uses the saved owner.
 func assignWorkOrderStarter(tx *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder, actor *uuid.UUID) error {
 	if actor == nil || !factory.OnboardingConfigValue().CodexSubscription {
 		return nil
@@ -62,7 +61,24 @@ func assignWorkOrderStarter(tx *gorm.DB, factory *models.Factory, order *models.
 	if len(owners) == 1 && owners[0].UserID == *actor {
 		return requireCallerCodexConnection(tx, factory, *actor)
 	}
-	return updateInteractiveWorkOrderAssignees(tx, factory, order, []uuid.UUID{*actor}, *actor)
+	if len(owners) > 0 {
+		blocked, err := order.SubscriptionOwnershipBlockedForStart(tx)
+		if err != nil {
+			return err
+		}
+		if blocked {
+			return models.ErrSubscriptionOwnerBusy
+		}
+		return requireCallerCodexConnection(tx, factory, *actor)
+	}
+	err = order.AssignStarter(tx, *actor)
+	if err != nil && !errors.Is(err, models.ErrSubscriptionOwnerInvalid) {
+		return err
+	}
+	if connectionErr := requireCallerCodexConnection(tx, factory, *actor); connectionErr != nil {
+		return connectionErr
+	}
+	return err
 }
 
 func resolveModelCatalogOwner(ctx context.Context, tx *gorm.DB, f *models.Factory, orderRef string) (uuid.UUID, error) {
@@ -117,7 +133,7 @@ func ListFactoryOwnerEligibility(ctx context.Context, organizationID string, req
 		member := &pb.FactoryOwnerEligibility{UserId: user.ID.String(), Eligible: true}
 		if response.Subscription {
 			member.Eligible, err = models.SubscriptionOwnerEligible(db, orgID, factory.ID, user.ID)
-			if err != nil && !errors.Is(err, models.ErrCodexConnectionUnavailable) {
+			if err != nil {
 				return nil, factoryErrorToStatus(err, "failed to load owner eligibility")
 			}
 			if !member.Eligible {

@@ -353,6 +353,40 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-intent-thinking")).toBeInTheDocument();
   });
 
+  it.each([true, false])("offers the execution owner's Start models when assigned=%s", async (assigned) => {
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const order = { ...DRAFT_WORK_ORDER, assignees: assigned ? [{ id: "owner", name: "Task Owner" }] : [] };
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      if (url.pathname === `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${order.id}`) {
+        return Response.json({ order });
+      }
+      if (url.pathname === `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${order.id}/artifacts`) {
+        return Response.json({
+          artifacts: [{ id: "spec", type: "TYPE_MARKDOWN", data: { name: SPEC_ARTIFACT_NAME, body: "# Plan" } }],
+        });
+      }
+      if (url.pathname === `/api/v1/factories/${PRIMARY_FACTORY_ID}/line-runner-models`) {
+        const model = url.searchParams.get("orderId") === order.id ? "owner-model" : "caller-model";
+        return Response.json({ models: [{ id: model, name: model }] });
+      }
+      return originalFetch(input, init);
+    });
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: order.id,
+      fixture: withPublishedSpec(splitRunFixtureForWorkOrder(order)),
+      canDispatch: true,
+      onDispatch: vi.fn(),
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Model: Auto Medium" }));
+    await user.hover(screen.getByTestId("split-run-draft-model-list"));
+    expect(await screen.findByRole("menuitem", { name: assigned ? "owner-model" : "caller-model" })).toBeVisible();
+  });
+
   it("saves a new planning model from the failure alert and shows a save error inline", async () => {
     const orderId = DRAFT_WORK_ORDER.id!;
     const originalFetch = globalThis.fetch.bind(globalThis);
@@ -435,6 +469,10 @@ describe("WorkOrderSplitRunPopup", () => {
       executionId: "planning-execution",
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    client.setQueryData(
+      factoryQueryKeys.workOrderDetail(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ID, DRAFT_WORK_ORDER.id!),
+      DRAFT_WORK_ORDER,
+    );
     client.setQueryData(canvasKeys.run("planning-canvas", "planning-run"), {
       run: { result: "RESULT_FAILED", errors: ["The selected model is unavailable."] },
     });
@@ -451,8 +489,9 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const alert = await screen.findByRole("alert", { name: "Planning failed" });
     expect(alert).toHaveTextContent("The selected model is unavailable.");
-    expect(alert).toHaveTextContent("Select a model in the task header, then send a new message to continue.");
-    expect(within(alert).queryByRole("button", { name: /Model:/ })).not.toBeInTheDocument();
+    expect(alert).toHaveTextContent("Select a model below, then send a new message to continue.");
+    expect(within(alert).getByRole("button", { name: /Model:/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Model:/ })).toHaveLength(1);
     expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
 
     act(() => {

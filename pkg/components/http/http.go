@@ -906,7 +906,7 @@ func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, ht
 	// We replace resp.Body with the buffered content so callers (processResponse)
 	// can read it without hitting "context canceled" errors.
 	//
-	// See: https://github.com/superplanehq/superplane/issues/3141
+	// See SuperPlane issue 3141.
 	//
 	bodyBytes, err := io.ReadAll(resp.Body)
 	resp.Body.Close()

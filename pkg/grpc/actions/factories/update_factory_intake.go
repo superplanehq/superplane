@@ -213,7 +213,7 @@ func applyIntakeUpdate(
 			}
 		}
 		if name != nil {
-			if err := canvases.UpdateCanvasInTransaction(tx, canvas, name, nil, nil); err != nil {
+			if err := canvases.UpdateCanvasInTransaction(tx, canvas, name, nil); err != nil {
 				return err
 			}
 		}

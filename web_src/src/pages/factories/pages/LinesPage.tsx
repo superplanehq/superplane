@@ -1,3 +1,4 @@
+import { PullRequestImportPicker } from "./PullRequestImportPicker";
 import { IntakeOwnerCreationDialog } from "./IntakeOwnerCreationDialog";
 import { SubscriptionIntakeOwnerRecovery } from "./SubscriptionIntakeOwnerRecovery";
 import type {
@@ -22,7 +23,8 @@ import {
 } from "@/hooks/useFactoryData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useFactoryCustomAutomations } from "@/hooks/useFactoryCustomAutomationData";
-import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
+import { githubHostFromIntegration, isGitHubEnterpriseServerHost } from "@/lib/githubHost";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
@@ -39,7 +41,7 @@ import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
-import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
@@ -392,13 +394,19 @@ export function LinesPage() {
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
     [configuredIntakes],
   );
-  const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
   const [ownerIntakeTemplate, setOwnerIntakeTemplate] = useState<AddIntakeTemplate>();
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const githubIntegration = useIntegration(organizationId, githubIntegrationId);
+  const githubHost = githubHostFromIntegration(githubIntegration.data);
+  const hideDependabot = isGitHubEnterpriseServerHost(githubHost);
+  const addIntakeTemplates = useMemo(
+    () => addIntakeTemplatesForOrg(hasExperimentalFeature, { hideDependabot }),
+    [hasExperimentalFeature, hideDependabot],
+  );
   const vcsProvider = factory?.onboarding?.vcsProvider;
   const supportsReviewBots = vcsProvider !== "bitbucket";
   const catalogParameters = appRepository ? { repository: appRepository } : undefined;
@@ -815,6 +823,7 @@ export function LinesPage() {
                 key={intake.intakeId}
                 message={intake.healthMessage}
                 repository={intake.resourceId}
+                host={githubHost}
                 retrying={intakeWebhookRetry.retrying}
                 onRetry={() => intakeWebhookRetry.retryIntake(intake)}
               />
@@ -1727,6 +1736,16 @@ function PhaseBoard({
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
         <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
         <VerifyColumn
+          importPicker={
+            lineId ? (
+              <PullRequestImportPicker
+                organizationId={organizationId}
+                factoryId={factoryId}
+                lineId={lineId}
+                onOpenTask={onOpenWorkOrder}
+              />
+            ) : undefined
+          }
           orders={verifyOrders}
           title={verifyTitle}
           scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "verify") : undefined}
@@ -1773,6 +1792,7 @@ function PhaseBoard({
 }
 
 function VerifyColumn({
+  importPicker,
   orders,
   title,
   listeners,
@@ -1792,6 +1812,7 @@ function VerifyColumn({
   cardsPending,
   scrollPersistenceKey,
 }: {
+  importPicker?: ReactNode;
   orders: FactoriesWorkOrder[];
   title: string;
   listeners: LaneListener[];
@@ -1834,6 +1855,7 @@ function VerifyColumn({
       className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
+          {importPicker}
           {automationRowCount ? null : (
             <ColumnAutomationsHeaderSlot
               title={title}

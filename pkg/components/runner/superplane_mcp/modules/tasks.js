@@ -6,6 +6,7 @@ const MAX_LIST_LIMIT = 100;
 const MAX_STATE_VALUES = 3;
 const MAX_TITLE_LENGTH = 256;
 const MAX_DESCRIPTION_LENGTH = 20000;
+const MAX_OWNER_PATHS = 10;
 
 function exceedsCodePoints(value, max) {
   let count = 0;
@@ -63,6 +64,80 @@ async function closeTask(input, client) {
   const body = result ? { result } : {};
   return client.request("POST", "/api/v1/runner/task/close", body);
 }
+
+function ownerPaths(raw) {
+  const values = Array.isArray(raw) ? raw : [];
+  return values
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .slice(0, MAX_OWNER_PATHS);
+}
+
+async function suggestTaskOwner(input, client) {
+  return client.request("POST", "/api/v1/runner/task/suggest-owners", {
+    paths: ownerPaths(input && input.paths),
+  });
+}
+
+async function assignTaskOwner(input, client) {
+  const user = String((input && input.user) || "").trim();
+  if (!user) throw new Error("user is required");
+  const reason = String((input && input.reason) || "").trim();
+  const body = { user };
+  if (reason) body.reason = reason;
+  if (input && input.only_if_unassigned === true) body.only_if_unassigned = true;
+  return client.request("PUT", "/api/v1/runner/task/owner", body);
+}
+
+const ASSIGN_TASK_OWNER = {
+  definition: {
+    name: "assign_task_owner",
+    description:
+      "Set one person as the owner of this run's task. That person replaces all current owners, including manually assigned owners. Pass user as a user_id or github_login from list_members. Returns status assigned with the new owner, or kept with the current owners. A closed or archived task cannot change owners.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        user: {
+          type: "string",
+          description: "user_id or github_login from list_members.",
+        },
+        reason: {
+          type: "string",
+          description:
+            "Optional. One sentence that SuperPlane shows on the task, for example: You changed pkg/payments/charge.go 3 times this month. SuperPlane keeps the first 280 characters.",
+        },
+        only_if_unassigned: {
+          type: "boolean",
+          description:
+            "Optional. When true, keep the current owners if the task already has one. The result status is kept. Use this for the default planning assignment.",
+        },
+      },
+      required: ["user"],
+    },
+  },
+  handler: assignTaskOwner,
+};
+
+const SUGGEST_TASK_OWNER = {
+  definition: {
+    name: "suggest_task_owner",
+    description:
+      "Rank the members who changed the repository paths of this task. Returns members with name, roles, GitHub login, and open_tasks, the current owners of the task, and code_owners: members ranked by their recent commits on the paths. Only members with a linked GitHub account can appear in code_owners.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        paths: {
+          type: "array",
+          maxItems: MAX_OWNER_PATHS,
+          items: { type: "string" },
+          description:
+            "Optional. Repository-relative files or directories, most specific first, for example pkg/payments or web_src/src/pages/checkout.tsx.",
+        },
+      },
+    },
+  },
+  handler: suggestTaskOwner,
+};
 
 const LIST_TASKS = {
   definition: {
@@ -132,5 +207,5 @@ const CLOSE_TASK = {
 };
 
 module.exports = {
-  tools: [LIST_TASKS, CREATE_TASK, CLOSE_TASK],
+  tools: [ASSIGN_TASK_OWNER, SUGGEST_TASK_OWNER, LIST_TASKS, CREATE_TASK, CLOSE_TASK],
 };

@@ -12,7 +12,7 @@ const registryResponse = {
   features: [
     { id: "factories", label: "Factories", description: "Software factories", released: false },
     { id: "new_canvas", label: "New Canvas", description: "Canvas v2", released: false },
-    { id: "claude_managed_agents", label: "Claude Managed Agents", description: "Chat", released: true },
+    { id: "superplane_mcp_server", label: "MCP Server", description: "Workspace tools", released: true },
   ],
   enabled: ["factories"],
 };
@@ -77,7 +77,7 @@ describe("OrgExperimentalFeaturesTable", () => {
     renderTable();
 
     expect(await screen.findByText("Factories")).toBeInTheDocument();
-    expect(screen.queryByText("Claude Managed Agents")).not.toBeInTheDocument();
+    expect(screen.queryByText("MCP Server")).not.toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Toggle Factories" })).toHaveAttribute("data-state", "checked");
 
     const fetchMock = vi.mocked(fetch);
@@ -144,7 +144,7 @@ describe("OrgExperimentalFeaturesTable", () => {
   it("disables only visible flags that are on", async () => {
     stubFetch({
       ...registryResponse,
-      enabled: ["factories", "new_canvas", "claude_managed_agents"],
+      enabled: ["factories", "new_canvas", "superplane_mcp_server"],
     });
     const user = userEvent.setup();
     renderTable();
@@ -162,7 +162,7 @@ describe("OrgExperimentalFeaturesTable", () => {
   it("shows an error and server state when a later bulk request fails", async () => {
     let registry = {
       ...registryResponse,
-      enabled: ["factories", "new_canvas", "claude_managed_agents"],
+      enabled: ["factories", "new_canvas", "superplane_mcp_server"],
     };
     vi.stubGlobal(
       "fetch",
@@ -172,7 +172,7 @@ describe("OrgExperimentalFeaturesTable", () => {
           return jsonResponse(registry);
         }
         if (url === featureTogglePath("factories") && init?.method === "DELETE") {
-          registry = { ...registry, enabled: ["new_canvas", "claude_managed_agents"] };
+          registry = { ...registry, enabled: ["new_canvas", "superplane_mcp_server"] };
           return jsonResponse({ status: "disabled" });
         }
         if (url === featureTogglePath("new_canvas") && init?.method === "DELETE") {

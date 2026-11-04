@@ -15,7 +15,7 @@ func TestGenerateAndValidateScopedToken(t *testing.T) {
 	token, err := signer.GenerateScopedToken(ScopedTokenClaims{
 		Subject: "user-123",
 		OrgID:   "org-123",
-		Purpose: "agent-builder",
+		Purpose: "test-scope",
 		Scopes: []string{
 			"canvases:read:canvas-123",
 			"canvases:read:canvas-123",
@@ -41,7 +41,7 @@ func TestGenerateAndValidateScopedToken(t *testing.T) {
 	assert.Equal(t, ScopedTokenType, claims.TokenType)
 	assert.Equal(t, "user-123", claims.Subject)
 	assert.Equal(t, "org-123", claims.OrgID)
-	assert.Equal(t, "agent-builder", claims.Purpose)
+	assert.Equal(t, "test-scope", claims.Purpose)
 	assert.Equal(
 		t,
 		[]string{"canvases:read:canvas-123", "org:read"},
@@ -57,7 +57,7 @@ func TestGenerateScopedTokenRequiresScopes(t *testing.T) {
 	_, err := signer.GenerateScopedToken(ScopedTokenClaims{
 		Subject: "user-123",
 		OrgID:   "org-123",
-		Purpose: "agent-builder",
+		Purpose: "test-scope",
 	}, time.Minute)
 	require.Error(t, err)
 	assert.Equal(t, "at least one scope is required", err.Error())
@@ -74,7 +74,7 @@ func TestValidateScopedTokenRejectsWrongTokenType(t *testing.T) {
 		IssuedAt:  gojwt.NewNumericDate(now),
 		TokenType: "session",
 		OrgID:     "org-123",
-		Purpose:   "agent-builder",
+		Purpose:   "test-scope",
 		Scopes:    []string{"canvases:read:canvas-123"},
 	})
 

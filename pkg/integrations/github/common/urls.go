@@ -26,10 +26,10 @@ func AppURL(properties core.IntegrationPropertyStorageReader, appSlug string) (s
 			return "", fmt.Errorf("error getting owner: %v", err)
 		}
 
-		return fmt.Sprintf("https://github.com/organizations/%s/settings/apps/%s/permissions", owner, appSlug), nil
+		return HostFromProperties(properties).AppPermissionsURL(ownerType, owner, appSlug), nil
 	}
 
-	return fmt.Sprintf("https://github.com/settings/apps/%s/permissions", appSlug), nil
+	return HostFromProperties(properties).AppPermissionsURL(ownerType, "", appSlug), nil
 }
 
 func AppInstallationURL(properties core.IntegrationPropertyStorageReader, installationID string) (string, error) {
@@ -44,10 +44,10 @@ func AppInstallationURL(properties core.IntegrationPropertyStorageReader, instal
 			return "", fmt.Errorf("error getting owner: %v", err)
 		}
 
-		return fmt.Sprintf("https://github.com/organizations/%s/settings/installations/%s", owner, installationID), nil
+		return HostFromProperties(properties).InstallationSettingsURL(ownerType, owner, installationID), nil
 	}
 
-	return fmt.Sprintf("https://github.com/settings/installations/%s", installationID), nil
+	return HostFromProperties(properties).InstallationSettingsURL(ownerType, "", installationID), nil
 }
 
 // InstallationSettingsURL is the GitHub page where an admin manages this App
@@ -68,9 +68,9 @@ func InstallationSettingsURL(installation models.VCSProviderInstallation) string
 		if login == "" {
 			return ""
 		}
-		return fmt.Sprintf("https://github.com/organizations/%s/settings/installations/%s", login, installationID)
+		return DotCom().InstallationSettingsURL(OwnerTypeOrganization, login, installationID)
 	case gitHubAccountTypeUser:
-		return fmt.Sprintf("https://github.com/settings/installations/%s", installationID)
+		return DotCom().InstallationSettingsURL(OwnerTypeUser, login, installationID)
 	default:
 		return ""
 	}

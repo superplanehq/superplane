@@ -85,7 +85,7 @@ func (c *Runner) Documentation() string {
 - **Failed**: The commands finished with non-zero exit code.
 
 ## Structured result
-If the completed broker task includes valid JSON in **result**, SuperPlane includes it on the ` + "`runner.finished`" + ` event payload next to **status** and **exit_code** (the exact shape depends on your runner / task implementation).
+If the completed task includes valid JSON in **result**, SuperPlane includes it on the ` + "`runner.finished`" + ` event payload next to **status** and **exit_code** (the exact shape depends on your runner / task implementation).
 `
 }
 

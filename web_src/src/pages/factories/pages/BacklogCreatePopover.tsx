@@ -1,4 +1,4 @@
-import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

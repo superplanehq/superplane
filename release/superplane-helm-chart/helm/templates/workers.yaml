@@ -153,11 +153,13 @@ spec:
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
             {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
+            {{- include "superplane.githubEnterpriseEnv" . | nindent 12 }}
 
           volumeMounts:
             - name: oidc-keys
               mountPath: /app/oidc-keys
               readOnly: true
+            {{- include "superplane.githubEnterpriseVolumeMount" . | nindent 12 }}
 {{- if eq .Values.blobStorage.provider "filesystem" }}
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
@@ -174,6 +176,7 @@ spec:
         - name: oidc-keys
           secret:
             secretName: {{ include "secrets.oidc.name" . }}
+        {{- include "superplane.githubEnterpriseVolume" . | nindent 8 }}
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}

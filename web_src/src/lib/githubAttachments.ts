@@ -1,4 +1,6 @@
-export function isGitHubUserAttachmentUrl(raw: string | undefined): boolean {
+import { isGitHubWebHostname } from "./githubHost";
+
+export function isGitHubUserAttachmentUrl(raw: string | undefined, host?: string | null): boolean {
   const value = raw?.trim() ?? "";
   if (!value) {
     return false;
@@ -14,7 +16,7 @@ export function isGitHubUserAttachmentUrl(raw: string | undefined): boolean {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return false;
   }
-  if (parsed.hostname.toLowerCase() !== "github.com") {
+  if (!isGitHubWebHostname(parsed.hostname, host)) {
     return false;
   }
 
@@ -36,8 +38,8 @@ function isGitHubAttachmentPath(pathname: string): boolean {
   return segments.length >= 4 && segments[2].toLowerCase() === "assets";
 }
 
-export function isGitHubAttachmentAutolink(href: string | undefined, label: string): boolean {
-  if (!isGitHubUserAttachmentUrl(href) || !href) {
+export function isGitHubAttachmentAutolink(href: string | undefined, label: string, host?: string | null): boolean {
+  if (!isGitHubUserAttachmentUrl(href, host) || !href) {
     return false;
   }
 

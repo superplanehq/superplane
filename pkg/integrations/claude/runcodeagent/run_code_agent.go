@@ -2,6 +2,7 @@ package runcodeagent
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"unicode"
@@ -13,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/claude/runagent"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 const (
@@ -105,7 +107,7 @@ func (a *RunCodeAgent) Configuration() []configuration.Field {
 		},
 		{
 			Name: "prUrl", Label: "Pull Request URL", Type: configuration.FieldTypeString, Required: false,
-			Placeholder: "https://github.com/owner/repo/pull/42", Description: "Existing pull request to update in place.",
+			Placeholder: githubcommon.DotCom().RepoURL("owner/repo") + "/pull/42", Description: "Existing pull request to update in place.",
 			VisibilityConditions: prMode,
 		},
 		{
@@ -407,7 +409,7 @@ func provisionVault(client *runagent.Client, ctx core.ExecutionContext, spec Spe
 
 	// Restrict the token to GitHub hosts only (never the user's extra allowedHosts)
 	// so it can never be sent to another host at the egress layer.
-	if err := client.CreateEnvVarCredential(vaultID, "GITHUB_TOKEN", "GITHUB_TOKEN", token, defaultGitHubHosts); err != nil {
+	if err := client.CreateEnvVarCredential(vaultID, "GITHUB_TOKEN", "GITHUB_TOKEN", token, githubHostFromSpec(spec).AllowedHosts()); err != nil {
 		return vaultID, fmt.Errorf("failed to inject GitHub token: %w", err)
 	}
 	return vaultID, nil
@@ -417,7 +419,7 @@ func buildEnvironmentConfig(spec Spec) runagent.EnvironmentConfig {
 	cfg := runagent.EnvironmentConfig{Type: "cloud"}
 	if spec.Networking == networkingLimited {
 		allow := true
-		hosts := append([]string{}, defaultGitHubHosts...)
+		hosts := append([]string{}, githubHostFromSpec(spec).AllowedHosts()...)
 		hosts = append(hosts, spec.AllowedHosts...)
 		cfg.Networking = runagent.EnvironmentNetworking{
 			Type:                 "limited",
@@ -540,13 +542,17 @@ func validateRepository(repository string) error {
 	if repoOwnerRepoPattern.MatchString(repository) {
 		return nil
 	}
-	// Only owner/repo and https://github.com URLs are accepted. The GitHub token
+	// Only owner/repo and GitHub web clone URLs are accepted. The GitHub token
 	// is embedded in the clone URL, so pointing at any other host would leak the
 	// credential to a non-GitHub server.
-	if strings.HasPrefix(repository, "https://github.com/") {
-		return nil
+	parsed, err := url.Parse(repository)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		return fmt.Errorf("repository must be owner/repo or a GitHub HTTPS URL")
 	}
-	return fmt.Errorf("repository must be owner/repo or an https://github.com/ URL")
+	if !githubcommon.IsKnownGitHubWebHostname(parsed.Hostname()) {
+		return fmt.Errorf("repository must be owner/repo or a GitHub HTTPS URL")
+	}
+	return nil
 }
 
 func setNodeMetadata(ctx core.SetupContext, spec Spec) error {
@@ -594,7 +600,7 @@ func resolveCommitAttribution(ctx core.ExecutionContext, spec Spec, token string
 	if actAsBot(spec) {
 		return commitAttribution{}, nil
 	}
-	name, email, err := resolveGitHubUser(ctx.HTTP, token)
+	name, email, err := resolveGitHubUser(ctx.HTTP, token, githubHostFromSpec(spec))
 	if err != nil {
 		return commitAttribution{}, fmt.Errorf("failed to resolve GitHub user for commit attribution: %w", err)
 	}

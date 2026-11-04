@@ -37,19 +37,17 @@ export function PlanningFailureAlert({
       <AlertDescription className="whitespace-pre-wrap break-words">
         <p>{planningFailureMessage(failure)}</p>
         {hasSession ? (
-          <p>Select a model in the task header, then send a new message to continue.</p>
+          <p>Select a model below, then send a new message to continue.</p>
         ) : isModelUnavailableFailure(failure) ? (
           <p>Change the model in Planning settings, or select another model for this task below.</p>
         ) : null}
-        {!hasSession ? (
-          <TaskRefinementModelSelect
-            organizationId={organizationId}
-            canEdit={canEditModel}
-            allowReselect
-            onSaveStart={() => setModelError("")}
-            onError={setModelError}
-          />
-        ) : null}
+        <TaskRefinementModelSelect
+          organizationId={organizationId}
+          canEdit={canEditModel}
+          allowReselect
+          onSaveStart={() => setModelError("")}
+          onError={setModelError}
+        />
         {modelError ? <p className="text-destructive">{modelError}</p> : null}
       </AlertDescription>
     </Alert>

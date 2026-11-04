@@ -5,7 +5,6 @@ type ViewportLike = { x: number; y: number; zoom: number };
 
 type FactoryEmbedCanvasChromeInput = {
   factoryEmbed: boolean;
-  factoryAgentEnabled?: boolean;
   factoryEditWorkspace?: boolean;
   factoryViewOnly: boolean;
   factoryOwnedApp: boolean;
@@ -53,7 +52,6 @@ function resolveFactoryShellVisibility(input: FactoryEmbedCanvasChromeInput) {
     showBottomStatusControls: !input.factoryEmbed && input.showBottomStatusControls,
     hideAddControls: resolveFactoryHideAddControls(input),
     hidePageChrome: input.factoryEmbed,
-    hideCanvasToolSidebar: input.factoryEmbed && !input.factoryAgentEnabled,
     hideRightSideControls: Boolean(input.factoryEmbed && input.factoryEditWorkspace),
     factoryEmbed: input.factoryEmbed,
   };

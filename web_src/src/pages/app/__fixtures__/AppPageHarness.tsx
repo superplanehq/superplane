@@ -1,4 +1,3 @@
-import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { OrgWorkspaceHarness } from "@/pages/__fixtures__/OrgWorkspaceHarness";
 
 import { defaultCanvasAppFixture, type CanvasAppFixture } from "./handlers";
@@ -11,13 +10,6 @@ interface AppPageHarnessProps {
    * capture used by the original `LiveCanvas`/`RunInspection` stories.
    */
   fixture?: CanvasAppFixture;
-  /**
-   * Open the agent chat sidebar on mount (AI Chat story). Live Canvas leaves
-   * this false so the Agent toggle is available but the panel starts closed.
-   */
-  openAgentSidebar?: boolean;
-  /** Agent improvement suggestions for the header Agent control (Live Canvas prototype). */
-  agentSuggestions?: AgentSuggestion[];
 }
 
 /**
@@ -25,19 +17,6 @@ interface AppPageHarnessProps {
  * router with HomePage so the header Homepage control returns to the org home
  * surface used by the HomePage stories.
  */
-export function AppPageHarness({
-  query = "",
-  fixture = defaultCanvasAppFixture,
-  openAgentSidebar = false,
-  agentSuggestions,
-}: AppPageHarnessProps) {
-  return (
-    <OrgWorkspaceHarness
-      startAt="app"
-      appFixture={fixture}
-      appQuery={query}
-      openAgentSidebar={openAgentSidebar}
-      agentSuggestions={agentSuggestions}
-    />
-  );
+export function AppPageHarness({ query = "", fixture = defaultCanvasAppFixture }: AppPageHarnessProps) {
+  return <OrgWorkspaceHarness startAt="app" appFixture={fixture} appQuery={query} />;
 }

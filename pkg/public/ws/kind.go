@@ -4,13 +4,10 @@ import "strings"
 
 const (
 	KindCanvas  = "canvas"
-	KindAgent   = "agent"
 	KindFactory = "factory"
 	KindUser    = "user"
 	KindPublic  = "public"
 
-	// AgentSessionTopicPrefix is shared with eventdistributer topic keys.
-	AgentSessionTopicPrefix = "agent-session:"
 	// FactoryTopicPrefix is shared with eventdistributer topic keys.
 	FactoryTopicPrefix = "factory:"
 	// UserTopicPrefix is shared with eventdistributer topic keys.
@@ -21,9 +18,6 @@ const (
 
 // KindFromTopic maps a hub subscription key to a low-cardinality kind label.
 func KindFromTopic(topic string) string {
-	if strings.HasPrefix(topic, AgentSessionTopicPrefix) {
-		return KindAgent
-	}
 	if strings.HasPrefix(topic, FactoryTopicPrefix) {
 		return KindFactory
 	}

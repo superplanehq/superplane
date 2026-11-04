@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,9 +10,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -189,7 +193,9 @@ func TestCodexExecArgsStartsOnlyTheGlobalMCPWithARunnerToken(t *testing.T) {
 			assert.Contains(t, args, `mcp_servers.superplane_global.command="node"`)
 			assert.Contains(t, args, `mcp_servers.superplane_global.args=["/task/superplane_mcp/server.js"]`)
 			assert.Contains(t, args, `mcp_servers.superplane_global.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUNNER_TOKEN", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ANALYSIS_SPEC_FILE"]`)
-			for _, tool := range []string{"assign_owner", "propose_update", "inspect_attachment", "upload_artifact", "publish_link", "report_merge_check"} {
+			for _, tool := range []string{
+				"list_members", "assign_task_owner", "add_checks", "get_artifact", "add_artifact", "propose_plan", "report_merge_check",
+			} {
 				assert.Contains(t, args, fmt.Sprintf(`mcp_servers.superplane_global.tools.%s.approval_mode="approve"`, tool))
 			}
 			assert.NotContains(t, joined, "mcp_servers.superplane.")
@@ -468,6 +474,151 @@ process.exitCode = %d;
 	}
 }
 
+func TestCodexRunRecoversAuthenticationOnlyBeforeWork(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		mode        string
+		wantRefresh string
+		wantCode    string
+		wantResult  string
+	}{
+		{name: "startup recovery", mode: "recover", wantRefresh: "1", wantResult: "Recovered."},
+		{name: "repeated rejection", mode: "repeat", wantRefresh: "1", wantCode: "chatgpt_unauthorized"},
+		{name: "work already started", mode: "active", wantRefresh: "", wantCode: "chatgpt_unauthorized", wantResult: "Started work."},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			taskDir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt.txt"), []byte("Inspect the change."), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), []byte(`const fs = require("fs");
+const path = require("path");
+module.exports = {
+  subscriptionEnabled: () => true,
+  subscriptionChildEnv: (env) => env,
+  setCredentialFailureHandler: () => {},
+  redactSecrets: (text) => text,
+  readAccessToken: () => "rejected-access",
+  refreshRejectedCredentials: async () => fs.writeFileSync(path.join(process.env.SUPERPLANE_TASK_DIR, "refreshed"), "1"),
+  restore: async () => {},
+  reportUsage: async () => {},
+};`), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(`#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+if (process.argv[2] === "worker") {
+  setInterval(() => {}, 1000);
+} else {
+const dir = process.env.SUPERPLANE_TASK_DIR;
+const countFile = path.join(dir, "invocations");
+const count = (Number(fs.existsSync(countFile) ? fs.readFileSync(countFile, "utf8") : 0) + 1);
+fs.writeFileSync(countFile, String(count));
+if (process.env.TEST_AUTH_MODE === "active") {
+  process.stdout.write(JSON.stringify({type:"item.completed",item:{id:"reply",type:"agent_message",text:"Started work."}}) + "\n");
+}
+
+if (count === 1 || process.env.TEST_AUTH_MODE === "repeat") {
+  const worker = require("child_process").spawn(process.execPath, [__filename, "worker"], {stdio:"ignore"});
+  fs.appendFileSync(path.join(dir, "worker.pids"), String(worker.pid) + "\n");
+  const fail = () => {
+    process.stderr.write("Failed to refresh your ChatGPT credentials.\n");
+    setInterval(() => process.stderr.write("Failed to refresh your ChatGPT credentials.\n"), 10);
+  };
+  if (process.env.TEST_AUTH_MODE === "active") setTimeout(fail, 50);
+  else fail();
+} else {
+  process.stdout.write(JSON.stringify({type:"item.completed",item:{id:"reply",type:"agent_message",text:"Recovered."}}) + "\n");
+}
+}
+`), 0o700))
+			script, err := filepath.Abs("run.js")
+			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "node", script, filepath.Join(taskDir, "prompt.txt"))
+			cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+				"PATH="+taskDir+":"+os.Getenv("PATH"),
+				"SUPERPLANE_TASK_DIR="+taskDir,
+				"SUPERPLANE_RESULT_FILE="+filepath.Join(taskDir, "result.json"),
+				"SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=lease",
+				"TEST_AUTH_MODE="+test.mode,
+			)
+			out, err := cmd.CombinedOutput()
+			if test.wantCode == "" {
+				require.NoError(t, err, string(out))
+			} else {
+				require.Error(t, err, string(out))
+			}
+			content, err := os.ReadFile(filepath.Join(taskDir, "result.json"))
+			require.NoError(t, err)
+			var result map[string]any
+			require.NoError(t, json.Unmarshal(content, &result))
+			if test.wantCode == "" {
+				assert.NotContains(t, result, "authentication_code")
+			} else {
+				assert.Equal(t, test.wantCode, result["authentication_code"])
+			}
+			assert.Equal(t, test.wantResult, result["result"])
+			refresh, _ := os.ReadFile(filepath.Join(taskDir, "refreshed"))
+			assert.Equal(t, test.wantRefresh, string(refresh))
+			if runtime.GOOS == "linux" {
+				workers, err := os.ReadFile(filepath.Join(taskDir, "worker.pids"))
+				require.NoError(t, err)
+				for _, entry := range strings.Fields(string(workers)) {
+					pid, err := strconv.Atoi(entry)
+					require.NoError(t, err)
+					assert.Eventually(t, func() bool {
+						state, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+						return os.IsNotExist(err) || err == nil && strings.Fields(string(state))[2] == "Z"
+					}, 2*time.Second, 10*time.Millisecond, "native Codex child must stop")
+				}
+			}
+		})
+	}
+}
+
+func TestCodexRunStopsBeforeSpawnWhenSavedRefreshIsRejected(t *testing.T) {
+	taskDir := t.TempDir()
+	prompt := filepath.Join(taskDir, "prompt.txt")
+	resultPath := filepath.Join(taskDir, "result.json")
+	require.NoError(t, os.WriteFile(prompt, []byte("Inspect the change."), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "prompt_count"), []byte("0\n"), 0o600))
+	home := filepath.Join(taskDir, "codex-home")
+	require.NoError(t, os.Mkdir(home, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"tokens":{"access_token":"expired-access"}}`), 0o600))
+	subscription, err := os.ReadFile("codex_subscription.js")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex_subscription.js"), subscription, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "codex"), []byte(`#!/usr/bin/env node
+require("fs").writeFileSync(process.env.SUPERPLANE_TASK_DIR + "/spawned", "yes");
+`), 0o700))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = io.WriteString(w, `{"error":"invalid_grant"}`)
+	}))
+	t.Cleanup(server.Close)
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", script, prompt)
+	cmd.Env = append(withoutCodexAPIKeys(os.Environ()),
+		"PATH="+taskDir+":"+os.Getenv("PATH"),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"SUPERPLANE_RESULT_FILE="+resultPath,
+		"SUPERPLANE_BASE_URL="+server.URL,
+		"SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=lease-secret",
+	)
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err, string(out))
+	var result map[string]any
+	content, err := os.ReadFile(resultPath)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(content, &result))
+	assert.Equal(t, "chatgpt_reconnect_required", result["authentication_code"])
+	assert.Equal(t, "SuperPlane could not refresh your ChatGPT connection. Reconnect ChatGPT to continue.", result["error"])
+	_, err = os.Stat(filepath.Join(taskDir, "spawned"))
+	assert.True(t, os.IsNotExist(err), "Codex must not start with rejected credentials")
+	assert.NotContains(t, string(out)+string(content), "lease-secret")
+}
+
 func TestCodexRunRedactsSubscriptionCredentialsAcrossRotation(t *testing.T) {
 	for _, activityEnabled := range []bool{false, true} {
 		for _, state := range []struct{ failed, removeAuth bool }{
@@ -670,6 +821,11 @@ process.stdout.write('{"type":"thread.started","thread_id":"thread-1"}\n{"type":
 				home := filepath.Join(taskDir, "codex-home")
 				require.NoError(t, os.Mkdir(home, 0o700))
 				require.NoError(t, os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"tokens":{"access_token":"restored-opaque-credential"}}`), 0o600))
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					_ = json.NewEncoder(w).Encode(map[string]any{"bundle": map[string]any{"tokens": map[string]string{"access_token": "restored-opaque-credential"}}, "version": 1})
+				}))
+				t.Cleanup(server.Close)
+				cmd.Env = append(cmd.Env, "SUPERPLANE_BASE_URL="+server.URL)
 				cmd.Env = append(cmd.Env, "SUPERPLANE_CODEX_SUBSCRIPTION_TOKEN=subscription-token")
 			}
 			output, err := cmd.CombinedOutput()
@@ -728,12 +884,12 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, joined, "developer_instructions=")
-	assert.Contains(t, joined, "propose_update")
+	assert.Contains(t, joined, "propose_plan")
 	assert.Contains(t, joined, "Do not call propose_spec, propose_clarity, propose_confidence, or survey")
 	assert.NotContains(t, joined, "Call propose_spec")
 	assert.NotContains(t, joined, "Call propose_clarity")
 	assert.NotContains(t, joined, "Call propose_confidence")
-	assert.NotContains(t, joined, "propose_plan")
+	assert.NotContains(t, joined, "propose_update")
 	assert.Contains(t, joined, "Use only the analysis tools")
 }
 
@@ -795,7 +951,7 @@ func TestFormatCodexJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"reasoning-1","type":"reasoning","text":%q}}`, token),
 		fmt.Sprintf(`{"type":"item.started","item":{"id":"item-1","type":"command_execution","command":%q}}`, "git clone https://x-access-token:"+token+"@github.com/acme/app.git"),
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"item-1","type":"command_execution","command":"true","aggregated_output":%q,"exit_code":0}}`, imageResult),
-		fmt.Sprintf(`{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_update","status":"failed","error":{"message":%q}}}`, token),
+		fmt.Sprintf(`{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_plan","status":"failed","error":{"message":%q}}}`, token),
 		fmt.Sprintf(`{"type":"item.completed","item":{"id":"answer-1","type":"agent_message","text":%q}}`, token),
 	})
 
@@ -827,7 +983,7 @@ func TestCodexFormatterReportsPlanningToolFailures(t *testing.T) {
 			t.Run(fmt.Sprintf("%s/activity=%t", status, withActivity), func(t *testing.T) {
 				item := map[string]any{
 					"id": "publish-1", "type": "mcp_tool_call", "server": "superplane",
-					"tool": "propose_update", "status": status,
+					"tool": "propose_plan", "status": status,
 				}
 				failed := status != "completed"
 				if failed {
@@ -842,7 +998,7 @@ func TestCodexFormatterReportsPlanningToolFailures(t *testing.T) {
 				output := format(t, []string{string(event)})
 				records := liveLogRecords(t, output)
 				require.Len(t, records, 2)
-				assert.Contains(t, records[0]["text"], "propose_update")
+				assert.Contains(t, records[0]["text"], "propose_plan")
 				expectedStatus := "passed"
 				if failed {
 					expectedStatus = "failed"
@@ -875,7 +1031,7 @@ func TestCodexFormatterReportsPlanningToolFailures(t *testing.T) {
 }
 
 func TestCodexFormatterShowsFailedMCPToolResultText(t *testing.T) {
-	event := `{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_update","status":"failed","error":null,"result":{"content":[{"type":"text","text":"SUPERPLANE_BASE_URL is required"}],"structured_content":null}}}`
+	event := `{"type":"item.completed","item":{"id":"publish-1","type":"mcp_tool_call","server":"superplane","tool":"propose_plan","status":"failed","error":null,"result":{"content":[{"type":"text","text":"SUPERPLANE_BASE_URL is required"}],"structured_content":null}}}`
 	output := runCodexFormatterWithActivity(t, []string{event})
 
 	var errorOutput string

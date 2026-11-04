@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -69,7 +70,16 @@ func serializeArtifact(artifact *models.FactoryWorkOrderArtifact) (*pb.WorkOrder
 		Data:      data,
 		CreatedBy: serializeArtifactCreator(artifact),
 		CreatedAt: timestamppb.New(artifact.CreatedAt),
+		Key:       artifactDisplayKey(artifact),
 	}, nil
+}
+
+// Runner keys are stored as "<order id>:<key>" so they stay unique per task.
+func artifactDisplayKey(artifact *models.FactoryWorkOrderArtifact) string {
+	if artifact.Key == nil {
+		return ""
+	}
+	return strings.TrimPrefix(*artifact.Key, artifact.WorkOrderID.String()+":")
 }
 
 func serializeArtifactCreator(artifact *models.FactoryWorkOrderArtifact) *pb.UserRef {
@@ -108,9 +118,8 @@ func artifactTypeFromProto(t pb.WorkOrderArtifact_Type) (string, bool) {
 		return models.FactoryWorkOrderArtifactTypeBranch, true
 	case pb.WorkOrderArtifact_TYPE_LINK:
 		return models.FactoryWorkOrderArtifactTypeLink, true
-	// File artifacts are created only by the task-scoped runner upload API.
 	case pb.WorkOrderArtifact_TYPE_FILE:
-		return "", false
+		return models.FactoryWorkOrderArtifactTypeFile, true
 	}
 	return "", false
 }

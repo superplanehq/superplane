@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import { useFactoryGitHubHost } from "@/hooks/useFactoryGitHubHost";
 import { useRevealAfterPending } from "@/hooks/useRevealAfterPending";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ interface WorkOrderArtifactsListProps {
 }
 
 export function WorkOrderArtifactsList({ artifacts, isLoading, error }: WorkOrderArtifactsListProps) {
+  const githubHost = useFactoryGitHubHost();
   const visibleArtifacts = withoutPullRequestArtifacts(artifacts);
   const reveal = useRevealAfterPending(isLoading);
   return (
@@ -36,6 +38,7 @@ export function WorkOrderArtifactsList({ artifacts, isLoading, error }: WorkOrde
               <li className="flex items-center py-1.5" key={artifact.id ?? `${artifact.type}-${artifact.createdAt}`}>
                 <WorkOrderArtifactInline
                   className="w-full justify-start"
+                  githubHost={githubHost}
                   artifact={{
                     id: artifact.id,
                     type: artifact.type ?? "TYPE_UNSPECIFIED",

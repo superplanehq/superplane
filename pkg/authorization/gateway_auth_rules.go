@@ -134,18 +134,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "GET", Pattern: "/api/v1/agents/canvases/{canvas_id}/chat"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "GET", Pattern: "/api/v1/agents/chats/{chat_id}/messages"}: {
-			Resource:                     "agents",
-			Action:                       "read",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
 		{Method: "GET", Pattern: "/api/v1/canvases"}: {
 			Resource:   "canvases",
 			Action:     "read",
@@ -301,6 +289,15 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestMerge},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/pull-request-imports/candidates"}: {
+			Resource: "work_orders", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestImport},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/pull-request-imports"}: {
+			Resource: "work_orders", Action: "create", RequiredActions: []string{"update"}, DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestImport},
+		},
+
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"}: {
 			Resource:                     "factories",
 			Action:                       "read",
@@ -716,30 +713,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
-		{Method: "POST", Pattern: "/api/v1/agents/canvases/{canvas_id}/chat/reset"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "POST", Pattern: "/api/v1/agents/chats/{chat_id}/interrupt"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "POST", Pattern: "/api/v1/agents/chats/{chat_id}/messages"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
-		{Method: "POST", Pattern: "/api/v1/agents/chats/{chat_id}/outcome"}: {
-			Resource:                     "agents",
-			Action:                       "create",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
-		},
 		{Method: "POST", Pattern: "/api/v1/canvases"}: {
 			Resource:   "canvases",
 			Action:     "create",
@@ -809,31 +782,31 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/codex-usage"}: {
 			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
 			Resource:                     "factories",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
 			Resource:                     "factories",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/codex-connection:cancel"}: {
 			Resource:                     "factories",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/codex-connection"}: {
 			Resource:                     "factories",
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureCodexSubscriptions},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"}: {
 			Resource:                     "work_orders",
@@ -886,6 +859,18 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts/remove"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/checks/remove"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,

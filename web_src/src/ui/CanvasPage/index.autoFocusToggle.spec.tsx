@@ -78,28 +78,6 @@ vi.mock("../componentSidebar", () => ({
   ComponentSidebar: () => <div data-testid="live-node-detail-pane-content" />,
 }));
 
-vi.mock("@/components/CanvasToolSidebar", () => ({
-  CanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/pages/factories/agent/FactoryCanvasToolSidebar", () => ({
-  FactoryCanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
-  useCanvasToolSidebarState: () => ({
-    canvasId: undefined,
-    organizationId: undefined,
-    isEditing: false,
-    readOnly: false,
-    isToolSidebarOpen: false,
-    showToolSidebarToggle: false,
-    handleToolSidebarToggle: vi.fn(),
-    openToolSidebar: vi.fn(),
-    closeToolSidebar: vi.fn(),
-  }),
-}));
-
 vi.mock("./Header", () => ({
   Header: () => <header data-testid="canvas-header" />,
 }));
@@ -169,7 +147,6 @@ describe("CanvasPage auto-focus toggle", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           viewportRef={viewportRef}
           focusRequest={focusRequest}
@@ -207,7 +184,6 @@ describe("CanvasPage auto-focus toggle", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           focusRequest={{ nodeId: "node-1", requestId: 7, targetMode: "live", fit: false }}
         />
@@ -244,7 +220,6 @@ describe("CanvasPage auto-focus toggle", () => {
             edges={[]}
             buildingBlocks={[]}
             isEditing={false}
-            activeCanvasVersionId="live-version"
             hasFitToViewRef={hasFitToViewRef}
             viewportRef={viewportRef}
             fitAllRequest={1}
@@ -271,7 +246,6 @@ describe("CanvasPage auto-focus toggle", () => {
             edges={[]}
             buildingBlocks={[]}
             isEditing={false}
-            activeCanvasVersionId="live-version"
             hasFitToViewRef={hasFitToViewRef}
             viewportRef={viewportRef}
             fitAllRequest={1}
@@ -310,7 +284,6 @@ describe("CanvasPage auto-focus toggle", () => {
             edges={[]}
             buildingBlocks={[]}
             isEditing={false}
-            activeCanvasVersionId="live-version"
             hasFitToViewRef={hasFitToViewRef}
             viewportRef={viewportRef}
             fitAllRequest={1}
@@ -336,7 +309,6 @@ describe("CanvasPage auto-focus toggle", () => {
             edges={[]}
             buildingBlocks={[]}
             isEditing={false}
-            activeCanvasVersionId="live-version"
             hasFitToViewRef={hasFitToViewRef}
             viewportRef={viewportRef}
             fitAllRequest={2}
@@ -379,7 +351,6 @@ describe("CanvasPage auto-focus toggle", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           viewportRef={viewportRef}
           focusRequest={focusRequest}

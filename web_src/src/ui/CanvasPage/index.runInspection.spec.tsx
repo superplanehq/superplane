@@ -79,28 +79,6 @@ vi.mock("../componentSidebar", () => ({
   ComponentSidebar: () => <div data-testid="live-node-detail-pane-content" />,
 }));
 
-vi.mock("@/components/CanvasToolSidebar", () => ({
-  CanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/pages/factories/agent/FactoryCanvasToolSidebar", () => ({
-  FactoryCanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
-  useCanvasToolSidebarState: () => ({
-    canvasId: undefined,
-    organizationId: undefined,
-    isEditing: false,
-    readOnly: false,
-    isToolSidebarOpen: false,
-    showToolSidebarToggle: false,
-    handleToolSidebarToggle: vi.fn(),
-    openToolSidebar: vi.fn(),
-    closeToolSidebar: vi.fn(),
-  }),
-}));
-
 vi.mock("./Header", () => ({
   Header: () => <header data-testid="canvas-header" />,
 }));
@@ -173,7 +151,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={0}
         />
@@ -213,7 +190,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={0}
         />
@@ -252,7 +228,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           viewportRef={viewportRef}
         />
@@ -286,7 +261,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           viewportRef={viewportRef}
           focusRequest={focusRequest}
@@ -317,7 +291,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           viewportRef={viewportRef}
           focusRequest={focusRequest}
@@ -355,7 +328,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           viewportRef={viewportRef}
           focusRequest={{ ...focusRequest }}
@@ -389,7 +361,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           focusRequest={runFocusRequest}
         />
@@ -433,7 +404,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={1}
         />
@@ -466,7 +436,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={1}
         />
@@ -515,7 +484,6 @@ describe("CanvasPage run inspection", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
         />
       </MemoryRouter>,
     );

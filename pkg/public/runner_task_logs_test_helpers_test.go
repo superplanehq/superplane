@@ -44,16 +44,17 @@ func runnerTaskLogsGETAs(
 	cursor string,
 ) *httptest.ResponseRecorder {
 	t.Helper()
-	request := httptest.NewRequest(
-		http.MethodGet,
-		fmt.Sprintf(
-			"/api/v1/canvases/%s/node-executions/%s/runner-logs?after=%s",
-			canvasID,
-			executionID,
-			url.QueryEscape(cursor),
-		),
-		nil,
-	)
+	return runnerLogEndpointGETAs(t, server, signer, accountID, organizationID,
+		fmt.Sprintf("/api/v1/canvases/%s/node-executions/%s/runner-logs?after=%s",
+			canvasID, executionID, url.QueryEscape(cursor)))
+}
+
+func runnerLogEndpointGETAs(
+	t *testing.T, server *Server, signer *jwt.Signer,
+	accountID, organizationID uuid.UUID, path string,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodGet, path, nil)
 	request.Header.Set("x-organization-id", organizationID.String())
 	token, err := authentication.GenerateAccountToken(
 		signer,

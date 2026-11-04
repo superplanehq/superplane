@@ -69,7 +69,7 @@ describe("decideClassicAppRouteRedirect", () => {
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/rf/automations/canvas-1?configure=1&agent=1",
+      to: "/org-1/workspaces/rf/automations/canvas-1?configure=1",
     });
   });
 
@@ -99,7 +99,7 @@ describe("decideClassicAppRouteRedirect", () => {
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/rf/automations/canvas-1?configure=1&agent=1&sidebar=1&node=create-pr&version=v1",
+      to: "/org-1/workspaces/rf/automations/canvas-1?configure=1&sidebar=1&node=create-pr&version=v1",
     });
   });
 
@@ -114,7 +114,7 @@ describe("decideClassicAppRouteRedirect", () => {
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/rf/automations/canvas-1?configure=1&agent=1",
+      to: "/org-1/workspaces/rf/automations/canvas-1?configure=1",
     });
   });
 
