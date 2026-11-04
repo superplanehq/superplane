@@ -270,6 +270,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		{source: models.FactoryIntakeSourceGitHubIssues, paused: true},
 		{source: models.FactoryIntakeSourceJiraIssues},
 		{source: models.FactoryIntakeSourceSentryExceptions},
+		{source: models.FactoryIntakeSourceSentryExceptions, paused: true},
 		{source: models.FactoryIntakeSourceDependabotAlerts},
 		{source: models.FactoryIntakeSourceProductiveTasks},
 		{source: models.FactoryIntakeSourceDatadog},
@@ -323,9 +324,19 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.LinearLabels = []string{}
 			}
 			binding := &intakeBinding{Configuration: map[string]any{"repository": "acme/app", "project": "APP"}}
+			var sentryIntegrationID string
+			var sentryIntegrationName string
 			if source == models.FactoryIntakeSourceGitHubIssues {
 				id := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 				binding.Integration = &yaml.IntegrationRef{ID: id}
+			}
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				sentryIntegrationID = createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+				id := uuid.MustParse(sentryIntegrationID)
+				integration, err := models.FindIntegrationInTransaction(database.DB(t.Context()), r.Organization.ID, id)
+				require.NoError(t, err)
+				sentryIntegrationName = integration.InstallationName
+				binding.Integration = &yaml.IntegrationRef{ID: sentryIntegrationID, Name: sentryIntegrationName}
 			}
 			doc, err := buildIntakeCanvas(intakeCanvasRequest{
 				OrganizationID: r.Organization.ID, FactoryID: factory.ID, Source: source,
@@ -351,7 +362,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			require.NoError(t, err)
 			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 			var paused *bool
-			if source == models.FactoryIntakeSourceGitHubIssues {
+			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceSentryExceptions {
 				paused = &tc.paused
 			}
 			updated, err := UpdateFactoryIntake(ctx, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}, r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
@@ -397,6 +408,22 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				create := findIntakeNode(version.Nodes, resolveIntakeGraph(source, spec).CreateNodeID)
 				require.NotNil(t, create)
 				assert.Equal(t, r.User.String(), create.Configuration["defaultOwnerId"])
+				trigger := findIntakeNode(version.Nodes, intakeTriggerNodeID)
+				require.NotNil(t, trigger)
+				require.NotNil(t, trigger.IntegrationID)
+				assert.Equal(t, sentryIntegrationID, *trigger.IntegrationID)
+				issueRequest := findIntakeNode(version.Nodes, intakeSentryIssueRequestNodeID)
+				eventRequest := findIntakeNode(version.Nodes, intakeSentryEventRequestNodeID)
+				require.NotNil(t, issueRequest)
+				require.NotNil(t, eventRequest)
+				for _, request := range []*models.Node{issueRequest, eventRequest} {
+					authorization, ok := request.Configuration["authorization"].(map[string]any)
+					require.True(t, ok)
+					assert.Equal(t, map[string]any{"name": sentryIntegrationName}, authorization["integration"])
+				}
+				assert.True(t, hasCanvasPath(spec.Edges, intakeFilterNodeID, issueRequest.ID))
+				assert.True(t, hasCanvasPath(spec.Edges, issueRequest.ID, eventRequest.ID))
+				assert.True(t, hasCanvasPath(spec.Edges, eventRequest.ID, create.ID))
 			}
 			if tc.restrictAuthors {
 				require.NotNil(t, findIntakeNode(version.Nodes, intakeAuthorPermissionNodeID))

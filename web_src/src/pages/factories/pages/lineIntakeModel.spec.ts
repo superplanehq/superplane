@@ -347,6 +347,9 @@ describe("lineIntakeModel", () => {
     const sentry = intakeAutomationFixture(lineIntakeSourceById("sentry-exceptions")!);
     expect(sentry.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "sentry.onIssue",
+      "if",
+      "http",
+      "http",
       "createWorkOrder",
     ]);
 
