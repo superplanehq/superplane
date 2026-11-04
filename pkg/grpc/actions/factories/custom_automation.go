@@ -209,7 +209,7 @@ func UpdateFactoryCustomAutomation(
 		); err != nil {
 			return err
 		}
-		return canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil, nil)
+		return canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update custom automation")
@@ -427,7 +427,7 @@ func buildCustomAutomationCanvas(
 		"executionTimeoutSeconds": settings.ExecutionTimeoutSeconds,
 		"steps":                   customAutomationStepConfiguration(settings.Steps),
 		"environmentFrom":         environmentFrom,
-		"environment":             customAutomationCheckoutEnvironment(factory, settings.StartMode),
+		"environment":             customAutomationCheckoutEnvironment(factory, settings.StartMode, githubHostForFactory(tx, factory)),
 	}
 	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
 		runnerConfiguration["credentials"] = credentials
@@ -492,10 +492,10 @@ func buildCustomAutomationCanvas(
 	return doc, nil
 }
 
-func customAutomationCheckoutEnvironment(factory *models.Factory, mode pb.FactoryCustomAutomation_StartMode) []any {
+func customAutomationCheckoutEnvironment(factory *models.Factory, mode pb.FactoryCustomAutomation_StartMode, githubHost string) []any {
 	config := factory.OnboardingConfigValue()
 	repository := strings.TrimSpace(config.AppRepository)
-	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository)
+	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository, githubHost)
 	env := []any{
 		checkoutEnvironmentVar("REPO", repository),
 		checkoutEnvironmentVar("REPO_URL", url),

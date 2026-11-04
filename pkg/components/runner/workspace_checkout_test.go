@@ -348,7 +348,7 @@ func TestWorkspaceCheckoutScriptCommitSetupInstallsIdentity(t *testing.T) {
 	repo := filepath.Join(dir, "repo")
 	assert.Equal(t, runner.FactoryAgentEmail, gitRepoConfig(t, repo, "user.email"))
 	assert.Equal(t, runner.FactoryAgentName, gitRepoConfig(t, repo, "user.name"))
-	hook := filepath.Join(repo, ".git", "hooks", "prepare-commit-msg")
+	hook := filepath.Join(repo, ".git", "superplane-hooks", "superplane-prepare-commit-msg")
 	info, err := os.Stat(hook)
 	require.NoError(t, err)
 	assert.NotZero(t, info.Mode()&0o111, "hook is executable")

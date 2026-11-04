@@ -13,7 +13,7 @@ export function isCodexActionCancelled(error: unknown): boolean {
 }
 
 export const CodexActionContext = createContext<
-  ((organizationId: string, factoryId: string) => Promise<boolean>) | null
+  ((organizationId: string, factoryId: string, stage?: "prompt" | "setup") => Promise<boolean>) | null
 >(null);
 
 /** Let the server validate ownership restrictions before offering a connection. */

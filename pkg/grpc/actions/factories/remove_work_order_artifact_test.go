@@ -63,3 +63,34 @@ func TestRemoveWorkOrderArtifactLeavesTheOtherArtifact(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, remaining, 1)
 }
+
+func TestRemoveWorkOrderArtifactAcceptsTheListedRunKey(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	runArtifact, err := order.CreateArtifact(db, models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeLink,
+		Key:  order.ID.String() + ":preview",
+		Data: map[string]any{"url": "https://preview.example.com/pr-42", "title": "Preview"},
+	})
+	require.NoError(t, err)
+	listed, err := ListWorkOrderArtifacts(ctx, r.Organization.ID.String(), &pb.ListWorkOrderArtifactsRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.Len(t, listed.Artifacts, 1)
+
+	response, err := RemoveWorkOrderArtifact(ctx, r.Organization.ID.String(), &pb.RemoveWorkOrderArtifactRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		Key:       listed.Artifacts[0].Key,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, runArtifact.ID.String(), response.GetId())
+}

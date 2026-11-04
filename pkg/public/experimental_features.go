@@ -18,6 +18,9 @@ func experimentalFeatureItems() []experimentalFeatureItem {
 	registry := features.All()
 	items := make([]experimentalFeatureItem, 0, len(registry))
 	for _, f := range registry {
+		if f.Hidden {
+			continue
+		}
 		items = append(items, experimentalFeatureItem{
 			ID:          f.ID,
 			Label:       f.Label,

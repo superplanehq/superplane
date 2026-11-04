@@ -1,4 +1,3 @@
-import { TaskRefinementModelSelect } from "../TaskRefinementModelSelect";
 import { FactoryTaskScope } from "../FactoryTaskScope";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { firstFactoryLineId, workOrderBoardLineIdFromSearch } from "../lib/factoryPagePaths";
 import { factoryHomeColumnPath } from "../lib/boardColumnSearch";
+import { latestBacklogAnalysisRun, planningRunFailure, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import {
   boardColumnKeyFromNavigationState,
   boardLineIdFromNavigationState,
@@ -29,6 +29,7 @@ import { formatWorkOrderIdentifier } from "../lib/workspaceKey";
 import { OwnerTimeCostRow } from "../pages/work-order-popup-redesign/popupShared";
 import { SPLIT_RUN_ANALYZING_NOTE } from "../pages/work-order-split-run/splitRunFooter";
 import { ANALYSIS_PLANNING_COPY } from "../pages/work-order-split-run/useAnalysisPlanningSession";
+import { PlanningFailureAlert } from "../pages/work-order-split-run/PlanningFailureAlert";
 import type { IntentAnalysisChat } from "../pages/work-order-split-run/intentAnalysisChat";
 import { WorkOrderSplitRunOverview } from "../pages/work-order-split-run/WorkOrderSplitRunOverview";
 import { DRAFT_START_MODEL_AUTO } from "../pages/work-order-split-run/draftStartModel";
@@ -65,11 +66,6 @@ function taskBackLineId(
   });
 }
 
-/**
- * Full-screen task view for the phone shell. Everything stacks in one
- * scrolling column so titles, notes, and the activity log stay readable on a
- * narrow screen. Actions come from the same footer model as the desktop popup.
- */
 export function MobileTaskDetailPage() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const { orderNumber = "" } = useParams<{ orderNumber?: string }>();
@@ -123,6 +119,7 @@ export function MobileTaskDetailPage() {
 type MobileTaskModel = {
   orderId: string;
   fixture: SplitRunFixture;
+  analysisRuns: BacklogAnalysisRun[];
   artifacts: FactoriesWorkOrderArtifact[];
   artifactsLoading: boolean;
   pullRequests: FactoriesFactoryPullRequest[];
@@ -144,7 +141,6 @@ type MobileTaskModel = {
   >;
 };
 
-/** Loads everything the task screen shows and wires the footer actions. */
 function useMobileTaskModel(
   order: FactoriesWorkOrder,
   orderId: string,
@@ -168,6 +164,7 @@ function useMobileTaskModel(
   const closer = useSplitRunFooterCloser(organizationId, factoryId, order);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
+  const analysisRuns = backlogAnalysis.runsByWorkOrder.get(orderId) ?? [];
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const columnApps = columnAppsFromFactoryApps(apps);
@@ -180,7 +177,7 @@ function useMobileTaskModel(
     lineName,
     demoArtifacts: false,
     prFeedbackRuns,
-    analysisRuns: backlogAnalysis.runsByWorkOrder.get(orderId) ?? [],
+    analysisRuns,
     columnApps,
     isAnalyzing: backlogAnalysis.analyzingOrderIds.has(orderId),
     stoppedBy: closer.actor,
@@ -207,6 +204,7 @@ function useMobileTaskModel(
   return {
     orderId,
     fixture,
+    analysisRuns,
     artifacts,
     artifactsLoading,
     pullRequests,
@@ -253,9 +251,11 @@ function LoadedMobileTask({
     orderId,
     fixture,
     artifacts,
+    analysisRuns: model.analysisRuns,
     canUpdate: model.canUpdate,
     modelSelect: draftStart.modelSelect,
   });
+  const planningFailure = planningRunFailure(latestBacklogAnalysisRun(model.analysisRuns)?.run);
   const review = (withModelSelect: boolean) => (
     <PhoneTaskReview
       model={model}
@@ -285,12 +285,7 @@ function LoadedMobileTask({
           review={review(false)}
           summary={
             <div className="mb-5" data-testid="mobile-task-detail">
-              <MobileTaskHeader
-                order={order}
-                fixture={fixture}
-                organizationId={organizationId}
-                ownerEdits={model.ownerEdits}
-              />
+              <MobileTaskHeader order={order} model={model} />
             </div>
           }
         />
@@ -302,13 +297,14 @@ function LoadedMobileTask({
     <MobileTaskFrame onBack={onBack} backDisabled={backDisabled}>
       {model.columnAppRunQueries}
       <article className="flex flex-col gap-5 px-4 pt-3 pb-8" data-testid="mobile-task-detail">
-        <MobileTaskHeader
-          order={order}
-          fixture={fixture}
-          organizationId={organizationId}
-          ownerEdits={model.ownerEdits}
-        />
-        {refine.sessionMissing ? (
+        <MobileTaskHeader order={order} model={model} />
+        {refine.sessionMissing && planningFailure ? (
+          <PlanningFailureAlert
+            failure={planningFailure}
+            organizationId={organizationId}
+            canEditModel={model.canUpdate}
+          />
+        ) : refine.sessionMissing ? (
           <p className="text-[13px] text-muted-foreground" role="status">
             {MOBILE_TASK_COPY.noRefinementSession}
           </p>
@@ -436,19 +432,9 @@ function showsPhoneDraftModelSelect(planningEnabled: boolean, footer: SplitRunFi
   return planningEnabled && footer.kind === "draft" && footer.actions.some((action) => action.kind === "start");
 }
 
-/** Key, status, full title, and the owner/time/cost row. The title wraps instead of truncating. */
-function MobileTaskHeader({
-  order,
-  fixture,
-  organizationId,
-  ownerEdits,
-}: {
-  order: FactoriesWorkOrder;
-  fixture: SplitRunFixture;
-  organizationId: string;
-  ownerEdits: MobileTaskModel["ownerEdits"];
-}) {
-  const { factoryKey } = useFactoriesLayout();
+function MobileTaskHeader({ order, model }: { order: FactoriesWorkOrder; model: MobileTaskModel }) {
+  const { fixture, ownerEdits } = model;
+  const { factoryKey, organizationId } = useFactoriesLayout();
   const statusMeta = getWorkOrderDisplayStatusMeta(getWorkOrderDisplayStatus(order));
   const identifier = fixture.identifier?.trim() || formatWorkOrderIdentifier(factoryKey, order.number);
 
@@ -471,7 +457,6 @@ function MobileTaskHeader({
       <h1 className="text-[20px] leading-snug font-semibold tracking-[-0.02em] text-foreground break-words">
         {fixture.title}
       </h1>
-      <TaskRefinementModelSelect organizationId={organizationId} canEdit={ownerEdits.canEdit} />
       <OwnerTimeCostRow
         fixture={{ ...fixture, owner: ownerEdits.owner }}
         className="mt-0"
@@ -491,11 +476,6 @@ function MobileTaskHeader({
   );
 }
 
-/**
- * Back row and task body above the bottom bar. With `scroll` off the body
- * is a fixed-height column: the refine chat scrolls its own log and keeps
- * the composer at the bottom, also when the keyboard shrinks the shell.
- */
 function MobileTaskFrame({
   onBack,
   backDisabled = false,

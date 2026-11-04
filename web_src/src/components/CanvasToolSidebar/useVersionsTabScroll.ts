@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type UIEvent } from "react";
-import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
+import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 
 const persistedScrollPositions = new Map<string, number>();
 

@@ -12,7 +12,7 @@ const registry = require("./superplane_mcp/registry");
 const { main } = require("./task_cli");
 
 async function recordScreenshot(file, taskEnv) {
-  await registry.findTool("inspect_screenshot").handler(
+  await registry.findTool("get_artifact").handler(
     { path: file },
     createClient(taskEnv, async () => {
       throw new Error("fetch must not run");
@@ -31,11 +31,7 @@ const env = {
   SUPERPLANE_RUNNER_TOKEN: "token",
 };
 
-const placeholders = [
-  ["task", "check", "add", "--name", "Tests pass"],
-  ["task", "check", "remove", "--name", "Tests pass"],
-  ["task", "move", "--column", "done"],
-];
+const placeholders = [["task", "move", "--column", "done"]];
 
 test("superplane task artifact add-link attaches the url and label", async () => {
   const requests = [];
@@ -139,11 +135,11 @@ test("superplane task artifact add-file uploads an image from the evidence direc
     { write: (chunk) => { blocked += chunk; } },
   );
   assert.equal(blockedCode, 1);
-  assert.match(blocked, /inspect_screenshot/);
+  assert.match(blocked, /call get_artifact before add_artifact/);
 
   let inspected = "";
   const inspectCode = await main(
-    ["task", "evidence", "inspect", "--file", file],
+    ["task", "artifact", "get", "--path", file],
     taskEnv,
     async () => {
       throw new Error("fetch must not run");
@@ -257,10 +253,9 @@ test("superplane task artifact add-file rejects a poster for an image", async ()
   assert.match(stderr, /posterPath is only supported for video artifacts/);
 });
 
-test("superplane task artifact add-file rejects a file outside the evidence directory", async () => {
+test("superplane task artifact add-file rejects a file outside the task directory", async () => {
   const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "task-artifact-"));
-  fs.mkdirSync(path.join(taskDir, "evidence"));
-  const outside = path.join(taskDir, "login.png");
+  const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "outside-")), "login.png");
   fs.writeFileSync(outside, "png-bytes");
   let stderr = "";
   const code = await main(
@@ -274,7 +269,7 @@ test("superplane task artifact add-file rejects a file outside the evidence dire
   );
   fs.rmSync(taskDir, { recursive: true, force: true });
   assert.equal(code, 1);
-  assert.match(stderr, /artifact path must be inside the task evidence directory/);
+  assert.match(stderr, /path must be inside the task directory/);
 });
 
 test("superplane task artifact add is not a command", () => {
@@ -309,23 +304,27 @@ test("other task commands are recognized and do no work", async () => {
 
 test("task help lists a command for every global tool", async () => {
   let stdout = "";
-  const code = await main(["task", "help"], env, fetch, { write: (chunk) => { stdout += chunk; } }, { write() {} });
+  const code = await main(["task", "--help"], env, fetch, { write: (chunk) => { stdout += chunk; } }, { write() {} });
   assert.equal(code, 0);
   for (const line of [
+    "superplane task members",
     "superplane task owner suggest",
     "superplane task owner assign",
     "superplane task list",
     "superplane task create",
     "superplane task close",
     "superplane task plan",
-    "superplane task attachment inspect",
-    "superplane task evidence inspect",
     "superplane task evidence unavailable",
+    "superplane task artifact list",
+    "superplane task artifact get",
     "superplane task artifact add-link",
     "superplane task artifact add-markdown",
     "superplane task artifact add-file",
     "superplane task artifact remove",
     "superplane task check report",
+    "superplane task check list",
+    "superplane task check add",
+    "superplane task check remove",
   ]) {
     assert.match(stdout, new RegExp(line));
   }
@@ -378,6 +377,11 @@ test("each global tool command calls that tool", async () => {
   };
   const cases = [
     {
+      argv: ["task", "members"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/members",
+    },
+    {
       argv: ["task", "owner", "suggest", "--path", "pkg/a", "--path", "pkg/b"],
       method: "POST",
       url: "https://app.example/api/v1/runner/task/suggest-owners",
@@ -426,10 +430,42 @@ test("each global tool command calls that tool", async () => {
       body: { title: "Staging" },
     },
     {
+      argv: ["task", "artifact", "list", "--type", "link"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/task/artifacts?type=link",
+    },
+    {
+      argv: ["task", "artifact", "get", "--key", "staging"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/task/artifact?key=staging",
+    },
+    {
       argv: ["task", "check", "report", "--check", "Risk", "--score", "4", "--summary", "The change is small."],
       method: "POST",
       url: "https://app.example/api/v1/runner/task/merge-checks",
       body: { check: "risk", score: 4, summary: "The change is small." },
+    },
+    {
+      argv: ["task", "check", "list", "--task", "SP-1"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/checks?task=SP-1",
+    },
+    {
+      argv: [
+        "task", "check", "add", "--key", "coverage", "--name", "Coverage", "--score", "4",
+        "--max-score", "5", "--level", "positive", "--reason", "Tests cover the change.",
+      ],
+      method: "POST",
+      url: "https://app.example/api/v1/runner/task/checks",
+      body: {
+        checks: [{ key: "coverage", name: "Coverage", score: 4, max_score: 5, level: "positive", reason: "Tests cover the change." }],
+      },
+    },
+    {
+      argv: ["task", "check", "remove", "--key", "coverage", "--key", "latency"],
+      method: "DELETE",
+      url: "https://app.example/api/v1/runner/task/checks",
+      body: { keys: ["coverage", "latency"] },
     },
   ];
 
@@ -460,7 +496,7 @@ test("each global tool command calls that tool", async () => {
 
   local = "";
   const attachmentCode = await main(
-    ["task", "attachment", "inspect", "--path", attachment],
+    ["task", "artifact", "get", "--path", attachment],
     taskEnv,
     fetchImpl,
     { write: (chunk) => { local += chunk; } },
@@ -472,10 +508,34 @@ test("each global tool command calls that tool", async () => {
   assert.equal(JSON.parse(local).mimeType, "image/png");
 });
 
+test("superplane task check list uses SUPERPLANE_TASK_ID when --task is omitted", async () => {
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(url);
+    return { ok: true, status: 200, text: async () => "{}" };
+  };
+  const quiet = { write() {} };
+
+  assert.equal(await main(["task", "check", "list"], { ...env, SUPERPLANE_TASK_ID: "12" }, fetchImpl, quiet, quiet), 0);
+  assert.equal(
+    await main(["task", "check", "list", "--task", "SP-3"], { ...env, SUPERPLANE_TASK_ID: "12" }, fetchImpl, quiet, quiet),
+    0,
+  );
+  assert.deepEqual(urls, [
+    "https://app.example/api/v1/runner/checks?task=12",
+    "https://app.example/api/v1/runner/checks?task=SP-3",
+  ]);
+
+  let stderr = "";
+  const code = await main(["task", "check", "list"], env, fetchImpl, quiet, { write: (chunk) => { stderr += chunk; } });
+  assert.equal(code, 1);
+  assert.match(stderr, /usage: superplane task check list \[--task TASK\]/);
+});
+
 test("a placeholder with a missing flag does not claim to run", async () => {
   let stderr = "";
   const code = await main(
-    ["task", "check", "add"],
+    ["task", "move"],
     env,
     async () => {
       throw new Error("fetch must not run");
@@ -484,6 +544,6 @@ test("a placeholder with a missing flag does not claim to run", async () => {
     { write: (chunk) => { stderr += chunk; } },
   );
   assert.equal(code, 1);
-  assert.match(stderr, /usage: superplane task check add --name NAME/);
+  assert.match(stderr, /usage: superplane task move --column COLUMN/);
   assert.doesNotMatch(stderr, /not available yet/);
 });

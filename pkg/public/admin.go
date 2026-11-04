@@ -998,7 +998,7 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 	orgID := mux.Vars(r)["orgId"]
 	featureID := mux.Vars(r)["featureId"]
 
-	if !features.Exists(featureID) {
+	if !features.Exists(featureID) || features.IsHidden(featureID) {
 		http.Error(w, "Unknown experimental feature", http.StatusBadRequest)
 		return
 	}

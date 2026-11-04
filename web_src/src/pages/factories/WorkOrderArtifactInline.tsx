@@ -25,19 +25,20 @@ export interface WorkOrderArtifactPresentation {
 interface WorkOrderArtifactInlineProps {
   artifact: WorkOrderArtifactPresentation;
   className?: string;
+  githubHost?: string | null;
 }
 
 const artifactInlineClassName =
   "inline-flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground";
 
-export function WorkOrderArtifactInline({ artifact, className }: WorkOrderArtifactInlineProps) {
+export function WorkOrderArtifactInline({ artifact, className, githubHost }: WorkOrderArtifactInlineProps) {
   const kind = normalizeArtifactKind(artifact.type);
 
   if (kind === "markdown") {
     return <MarkdownArtifactInline artifact={artifact} className={className} />;
   }
 
-  const safeUrl = safeExternalUrl(artifactLinkUrl(kind, artifact.data));
+  const safeUrl = safeExternalUrl(artifactLinkUrl(kind, artifact.data, githubHost));
   const { icon: Icon, label, fullLabel, iconClassName } = artifactLinkPresentation(kind, artifact);
   const content = (
     <>
@@ -126,12 +127,12 @@ function artifactLinkPresentation(kind: string, artifact: WorkOrderArtifactPrese
   }
 }
 
-function artifactLinkUrl(kind: string, data: ArtifactData): string | undefined {
+function artifactLinkUrl(kind: string, data: ArtifactData, host?: string | null): string | undefined {
   const url = extractArtifactUrl(data);
   if (url || kind !== "branch") {
     return url;
   }
-  return branchTreeUrl(data);
+  return branchTreeUrl(data, host);
 }
 
 function presentation(icon: typeof FileText, label: string, iconClassName?: string): ArtifactLinkPresentation {

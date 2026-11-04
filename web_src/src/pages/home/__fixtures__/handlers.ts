@@ -150,12 +150,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Manage organization fleets and runners",
             },
             {
-              id: "claude_managed_agents",
-              label: "Managed agents",
-              description: "Canvas agent chat",
-              released: true,
-            },
-            {
               id: "factories",
               label: "Factories",
               description: "Software factories for tasks",
@@ -169,11 +163,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               id: "organization_byok_custom_provider",
               label: "Organization BYOK Custom Provider",
               description: "Add a custom model provider with a URL, token, and API type",
-            },
-            {
-              id: "codex_subscriptions",
-              label: "ChatGPT subscriptions",
-              description: "Use personal ChatGPT subscriptions for workspace tasks",
             },
             {
               id: "workspace_skills",

@@ -556,10 +556,10 @@ func publicCardFromOrder(
 	}
 	if order.State == models.FactoryWorkOrderStateDraft {
 		if planning.Confidence {
-			card.Confidence = scoreForCheck(checks, "Confidence score")
+			card.Confidence = scoreForCheck(checks, models.PlanningConfidenceCheckKey)
 		}
 		if planning.Clarity {
-			card.Clarity = scoreForCheck(checks, "Clarity score")
+			card.Clarity = scoreForCheck(checks, models.PlanningClarityCheckKey)
 		}
 		card.AgentQuestion = sessionHasAgentQuestion(session)
 	}
@@ -657,9 +657,9 @@ func assigneeAvatarURLs(orders []models.FactoryWorkOrder) map[uuid.UUID]string {
 	return avatars
 }
 
-func scoreForCheck(checks []models.FactoryWorkOrderCheck, name string) *int {
+func scoreForCheck(checks []models.FactoryWorkOrderCheck, key string) *int {
 	for _, check := range checks {
-		if check.Name != name {
+		if check.Key != key {
 			continue
 		}
 		score := check.Score

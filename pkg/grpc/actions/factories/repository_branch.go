@@ -104,6 +104,13 @@ func sameRepository(left, right string) bool {
 	return strings.EqualFold(strings.TrimSpace(left), strings.TrimSpace(right))
 }
 
+func vcsConnectionChanged(current models.FactoryOnboardingConfig, patch models.FactoryOnboardingPatch) bool {
+	if patch.VCSIntegrationID == nil {
+		return false
+	}
+	return strings.TrimSpace(*patch.VCSIntegrationID) != strings.TrimSpace(current.VCSIntegrationID)
+}
+
 func ensureGitHubBranch(
 	ctx context.Context,
 	deps IntakeDependencies,
@@ -300,11 +307,12 @@ func verifiedOnboardingDefaultBranch(
 	}
 	current := factory.OnboardingConfigValue()
 	repositoryChanged := patch.AppRepository != nil && !sameRepository(current.AppRepository, *patch.AppRepository)
+	connectionChanged := vcsConnectionChanged(current, patch)
 	if patch.DefaultBranch == nil || strings.TrimSpace(*patch.DefaultBranch) == "" {
 		// A new repository must not keep the previous repository's branch.
 		// Use the provider default when it is available. Leave the branch
 		// empty when that lookup fails so the user can choose one.
-		if repositoryChanged {
+		if repositoryChanged || connectionChanged {
 			branch := onboardingProviderDefaultBranch(ctx, deps, db, orgID, organizationID, factory, patch)
 			if branch == "" {
 				empty := ""
@@ -323,10 +331,11 @@ func verifiedOnboardingDefaultBranch(
 	if err != nil {
 		return patch, err
 	}
-	// A saved branch belongs to the current repository. A different
-	// repository must not keep that name when the provider lookup fails.
+	// A saved branch belongs to the current repository on the current
+	// Git connection. A different repository or GitHub connection must
+	// not keep that name when the provider lookup fails.
 	saved := ""
-	if sameRepository(current.AppRepository, merged.AppRepository) {
+	if sameRepository(current.AppRepository, merged.AppRepository) && !connectionChanged {
 		saved = strings.TrimSpace(current.DefaultBranch)
 	}
 	check := onboardingBranchVerification(ctx, deps, db, orgID, organizationID, merged, requested)

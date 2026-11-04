@@ -63,21 +63,6 @@ func GenerateFiles() ([]File, error) {
 	return files, nil
 }
 
-func GenerateComponentIndexFile() (File, error) {
-	reg, err := registry.NewRegistry(crypto.NewNoOpEncryptor(), registry.HTTPOptions{})
-	if err != nil {
-		return File{}, err
-	}
-
-	integrations := reg.ListIntegrations()
-	sort.Slice(integrations, func(i, j int) bool {
-		return integrations[i].Label() < integrations[j].Label()
-	})
-
-	content := renderComponentIndex(reg.ListActions(), reg.ListTriggers(), integrations)
-	return File{Name: "Index.md", Content: content}, nil
-}
-
 func WriteFiles(outputDir string) error {
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return err
@@ -140,89 +125,6 @@ func renderCoreComponentsDoc(actions []core.Action, triggers []core.Trigger) ([]
 	writeTriggerSection(&buf, triggers)
 	writeActionSection(&buf, actions)
 	return buf.Bytes(), nil
-}
-
-func renderComponentIndex(actions []core.Action, triggers []core.Trigger, integrations []core.Integration) []byte {
-	sort.Slice(actions, func(i, j int) bool { return actions[i].Name() < actions[j].Name() })
-	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
-
-	var buf bytes.Buffer
-	buf.WriteString("# SuperPlane Component Index\n\n")
-	buf.WriteString("Fast lookup for canvas YAML keys. Use this before searching full component docs.\n\n")
-
-	writeIndexEntries(&buf, "Core Triggers", "Trigger", triggerIndexEntries(triggers))
-	writeIndexEntries(&buf, "Core Actions", "Component", actionIndexEntries(actions))
-
-	for _, integration := range integrations {
-		integrationTriggers := integration.Triggers()
-		integrationActions := integration.Actions()
-		sort.Slice(integrationTriggers, func(i, j int) bool { return integrationTriggers[i].Name() < integrationTriggers[j].Name() })
-		sort.Slice(integrationActions, func(i, j int) bool { return integrationActions[i].Name() < integrationActions[j].Name() })
-
-		writeIndexEntries(
-			&buf,
-			fmt.Sprintf("%s Triggers", integration.Label()),
-			"Trigger",
-			triggerIndexEntries(integrationTriggers),
-		)
-		writeIndexEntries(
-			&buf,
-			fmt.Sprintf("%s Actions", integration.Label()),
-			"Component",
-			actionIndexEntries(integrationActions),
-		)
-	}
-
-	return buf.Bytes()
-}
-
-type componentIndexEntry struct {
-	Key         string
-	Label       string
-	Description string
-}
-
-func actionIndexEntries(actions []core.Action) []componentIndexEntry {
-	entries := make([]componentIndexEntry, 0, len(actions))
-	for _, action := range actions {
-		entries = append(entries, componentIndexEntry{
-			Key:         action.Name(),
-			Label:       action.Label(),
-			Description: action.Description(),
-		})
-	}
-	return entries
-}
-
-func triggerIndexEntries(triggers []core.Trigger) []componentIndexEntry {
-	entries := make([]componentIndexEntry, 0, len(triggers))
-	for _, trigger := range triggers {
-		entries = append(entries, componentIndexEntry{
-			Key:         trigger.Name(),
-			Label:       trigger.Label(),
-			Description: trigger.Description(),
-		})
-	}
-	return entries
-}
-
-func writeIndexEntries(buf *bytes.Buffer, title, keyLabel string, entries []componentIndexEntry) {
-	if len(entries) == 0 {
-		return
-	}
-
-	buf.WriteString(fmt.Sprintf("## %s\n\n", title))
-	buf.WriteString(fmt.Sprintf("| Label | %s key | Description |\n", keyLabel))
-	buf.WriteString("| --- | --- | --- |\n")
-	for _, entry := range entries {
-		buf.WriteString(fmt.Sprintf(
-			"| %s | `%s` | %s |\n",
-			escapeTableCell(entry.Label),
-			entry.Key,
-			escapeTableCell(entry.Description),
-		))
-	}
-	buf.WriteString("\n")
 }
 
 func writeFrontMatter(buf *bytes.Buffer, title string, order *int) {
@@ -440,9 +342,4 @@ func integrationFilename(integration core.Integration) string {
 
 func escapeQuotes(value string) string {
 	return strings.ReplaceAll(value, "\"", "\\\"")
-}
-
-func escapeTableCell(value string) string {
-	value = strings.ReplaceAll(strings.TrimSpace(value), "\n", " ")
-	return strings.ReplaceAll(value, "|", "\\|")
 }

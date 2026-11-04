@@ -3,7 +3,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AppPage } from "./index";
 import { AppPageHarness } from "./__fixtures__/AppPageHarness";
 import { canvasAppIds } from "./__fixtures__/handlers";
-import { softwareFactoryAgentSuggestions } from "./__fixtures__/softwareFactoryAgentSuggestions";
 
 /**
  * Mounts the real `AppPage` orchestrator against an in-process fixture backend
@@ -18,7 +17,7 @@ import { softwareFactoryAgentSuggestions } from "./__fixtures__/softwareFactoryA
  * on a Service Worker, which is silently disabled in non-secure contexts
  * (opening Storybook via a LAN IP instead of `localhost`), causing every
  * request to escape to the live API. The fetch override has no such dependency,
- * so the graph, runs sidebar, versions, agent chat, and run inspector render
+ * so the graph, runs sidebar, versions, and run inspector render
  * deterministic fake data however Storybook is opened.
  */
 const meta = {
@@ -35,20 +34,9 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Software Factory app opened on the Console tab.
- * Agent chat is enabled (header Agent toggle) but starts closed.
- * Shows a prototype Agent suggestions badge/hover card for post-install ideas.
  */
 export const LiveCanvas: Story = {
-  render: () => <AppPageHarness query="view=console" agentSuggestions={softwareFactoryAgentSuggestions} />,
-};
-
-/**
- * AI chat: same Software Factory canvas with the agent sidebar open and a
- * seeded transcript (user + assistant turns).
- */
-export const AIChat: Story = {
-  name: "AI Chat",
-  render: () => <AppPageHarness openAgentSidebar />,
+  render: () => <AppPageHarness query="view=console" />,
 };
 
 /**

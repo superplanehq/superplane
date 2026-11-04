@@ -10,6 +10,10 @@ const (
 	FeatureCustomRoles Feature = "custom_roles"
 	FeatureGroups      Feature = "groups"
 
+	// FeatureGitHubEnterprise grants GitHub Enterprise Cloud (ghe.com) and
+	// GitHub Enterprise Server connections. The key is permanent.
+	FeatureGitHubEnterprise Feature = "github_enterprise"
+
 	// FeatureAuditLogs is a defined Enterprise entitlement without a product
 	// implementation yet.
 	FeatureAuditLogs Feature = "audit_logs"
@@ -18,6 +22,7 @@ const (
 var recognizedFeatures = []Feature{
 	FeatureAuditLogs,
 	FeatureCustomRoles,
+	FeatureGitHubEnterprise,
 	FeatureGroups,
 }
 

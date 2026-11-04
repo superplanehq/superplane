@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Radio } from "lucide-react";
-import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
+import { RUNS_SIDEBAR_ROW_CLASS } from "@/lib/runsSidebarRowLayout";
 
 interface LiveCanvasSidebarRowProps {
   isSelected: boolean;

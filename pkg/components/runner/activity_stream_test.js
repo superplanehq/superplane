@@ -204,7 +204,7 @@ test("omits MCP image data from activity tool output", () => {
     writeRecord: (record) => records.push(record),
   });
 
-  stream.startTool({ id: "tool-1", kind: "mcp", input: "inspect_screenshot" });
+  stream.startTool({ id: "tool-1", kind: "mcp", input: "get_artifact" });
   stream.appendToolOutput(
     "tool-1",
     JSON.stringify({ content: [{ type: "image", data: encodedImage, mimeType: "image/png" }] }),

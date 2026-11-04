@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
-  isFactoryAppAgentPanelOpen,
   isFactoryAppAgentPromptOpen,
   isFactoryAppComponentsOpen,
   isFactoryAppConfigureMode,
@@ -39,7 +38,6 @@ export function useFactoryAppCanvasRoute() {
   const isConfigure = isFactoryAppConfigureMode(searchParams);
   const agentPromptOpen = isFactoryAppAgentPromptOpen(searchParams);
   const yamlViewOpen = isFactoryAppYamlViewOpen(searchParams);
-  const agentOpen = isFactoryAppAgentPanelOpen(searchParams);
   const componentsOpen = isFactoryAppComponentsOpen(searchParams);
   const lineName = useMemo(() => resolveFactoryLineName(factory?.lines, lineId), [factory?.lines, lineId]);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
@@ -86,7 +84,6 @@ export function useFactoryAppCanvasRoute() {
     isConfigure,
     agentPromptOpen,
     yamlViewOpen,
-    agentOpen,
     componentsOpen,
     back,
     shouldRedirect,

@@ -105,11 +105,14 @@ func TestRunnerAdmissionRejectsQueuedModelRemovedFromWorkspace(t *testing.T) {
 }
 
 func TestRunnerAdmissionRejectsInvalidSubscriptionAndContinuesFleetScan(t *testing.T) {
-	for _, reason := range []string{"revoked lease", "disconnected connection", "missing connection", "missing owner", "unavailable model", "workspace disables subscription models", "blank queued model under restriction", "missing task association"} {
+	for _, reason := range []string{"factories disabled", "revoked lease", "disconnected connection", "missing connection", "missing owner", "unavailable model", "workspace disables subscription models", "blank queued model under restriction", "missing task association"} {
 		t.Run(reason, func(t *testing.T) {
 			db, connection, rejected, runner, order := queuedSubscriptionRunnerTask(t)
 			expectedError := models.ErrCodexConnectionStale
 			switch reason {
+			case "factories disabled":
+				expectedError = models.ErrCodexConnectionUnavailable
+				require.NoError(t, models.DisableExperimentalFeature(connection.OrganizationID, features.FeatureFactories))
 			case "revoked lease":
 				require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", rejected.ID).Update("revoked_at", time.Now()).Error)
 			case "disconnected connection":
@@ -164,7 +167,11 @@ func TestRunnerAdmissionRejectsInvalidSubscriptionAndContinuesFleetScan(t *testi
 				assert.Contains(t, *stored.ErrorMessage, "No ChatGPT models are enabled")
 				assert.Contains(t, *stored.ErrorMessage, "Update Models in workspace settings")
 			}
-			assert.Contains(t, *stored.ErrorMessage, expectedError.Error())
+			if reason == "unavailable model" {
+				assert.Equal(t, "Model \"removed-model\" is not available for the current task owner.", *stored.ErrorMessage)
+			} else {
+				assert.Contains(t, *stored.ErrorMessage, expectedError.Error())
+			}
 			assert.NotNil(t, stored.FinishedAt)
 			assert.Nil(t, stored.RunnerID)
 			assert.Empty(t, codexLeases(t, db, connection.ID))

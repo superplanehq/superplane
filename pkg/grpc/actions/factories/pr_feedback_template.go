@@ -86,9 +86,6 @@ type prFeedbackBuildRequest struct {
 	TriggerSettings        map[string]*factoryTriggerSettings
 	// VCSProvider selects the Git host. Empty means GitHub.
 	VCSProvider string
-	// OmitCommitIdentity drops the git user and DCO steps. The factory git
-	// wrapper already sets the agent identity and the sign-off hook.
-	OmitCommitIdentity bool
 }
 
 // prFeedbackVCSProvider normalizes the request host. Bitbucket canvases use
@@ -655,10 +652,7 @@ func prFeedbackCommitIdentitySteps() []any {
 }
 
 func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
-	steps := []any{}
-	if !request.OmitCommitIdentity {
-		steps = append(steps, prFeedbackCommitIdentitySteps()...)
-	}
+	steps := prFeedbackCommitIdentitySteps()
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return append(steps, prFeedbackBitbucketWorkSteps(request)...)
 	}
@@ -673,16 +667,23 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 			"name":             "Commit and Push",
 			"type":             "bash",
 			"workingDirectory": "repo",
-			"command": strings.Join([]string{
-				"set -euo pipefail",
-				"git add -A",
-				"if ! git diff --cached --quiet; then",
-				`  git commit -s -m "fix: address PR #${PR_NUMBER} feedback"`,
-				"  git push origin HEAD",
-				"fi",
-			}, "\n"),
+			"command": strings.Join(append([]string{"set -euo pipefail"},
+				prFeedbackCommitPushLines("fix: address PR #${PR_NUMBER} feedback", "git push origin HEAD")...), "\n"),
 		},
 	)
+}
+
+func prFeedbackCommitPushLines(message, push string) []string {
+	return []string{
+		"git add -A",
+		"if ! git diff --cached --quiet; then",
+		`  git commit -s -m "` + message + `"`,
+		"fi",
+		`FACTORY_CHECKOUT_HEAD=$(cat "$(git rev-parse --git-path superplane-checkout-head)")`,
+		`if [ "$(git rev-parse HEAD)" != "${FACTORY_CHECKOUT_HEAD}" ]; then`,
+		"  " + push,
+		"fi",
+	}
 }
 
 // prFeedbackBitbucketWorkSteps pushes to the pull request source
