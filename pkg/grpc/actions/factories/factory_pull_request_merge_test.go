@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -26,7 +27,9 @@ import (
 )
 
 type fakeFactoryGitHub struct {
-	pullRequest   *github.PullRequest
+	pullRequest *github.PullRequest
+	// pullRequests returns a pull request by "owner/name#number" when set.
+	pullRequests  map[string]*github.PullRequest
 	combined      *github.CombinedStatus
 	combinedPages []*github.CombinedStatus
 	checkRuns     *github.ListCheckRunsResults
@@ -46,9 +49,12 @@ type fakeFactoryGitHub struct {
 	repositoryErr error
 }
 
-func (f *fakeFactoryGitHub) GetPullRequest(context.Context, string, int) (*github.PullRequest, *github.Response, error) {
+func (f *fakeFactoryGitHub) GetPullRequest(_ context.Context, repository string, number int) (*github.PullRequest, *github.Response, error) {
 	if f.getPullErr != nil {
 		return nil, nil, f.getPullErr
+	}
+	if f.pullRequests != nil {
+		return f.pullRequests[repository+"#"+strconv.Itoa(number)], nil, nil
 	}
 	return f.pullRequest, nil, nil
 }

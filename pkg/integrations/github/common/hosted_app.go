@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	githubauth "github.com/google/go-github/v75/github"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -63,12 +65,21 @@ func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to list repositories granted to the GitHub App binding: %w", err)
 	}
-	if len(repositories) == 0 {
-		return nil, fmt.Errorf("hosted GitHub integration has no granted repositories")
-	}
 	repositoryIDs := make([]int64, 0, len(repositories))
 	for _, repository := range repositories {
 		repositoryIDs = append(repositoryIDs, repository.RepositoryID)
+	}
+	contextRepositoryIDs, err := bindingContextRepositoryIDs(binding)
+	if err != nil {
+		return nil, err
+	}
+	for _, repositoryID := range contextRepositoryIDs {
+		if !slices.Contains(repositoryIDs, repositoryID) {
+			repositoryIDs = append(repositoryIDs, repositoryID)
+		}
+	}
+	if len(repositoryIDs) == 0 {
+		return nil, fmt.Errorf("hosted GitHub integration has no granted repositories")
 	}
 	app, ok := ResolveHostedApp(context.Background())
 	if !ok {
@@ -80,6 +91,31 @@ func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, er
 		ID:            binding.InstallationID,
 		RepositoryIDs: repositoryIDs,
 	}, nil
+}
+
+// bindingContextRepositoryIDs adds the workspace context repositories to the
+// token. Saved grants can miss them: connections from before agents changed
+// context repositories, and names that the catalog learns after the last
+// grant sync. A name missing from the catalog schedules an installation
+// refresh, so a later run can include it.
+func bindingContextRepositoryIDs(binding *models.VCSProviderIntegrationBinding) ([]int64, error) {
+	repositoryIDs, missing, err := models.MatchBindingContextRepositoryIDs(database.Conn(), binding.IntegrationID, binding.InstallationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to match context repositories: %w", err)
+	}
+	if len(missing) == 0 {
+		return repositoryIDs, nil
+	}
+	if err := models.EnqueueVCSProviderInstallationReconciliation(
+		database.Conn(),
+		models.ProviderGitHub,
+		binding.InstallationID,
+		binding.OrganizationID,
+		time.Now(),
+	); err != nil {
+		log.WithError(err).Warnf("failed to refresh GitHub installation %d for context repositories", binding.InstallationID)
+	}
+	return repositoryIDs, nil
 }
 
 func RestrictHostedAppTransport(transport *ghinstallation.Transport, repositoryIDs []int64) error {

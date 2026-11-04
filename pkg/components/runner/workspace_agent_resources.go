@@ -38,10 +38,6 @@ const (
 	// Implement sets it on the node environment. Pull request checkouts
 	// leave it off so the helper never pushes an initial commit.
 	WorkspaceCheckoutCommitSetupEnv = "CHECKOUT_COMMIT_SETUP"
-	// GitHubContextTokenEnv is the read-only installation token used to
-	// clone context repositories. The GitHub integration sets it. The
-	// write token in GITHUB_TOKEN stays on the workspace repository.
-	GitHubContextTokenEnv = "SUPERPLANE_GITHUB_CONTEXT_TOKEN"
 )
 
 type workspaceMCPServer struct {
@@ -312,7 +308,7 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 			githubHost = host.WebHostname()
 		}
 	}
-	repos := make([]workspaceContextRepository, 0, len(resources))
+	repos := make([]workspaceContextRepository, 0, len(resources)+1)
 	for i := range resources {
 		config := resources[i].Config.Data()
 		repository := strings.TrimSpace(config.Repository)
@@ -336,6 +332,9 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 	if len(repos) == 0 {
 		return files
 	}
+	if primary, ok := workspacePrimaryContextRepository(factory, factoryProvider, githubHost); ok {
+		repos = append([]workspaceContextRepository{primary}, repos...)
+	}
 	payload, err := json.Marshal(workspaceContextFile{Repositories: repos})
 	if err != nil {
 		return files
@@ -347,14 +346,33 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 	})
 }
 
+// workspacePrimaryContextRepository lists the primary repository next to the
+// context repositories. A pull request run in another workspace repository
+// checks that repository out in repo/, so the primary still needs a clone.
+func workspacePrimaryContextRepository(factory *models.Factory, provider, githubHost string) (workspaceContextRepository, bool) {
+	if factory == nil {
+		return workspaceContextRepository{}, false
+	}
+	repository := strings.TrimSpace(factory.OnboardingConfigValue().AppRepository)
+	if repository == "" {
+		return workspaceContextRepository{}, false
+	}
+	return workspaceContextRepository{
+		Name:       models.NormalizeContextRepoName(repository),
+		Repository: repository,
+		URL:        WorkspaceContextRepoURL(provider, repository, githubHost),
+		Directory:  WorkspaceContextRepoDirectory(repository),
+	}, true
+}
+
 // WorkspaceCheckoutScript is the checkout command the runner inserts before
 // factory agent steps. It checks out the main repo to repo/, positions a
 // pull request when the task environment describes one, then clones every
 // workspace_context.json entry. Setup commands are separate steps.
-// Authentication for the main repository comes from the VCS integration
+// Authentication for every repository comes from the VCS integration
 // setup that already ran (gh auth setup-git / Bitbucket credential
-// helper). GitHub context repositories use a read-only token from
-// SUPERPLANE_GITHUB_CONTEXT_TOKEN and skip the write credential helper.
+// helper), so the agent can push to each workspace repository. The entry
+// for the repository already checked out in repo/ is skipped.
 // The script uses plain HTTPS URLs and never embeds tokens. It is idempotent: directories
 // that already contain a checkout are reused, never wiped. The factory
 // commit setup (agent git identity, trailer hook, branch handling) runs
@@ -642,19 +660,8 @@ if [ -f "$ctx" ]; then
     echo "node not found on PATH; skipping context repositories" >&2
   else
     _sp_tab="$(printf '\t')"
-    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();if(u&&dir){console.log(u+"\t"+dir);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx")" || exit 1
+    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];const main=(process.argv[2]||"").trim().toLowerCase();for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();const repo=((e&&e.repository)||"").trim().toLowerCase();if(main&&repo===main){continue;}if(u&&dir){console.log(u+"\t"+dir);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx" "${REPO:-}")" || exit 1
     if [ -n "$_sp_ctx_list" ]; then
-      clone_context_repository() {
-        case "$1" in
-          ` + githubcommon.DotCom().WebURL() + `/*|https://www.` + githubcommon.DotCom().WebHostname() + `/*)
-            if [ -n "${` + GitHubContextTokenEnv + `:-}" ]; then
-              git -c credential.helper= -c 'credential.helper=!f() { echo username=superplane; echo "password=$` + GitHubContextTokenEnv + `"; }; f' clone --depth 1 "$1" "$2"
-              return
-            fi
-            ;;
-        esac
-        git clone --depth 1 "$1" "$2"
-      }
       printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir; do
         case "$dir" in
           ""|"."|"/"|*..*)
@@ -674,7 +681,7 @@ if [ -f "$ctx" ]; then
         fi
         mkdir -p "$(dirname "$dir")"
         rm -rf "$dir"
-        clone_context_repository "$url" "$dir" || exit 1
+        git clone --depth 1 "$url" "$dir" || exit 1
       done
     fi
     unset _sp_tab _sp_ctx_list
@@ -756,8 +763,8 @@ func taskShipsCheckout(files []TaskFile) bool {
 const (
 	setupHintPending   = "\nSetup commands (run in repo/ after clone, in order): "
 	setupHintDone      = "\nSetup commands already ran in repo/ after checkout, in order: "
-	contextHintPending = "\nCheckout: run `checkout` to check out repo/ and the context repositories. From repo/, read: "
-	contextHintDone    = "\nContext repositories are already checked out next to repo/. From repo/, read: "
+	contextHintPending = "\nCheckout: run `checkout` to check out repo/ and the other workspace repositories. From repo/, they are at: "
+	contextHintDone    = "\nThe other workspace repositories are already checked out next to repo/. From repo/, they are at: "
 )
 
 // ApplyFactoryCheckout inserts the checkout command after setup and before

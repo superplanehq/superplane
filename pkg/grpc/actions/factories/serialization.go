@@ -1008,5 +1008,10 @@ func serializePendingHandOff(order *models.FactoryWorkOrder) *pb.PendingHandOff 
 		return nil
 	}
 	pending := order.PendingHandOff.Data()
-	return &pb.PendingHandOff{LineId: pending.LineID.String(), Column: pending.Column, PullRequestUrl: pending.PullRequestURL}
+	return &pb.PendingHandOff{
+		LineId:          pending.LineID.String(),
+		Column:          pending.Column,
+		PullRequestUrl:  pending.PullRequestURL,
+		PullRequestUrls: pending.URLs(),
+	}
 }
