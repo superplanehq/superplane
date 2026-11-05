@@ -56,7 +56,7 @@ func IsOrganizationPinnedForAccount(tx *gorm.DB, accountID, organizationID uuid.
 	return count > 0, nil
 }
 
-func ListPinnedOrganizationsForAccount(tx *gorm.DB, accountID uuid.UUID) ([]OrganizationWithCounts, error) {
+func ListPinnedOrganizationsForAccount(tx *gorm.DB, accountID uuid.UUID, planKey string) ([]OrganizationWithCounts, error) {
 	query := withOrganizationCounts(tx, tx.Model(&Organization{}).
 		Joins(
 			"JOIN installation_admin_organization_pins ON installation_admin_organization_pins.organization_id = organizations.id AND installation_admin_organization_pins.account_id = ?",
@@ -73,5 +73,5 @@ func ListPinnedOrganizationsForAccount(tx *gorm.DB, accountID uuid.UUID) ([]Orga
 		return nil, err
 	}
 
-	return organizations, nil
+	return filterOrganizationsByPlan(tx, organizations, planKey)
 }
