@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,14 +34,22 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	db := database.DB(t.Context())
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
-	env := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{{Name: runner.EnvSuperplaneRunnerToken, Value: "untrusted"}}, 60, nil)
+	env := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
+		{Name: runner.EnvSuperplaneRunnerToken, Value: "untrusted"},
+		{Name: runner.EnvSuperplaneTaskID, Value: "untrusted"},
+	}, 60, nil)
 	token := runnerTokenFrom(env)
 	require.NotEmpty(t, token)
 	require.NotEqual(t, "untrusted", token)
 	assert.False(t, runner.HasArtifactUploadToken(env))
+	var taskIDs []string
 	for _, item := range env {
 		assert.NotEqual(t, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN", item.Name)
+		if item.Name == runner.EnvSuperplaneTaskID {
+			taskIDs = append(taskIDs, item.Value)
+		}
 	}
+	assert.Equal(t, []string{strconv.FormatInt(order.Number, 10)}, taskIDs, "the CLI defaults --task to the run's task")
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
 	t.Run("code history follows the saved task repository", func(t *testing.T) {
 		integration := models.NewIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), nil)

@@ -5,6 +5,7 @@ import { overlayHeaderSpend } from "@/lib/overlayHeaderSpend";
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 import { type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
@@ -150,7 +151,7 @@ export function ConsoleSummaryPanel({
               onOwnerSave={onOwnerSave}
             />
           </SummaryRow>
-          <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
+          <StartSummaryRow fixture={fixture} />
           {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
             <OwnerSpendValue
@@ -163,6 +164,31 @@ export function ConsoleSummaryPanel({
         </FramePanel>
       </Frame>
     </aside>
+  );
+}
+
+function StartSummaryRow({ fixture }: { fixture: SplitRunFixture }) {
+  return (
+    <SummaryRow label={fixture.autoStarted ? "Auto-started" : "Started"} truncate={false}>
+      <span className="inline-flex items-center gap-1.5 tabular-nums">
+        {fixture.startedBy && !fixture.autoStarted ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                tabIndex={0}
+                role="img"
+                aria-label={`Started by ${fixture.startedBy.name}`}
+                className="inline-flex shrink-0"
+              >
+                <OrgUserReference display={fixture.startedBy} size="xs" showName={false} />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Started by {fixture.startedBy.name}</TooltipContent>
+          </Tooltip>
+        ) : null}
+        {fixture.startedLabel.replace(/^Started\s+/i, "")}
+      </span>
+    </SummaryRow>
   );
 }
 

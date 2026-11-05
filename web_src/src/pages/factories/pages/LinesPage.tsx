@@ -1,3 +1,4 @@
+import { PullRequestImportPicker } from "./PullRequestImportPicker";
 import { IntakeOwnerCreationDialog } from "./IntakeOwnerCreationDialog";
 import { SubscriptionIntakeOwnerRecovery } from "./SubscriptionIntakeOwnerRecovery";
 import type {
@@ -46,6 +47,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import {
+  customAutomationAllowsManualStart,
   customAutomationMode,
   CUSTOM_AUTOMATION_TEMPLATE_ID,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
@@ -1144,13 +1146,27 @@ function LineDetail({
         ...app,
         customAutomationMode: app.id ? customAutomationModes.get(app.id) : undefined,
         customAutomationIcon: app.id ? customAutomationIcons.get(app.id) : undefined,
+        customAutomationCronExpression: customAutomationDetails.find(({ automationId }) => automationId === app.id)
+          ?.automation.settings?.schedule?.cronExpression,
+        customAutomationTriggers: (() => {
+          const triggers = customAutomationDetails.find(({ automationId }) => automationId === app.id)?.automation
+            .settings?.triggers;
+          if (!triggers || triggers.length < 2) {
+            return undefined;
+          }
+          return triggers.flatMap((trigger) =>
+            trigger.startMode
+              ? [{ mode: customAutomationMode(trigger.startMode), cronExpression: trigger.schedule?.cronExpression }]
+              : [],
+          );
+        })(),
       })),
-    [apps, customAutomationIcons, customAutomationModes],
+    [apps, customAutomationDetails, customAutomationIcons, customAutomationModes],
   );
   const manualCustomAutomations = useMemo<ManualCustomAutomation[]>(
     () =>
       customAutomationDetails.flatMap(({ automationId, automation }) =>
-        customAutomationMode(automation.settings?.startMode) === "manual"
+        customAutomationAllowsManualStart(automation.settings)
           ? [
               {
                 id: automationId,
@@ -1735,6 +1751,16 @@ function PhaseBoard({
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
         <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
         <VerifyColumn
+          importPicker={
+            lineId ? (
+              <PullRequestImportPicker
+                organizationId={organizationId}
+                factoryId={factoryId}
+                lineId={lineId}
+                onOpenTask={onOpenWorkOrder}
+              />
+            ) : undefined
+          }
           orders={verifyOrders}
           title={verifyTitle}
           scrollPersistenceKey={lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, "verify") : undefined}
@@ -1781,6 +1807,7 @@ function PhaseBoard({
 }
 
 function VerifyColumn({
+  importPicker,
   orders,
   title,
   listeners,
@@ -1800,6 +1827,7 @@ function VerifyColumn({
   cardsPending,
   scrollPersistenceKey,
 }: {
+  importPicker?: ReactNode;
   orders: FactoriesWorkOrder[];
   title: string;
   listeners: LaneListener[];
@@ -1842,6 +1870,7 @@ function VerifyColumn({
       className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
+          {importPicker}
           {automationRowCount ? null : (
             <ColumnAutomationsHeaderSlot
               title={title}

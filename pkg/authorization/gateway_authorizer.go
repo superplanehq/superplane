@@ -83,6 +83,20 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 		return nil, status.Error(codes.NotFound, "Not found")
 	}
 
+	// Some operations both create and dispatch a resource.
+	for _, action := range rule.RequiredActions {
+		additional := rule
+		additional.Action = action
+		additional.LegacyActions = nil
+		allowed, err := checkOrganizationRulePermission(ctx, a.auth, userID, organizationID, additional)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed || !HasRequiredScopedTokenPermissionForScopes(firstHTTPHeader(r, "x-token-scopes"), pathParams, additional) {
+			return nil, status.Error(codes.NotFound, "Not found")
+		}
+	}
+
 	if err := checkRequiredExperimentalFeatures(ctx, organizationID, rule); err != nil {
 		log.Warnf(
 			"User %s tried to access %s:%s in organization %s without required experimental feature",

@@ -194,7 +194,8 @@ func loadExamples() (map[string]exampleRecord, error) {
 		}
 	}
 
-	for _, action := range reg.ListActions() {
+	// Validate registered actions even when the component catalog hides them.
+	for _, action := range reg.Actions {
 		add(nodeKindAction, action.Name(), cloneMap(action.ExampleOutput()))
 	}
 

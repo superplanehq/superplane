@@ -41,8 +41,8 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "custom-verification",
     iconName: "sparkles",
-    name: "Custom automation",
-    description: "Run prompt and Bash steps for a Backlog task.",
+    name: "Build your own",
+    description: "Run prompt and Bash steps, or create tasks on a schedule.",
     featureId: FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   },
   {
@@ -93,7 +93,7 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "linear-issues",
     name: "Linear issues",
-    description: "Create a task when a Linear issue is added to a selected project.",
+    description: "Create a task when a Linear issue is created in the selected team.",
     iconSrc: linearIcon,
   },
   {

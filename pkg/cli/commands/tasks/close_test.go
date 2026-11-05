@@ -55,9 +55,10 @@ func TestCloseTaskSendsTheResult(t *testing.T) {
 }
 
 func TestCloseTaskRequiresTask(t *testing.T) {
+	t.Setenv(TaskIDEnv, "")
 	workspace := "factory-1"
 	err := (&taskCloseCommand{workspace: &workspace}).Execute(core.CommandContext{})
-	require.EqualError(t, err, "--task is required")
+	require.EqualError(t, err, "--task is required (or set SUPERPLANE_TASK_ID)")
 }
 
 func TestCloseTaskRejectsAnUnknownResult(t *testing.T) {

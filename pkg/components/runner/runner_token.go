@@ -14,6 +14,9 @@ import (
 const (
 	RunnerTokenPurpose       = "runner_run"
 	EnvSuperplaneRunnerToken = "SUPERPLANE_RUNNER_TOKEN"
+	// EnvSuperplaneTaskID is the number of the task of the run. The task CLI
+	// uses it when a command needs a task and the caller gives none.
+	EnvSuperplaneTaskID = "SUPERPLANE_TASK_ID"
 )
 
 // RunnerScope is the signed identity of one agent run. The global runner MCP
@@ -52,7 +55,7 @@ func (s RunnerScope) complete() error {
 	if s.Flow == RunnerFlowPlanning && s.PlanningSessionID == uuid.Nil {
 		return fmt.Errorf("planning runner scope needs a planning session")
 	}
-	if s.Flow != RunnerFlowPlanning && s.WorkOrderID == uuid.Nil {
+	if s.Flow != RunnerFlowPlanning && s.Flow != RunnerFlowSchedule && s.WorkOrderID == uuid.Nil {
 		return fmt.Errorf("runner scope needs a task")
 	}
 	return nil

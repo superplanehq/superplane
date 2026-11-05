@@ -8,6 +8,7 @@ import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Link, useNavigate } from "react-router";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
+import { OrganizationPlanFilter } from "./OrganizationPlanFilter";
 import { formatDate } from "./formatDate";
 import { SortableHeader, type SortDirection } from "./SortableHeader";
 import {
@@ -346,15 +347,6 @@ const OrganizationsList: React.FC = () => {
   const hasOrganizations = list.organizations.length > 0 || list.pinnedOrganizations.length > 0;
   useReportPageReady(!list.loading || hasOrganizations);
 
-  if (list.loading && !hasOrganizations) {
-    return (
-      <div className="flex flex-col items-center space-y-4 py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
-        <Text className="text-gray-500 dark:text-gray-400">Loading organizations...</Text>
-      </div>
-    );
-  }
-
   return (
     <div>
       <AdminSearchHeader
@@ -363,6 +355,7 @@ const OrganizationsList: React.FC = () => {
         search={list.search}
         onSearchChange={list.setSearch}
         placeholder="Search by name or ID..."
+        filters={<OrganizationPlanFilter planKey={list.planKey} onPlanChange={list.setPlanKey} />}
       />
       {list.pinError ? <Text className="mb-3 text-sm text-red-600 dark:text-red-400">{list.pinError}</Text> : null}
       {list.listError ? (
@@ -373,10 +366,17 @@ const OrganizationsList: React.FC = () => {
           </Button>
         </div>
       ) : null}
-      {!hasOrganizations ? (
+      {list.loading && !hasOrganizations ? (
+        <div className="flex flex-col items-center space-y-4 py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
+          <Text className="text-gray-500 dark:text-gray-400">Loading organizations...</Text>
+        </div>
+      ) : !hasOrganizations ? (
         <div className="text-center py-12">
           <Text className="text-gray-500 dark:text-gray-400">
-            {list.search ? "No organizations match your search." : "No organizations found."}
+            {list.search || list.planKey
+              ? "No organizations match your filters. Change the plan or search and try again."
+              : "No organizations found."}
           </Text>
         </div>
       ) : (
