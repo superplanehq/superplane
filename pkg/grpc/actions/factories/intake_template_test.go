@@ -1,9 +1,11 @@
 package factories
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/expr-lang/expr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	dependabotcomp "github.com/superplanehq/superplane/pkg/integrations/github/components/dependabot"
@@ -12,6 +14,32 @@ import (
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+func TestSentryIntakeUsesEnrichedIssueDescription(t *testing.T) {
+	canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
+	require.NoError(t, err)
+	create := findSpecNode(t, canvas, intakeCreateNodeID)
+	description := create.Configuration["description"].(string)
+
+	enriched := "[View in Sentry](https://sentry.io/issues/123/events/abc/)\n\n## HTTP Request\n\nGET /checkout"
+	// Include the former HTTP outputs so the test catches a short saved body.
+	env := map[string]any{"$": map[string]any{
+		"Enrich Issue":     map[string]any{"data": map[string]any{"description": enriched}},
+		"Get Sentry Issue": map[string]any{"data": map[string]any{}},
+		"Get Sentry Event": map[string]any{"data": map[string]any{}},
+	}}
+	root := map[string]any{"data": map[string]any{"description": "[View in Sentry](https://sentry.io/issues/123/)"}}
+	var actual strings.Builder
+	for _, match := range regexp.MustCompile(`(?s)\{\{(.*?)\}\}`).FindAllStringSubmatch(description, -1) {
+		program, err := expr.Compile(match[1], expr.Env(env), expr.AsAny(),
+			expr.Function("root", func(...any) (any, error) { return root, nil }))
+		require.NoError(t, err)
+		value, err := expr.Run(program, env)
+		require.NoError(t, err)
+		actual.WriteString(value.(string))
+	}
+	assert.Equal(t, enriched, actual.String())
+}
 
 func Test__BuildIntakeCanvas(t *testing.T) {
 	t.Run("each source listens with its own trigger", func(t *testing.T) {
@@ -134,14 +162,12 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.NotContains(t, create.Configuration["description"], "fields.description")
 	})
 
-	t.Run("a Sentry work order reads the formatted issue payload, not the permalink", func(t *testing.T) {
+	t.Run("a Sentry work order keeps the issue title", func(t *testing.T) {
 		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
 		require.NoError(t, err)
 
 		create := findSpecNode(t, canvas, intakeCreateNodeID)
 		assert.Equal(t, "{{ root().data.data.issue.title }}", create.Configuration["title"])
-		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
-		assert.NotContains(t, create.Configuration["description"], "permalink")
 	})
 
 	t.Run("a Sentry issue flows from the trigger through the filter to the work order", func(t *testing.T) {
@@ -150,7 +176,8 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 		assert.Equal(t, []yaml.Edge{
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
-			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeEnrichIssueNodeID},
+			{Channel: "default", SourceID: intakeEnrichIssueNodeID, TargetID: intakeCreateNodeID},
 		}, canvas.Spec.Edges)
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
@@ -159,6 +186,9 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, filter.Component)
 		assert.Equal(t, "true", filter.Configuration["expression"])
+		enrich := findSpecNode(t, canvas, intakeEnrichIssueNodeID)
+		assert.Equal(t, intakeEnrichIssueComponent, enrich.Component)
+		assert.Equal(t, "{{ root().data.data.issue }}", enrich.Configuration["issue"])
 	})
 
 	t.Run("a Datadog issue flows from the trigger through the filter to the work order", func(t *testing.T) {

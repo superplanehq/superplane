@@ -320,7 +320,12 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(sentry.title).toBe("Sentry");
-    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Task"]);
+    expect(sentry.nodes.map((node) => node.name)).toEqual([
+      "On Issue",
+      "Factory project?",
+      "Enrich Issue",
+      "Create Task",
+    ]);
     expect(slack.title).toBe("Slack");
     expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Task"]);
   });
