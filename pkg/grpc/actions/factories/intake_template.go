@@ -17,9 +17,10 @@ import (
 const (
 	// Node identifiers of a generated intake graph. An intake owns its whole
 	// canvas, so the identifiers are fixed rather than derived from the source.
-	intakeTriggerNodeID            = "trigger"
-	intakeFilterNodeID             = "filter"
-	intakeEnrichIssueNodeID        = "enrich-issue" // Legacy canvases still use this node.
+	intakeTriggerNodeID     = "trigger"
+	intakeFilterNodeID      = "filter"
+	intakeEnrichIssueNodeID = "enrich-issue"
+	// Existing canvases can still use the HTTP request nodes.
 	intakeSentryIssueRequestNodeID = "get-sentry-issue"
 	intakeSentryEventRequestNodeID = "get-sentry-event"
 	intakeCreateNodeID             = "create-work-order"
@@ -63,28 +64,8 @@ const (
 // name it.
 const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 
-// The webhook description remains the fallback when either API request fails.
-// HTTP Request returns parsed JSON, so the expression adds current issue data
-// and exception frames without another Sentry action. HTTP Request returns a
-// string body for a non-JSON response, such as a proxy error page. Each block
-// reads fields only from an object body, so an error page cannot stop task
-// creation.
-const sentryIntakeDescriptionExpression = `{{ root().data.description ?? "" }}{{
-  let issue = $["Get Sentry Issue"].data.body;
-  type(issue) == "map" && (issue.count ?? "") != "" ?
-    "\n\n## Latest issue details\n\nOccurrences: " + string(issue.count) : ""
-}}{{
-  let event = $["Get Sentry Event"].data.body;
-  type(event) == "map" && (event.message ?? "") != "" ?
-    "\n\n## Latest event\n\n" + string(event.message) : ""
-}}{{
-  let event = $["Get Sentry Event"].data.body;
-  join(map(filter(type(event) == "map" ? event.entries ?? [] : [], {#.type == "exception"}),
-    join(map(filter(#.data.values ?? [], {len(#.stacktrace.frames ?? []) > 0}),
-      "\n\n## Stack Trace\n\n" +
-      join(map(#.stacktrace.frames, "    " + (#.function ?? "unknown") + " (" + (#.filename ?? "") + ":" + string(#.lineNo ?? "") + ")"), "\n")), "\n\n")), "\n\n")
-}}`
-
+// sentryRequestAuthorization keeps the credentials current when an existing
+// HTTP-based intake is rebound to a different Sentry integration.
 func sentryRequestAuthorization(binding *intakeBinding) map[string]any {
 	integrationName := "Connect Sentry"
 	if ref := binding.integrationRef(); ref != nil && strings.TrimSpace(ref.Name) != "" {
@@ -139,7 +120,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerName:          "On Issue Event",
 		triggerConfiguration: map[string]any{"actions": intakeSentryActionsFor(defaultSentryIntakeSettings())},
 		createTitle:          "{{ root().data.data.issue.title }}",
-		createDescription:    sentryIntakeDescriptionExpression,
+		createDescription:    `{{ $["Enrich Issue"].data.description }}`,
 	},
 	models.FactoryIntakeSourcePagerDutyIncidents: {
 		name:             "PagerDuty incidents",
@@ -295,37 +276,26 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 		edges = append(edges, yaml.Edge{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID})
 	}
 	if request.Source == models.FactoryIntakeSourceSentryExceptions {
-		for _, requestNode := range []struct {
-			id, name, url string
-		}{
-			{intakeSentryIssueRequestNodeID, "Get Sentry Issue", "{{ root().data.issueApiUrl }}"},
-			{intakeSentryEventRequestNodeID, "Get Sentry Event", "{{ root().data.issueApiUrl }}events/latest/"},
-		} {
-			nodes = append(nodes, yaml.Node{
-				ID:        requestNode.id,
-				Name:      requestNode.name,
-				Type:      yaml.NodeTypeAction,
-				Component: intakeHTTPRequestComponent,
-				Configuration: map[string]any{
-					"method":        "GET",
-					"url":           requestNode.url,
-					"authorization": sentryRequestAuthorization(request.Binding),
-				},
-				Concurrency: intakeConcurrency(),
-				Position:    yaml.Position{X: 160, Y: createY},
-			})
-			createY += 180
-		}
+		nodes = append(nodes, yaml.Node{
+			ID:          intakeEnrichIssueNodeID,
+			Name:        "Enrich Issue",
+			Type:        yaml.NodeTypeAction,
+			Component:   intakeEnrichIssueComponent,
+			Integration: request.Binding.integrationRef(),
+			Configuration: map[string]any{
+				"issue": "{{ root().data.data.issue }}",
+			},
+			Concurrency: intakeConcurrency(),
+			Position:    yaml.Position{X: 160, Y: createY},
+		})
 		edges = slices.DeleteFunc(edges, func(edge yaml.Edge) bool {
 			return edge.SourceID == intakeFilterNodeID && edge.TargetID == intakeCreateNodeID
 		})
 		edges = append(edges,
-			yaml.Edge{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeSentryIssueRequestNodeID},
-			yaml.Edge{Channel: "success", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
-			yaml.Edge{Channel: "failure", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
-			yaml.Edge{Channel: "success", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeCreateNodeID},
-			yaml.Edge{Channel: "failure", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeCreateNodeID},
+			yaml.Edge{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeEnrichIssueNodeID},
+			yaml.Edge{Channel: "default", SourceID: intakeEnrichIssueNodeID, TargetID: intakeCreateNodeID},
 		)
+		createY += 180
 	}
 
 	nodes = append(nodes, yaml.Node{

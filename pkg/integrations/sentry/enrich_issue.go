@@ -15,12 +15,12 @@ type EnrichIssue struct{}
 func (c *EnrichIssue) Name() string  { return "sentry.enrichIssue" }
 func (c *EnrichIssue) Label() string { return "Enrich Issue" }
 func (c *EnrichIssue) Description() string {
-	return "Fetch issue details and a stack trace from Sentry"
+	return "Fetch issue details and event data from Sentry"
 }
 func (c *EnrichIssue) Documentation() string {
 	return `Enrich Issue fetches the latest issue details and a preferred event from Sentry. Add it after filters so rejected issues do not make API requests.
 
-New factory intakes use HTTP Request to fetch issue and event data. Existing workflows can continue to use Enrich Issue.
+Sentry factory intakes use this action to create work orders with the same issue details as manual imports.
 
 ## Configuration
 

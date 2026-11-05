@@ -10,18 +10,9 @@ spec:
       targetId: factory-project
     - channel: 'true'
       sourceId: factory-project
-      targetId: get-sentry-issue
-    - channel: success
-      sourceId: get-sentry-issue
-      targetId: get-sentry-event
-    - channel: failure
-      sourceId: get-sentry-issue
-      targetId: get-sentry-event
-    - channel: success
-      sourceId: get-sentry-event
-      targetId: create-work-order
-    - channel: failure
-      sourceId: get-sentry-event
+      targetId: enrich-issue
+    - channel: default
+      sourceId: enrich-issue
       targetId: create-work-order
   nodes:
     - id: on-sentry-issue
@@ -45,37 +36,15 @@ spec:
         x: 576
         'y': 618
       isCollapsed: false
-    - id: get-sentry-issue
-      name: Get Sentry Issue
+    - id: enrich-issue
+      name: Enrich Issue
       type: TYPE_ACTION
-      component: http
+      component: sentry.enrichIssue
       configuration:
-        method: GET
-        url: '{{ root().data.issueApiUrl }}'
-        authorization:
-          type: integration_bearer
-          integration:
-            name: Sentry
-          integrationKey: SENTRY_AUTH_TOKEN
+        issue: '{{ root().data.data.issue }}'
       position:
         x: 576
         'y': 978
-      isCollapsed: false
-    - id: get-sentry-event
-      name: Get Sentry Event
-      type: TYPE_ACTION
-      component: http
-      configuration:
-        method: GET
-        url: '{{ root().data.issueApiUrl }}events/latest/'
-        authorization:
-          type: integration_bearer
-          integration:
-            name: Sentry
-          integrationKey: SENTRY_AUTH_TOKEN
-      position:
-        x: 576
-        'y': 1338
       isCollapsed: false
     - id: create-work-order
       name: Create Task
@@ -83,8 +52,8 @@ spec:
       component: createWorkOrder
       configuration:
         title: '{{ root().data.data.issue.title }}'
-        description: '{{ root().data.description }}{{ $["Get Sentry Event"].data.body?.message ? "\n\n## Latest event\n\n" + $["Get Sentry Event"].data.body.message : "" }}'
+        description: '{{ $["Enrich Issue"].data.description }}'
       position:
         x: 576
-        'y': 1698
+        'y': 1338
       isCollapsed: false

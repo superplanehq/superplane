@@ -19,7 +19,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Deploy" href="#create-deploy" description="Mark a deploy against an existing Sentry release" />
   <LinkCard title="Create Release" href="#create-release" description="Register a new release in Sentry after a deploy or build step" />
   <LinkCard title="Delete Alert" href="#delete-alert" description="Delete a Sentry metric alert rule" />
-  <LinkCard title="Enrich Issue" href="#enrich-issue" description="Fetch issue details and a stack trace from Sentry" />
+  <LinkCard title="Enrich Issue" href="#enrich-issue" description="Fetch issue details and event data from Sentry" />
   <LinkCard title="Get Alert" href="#get-alert" description="Retrieve a Sentry metric alert rule with its thresholds, projects, and actions" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Sentry issue with tags, frequency, assignee, and recent events" />
   <LinkCard title="Link GitHub Issue" href="#link-git-hub-issue" description="Link an existing GitHub issue to a Sentry issue through the Sentry GitHub integration" />
@@ -355,7 +355,7 @@ Returns the deleted alert ID and name so downstream steps can record the removal
 
 Enrich Issue fetches the latest issue details and a preferred event from Sentry. Add it after filters so rejected issues do not make API requests.
 
-New factory intakes use HTTP Request to fetch issue and event data. Existing workflows can continue to use Enrich Issue.
+Sentry factory intakes use this action to create work orders with the same issue details as manual imports.
 
 ### Configuration
 

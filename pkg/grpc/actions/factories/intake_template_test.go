@@ -15,45 +15,30 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func TestSentryIntakeCreatesTaskFromGenericResponses(t *testing.T) {
-	root := map[string]any{"data": map[string]any{"description": "[View in Sentry](https://sentry.io/issues/123/)"}}
-	issue := map[string]any{"data": map[string]any{"body": map[string]any{"count": "8"}}}
-	event := map[string]any{"data": map[string]any{"body": map[string]any{
-		"message": "TypeError: boom",
-		"entries": []any{map[string]any{"type": "exception", "data": map[string]any{"values": []any{
-			map[string]any{"stacktrace": map[string]any{"frames": []any{
-				map[string]any{"function": "Handle", "filename": "app.go", "lineNo": 22},
-			}}},
-		}}}},
-	}}}
+func TestSentryIntakeUsesEnrichedIssueDescription(t *testing.T) {
+	canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
+	require.NoError(t, err)
+	create := findSpecNode(t, canvas, intakeCreateNodeID)
+	description := create.Configuration["description"].(string)
 
-	for _, test := range []struct {
-		name, want   string
-		issue, event map[string]any
-	}{
-		{"API data", "Handle (app.go:22)", issue, event},
-		{"API unavailable", "[View in Sentry](https://sentry.io/issues/123/)", map[string]any{"data": map[string]any{}}, map[string]any{"data": map[string]any{}}},
-		{"API error page", "[View in Sentry](https://sentry.io/issues/123/)",
-			map[string]any{"data": map[string]any{"body": "<html>502 Bad Gateway</html>"}},
-			map[string]any{"data": map[string]any{"body": "<html>502 Bad Gateway</html>"}}},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			env := map[string]any{"$": map[string]any{"Get Sentry Issue": test.issue, "Get Sentry Event": test.event}}
-			var actual strings.Builder
-			for _, match := range regexp.MustCompile(`(?s)\{\{(.*?)\}\}`).FindAllStringSubmatch(sentryIntakeDescriptionExpression, -1) {
-				program, err := expr.Compile(match[1], expr.Env(env), expr.AsAny(),
-					expr.Function("root", func(...any) (any, error) { return root, nil }))
-				require.NoError(t, err)
-				value, err := expr.Run(program, env)
-				require.NoError(t, err)
-				actual.WriteString(value.(string))
-			}
-			assert.Contains(t, actual.String(), test.want)
-			if test.name != "API data" {
-				assert.Equal(t, root["data"].(map[string]any)["description"], actual.String())
-			}
-		})
+	enriched := "[View in Sentry](https://sentry.io/issues/123/events/abc/)\n\n## HTTP Request\n\nGET /checkout"
+	// Include the former HTTP outputs so the test catches a short saved body.
+	env := map[string]any{"$": map[string]any{
+		"Enrich Issue":     map[string]any{"data": map[string]any{"description": enriched}},
+		"Get Sentry Issue": map[string]any{"data": map[string]any{}},
+		"Get Sentry Event": map[string]any{"data": map[string]any{}},
+	}}
+	root := map[string]any{"data": map[string]any{"description": "[View in Sentry](https://sentry.io/issues/123/)"}}
+	var actual strings.Builder
+	for _, match := range regexp.MustCompile(`(?s)\{\{(.*?)\}\}`).FindAllStringSubmatch(description, -1) {
+		program, err := expr.Compile(match[1], expr.Env(env), expr.AsAny(),
+			expr.Function("root", func(...any) (any, error) { return root, nil }))
+		require.NoError(t, err)
+		value, err := expr.Run(program, env)
+		require.NoError(t, err)
+		actual.WriteString(value.(string))
 	}
+	assert.Equal(t, enriched, actual.String())
 }
 
 func Test__BuildIntakeCanvas(t *testing.T) {
@@ -177,14 +162,12 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.NotContains(t, create.Configuration["description"], "fields.description")
 	})
 
-	t.Run("a Sentry work order reads the formatted issue payload, not the permalink", func(t *testing.T) {
+	t.Run("a Sentry work order keeps the issue title", func(t *testing.T) {
 		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
 		require.NoError(t, err)
 
 		create := findSpecNode(t, canvas, intakeCreateNodeID)
 		assert.Equal(t, "{{ root().data.data.issue.title }}", create.Configuration["title"])
-		assert.Equal(t, sentryIntakeDescriptionExpression, create.Configuration["description"])
-		assert.NotContains(t, create.Configuration["description"], "permalink")
 	})
 
 	t.Run("a Sentry issue flows from the trigger through the filter to the work order", func(t *testing.T) {
@@ -193,11 +176,8 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 		assert.Equal(t, []yaml.Edge{
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
-			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeSentryIssueRequestNodeID},
-			{Channel: "success", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
-			{Channel: "failure", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
-			{Channel: "success", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeCreateNodeID},
-			{Channel: "failure", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeEnrichIssueNodeID},
+			{Channel: "default", SourceID: intakeEnrichIssueNodeID, TargetID: intakeCreateNodeID},
 		}, canvas.Spec.Edges)
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
@@ -206,12 +186,9 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, filter.Component)
 		assert.Equal(t, "true", filter.Configuration["expression"])
-		issueRequest := findSpecNode(t, canvas, intakeSentryIssueRequestNodeID)
-		assert.Equal(t, intakeHTTPRequestComponent, issueRequest.Component)
-		assert.Equal(t, "{{ root().data.issueApiUrl }}", issueRequest.Configuration["url"])
-		eventRequest := findSpecNode(t, canvas, intakeSentryEventRequestNodeID)
-		assert.Equal(t, intakeHTTPRequestComponent, eventRequest.Component)
-		assert.Equal(t, "{{ root().data.issueApiUrl }}events/latest/", eventRequest.Configuration["url"])
+		enrich := findSpecNode(t, canvas, intakeEnrichIssueNodeID)
+		assert.Equal(t, intakeEnrichIssueComponent, enrich.Component)
+		assert.Equal(t, "{{ root().data.data.issue }}", enrich.Configuration["issue"])
 	})
 
 	t.Run("a Datadog issue flows from the trigger through the filter to the work order", func(t *testing.T) {

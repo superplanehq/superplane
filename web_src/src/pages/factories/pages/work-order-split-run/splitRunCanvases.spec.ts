@@ -323,8 +323,7 @@ describe("splitRunCanvasForPhase", () => {
     expect(sentry.nodes.map((node) => node.name)).toEqual([
       "On Issue",
       "Factory project?",
-      "Get Sentry Issue",
-      "Get Sentry Event",
+      "Enrich Issue",
       "Create Task",
     ]);
     expect(slack.title).toBe("Slack");
