@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"errors"
 	"maps"
 	"slices"
 	"strings"
@@ -27,28 +26,6 @@ const allPullRequestsDoneField = "whenAllPullRequestsDone"
 // A workspace-scope closure app closes the task only after every attached
 // pull request is done. Older closure apps close on the first one.
 var prClosureCloseNodeIDs = []string{"complete-work-order", "reject-work-order"}
-
-// syncWorkspaceRepositoryAccess grants the hosted GitHub App write token
-// access to every workspace repository. Workspaces without a hosted app
-// binding use a token that already covers the installation.
-func syncWorkspaceRepositoryAccess(tx *gorm.DB, factory *models.Factory) error {
-	config := factory.OnboardingConfigValue()
-	if config.EffectiveVCSProvider() != models.ProviderGitHub {
-		return nil
-	}
-	integrationID, err := uuid.Parse(strings.TrimSpace(config.VCSIntegrationID))
-	if err != nil {
-		return nil
-	}
-	_, err = models.FindVCSProviderIntegrationBinding(tx, integrationID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	return models.SyncVCSProviderBindingRepositories(tx, integrationID, models.ProviderGitHub)
-}
 
 // refreshWorkspaceRepositoryAutomations points the pull request webhooks of
 // the workspace automations at the current repository list. The list change

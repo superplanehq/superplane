@@ -78,24 +78,13 @@ func CreateFactoryAgentResource(
 	if err := authorizeContextRepository(ctx, db, organizationID, factory, config); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
-	var resource *models.FactoryAgentResource
-	err = db.Transaction(func(tx *gorm.DB) error {
-		created, err := factory.CreateAgentResource(
-			tx,
-			protoKindToModel(req.GetKind()),
-			req.GetName(),
-			req.GetEnabled(),
-			config,
-		)
-		if err != nil {
-			return err
-		}
-		resource = created
-		if created.Kind != models.FactoryAgentResourceKindContextRepo {
-			return nil
-		}
-		return syncWorkspaceRepositoryAccess(tx, factory)
-	})
+	resource, err := factory.CreateAgentResource(
+		db,
+		protoKindToModel(req.GetKind()),
+		req.GetName(),
+		req.GetEnabled(),
+		config,
+	)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
@@ -214,16 +203,7 @@ func UpdateFactoryAgentResource(
 	if config != nil && resource.Config.Data().InvalidatesOAuth(*config) {
 		revocation = captureOAuthRevocation(ctx, deps, db, resource)
 	}
-	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := resource.Update(tx, name, enabled, config); err != nil {
-			return err
-		}
-		if resource.Kind != models.FactoryAgentResourceKindContextRepo {
-			return nil
-		}
-		return syncWorkspaceRepositoryAccess(tx, factory)
-	})
-	if err != nil {
+	if err := resource.Update(db, name, enabled, config); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update agent resource")
 	}
 	revocation.run(ctx, deps)
@@ -313,16 +293,7 @@ func DeleteFactoryAgentResource(
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}
 	revocation := captureOAuthRevocation(ctx, deps, db, resource)
-	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := resource.Delete(tx); err != nil {
-			return err
-		}
-		if resource.Kind != models.FactoryAgentResourceKindContextRepo {
-			return nil
-		}
-		return syncWorkspaceRepositoryAccess(tx, factory)
-	})
-	if err != nil {
+	if err := resource.Delete(db); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}
 	revocation.run(ctx, deps)

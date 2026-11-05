@@ -685,7 +685,7 @@ if [ -f "$ctx" ]; then
     echo "node not found on PATH; skipping context repositories" >&2
   else
     _sp_tab="$(printf '\t')"
-    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];const main=(process.argv[2]||"").trim().toLowerCase();for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();const repo=((e&&e.repository)||"").trim().toLowerCase();const b=((e&&e.branch)||"").trim()||"-";const ro=e&&e.readOnly?"1":"0";if(main&&repo===main){continue;}if(u&&dir){console.log(u+"\t"+dir+"\t"+ro+"\t"+b);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx" "${REPO:-}")" || exit 1
+    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];const url=(process.argv[3]||"").trim().replace(/\.git$/,"").match(/[\/:]([^\/:]+\/[^\/:]+)$/);const main=((process.argv[2]||"").trim()||(url?url[1]:"")).toLowerCase();for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();const repo=((e&&e.repository)||"").trim().toLowerCase();const b=((e&&e.branch)||"").trim()||"-";const ro=e&&e.readOnly?"1":"0";if(main&&repo===main){continue;}if(u&&dir){console.log(u+"\t"+dir+"\t"+ro+"\t"+b);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx" "${REPO:-}" "${REPO_URL:-}")" || exit 1
     if [ -n "$_sp_ctx_list" ]; then
       clone_context_repository() {
         _sp_branch="$4"

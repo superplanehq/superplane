@@ -261,6 +261,23 @@ func TestWorkspaceCheckoutScriptSkipsRepositoryInRepoDirectory(t *testing.T) {
 	assert.NoDirExists(t, filepath.Join(dir, "context", "acme", "web"))
 }
 
+func TestWorkspaceCheckoutScriptSkipsRepositoryFromRepoURL(t *testing.T) {
+	web := filepath.Join(t.TempDir(), "acme", "web.git")
+	require.NoError(t, os.MkdirAll(filepath.Dir(web), 0o755))
+	require.NoError(t, os.Rename(initBareRepo(t, "main"), web))
+	dir := t.TempDir()
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]string{
+		{"repository": "acme/web", "url": "file://" + web, "directory": "context/acme/web"},
+	}})
+	require.NoError(t, err)
+
+	output, err := runCheckoutScriptFull(t, dir, "file://"+web, "main", checkoutScriptOptions{context: string(payload)})
+
+	require.NoError(t, err, output)
+	assert.DirExists(t, filepath.Join(dir, "repo", ".git"))
+	assert.NoDirExists(t, filepath.Join(dir, "context", "acme", "web"))
+}
+
 func TestWorkspaceCheckoutScriptClonesContextBranch(t *testing.T) {
 	main := initBareRepo(t, "main")
 	extra := initBareRepo(t, "main")
