@@ -1,3 +1,4 @@
+import { updatePullRequestBodySectionMapper } from "../updatePullRequestBodySection";
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { buildActionStateRegistry } from "../eventDisplay";
 import { onPushTriggerRenderer } from "./on_push";
@@ -17,6 +18,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   findPullRequest: findPullRequestMapper,
   createPullRequest: createPullRequestMapper,
   updatePullRequest: updatePullRequestMapper,
+  updatePullRequestBodySection: updatePullRequestBodySectionMapper,
   createPullRequestComment: createPullRequestCommentMapper,
 };
 

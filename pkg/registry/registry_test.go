@@ -543,6 +543,28 @@ func TestRegistry_GetIntegrationAction(t *testing.T) {
 	assert.Contains(t, err.Error(), "action app.other not found for integration app")
 }
 
+func TestRegistry_ListActionsKeepsRetiredActionsForSavedNodes(t *testing.T) {
+	r := &registry.Registry{
+		Actions: map[string]core.Action{
+			"noop": impl.NewDummyAction(impl.DummyActionOptions{Name: "noop"}),
+			"updatePullRequestBodySection": impl.NewDummyAction(
+				impl.DummyActionOptions{Name: "updatePullRequestBodySection"},
+			),
+		},
+	}
+
+	names := func(actions []core.Action) []string {
+		result := make([]string, 0, len(actions))
+		for _, action := range actions {
+			result = append(result, action.Name())
+		}
+		return result
+	}
+
+	assert.Equal(t, []string{"noop", "updatePullRequestBodySection"}, names(r.ListActions()))
+	assert.Equal(t, []string{"noop"}, names(r.ListSelectableActions()))
+}
+
 func TestRegistry_ListFunctionsSortByName(t *testing.T) {
 	a := impl.NewDummyAction(impl.DummyActionOptions{Name: "zebra"})
 	b := impl.NewDummyAction(impl.DummyActionOptions{Name: "alpha"})
