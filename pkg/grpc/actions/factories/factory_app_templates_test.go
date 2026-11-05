@@ -149,6 +149,47 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	requireValidCanvasExpressions(t, canvas)
 }
 
+func TestMaterializeMultiRepoImplementationTemplate(t *testing.T) {
+	result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
+		appID:         "app-1",
+		appName:       "Implement refunds",
+		installParams: map[string]string{"appRepository": "acme/refunds", "defaultBranch": "develop"},
+		integrations:  map[string]factoryTemplateIntegration{"github": {id: "github-1", name: "acme-github"}},
+		agent:         &factoryTemplateAgent{component: "runnerOpenRouter", model: "anthropic/claude-sonnet-4-6", credentialSource: "integration", credentialIntegrationName: "acme-openrouter"},
+		multiRepo:     true,
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	agent := findYAMLNode(t, canvas, "implementation-agent-no-issue")
+	environment, ok := agent.Configuration["environment"].([]any)
+	require.True(t, ok, "expected the agent to declare step environment")
+	assert.Contains(t, environment, map[string]any{
+		"name":        factoryDraftPullRequestsEnv,
+		"value":       "false",
+		"valueSource": "literal",
+	})
+
+	implementationPrompt, ok := implementationStep(t, agent, "Implementation")["prompt"].(string)
+	require.True(t, ok)
+	assert.Contains(t, implementationPrompt, "../context/<owner>/<name>")
+	assert.Contains(t, implementationPrompt, "open_pull_request")
+	assert.Contains(t, implementationPrompt, "Do not add GitHub closing keywords")
+	checkCommand, _ := implementationStep(t, agent, "Check pull requests")["command"].(string)
+	assert.Contains(t, checkCommand, "superplane task pr list")
+	assert.NotContains(t, result.canvasYAML, "git push")
+	for _, component := range []string{"github.findPullRequest", "github.createPullRequest", "github.updatePullRequest", "addPullRequest", "addWorkOrderArtifact"} {
+		assert.NotContains(t, result.canvasYAML, component)
+	}
+	assert.ElementsMatch(t, []yaml.Edge{
+		{SourceID: "onrun-implement", TargetID: "implementation-agent-no-issue", Channel: "default"},
+		{SourceID: "implementation-agent-no-issue", TargetID: "add-run-error", Channel: "failed"},
+	}, canvas.Spec.Edges)
+
+	requireValidCanvasExpressions(t, canvas)
+}
+
 func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	result, err := materializeFactoryTemplate("risk-score", "", factoryTemplateInput{
 		appID:   "app-risk",
@@ -179,7 +220,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
 	assert.Equal(t, "github.onPullRequest", entrypoint.Component)
 	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
-	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
+	assert.Equal(t, models.WorkspaceRepositoriesExpression, entrypoint.Configuration["repository"])
 	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
 	assert.NotContains(t, result.canvasYAML, "should-assess")
@@ -365,7 +406,7 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 		"provider": models.ProviderGitHub,
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
 	assert.Equal(t, "github.onPullRequest", entrypoint.Component)
-	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
+	assert.Equal(t, models.WorkspaceRepositoriesExpression, entrypoint.Configuration["repository"])
 	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
 	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
 	assert.Equal(t, []any{"synchronize", "reopened", "ready_for_review"}, entrypoint.Configuration["actions"])
