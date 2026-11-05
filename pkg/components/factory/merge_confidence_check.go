@@ -45,11 +45,14 @@ var mergeConfidenceChecks = []mergeConfidenceCheck{
 
 // ReportMergeConfidenceCheck stores one merge confidence check. enabled is the
 // list from the runner token. A check that is not in that list is rejected.
+// repository is the pull request repository of the run. Each repository
+// keeps its own scores.
 func ReportMergeConfidenceCheck(
 	tx *gorm.DB,
 	order *models.FactoryWorkOrder,
 	runID uuid.UUID,
 	automation *factory.AutomationRef,
+	repository string,
 	check string,
 	score float64,
 	summary string,
@@ -68,6 +71,7 @@ func ReportMergeConfidenceCheck(
 	}
 	params.Run = &factory.RunRef{ID: runID}
 	params.Automation = automation
+	params.Repository = repository
 	return order.ReportCheck(tx, params)
 }
 

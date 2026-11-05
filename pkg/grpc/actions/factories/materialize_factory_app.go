@@ -53,6 +53,10 @@ func MaterializeFactoryAppTemplate(
 	if input.agent == nil {
 		input.agent = factoryTemplateAgentFromIntake(resolveIntakeAgent(db, factory))
 	}
+	input.multiRepo, err = factory.MultiRepoTasksEnabled(db)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
+	}
 	provider := factory.OnboardingConfigValue().EffectiveVCSProvider()
 	result, err := materializeFactoryTemplate(req.GetTemplateId(), provider, input)
 	if err != nil {

@@ -103,14 +103,16 @@ export type MergeConfidenceCard = {
 export function mergeConfidenceHeadline(
   checks: readonly MergeConfidenceHeadlineInput[] | undefined,
 ): MergeConfidenceCard | undefined {
-  const metrics = (checks ?? []).flatMap((check): MergeConfidenceCardCheck[] => {
-    const score = check.score;
-    const maxScore = check.maxScore ?? 0;
-    if (!isMergeConfidenceMetric(check) || score == null || maxScore <= 0) {
-      return [];
-    }
-    return [{ key: check.key, name: check.name, score, maxScore }];
-  });
+  const metrics = weakestPerKey(
+    (checks ?? []).flatMap((check): MergeConfidenceCardCheck[] => {
+      const score = check.score;
+      const maxScore = check.maxScore ?? 0;
+      if (!isMergeConfidenceMetric(check) || score == null || maxScore <= 0) {
+        return [];
+      }
+      return [{ key: check.key, name: check.name, score, maxScore }];
+    }),
+  );
   if (metrics.length === 0) {
     return undefined;
   }
@@ -120,6 +122,72 @@ export function mergeConfidenceHeadline(
     return undefined;
   }
   return { ...headline, checks: ordered };
+}
+
+/** Each pull request repository reports its own scores. The card lists each check once, with its weakest score. */
+function weakestPerKey(metrics: MergeConfidenceCardCheck[]): MergeConfidenceCardCheck[] {
+  const byKey = new Map<string, MergeConfidenceCardCheck>();
+  for (const metric of metrics) {
+    const key = metric.key ?? metric.name ?? "";
+    const current = byKey.get(key);
+    if (!current || confidenceRatio(metric) < confidenceRatio(current)) {
+      byKey.set(key, metric);
+    }
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * Merge confidence scores each repository in its own run. A check without a
+ * repository applies to every pull request. GitHub repository names ignore case.
+ */
+export function checksForRepository<Check extends { repository?: string }>(
+  checks: readonly Check[],
+  repository: string | undefined,
+): Check[] {
+  const name = repository?.trim().toLowerCase();
+  return checks.filter((check) => !check.repository || !name || check.repository.toLowerCase() === name);
+}
+
+export type MergeChecksByPullRequest = {
+  /** Merge checks of each pull request repository, keyed by `pullRequestChecksKey`. */
+  byRepository: Map<string, WorkOrderCheckPresentation[]>;
+  /** Merge checks that belong to no listed pull request. */
+  unattached: WorkOrderCheckPresentation[];
+};
+
+export function pullRequestChecksKey(repository: string | null | undefined): string {
+  return repository?.trim().toLowerCase() ?? "";
+}
+
+/**
+ * Each pull request row shows the merge checks of its repository. A check
+ * without a repository attaches only when the task has one pull request
+ * repository; with more, nothing says which pull request it scores.
+ */
+export function splitMergeChecksByPullRequest(
+  checks: WorkOrderCheckPresentation[],
+  pullRequestRepositories: readonly (string | null | undefined)[],
+): MergeChecksByPullRequest {
+  const metrics = consoleCheckList(checks)?.metrics ?? [];
+  const keys = [...new Set(pullRequestRepositories.map(pullRequestChecksKey))];
+  const byRepository = new Map<string, WorkOrderCheckPresentation[]>();
+  const unattached: WorkOrderCheckPresentation[] = [];
+  for (const metric of metrics) {
+    const key = attachedPullRequestKey(metric, keys);
+    if (key === undefined) {
+      unattached.push(metric);
+      continue;
+    }
+    byRepository.set(key, [...(byRepository.get(key) ?? []), metric]);
+  }
+  return { byRepository, unattached };
+}
+
+function attachedPullRequestKey(check: WorkOrderCheckPresentation, keys: string[]): string | undefined {
+  const key = pullRequestChecksKey(check.repository);
+  if (key) return keys.includes(key) ? key : undefined;
+  return keys.length === 1 ? keys[0] : undefined;
 }
 
 /**
