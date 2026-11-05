@@ -42,7 +42,7 @@ func TestGlobalRunnerToolsOverStdio(t *testing.T) {
 	env := runner.AttachRunnerEnv(ctx, nil, 60, nil)
 	mcp := startGlobalMCP(t, server, runnerTokenFrom(env), runner.AppendGlobalMCP(env, nil))
 
-	assert.ElementsMatch(t, everyGlobalRunnerTool, mcp.toolNames())
+	assert.ElementsMatch(t, taskRunnerTools, mcp.toolNames())
 
 	members := mcp.call("list_members", map[string]any{})["members"].([]any)
 	assert.Contains(t, fieldValues(members, "user_id"), member.ID.String())

@@ -1,6 +1,7 @@
 package public
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -105,4 +106,74 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, checks, 1)
 	assert.Equal(t, 4.0, checks[0].Score)
+}
+
+func TestRunnerMergeConfidenceCheckKeepsEachRepositoryApart(t *testing.T) {
+	r := support.Setup(t)
+	server, _ := mustRunnerLiveLogServer(t, r)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Add AGENTS.md", "Add one to each repository.", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	const nodeID = "assess-risk"
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: nodeID,
+		Name:   "Assess risk",
+		Type:   models.NodeTypeComponent,
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factoryModel.ID).Error)
+	t.Setenv("JWT_SECRET", "test")
+	t.Setenv("RUNNER_API_BASE_URL", "http://app.test")
+	t.Setenv("WEBHOOKS_BASE_URL", "http://app.test")
+	t.Setenv("BASE_URL", "http://app.test")
+
+	tokenForPullRequest := func(repository string, number int) string {
+		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, map[string]any{
+			"type": "github.pullRequest",
+			"data": map[string]any{
+				"repository":   map[string]any{"full_name": repository},
+				"pull_request": map[string]any{"number": number},
+			},
+		})
+		run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
+		require.NoError(t, err)
+		execution := createExecutionForCanvasRun(t, run, rootEvent.ID, nodeID)
+		require.NoError(t, db.Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+		ctx := core.ExecutionContext{ID: execution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://app.test"}
+		prompt := "Merge check: risk.\nScore the diff."
+		environment, scope, err := runneraction.AttachMergeConfidenceEnv(ctx, []runneraction.TaskEnvironmentVariable{
+			{Name: runneraction.EnvSuperplaneMergeConfidenceOrderID, Value: order.ID.String()},
+		}, []runneraction.AgentStep{{Name: "Blast radius", Type: runneraction.AgentStepPrompt, Prompt: &prompt}})
+		require.NoError(t, err)
+		require.NotNil(t, scope)
+		return runnerTokenFrom(runneraction.AttachRunnerEnv(ctx, environment, 60, scope))
+	}
+
+	const reportPath = "/api/v1/runner/task/merge-checks"
+	report := func(token string, score int) {
+		body := fmt.Sprintf(`{"check":"risk","score":%d,"summary":"Lower risk because the pull request adds documentation only."}`, score)
+		rec := runnerRequest(t, server, http.MethodPost, token, reportPath, body)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	apiToken := tokenForPullRequest("acme/api", 6)
+	docsToken := tokenForPullRequest("acme/docs", 5)
+	report(apiToken, 4)
+	report(docsToken, 1)
+	report(apiToken, 2)
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 2)
+	byRepository := map[string]models.FactoryWorkOrderCheck{}
+	for _, check := range checks {
+		byRepository[check.Repository] = check
+	}
+	assert.Equal(t, 2.0, byRepository["acme/api"].Score)
+	require.NotNil(t, byRepository["acme/api"].PreviousScore)
+	assert.Equal(t, 4.0, *byRepository["acme/api"].PreviousScore)
+	assert.Equal(t, 1.0, byRepository["acme/docs"].Score)
+	assert.Nil(t, byRepository["acme/docs"].PreviousScore)
 }
