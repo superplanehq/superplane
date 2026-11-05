@@ -149,26 +149,29 @@ function ColumnAutomationRow({
         details
       )}
       {showRun ? (
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          type="button"
-          aria-label={`Run ${automation.name}`}
-          disabled={runPending}
-          aria-busy={starting}
-          data-testid={`${testId}-run-${automation.id}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onRun?.(automation);
-          }}
-          className="size-4 shrink-0 p-0 text-muted-foreground hover:text-foreground"
-        >
-          {starting ? (
-            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          ) : (
-            <Play className="size-3.5" aria-hidden />
-          )}
-        </Button>
+        // Disabled buttons ignore pointer events, so stop clicks on their enclosing area.
+        <span className="flex shrink-0" onClick={(event) => event.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            type="button"
+            aria-label={`Run ${automation.name}`}
+            disabled={runPending}
+            aria-busy={starting}
+            data-testid={`${testId}-run-${automation.id}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRun?.(automation);
+            }}
+            className="size-4 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+          >
+            {starting ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Play className="size-3.5" aria-hidden />
+            )}
+          </Button>
+        </span>
       ) : null}
       {onRowAction ? (
         <Button

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
+import { expect, userEvent, within } from "storybook/test";
 
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
@@ -89,6 +90,25 @@ export const EmptyWithAdd: Story = {
 };
 
 export const ScheduleControls: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Open automation: Scheduled repository review" }));
+    await expect(canvas.getByRole("status")).toHaveTextContent("Automation settings opened.");
+
+    const run = canvas.getByRole("button", { name: "Run Scheduled repository review" });
+    await userEvent.click(run);
+    await expect(run).toBeDisabled();
+
+    // Use browser hit testing: a disabled button can pass pointer clicks to the row.
+    const bounds = run.getBoundingClientRect();
+    const target = canvasElement.ownerDocument.elementFromPoint(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    );
+    if (!target) throw new Error("The pending Run control is not visible.");
+    await userEvent.click(target);
+    await expect(canvas.getByRole("status")).toHaveTextContent("Automation run requested.");
+  },
   render: function ScheduleControlsStory() {
     const [pending, setPending] = useState(false);
     const [status, setStatus] = useState("");
