@@ -84,6 +84,9 @@ type ContextRepoListProps = {
 };
 
 const PRIMARY_ROW_ID = "primary";
+// With a pointer, the remove button takes no width until the row has hover or focus, so chevrons line up with the primary row.
+const REMOVE_ON_HOVER_CLASS =
+  "mr-2 size-8 shrink-0 text-muted-foreground [@media(hover:hover)]:mr-0 [@media(hover:hover)]:w-0 [@media(hover:hover)]:overflow-hidden [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:mr-2 [@media(hover:hover)]:group-focus-within:w-8 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:mr-2 [@media(hover:hover)]:group-hover:w-8 [@media(hover:hover)]:group-hover:opacity-100";
 
 function ContextRepoList(props: ContextRepoListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -132,7 +135,7 @@ function ContextRepoRow({
   const panelId = `agent-cross-repo-panel-${resource.id}`;
   return (
     <li className="group min-w-0" data-testid={`agent-cross-repo-row-${resource.id}`}>
-      <div className="flex min-w-0 items-center gap-1 pr-2 transition-colors hover:bg-accent/40">
+      <div className="flex min-w-0 items-center transition-colors hover:bg-accent/40">
         <Button
           type="button"
           variant="ghost"
@@ -158,7 +161,7 @@ function ContextRepoRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-8 shrink-0 text-muted-foreground transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:group-hover:opacity-100"
+          className={REMOVE_ON_HOVER_CLASS}
           disabled={!props.canUpdate || props.isSaving}
           aria-label={AGENT_RESOURCES_COPY.removeRepository}
           data-testid={`agent-cross-repo-remove-${resource.id}`}
