@@ -19,9 +19,10 @@ func (failingEnrichOutput) Emit(string, string, []any) error {
 	return errors.New("output store unavailable")
 }
 
-type deadlineSentryHTTP struct{}
+type deadlineSentryHTTP struct{ calls int }
 
-func (deadlineSentryHTTP) Do(*http.Request) (*http.Response, error) {
+func (h *deadlineSentryHTTP) Do(*http.Request) (*http.Response, error) {
+	h.calls++
 	return nil, context.DeadlineExceeded
 }
 
@@ -106,15 +107,19 @@ func TestEnrichIssuePropagatesOutputPersistenceError(t *testing.T) {
 func TestEnrichIssueContinuesAfterSentryTimeout(t *testing.T) {
 	issue := map[string]any{"id": "123", "title": "Broken deploy"}
 	state := &contexts.ExecutionStateContext{}
+	httpClient := &deadlineSentryHTTP{}
 	err := (&EnrichIssue{}).Execute(core.ExecutionContext{
 		Configuration: map[string]any{"issue": issue},
-		HTTP:          deadlineSentryHTTP{},
+		HTTP:          httpClient,
 		Integration: &contexts.IntegrationContext{
 			Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "token"},
+			Metadata:      Metadata{Organization: &OrganizationSummary{Slug: "example"}},
 		},
 		ExecutionState: state,
+		Logger:         logrus.NewEntry(logrus.New()),
 	})
 	require.NoError(t, err)
+	assert.Positive(t, httpClient.calls, "Sentry API was not called")
 	require.Len(t, state.Payloads, 1)
 	data := state.Payloads[0].(map[string]any)["data"].(map[string]any)
 	assert.Equal(t, IssueDescription(issue, nil), data["description"])
