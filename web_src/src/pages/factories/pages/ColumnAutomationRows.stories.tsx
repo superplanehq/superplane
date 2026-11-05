@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MoreHorizontal, Plus } from "lucide-react";
+import { useState } from "react";
 
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
@@ -85,6 +86,48 @@ export const EmptyWithAdd: Story = {
       <Lane title="Review" automations={[]} onAdd={() => undefined} cards={[]} />
     </div>
   ),
+};
+
+export const ScheduleControls: Story = {
+  render: function ScheduleControlsStory() {
+    const [pending, setPending] = useState(false);
+    const [status, setStatus] = useState("");
+    const automation: ColumnAutomation = {
+      ...VERIFY,
+      id: "scheduled-review",
+      canvasId: "scheduled-review",
+      name: "Scheduled repository review",
+      trigger: "On schedule",
+      canRunNow: true,
+    };
+    return (
+      <div className="max-w-sm space-y-4 rounded-lg bg-muted p-4">
+        <h2 className="text-sm font-semibold">Verify automations</h2>
+        <ColumnAutomationRows
+          title="Verify"
+          automations={[automation]}
+          rowCount={1}
+          testId="schedule-controls"
+          onRowAction={(selected, action) => {
+            console.log("Automation action", selected.id, action);
+            setStatus("Automation settings opened.");
+          }}
+          onRun={(selected) => {
+            console.log("Run automation", selected.id);
+            setPending(true);
+            setStatus("Automation run requested.");
+          }}
+          runPending={pending}
+          runningAutomationId={pending ? automation.canvasId : undefined}
+        />
+        {status ? (
+          <p role="status" className="text-sm">
+            {status}
+          </p>
+        ) : null}
+      </div>
+    );
+  },
 };
 
 function Board() {

@@ -1310,11 +1310,9 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
     await user.click(screen.getByTestId("add-intake-template-custom-verification"));
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=backlog");
-    const trigger = screen.getByRole("combobox", { name: "Trigger" });
-    expect(trigger).toHaveTextContent("Manual");
-    await user.click(trigger);
-    expect(screen.getByRole("option", { name: /When a task enters Backlog/ })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /Every pull request commit/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add trigger" }));
+    expect(screen.getByRole("menuitem", { name: /When a task enters Backlog/ })).toBeEnabled();
+    expect(screen.queryByRole("menuitem", { name: /Every pull request commit/ })).not.toBeInTheDocument();
   });
 
   it("opens the created scheduled intake in the board automation view", async () => {
