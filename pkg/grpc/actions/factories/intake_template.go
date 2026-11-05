@@ -159,7 +159,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 	},
 	models.FactoryIntakeSourceLinearIssues: {
 		name:             "Linear issues",
-		description:      "Create a work order when a Linear issue is added to a selected project.",
+		description:      "Create a work order when a Linear issue is created in the selected team.",
 		triggerComponent: "linear.onIssue",
 		triggerName:      "On Issue",
 		triggerConfiguration: map[string]any{
@@ -475,13 +475,7 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
 	}
 	if request.Source == models.FactoryIntakeSourceLinearIssues {
-		projects := request.Settings.LinearProjectIDs
-		if len(projects) == 0 {
-			projects = configurationStrings(configuration["projects"])
-		}
-		configuration["projects"] = configurationAnyStrings(projects)
-		configuration["labels"] = linearLabelPredicates(request.Settings.LinearLabels)
-		configuration["actions"] = []any{"create", "update"}
+		applyLinearTriggerConfiguration(configuration, linearTriggerSettings(request.Settings, configuration))
 	}
 	if request.Source == models.FactoryIntakeSourceSentryExceptions {
 		projects := request.Settings.SentryProjectIDs
