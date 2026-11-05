@@ -12,6 +12,7 @@ const (
 	RunnerFlowPlanning        RunnerFlow = "planning"
 	RunnerFlowTask            RunnerFlow = "task"
 	RunnerFlowMergeConfidence RunnerFlow = "merge_confidence"
+	RunnerFlowSchedule        RunnerFlow = "schedule"
 
 	ScopeMembersRead      RunnerToolScope = "members:read"
 	ScopeOwnerRead        RunnerToolScope = "owner:read"
@@ -74,6 +75,8 @@ var runnerFlowScopes = map[RunnerFlow][]RunnerToolScope{
 	RunnerFlowPlanning:        withScopes(ScopePlanWrite),
 	RunnerFlowTask:            withScopes(),
 	RunnerFlowMergeConfidence: withScopes(ScopeMergeChecksWrite),
+	// A schedule run has no task yet. It can list and create tasks.
+	RunnerFlowSchedule: {ScopeTasksRead, ScopeTasksCreate},
 }
 
 func withScopes(extra ...RunnerToolScope) []RunnerToolScope {

@@ -41,8 +41,8 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "custom-verification",
     iconName: "sparkles",
-    name: "Custom automation",
-    description: "Run prompt and Bash steps for a Backlog task.",
+    name: "Build your own",
+    description: "Run prompt and Bash steps, or create tasks on a schedule.",
     featureId: FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   },
   {
