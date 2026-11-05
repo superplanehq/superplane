@@ -243,6 +243,8 @@ export interface SplitRunFixture {
   usageByMachineType?: WorkOrderUsageByMachineType[];
   lineName: string;
   currentStepIndex: number;
+  /** Exact task status. Storybook fixtures can omit it. */
+  displayStatus?: WorkOrderDisplayStatus;
   lineStatus: SplitRunPhaseStatus;
   /** Verify eligibility remains independent of the review strip. */
   canRunVerifyCustomAutomation?: boolean;
@@ -542,6 +544,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       visibleDispatchForLine(order, options?.lineId)?.line?.name ||
       SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
+    displayStatus,
     lineStatus: lineStatusForDisplay(displayStatus),
     canRunVerifyCustomAutomation:
       displayStatus === "waiting" &&
