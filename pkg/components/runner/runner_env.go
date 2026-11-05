@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -98,6 +99,13 @@ func resolveRunnerScope(
 	scope.Scopes = ScopesForFlow(scope.Flow)
 	if scope.Flow == RunnerFlowTask {
 		scope.Scopes = append(scope.Scopes, TaskCapabilityScopes(environment)...)
+		multiRepo, err := models.HasExperimentalFeature(orgID, features.FeatureFactoryMultiRepoTasks)
+		if err != nil {
+			return nil, nil, err
+		}
+		if multiRepo {
+			scope.Scopes = append(scope.Scopes, MultiRepoTaskScopes...)
+		}
 	}
 	if err := validateRunnerTokenScope(db, scope); err != nil {
 		return nil, nil, err
@@ -135,6 +143,7 @@ func applyMergeConfidenceScope(scope *RunnerScope, merge *MergeConfidenceScope) 
 	scope.WorkOrderID = merge.WorkOrderID
 	scope.MergeChecks = merge.EnabledChecks
 	scope.MergeCheckLabels = merge.CheckLabels
+	scope.MergeRepository = merge.Repository
 	return nil
 }
 

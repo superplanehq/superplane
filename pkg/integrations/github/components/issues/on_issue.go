@@ -214,7 +214,7 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(common.WebhookConfiguration{
+	return common.RequestWorkspaceWebhook(ctx, common.WebhookConfiguration{
 		EventType:  "issues",
 		Repository: config.Repository,
 	})
@@ -280,7 +280,7 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	}
 
 	if config.AuthorsWithAccess {
-		allowed, code, accessErr := authorHasRepositoryAccess(ctx, config.Repository, issueAuthorLogin(data))
+		allowed, code, accessErr := authorHasRepositoryAccess(ctx, common.EventRepository(data, config.Repository), issueAuthorLogin(data))
 		if accessErr != nil || !allowed {
 			return code, nil, accessErr
 		}

@@ -108,6 +108,9 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 
 	t.Run("a missing repository binding is not healthy", func(t *testing.T) {
 		spec := prFeedbackSpecFromTemplate(t, "")
+		for i := range spec.Nodes {
+			delete(spec.Nodes[i].Configuration, "repository")
+		}
 
 		graph := resolvePRFeedbackGraph(spec)
 		assert.False(t, graph.Healthy(spec))

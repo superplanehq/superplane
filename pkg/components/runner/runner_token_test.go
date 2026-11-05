@@ -51,12 +51,13 @@ func TestRunnerTokenRoundTrip(t *testing.T) {
 		assert.Equal(t, scope, *parsed)
 	})
 
-	t.Run("merge confidence flow keeps the enabled checks", func(t *testing.T) {
+	t.Run("merge confidence flow keeps the enabled checks and the repository", func(t *testing.T) {
 		scope := taskRunnerScope()
 		scope.Flow = RunnerFlowMergeConfidence
 		scope.Scopes = ScopesForFlow(RunnerFlowMergeConfidence)
 		scope.MergeChecks = []string{"risk", "api-latency"}
 		scope.MergeCheckLabels = map[string]string{"api-latency": "API latency"}
+		scope.MergeRepository = "acme/docs"
 		token, err := MintRunnerToken(signer, scope, time.Minute)
 		require.NoError(t, err)
 

@@ -41,6 +41,7 @@ func serializeCheck(check *models.FactoryWorkOrderCheck) (*pb.WorkOrderCheck, er
 	serialized := &pb.WorkOrderCheck{
 		Id:            check.ID.String(),
 		Key:           check.Key,
+		Repository:    check.Repository,
 		Name:          check.Name,
 		Score:         check.Score,
 		MaxScore:      check.MaxScore,

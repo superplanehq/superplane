@@ -7,7 +7,7 @@ import { AgentAdditionalInstructions } from "./AgentAdditionalInstructions";
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import { ImplementDurationDraftProvider } from "./ImplementDurationDraft";
 import { ImplementSettingRow } from "./ImplementSettingRow";
-import { findImplementPullRequest, useImplementSettingsDraft } from "./implementSettingsDraft";
+import { implementPullRequestDraft, useImplementSettingsDraft } from "./implementSettingsDraft";
 import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
@@ -15,7 +15,7 @@ type SaveSettings = (update: NodeConfigurationSave) => Promise<void> | void;
 
 type ImplementSettingsController = {
   agentDraft: PlanningReviewDraft;
-  pullRequest?: SuperplaneComponentsNode;
+  pullRequestDraft?: boolean;
   durationMinutes: string;
   durationInvalid: boolean;
   saving: boolean;
@@ -50,7 +50,7 @@ export function ImplementConfiguration({
       <ImplementConfigurationView
         agent={agent}
         agentDraft={controller.agentDraft}
-        pullRequest={controller.pullRequest}
+        pullRequestDraft={controller.pullRequestDraft}
         organizationId={organizationId}
         factoryId={factoryId}
         factoryKey={factoryKey}
@@ -101,7 +101,7 @@ function OwnedImplementConfiguration({
     <ImplementConfigurationView
       agent={settings.draft.agentBase}
       agentDraft={settings.draft.agentDraft}
-      pullRequest={settings.draft.pullRequestNode ?? findImplementPullRequest(nodes)}
+      pullRequestDraft={implementPullRequestDraft(settings.draft)}
       organizationId={organizationId}
       factoryId={factoryId}
       factoryKey={factoryKey}
@@ -120,7 +120,7 @@ function OwnedImplementConfiguration({
 function ImplementConfigurationView({
   agent,
   agentDraft,
-  pullRequest,
+  pullRequestDraft,
   organizationId,
   factoryId,
   factoryKey,
@@ -135,7 +135,7 @@ function ImplementConfigurationView({
 }: {
   agent: SuperplaneComponentsNode;
   agentDraft: PlanningReviewDraft;
-  pullRequest?: SuperplaneComponentsNode;
+  pullRequestDraft?: boolean;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
@@ -173,9 +173,13 @@ function ImplementConfigurationView({
               view="implementation"
               disabled={saving}
             />
-            {pullRequest ? (
-              <PullRequestSettings node={pullRequest} disabled={saving} onDraftChange={onPullRequestDraftChange} />
-            ) : null}
+            {pullRequestDraft === undefined ? null : (
+              <PullRequestSettings
+                checked={pullRequestDraft}
+                disabled={saving}
+                onDraftChange={onPullRequestDraftChange}
+              />
+            )}
             <AgentAdditionalInstructions
               draft={agentDraft}
               disabled={saving}
@@ -222,11 +226,11 @@ function ImplementSettingsFooter({
 }
 
 function PullRequestSettings({
-  node,
+  checked,
   disabled = false,
   onDraftChange,
 }: {
-  node: SuperplaneComponentsNode;
+  checked: boolean;
   disabled?: boolean;
   onDraftChange: (draft: boolean) => void;
 }) {
@@ -240,7 +244,7 @@ function PullRequestSettings({
       <Switch
         id={id}
         aria-describedby={`${id}-help`}
-        checked={node.configuration?.draft === true}
+        checked={checked}
         disabled={disabled}
         onCheckedChange={onDraftChange}
       />

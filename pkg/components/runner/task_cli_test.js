@@ -9,7 +9,7 @@ const test = require("node:test");
 
 const { createClient } = require("./superplane_mcp/client");
 const registry = require("./superplane_mcp/registry");
-const { main } = require("./task_cli");
+const { main, parseCommand } = require("./task_cli");
 
 async function recordScreenshot(file, taskEnv) {
   await registry.findTool("get_artifact").handler(
@@ -325,6 +325,8 @@ test("task help lists a command for every global tool", async () => {
     "superplane task check list",
     "superplane task check add",
     "superplane task check remove",
+    "superplane task pr open",
+    "superplane task pr list",
   ]) {
     assert.match(stdout, new RegExp(line));
   }
@@ -467,6 +469,11 @@ test("each global tool command calls that tool", async () => {
       url: "https://app.example/api/v1/runner/task/checks",
       body: { keys: ["coverage", "latency"] },
     },
+    {
+      argv: ["task", "pr", "list"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/task/pull-requests",
+    },
   ];
 
   for (const item of cases) {
@@ -506,6 +513,24 @@ test("each global tool command calls that tool", async () => {
   assert.equal(attachmentCode, 0);
   assert.equal(calls.length, 0);
   assert.equal(JSON.parse(local).mimeType, "image/png");
+});
+
+test("superplane task pr open reads the body file and resolves the directory", () => {
+  const bodyFile = path.join(os.tmpdir(), `pr-body-${process.pid}.md`);
+  fs.writeFileSync(bodyFile, "Why the change exists.\n");
+  const { command, input } = parseCommand([
+    "task", "pr", "open", "--title", "Change web", "--body-file", bodyFile, "--directory", "context/acme/web", "--draft",
+  ]);
+  const prepared = command.prepare(input);
+  fs.rmSync(bodyFile, { force: true });
+
+  assert.equal(command.tool, "open_pull_request");
+  assert.deepEqual(prepared, {
+    title: "Change web",
+    body: "Why the change exists.\n",
+    directory: path.resolve("context/acme/web"),
+    draft: true,
+  });
 });
 
 test("superplane task check list uses SUPERPLANE_TASK_ID when --task is omitted", async () => {
