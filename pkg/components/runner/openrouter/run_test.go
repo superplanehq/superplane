@@ -182,6 +182,73 @@ func TestRunPromptRecordsPlanningAgentReply(t *testing.T) {
 	assert.Equal(t, []string{"I found the retry seam."}, result.agentMessages)
 }
 
+func TestRunPromptIsolatesProjectConfigAndPreservesInstructions(t *testing.T) {
+	for _, projectConfig := range []string{"", `{"permissions":{"edit":"allow"},"agents":{"triaging":{"permissions":{"edit":"allow"}}}}`} {
+		t.Run(fmt.Sprintf("project config present=%t", projectConfig != ""), func(t *testing.T) {
+			repo := t.TempDir()
+			require.NoError(t, os.Mkdir(filepath.Join(repo, ".git"), 0o755))
+			rootInstructions := filepath.Join(repo, "AGENTS.md")
+			require.NoError(t, os.WriteFile(rootInstructions, []byte("Root instructions."), 0o644))
+			cwd := filepath.Join(repo, "src")
+			require.NoError(t, os.Mkdir(cwd, 0o755))
+			nestedInstructions := filepath.Join(cwd, "AGENTS.md")
+			require.NoError(t, os.WriteFile(nestedInstructions, []byte("Nested instructions."), 0o644))
+			configPath := filepath.Join(repo, "opencode.json")
+			if projectConfig != "" {
+				require.NoError(t, os.WriteFile(configPath, []byte(projectConfig), 0o644))
+			}
+			result := runOpenRouterPrompt(t, promptHarness{
+				cwd: cwd,
+				env: map[string]string{
+					"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+					"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+					"OPENCODE_CONFIG":                  "/inherited/opencode.json",
+					"OPENCODE_CONFIG_CONTENT":          projectConfig,
+					"OPENCODE_CONFIG_DIR":              repo,
+					"OPENCODE_PERMISSION":              `{"edit":"allow"}`,
+				},
+				spawns: []spawnScript{successSpawn("Plan complete.")},
+			})
+			require.Equal(t, 0, result.exitCode, result.output, result.stderr)
+			require.Len(t, result.childOptions, 1)
+			child := result.childOptions[0]
+			assert.Equal(t, cwd, child.Cwd)
+			assert.Contains(t, result.spawns[0], cwd)
+			assert.Equal(t, filepath.Join(result.taskDir, "opencode.json"), child.Env["OPENCODE_CONFIG"])
+			assert.Equal(t, "1", child.Env["OPENCODE_DISABLE_PROJECT_CONFIG"])
+			for _, key := range []string{"OPENCODE_CONFIG_CONTENT", "OPENCODE_CONFIG_DIR", "OPENCODE_PERMISSION"} {
+				assert.NotContains(t, child.Env, key)
+			}
+			config := resultPayload(t, child.Env["OPENCODE_CONFIG"])
+			assert.Equal(t, []any{nestedInstructions, rootInstructions, filepath.Join(result.taskDir, "analysis_protocol.md")}, config["instructions"])
+			if projectConfig != "" {
+				unchanged, err := os.ReadFile(configPath)
+				require.NoError(t, err)
+				assert.Equal(t, projectConfig, string(unchanged))
+			}
+		})
+	}
+}
+
+func TestRunPromptStopsOnManagedConfigurationError(t *testing.T) {
+	token := "synthetic-config-error-token"
+	for _, exitCode := range []int{0, 1} {
+		result := runOpenRouterPrompt(t, promptHarness{
+			env: map[string]string{"OPENROUTER_API_KEY": token},
+			spawns: []spawnScript{{
+				ExitCode: exitCode,
+				Stdout:   []string{fmt.Sprintf(`{"type":"error","error":{"name":"ConfigInvalidError","data":{"path":"/task/opencode.json","issues":[{"path":["provider","timeout"],"message":%q}]}}}`, "invalid provider timeout; Bearer "+token)},
+			}},
+		})
+		assert.NotZero(t, result.exitCode)
+		assert.Len(t, result.spawns, 1)
+		assert.Empty(t, result.sleeps)
+		assert.Contains(t, result.output, "Configuration is invalid at /task/opencode.json")
+		assert.Contains(t, result.output, "invalid provider timeout")
+		assert.NotContains(t, result.output+result.stderr, token)
+	}
+}
+
 func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	config := jsBuildConfig(t, "/task", map[string]string{})
 	permission, _ := config["permission"].(map[string]any)
@@ -1317,6 +1384,7 @@ type spawnScript struct {
 }
 
 type promptHarness struct {
+	cwd           string
 	model         string
 	spawns        []spawnScript
 	env           map[string]string
@@ -1326,6 +1394,10 @@ type promptHarness struct {
 }
 
 type openRouterPromptResult struct {
+	childOptions []struct {
+		Cwd string            `json:"cwd"`
+		Env map[string]string `json:"env"`
+	}
 	exitCode      int
 	output        string
 	stderr        string
@@ -1342,7 +1414,7 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 	writeTaskHelpers(t, dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("0\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("do the work"), 0o644))
-	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage, harness.catalogSource)
+	return runPromptWithCwd(t, dir, harness.cwd, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage, harness.catalogSource)
 }
 
 func rateLimitSpawn(message string) spawnScript {
@@ -1377,7 +1449,14 @@ func successSpawn(text string) spawnScript {
 }
 
 func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any, catalogSource string) openRouterPromptResult {
+	return runPromptWithCwd(t, dir, dir, promptName, model, spawns, extraEnv, nowValues, sessionUsage, catalogSource)
+}
+
+func runPromptWithCwd(t *testing.T, dir, cwd, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any, catalogSource string) openRouterPromptResult {
 	t.Helper()
+	if cwd == "" {
+		cwd = dir
+	}
 	resultFile := filepath.Join(dir, "result.json")
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
@@ -1403,6 +1482,7 @@ const nowValues = %s;
 const sessionReads = %s;
 const catalogSource = %q;
 const calls = [];
+const childOptions = [];
 const sleeps = [];
 const agentMessages = [];
 let index = 0;
@@ -1439,7 +1519,8 @@ const helpers = {
   ensureOpenCodeModelCatalog() {
     return catalogSource;
   },
-  spawnOpenCode(args) {
+  spawnOpenCode(args, options) {
+    childOptions.push({ cwd: options.cwd, env: Object.fromEntries(Object.entries(options.env).filter(([key]) => key.startsWith("OPENCODE_"))) });
     const spec = spawns[index] || { exitCode: 1, stderr: "unexpected extra spawn", stdout: [] };
     index += 1;
     calls.push(args);
@@ -1474,19 +1555,19 @@ if (Array.isArray(sessionReads)) {
 }
 runPrompt(%q, %q, helpers)
   .then((code) => {
-    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps, agentMessages }));
+    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, childOptions, sleeps, agentMessages }));
     process.exit(code);
   })
   .catch((err) => {
-    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, sleeps, agentMessages }));
+    fs.writeFileSync(process.env.SPAWNS_FILE, JSON.stringify({ calls, childOptions, sleeps, agentMessages }));
     console.error(err && err.message ? err.message : err);
     process.exit(1);
   });
-`, script, spawnsJSON, nowJSON, sessionJSON, catalogSource, dir, filepath.Join(dir, promptName), model)), 0o644))
+`, script, spawnsJSON, nowJSON, sessionJSON, catalogSource, cwd, filepath.Join(dir, promptName), model)), 0o644))
 
 	spawnsFile := filepath.Join(dir, "spawns.json")
 	cmd := exec.Command("node", harnessFile)
-	cmd.Dir = dir
+	cmd.Dir = cwd
 	env := append(os.Environ(),
 		"SUPERPLANE_RESULT_FILE="+resultFile,
 		"SUPERPLANE_TASK_DIR="+dir,
@@ -1510,6 +1591,10 @@ runPrompt(%q, %q, helpers)
 		exitCode = exitErr.ExitCode()
 	}
 	recorded := struct {
+		ChildOptions []struct {
+			Cwd string            `json:"cwd"`
+			Env map[string]string `json:"env"`
+		} `json:"childOptions"`
 		Calls         [][]string `json:"calls"`
 		Sleeps        []float64  `json:"sleeps"`
 		AgentMessages []string   `json:"agentMessages"`
@@ -1518,6 +1603,7 @@ runPrompt(%q, %q, helpers)
 	require.NoError(t, readErr)
 	require.NoError(t, json.Unmarshal(raw, &recorded))
 	return openRouterPromptResult{
+		childOptions:  recorded.ChildOptions,
 		exitCode:      exitCode,
 		output:        stdout.String(),
 		stderr:        stderr.String(),
