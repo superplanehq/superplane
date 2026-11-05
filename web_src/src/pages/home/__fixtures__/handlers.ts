@@ -170,6 +170,12 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Add skills for workspace agents",
             },
             {
+              id: "factory_multi_repo_tasks",
+              label: "Multi-repo tasks",
+              description:
+                "Let agents change every Read & Write workspace repository and open one pull request per repository",
+            },
+            {
               id: "superplane_mcp_server",
               label: "MCP Server",
               description: "Allow Cursor and other MCP clients to connect to workspaces in this organization",

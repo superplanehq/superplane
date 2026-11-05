@@ -462,6 +462,39 @@ func Test__CreateFactoryAgentResourceCreatesContextRepo(t *testing.T) {
 	assert.Equal(t, "superplanehq/suss", response.GetResource().GetRepository())
 }
 
+func Test__ContextRepoWriteAccessNeedsMultiRepoTasks(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	create := func(repository string) (*pb.CreateFactoryAgentResourceResponse, error) {
+		return CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+			FactoryId: factory.ID.String(), Kind: pb.FactoryAgentResource_KIND_CONTEXT_REPO, Enabled: true,
+			Repository: repository, VcsProvider: "github", Access: models.FactoryContextRepoAccessWrite,
+		})
+	}
+
+	_, err = create("acme/web")
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+
+	readOnly, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "acme/docs"})
+	require.NoError(t, err)
+	write := models.FactoryContextRepoAccessWrite
+	_, err = UpdateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(), ResourceId: readOnly.ID.String(), Access: &write,
+	})
+	code, _, ok = grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	response, err := create("acme/web")
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryContextRepoAccessWrite, response.GetResource().GetAccess())
+}
+
 func Test__CreateFactoryAgentResourceRejectsInaccessibleContextRepo(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppID, "123")
 	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")

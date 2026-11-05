@@ -61,7 +61,7 @@ func searchPullRequestImportItems(ctx context.Context, db *gorm.DB, deps IntakeD
 	provider := config.EffectiveVCSProvider()
 	number, numericErr := strconv.Atoi(strings.TrimPrefix(query, "#"))
 	if strings.Contains(query, "://") {
-		parsed, err := validateImportPullRequestURL(factory, query)
+		parsed, err := validateImportPullRequestURL(db, factory, query)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +123,7 @@ func searchPullRequestImportItems(ctx context.Context, db *gorm.DB, deps IntakeD
 		return nil, err
 	}
 	for _, issue := range results.Issues {
-		parsed, err := validateImportPullRequestURL(factory, issue.GetHTMLURL())
+		parsed, err := validateImportPullRequestURL(db, factory, issue.GetHTMLURL())
 		if err != nil || issue.GetPullRequestLinks() == nil || issue.GetState() != "open" {
 			continue
 		}

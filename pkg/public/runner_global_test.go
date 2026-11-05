@@ -12,6 +12,7 @@ import (
 	runner "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -26,6 +27,10 @@ func TestRunnerToolsFollowTheTokenScopes(t *testing.T) {
 	require.NotEmpty(t, token)
 
 	assert.Equal(t, everyGlobalRunnerTool, listRunnerTools(t, server, token))
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	multiRepoToken := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	assert.Equal(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests"), listRunnerTools(t, server, multiRepoToken))
 
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
 	require.NoError(t, err)
