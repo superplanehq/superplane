@@ -711,11 +711,14 @@ if [ -f "$ctx" ]; then
         esac
         if [ -d "$dir/.git" ]; then
           echo "$dir already checked out, reusing."
-          continue
+        else
+          mkdir -p "$(dirname "$dir")"
+          rm -rf "$dir"
+          clone_context_repository "$url" "$dir" "$readonly" "$branch" || exit 1
         fi
-        mkdir -p "$(dirname "$dir")"
-        rm -rf "$dir"
-        clone_context_repository "$url" "$dir" "$readonly" "$branch" || exit 1
+        if [ "$readonly" = "0" ] && [ "${` + WorkspaceCheckoutCommitSetupEnv + `:-0}" = "1" ]; then
+          (cd "$dir" && bash -c ` + shellSingleQuoted(FactoryRepoCommitSetup()) + `) || exit 1
+        fi
       done
     fi
     unset _sp_tab _sp_ctx_list
@@ -770,6 +773,13 @@ cd "$_sp_cwd" || exit 1
 unset _sp_cwd
 fi
 `
+}
+
+// shellSingleQuoted quotes script as one shell word. Context repositories
+// run the commit setup with bash -c, because a subshell in an "|| exit 1"
+// list ignores set -e.
+func shellSingleQuoted(script string) string {
+	return "'" + strings.ReplaceAll(script, "'", `'\''`) + "'"
 }
 
 func appendWorkspaceCheckoutFile(files []TaskFile) []TaskFile {

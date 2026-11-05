@@ -347,6 +347,31 @@ func TestWorkspaceCheckoutScriptCommitSetupInstallsIdentity(t *testing.T) {
 	assert.DirExists(t, filepath.Join(dir, "context", "acme", "extra", ".git"))
 }
 
+func TestWorkspaceCheckoutScriptCommitSetupSignsWritableContextRepositories(t *testing.T) {
+	main := initBareRepo(t, "main")
+	writable := initBareRepo(t, "main")
+	readonly := initBareRepo(t, "main")
+	dir := t.TempDir()
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]any{
+		{"repository": "acme/web", "url": "file://" + writable, "directory": "context/acme/web"},
+		{"repository": "acme/docs", "url": "file://" + readonly, "directory": "context/acme/docs", "readOnly": true},
+	}})
+	require.NoError(t, err)
+
+	output, err := runCheckoutScriptFull(t, dir, "file://"+main, "main", checkoutScriptOptions{
+		commitSetup: "1",
+		context:     string(payload),
+	})
+
+	require.NoError(t, err, output)
+	web := filepath.Join(dir, "context", "acme", "web")
+	assert.Equal(t, runner.FactoryAgentEmail, gitRepoConfig(t, web, "user.email"))
+	assert.FileExists(t, filepath.Join(web, ".git", "superplane-hooks", "superplane-pre-push"))
+	assert.Equal(t, filepath.Join(web, ".git", "superplane-hooks"), gitRepoConfig(t, web, "core.hooksPath"))
+	docs := filepath.Join(dir, "context", "acme", "docs")
+	assert.Empty(t, gitRepoConfig(t, docs, "core.hooksPath"))
+}
+
 func TestWorkspaceCheckoutScriptCommitSetupCreatesBranchOnEmptyRemote(t *testing.T) {
 	remote := initBareRepo(t, "")
 	dir := t.TempDir()
