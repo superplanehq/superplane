@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,9 +21,9 @@ func TestDispatchedPlanningProtocolIncludesRefinementWithoutSkills(t *testing.T)
 	cmd := exec.Command("node", "-e", `process.stdout.write(require(process.argv[1]).analysisProtocol());`, filepath.Join(taskDir, "analysis_protocol.js"))
 	protocol, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(protocol))
-	assert.Contains(t, string(protocol), "Before writing options, identify the missing information or decision")
-	assert.Contains(t, string(protocol), "'## Scope', '## Approach', '## Acceptance', and '## Risks'")
-	assert.Contains(t, string(protocol), "integer from 1 through 3")
+	guidance, err := os.ReadFile("analysis_user_prompt_review.md")
+	require.NoError(t, err)
+	assert.Contains(t, string(protocol), strings.TrimSpace(string(guidance)))
 	assert.Contains(t, string(protocol), "Before your final response, call propose_plan")
 	assert.Contains(t, string(protocol), "no scores have been published")
 	assert.Contains(t, string(protocol), "The assign_task_owner call does not complete the turn")

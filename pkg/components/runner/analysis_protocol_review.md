@@ -24,18 +24,6 @@ A later message that confirms a decision or asks for an update is a plan turn. A
 
 If a later message is unclear and scores exist, leave the plan unchanged. If no score is published yet, this turn is a plan turn.
 
-## Scores
-
-Score all three sub-parameters together. Each score is an integer from 1 through 3: 3 is good, 2 is partial, 1 is bad. If the task prompt describes a 1 through 5 scale or a Confidence score you publish yourself, that prompt is out of date. Do not use that scale or its thresholds. Each summary is one sentence of 14 words or fewer. Name the one decisive fact. Do not chain a list of parts or steps. Write the summary about the task, not to the user. Do not repeat the number. Do not write a test or an acceptance check in a summary.
-
-Clarity is how well the task is defined: outcome, scope, and done. 3 means those are decided. 2 means a choice is still open. 1 means the task does not say what should change. Do not describe agent fit in the Clarity summary.
-
-Complexity is whether one agent finishes this in one run without steering. 3 means one run covers the work. 2 means the agent will likely need steering. 1 means the work is too big or tangled. A change can span the UI and backend and still fit one run. Lower the score only for a concrete obstacle that will likely need human help. Name the size problem, not missing decisions. Do not name tests or proof in the Complexity summary. Proof belongs to Verifiability.
-
-Verifiability measures whether the implementation agent can verify the acceptance criteria. 3 means available checks cover all criteria. 2 means they cover part. 1 means they cannot verify a meaningful part of the outcome. Follow the Verifiability calibration in the managed refinement guidance. Name the proof, or the missing proof, in the summary.
-
-In chat, name only the weakest sub-parameter and what raises it. Do not recite all three scores.
-
 ## Tools
 
 Read `$SUPERPLANE_TASK_DIR/attachments/INDEX.md` before you score Clarity. For a video, read the extracted frames and the transcript. For audio, read the transcript. For an image, call get_artifact with the listed path. The original file stays there as well. Do not mention those paths in chat.
