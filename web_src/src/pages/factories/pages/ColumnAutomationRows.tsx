@@ -1,5 +1,6 @@
-import { Plus, Settings2 } from "lucide-react";
+import { Loader2, Play, Plus, Settings2 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { columnAutomationHeadline } from "../lib/columnAutomationHeadline";
@@ -19,6 +20,9 @@ export function ColumnAutomationRows({
   automations,
   rowCount,
   onRowAction,
+  onRun,
+  runPending = false,
+  runningAutomationId,
   onAdd,
   testId,
 }: {
@@ -26,6 +30,9 @@ export function ColumnAutomationRows({
   automations: ColumnAutomation[];
   rowCount: number;
   onRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  onRun?: (automation: ColumnAutomation) => void;
+  runPending?: boolean;
+  runningAutomationId?: string;
   onAdd?: () => void;
   testId: string;
 }) {
@@ -37,7 +44,15 @@ export function ColumnAutomationRows({
         <EmptyAutomationRow title={title} onAdd={onAdd} testId={testId} />
       ) : (
         automations.map((automation) => (
-          <ColumnAutomationRow key={automation.id} automation={automation} onRowAction={onRowAction} testId={testId} />
+          <ColumnAutomationRow
+            key={automation.id}
+            automation={automation}
+            onRowAction={onRowAction}
+            onRun={onRun}
+            runPending={runPending}
+            runningAutomationId={runningAutomationId}
+            testId={testId}
+          />
         ))
       )}
       {Array.from({ length: blankCount }, (_, index) => (
@@ -57,26 +72,34 @@ function EmptyAutomationRow({ title, onAdd, testId }: { title: string; onAdd?: (
   }
 
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="xs"
       type="button"
       data-testid={`${testId}-empty`}
       aria-label={`${COLUMN_AUTOMATIONS_COPY.addLabel} for ${title}`}
       onClick={onAdd}
-      className={cn(ROW_CLASSNAME, ROW_HOVER_CLASSNAME, "text-muted-foreground hover:text-foreground")}
+      className={cn(ROW_CLASSNAME, ROW_HOVER_CLASSNAME, "font-normal text-muted-foreground hover:text-foreground")}
     >
       <Plus className="size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate">{COLUMN_AUTOMATIONS_COPY.addLabel}</span>
-    </button>
+    </Button>
   );
 }
 
 function ColumnAutomationRow({
   automation,
   onRowAction,
+  onRun,
+  runPending,
+  runningAutomationId,
   testId,
 }: {
   automation: ColumnAutomation;
   onRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  onRun?: (automation: ColumnAutomation) => void;
+  runPending: boolean;
+  runningAutomationId?: string;
   testId: string;
 }) {
   const disabled = automation.health === "disabled";
@@ -88,7 +111,7 @@ function ColumnAutomationRow({
     disabled && "line-through opacity-60",
     onRowAction && ROW_HOVER_CLASSNAME,
   );
-  const content = (
+  const details = (
     <>
       <ColumnAutomationGlyph automation={automation} className="size-3.5" />
       <span className="min-w-0 flex-1 truncate">{headline}</span>
@@ -99,40 +122,70 @@ function ColumnAutomationRow({
           data-testid={`${testId}-needs-repair-${automation.id}`}
         />
       ) : null}
-      {onRowAction ? (
-        <Settings2
-          className="size-3.5 shrink-0 text-muted-foreground"
-          aria-hidden
-          data-testid={`${testId}-settings-${automation.id}`}
-        />
-      ) : null}
     </>
   );
-
-  if (!onRowAction) {
-    return (
-      <div
-        role="listitem"
-        title={`${automation.name}: ${automation.trigger} → ${automation.action}`}
-        className={className}
-        data-testid={`${testId}-row-${automation.id}`}
-      >
-        {content}
-      </div>
-    );
-  }
+  const showRun = Boolean(onRun && automation.canRunNow);
+  const starting = Boolean(runningAutomationId && runningAutomationId === automation.canvasId);
 
   return (
-    <button
-      type="button"
+    <div
       role="listitem"
       title={`${automation.name}: ${automation.trigger} → ${automation.action}`}
-      aria-label={`${COLUMN_AUTOMATIONS_COPY.rowMenu}: ${automation.name}`}
       className={className}
       data-testid={`${testId}-row-${automation.id}`}
-      onClick={() => onRowAction(automation, "settings")}
+      onClick={onRowAction ? () => onRowAction(automation, "settings") : undefined}
     >
-      {content}
-    </button>
+      {onRowAction ? (
+        <Button
+          variant="ghost"
+          size="xs"
+          type="button"
+          aria-label={`${COLUMN_AUTOMATIONS_COPY.rowMenu}: ${automation.name}`}
+          className="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-none p-0 text-left text-[12px] font-normal hover:bg-transparent dark:hover:bg-transparent"
+        >
+          {details}
+        </Button>
+      ) : (
+        details
+      )}
+      {showRun ? (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          type="button"
+          aria-label={`Run ${automation.name}`}
+          disabled={runPending}
+          aria-busy={starting}
+          data-testid={`${testId}-run-${automation.id}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRun?.(automation);
+          }}
+          className="size-4 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+        >
+          {starting ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <Play className="size-3.5" aria-hidden />
+          )}
+        </Button>
+      ) : null}
+      {onRowAction ? (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          type="button"
+          tabIndex={-1}
+          aria-hidden
+          onClick={(event) => {
+            event.stopPropagation();
+            onRowAction(automation, "settings");
+          }}
+          className="size-4 shrink-0 p-0 text-muted-foreground"
+        >
+          <Settings2 className="size-3.5" aria-hidden data-testid={`${testId}-settings-${automation.id}`} />
+        </Button>
+      ) : null}
+    </div>
   );
 }

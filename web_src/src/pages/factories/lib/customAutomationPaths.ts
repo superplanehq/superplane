@@ -18,6 +18,23 @@ export function factoryCustomAutomationSetupPath(
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}?${params.toString()}`;
 }
 
+/** Open the automation modal on one run. */
+export function factoryCustomAutomationRunPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  automationId: string,
+  runId: string,
+) {
+  const params = new URLSearchParams({
+    [CUSTOM_AUTOMATION_PARAM]: automationId,
+    automationColumn: "backlog",
+    automationTab: "runs",
+    automationRun: runId,
+  });
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
 export function customAutomationIdFromSearch(search: string): string | null | undefined {
   const params = new URLSearchParams(search);
   const value = params.get(CUSTOM_AUTOMATION_PARAM)?.trim() || params.get(LEGACY_CUSTOM_AUTOMATION_PARAM)?.trim();

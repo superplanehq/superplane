@@ -47,6 +47,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import {
+  customAutomationAllowsManualStart,
   customAutomationMode,
   CUSTOM_AUTOMATION_TEMPLATE_ID,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
@@ -1145,13 +1146,27 @@ function LineDetail({
         ...app,
         customAutomationMode: app.id ? customAutomationModes.get(app.id) : undefined,
         customAutomationIcon: app.id ? customAutomationIcons.get(app.id) : undefined,
+        customAutomationCronExpression: customAutomationDetails.find(({ automationId }) => automationId === app.id)
+          ?.automation.settings?.schedule?.cronExpression,
+        customAutomationTriggers: (() => {
+          const triggers = customAutomationDetails.find(({ automationId }) => automationId === app.id)?.automation
+            .settings?.triggers;
+          if (!triggers || triggers.length < 2) {
+            return undefined;
+          }
+          return triggers.flatMap((trigger) =>
+            trigger.startMode
+              ? [{ mode: customAutomationMode(trigger.startMode), cronExpression: trigger.schedule?.cronExpression }]
+              : [],
+          );
+        })(),
       })),
-    [apps, customAutomationIcons, customAutomationModes],
+    [apps, customAutomationDetails, customAutomationIcons, customAutomationModes],
   );
   const manualCustomAutomations = useMemo<ManualCustomAutomation[]>(
     () =>
       customAutomationDetails.flatMap(({ automationId, automation }) =>
-        customAutomationMode(automation.settings?.startMode) === "manual"
+        customAutomationAllowsManualStart(automation.settings)
           ? [
               {
                 id: automationId,
