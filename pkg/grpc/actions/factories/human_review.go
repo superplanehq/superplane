@@ -181,7 +181,13 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 			return err
 		}
 	}
-	if source == nil {
+	// Completed decisions retain their evidence after run retention. A new
+	// revision, policy, or assessment still replaces that authority above.
+	retainedDecision := source == nil && !changed && len(decision.Assessment) > 0 && len(decision.Result) > 0
+	if retainedDecision {
+		assessment = decision.Assessment
+	}
+	if source == nil && !retainedDecision {
 		publicationErr := publishHumanReviewCheck(ctx, db, client, pr, decision, humanReviewPublication{Status: "queued", Reason: "Waiting for merge confidence."})
 		requests, err := models.ListPullRequestChecksStartRequests(db, pr.ID)
 		if err != nil {
@@ -192,7 +198,7 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 		}
 		return publicationErr
 	}
-	if source.State != models.CanvasRunStateFinished {
+	if source != nil && source.State != models.CanvasRunStateFinished {
 		return publishHumanReviewCheck(ctx, db, client, pr, decision, humanReviewPublication{Status: "queued", Reason: "Waiting for merge confidence."})
 	}
 	var report mergeconfidence.ReportData
@@ -201,7 +207,7 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 	} else if err := json.Unmarshal(encoded, &report); err != nil {
 		return err
 	}
-	if source.Result != models.CanvasRunResultPassed || !validHumanReviewAssessment(report, pr.ID, sha) {
+	if (source != nil && source.Result != models.CanvasRunResultPassed) || !validHumanReviewAssessment(report, pr.ID, sha) {
 		previousState, previousReason := decision.State, decision.BlockingReason
 		decision.State = models.FactoryHumanReviewStateFailed
 		decision.BlockingReason = "Merge confidence failed or did not produce a complete assessment. Run merge confidence again."
@@ -219,7 +225,7 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 			return err
 		}
 	}
-	if decision.RunID == nil {
+	if decision.RunID == nil && len(decision.Result) == 0 {
 		if err := startHumanReviewAgent(ctx, db, factory, pr, automation, client, current, decision, report); err != nil {
 			decision.State = models.FactoryHumanReviewStateFailed
 			decision.BlockingReason = "Human review could not start. " + err.Error()
@@ -230,7 +236,7 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 			return errors.Join(err, publishHumanReviewCheck(ctx, db, client, pr, decision, humanReviewPublication{Status: "completed", Conclusion: "failure", Reason: decision.BlockingReason}))
 		}
 	}
-	if decision.RunID == nil {
+	if decision.RunID == nil && len(decision.Result) == 0 {
 		return nil
 	}
 	if len(decision.Result) == 0 {
@@ -238,20 +244,21 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 		if err != nil {
 			return err
 		}
-		if run.State == models.CanvasRunStateFinished {
-			previousState, previousReason := decision.State, decision.BlockingReason
-			decision.State = models.FactoryHumanReviewStateFailed
-			decision.BlockingReason = "The Human review agent failed or returned no valid decision. Run the automation again."
-			if err := decision.Save(db); err != nil {
-				return err
-			}
-			if previousState != decision.State || previousReason != decision.BlockingReason {
-				notifyHumanReviewDecision(db, pr, decision)
-			}
+		if run.State != models.CanvasRunStateFinished {
+			return publishHumanReviewCheck(ctx, db, client, pr, decision, humanReviewPublication{Status: "in_progress", Reason: "Waiting for the Human review decision."})
+		}
+		decision, err = failHumanReviewWithoutResult(db, pr, decision)
+		if err != nil {
+			return err
+		}
+		if decision.State == models.FactoryHumanReviewStateSuperseded {
+			return nil
+		}
+		if len(decision.Result) == 0 {
 			return publishHumanReviewCheck(ctx, db, client, pr, decision, humanReviewPublication{Status: "completed", Conclusion: "failure", Reason: decision.BlockingReason})
 		}
-		return publishHumanReviewCheck(ctx, db, client, pr, decision, humanReviewPublication{Status: "in_progress", Reason: "Waiting for the Human review decision."})
 	}
+
 	err = evaluateHumanReviewDecision(ctx, db, client, pr, current, automation, decision)
 	if err == nil || errors.Is(err, errHumanReviewPublication) {
 		return err
@@ -263,6 +270,34 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 	}
 	notifyHumanReviewDecision(db, pr, decision)
 	return errors.Join(err, publishHumanReviewCheck(ctx, db, client, pr, decision, humanReviewPublication{Status: "completed", Conclusion: "failure", Reason: decision.BlockingReason}))
+}
+
+func failHumanReviewWithoutResult(db *gorm.DB, pr *models.FactoryPullRequest, decision *models.FactoryHumanReviewDecision) (*models.FactoryHumanReviewDecision, error) {
+	changed := false
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// Runner completion takes the same PR lock. Reload after observing the
+		// finished run so a result saved between the two reads cannot be erased.
+		if err := pr.LockForUpdate(tx); err != nil {
+			return err
+		}
+		current, err := models.FindFactoryHumanReviewDecision(tx, decision.ID)
+		if err != nil {
+			return err
+		}
+		decision = current
+		if len(decision.Result) > 0 || decision.State == models.FactoryHumanReviewStateSuperseded {
+			return nil
+		}
+		reason := "The Human review agent failed or returned no valid decision. Run the automation again."
+		changed = decision.State != models.FactoryHumanReviewStateFailed || decision.BlockingReason != reason
+		decision.State = models.FactoryHumanReviewStateFailed
+		decision.BlockingReason = reason
+		return decision.Save(tx)
+	})
+	if err == nil && changed {
+		notifyHumanReviewDecision(db, pr, decision)
+	}
+	return decision, err
 }
 
 func equalHumanReviewRun(left, right *uuid.UUID) bool {
