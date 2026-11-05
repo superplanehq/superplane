@@ -15,12 +15,12 @@ func ValidateRunnerScope(db *gorm.DB, scope *RunnerScope) error {
 }
 
 // validateRunnerTokenScope permits startup before NodeExecutor commits the
-// started state. Requests still require a committed, started merge execution.
+// started state. Merge and schedule requests require a committed, started execution.
 func validateRunnerTokenScope(db *gorm.DB, scope *RunnerScope) error {
 	return validateRunnerScope(db, scope, []string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted})
 }
 
-func validateRunnerScope(db *gorm.DB, scope *RunnerScope, mergeExecutionStates []string) error {
+func validateRunnerScope(db *gorm.DB, scope *RunnerScope, allowedExecutionStates []string) error {
 	execution, err := validateRunnerExecution(db, scope)
 	if err != nil {
 		return err
@@ -37,13 +37,16 @@ func validateRunnerScope(db *gorm.DB, scope *RunnerScope, mergeExecutionStates [
 		if canvas.FactoryID == nil || *canvas.FactoryID != scope.FactoryID {
 			return fmt.Errorf("runner canvas does not match")
 		}
-		if !slices.Contains(mergeExecutionStates, execution.State) {
+		if !slices.Contains(allowedExecutionStates, execution.State) {
 			return fmt.Errorf("merge confidence execution is inactive")
 		}
 		return nil
 	case RunnerFlowSchedule:
 		if canvas.FactoryID == nil || *canvas.FactoryID != scope.FactoryID {
 			return fmt.Errorf("runner canvas does not match")
+		}
+		if !slices.Contains(allowedExecutionStates, execution.State) {
+			return fmt.Errorf("schedule execution is inactive")
 		}
 		return nil
 	case RunnerFlowTask:

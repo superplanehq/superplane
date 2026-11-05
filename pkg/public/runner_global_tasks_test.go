@@ -91,14 +91,36 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	require.NotEmpty(t, token)
+	// Token creation precedes the committed started state, but API access must wait.
+	rec := runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/tasks", "")
+	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"Before start"}`)
+	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	require.NoError(t, execution.StartInTransaction(db))
+
 	assert.Equal(t, []string{"list_tasks", "create_task"}, listRunnerTools(t, server, token))
-	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"Fix the lint","description":"Clean the reported errors."}`)
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"Fix the lint","description":"Clean the reported errors."}`)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 	created := decodeRunnerTask(t, rec.Body.Bytes())
 	assert.Equal(t, "Fix the lint", created.Title)
 	assert.Equal(t, "draft", created.State)
+	rec = runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/tasks", "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	listed := decodeRunnerTaskList(t, rec.Body.Bytes())
+	assert.Equal(t, []runnerTaskJSON{created}, listed)
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/close", `{}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code)
+
+	for _, state := range []string{models.CanvasNodeExecutionStateCancelling, models.CanvasNodeExecutionStateFinished} {
+		t.Run(state, func(t *testing.T) {
+			require.NoError(t, db.Model(execution).Update("state", state).Error)
+			assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60, nil)))
+			rec := runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/tasks", "")
+			assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+			rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"After stop"}`)
+			assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+		})
+	}
 }
 
 func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {
