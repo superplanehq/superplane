@@ -17,6 +17,7 @@ import {
   type FactoryAgentRewrite,
 } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
+import { linearIntakeScopeToApi, type LinearIntakeScope } from "../linearIntakeScope";
 import type { IssuesChoiceId } from "./onboardingFixtures";
 import {
   forgetOnboardingIntakeBinding,
@@ -288,8 +289,28 @@ export async function provisionJiraIntake(args: {
   return created;
 }
 
-function linearIntakeResourceId(projectIds: string[]): string {
-  return projectIds.join(",");
+function sameValues(left: string[] | undefined, right: string[]): boolean {
+  const sortedLeft = [...(left ?? [])].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.length === sortedRight.length && sortedLeft.every((value, index) => value === sortedRight[index]);
+}
+
+// A retried finish keeps the intake only when it already has the same
+// connection, team, and filters. The intake settings are the source of truth,
+// because a team intake has no project list as its resource.
+function linearIntakeMatches(intake: FactoriesFactoryIntake, integrationId: string, scope: LinearIntakeScope): boolean {
+  const settings = intake.settings;
+  // The "no project" choice only matters while projects narrow the team.
+  const sameProjectChoice =
+    scope.projectIds.length === 0 ||
+    (settings?.linearIncludeIssuesWithoutProject ?? true) === scope.includeIssuesWithoutProject;
+  return (
+    intake.integrationId === integrationId &&
+    (settings?.linearTeamId ?? "") === scope.teamId &&
+    sameValues(settings?.linearProjectIds, scope.projectIds) &&
+    sameValues(settings?.linearLabels, scope.labels) &&
+    sameProjectChoice
+  );
 }
 
 export async function provisionLinearIntake(args: {
@@ -300,31 +321,24 @@ export async function provisionLinearIntake(args: {
   paused?: boolean;
   deleteIntake: DeleteFactoryIntake;
   integrationId: string;
-  projectIds: string[];
+  scope: LinearIntakeScope;
 }): Promise<FactoriesFactoryIntake> {
-  const resourceId = linearIntakeResourceId(args.projectIds);
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === LINEAR_INTAKE_SOURCE);
-  if (existing && intakeBindingMatches(existing, args.integrationId, resourceId)) {
+  if (existing && linearIntakeMatches(existing, args.integrationId, args.scope)) {
     return reuseIntake(existing, args.paused, args.updateIntake);
   }
   if (existing) {
     await removeProvisionedIntake(args.deleteIntake, existing);
   }
 
-  const created = await args.createIntake({
+  return args.createIntake({
     source: LINEAR_INTAKE_SOURCE,
     ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
     ...(args.paused ? { paused: true } : {}),
     integrationId: args.integrationId,
-    resourceId,
-    settings: { linearProjectIds: args.projectIds },
+    settings: linearIntakeScopeToApi(args.scope),
   });
-  rememberOnboardingIntakeBinding(created.id, {
-    integrationId: args.integrationId,
-    resourceId,
-  });
-  return created;
 }
 
 // Create the selected backlog intake and remove a leftover intake from an
@@ -346,7 +360,7 @@ export async function provisionOnboardingIntake(args: {
   };
   linear?: {
     integrationId: string;
-    projectIds: string[];
+    scope: LinearIntakeScope;
   };
 }): Promise<FactoriesFactoryIntake | undefined> {
   const intakes = await args.listIntakes();
@@ -373,8 +387,8 @@ export async function provisionOnboardingIntake(args: {
     });
   }
   if (args.issuesChoice === "linear") {
-    if (!args.linear?.integrationId || args.linear.projectIds.length === 0) {
-      throw new Error("Connect Linear, then choose a project.");
+    if (!args.linear?.integrationId || !args.linear.scope.teamId) {
+      throw new Error("Connect Linear, then choose a team.");
     }
     return provisionLinearIntake({
       listIntakes: args.listIntakes,
@@ -384,7 +398,7 @@ export async function provisionOnboardingIntake(args: {
       paused: args.paused,
       deleteIntake: args.deleteIntake,
       integrationId: args.linear.integrationId,
-      projectIds: args.linear.projectIds,
+      scope: args.linear.scope,
     });
   }
   // GitHub Issues needs a GitHub repository, so other hosts get no intake.

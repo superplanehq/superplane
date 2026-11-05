@@ -1,3 +1,4 @@
+import { updatePullRequestBodySectionMapper } from "../updatePullRequestBodySection";
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onPushTriggerRenderer } from "./on_push";
 import { onPullRequestTriggerRenderer } from "./on_pull_request";
@@ -87,6 +88,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   markPullRequestReadyForReview: markPullRequestReadyForReviewMapper,
   addPullRequestReviewers: addPullRequestReviewersMapper,
   updatePullRequest: updatePullRequestMapper,
+  updatePullRequestBodySection: updatePullRequestBodySectionMapper,
   findPullRequest: findPullRequestMapper,
   runWorkflow: runWorkflowMapper,
   waitForPullRequestChecks: waitForPullRequestChecksMapper,

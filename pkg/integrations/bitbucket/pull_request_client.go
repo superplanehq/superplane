@@ -38,7 +38,7 @@ type CreatePullRequestRequest struct {
 
 type UpdatePullRequestRequest struct {
 	Title       string
-	Description string
+	Description *string
 }
 
 // APIError carries the Bitbucket HTTP status with the response message so
@@ -196,8 +196,8 @@ func (c *Client) UpdatePullRequest(repository string, id int64, request UpdatePu
 	if request.Title != "" {
 		body["title"] = request.Title
 	}
-	if request.Description != "" {
-		body["description"] = request.Description
+	if request.Description != nil {
+		body["description"] = *request.Description
 	}
 
 	var pullRequest map[string]any
@@ -281,11 +281,11 @@ func PullRequestMergeStrategy(method string) string {
 
 // BitbucketPullRequest is the merge-relevant subset of a pull request.
 type BitbucketPullRequest struct {
-	Description         string
 	ID                  int64  `json:"id"`
 	State               string `json:"state"`
 	Draft               bool   `json:"draft"`
 	Title               string `json:"title"`
+	Description         string `json:"description"`
 	HTMLURL             string
 	SourceRepository    string
 	SourceHash          string

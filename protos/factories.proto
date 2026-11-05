@@ -1405,6 +1405,7 @@ message FactoryCustomAutomation {
     START_MODE_UNSPECIFIED = 0;
     START_MODE_MANUAL = 1;
     START_MODE_AUTOMATIC = 2;
+    START_MODE_SCHEDULED = 3;
   }
 
   message Step {
@@ -1422,12 +1423,24 @@ message FactoryCustomAutomation {
     repeated string secrets = 6;
   }
 
+  message Schedule {
+    string cron_expression = 1;
+    double utc_offset = 2;
+  }
+
+  message StartTrigger {
+    StartMode start_mode = 1;
+    Schedule schedule = 2;
+  }
+
   message Settings {
     StartMode start_mode = 1;
     FactoryAppTemplateAgent agent = 2;
     repeated Step steps = 3;
     string icon = 4;
     int32 execution_timeout_seconds = 5;
+    Schedule schedule = 6;
+    repeated StartTrigger triggers = 7;
   }
 
   Factory.Automation automation = 1;
@@ -1637,7 +1650,8 @@ message FactoryIntake {
     // Environments that still create a task. Empty means every environment.
     // Datadog intakes only.
     repeated string datadog_environments = 20;
-    // Projects that still create a task. Required for a Linear intake.
+    // Projects that still create a task. Optional for a Linear intake that
+    // has a team. Empty means every project in the team.
     // Linear issue intakes only.
     repeated string linear_project_ids = 21;
     // Label names that still create a task. Empty means every label.
@@ -1648,6 +1662,14 @@ message FactoryIntake {
     repeated string sentry_project_ids = 23;
     // Organization user ID. Omitted updates preserve the selection; empty clears it.
     optional string default_owner_id = 24;
+    // Linear team that the intake listens to. Required for a new Linear
+    // intake. An older intake that has projects and no team still works.
+    // Linear issue intakes only.
+    string linear_team_id = 25;
+    // Create a task for an issue that has no project. Applies only when
+    // linear_project_ids is not empty. Omitted means true.
+    // Linear issue intakes only.
+    optional bool linear_include_issues_without_project = 26;
   }
 
   string id = 1;

@@ -321,6 +321,41 @@ func TestAdminListOrganizationPlans(t *testing.T) {
 	assert.Equal(t, twins[1], page.Items[0].ID)
 	assert.Equal(t, int64(2), page.Total)
 	request(t, "search=PlanSort&sort_by=name&sort_direction=asc&limit=2")
+	t.Run("filters by current plan before pagination and counts", func(t *testing.T) {
+		for _, test := range []struct {
+			key       string
+			ids       []string
+			pinnedIDs []string
+		}{
+			{custom.Key, []string{twinA.ID.String(), zebra.ID.String()}, []string{pinCustom.ID.String()}},
+			{other.Key, []string{alpha.ID.String(), twinB.ID.String()}, []string{}},
+			{"trial", []string{trial.ID.String()}, []string{pinTrial.ID.String()}},
+			{"none", noneIDs, []string{}},
+			{"unknown-plan", []string{}, []string{}},
+		} {
+			t.Run(test.key, func(t *testing.T) {
+				for _, sortBy := range []string{"name", "plan_name", "remaining_credit_cents"} {
+					ids := []string{}
+					for offset := 0; offset < max(1, len(test.ids)); offset++ {
+						page := request(t, fmt.Sprintf("search=PlanSort&plan_key=%s&sort_by=%s&sort_direction=asc&limit=1&offset=%d", test.key, sortBy, offset))
+						assert.Equal(t, int64(len(test.ids)), page.Total)
+						assert.Equal(t, int64(len(test.ids)+len(test.pinnedIDs)), page.MatchTotal)
+						assert.ElementsMatch(t, test.pinnedIDs, adminOrganizationIDs(page.Pinned))
+						assert.LessOrEqual(t, len(page.Items), 1)
+						ids = append(ids, adminOrganizationIDs(page.Items)...)
+					}
+					assert.ElementsMatch(t, test.ids, ids)
+				}
+			})
+		}
+		page := request(t, "search=PlanSort%20Twin&plan_key="+custom.Key)
+		assert.Equal(t, []string{twinA.ID.String()}, adminOrganizationIDs(page.Items))
+		assert.Equal(t, int64(1), page.MatchTotal)
+		// Pins remain visible during text search, but must match the selected plan.
+		assert.Equal(t, []string{pinCustom.ID.String()}, adminOrganizationIDs(page.Pinned))
+		page = request(t, "search="+zebra.ID.String()+"&plan_key="+custom.Key)
+		assert.Equal(t, []string{zebra.ID.String()}, adminOrganizationIDs(page.Items))
+	})
 	for _, org := range []*models.Organization{none, expired, ended} {
 		stored, err := billingmodels.FindOrganizationBillingPlan(db, org.ID)
 		require.NoError(t, err)
@@ -339,7 +374,7 @@ func TestAdminListOrganizationPlanResolutionErrors(t *testing.T) {
 		}
 	}))
 	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
-	for _, query := range []string{"sort_by=name", "sort_by=plan_name"} {
+	for _, query := range []string{"sort_by=name", "sort_by=plan_name", "plan_key=trial"} {
 		response := execRequest(server, requestParams{method: http.MethodGet, path: "/admin/api/organizations?" + query, authCookie: token})
 		assert.Equal(t, http.StatusInternalServerError, response.Code)
 		assert.Equal(t, "Failed to list organizations\n", response.Body.String())
