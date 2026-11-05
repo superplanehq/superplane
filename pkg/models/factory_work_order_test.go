@@ -491,7 +491,7 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 }
 
-func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
+func TestFactoryWorkOrder_StartFillsMissingOwner(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	org, creatorID, factoryModel := setupFactoryWithUser(t, "assign-on-start")
@@ -513,7 +513,7 @@ func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
 		assert.Equal(t, starter.ID, loaded.Assignees[0].UserID)
 	})
 
-	t.Run("replaces the creator when someone else starts the draft", func(t *testing.T) {
+	t.Run("preserves the owner when someone else starts the draft", func(t *testing.T) {
 		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Manual draft", "", &creatorID, []uuid.UUID{creatorID}, nil)
 		require.NoError(t, err)
 
@@ -526,7 +526,7 @@ func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
 		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
 		require.NoError(t, err)
 		require.Len(t, loaded.Assignees, 1)
-		assert.Equal(t, starter.ID, loaded.Assignees[0].UserID)
+		assert.Equal(t, creatorID, loaded.Assignees[0].UserID)
 	})
 
 	t.Run("leaves assignees unchanged when no person opens the draft", func(t *testing.T) {

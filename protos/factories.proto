@@ -2211,6 +2211,13 @@ message WorkOrder {
   WorkOrderMcpClient mcp_client = 26;
   string refinement_model = 27;
   PendingHandOff pending_handoff = 28;
+  // Person who first moved this task from draft to open. Independent of ownership.
+  // Empty when the first start was automated or the task has not started.
+  UserRef started_by = 29;
+  // True when the first start was automatic. False before the task starts.
+  bool auto_started = 30;
+  // Timestamp of the first start. Empty before the task starts.
+  google.protobuf.Timestamp started_at = 31;
 }
 
 // WorkOrderSummary is the list row for a work order.
