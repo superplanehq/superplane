@@ -11,6 +11,7 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	githubauth "github.com/google/go-github/v75/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -65,7 +66,7 @@ func resolveAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integratio
 		return pat, nil
 
 	case common.AuthMethodApp:
-		return appInstallationAccessToken(httpCtx, integrationCtx.Properties(), integrationCtx.Secrets())
+		return appInstallationAccessToken(httpCtx, integrationCtx)
 
 	default:
 		return "", fmt.Errorf("invalid authentication method: %s", authMethod)
@@ -80,7 +81,6 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 
 	installationID := 0
 	appID := metadata.GitHubApp.ID
-	pem := ""
 	var repositoryIDs []int64
 	if metadata.HostedApp {
 		hosted, err := common.ResolveHostedAppBinding(integrationCtx)
@@ -89,7 +89,6 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 		}
 		installationID = int(hosted.ID)
 		appID = hosted.App.ID
-		pem = hosted.App.PrivateKey
 		repositoryIDs = hosted.RepositoryIDs
 	} else {
 		var err error
@@ -97,34 +96,13 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 		if err != nil {
 			return "", fmt.Errorf("failed to parse installation ID: %v", err)
 		}
-		pem, err = common.LegacyAppPrivateKey(integrationCtx, metadata)
-		if err != nil {
-			return "", fmt.Errorf("failed to find PEM: %v", err)
-		}
 	}
 
-	itr, err := ghinstallation.New(
-		&httpContextTransport{http: httpCtx},
-		appID,
-		int64(installationID),
-		[]byte(pem),
-	)
+	client, err := newClientForApp(httpCtx, integrationCtx, appID)
 	if err != nil {
-		return "", fmt.Errorf("failed to create apps transport: %v", err)
+		return "", err
 	}
-	common.ApplyHostToInstallationTransport(itr, common.HostFromIntegration(integrationCtx))
-	if metadata.HostedApp {
-		if err := common.RestrictHostedAppTransport(itr, repositoryIDs); err != nil {
-			return "", err
-		}
-	}
-
-	token, err := itr.Token(context.Background())
-	if err != nil {
-		return "", fmt.Errorf("failed to create installation access token: %v", err)
-	}
-
-	return token, nil
+	return mintRunnerInstallationToken(client, int64(installationID), repositoryIDs)
 }
 
 // resolveContextAccessToken mints a contents:read installation token for
@@ -215,9 +193,9 @@ func mintReadOnlyInstallationToken(
 
 func appInstallationAccessToken(
 	httpCtx core.HTTPContext,
-	properties core.IntegrationPropertyStorageReader,
-	secrets core.IntegrationSecretStorageReader,
+	integrationCtx core.IntegrationContext,
 ) (string, error) {
+	properties := integrationCtx.Properties()
 	appID, err := properties.GetString(common.PropertyAppID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get GitHub app ID: %v", err)
@@ -238,26 +216,49 @@ func appInstallationAccessToken(
 		return "", fmt.Errorf("failed to parse installation ID: %v", err)
 	}
 
-	pem, err := secrets.Get(common.SecretAppPEM)
+	client, err := newClientForApp(httpCtx, integrationCtx, appNumber)
 	if err != nil {
-		return "", fmt.Errorf("failed to get PEM: %v", err)
+		return "", err
 	}
+	return mintRunnerInstallationToken(client, installationNumber, nil)
+}
 
-	itr, err := ghinstallation.New(
-		&httpContextTransport{http: httpCtx},
-		appNumber,
-		installationNumber,
-		[]byte(pem),
-	)
+// Runner credentials cannot publish checks or commit statuses. Either can
+// satisfy a required GitHub gate, so both remain under server control.
+func mintRunnerInstallationToken(client *github.Client, installationID int64, repositoryIDs []int64) (string, error) {
+	path := fmt.Sprintf("app/installations/%d", installationID)
+	request, err := client.NewRequest(http.MethodGet, path, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create apps transport: %v", err)
+		return "", err
 	}
-	common.ApplyHostToInstallationTransport(itr, common.HostFromProperties(properties))
-
-	token, err := itr.Token(context.Background())
+	var installation struct {
+		Permissions map[string]string `json:"permissions"`
+	}
+	if _, err := client.Do(context.Background(), request, &installation); err != nil {
+		return "", fmt.Errorf("failed to get installation permissions: %w", err)
+	}
+	if len(installation.Permissions) == 0 {
+		return "", fmt.Errorf("GitHub installation did not return permissions")
+	}
+	for _, permission := range []string{"checks", "statuses"} {
+		if installation.Permissions[permission] == "write" {
+			installation.Permissions[permission] = "read"
+		}
+	}
+	options := struct {
+		RepositoryIDs []int64           `json:"repository_ids,omitempty"`
+		Permissions   map[string]string `json:"permissions"`
+	}{RepositoryIDs: repositoryIDs, Permissions: installation.Permissions}
+	request, err = client.NewRequest(http.MethodPost, path+"/access_tokens", options)
 	if err != nil {
-		return "", fmt.Errorf("failed to create installation access token: %v", err)
+		return "", err
 	}
-
-	return token, nil
+	var token github.InstallationToken
+	if _, err := client.Do(context.Background(), request, &token); err != nil {
+		return "", fmt.Errorf("failed to create runner installation access token: %w", err)
+	}
+	if token.GetToken() == "" {
+		return "", fmt.Errorf("GitHub did not return a runner installation access token")
+	}
+	return token.GetToken(), nil
 }
