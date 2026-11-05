@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 
 import { pullRequestRepositoryLabel } from "../../lib/workOrderPullRequest";
+import { PullRequestConfidence } from "./redesign/consoleCheckRows";
 import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
 import { multiplePullRequestReviewCopy } from "./splitRunPullRequestReview";
 
@@ -89,6 +90,7 @@ function ReviewPullRequestRow({
         <p className="truncate text-[12px] leading-4 text-muted-foreground">{label}</p>
         {title ? <p className="line-clamp-2 text-[13px] font-medium leading-5 text-foreground">{title}</p> : null}
       </div>
+      <PullRequestConfidence repository={pullRequest.repository} />
       <div className="flex flex-wrap items-center gap-2">
         {href ? (
           <Button asChild size="sm" className="bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700">

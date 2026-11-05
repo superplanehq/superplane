@@ -1374,7 +1374,9 @@ describe("WorkOrderSplitRunPopup", () => {
 
     // The tab shows the check count. The page lists every score.
     await user.click(screen.getByRole("tab", { name: "Checks 2" }));
-    expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
+    const summary = screen.getByTestId("redesign-console-summary");
+    const onChecksPage = screen.getAllByText(/Moderate risk: retry policy/).filter((node) => !summary.contains(node));
+    expect(onChecksPage).toHaveLength(1);
   });
 
   it("pins the pull request review to the waiting implement log", () => {
@@ -2440,11 +2442,12 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(screen.queryByText(/fit for an agent on this factory line/)).toBeNull();
     const summary = screen.getByTestId("redesign-console-summary");
+    // The risk check needs review, so the pull request opens its checks.
     const header = within(summary).getByRole("button", { name: "Merge confidence" });
-    expect(header).toHaveAttribute("aria-expanded", "false");
-    expect(within(summary).queryByText("Blast radius")).not.toBeInTheDocument();
-    fireEvent.click(header);
+    expect(header).toHaveAttribute("aria-expanded", "true");
     expect(within(summary).getByText("Blast radius")).toBeInTheDocument();
+    fireEvent.click(header);
+    expect(within(summary).queryByText("Blast radius")).not.toBeInTheDocument();
   });
 
   it("shows the console when a GitHub automation created the draft", () => {

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { MERGE_CONFIDENCE_SCORE_NAME } from "../../../lib/mergeConfidenceScore";
 import {
@@ -10,6 +10,7 @@ import {
 } from "../../../lib/workOrderChecks";
 import { CheckStatusBars } from "../../../workOrders/ConfidenceMeter";
 import { CheckStatusIcon } from "../../../workOrders/CheckStatusIcon";
+import { usePullRequestMergeChecks } from "./pullRequestChecksContext";
 
 /** Each header bar represents one check. Expanded rows show status and evidence. */
 export function ConsoleCheckRows({
@@ -47,6 +48,57 @@ export function ConsoleCheckRows({
         />
       </button>
       {open ? <CheckList checks={checks} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Merge confidence of one pull request, under its title. It opens by itself
+ * when a check needs review, so passing pull requests stay one line.
+ */
+export function PullRequestConfidence({
+  repository,
+  className,
+}: {
+  repository: string | null | undefined;
+  className?: string;
+}) {
+  const checks = usePullRequestMergeChecks(repository);
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const summaryId = useId();
+  if (checks.length === 0) {
+    return null;
+  }
+  const attention = needsReview(checks);
+  const open = toggled ?? attention;
+  return (
+    <div
+      className={cn("min-w-0", className)}
+      data-testid="redesign-console-pull-request-checks"
+      data-repository={repository ?? ""}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={MERGE_CONFIDENCE_SCORE_NAME}
+        aria-describedby={summaryId}
+        onClick={() => setToggled(!open)}
+        className="flex w-full min-w-0 items-center gap-2 text-left"
+      >
+        <CheckStatusBars checks={checks} className="shrink-0" />
+        <span className="min-w-0 flex-1 truncate text-[12px] leading-4">
+          <span className="font-medium text-foreground">{MERGE_CONFIDENCE_SCORE_NAME}</span>
+          <span id={summaryId} className={attention ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}>
+            {" · "}
+            {checksSummary(checks)}
+          </span>
+        </span>
+        <ChevronDown
+          className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open ? "" : "-rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {open ? <CheckRowList checks={checks} className="mt-1" /> : null}
     </div>
   );
 }
@@ -92,8 +144,16 @@ function checksByRepository(
   return [...groups].map(([repository, grouped]) => ({ repository, checks: grouped }));
 }
 
+function needsReview(checks: WorkOrderCheckPresentation[]): boolean {
+  return checks.some(checkNeedsReview);
+}
+
+function checkNeedsReview(check: WorkOrderCheckPresentation): boolean {
+  return check.level === "critical" || check.level === "caution";
+}
+
 function checksSummary(checks: WorkOrderCheckPresentation[]): string {
-  const attention = checks.filter((check) => check.level === "critical" || check.level === "caution").length;
+  const attention = checks.filter(checkNeedsReview).length;
   if (attention > 0) {
     return attention === 1 ? "1 check needs review" : `${attention} checks need review`;
   }

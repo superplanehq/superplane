@@ -8,6 +8,7 @@ import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequest
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
+import { PullRequestConfidence } from "./redesign/consoleCheckRows";
 import { ContinueFixesButton, MultiPullRequestReviewNote } from "./SplitRunMultiPullRequestReview";
 import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
@@ -206,6 +207,7 @@ function CompactPullRequestReviewNote({
       <div className="min-w-0">
         <h3 className="text-[14px] font-semibold leading-5 text-foreground">{copy.headline}</h3>
         <p className="mt-1 text-[12px] leading-4 text-foreground/70">{copy.closing}</p>
+        <PullRequestConfidence repository={trackedPullRequest?.repository} className="mt-3" />
         <div className="mt-3">
           <ReviewCallToAction
             ctaLabel={ctaLabel}

@@ -7,6 +7,7 @@ import {
   mergeConfidenceHeadline,
   mergeConfidencePanelTone,
   mergeConfidenceScore,
+  splitMergeChecksByPullRequest,
 } from "./mergeConfidenceScore";
 import type { WorkOrderCheckPresentation } from "./workOrderChecks";
 
@@ -113,6 +114,39 @@ describe("checksForRepository", () => {
     ];
 
     expect(checksForRepository(checks, "acme/api").map((check) => check.id)).toEqual(["api", "task"]);
+  });
+});
+
+describe("splitMergeChecksByPullRequest", () => {
+  const api = check({ id: "api", key: "risk-review", name: "Blast radius", repository: "Acme/API" });
+  const web = check({ id: "web", key: "security-review", name: "Security", repository: "acme/web" });
+  const task = check({ id: "task", key: "drift-review", name: "Drift" });
+  const other = check({ id: "other", key: "risk-review", name: "Blast radius", repository: "acme/other" });
+  const ids = (checks: WorkOrderCheckPresentation[] | undefined) => (checks ?? []).map((entry) => entry.id);
+
+  it("gives each pull request the checks of its repository", () => {
+    const split = splitMergeChecksByPullRequest([api, web, other], ["acme/api", "acme/web"]);
+
+    expect(ids(split.byRepository.get("acme/api"))).toEqual(["api"]);
+    expect(ids(split.byRepository.get("acme/web"))).toEqual(["web"]);
+    expect(ids(split.unattached)).toEqual(["other"]);
+  });
+
+  it("keeps a check without a repository off the rows when several repositories have pull requests", () => {
+    const split = splitMergeChecksByPullRequest([api, task], ["acme/api", "acme/web"]);
+
+    expect(ids(split.unattached)).toEqual(["task"]);
+  });
+
+  it("attaches a check without a repository to the only pull request repository", () => {
+    const split = splitMergeChecksByPullRequest([api, task], ["acme/api", "ACME/api"]);
+
+    expect(ids(split.byRepository.get("acme/api"))).toEqual(["api", "task"]);
+    expect(split.unattached).toEqual([]);
+  });
+
+  it("leaves every check unattached without pull requests", () => {
+    expect(ids(splitMergeChecksByPullRequest([api, task], []).unattached)).toEqual(["api", "task"]);
   });
 });
 

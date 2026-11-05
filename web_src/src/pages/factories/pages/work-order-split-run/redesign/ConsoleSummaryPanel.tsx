@@ -10,7 +10,11 @@ import { type ReactNode } from "react";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
-import { checksForRepository, consoleCheckList, isMergeConfidenceMetric } from "../../../lib/mergeConfidenceScore";
+import {
+  checksForRepository,
+  isMergeConfidenceMetric,
+  splitMergeChecksByPullRequest,
+} from "../../../lib/mergeConfidenceScore";
 import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
 import { workOrderCardPullRequestShowsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
@@ -27,7 +31,8 @@ import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
 import { OwnerSpendValue } from "../../work-order-popup-redesign/popupShared";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
-import { ConsoleCheckRows } from "./consoleCheckRows";
+import { ConsoleCheckRows, PullRequestConfidence } from "./consoleCheckRows";
+import { PullRequestChecksContext } from "./pullRequestChecksContext";
 import type { SplitRunFixture } from "../splitRunMocks";
 import { splitRunPanelArtifacts } from "../splitRunPopupModel";
 import { isPullRequestReviewFooter, openReviewPullRequests, pullRequestReviewNote } from "../splitRunPullRequestReview";
@@ -85,88 +90,92 @@ export function ConsoleSummaryPanel({
   const shownAssigneeIds = assigneeIds ?? fixture.assigneeIds;
   return (
     <aside className="lg:sticky lg:top-0 lg:self-start" data-testid="redesign-console-summary">
-      <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
-        <FrameHeader>
-          <FrameTitle className="flex items-center gap-2">
-            <StaticStatusGlyph status={outcome.status} />
-            {outcome.statusLabel}
-          </FrameTitle>
-          {panel.showsStrip ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
-        </FrameHeader>
-        <SummaryDecisionStrip
-          hasDecision={panel.hasDecision}
-          panelReview={panelReview}
-          decisionClassName={panel.decisionClassName}
-          isLive={panel.isLive}
-          liveStage={panel.liveStage}
-          footer={fixture.footer}
-          actionBusy={actionBusy}
-          onStop={onStopLiveRun}
-        />
-        {panel.panelPullRequests.length > 0 ? (
-          <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
-            <span className="text-[12px] font-medium text-muted-foreground">
-              {panel.panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
-            </span>
-            {panel.panelPullRequests.map((pullRequest, index) => (
-              <PanelPullRequest
-                key={pullRequest.id ?? pullRequest.url ?? index}
-                pullRequest={pullRequest}
-                checks={fixture.checks}
-                showRepository={panel.showsPullRequestRepository}
+      <PullRequestChecksContext.Provider value={panel.pullRequestChecks}>
+        <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
+          <FrameHeader>
+            <FrameTitle className="flex items-center gap-2">
+              <StaticStatusGlyph status={outcome.status} />
+              {outcome.statusLabel}
+            </FrameTitle>
+            {panel.showsStrip ? null : (
+              <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>
+            )}
+          </FrameHeader>
+          <SummaryDecisionStrip
+            hasDecision={panel.hasDecision}
+            panelReview={panelReview}
+            decisionClassName={panel.decisionClassName}
+            isLive={panel.isLive}
+            liveStage={panel.liveStage}
+            footer={fixture.footer}
+            actionBusy={actionBusy}
+            onStop={onStopLiveRun}
+          />
+          {panel.panelPullRequests.length > 0 ? (
+            <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
+              <span className="text-[12px] font-medium text-muted-foreground">
+                {panel.panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
+              </span>
+              {panel.panelPullRequests.map((pullRequest, index) => (
+                <PanelPullRequest
+                  key={pullRequest.id ?? pullRequest.url ?? index}
+                  pullRequest={pullRequest}
+                  checks={fixture.checks}
+                  showRepository={panel.showsPullRequestRepository}
+                />
+              ))}
+            </FramePanel>
+          ) : null}
+          {panel.mergeChecks.length > 0 ? (
+            <FramePanel className="py-3">
+              <ConsoleCheckRows checks={panel.mergeChecks} />
+            </FramePanel>
+          ) : null}
+          {panel.otherChecks.length > 0 ? (
+            <FramePanel className="py-3">
+              <ConsoleCheckRows
+                checks={panel.otherChecks}
+                title="Checks"
+                testId="redesign-console-other-checks"
+                defaultOpen
               />
-            ))}
-          </FramePanel>
-        ) : null}
-        {panel.mergeChecks.length > 0 ? (
-          <FramePanel className="py-3">
-            <ConsoleCheckRows checks={panel.mergeChecks} />
-          </FramePanel>
-        ) : null}
-        {panel.otherChecks.length > 0 ? (
-          <FramePanel className="py-3">
-            <ConsoleCheckRows
-              checks={panel.otherChecks}
-              title="Checks"
-              testId="redesign-console-other-checks"
-              defaultOpen
-            />
-          </FramePanel>
-        ) : null}
-        {panel.panelArtifacts.length > 0 ? (
-          <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-artifacts">
-            <span className="text-[12px] font-medium text-muted-foreground">Artifacts</span>
-            {panel.panelArtifacts.map((artifact) => (
-              <WorkOrderArtifactInline
-                key={artifact.id}
-                artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
+            </FramePanel>
+          ) : null}
+          {panel.panelArtifacts.length > 0 ? (
+            <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-artifacts">
+              <span className="text-[12px] font-medium text-muted-foreground">Artifacts</span>
+              {panel.panelArtifacts.map((artifact) => (
+                <WorkOrderArtifactInline
+                  key={artifact.id}
+                  artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
+                />
+              ))}
+            </FramePanel>
+          ) : null}
+          <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-context">
+            <SummaryRow label="Owner" truncate={false}>
+              <OwnerSummaryValue
+                organizationId={organizationId}
+                assigneeIds={shownAssigneeIds}
+                owner={shownOwner}
+                canEditOwner={canEditOwner}
+                ownerBusy={ownerBusy}
+                onOwnerSave={onOwnerSave}
               />
-            ))}
+            </SummaryRow>
+            <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
+            {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
+            <SummaryRow label="Spend">
+              <OwnerSpendValue
+                costUsd={spend.costUsd}
+                usageByModel={fixture.usageByModel}
+                usageByMachineType={fixture.usageByMachineType}
+              />{" "}
+              <span className="text-muted-foreground">· {spend.tokensLabel}</span>
+            </SummaryRow>
           </FramePanel>
-        ) : null}
-        <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-context">
-          <SummaryRow label="Owner" truncate={false}>
-            <OwnerSummaryValue
-              organizationId={organizationId}
-              assigneeIds={shownAssigneeIds}
-              owner={shownOwner}
-              canEditOwner={canEditOwner}
-              ownerBusy={ownerBusy}
-              onOwnerSave={onOwnerSave}
-            />
-          </SummaryRow>
-          <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
-          {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
-          <SummaryRow label="Spend">
-            <OwnerSpendValue
-              costUsd={spend.costUsd}
-              usageByModel={fixture.usageByModel}
-              usageByMachineType={fixture.usageByMachineType}
-            />{" "}
-            <span className="text-muted-foreground">· {spend.tokensLabel}</span>
-          </SummaryRow>
-        </FramePanel>
-      </Frame>
+        </Frame>
+      </PullRequestChecksContext.Provider>
     </aside>
   );
 }
@@ -195,6 +204,10 @@ function consolePanelFacts({
   const reviewedHrefs = panelReview ? reviewStripPullRequestHrefs(fixture, taskPullRequests) : [];
   const panelPullRequests = withoutPullRequests(taskPullRequests, reviewedHrefs);
   const hasPullRequest = panelPullRequests.length > 0 || reviewedHrefs.length > 0;
+  const mergeChecks = splitMergeChecksByPullRequest(
+    fixture.checks,
+    taskPullRequests.map((pullRequest) => pullRequest.repository),
+  );
   const taskArtifacts = artifacts ?? [];
   const taskArtifactIds = new Set(taskArtifacts.map((artifact) => artifact.id).filter(Boolean));
   const stageArtifacts = stages
@@ -216,9 +229,11 @@ function consolePanelFacts({
     panelPullRequests,
     showsPullRequestRepository: pullRequestsSpanRepositories(taskPullRequests),
     panelArtifacts,
-    // Merge confidence stays on its own list. Other non-planning checks stay
-    // reachable here when no verify card copied them.
-    mergeChecks: consoleCheckList(fixture.checks)?.metrics ?? [],
+    // Each pull request row shows its own merge checks. The list keeps the
+    // rest. Other non-planning checks stay reachable here when no verify
+    // card copied them.
+    pullRequestChecks: mergeChecks.byRepository,
+    mergeChecks: mergeChecks.unattached,
     otherChecks: fixture.checks.filter(
       (check) =>
         !isMergeConfidenceMetric(check) &&
@@ -390,6 +405,7 @@ function PanelPullRequest({
           <WorkOrderMergeableChip />
         ) : null}
       </div>
+      <PullRequestConfidence repository={pullRequest.repository} />
     </div>
   );
 }

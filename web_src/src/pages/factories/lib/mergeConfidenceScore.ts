@@ -149,6 +149,47 @@ export function checksForRepository<Check extends { repository?: string }>(
   return checks.filter((check) => !check.repository || !name || check.repository.toLowerCase() === name);
 }
 
+export type MergeChecksByPullRequest = {
+  /** Merge checks of each pull request repository, keyed by `pullRequestChecksKey`. */
+  byRepository: Map<string, WorkOrderCheckPresentation[]>;
+  /** Merge checks that belong to no listed pull request. */
+  unattached: WorkOrderCheckPresentation[];
+};
+
+export function pullRequestChecksKey(repository: string | null | undefined): string {
+  return repository?.trim().toLowerCase() ?? "";
+}
+
+/**
+ * Each pull request row shows the merge checks of its repository. A check
+ * without a repository attaches only when the task has one pull request
+ * repository; with more, nothing says which pull request it scores.
+ */
+export function splitMergeChecksByPullRequest(
+  checks: WorkOrderCheckPresentation[],
+  pullRequestRepositories: readonly (string | null | undefined)[],
+): MergeChecksByPullRequest {
+  const metrics = consoleCheckList(checks)?.metrics ?? [];
+  const keys = [...new Set(pullRequestRepositories.map(pullRequestChecksKey))];
+  const byRepository = new Map<string, WorkOrderCheckPresentation[]>();
+  const unattached: WorkOrderCheckPresentation[] = [];
+  for (const metric of metrics) {
+    const key = attachedPullRequestKey(metric, keys);
+    if (key === undefined) {
+      unattached.push(metric);
+      continue;
+    }
+    byRepository.set(key, [...(byRepository.get(key) ?? []), metric]);
+  }
+  return { byRepository, unattached };
+}
+
+function attachedPullRequestKey(check: WorkOrderCheckPresentation, keys: string[]): string | undefined {
+  const key = pullRequestChecksKey(check.repository);
+  if (key) return keys.includes(key) ? key : undefined;
+  return keys.length === 1 ? keys[0] : undefined;
+}
+
 /**
  * The task summary shows merge confidence only. Planning confidence and other
  * checks stay off this list once work has started.
