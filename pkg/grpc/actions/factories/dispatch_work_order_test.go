@@ -184,6 +184,57 @@ func TestDispatchOpenRouterThinkingFollowsProviderCatalog(t *testing.T) {
 	assert.Equal(t, "max", response.Order.LineDispatches[0].ThinkingLevel)
 }
 
+func TestDispatchCodexSubscriptionThinkingFollowsCatalog(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+		{Model: "gpt-6-astra", IsDefault: true, SupportedReasoningEfforts: []models.CodexReasoningEffortOption{
+			{ReasoningEffort: "low"}, {ReasoningEffort: "max"}, {ReasoningEffort: "ultra"}, {ReasoningEffort: "future-effort"},
+		}},
+		{Model: "gpt-6-luna", SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "max"}}},
+	}, time.Now()))
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	app := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "subscription", "")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	for _, tc := range []struct {
+		name, model, effort string
+		wantErr             bool
+	}{
+		{name: "max", model: "gpt-6-astra", effort: "max"},
+		{name: "ultra", model: "gpt-6-astra", effort: "ultra"},
+		{name: "future catalog effort", model: "gpt-6-astra", effort: "future-effort"},
+		{name: "native default model", effort: "ultra"},
+		{name: "unreported effort", model: "gpt-6-astra", effort: "high", wantErr: true},
+		{name: "unsupported model effort", model: "gpt-6-luna", effort: "ultra", wantErr: true},
+		{name: "unsupported native default effort", effort: "high", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, []uuid.UUID{r.User}, nil)
+			require.NoError(t, err)
+			response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+				FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+				Model: tc.model, ThinkingLevel: tc.effort,
+			})
+			if tc.wantErr {
+				require.ErrorContains(t, err, "thinking level")
+				assertDispatchRejected(t, db, order, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, response.Order.LineDispatches, 1)
+			assert.Equal(t, tc.effort, response.Order.LineDispatches[0].ThinkingLevel)
+		})
+	}
+}
+
 func TestDispatchThinkingLevelWithModelMustBeAcceptedByEveryLineRunner(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

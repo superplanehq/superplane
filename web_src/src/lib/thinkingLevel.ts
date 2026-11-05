@@ -5,7 +5,7 @@ const STORED_THINKING_DEFAULT = "default";
 
 export type ThinkingOption = { value: string; label: string };
 
-/** Every level that an agent CLI can receive, in display order. A model supports a subset. */
+/** Display labels and order for familiar levels. Model catalogs can supply more. */
 const THINKING_LEVEL_LABELS: ReadonlyArray<ThinkingOption> = [
   { value: "none", label: "None" },
   { value: "minimal", label: "Minimal" },
@@ -23,13 +23,25 @@ export function normalizeThinkingLevel(value: unknown): string {
     return "";
   }
   const key = value.trim().toLowerCase();
-  return THINKING_LEVEL_LABELS.some((level) => level.value === key) ? key : "";
+  if (key === OMITTED_DRAFT_START_THINKING || key === STORED_THINKING_DEFAULT) {
+    return "";
+  }
+  return /^[a-z][a-z0-9_-]*$/.test(key) ? key : "";
 }
 
-/** Known levels from a model catalog, in display order. */
+/** Catalog levels, with familiar levels first and additional efforts in catalog order. */
 export function modelThinkingLevels(levels: ReadonlyArray<string> | undefined): string[] {
   const keys = new Set((levels ?? []).map(normalizeThinkingLevel));
-  return THINKING_LEVEL_LABELS.filter((level) => keys.has(level.value)).map((level) => level.value);
+  keys.delete("");
+  const known = THINKING_LEVEL_LABELS.filter((level) => keys.has(level.value)).map((level) => level.value);
+  return [...known, ...[...keys].filter((level) => !known.includes(level))];
+}
+
+function thinkingLevelLabel(level: string): string {
+  const known = THINKING_LEVEL_LABELS.find((option) => option.value === level);
+  if (known) return known.label;
+  const words = level.replace(/[_-]+/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /**
@@ -44,7 +56,7 @@ export function thinkingOptions(
   if (supported.length === 0) {
     return [];
   }
-  const options = THINKING_LEVEL_LABELS.filter((level) => supported.includes(level.value));
+  const options = supported.map((value) => ({ value, label: thinkingLevelLabel(value) }));
   return withDefault ? [DEFAULT_THINKING_OPTION, ...options] : options;
 }
 
@@ -71,7 +83,8 @@ export function visibleThinkingLevelLabel(value: string | undefined): string | u
   if (key === STORED_THINKING_DEFAULT) {
     return "Default";
   }
-  return THINKING_LEVEL_LABELS.find((level) => level.value === key)?.label;
+  const level = normalizeThinkingLevel(key);
+  return level ? thinkingLevelLabel(level) : undefined;
 }
 
 /** Model name plus a thinking word. No model name means no word. */

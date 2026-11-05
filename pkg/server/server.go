@@ -315,7 +315,7 @@ func startWorkers(
 	if os.Getenv("START_PRICE_BOOK_SYNC_WORKER") == "yes" {
 		log.Println("Starting LLM Model Catalog Worker")
 		catalog := llmcatalog.New(encryptor, registry.HTTPContext())
-		go workers.NewLLMModelCatalogWorker(catalog).Start(context.Background())
+		go workers.NewLLMModelCatalogWorker(catalog, registry).Start(context.Background())
 
 		log.Println("Starting Price Book Sync Worker")
 

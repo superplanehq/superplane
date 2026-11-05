@@ -158,10 +158,10 @@ function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
     .toLowerCase();
-  if (["none", "minimal", "low", "medium", "high", "xhigh"].includes(level)) {
-    return ["-c", `model_reasoning_effort=${tomlString(level)}`];
+  if (!level || level === "default") {
+    return [];
   }
-  return [];
+  return ["-c", `model_reasoning_effort=${tomlString(level)}`];
 }
 
 function codexExecArgs(

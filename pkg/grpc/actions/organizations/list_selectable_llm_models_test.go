@@ -165,6 +165,9 @@ func TestSelectableSubscriptionModelsUseCodexCatalogEfforts(t *testing.T) {
 			SupportedReasoningEfforts: []models.CodexReasoningEffortOption{
 				{ReasoningEffort: "high"},
 				{ReasoningEffort: "low"},
+				{ReasoningEffort: "ultra"},
+				{ReasoningEffort: "max"},
+				{ReasoningEffort: "future-effort"},
 			},
 		},
 	}, time.Now()))
@@ -184,7 +187,7 @@ func TestSelectableSubscriptionModelsUseCodexCatalogEfforts(t *testing.T) {
 		byID[model.GetModel().GetId()] = model
 	}
 	require.Contains(t, byID, "gpt-5.4")
-	assert.Equal(t, []string{"low", "high"}, byID["gpt-5.4"].GetThinkingLevels())
+	assert.Equal(t, []string{"low", "high", "max", "ultra", "future-effort"}, byID["gpt-5.4"].GetThinkingLevels())
 	assert.True(t, byID["gpt-5.4"].GetIsDefault())
 	assert.Equal(t, "subscription", byID["gpt-5.4"].GetSource().GetId())
 	assert.Empty(t, byID["gpt-5.3"].GetThinkingLevels())

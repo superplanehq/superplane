@@ -30,7 +30,9 @@ func TestThinkingArgsMapsReasoningEffort(t *testing.T) {
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="minimal"`}, thinkingArgsFromScript(t, "minimal"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="xhigh"`}, thinkingArgsFromScript(t, "xhigh"))
 	assert.Equal(t, []string{"-c", `model_reasoning_effort="none"`}, thinkingArgsFromScript(t, "none"))
-	assert.Empty(t, thinkingArgsFromScript(t, "max"))
+	for _, effort := range []string{"max", "ultra", "future-effort"} {
+		assert.Equal(t, []string{"-c", `model_reasoning_effort="` + effort + `"`}, thinkingArgsFromScript(t, effort))
+	}
 }
 
 func TestCodexRunReadsModelFromRolloutAndMapsUsage(t *testing.T) {

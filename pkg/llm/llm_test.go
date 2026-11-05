@@ -48,7 +48,7 @@ func TestNew_UsesDefaultBaseURLs(t *testing.T) {
 	anthropic, err := New(httpCtx, ProviderAnthropic, Credentials{APIKey: "sk-ant"})
 	require.NoError(t, err)
 	assert.Equal(t, ProviderAnthropic, anthropic.Provider())
-	assert.Equal(t, defaultAnthropicBaseURL, anthropic.(*anthropicClient).baseURL)
+	assert.Equal(t, DefaultAnthropicBaseURL, anthropic.(*anthropicClient).baseURL)
 
 	openai, err := New(httpCtx, ProviderOpenAI, Credentials{APIKey: "sk"})
 	require.NoError(t, err)
@@ -90,8 +90,8 @@ func TestAnthropic_ListModelsAndComplete(t *testing.T) {
 
 	require.Len(t, httpCtx.Requests, 2)
 	assert.Equal(t, "sk-ant", httpCtx.Requests[0].Header.Get("x-api-key"))
-	assert.Equal(t, defaultAnthropicBaseURL+"/models", httpCtx.Requests[0].URL.String())
-	assert.Equal(t, defaultAnthropicBaseURL+"/messages", httpCtx.Requests[1].URL.String())
+	assert.Equal(t, DefaultAnthropicBaseURL+"/models", httpCtx.Requests[0].URL.String())
+	assert.Equal(t, DefaultAnthropicBaseURL+"/messages", httpCtx.Requests[1].URL.String())
 }
 
 func TestOpenAI_ListModelsAndComplete(t *testing.T) {
@@ -302,7 +302,9 @@ func TestComplete_ErrorStatus(t *testing.T) {
 	require.NoError(t, err)
 	_, err = client.ListModels(context.Background())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "401")
+	var providerErr *core.ProviderAPIError
+	require.ErrorAs(t, err, &providerErr)
+	assert.Equal(t, http.StatusUnauthorized, providerErr.StatusCode)
 }
 
 func TestOpenAIChatRequestJSON(t *testing.T) {

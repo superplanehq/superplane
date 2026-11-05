@@ -131,10 +131,10 @@ func mergeLineRunnerModels(options []lineRunnerModel) []lineRunnerModel {
 		index, seen := merged[option.ID]
 		if !seen {
 			merged[option.ID] = len(out)
-			out = append(out, lineRunnerModel{ID: option.ID, ThinkingLevels: runner.SupportedThinkingLevels(option.ThinkingLevels)})
+			out = append(out, lineRunnerModel{ID: option.ID, ThinkingLevels: runner.CatalogThinkingLevels(option.ThinkingLevels)})
 			continue
 		}
-		shared := runner.SupportedThinkingLevels(option.ThinkingLevels)
+		shared := runner.CatalogThinkingLevels(option.ThinkingLevels)
 		out[index].ThinkingLevels = slices.DeleteFunc(out[index].ThinkingLevels, func(level string) bool {
 			return !slices.Contains(shared, level)
 		})
@@ -177,12 +177,9 @@ func lineRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node mode
 }
 
 func codexSubscriptionThinkingLevels(catalog []models.CodexModel) func(string) []string {
-	levels := make(map[string][]string, len(catalog))
-	for _, model := range catalog {
-		id := strings.TrimSpace(model.Model)
-		levels[id] = runner.SupportedThinkingLevels(append(levels[id], model.ReasoningEfforts()...))
+	return func(id string) []string {
+		return runner.CatalogThinkingLevels(models.CodexModelReasoningEfforts(catalog, id))
 	}
-	return func(id string) []string { return levels[strings.TrimSpace(id)] }
 }
 
 // lineRunnerNodeUsesHostedFunding reports whether a runner node spends

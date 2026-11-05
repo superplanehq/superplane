@@ -76,33 +76,37 @@ describe("HostedModelFieldRenderer thinking levels", () => {
     expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
   });
 
-  it("offers Codex effort levels for OpenAI models", async () => {
+  it.each([
+    ["max", "Max"],
+    ["ultra", "Ultra"],
+    ["future-effort", "Future effort"],
+  ])("saves the subscription catalog effort %s", async (effort, label) => {
     const user = userEvent.setup();
     const onValuesChange = vi.fn();
-    mockSelectableModels([selectableModel("byok", "openai", "gpt-5.4", ["none", "low", "medium", "high", "xhigh"])]);
+    mockSelectableModels([selectableModel("subscription", "openai", "gpt-6-astra", ["low", effort])]);
 
     renderField(
       <HostedModelFieldRenderer
         field={createField("openai")}
-        value="gpt-5.4"
+        value="gpt-6-astra"
         onChange={vi.fn()}
         onValuesChange={onValuesChange}
-        allValues={{ model: "gpt-5.4" }}
+        allValues={{ model: "gpt-6-astra", credentials: { source: "subscription" } }}
         organizationId="org-1"
       />,
     );
 
     await user.click(screen.getByTestId("field-model-hosted-model"));
-    await selectFlyoutOption(user, "field-model-hosted-thinking", "Extra high");
-    expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-5.4", thinkingLevel: "xhigh" });
+    await selectFlyoutOption(user, "field-model-hosted-thinking", label);
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-6-astra", thinkingLevel: effort });
   });
 
   it("uses a flat model-only menu and preserves Codex effort when the model changes", async () => {
     const user = userEvent.setup();
     const onValuesChange = vi.fn();
     mockSelectableModels([
-      selectableModel("byok", "openai", "gpt-5.4", ["low", "medium", "high", "xhigh"]),
-      selectableModel("byok", "openai", "gpt-5.3-codex", ["low", "medium", "high", "xhigh"]),
+      selectableModel("subscription", "openai", "gpt-5.4", ["low", "ultra"]),
+      selectableModel("subscription", "openai", "gpt-5.3-codex", ["low", "ultra"]),
     ]);
     renderField(
       <HostedModelFieldRenderer
@@ -110,15 +114,15 @@ describe("HostedModelFieldRenderer thinking levels", () => {
         value="gpt-5.4"
         onChange={vi.fn()}
         onValuesChange={onValuesChange}
-        allValues={{ model: "gpt-5.4", thinkingLevel: "xhigh" }}
+        allValues={{ model: "gpt-5.4", thinkingLevel: "ultra", credentials: { source: "subscription" } }}
         organizationId="org-1"
         modelOnly
       />,
     );
     await user.click(screen.getByTestId("field-model-hosted-model"));
     expect(screen.queryByTestId("field-model-hosted-thinking")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("menuitem", { name: "openai/gpt-5.3-codex" }));
-    expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-5.3-codex", thinkingLevel: "xhigh" });
+    await user.click(screen.getByRole("menuitem", { name: "gpt-5.3-codex" }));
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-5.3-codex", thinkingLevel: "ultra" });
   });
 
   it("offers only the thinking levels of the selected model", async () => {

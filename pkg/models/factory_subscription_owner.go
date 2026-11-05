@@ -341,7 +341,7 @@ func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasI
 		if strings.Contains(model, "{{") {
 			continue
 		}
-		_, err := ResolveFactoryCodexSubscriptionModel(tx, o.OrganizationID, o.FactoryID, ownerID, model)
+		_, err := ResolveFactoryCodexSubscriptionModel(tx, o.OrganizationID, o.FactoryID, ownerID, model, "")
 		if err != nil {
 			return err
 		}

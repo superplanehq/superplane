@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -27,7 +28,8 @@ var (
 	ClaudeCodeThinkingLevels = []string{
 		ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh, ThinkingLevelMax,
 	}
-	// CodexThinkingLevels are the values of Codex `model_reasoning_effort`.
+	// CodexThinkingLevels are fallback efforts for API credentials.
+	// Subscriptions use the efforts reported by the native Codex catalog.
 	CodexThinkingLevels = []string{
 		ThinkingLevelNone, ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh,
 	}
@@ -54,6 +56,21 @@ func NormalizeCodexThinkingLevel(value string) (string, error) {
 	return normalizeThinkingLevelIn(value, CodexThinkingLevels)
 }
 
+var catalogThinkingLevelPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
+
+// NormalizeCatalogThinkingLevel normalizes an effort identifier. The selected
+// model's catalog determines whether that effort is available.
+func NormalizeCatalogThinkingLevel(value string) (string, error) {
+	level := strings.ToLower(strings.TrimSpace(value))
+	if level == "" {
+		return "", nil
+	}
+	if level == "auto" || level == DispatchThinkingDefault || !catalogThinkingLevelPattern.MatchString(level) {
+		return "", fmt.Errorf("thinkingLevel must be a reasoning effort identifier")
+	}
+	return level, nil
+}
+
 func NormalizeOpenCodeThinkingLevel(value string) (string, error) {
 	return normalizeThinkingLevelIn(value, OpenCodeThinkingLevels)
 }
@@ -63,9 +80,9 @@ func NormalizeDispatchThinkingLevel(value string) (string, error) {
 	if trimmed == DispatchThinkingDefault {
 		return trimmed, nil
 	}
-	normalized, err := NormalizeThinkingLevel(trimmed)
+	normalized, err := NormalizeCatalogThinkingLevel(trimmed)
 	if err != nil {
-		return "", fmt.Errorf("thinking_level must be empty, %s, or one of: %s", DispatchThinkingDefault, strings.Join(allThinkingLevels, ", "))
+		return "", fmt.Errorf("thinking_level must be empty, %s, or a reasoning effort identifier", DispatchThinkingDefault)
 	}
 	return normalized, nil
 }

@@ -117,11 +117,29 @@ type CodexReasoningEffortOption struct {
 	Description     string `json:"description"`
 }
 
-// ReasoningEfforts lists the reasoning effort values that Codex reports for the model.
-func (m CodexModel) ReasoningEfforts() []string {
-	efforts := make([]string, 0, len(m.SupportedReasoningEfforts))
-	for _, option := range m.SupportedReasoningEfforts {
-		efforts = append(efforts, option.ReasoningEffort)
+// CodexModelReasoningEfforts lists the efforts reported for a native model.
+// An empty model uses the native default from the same catalog.
+func CodexModelReasoningEfforts(catalog []CodexModel, model string) []string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		for _, candidate := range catalog {
+			if candidate.IsDefault {
+				model = strings.TrimSpace(candidate.Model)
+				break
+			}
+		}
+	}
+	if model == "" {
+		return nil
+	}
+	var efforts []string
+	for _, candidate := range catalog {
+		if strings.TrimSpace(candidate.Model) != model {
+			continue
+		}
+		for _, option := range candidate.SupportedReasoningEfforts {
+			efforts = append(efforts, option.ReasoningEffort)
+		}
 	}
 	return efforts
 }
@@ -974,12 +992,25 @@ func readyCodexSubscription(tx *gorm.DB, organizationID, ownerID uuid.UUID) (*Fa
 
 // ResolveFactoryCodexSubscriptionModel preserves the native default while
 // inheriting. Restricted workspaces always dispatch a permitted native ID.
-func ResolveFactoryCodexSubscriptionModel(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID, requested string) (string, error) {
+// Explicit thinking must be available for the final model in the owner's catalog.
+func ResolveFactoryCodexSubscriptionModel(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID, requested, thinking string) (string, error) {
 	connection, err := FindCodexConnection(tx, organizationID, ownerID)
 	if err != nil {
 		return "", err
 	}
-	return connection.resolvePermittedModel(tx, factoryID, requested)
+	model, err := connection.resolvePermittedModel(tx, factoryID, requested)
+	if err != nil {
+		return "", err
+	}
+	thinking = strings.ToLower(strings.TrimSpace(thinking))
+	if thinking == "" {
+		return model, nil
+	}
+	levels := CodexModelReasoningEfforts(connection.AvailableModels, model)
+	if slices.ContainsFunc(levels, func(level string) bool { return strings.EqualFold(strings.TrimSpace(level), thinking) }) {
+		return model, nil
+	}
+	return "", newSubscriptionAdmissionError(fmt.Sprintf("thinking level %q is not available for this ChatGPT model", thinking))
 }
 
 func (c *FactoryCodexConnection) resolvePermittedModel(tx *gorm.DB, factoryID uuid.UUID, requested string) (string, error) {

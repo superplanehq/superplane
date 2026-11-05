@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // LLMModelCapability stores provider model metadata independently of billing rates.
@@ -26,6 +27,18 @@ func ListLLMModelCapabilities(tx *gorm.DB, provider string) ([]LLMModelCapabilit
 	var capabilities []LLMModelCapability
 	err := tx.Where("provider = ?", provider).Find(&capabilities).Error
 	return capabilities, err
+}
+
+// UpsertLLMModelCapabilities keeps models absent from a restricted API key's
+// catalog. Capability metadata is shared; model access remains organization scoped.
+func UpsertLLMModelCapabilities(tx *gorm.DB, capabilities []LLMModelCapability) error {
+	if len(capabilities) == 0 {
+		return nil
+	}
+	return tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "provider"}, {Name: "base_url"}, {Name: "model"}},
+		DoUpdates: clause.AssignmentColumns([]string{"thinking_levels", "default_thinking_level", "reasoning_mandatory", "refreshed_at"}),
+	}).CreateInBatches(capabilities, 250).Error
 }
 
 // ReplaceLLMModelCapabilities publishes one successfully fetched source catalog.

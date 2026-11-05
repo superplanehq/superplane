@@ -68,7 +68,7 @@ func ListSelectableLLMModels(
 					Model:          &pb.SelectableLLMNamedID{Id: id, Name: id},
 					Key:            id,
 					Label:          id,
-					ThinkingLevels: runner.SupportedThinkingLevels(model.ReasoningEfforts()),
+					ThinkingLevels: runner.CatalogThinkingLevels(models.CodexModelReasoningEfforts(catalog, id)),
 					IsDefault:      model.IsDefault,
 				})
 			}

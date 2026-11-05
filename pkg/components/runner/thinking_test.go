@@ -49,12 +49,12 @@ func TestNormalizeThinkingLevelPerCLI(t *testing.T) {
 func TestNormalizeDispatchThinkingLevel(t *testing.T) {
 	t.Parallel()
 
-	for _, level := range []string{"", "default", "none", "minimal", "low", "medium", "high", "xhigh", "max"} {
+	for _, level := range []string{"", "default", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra", "future-effort"} {
 		got, err := NormalizeDispatchThinkingLevel(level)
 		require.NoError(t, err)
 		assert.Equal(t, level, got)
 	}
-	_, err := NormalizeDispatchThinkingLevel("ultra")
+	_, err := NormalizeDispatchThinkingLevel("invalid effort")
 	require.Error(t, err)
 }
 

@@ -321,6 +321,8 @@ func TestLineRunnerModelsReportModelThinkingLevels(t *testing.T) {
 		Model: "gpt-5.4",
 		SupportedReasoningEfforts: []models.CodexReasoningEffortOption{
 			{ReasoningEffort: "high"}, {ReasoningEffort: "low"}, {ReasoningEffort: "xhigh"},
+			{ReasoningEffort: "ultra"}, {ReasoningEffort: "max"}, {ReasoningEffort: "future-effort"},
+			{ReasoningEffort: " ULTRA "}, {ReasoningEffort: ""}, {ReasoningEffort: "default"},
 		},
 	}}, time.Now()))
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
@@ -337,19 +339,19 @@ func TestLineRunnerModelsReportModelThinkingLevels(t *testing.T) {
 	assert.Equal(t, []lineRunnerModel{
 		{ID: "claude-haiku-4-5", ThinkingLevels: []string{}},
 		{ID: "claude-opus-5-5", ThinkingLevels: []string{"low", "medium", "high", "xhigh", "max"}},
-		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh"}},
+		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh", "max", "ultra", "future-effort"}},
 	}, options)
 }
 
 func TestMergeLineRunnerModelsKeepsLevelsEveryRunnerAccepts(t *testing.T) {
 	merged := mergeLineRunnerModels([]lineRunnerModel{
-		{ID: "gpt-5.4", ThinkingLevels: []string{"none", "low", "high", "xhigh"}},
-		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh"}},
+		{ID: "gpt-5.4", ThinkingLevels: []string{"none", "low", "high", "xhigh", "ultra", "future-effort"}},
+		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh", "ultra"}},
 		{ID: "claude-opus-5-5", ThinkingLevels: []string{"low", "max"}},
 	})
 
 	assert.Equal(t, []lineRunnerModel{
-		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh"}},
+		{ID: "gpt-5.4", ThinkingLevels: []string{"low", "high", "xhigh", "ultra"}},
 		{ID: "claude-opus-5-5", ThinkingLevels: []string{"low", "max"}},
 	}, merged)
 }

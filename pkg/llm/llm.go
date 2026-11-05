@@ -13,7 +13,7 @@ const (
 	ProviderOpenAI     = "openai"
 	ProviderOpenRouter = "openrouter"
 
-	defaultAnthropicBaseURL = "https://api.anthropic.com/v1"
+	DefaultAnthropicBaseURL = "https://api.anthropic.com/v1"
 	defaultOpenAIBaseURL    = "https://api.openai.com/v1"
 	// DefaultOpenRouterBaseURL is the official OpenRouter API endpoint.
 	DefaultOpenRouterBaseURL = "https://openrouter.ai/api/v1"

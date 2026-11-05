@@ -301,7 +301,7 @@ func dispatchWorkOrderOnLineTx(
 // their own model, so the CLI of every runner on the line must accept it.
 func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string, ownerID uuid.UUID) error {
 	if model == "" {
-		return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking)
+		return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking, ownerID)
 	}
 	options, _, err := listLineRunnerModelOptions(tx, orgID, factoryID, line.Name, ownerID)
 	if err != nil {
@@ -314,14 +314,14 @@ func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *mo
 	if dispatchThinkingOverridesLevel(thinking) && !slices.Contains(options[index].ThinkingLevels, thinking) {
 		return invalidArgument("thinking level is not available for this model")
 	}
-	return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking)
+	return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking, ownerID)
 }
 
 // validateDispatchThinkingForRunners checks the thinking level against the CLI
 // that each runner on the line uses for this dispatch. A SuperPlane agent that
 // accepts the selected model runs the CLI of that model provider. Other agents
 // keep their own CLI.
-func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string) error {
+func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string, ownerID uuid.UUID) error {
 	if !dispatchThinkingOverridesLevel(thinking) {
 		return nil
 	}
@@ -334,7 +334,7 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 			return err
 		}
 		for _, node := range version.Nodes {
-			levels, isRunner, err := runnerCLIThinkingLevels(tx, orgID, factoryID, node, model)
+			levels, isRunner, err := runnerCLIThinkingLevels(tx, orgID, factoryID, node, model, ownerID)
 			if err != nil {
 				return err
 			}
@@ -484,11 +484,26 @@ func dispatchThinkingOverridesLevel(thinking string) bool {
 // agent runs the CLI of the provider of its model. That model is the selected
 // model when the agent accepts it, and the saved model otherwise. An agent
 // without a known provider accepts only the levels that every CLI accepts.
-func runnerCLIThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, model string) ([]string, bool, error) {
+func runnerCLIThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, model string, ownerID uuid.UUID) ([]string, bool, error) {
 	switch node.ComponentName() {
 	case runnerClaudeCode:
 		return runner.ClaudeCodeThinkingLevels, true, nil
 	case runnerCodex:
+		credentials, _ := node.Configuration["credentials"].(map[string]any)
+		if credentials["source"] == "subscription" {
+			catalog, err := models.FactoryCodexSubscriptionCatalog(tx, orgID, factoryID, ownerID)
+			if err != nil {
+				return nil, true, err
+			}
+			if model == "" {
+				model = storedRunnerModel(node.Configuration)
+			}
+			model, err = models.ResolveFactoryCodexSubscriptionModel(tx, orgID, factoryID, ownerID, model, "")
+			if err != nil {
+				return nil, true, err
+			}
+			return codexSubscriptionThinkingLevels(catalog)(model), true, nil
+		}
 		return runner.CodexThinkingLevels, true, nil
 	case runnerOpenRouter:
 		return runner.OpenCodeThinkingLevels, true, nil

@@ -66,13 +66,26 @@ func CommonThinkingLevels() []string {
 }
 
 // SupportedThinkingLevels keeps the known levels from a provider catalog,
-// such as the Codex model list, in display order.
+// in display order. Subscription catalogs use CatalogThinkingLevels instead.
 func SupportedThinkingLevels(levels []string) []string {
 	out := make([]string, 0, len(levels))
 	for _, level := range allThinkingLevels {
 		if slices.ContainsFunc(levels, func(candidate string) bool {
 			return strings.EqualFold(strings.TrimSpace(candidate), level)
 		}) {
+			out = append(out, level)
+		}
+	}
+	return out
+}
+
+// CatalogThinkingLevels orders familiar efforts and preserves additional
+// efforts reported by a model catalog.
+func CatalogThinkingLevels(levels []string) []string {
+	out := SupportedThinkingLevels(levels)
+	for _, value := range levels {
+		level, err := NormalizeCatalogThinkingLevel(value)
+		if err == nil && level != "" && !slices.Contains(out, level) {
 			out = append(out, level)
 		}
 	}

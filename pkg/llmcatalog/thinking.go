@@ -2,6 +2,7 @@ package llmcatalog
 
 import (
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
@@ -15,6 +16,7 @@ import (
 type ThinkingCatalog struct {
 	openRouterHostedSource string
 	openRouter             map[string]map[string][]string
+	anthropic              map[string][]string
 }
 
 func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
@@ -25,6 +27,7 @@ func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
 	catalog := &ThinkingCatalog{
 		openRouterHostedSource: llm.DefaultOpenRouterBaseURL,
 		openRouter:             make(map[string]map[string][]string),
+		anthropic:              make(map[string][]string),
 	}
 	provider, err := models.FindHostedLLMProvider(tx, models.UsageProviderOpenRouter)
 	if err != nil && !errors.Is(err, models.ErrHostedLLMProviderNotFound) {
@@ -41,10 +44,30 @@ func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
 		id := strings.ToLower(modelid.CatalogModelID(capability.Model))
 		catalog.openRouter[source][id] = runner.SupportedThinkingLevels(capability.ThinkingLevels)
 	}
+	anthropic, err := models.ListLLMModelCapabilities(tx, models.UsageProviderAnthropic)
+	if err != nil {
+		return nil, err
+	}
+	for _, capability := range anthropic {
+		if capability.BaseURL != llm.DefaultAnthropicBaseURL {
+			continue
+		}
+		id := strings.ToLower(modelid.CatalogModelID(capability.Model))
+		levels := runner.SupportedThinkingLevels(capability.ThinkingLevels)
+		catalog.anthropic[id] = slices.DeleteFunc(levels, func(level string) bool {
+			return !slices.Contains(runner.ClaudeCodeThinkingLevels, level)
+		})
+	}
 	return catalog, nil
 }
 
 func (c *ThinkingCatalog) ThinkingLevels(provider, model, fundingSource string) []string {
+	if provider == models.UsageProviderAnthropic && fundingSource == models.UsageFundingSourceBYOK {
+		id := strings.ToLower(modelid.CatalogModelID(model))
+		if levels, found := c.anthropic[id]; found {
+			return slices.Clone(levels)
+		}
+	}
 	if provider != models.UsageProviderOpenRouter {
 		return runner.ModelThinkingLevels(provider, model)
 	}

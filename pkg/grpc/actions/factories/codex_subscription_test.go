@@ -244,7 +244,7 @@ func TestSerializeCodexModelOptionsMarksCatalogDefault(t *testing.T) {
 		{
 			ID:                        "gpt-5.4",
 			Model:                     "gpt-5.4",
-			SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "low"}, {ReasoningEffort: "high"}},
+			SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "low"}, {ReasoningEffort: "high"}, {ReasoningEffort: "ultra"}},
 			IsDefault:                 true,
 		},
 	})
@@ -255,6 +255,6 @@ func TestSerializeCodexModelOptionsMarksCatalogDefault(t *testing.T) {
 		byID[option.Id] = option
 	}
 	assert.True(t, byID["gpt-5.4"].IsDefault)
-	assert.Equal(t, []string{"low", "high"}, byID["gpt-5.4"].ThinkingLevels)
+	assert.Equal(t, []string{"low", "high", "ultra"}, byID["gpt-5.4"].ThinkingLevels)
 	assert.False(t, byID["gpt-5.3"].IsDefault)
 }
