@@ -1519,7 +1519,7 @@ func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (core.Integra
 	}
 	if contextToken != "" {
 		values[integrationSecretGitHubContextToken] = []byte(contextToken)
-		usage += "\nContext repositories are checked out with a read-only token. GITHUB_TOKEN writes to the workspace repository."
+		usage += "\nRead-only workspace repositories are checked out with a read-only token. GITHUB_TOKEN writes to the other workspace repositories."
 	}
 
 	return core.IntegrationSecrets{

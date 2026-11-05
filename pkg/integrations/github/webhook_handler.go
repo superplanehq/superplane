@@ -13,6 +13,14 @@ import (
 type Webhook struct {
 	ID          int64  `json:"id"`
 	WebhookName string `json:"name"`
+	// Hooks has one entry per repository for a multi-repository webhook.
+	Hooks []RepositoryWebhook `json:"hooks,omitempty" mapstructure:"hooks"`
+}
+
+type RepositoryWebhook struct {
+	Repository string `json:"repository" mapstructure:"repository"`
+	ID         int64  `json:"id" mapstructure:"id"`
+	Name       string `json:"name" mapstructure:"name"`
 }
 
 type GitHubWebhookHandler struct{}
@@ -31,7 +39,10 @@ func (h *GitHubWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	if configA.Repository != configB.Repository {
+	if len(configA.Repositories) == 0 && len(configB.Repositories) == 0 && configA.Repository != configB.Repository {
+		return false, nil
+	}
+	if !configA.SameRepositories(configB) {
 		return false, nil
 	}
 
@@ -101,12 +112,41 @@ func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		return nil, err
 	}
 
-	newHook, _, err := client.CreateHook(context.Background(), config.Repository, hook)
-	if err != nil {
-		return nil, fmt.Errorf("error creating webhook: %v", err)
+	if len(config.Repositories) == 0 {
+		newHook, _, err := client.CreateHook(context.Background(), config.Repository, hook)
+		if err != nil {
+			return nil, fmt.Errorf("error creating webhook: %v", err)
+		}
+		return &Webhook{ID: newHook.GetID(), WebhookName: *newHook.Name}, nil
 	}
 
-	return &Webhook{ID: newHook.GetID(), WebhookName: *newHook.Name}, nil
+	return setupRepositoryWebhooks(client, config.Repositories, hook)
+}
+
+// setupRepositoryWebhooks creates the same hook in each repository. When a
+// repository fails, it removes the hooks it already created.
+func setupRepositoryWebhooks(client *common.Client, repositories []string, hook *github.Hook) (*Webhook, error) {
+	hooks := make([]RepositoryWebhook, 0, len(repositories))
+	for _, repository := range repositories {
+		newHook, _, err := client.CreateHook(context.Background(), repository, hook)
+		if err != nil {
+			_ = deleteRepositoryWebhooks(client, hooks)
+			return nil, fmt.Errorf("error creating webhook in %s: %v", repository, err)
+		}
+		hooks = append(hooks, RepositoryWebhook{Repository: repository, ID: newHook.GetID(), Name: newHook.GetName()})
+	}
+
+	return &Webhook{ID: hooks[0].ID, WebhookName: hooks[0].Name, Hooks: hooks}, nil
+}
+
+func deleteRepositoryWebhooks(client *common.Client, hooks []RepositoryWebhook) error {
+	for _, hook := range hooks {
+		_, err := client.DeleteHook(context.Background(), hook.Repository, hook.ID)
+		if err != nil && !common.IsNotFoundError(err) {
+			return fmt.Errorf("error deleting webhook in %s: %v", hook.Repository, err)
+		}
+	}
+	return nil
 }
 
 func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
@@ -119,6 +159,10 @@ func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	err = mapstructure.Decode(ctx.Webhook.GetMetadata(), &webhook)
 	if err != nil {
 		return err
+	}
+
+	if len(webhook.Hooks) > 0 {
+		return deleteRepositoryWebhooks(client, webhook.Hooks)
 	}
 
 	configuration := common.WebhookConfiguration{}

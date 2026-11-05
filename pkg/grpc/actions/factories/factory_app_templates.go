@@ -169,7 +169,7 @@ type factoryTemplateInput struct {
 	includeVisualEvidence *bool
 	agentSettings         map[string]*factoryAgentSettings
 	triggerSettings       *factoryTriggerSettings
-	pullRequestSettings   map[string]any
+	draftPullRequests     *bool
 	mergeCheckSteps       any
 	bodySectionSettings   map[string]map[string]any
 }
@@ -398,9 +398,7 @@ func wireFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate, input
 		if node.ID == template.entrypointNodeID {
 			*node = input.triggerSettings.configure(*node)
 		}
-		if node.Component == "github.createPullRequest" || node.Component == "bitbucket.createPullRequest" {
-			maps.Copy(node.Configuration, input.pullRequestSettings)
-		}
+		applyFactoryDraftPullRequests(node, input.draftPullRequests)
 		if node.Component == "runApp" && configString(node.Configuration, "app") == input.appID {
 			node.Metadata = maps.Clone(node.Metadata)
 			if node.Metadata == nil {
@@ -609,7 +607,7 @@ func deriveFactoryTemplateInput(
 	if settings != nil {
 		input.agentSettings = settings.agents
 		input.triggerSettings = settings.triggers[template.entrypointNodeID]
-		input.pullRequestSettings = settings.pullRequests["create-pr"]
+		input.draftPullRequests = settings.draftPullRequests
 		if template.id == "risk-score" {
 			input.mergeCheckSteps = settings.agentSteps["assess-risk"]
 			input.bodySectionSettings = settings.bodySections
@@ -996,7 +994,7 @@ func materializePRFeedbackDefaults(
 ) (*materializedFactoryTemplate, error) {
 	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 	graph := resolvePRFeedbackGraph(spec)
-	settings := prFeedbackSettingsFromGraph(graph, spec)
+	settings := prFeedbackSettingsFromGraph(graph, spec).withPrimaryRepository(factory)
 	request := prFeedbackBuildRequest{
 		Name:                   canvas.Name,
 		Repository:             settings.Repository,

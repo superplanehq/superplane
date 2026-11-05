@@ -1,11 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  checksForRepository,
   consoleCheckList,
   mergeConfidenceCheckLevel,
   mergeConfidenceHeadline,
   mergeConfidencePanelTone,
   mergeConfidenceScore,
+  splitMergeChecksByPullRequest,
 } from "./mergeConfidenceScore";
 import type { WorkOrderCheckPresentation } from "./workOrderChecks";
 
@@ -76,6 +78,19 @@ describe("mergeConfidenceHeadline", () => {
     });
   });
 
+  it("lists a check once with its weakest score across repositories", () => {
+    const headline = mergeConfidenceHeadline([
+      { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+      { key: "risk-review", name: "Blast radius", score: 4, maxScore: 5 },
+    ]);
+
+    expect(headline).toMatchObject({
+      score: 2,
+      checks: [{ key: "risk-review", score: 4 }],
+    });
+    expect(headline?.checks).toHaveLength(1);
+  });
+
   it("drops checks that omit a score and still scores the rest", () => {
     const headline = mergeConfidenceHeadline([
       { key: "security-review", name: "Security" },
@@ -87,6 +102,51 @@ describe("mergeConfidenceHeadline", () => {
       score: 5,
       checks: [{ key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 }],
     });
+  });
+});
+
+describe("checksForRepository", () => {
+  it("matches the repository without case and keeps checks of the whole task", () => {
+    const checks = [
+      { id: "api", repository: "Acme/API" },
+      { id: "docs", repository: "acme/docs" },
+      { id: "task", repository: undefined },
+    ];
+
+    expect(checksForRepository(checks, "acme/api").map((check) => check.id)).toEqual(["api", "task"]);
+  });
+});
+
+describe("splitMergeChecksByPullRequest", () => {
+  const api = check({ id: "api", key: "risk-review", name: "Blast radius", repository: "Acme/API" });
+  const web = check({ id: "web", key: "security-review", name: "Security", repository: "acme/web" });
+  const task = check({ id: "task", key: "drift-review", name: "Drift" });
+  const other = check({ id: "other", key: "risk-review", name: "Blast radius", repository: "acme/other" });
+  const ids = (checks: WorkOrderCheckPresentation[] | undefined) => (checks ?? []).map((entry) => entry.id);
+
+  it("gives each pull request the checks of its repository", () => {
+    const split = splitMergeChecksByPullRequest([api, web, other], ["acme/api", "acme/web"]);
+
+    expect(ids(split.byRepository.get("acme/api"))).toEqual(["api"]);
+    expect(ids(split.byRepository.get("acme/web"))).toEqual(["web"]);
+    expect(ids(split.unattached)).toEqual(["other"]);
+  });
+
+  it("keeps a check without a repository off the rows when several repositories have pull requests", () => {
+    const split = splitMergeChecksByPullRequest([api, task], ["acme/api", "acme/web"]);
+
+    expect(ids(split.unattached)).toEqual(["task"]);
+  });
+
+  it("attaches a check without a repository to the only pull request repository", () => {
+    const split = splitMergeChecksByPullRequest([api, task], ["acme/api", "ACME/api"]);
+
+    expect(ids(split.byRepository.get("acme/api"))).toEqual(["api", "task"]);
+    expect(split.unattached).toEqual([]);
+  });
+
+  it("leaves every check unattached without pull requests", () => {
+    expect(ids(splitMergeChecksByPullRequest([api, task], []).unattached)).toEqual(["api", "task"]);
   });
 });
 

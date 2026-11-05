@@ -199,7 +199,7 @@ func loadSubmittedReviewComments(
 		return nil, http.StatusInternalServerError, fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
-	repository := webhookRepositoryFullName(data, configuredRepository)
+	repository := common.EventRepository(data, configuredRepository)
 	comments, err := client.ListPullRequestReviewComments(
 		context.Background(),
 		repository,

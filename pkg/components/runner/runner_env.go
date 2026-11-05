@@ -130,6 +130,7 @@ func applyMergeConfidenceScope(scope *RunnerScope, merge *MergeConfidenceScope) 
 	scope.WorkOrderID = merge.WorkOrderID
 	scope.MergeChecks = merge.EnabledChecks
 	scope.MergeCheckLabels = merge.CheckLabels
+	scope.MergeRepository = merge.Repository
 	return nil
 }
 
