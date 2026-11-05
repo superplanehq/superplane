@@ -78,7 +78,10 @@ func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 	require.NoError(t, err)
 	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
-	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}, {Model: "gpt-5-codex"}}, time.Now()))
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+		{Model: "gpt-5.4", SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "ultra"}, {ReasoningEffort: "future-effort"}}},
+		{Model: "gpt-5-codex", IsDefault: true, SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "low"}}},
+	}, time.Now()))
 	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-4.1"})
 	require.NoError(t, err)
@@ -120,6 +123,34 @@ func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 			assert.Equal(t, tc.expected, resolved["model"])
 		})
 	}
+	t.Run("thinking follows the final model catalog", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, model, saved, override, want string
+			wantErr                            bool
+		}{
+			{name: "dispatch override", model: "gpt-5.4", saved: "low", override: "ultra", want: "ultra"},
+			{name: "saved catalog effort", model: "gpt-5.4", saved: "future-effort", want: "future-effort"},
+			{name: "unsupported saved effort", model: "gpt-5.4", saved: "high", wantErr: true},
+			{name: "unsupported dispatch effort", model: "gpt-5-codex", override: "ultra", wantErr: true},
+			{name: "native default", saved: "low", want: "low"},
+			{name: "unsupported native default effort", saved: "ultra", wantErr: true},
+			{name: "runner default clears saved effort", model: "gpt-5-codex", saved: "ultra", override: "default"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				require.NoError(t, db.Model(dispatch).Updates(map[string]any{"model": tc.model, "thinking_level": tc.override}).Error)
+				resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID("agent").WithRootEvent(&rootEvent.ID).Build(map[string]any{
+					"model": tc.model, "thinkingLevel": tc.saved, "credentials": map[string]any{"source": "subscription"},
+				})
+				if tc.wantErr {
+					require.ErrorContains(t, err, "thinking level")
+					return
+				}
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, resolved["thinkingLevel"])
+			})
+		}
+		require.NoError(t, db.Model(dispatch).Update("thinking_level", "").Error)
+	})
 	t.Run("a locked task retries queue admission", func(t *testing.T) {
 		require.NoError(t, db.Model(dispatch).Update("model", "gpt-5.4").Error)
 		node, err := models.FindCanvasNode(db, canvas.ID, "agent")

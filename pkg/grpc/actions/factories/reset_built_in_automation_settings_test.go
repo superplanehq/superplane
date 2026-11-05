@@ -711,7 +711,11 @@ func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing
 		findYAMLNode(t, doc, "create-task").Configuration["defaultOwnerId"] = otherOwner.ID.String()
 	})
 	planner := support.CreateFactoryCanvas(t, r, factory.ID, "Planner")
-	resetTestPublishCanvas(t, r, planner, buildBacklogCanvas(backlogCanvasRequest{Agent: &intakeAgent{Component: models.SuperPlaneRunnerComponent}}))
+	plannerDoc := buildBacklogCanvas(backlogCanvasRequest{Agent: &intakeAgent{
+		Component: "runnerCodex", Credentials: map[string]any{"source": "subscription"},
+	}})
+	findYAMLNode(t, plannerDoc, backlogRefinementNodeID).Configuration["thinkingLevel"] = "ultra"
+	resetTestPublishCanvas(t, r, planner, plannerDoc)
 	repository := "acme/app"
 	subscription := true
 	defaultOwnerID := r.User.String()
@@ -745,6 +749,7 @@ func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing
 		}
 	}
 	assert.Equal(t, otherOwner.ID.String(), findIntakeNode(resetTestLiveVersion(t, scheduled).Nodes, "create-task").Configuration["defaultOwnerId"])
+	assert.Equal(t, "ultra", findIntakeNode(resetTestLiveVersion(t, planner).Nodes, backlogRefinementNodeID).Configuration["thinkingLevel"])
 	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 	require.NoError(t, err)
 	assert.Equal(t, defaultOwnerID, reloaded.OnboardingConfigValue().CodexDefaultOwnerID)
