@@ -474,13 +474,11 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		)
 	}
 
-	w.followUpLineStepRun(runID)
+	w.startAutomaticCustomAutomationsForRun(runID)
 	return nil
 }
 
-// followUpLineStepRun closes a task whose pull requests finished while the
-// step ran, then starts the automatic Verify automations.
-func (w *RunFinalizer) followUpLineStepRun(runID uuid.UUID) {
+func (w *RunFinalizer) startAutomaticCustomAutomationsForRun(runID uuid.UUID) {
 	db := database.Conn()
 	execution, err := models.FindWorkOrderExecutionByRunID(db, runID)
 	if err != nil {
@@ -493,9 +491,6 @@ func (w *RunFinalizer) followUpLineStepRun(runID uuid.UUID) {
 	if err != nil {
 		w.logger.WithError(err).Warnf("custom automation: failed to load factory for run %s", runID)
 		return
-	}
-	if err := factoryactions.CloseWorkOrderAfterLineStep(db, factory, execution); err != nil {
-		w.logger.WithError(err).Warnf("factory: failed to close work order %s after its line step", execution.WorkOrderID)
 	}
 	order, err := factory.FindWorkOrder(db, execution.WorkOrderID)
 	if err != nil {

@@ -226,51 +226,6 @@ func closeFactoryWorkOrderForPullRequest(
 	return outcome, nil
 }
 
-// CloseWorkOrderAfterLineStep closes the task when its last pull request
-// finished while its line ran. The close at merge time waits for the line
-// step, so a running Implement step can still open its other pull requests.
-// A pull request that finished before the line started does not close a
-// task that someone opened again.
-func CloseWorkOrderAfterLineStep(db *gorm.DB, factory *models.Factory, execution *models.FactoryWorkOrderExecution) error {
-	var outcome *factoryPullRequestCloseResult
-	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := models.LockFactoryWorkOrder(tx, execution.WorkOrderID); err != nil {
-			return err
-		}
-		order, err := factory.FindWorkOrder(tx, execution.WorkOrderID)
-		if err != nil || !order.IsOpen() {
-			return err
-		}
-		dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
-		if err != nil {
-			return err
-		}
-		finished, err := order.PullRequestFinishedSince(tx, dispatch.CreatedAt)
-		if err != nil || !finished {
-			return err
-		}
-		result, done, err := order.PullRequestCloseOutcome(tx)
-		if err != nil || !done {
-			return err
-		}
-		fromState := order.State
-		if _, err := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
-			ToState:  models.FactoryWorkOrderStateClosed,
-			Result:   result,
-			SkipSame: true,
-		}); err != nil {
-			return err
-		}
-		outcome = &factoryPullRequestCloseResult{order: order, fromState: fromState, result: result, closed: true}
-		return nil
-	})
-	if err != nil || outcome == nil {
-		return err
-	}
-	publishWorkOrderClosed(factory.OrganizationID, factory, outcome.order, nil, outcome.fromState, outcome.result, false)
-	return nil
-}
-
 func githubCloseAutomation(payload githubMergeabilityWebhookPayload, merged bool) *factoryevents.AutomationRef {
 	if payload.PullRequest == nil {
 		return githubUserAutomation(payload.Sender)

@@ -875,26 +875,6 @@ func ListWorkOrderLineDispatchesByWorkOrderIDs(
 // WorkOrderIsWaitingAfterPassedStage reports the backend invariant used by the
 // Verify board: an open task whose latest line traversal has no active step and
 // whose furthest step passed.
-// WorkOrderHasActiveLineStep reports whether a step of the current line
-// dispatch is pending or running.
-func WorkOrderHasActiveLineStep(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) {
-	grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{workOrderID})
-	if err != nil {
-		return false, err
-	}
-	dispatches := grouped[workOrderID]
-	if len(dispatches) == 0 {
-		return false, nil
-	}
-	for _, execution := range dispatches[len(dispatches)-1].Executions {
-		status := execution.FactoryWorkOrderExecution.Status
-		if status == FactoryWorkOrderExecutionStatusPending || status == FactoryWorkOrderExecutionStatusRunning {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func WorkOrderIsWaitingAfterPassedStage(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) {
 	var order FactoryWorkOrder
 	if err := tx.Where("id = ?", workOrderID).First(&order).Error; err != nil {
