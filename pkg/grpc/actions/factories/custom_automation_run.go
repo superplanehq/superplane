@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -48,19 +49,21 @@ func RunFactoryCustomAutomation(
 		return nil, factoryErrorToStatus(invalidArgument("automation does not use manual start"), "failed to run custom automation")
 	}
 
-	event, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, false)
+	events, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, false)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	if event == nil {
+	if len(events) == 0 {
 		return nil, factoryErrorToStatus(errors.New("custom automation did not create a run"), "failed to run custom automation")
 	}
-	if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
-		log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
+	for _, event := range events {
+		if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
+			log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
+		}
 	}
 	return &pb.RunFactoryCustomAutomationResponse{
-		RunId:   event.RunID.String(),
-		EventId: event.ID.String(),
+		RunId:   events[0].RunID.String(),
+		EventId: events[0].ID.String(),
 	}, nil
 }
 
@@ -99,11 +102,11 @@ func StartAutomaticCustomAutomations(
 		if err != nil || mode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
 			continue
 		}
-		event, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, true)
+		events, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, true)
 		if err != nil {
 			return err
 		}
-		if event != nil {
+		for _, event := range events {
 			if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
 				log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
 			}
@@ -120,9 +123,13 @@ func startCustomAutomation(
 	canvas *models.Canvas,
 	order *models.FactoryWorkOrder,
 	automatic bool,
-) (*models.CanvasEvent, error) {
+) ([]*models.CanvasEvent, error) {
 	if canvas.ColumnKey != nil && *canvas.ColumnKey == models.CanvasColumnKeyBacklog {
-		return contexts.StartBacklogCustomAutomation(db, factory, canvas, order, automatic)
+		event, err := contexts.StartBacklogCustomAutomation(db, factory, canvas, order, automatic)
+		if err != nil || event == nil {
+			return nil, err
+		}
+		return []*models.CanvasEvent{event}, nil
 	}
 	if err := requireWorkOrderInVerify(db, order); err != nil {
 		return nil, err
@@ -134,16 +141,44 @@ func startCustomAutomation(
 	if len(pullRequests) == 0 {
 		return nil, grpcFailedPrecondition("The task has no pull request.")
 	}
-	pullRequest := firstOpenPullRequest(pullRequests)
-	if pullRequest == nil {
+	openPullRequests := slices.DeleteFunc(slices.Clone(pullRequests), func(pullRequest models.FactoryPullRequest) bool {
+		return pullRequest.State != models.FactoryPullRequestStateOpen
+	})
+	if len(openPullRequests) == 0 {
 		return nil, grpcFailedPrecondition("The pull request is not open.")
 	}
-
-	payload, revision, payloadType, err := customAutomationPullRequestPayload(ctx, db, deps, factory, order, pullRequest)
+	trigger, err := models.FindCanvasNode(db, canvas.ID, customAutomationTriggerID)
 	if err != nil {
 		return nil, err
 	}
-	trigger, err := models.FindCanvasNode(db, canvas.ID, customAutomationTriggerID)
+
+	// A task can have one pull request in each workspace repository. Each
+	// pull request gets its own run, like merge confidence.
+	events := make([]*models.CanvasEvent, 0, len(openPullRequests))
+	for i := range openPullRequests {
+		event, err := startCustomAutomationForPullRequest(ctx, db, deps, factory, canvas, trigger, order, &openPullRequests[i], automatic)
+		if err != nil {
+			return nil, err
+		}
+		if event != nil {
+			events = append(events, event)
+		}
+	}
+	return events, nil
+}
+
+func startCustomAutomationForPullRequest(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	canvas *models.Canvas,
+	trigger *models.CanvasNode,
+	order *models.FactoryWorkOrder,
+	pullRequest *models.FactoryPullRequest,
+	automatic bool,
+) (*models.CanvasEvent, error) {
+	payload, revision, payloadType, err := customAutomationPullRequestPayload(ctx, db, deps, factory, order, pullRequest)
 	if err != nil {
 		return nil, err
 	}

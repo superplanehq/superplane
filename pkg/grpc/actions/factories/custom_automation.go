@@ -375,6 +375,7 @@ func buildCustomAutomationCanvas(
 	}
 	if provider == models.ProviderGitHub {
 		triggerConfiguration["ignoreDrafts"] = true
+		triggerConfiguration["repository"] = models.WorkspaceRepositoriesExpression
 	}
 	environmentFrom := []any{
 		map[string]any{
@@ -455,8 +456,20 @@ func buildCustomAutomationCanvas(
 	return doc, nil
 }
 
+// customAutomationCheckoutEnvironment checks out the pull request that
+// started the run. A GitHub automation listens on every workspace
+// repository, so it reads the repository from the event.
 func customAutomationCheckoutEnvironment(factory *models.Factory, githubHost string) []any {
 	config := factory.OnboardingConfigValue()
+	if config.EffectiveVCSProvider() == models.ProviderGitHub {
+		return []any{
+			checkoutEnvironmentVar("REPO", prFeedbackEventRepositoryExpression),
+			checkoutEnvironmentVar("REPO_URL", runner.WorkspaceContextRepoURL(models.ProviderGitHub, prFeedbackEventRepositoryExpression, githubHost)),
+			checkoutEnvironmentVar("SOURCE_REPO", prFeedbackEventRepositoryExpression),
+			checkoutEnvironmentVar("PR_NUMBER", prFeedbackPRNumberExpression()),
+			checkoutEnvironmentVar("PR_HEAD", prFeedbackPRHeadExpression()),
+		}
+	}
 	repository := strings.TrimSpace(config.AppRepository)
 	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository, githubHost)
 	env := []any{
