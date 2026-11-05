@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, GitBranch, X } from "lucide-react";
+import { ChevronDown, GitBranch, Trash2 } from "lucide-react";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
@@ -126,8 +126,8 @@ function ContextRepoRow({
   const prefetchBranches = useRepositoryBranchesPrefetch({ ...props, repository: name });
   const panelId = `agent-cross-repo-panel-${resource.id}`;
   return (
-    <li className="group min-w-0" data-testid={`agent-cross-repo-row-${resource.id}`}>
-      <div className="flex min-w-0 items-center gap-1 pr-2 transition-colors hover:bg-accent/40">
+    <li className="min-w-0" data-testid={`agent-cross-repo-row-${resource.id}`}>
+      <div className="flex min-w-0 items-center transition-colors hover:bg-accent/40">
         <Button
           type="button"
           variant="ghost"
@@ -149,18 +149,6 @@ function ContextRepoRow({
             aria-hidden
           />
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0 text-muted-foreground transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:group-hover:opacity-100"
-          disabled={!props.canUpdate || props.isSaving}
-          aria-label={AGENT_RESOURCES_COPY.removeRepository}
-          data-testid={`agent-cross-repo-remove-${resource.id}`}
-          onClick={() => resource.id && props.onRemove(resource.id)}
-        >
-          <X className="size-4" strokeWidth={1.75} aria-hidden />
-        </Button>
       </div>
       {expanded ? (
         <div id={panelId} className="border-t border-border bg-muted/30 px-3 py-3">
@@ -175,6 +163,20 @@ function ContextRepoRow({
             disabled={!props.canUpdate || props.isSaving}
             onChange={(next) => resource.id && props.onUpdate(resource.id, changedRepositorySettings(settings, next))}
           />
+          <div className="mt-3 flex justify-end border-t border-border pt-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={!props.canUpdate || props.isSaving}
+              data-testid={`agent-cross-repo-remove-${resource.id}`}
+              onClick={() => resource.id && props.onRemove(resource.id)}
+            >
+              <Trash2 strokeWidth={1.75} aria-hidden />
+              {AGENT_RESOURCES_COPY.removeRepository}
+            </Button>
+          </div>
         </div>
       ) : null}
     </li>
