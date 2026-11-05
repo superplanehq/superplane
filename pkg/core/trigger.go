@@ -94,6 +94,8 @@ type TriggerContext struct {
 	Webhook       NodeWebhookContext
 	Integration   IntegrationContext
 	Apps          AppContext
+	// Factory is set only for apps that a factory owns.
+	Factory FactoryContext
 }
 
 type AppContext interface {

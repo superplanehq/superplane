@@ -15,8 +15,11 @@ const { spawn } = require("child_process");
 
 const SESSION_FILE = "codex_session";
 
-// Codex starts stdio MCP servers with a minimal environment. Forward by name,
-// not with mcp_servers.<id>.env, so tokens stay out of the codex argv.
+// Codex starts stdio MCP servers with a minimal environment. The global server
+// pushes branches with the task's git credentials and reads task settings such
+// as BASE, so it must see the same environment as the agent, as it does under
+// Claude Code and OpenCode. Forward by name, not with mcp_servers.<id>.env, so
+// values stay out of the codex argv. The model credentials stay with Codex.
 const GLOBAL_MCP_SERVER = "superplane_global";
 const GLOBAL_MCP_ENV_VARS = [
   "SUPERPLANE_BASE_URL",
@@ -24,6 +27,16 @@ const GLOBAL_MCP_ENV_VARS = [
   "SUPERPLANE_TASK_DIR",
   "SUPERPLANE_ANALYSIS_SPEC_FILE",
 ];
+const ENV_VAR_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const CODEX_CREDENTIAL_ENV_VAR = /^(CODEX_|OPENAI_|SUPERPLANE_CODEX_)/;
+
+function globalMCPEnvVars(env) {
+  const names = new Set(GLOBAL_MCP_ENV_VARS);
+  for (const name of Object.keys(env || {}).sort()) {
+    if (ENV_VAR_NAME.test(name) && !CODEX_CREDENTIAL_ENV_VAR.test(name)) names.add(name);
+  }
+  return [...names];
+}
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
@@ -263,7 +276,7 @@ function globalMCPConfigOverrides(taskDir, env = process.env) {
     "-c",
     `mcp_servers.${GLOBAL_MCP_SERVER}.args=${tomlStringArray([path.join(taskDir, "superplane_mcp", "server.js")])}`,
     "-c",
-    `mcp_servers.${GLOBAL_MCP_SERVER}.env_vars=${tomlStringArray(GLOBAL_MCP_ENV_VARS)}`,
+    `mcp_servers.${GLOBAL_MCP_SERVER}.env_vars=${tomlStringArray(globalMCPEnvVars(env))}`,
     ...toolNames.flatMap((name) => [
       "-c",
       `mcp_servers.${GLOBAL_MCP_SERVER}.tools.${tomlKey(name)}.approval_mode="approve"`,

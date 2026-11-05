@@ -431,6 +431,10 @@ func (f *recordingBitbucketFactory) GitHubHost() (string, error) {
 	return "", nil
 }
 
+func (f *recordingBitbucketFactory) ListRepositories() ([]string, error) {
+	return nil, nil
+}
+
 func Test__OnPush__RepositoryRouting(t *testing.T) {
 
 	trigger := &OnPush{}

@@ -98,13 +98,17 @@ func StatusCode(err error) int {
 }
 
 func (c *Client) FindRepository(repository string) (*github.Repository, error) {
-	owner, name := c.ownerAndName(repository)
-	repo, _, err := c.underlying.Repositories.Get(context.Background(), owner, name)
+	repo, _, err := c.GetRepository(context.Background(), repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository: %w", err)
 	}
 
 	return repo, nil
+}
+
+func (c *Client) GetRepository(ctx context.Context, repository string) (*github.Repository, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.Get(ctx, owner, name)
 }
 
 // ownerAndName accepts either "repo" (scoped to the integration owner) or

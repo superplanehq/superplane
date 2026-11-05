@@ -209,6 +209,9 @@ func UpdateFactoryRepository(
 		}
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
+	// Workspace-scope triggers keep the same expression, so only a new Setup
+	// moves their webhooks to the new primary repository.
+	refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
 
 	lines, err := factory.ListLines(db)
 	if err != nil {

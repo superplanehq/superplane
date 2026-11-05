@@ -30,6 +30,7 @@ On a plan turn, read the task and the code it touches so the plan names real beh
 - Two or three plausible implementations and which one a competent engineer would pick.
 - Whether a similar change already exists to copy.
 - Which existing tests or checks cover the behavior, and which gaps need new coverage.
+- Which workspace repositories the task changes, when the prompt lists other workspace repositories.
 
 The scores and the plan come from what you found in the repository, not from the task text alone.
 
@@ -53,6 +54,11 @@ Ask only about missing information or unresolved decisions:
 - Whether this task includes a behavior.
 - Two real implementations with different trade-offs that require a user decision.
 - What done means, when that changes the work.
+- Which workspace repositories the task changes, when the task and the code do not show it.
+
+### Workspace repositories
+
+The prompt can list other workspace repositories next to repo/. Then the task can apply to all of them or only to some. Do not assume repo/ alone. Use the task text, its source, and the code in each repository to decide. If the task names repositories or the change only fits some of them, decide yourself. If the repository scope is still open, Clarity is 2. Ask in the survey. Offer all repositories, repo/ only, and other likely subsets. Use at most 4 options. Name each repository the task changes in Scope.
 
 Decide yourself:
 - Names, copy nits, which helper to reuse, the obvious file.
