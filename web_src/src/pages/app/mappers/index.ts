@@ -50,6 +50,10 @@ import {
   eventStateRegistry as linearEventStateRegistry,
 } from "./linear/index";
 import {
+  componentMappers as notionComponentMappers,
+  eventStateRegistry as notionEventStateRegistry,
+} from "./notion/index";
+import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
   eventStateRegistry as pagerdutyEventStateRegistry,
@@ -344,6 +348,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   gitlab: gitlabComponentMappers,
   jira: jiraComponentMappers,
   linear: linearComponentMappers,
+  notion: notionComponentMappers,
   grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   productive: productiveComponentMappers,
@@ -477,6 +482,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   gitlab: gitlabEventStateRegistry,
   jira: jiraEventStateRegistry,
   linear: linearEventStateRegistry,
+  notion: notionEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   honeycomb: honeycombEventStateRegistry,
