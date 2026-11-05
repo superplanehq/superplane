@@ -77,6 +77,9 @@ type CanvasPublisherOptions struct {
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
 	WebhookBaseURL string
+	// BuiltInAutomationReset is set only by the internal installation reset.
+	// User APIs must always authorize Human review policy changes.
+	BuiltInAutomationReset bool
 }
 
 func (o *CanvasPublisherOptions) Validate() error {
@@ -150,6 +153,9 @@ func NewCanvasPublisher(tx *gorm.DB, canvas *models.Canvas, draft *models.Canvas
 }
 
 func (p *CanvasPublisher) Publish(ctx context.Context) error {
+	if err := p.validateHumanReviewPolicy(ctx); err != nil {
+		return err
+	}
 	if err := models.ValidateSubscriptionIntakeOwners(p.tx, p.canvas, p.draft, p.live); err != nil {
 		return err
 	}

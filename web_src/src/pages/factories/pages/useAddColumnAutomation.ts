@@ -84,15 +84,16 @@ export function useAddColumnAutomation(args: {
       });
       return;
     }
-    if (entry.kind === "visual-evidence") {
+    if (entry.kind === "human-review" || entry.kind === "visual-evidence") {
+      const label = entry.kind === "human-review" ? "Human review" : "Visual evidence";
       if (factoryVCSProvider(args.vcsProvider) !== "github") {
-        showErrorToast("Visual evidence is available for GitHub only.");
+        showErrorToast(`${label} is available for GitHub only.`);
         return;
       }
       await installBundledCanvas(args, installFactory, queryClient, closePicker, {
-        factoryId: "visual-evidence",
+        factoryId: entry.kind,
         provider: "github",
-        missingIntegrationMessage: "Connect GitHub in workspace setup before you add visual evidence.",
+        missingIntegrationMessage: `Connect GitHub in workspace setup before you add ${label}.`,
       });
       return;
     }

@@ -163,6 +163,14 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Score a pull request when it opens or updates.",
     triggerNodeId: "on-pr-risk",
   }),
+  "human-review": buildOnboardingApp({
+    id: "human-review",
+    title: "Human review",
+    description: "Select reviewers after merge confidence and wait for required approval.",
+    integrations: ["github"],
+    componentIntegrations: {},
+    entrypointNodeId: "on-human-review",
+  }),
   "visual-evidence": buildOnboardingApp({
     id: "visual-evidence",
     title: "Visual Evidence",

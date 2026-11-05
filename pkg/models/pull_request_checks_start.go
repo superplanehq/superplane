@@ -189,6 +189,13 @@ func (p *FactoryPullRequest) enqueueChecksStart(tx *gorm.DB) error {
 	if err != nil || len(nodes) == 0 {
 		return err
 	}
+	return p.enqueueVerificationTriggers(tx, nodes)
+}
+
+func (p *FactoryPullRequest) enqueueVerificationTriggers(tx *gorm.DB, nodes []CanvasNode) error {
+	if len(nodes) == 0 {
+		return nil
+	}
 	now := time.Now()
 	requests := make([]CanvasNodeRequest, 0, len(nodes))
 	for _, node := range nodes {

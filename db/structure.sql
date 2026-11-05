@@ -567,6 +567,38 @@ CREATE TABLE public.factory_codex_leases (
 
 
 --
+-- Name: factory_human_review_decisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_human_review_decisions (
+    id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    pull_request_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    source_run_id uuid,
+    run_id uuid,
+    configuration_version text NOT NULL,
+    state text NOT NULL,
+    assessed_commit text NOT NULL,
+    assessment jsonb DEFAULT '{}'::jsonb NOT NULL,
+    result jsonb DEFAULT '{}'::jsonb NOT NULL,
+    review_required boolean DEFAULT false NOT NULL,
+    rationale text DEFAULT ''::text NOT NULL,
+    selected_reviewers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    approval_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    blocking_reason text DEFAULT ''::text NOT NULL,
+    check_run_id bigint DEFAULT 0 NOT NULL,
+    check_url text DEFAULT ''::text NOT NULL,
+    publication_pending boolean DEFAULT true NOT NULL,
+    publication_error text DEFAULT ''::text NOT NULL,
+    retry_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2655,6 +2687,14 @@ ALTER TABLE ONLY public.factory_codex_leases
 
 
 --
+-- Name: factory_human_review_decisions factory_human_review_decisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_human_review_decisions
+    ADD CONSTRAINT factory_human_review_decisions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_intakes factory_intakes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3626,6 +3666,20 @@ CREATE UNIQUE INDEX factory_codex_leases_secret_idx ON public.factory_codex_leas
 --
 
 CREATE INDEX factory_codex_leases_task_idx ON public.factory_codex_leases USING btree (task_id);
+
+
+--
+-- Name: factory_human_review_current; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factory_human_review_current ON public.factory_human_review_decisions USING btree (pull_request_id) WHERE (state <> 'superseded'::text);
+
+
+--
+-- Name: factory_human_review_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factory_human_review_run ON public.factory_human_review_decisions USING btree (run_id) WHERE (run_id IS NOT NULL);
 
 
 --
@@ -5287,6 +5341,54 @@ ALTER TABLE ONLY public.factory_codex_leases
 
 
 --
+-- Name: factory_human_review_decisions factory_human_review_decisions_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_human_review_decisions
+    ADD CONSTRAINT factory_human_review_decisions_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id);
+
+
+--
+-- Name: factory_human_review_decisions factory_human_review_decisions_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_human_review_decisions
+    ADD CONSTRAINT factory_human_review_decisions_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: factory_human_review_decisions factory_human_review_decisions_pull_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_human_review_decisions
+    ADD CONSTRAINT factory_human_review_decisions_pull_request_id_fkey FOREIGN KEY (pull_request_id) REFERENCES public.factory_pull_requests(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_human_review_decisions factory_human_review_decisions_revision_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_human_review_decisions
+    ADD CONSTRAINT factory_human_review_decisions_revision_id_fkey FOREIGN KEY (revision_id) REFERENCES public.factory_pull_request_revisions(id);
+
+
+--
+-- Name: factory_human_review_decisions factory_human_review_decisions_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_human_review_decisions
+    ADD CONSTRAINT factory_human_review_decisions_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
+
+
+--
+-- Name: factory_human_review_decisions factory_human_review_decisions_source_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_human_review_decisions
+    ADD CONSTRAINT factory_human_review_decisions_source_run_id_fkey FOREIGN KEY (source_run_id) REFERENCES public.workflow_runs(id);
+
+
+--
 -- Name: factory_intakes factory_intakes_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6502,7 +6604,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261103140609	f
+20261105141152	f
 \.
 
 

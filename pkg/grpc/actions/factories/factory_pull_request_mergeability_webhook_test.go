@@ -23,6 +23,7 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -37,6 +38,15 @@ func TestGitHubMergeabilityWebhookRef(t *testing.T) {
 		assert.Equal(t, []int64{42}, numbers)
 		assert.Equal(t, "abc123", sha)
 	})
+
+	for _, action := range []string{"submitted", "dismissed"} {
+		t.Run("reads a review "+action+" event", func(t *testing.T) {
+			repository, numbers, sha := githubMergeabilityWebhookRef("pull_request_review", []byte(`{"action":"`+action+`","repository":{"full_name":"acme/app"},"pull_request":{"number":42,"head":{"sha":"current"}},"review":{"state":"APPROVED"}}`))
+			assert.Equal(t, "acme/app", repository)
+			assert.Equal(t, []int64{42}, numbers)
+			assert.Equal(t, "current", sha)
+		})
+	}
 
 	t.Run("reads a completed check run", func(t *testing.T) {
 		repository, numbers, sha := githubMergeabilityWebhookRef("check_run", []byte(`{
@@ -105,6 +115,23 @@ func TestEnsureGitHubFactoryMergeabilityWebhook(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, webhooks, 1)
 	assert.Equal(t, firstID, webhooks[0].ID)
+
+	// Existing installations must provision the newly required review events.
+	require.NoError(t, db.Model(&webhooks[0]).Updates(map[string]any{
+		"state":         models.WebhookStateReady,
+		"configuration": datatypes.NewJSONType(any(map[string]any{"factoryMergeability": true, "repository": "acme/app", "eventTypes": []string{"check_run", "check_suite", "status", "pull_request"}})),
+	}).Error)
+	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/app"))
+	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	require.Len(t, webhooks, 1)
+	require.Equal(t, firstID, webhooks[0].ID)
+	require.Equal(t, models.WebhookStatePending, webhooks[0].State)
+	configuration, ok := webhooks[0].Configuration.Data().(map[string]any)
+	require.True(t, ok)
+	events, ok := configuration["eventTypes"].([]any)
+	require.True(t, ok)
+	require.Contains(t, events, "pull_request_review")
 
 	require.NoError(t, db.Model(&webhooks[0]).Update("state", models.WebhookStateFailed).Error)
 	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/app"))
