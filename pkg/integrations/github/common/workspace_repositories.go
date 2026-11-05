@@ -50,3 +50,28 @@ func WorkspaceWebhookConfiguration(factory core.FactoryContext, config WebhookCo
 	}
 	return config, nil
 }
+
+// RequestWorkspaceWebhook requests the trigger webhook. A trigger that
+// listens on the whole workspace gets a webhook on every workspace repository.
+func RequestWorkspaceWebhook(ctx core.TriggerContext, config WebhookConfiguration) error {
+	config, err := WorkspaceWebhookConfiguration(ctx.Factory, config)
+	if err != nil {
+		return err
+	}
+	return ctx.Integration.RequestWebhook(config)
+}
+
+// EventRepository returns the repository that sent the webhook event. A
+// trigger that listens on the workspace can get events from any workspace
+// repository, so its configured repository is only a fallback.
+func EventRepository(data map[string]any, fallback string) string {
+	repository, ok := data["repository"].(map[string]any)
+	if !ok {
+		return fallback
+	}
+	fullName, _ := repository["full_name"].(string)
+	if fullName != "" {
+		return fullName
+	}
+	return fallback
+}

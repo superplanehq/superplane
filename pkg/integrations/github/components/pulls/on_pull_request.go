@@ -159,14 +159,10 @@ func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	webhookConfig, err := common.WorkspaceWebhookConfiguration(ctx.Factory, common.WebhookConfiguration{
+	return common.RequestWorkspaceWebhook(ctx, common.WebhookConfiguration{
 		EventType:  "pull_request",
 		Repository: config.Repository,
 	})
-	if err != nil {
-		return err
-	}
-	return ctx.Integration.RequestWebhook(webhookConfig)
 }
 
 func (p *OnPullRequest) Hooks() []core.Hook {

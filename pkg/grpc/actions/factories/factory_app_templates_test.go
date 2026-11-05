@@ -349,7 +349,7 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 		"provider": models.ProviderGitHub,
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
 	assert.Equal(t, "github.onPullRequest", entrypoint.Component)
-	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
+	assert.Equal(t, models.WorkspaceRepositoriesExpression, entrypoint.Configuration["repository"])
 	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
 	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
 	assert.Equal(t, []any{"synchronize", "reopened", "ready_for_review"}, entrypoint.Configuration["actions"])

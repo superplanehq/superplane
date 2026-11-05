@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	prClosureTriggerNodeID = "on-pr-closed"
-	riskScoreTriggerNodeID = "on-pr-risk"
+	prClosureTriggerNodeID      = "on-pr-closed"
+	riskScoreTriggerNodeID      = "on-pr-risk"
+	visualEvidenceTriggerNodeID = "on-pr-visual-evidence"
 )
 
 const allPullRequestsDoneField = "whenAllPullRequestsDone"
@@ -62,9 +63,10 @@ func refreshWorkspaceRepositoryAutomations(ctx context.Context, deps IntakeDepen
 }
 
 // republishWorkspaceRepositoryAutomations turns on the workspace scope on
-// the pull request closure, merge confidence, and PR feedback nodes, then
-// runs their Setup again so each webhook covers the current workspace
-// repositories.
+// the pull request closure, merge confidence, Visual Evidence, and PR
+// feedback nodes. It then runs Setup again on those nodes and on every other
+// GitHub node that listens on the workspace, so each webhook covers the
+// current workspace repositories.
 func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, factory *models.Factory) error {
 	if factory.OnboardingConfigValue().EffectiveVCSProvider() != models.ProviderGitHub {
 		return nil
@@ -101,7 +103,8 @@ func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, d
 		}
 		spec := models.LiveCanvasSpec{Nodes: liveVersion.Nodes, Edges: liveVersion.Edges}
 		nodeIDs := workspaceScopeNodeIDs(spec, handlerCanvasIDs[canvas.ID])
-		if len(nodeIDs) == 0 {
+		setupNodeIDs := withWorkspaceListenerNodeIDs(nodeIDs, liveVersion.Nodes)
+		if len(setupNodeIDs) == 0 {
 			continue
 		}
 
@@ -123,7 +126,7 @@ func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, d
 				return err
 			}
 		}
-		if err := changesets.RerunNodeSetup(ctx, tx, canvas, nodeIDs, options); err != nil {
+		if err := changesets.RerunNodeSetup(ctx, tx, canvas, setupNodeIDs, options); err != nil {
 			return err
 		}
 	}
@@ -132,8 +135,8 @@ func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, d
 }
 
 // workspaceScopeNodeIDs lists the GitHub nodes that listen for pull request
-// events of the workspace: the closure and merge confidence triggers and the
-// PR feedback nodes.
+// events of the workspace: the closure, merge confidence, and Visual Evidence
+// triggers and the PR feedback nodes.
 func workspaceScopeNodeIDs(spec models.LiveCanvasSpec, prFeedback bool) []string {
 	nodeIDs := []string{}
 	if template, ok := resolveFactoryTemplate(spec.Nodes); ok {
@@ -142,6 +145,8 @@ func workspaceScopeNodeIDs(spec models.LiveCanvasSpec, prFeedback bool) []string
 			nodeIDs = append(nodeIDs, prClosureTriggerNodeID)
 		case "risk-score":
 			nodeIDs = append(nodeIDs, riskScoreTriggerNodeID)
+		case "visual-evidence":
+			nodeIDs = append(nodeIDs, visualEvidenceTriggerNodeID)
 		}
 	}
 	if prFeedback {
@@ -156,6 +161,23 @@ func workspaceScopeNodeIDs(spec models.LiveCanvasSpec, prFeedback bool) []string
 		node := findIntakeNode(spec.Nodes, nodeID)
 		return node == nil || !strings.HasPrefix(node.ComponentName(), "github.")
 	})
+}
+
+// withWorkspaceListenerNodeIDs adds the GitHub nodes that users pointed at
+// {{ workspace().repositories }}, for example in custom automations. Their
+// webhooks must also cover repositories added after the last publish.
+func withWorkspaceListenerNodeIDs(nodeIDs []string, nodes []models.Node) []string {
+	setupNodeIDs := slices.Clone(nodeIDs)
+	for _, node := range nodes {
+		repository, _ := node.Configuration["repository"].(string)
+		if !strings.HasPrefix(node.ComponentName(), "github.") || !models.IsWorkspaceRepositoriesExpression(repository) {
+			continue
+		}
+		if !slices.Contains(setupNodeIDs, node.ID) {
+			setupNodeIDs = append(setupNodeIDs, node.ID)
+		}
+	}
+	return setupNodeIDs
 }
 
 // withWorkspaceScope points the given nodes at every workspace repository.

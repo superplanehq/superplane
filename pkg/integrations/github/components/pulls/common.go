@@ -167,11 +167,7 @@ func setupPRCommentTrigger(ctx core.TriggerContext, webhookConfig common.Webhook
 	}
 
 	webhookConfig.Repository = config.Repository
-	webhookConfig, err = common.WorkspaceWebhookConfiguration(ctx.Factory, webhookConfig)
-	if err != nil {
-		return err
-	}
-	return ctx.Integration.RequestWebhook(webhookConfig)
+	return common.RequestWorkspaceWebhook(ctx, webhookConfig)
 }
 
 func extractGitHubEventType(headers http.Header) (string, error) {
@@ -437,20 +433,6 @@ func authorUser(eventType string, data map[string]any) map[string]any {
 	}
 
 	return nil
-}
-
-func webhookRepositoryFullName(data map[string]any, fallback string) string {
-	repository, ok := data["repository"].(map[string]any)
-	if !ok {
-		return fallback
-	}
-
-	fullName, _ := repository["full_name"].(string)
-	if fullName != "" {
-		return fullName
-	}
-
-	return fallback
 }
 
 func int64FromJSON(value any) (int64, bool) {
