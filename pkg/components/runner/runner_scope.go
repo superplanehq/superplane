@@ -41,6 +41,11 @@ func validateRunnerScope(db *gorm.DB, scope *RunnerScope, mergeExecutionStates [
 			return fmt.Errorf("merge confidence execution is inactive")
 		}
 		return nil
+	case RunnerFlowSchedule:
+		if canvas.FactoryID == nil || *canvas.FactoryID != scope.FactoryID {
+			return fmt.Errorf("runner canvas does not match")
+		}
+		return nil
 	case RunnerFlowTask:
 		if canvas.FactoryID == nil || *canvas.FactoryID != scope.FactoryID {
 			return fmt.Errorf("runner canvas does not match")
