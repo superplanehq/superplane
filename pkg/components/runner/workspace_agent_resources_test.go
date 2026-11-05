@@ -704,6 +704,41 @@ func TestAttachWorkspaceAgentResourcesUsesEnterpriseContextHost(t *testing.T) {
 	assert.Equal(t, "https://acme.ghe.com/acme/extra.git", contextFile.Repositories[0].URL)
 }
 
+func TestAttachWorkspaceAgentResourcesListsPrimaryRepositoryWithContext(t *testing.T) {
+	r := setupWorkspaceAgentResources(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/app"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository}))
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/web",
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+
+	paths := map[string]string{}
+	for _, file := range files {
+		paths[file.Path] = file.Content
+	}
+	var contextFile struct {
+		Repositories []struct {
+			Repository string `json:"repository"`
+			Directory  string `json:"directory"`
+		} `json:"repositories"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(paths[runner.WorkspaceContextConfigPath]), &contextFile))
+	require.Len(t, contextFile.Repositories, 2)
+	assert.Equal(t, "acme/app", contextFile.Repositories[0].Repository)
+	assert.Equal(t, "context/acme/app", contextFile.Repositories[0].Directory)
+	assert.Equal(t, "acme/web", contextFile.Repositories[1].Repository)
+}
+
 func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testing.T) {
 	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())

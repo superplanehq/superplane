@@ -153,6 +153,23 @@ const COMMANDS = [
     tool: "remove_checks",
   },
   {
+    words: ["task", "pr", "open"],
+    usage: "superplane task pr open --title TITLE [--body-file PATH] [--directory DIR] [--base BRANCH] [--draft]",
+    flags: ["title", "body-file", "directory", "base", "draft"],
+    boolean: ["draft"],
+    alias: { "body-file": "bodyFile" },
+    required: ["title"],
+    tool: "open_pull_request",
+    prepare: pullRequestInput,
+    line: (result) => result.url,
+  },
+  {
+    words: ["task", "pr", "list"],
+    usage: "superplane task pr list",
+    flags: [],
+    tool: "list_pull_requests",
+  },
+  {
     words: ["task", "move"],
     usage: "superplane task move --column COLUMN",
     flags: ["column"],
@@ -257,6 +274,15 @@ function evidenceUnavailableInput(input) {
   return { reason: input.reason, attempts: readJSON(input.attempts) };
 }
 
+// A shell directory is relative to the current directory.
+function pullRequestInput(input) {
+  const { bodyFile, ...rest } = input;
+  const prepared = { ...rest };
+  if (bodyFile) prepared.body = readText(bodyFile);
+  if (prepared.directory) prepared.directory = path.resolve(prepared.directory);
+  return prepared;
+}
+
 function markdownInput(input) {
   return { type: "markdown", body: readText(input.file), title: input.title, key: input.key };
 }
@@ -298,6 +324,7 @@ async function main(argv, env = process.env, fetchImpl = fetch, stdout = process
 }
 
 if (require.main === module) {
+  registry.stopOnExit();
   main(process.argv.slice(2)).then((code) => process.exit(code));
 }
 

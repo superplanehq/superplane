@@ -113,7 +113,7 @@ func newPublicationFixture(t *testing.T) publicationFixture {
 }
 
 func (f publicationFixture) report(t *testing.T, run *models.CanvasRun, score float64) {
-	_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "agent"}, "security", score, "No security gap.", []string{"security"}, nil)
+	_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "agent"}, "acme/app", "security", score, "No security gap.", []string{"security"}, nil)
 	require.NoError(t, err)
 }
 
@@ -202,7 +202,7 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 					require.NoError(t, err)
 				} else if scenario == "mixed" {
 					for _, check := range mixedChecks {
-						_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, f.run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "agent"}, check.id, check.score, "Reported result.", []string{check.id}, nil)
+						_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, f.run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "agent"}, "acme/app", check.id, check.score, "Reported result.", []string{check.id}, nil)
 						require.NoError(t, err)
 					}
 				} else if scenario == "caution" {

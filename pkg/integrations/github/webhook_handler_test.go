@@ -42,6 +42,70 @@ func Test__GitHubWebhookHandler__Setup(t *testing.T) {
 		assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[0].URL.Path)
 	})
 
+	t.Run("registers one hook per workspace repository", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusCreated, `{"id":456,"name":"web"}`),
+				mocks.GitHubResponse(http.StatusCreated, `{"id":457,"name":"web"}`),
+			},
+		}
+
+		metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			Webhook: &contexts.WebhookContext{
+				URL:    "https://app.example/api/v1/webhooks/webhook-id",
+				Secret: []byte("local-webhook-secret"),
+				Configuration: common.WebhookConfiguration{
+					EventType:    "pull_request",
+					Repository:   "testhq/hello",
+					Repositories: []string{"testhq/hello", "testhq/world"},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, &Webhook{
+			ID:          456,
+			WebhookName: "web",
+			Hooks: []RepositoryWebhook{
+				{Repository: "testhq/hello", ID: 456, Name: "web"},
+				{Repository: "testhq/world", ID: 457, Name: "web"},
+			},
+		}, metadata)
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[0].URL.Path)
+		assert.Equal(t, "/repos/testhq/world/hooks", httpCtx.Requests[1].URL.Path)
+	})
+
+	t.Run("removes created hooks when a later repository fails", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusCreated, `{"id":456,"name":"web"}`),
+				mocks.GitHubResponse(http.StatusForbidden, `{"message":"Forbidden"}`),
+				mocks.GitHubResponse(http.StatusNoContent, ""),
+			},
+		}
+
+		_, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			Webhook: &contexts.WebhookContext{
+				URL:    "https://app.example/api/v1/webhooks/webhook-id",
+				Secret: []byte("local-webhook-secret"),
+				Configuration: common.WebhookConfiguration{
+					EventType:    "pull_request",
+					Repositories: []string{"testhq/hello", "testhq/world"},
+				},
+			},
+		})
+
+		require.Error(t, err)
+		require.Len(t, httpCtx.Requests, 3)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[2].Method)
+		assert.Equal(t, "/repos/testhq/hello/hooks/456", httpCtx.Requests[2].URL.Path)
+	})
+
 	// Hosted GitHub App metadata must not skip hook registration. The App
 	// webhook endpoint no longer delivers repository events to nodes.
 	t.Run("does not skip hook registration for hosted app metadata", func(t *testing.T) {
@@ -151,6 +215,43 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "same repository set in a different order and case",
+			configA: common.WebhookConfiguration{
+				EventType:    "pull_request",
+				Repositories: []string{"acme/api", "acme/web"},
+			},
+			configB: common.WebhookConfiguration{
+				EventType:    "pull_request",
+				Repositories: []string{"Acme/Web", "acme/api"},
+			},
+			expectEqual: true,
+		},
+		{
+			name: "repository set gains a repository",
+			configA: common.WebhookConfiguration{
+				EventType:    "pull_request",
+				Repositories: []string{"acme/api"},
+			},
+			configB: common.WebhookConfiguration{
+				EventType:    "pull_request",
+				Repositories: []string{"acme/api", "acme/web"},
+			},
+			expectEqual: false,
+		},
+		{
+			name: "single repository differs from a repository set",
+			configA: common.WebhookConfiguration{
+				EventType:  "pull_request",
+				Repository: "acme/api",
+			},
+			configB: common.WebhookConfiguration{
+				EventType:    "pull_request",
+				Repository:   "acme/api",
+				Repositories: []string{"acme/api", "acme/web"},
+			},
+			expectEqual: false,
+		},
+		{
 			name:    "invalid first configuration",
 			configA: "invalid",
 			configB: common.WebhookConfiguration{
@@ -209,6 +310,40 @@ func Test__GitHubWebhookHandler__Cleanup(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
 		assert.Equal(t, "/repos/testhq/hello/hooks/123", httpCtx.Requests[0].URL.Path)
+	})
+
+	t.Run("removes the hook in every workspace repository", func(t *testing.T) {
+		handler := &GitHubWebhookHandler{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNoContent, ""),
+				mocks.GitHubResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			Webhook: &contexts.WebhookContext{
+				Metadata: map[string]any{
+					"id":   123,
+					"name": "web",
+					"hooks": []any{
+						map[string]any{"repository": "testhq/hello", "id": 123, "name": "web"},
+						map[string]any{"repository": "testhq/world", "id": 124, "name": "web"},
+					},
+				},
+				Configuration: common.WebhookConfiguration{
+					Repository:   "testhq/hello",
+					Repositories: []string{"testhq/hello", "testhq/world"},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, "/repos/testhq/hello/hooks/123", httpCtx.Requests[0].URL.Path)
+		assert.Equal(t, "/repos/testhq/world/hooks/124", httpCtx.Requests[1].URL.Path)
 	})
 
 	t.Run("does not skip hook removal for hosted app metadata", func(t *testing.T) {
