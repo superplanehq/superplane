@@ -44,6 +44,22 @@ describe("automations view model", () => {
     );
   });
 
+  it("shows Closed in the console header when the pull request closed without a merge", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...CLOSED_WORK_ORDER,
+        id: "wo-pr-closed-no-merge",
+        state: "STATE_CLOSED",
+        result: "RESULT_PR_CLOSED",
+        lineDispatches: CLOSED_WORK_ORDER.lineDispatches,
+      },
+      { demoArtifacts: false },
+    );
+
+    expect(fixture.lineStatus).toBe("failed");
+    expect(outcomeSummary(fixture).statusLabel).toBe("Closed");
+  });
+
   it("summarizes the run status, models, and spend from the fixture", () => {
     const outcome = outcomeSummary(SPLIT_RUN_RUNNING);
 
