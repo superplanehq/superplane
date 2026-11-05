@@ -77,6 +77,32 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 	}
 }
 
+func TestResetBuiltInHumanReviewPreservesDisabledStateAndPolicy(t *testing.T) {
+	r, factory := resetTestFactory(t)
+	canvas := resetTestTemplate(t, r, factory, models.FactoryAppTemplateHumanReviewID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+		trigger := findYAMLNode(t, doc, models.HumanReviewTriggerNodeID)
+		trigger.Configuration["enabled"] = false
+		trigger.Configuration["fallbackTeam"] = "acme/release-reviewers"
+		agent := findYAMLNode(t, doc, models.HumanReviewAgentNodeID)
+		agent.Configuration["additionalInstructions"] = "Require approval for database changes."
+		agent.Configuration["executionTimeoutSeconds"] = 1200
+		agent.Configuration["steps"].([]any)[0].(map[string]any)["prompt"] = "Retired managed instructions"
+	})
+	require.NoError(t, resetTestOrganization(t, r))
+	version := resetTestLiveVersion(t, canvas)
+	settings, ok := models.HumanReviewSettingsFromNodes(version.Nodes)
+	require.True(t, ok)
+	assert.False(t, settings.Enabled)
+	assert.Equal(t, "acme/release-reviewers", settings.FallbackTeam)
+	agent := findIntakeNode(version.Nodes, models.HumanReviewAgentNodeID)
+	require.NotNil(t, agent)
+	assert.Equal(t, "Require approval for database changes.", agent.Configuration["additionalInstructions"])
+	assert.EqualValues(t, 1200, agent.Configuration["executionTimeoutSeconds"])
+	assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired managed instructions")
+	_, bitbucketSupported := lookupFactoryAppTemplate(models.FactoryAppTemplateHumanReviewID, models.ProviderBitbucket)
+	assert.False(t, bitbucketSupported)
+}
+
 func resetTestTemplate(t *testing.T, r *support.ResourceRegistry, factory *models.Factory, templateID, provider string, configure func(*yaml.Canvas)) *models.Canvas {
 	t.Helper()
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, templateID)
