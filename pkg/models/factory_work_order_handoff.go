@@ -18,17 +18,6 @@ type PendingHandOff struct {
 	PullRequestURLs []string `json:"pull_request_urls,omitempty"`
 }
 
-// URLs returns every saved pull request URL, first URL first.
-func (p PendingHandOff) URLs() []string {
-	return NormalizeHandOffPullRequestURLs(append([]string{p.PullRequestURL}, p.PullRequestURLs...))
-}
-
-func (p PendingHandOff) Equal(other PendingHandOff) bool {
-	return p.LineID == other.LineID &&
-		p.Column == other.Column &&
-		slices.Equal(p.URLs(), other.URLs())
-}
-
 // NewPendingHandOff saves the first URL in PullRequestURL so older readers
 // still find it.
 func NewPendingHandOff(lineID uuid.UUID, column string, urls []string) *PendingHandOff {
@@ -42,6 +31,17 @@ func NewPendingHandOff(lineID uuid.UUID, column string, urls []string) *PendingH
 		pending.PullRequestURLs = slices.Clone(urls[1:])
 	}
 	return pending
+}
+
+// URLs returns every saved pull request URL, first URL first.
+func (p PendingHandOff) URLs() []string {
+	return NormalizeHandOffPullRequestURLs(append([]string{p.PullRequestURL}, p.PullRequestURLs...))
+}
+
+func (p PendingHandOff) Equal(other PendingHandOff) bool {
+	return p.LineID == other.LineID &&
+		p.Column == other.Column &&
+		slices.Equal(p.URLs(), other.URLs())
 }
 
 // NormalizeHandOffPullRequestURLs trims the URLs and drops empty and
