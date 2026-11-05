@@ -160,7 +160,7 @@ function CustomAutomationConfiguration({
     <CustomAutomationSetupForm
       name={model.name}
       icon={model.icon}
-      mode={model.mode}
+      triggers={model.triggers}
       columnKey={model.columnKey}
       draft={model.draft}
       organizationId={organizationId}
@@ -171,7 +171,7 @@ function CustomAutomationConfiguration({
       error={model.saveError}
       onNameChange={model.setName}
       onIconChange={model.setIcon}
-      onModeChange={model.setMode}
+      onTriggersChange={model.setTriggers}
       onDraftChange={model.setDraft}
       onSave={() => void model.save().then((saved) => saved && onClose())}
       onDelete={onDelete}

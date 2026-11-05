@@ -414,14 +414,22 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	// Persist field updates now so later Setups see the new configuration.
 	// Setup itself is deferred with AddNode setups (see runPendingSetups).
 	//
+	wasDeleted := existingNode.DeletedAt.Valid
+	if wasDeleted {
+		existingNode.DeletedAt = gorm.DeletedAt{}
+	}
+	save := p.tx
+	if wasDeleted {
+		save = p.tx.Unscoped()
+	}
 	if existingNode.State == models.CanvasNodeStateError {
 		updatedNode.Metadata = existingNode.Metadata.Data()
 		p.finalNodes[existingNode.NodeID] = updatedNode
 		p.allNodes[existingNode.NodeID] = existingNode
-		return p.tx.Save(&existingNode).Error
+		return save.Save(&existingNode).Error
 	}
 
-	if err := p.tx.Save(&existingNode).Error; err != nil {
+	if err := save.Save(&existingNode).Error; err != nil {
 		return err
 	}
 
