@@ -1753,6 +1753,28 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	})
 }
 
+func TestAdminToggleMultiRepoTasksReportsRepublishedAutomations(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactoryMultiRepoTasks
+
+	for _, method := range []string{"POST", "DELETE"} {
+		response := execRequest(server, requestParams{method: method, path: path, authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Status string `json:"status"`
+			Reset  *int   `json:"reset"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		require.NotNil(t, body.Reset)
+		assert.Zero(t, *body.Reset, "the organization has no Implement automation")
+
+		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, method == "POST", slices.Contains(reloaded.EnabledExperimentalFeatures, features.FeatureFactoryMultiRepoTasks))
+	}
+}
+
 func TestAdminBlockAndUnblockAccount(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 

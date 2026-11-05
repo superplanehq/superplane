@@ -2,6 +2,8 @@ package factories
 
 import (
 	"maps"
+	"strconv"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -138,18 +140,17 @@ func (s *factoryTriggerSettings) configure(node yaml.Node) yaml.Node {
 // Admin reset supplies saved settings to the builders. A request to restore
 // factory defaults supplies none, so that action still restores defaults.
 type factoryAutomationSettings struct {
-	agents       map[string]*factoryAgentSettings
-	triggers     map[string]*factoryTriggerSettings
-	pullRequests map[string]map[string]any
-	agentSteps   map[string]any
-	bodySections map[string]map[string]any
+	agents            map[string]*factoryAgentSettings
+	triggers          map[string]*factoryTriggerSettings
+	draftPullRequests *bool
+	agentSteps        map[string]any
+	bodySections      map[string]map[string]any
 }
 
 func factoryAutomationSettingsFromVersion(version *models.CanvasVersion) *factoryAutomationSettings {
 	settings := &factoryAutomationSettings{
 		agents:       map[string]*factoryAgentSettings{},
 		triggers:     map[string]*factoryTriggerSettings{},
-		pullRequests: map[string]map[string]any{},
 		agentSteps:   map[string]any{},
 		bodySections: map[string]map[string]any{},
 	}
@@ -167,11 +168,64 @@ func factoryAutomationSettingsFromVersion(version *models.CanvasVersion) *factor
 		if node.Type == models.NodeTypeTrigger {
 			settings.triggers[node.ID] = factoryTriggerSettingsFromNode(node)
 		}
-		if node.ComponentName() == "github.createPullRequest" || node.ComponentName() == "bitbucket.createPullRequest" {
-			if draft, present := node.Configuration["draft"]; present {
-				settings.pullRequests[node.ID] = map[string]any{"draft": draft}
-			}
+		if draft, present := factoryDraftPullRequests(node.ComponentName(), node.Configuration); present {
+			settings.draftPullRequests = &draft
 		}
 	}
 	return settings
+}
+
+// The Implement app has one "Create draft pull requests" setting. Canvas pull
+// request nodes hold it in "draft". When the agent opens the pull requests,
+// the agent environment variable DRAFT_PULL_REQUESTS holds it.
+const factoryDraftPullRequestsEnv = "DRAFT_PULL_REQUESTS"
+
+func isFactoryPullRequestComponent(component string) bool {
+	return component == "github.createPullRequest" || component == "bitbucket.createPullRequest"
+}
+
+func factoryDraftPullRequests(component string, configuration map[string]any) (bool, bool) {
+	if isFactoryPullRequestComponent(component) {
+		draft, ok := configuration["draft"].(bool)
+		return draft, ok
+	}
+	if !isFactoryAgentHarness(component) {
+		return false, false
+	}
+	entry := factoryEnvironmentEntry(configuration, factoryDraftPullRequestsEnv)
+	if entry == nil {
+		return false, false
+	}
+	value, _ := entry["value"].(string)
+	return strings.TrimSpace(value) == "true", true
+}
+
+func applyFactoryDraftPullRequests(node *yaml.Node, draft *bool) {
+	if draft == nil {
+		return
+	}
+	if isFactoryPullRequestComponent(node.Component) {
+		if node.Configuration == nil {
+			node.Configuration = map[string]any{}
+		}
+		node.Configuration["draft"] = *draft
+		return
+	}
+	if !isFactoryAgentHarness(node.Component) {
+		return
+	}
+	if entry := factoryEnvironmentEntry(node.Configuration, factoryDraftPullRequestsEnv); entry != nil {
+		entry["value"] = strconv.FormatBool(*draft)
+	}
+}
+
+func factoryEnvironmentEntry(configuration map[string]any, name string) map[string]any {
+	environment, _ := configuration["environment"].([]any)
+	for _, item := range environment {
+		entry, ok := item.(map[string]any)
+		if ok && entry["name"] == name {
+			return entry
+		}
+	}
+	return nil
 }

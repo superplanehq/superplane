@@ -412,6 +412,53 @@ describe("SplitRunAttentionNote for a pull request", () => {
     ).toEqual(["✓ Squash and merge", "Create a merge commit"]);
   });
 
+  it("lists each open pull request with its repository when a task has several", async () => {
+    const user = userEvent.setup();
+    const docsPullRequest: FactoriesFactoryPullRequest = {
+      id: "pr-5",
+      provider: "PROVIDER_GITHUB",
+      repository: "acme/docs",
+      url: "https://github.com/acme/docs/pull/5",
+      number: "5",
+      title: "Add AGENTS.md",
+      state: "STATE_OPEN",
+    };
+    renderNote({
+      compact: true,
+      pullRequests: [{ ...GITHUB_PR, repository: "acme/payments", title: "Refine payments" }, docsPullRequest],
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "2 pull requests are ready for review" })).toBeInTheDocument();
+    expect(note).toHaveTextContent("This task closes when all pull requests are merged or closed.");
+    const rows = within(note).getAllByTestId("split-run-review-pull-request");
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]!).getByRole("link", { name: "Review acme/payments #6812" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/payments/pull/6812",
+    );
+    expect(within(rows[1]!).getByRole("link", { name: "Review acme/docs #5" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/docs/pull/5",
+    );
+
+    await user.click(within(rows[1]!).getByTestId("split-run-merge-button"));
+    expect(mergeMutate.mock.calls[0]?.[0]).toMatchObject({ pullRequestId: "pr-5" });
+  });
+
+  it("keeps the single review action when only one tracked pull request is open", () => {
+    renderNote({
+      pullRequests: [
+        GITHUB_PR,
+        { ...GITHUB_PR, id: "pr-old", url: "https://github.com/acme/docs/pull/1", state: "STATE_MERGED" },
+      ],
+    });
+
+    expect(screen.getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-pull-request-cta")).toHaveAccessibleName("Review PR #6812");
+    expect(screen.queryByTestId("split-run-review-pull-request")).not.toBeInTheDocument();
+  });
+
   it("merges a Bitbucket pull request with the selected method", async () => {
     const user = userEvent.setup();
     renderNote({ note: BITBUCKET_PR_NOTE, pullRequests: [BITBUCKET_PR] });
