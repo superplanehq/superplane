@@ -33,6 +33,7 @@ export const ORGANIZATION_PAGE_SIZE = 50;
 
 interface OrganizationListQuery {
   search: string;
+  planKey: string;
   offset: number;
   sortBy: OrganizationSortField;
   sortDirection: SortDirection;
@@ -45,8 +46,8 @@ interface OrganizationListResponse {
   matchTotal: number;
 }
 
-function listFilterKey(search: string, sortBy: OrganizationSortField, sortDirection: SortDirection): string {
-  return `${search}\0${sortBy}\0${sortDirection}`;
+function listFilterKey({ search, planKey, sortBy, sortDirection }: OrganizationListQuery): string {
+  return `${search}\0${planKey}\0${sortBy}\0${sortDirection}`;
 }
 
 function pageOffsetForTotal(pageOffset: number, total: number): number {
@@ -76,16 +77,12 @@ const LIST_REFRESH_ERROR = "Could not refresh the organization list.";
 
 type ListLoadResult = "applied" | "failed" | "stale";
 
-async function requestOrganizationList(
-  searchTerm: string,
-  pageOffset: number,
-  sort: OrganizationSortField,
-  direction: SortDirection,
-): Promise<OrganizationListResponse | null> {
-  const params = new URLSearchParams({ limit: String(ORGANIZATION_PAGE_SIZE), offset: String(pageOffset) });
-  if (searchTerm) params.set("search", searchTerm);
-  params.set("sort_by", sort);
-  params.set("sort_direction", direction);
+async function requestOrganizationList(query: OrganizationListQuery): Promise<OrganizationListResponse | null> {
+  const params = new URLSearchParams({ limit: String(ORGANIZATION_PAGE_SIZE), offset: String(query.offset) });
+  if (query.search) params.set("search", query.search);
+  if (query.planKey) params.set("plan_key", query.planKey);
+  params.set("sort_by", query.sortBy);
+  params.set("sort_direction", query.sortDirection);
   const response = await fetch(`/admin/api/organizations?${params}`, { credentials: "include" });
   if (!response.ok) {
     return null;
@@ -100,18 +97,17 @@ export function useOrganizationsList() {
   const [matchTotal, setMatchTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState("");
+  const [planKey, setPlanKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<OrganizationSortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [listError, setListError] = useState<string | null>(null);
   const listRequestID = useRef(0);
-  const appliedFilterKeyRef = useRef(listFilterKey("", "created_at", "desc"));
-  const listQueryRef = useRef<OrganizationListQuery>({ search, offset, sortBy, sortDirection });
-  const filterKey = listFilterKey(search, sortBy, sortDirection);
-  listQueryRef.current =
-    filterKey === appliedFilterKeyRef.current
-      ? { search, offset, sortBy, sortDirection }
-      : { search, offset: 0, sortBy, sortDirection };
+  const query = { search, planKey, offset, sortBy, sortDirection };
+  const appliedFilterKeyRef = useRef(listFilterKey(query));
+  const listQueryRef = useRef<OrganizationListQuery>(query);
+  const filterKey = listFilterKey(query);
+  listQueryRef.current = filterKey === appliedFilterKeyRef.current ? query : { ...query, offset: 0 };
 
   const applyList = (list: OrganizationListResponse, pageOffset: number) => {
     setOffset(pageOffset);
@@ -122,26 +118,21 @@ export function useOrganizationsList() {
   };
 
   const fetchOrganizations = useCallback(
-    async (
-      searchTerm: string,
-      pageOffset: number,
-      sort: OrganizationSortField,
-      direction: SortDirection,
-      correctPage = true,
-    ): Promise<ListLoadResult> => {
+    async (query: OrganizationListQuery, correctPage = true): Promise<ListLoadResult> => {
       const requestID = ++listRequestID.current;
       setLoading(true);
       try {
-        const list = await requestOrganizationList(searchTerm, pageOffset, sort, direction);
+        const list = await requestOrganizationList(query);
         if (requestID !== listRequestID.current) {
           return "stale";
         }
         if (!list) {
+          setListError(LIST_REFRESH_ERROR);
           return "failed";
         }
-        const nextOffset = pageOffsetForTotal(pageOffset, list.total);
-        if (shouldLoadPage(correctPage, pageOffset, nextOffset, list.total)) {
-          return fetchOrganizations(searchTerm, nextOffset, sort, direction, false);
+        const nextOffset = pageOffsetForTotal(query.offset, list.total);
+        if (shouldLoadPage(correctPage, query.offset, nextOffset, list.total)) {
+          return fetchOrganizations({ ...query, offset: nextOffset }, false);
         }
         if (requestID !== listRequestID.current) {
           return "stale";
@@ -153,6 +144,7 @@ export function useOrganizationsList() {
         if (requestID !== listRequestID.current) {
           return "stale";
         }
+        setListError(LIST_REFRESH_ERROR);
         return "failed";
       } finally {
         if (requestID === listRequestID.current) {
@@ -165,14 +157,15 @@ export function useOrganizationsList() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      appliedFilterKeyRef.current = listFilterKey(search, sortBy, sortDirection);
+      const query = { search, planKey, offset: 0, sortBy, sortDirection };
+      appliedFilterKeyRef.current = listFilterKey(query);
       setOffset(0);
-      void fetchOrganizations(search, 0, sortBy, sortDirection);
+      void fetchOrganizations(query);
     }, 200);
     return () => clearTimeout(timeout);
-  }, [search, sortBy, sortDirection, fetchOrganizations]);
+  }, [search, planKey, sortBy, sortDirection, fetchOrganizations]);
 
-  const pinActions = useOrganizationPinActions(listQueryRef, fetchOrganizations, setListError);
+  const pinActions = useOrganizationPinActions(listQueryRef, fetchOrganizations);
 
   const handleSort = (field: OrganizationSortField) => {
     if (field === sortBy) {
@@ -185,7 +178,7 @@ export function useOrganizationsList() {
 
   const changePage = (pageOffset: number) => {
     setOffset(pageOffset);
-    void fetchOrganizations(search, pageOffset, sortBy, sortDirection);
+    void fetchOrganizations({ search, planKey, offset: pageOffset, sortBy, sortDirection });
   };
 
   return {
@@ -196,6 +189,8 @@ export function useOrganizationsList() {
     offset,
     search,
     setSearch,
+    planKey,
+    setPlanKey,
     loading,
     sortBy,
     sortDirection,
@@ -215,13 +210,7 @@ function shouldLoadPage(correctPage: boolean, pageOffset: number, nextOffset: nu
 
 function useOrganizationPinActions(
   listQueryRef: { current: OrganizationListQuery },
-  fetchOrganizations: (
-    searchTerm: string,
-    pageOffset: number,
-    sort: OrganizationSortField,
-    direction: SortDirection,
-  ) => Promise<ListLoadResult>,
-  setListError: (message: string | null) => void,
+  fetchOrganizations: (query: OrganizationListQuery) => Promise<ListLoadResult>,
 ) {
   const [pinError, setPinError] = useState<string | null>(null);
   const [pendingPinIDs, setPendingPinIDs] = useState<ReadonlySet<string>>(() => new Set());
@@ -253,11 +242,7 @@ function useOrganizationPinActions(
         setPinError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
         return;
       }
-      const query = listQueryRef.current;
-      const result = await fetchOrganizations(query.search, query.offset, query.sortBy, query.sortDirection);
-      if (result === "failed") {
-        setListError(LIST_REFRESH_ERROR);
-      }
+      await fetchOrganizations(listQueryRef.current);
     } catch {
       setPinError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
     } finally {
@@ -266,12 +251,7 @@ function useOrganizationPinActions(
   };
 
   const retryList = () => {
-    const query = listQueryRef.current;
-    void fetchOrganizations(query.search, query.offset, query.sortBy, query.sortDirection).then((result) => {
-      if (result === "failed") {
-        setListError(LIST_REFRESH_ERROR);
-      }
-    });
+    void fetchOrganizations(listQueryRef.current);
   };
 
   return { pinError, pendingPinIDs, togglePin, retryList };
