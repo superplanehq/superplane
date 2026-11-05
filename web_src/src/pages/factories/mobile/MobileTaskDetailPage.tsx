@@ -360,6 +360,7 @@ function useMobileDraftStart(model: MobileTaskModel, startLineKey: string) {
       organizationId={organizationId}
       factoryId={factoryId}
       lineName={model.lineName}
+      orderId={fixture.assigneeIds?.length ? model.orderId : undefined}
       model={draftModel}
       thinkingLevel={draftThinking}
       disabled={!model.canUpdate || model.startBusy}

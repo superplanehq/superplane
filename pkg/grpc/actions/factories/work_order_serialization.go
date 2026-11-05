@@ -28,6 +28,13 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return loadWorkOrderAssigneeUsers(db.WithContext(gctx), order)
 	})
 
+	var start *models.FactoryWorkOrderStart
+	g.Go(func() error {
+		var err error
+		start, err = order.StartAttribution(db.WithContext(gctx))
+		return err
+	})
+
 	var dispatchesByOrderID map[uuid.UUID][]models.FactoryWorkOrderLineDispatchRecord
 	var modelsByExecution map[uuid.UUID][]string
 	g.Go(func() error {
@@ -106,6 +113,16 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 	)
 	if err != nil {
 		return nil, err
+	}
+	if start != nil {
+		serialized.AutoStarted = start.Automatic
+		serialized.StartedAt = timestamppb.New(start.StartedAt)
+		if starter := start.User; starter != nil {
+			serialized.StartedBy = &pb.UserRef{
+				Id: starter.ID.String(), Name: starter.Name,
+				Deleted: loadedMemberDeleted(starter), FormerMember: loadedMemberFormer(starter),
+			}
+		}
 	}
 	serialized.PullRequests = pullRequestsByOrder[order.ID]
 	if err := attachWorkOrderFiles(ctx, db, serialized, order.ID); err != nil {

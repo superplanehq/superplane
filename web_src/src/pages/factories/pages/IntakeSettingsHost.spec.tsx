@@ -10,6 +10,7 @@ import {
   DEPENDABOT_INTAKE,
   DEPENDABOT_INTAKE_CANVAS,
   deleteIntake,
+  LINEAR_INTAKE,
   PRODUCTIVE_INTAKE,
   renderHost,
   resetHostMocks,
@@ -18,6 +19,7 @@ import {
 } from "./IntakeSettingsHost.spec.fixtures";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS, INTAKE_SETTINGS_COPY, intakeSettingsToApi } from "./intakeSourceSettingsModel";
 import "./intakeSettingsHostSentryCases";
+import { selectLinearProject } from "./linearScopeFields.testHelpers";
 
 describe("IntakeSettingsHost", () => {
   beforeEach(() => {
@@ -225,6 +227,47 @@ describe("IntakeSettingsHost", () => {
       }),
       integrationId: "datadog-1",
       resourceId: "billing",
+    });
+  });
+
+  it("saves the project filter of a Linear team intake without rebinding the connection", async () => {
+    const user = userEvent.setup();
+    renderHost({ intake: LINEAR_INTAKE });
+
+    expect(screen.getByTestId("linear-team-team-1")).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("radio", { name: "Only issues in selected projects" }));
+    await selectLinearProject(user, "Engineering");
+    await user.click(screen.getByRole("checkbox", { name: "Include issues without a project" }));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-linear",
+      settings: expect.objectContaining({
+        linearTeamId: "team-1",
+        linearProjectIds: ["ENG"],
+        linearIncludeIssuesWithoutProject: false,
+      }),
+    });
+  });
+
+  it("rebinds an older Linear intake that has projects and no team when its projects change", async () => {
+    const user = userEvent.setup();
+    renderHost({
+      intake: {
+        ...LINEAR_INTAKE,
+        settings: { ...LINEAR_INTAKE.settings, linearTeamId: "", linearProjectIds: ["ENG"] },
+        resourceId: "ENG",
+      },
+    });
+
+    await selectLinearProject(user, "Operations");
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-linear",
+      settings: expect.objectContaining({ linearTeamId: "", linearProjectIds: ["ENG", "OPS"] }),
+      integrationId: "linear-1",
+      resourceId: "ENG,OPS",
     });
   });
 

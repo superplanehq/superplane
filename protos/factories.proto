@@ -1650,7 +1650,8 @@ message FactoryIntake {
     // Environments that still create a task. Empty means every environment.
     // Datadog intakes only.
     repeated string datadog_environments = 20;
-    // Projects that still create a task. Required for a Linear intake.
+    // Projects that still create a task. Optional for a Linear intake that
+    // has a team. Empty means every project in the team.
     // Linear issue intakes only.
     repeated string linear_project_ids = 21;
     // Label names that still create a task. Empty means every label.
@@ -1661,6 +1662,14 @@ message FactoryIntake {
     repeated string sentry_project_ids = 23;
     // Organization user ID. Omitted updates preserve the selection; empty clears it.
     optional string default_owner_id = 24;
+    // Linear team that the intake listens to. Required for a new Linear
+    // intake. An older intake that has projects and no team still works.
+    // Linear issue intakes only.
+    string linear_team_id = 25;
+    // Create a task for an issue that has no project. Applies only when
+    // linear_project_ids is not empty. Omitted means true.
+    // Linear issue intakes only.
+    optional bool linear_include_issues_without_project = 26;
   }
 
   string id = 1;
@@ -2224,6 +2233,13 @@ message WorkOrder {
   WorkOrderMcpClient mcp_client = 26;
   string refinement_model = 27;
   PendingHandOff pending_handoff = 28;
+  // Person who first moved this task from draft to open. Independent of ownership.
+  // Empty when the first start was automated or the task has not started.
+  UserRef started_by = 29;
+  // True when the first start was automatic. False before the task starts.
+  bool auto_started = 30;
+  // Timestamp of the first start. Empty before the task starts.
+  google.protobuf.Timestamp started_at = 31;
 }
 
 // WorkOrderSummary is the list row for a work order.

@@ -73,4 +73,16 @@ describe("buildBuildingBlockCategories", () => {
       "runApp",
     ]);
   });
+
+  it("hides retired core actions from the picker in all apps", () => {
+    const withRetired = [...components, { name: "updatePullRequestBodySection", label: "Update PR Body Section" }];
+
+    for (const isFactoryApp of [false, true]) {
+      const blockNames = buildBuildingBlockCategories(triggers, withRetired, [], { isFactoryApp }).flatMap((category) =>
+        category.blocks.map((block) => block.name),
+      );
+
+      expect(blockNames).not.toContain("updatePullRequestBodySection");
+    }
+  });
 });
