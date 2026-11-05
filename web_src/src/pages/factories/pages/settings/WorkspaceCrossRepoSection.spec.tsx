@@ -224,6 +224,38 @@ describe("cross-repo context picker", () => {
     ).toBeInTheDocument();
   }, 15000);
 
+  it("uses the default branch of a repository chosen after Back", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository),
+          agentResourcesByFactoryId: {},
+        }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
+    const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
+    await user.click(await within(picker).findByTestId("agent-cross-repo-new-list-access", {}, { timeout: 8000 }));
+    await user.click(await screen.findByRole("option", { name: AGENT_RESOURCES_COPY.accessRead }));
+    await user.click(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 }));
+    await user.click(await within(picker).findByTestId("agent-cross-repo-new-branch", {}, { timeout: 8000 }));
+    await user.type(await screen.findByPlaceholderText("Find a branch"), "release/v2");
+    await user.click(await screen.findByRole("option", { name: 'Use "release/v2"' }));
+    await user.click(within(picker).getByRole("button", { name: AGENT_RESOURCES_COPY.back }));
+    await user.click(await within(picker).findByRole("option", { name: /^acme\/mobile$/ }, { timeout: 8000 }));
+    await user.click(await within(picker).findByTestId("agent-cross-repo-confirm", {}, { timeout: 8000 }));
+
+    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
+    expect(
+      await within(list).findByText(`main · ${AGENT_RESOURCES_COPY.accessRead}`, {}, { timeout: 8000 }),
+    ).toBeInTheDocument();
+  }, 15000);
+
   it("treats a repository without access as read only and edits it in place", async () => {
     const user = userEvent.setup();
     render(

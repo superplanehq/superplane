@@ -372,6 +372,7 @@ function AddRepositoryDialog(props: {
       props.onOpenChange(false);
       return;
     }
+    setSettings((current) => ({ ...current, ref: NEW_REPOSITORY_SETTINGS.ref }));
     setSelected(repository);
   };
 
