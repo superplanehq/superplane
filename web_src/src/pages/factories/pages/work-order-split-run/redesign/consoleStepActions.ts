@@ -1,9 +1,61 @@
 import type { FactoriesWorkOrderEvent } from "@/api-client";
+import type { SplitRunPhase } from "../splitRunMocks";
+import type { ConsoleAutomation } from "./automationsViewModel";
 
 export interface StepActionRow {
   id: string;
+  runId: string;
+  timestamp?: string;
   title: string;
   detail?: string;
+}
+
+export interface StepActionRun {
+  runId: string;
+  title: string;
+  ordinal: number;
+  startedAt?: string;
+  rows: StepActionRow[];
+}
+
+/** Join stage IDs to actual run IDs; preserve the Agent runs order. */
+export function stepActionRuns(
+  automation: ConsoleAutomation,
+  phases: SplitRunPhase[],
+  rows: StepActionRow[],
+): StepActionRun[] {
+  const phasesById = new Map(phases.map((phase) => [phase.id, phase]));
+  const rowsByRun = new Map<string, StepActionRow[]>();
+  for (const row of rows) {
+    const runRows = rowsByRun.get(row.runId) ?? [];
+    runRows.push(row);
+    rowsByRun.set(row.runId, runRows);
+  }
+  return automation.runs.flatMap((run, index) => {
+    const phase = phasesById.get(run.id);
+    const runId = phase?.runId;
+    const runRows = runId ? rowsByRun.get(runId) : undefined;
+    if (!runId || !runRows?.length) {
+      return [];
+    }
+    const firstActionTime = runRows
+      .map((row) => validTimestamp(row.timestamp))
+      .filter((timestamp): timestamp is string => Boolean(timestamp))
+      .sort((left, right) => Date.parse(left) - Date.parse(right))[0];
+    return [
+      {
+        runId,
+        title: run.name.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim() || "Run",
+        ordinal: index + 1,
+        startedAt: validTimestamp(run.startedAt) ?? validTimestamp(phase?.startedAt) ?? firstActionTime,
+        rows: runRows,
+      },
+    ];
+  });
+}
+
+function validTimestamp(timestamp?: string): string | undefined {
+  return timestamp && Number.isFinite(Date.parse(timestamp)) ? timestamp : undefined;
 }
 
 const OWNER_EVENT = "order.assignees.updated";
@@ -30,7 +82,8 @@ export function stepActionRows(
     })
     .flatMap(({ event, index }) => {
       const row = stepActionRow(event, index, resolveName);
-      return row ? [row] : [];
+      const runId = readRunId(event.event);
+      return row && runId ? [{ ...row, runId, timestamp: event.timestamp }] : [];
     });
 }
 
@@ -38,7 +91,7 @@ function stepActionRow(
   event: FactoriesWorkOrderEvent,
   index: number,
   resolveName: (userId: string) => string | undefined,
-): StepActionRow | undefined {
+): Omit<StepActionRow, "runId" | "timestamp"> | undefined {
   const payload = record(event.event);
   if (!payload) {
     return undefined;
@@ -57,7 +110,7 @@ function ownerRow(
   index: number,
   payload: Record<string, unknown>,
   resolveName: (userId: string) => string | undefined,
-): StepActionRow {
+): Omit<StepActionRow, "runId" | "timestamp"> {
   const assigned = Array.isArray(payload.assigned) ? payload.assigned : [];
   const userId = readId(assigned[0]);
   const name = (userId && resolveName(userId)) || "Unknown member";
@@ -73,7 +126,7 @@ function checkRow(
   event: FactoriesWorkOrderEvent,
   index: number,
   payload: Record<string, unknown>,
-): StepActionRow | undefined {
+): Omit<StepActionRow, "runId" | "timestamp"> | undefined {
   const check = record(payload.check);
   if (!check) {
     return undefined;

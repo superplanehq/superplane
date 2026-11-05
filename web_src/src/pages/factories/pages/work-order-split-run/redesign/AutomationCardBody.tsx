@@ -20,10 +20,11 @@ import { useSpecificModelIds } from "../specificModelIds";
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { AutomationStage, ConsoleAutomation } from "./automationsViewModel";
 import { AgentRunsPage } from "./consoleAgentRuns";
+import { ActionsPage } from "./consoleActionRuns";
 import { ArtifactsPage } from "./consoleArtifactRows";
 import { runFooterLine, runFooterSpendLabel } from "./consoleCardText";
 import { artifactsPageCount, consolePages, type ConsolePageId } from "./consolePages";
-import type { StepActionRow } from "./consoleStepActions";
+import { stepActionRuns, type StepActionRow } from "./consoleStepActions";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
 import { useStepActions } from "./useStepActions";
 
@@ -133,6 +134,7 @@ function AutomationCardBodyView({
   onRetryActions?: () => void;
 }) {
   const { latest, runs } = automation;
+  const cardPhases = phases ?? (phase ? [phase] : []);
   const pages = consolePages(latest, phase, runs, actionRows.length, actionsFailed);
   const [chosen, setChosen] = useState<ConsolePageId>();
   const active = chosen && pages.includes(chosen) ? chosen : pages[0];
@@ -157,7 +159,7 @@ function AutomationCardBodyView({
           <div className={cn(active !== "agent" && "hidden")}>
             <AgentRunsPage
               runs={runs}
-              phases={phases ?? (phase ? [phase] : [])}
+              phases={cardPhases}
               automationName={automation.name}
               organizationId={organizationId}
               factoryKey={factoryKey}
@@ -166,16 +168,20 @@ function AutomationCardBodyView({
             />
           </div>
         ) : null}
-        <CardDetailPage
-          active={active}
-          stage={latest}
-          actionRows={actionRows}
-          actionsFailed={actionsFailed}
-          onRetryActions={onRetryActions}
-        />
+        <CardDetailPage active={active} stage={latest} />
+        {/* Keep disclosures mounted so tab changes and history updates preserve user choices. */}
+        {pages.includes("actions") ? (
+          <div className={cn(active !== "actions" && "hidden")}>
+            <ActionsPage
+              runs={stepActionRuns(automation, cardPhases, actionRows)}
+              failed={actionsFailed}
+              onRetry={onRetryActions}
+            />
+          </div>
+        ) : null}
         <CardRunFooter
           automation={automation}
-          phases={phases ?? (phase ? [phase] : [])}
+          phases={cardPhases}
           actionBusy={actionBusy}
           onRetry={onRetry}
           onStop={onStop}
@@ -388,56 +394,14 @@ function PageTabDetail({
   return <span className="tabular-nums opacity-60">{count}</span>;
 }
 
-function CardDetailPage({
-  active,
-  stage,
-  actionRows,
-  actionsFailed,
-  onRetryActions,
-}: {
-  active?: ConsolePageId;
-  stage: AutomationStage;
-  actionRows: StepActionRow[];
-  actionsFailed: boolean;
-  onRetryActions?: () => void;
-}) {
+function CardDetailPage({ active, stage }: { active?: ConsolePageId; stage: AutomationStage }) {
   if (active === "artifacts") {
     return <ArtifactsPage stage={stage} />;
   }
   if (active === "checks") {
     return <ChecksPage checks={stage.checks} />;
   }
-  if (active === "actions") {
-    return <ActionsPage rows={actionRows} failed={actionsFailed} onRetry={onRetryActions} />;
-  }
   return null;
-}
-
-function ActionsPage({ rows, failed, onRetry }: { rows: StepActionRow[]; failed?: boolean; onRetry?: () => void }) {
-  return (
-    <div className="space-y-3">
-      {failed ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[12px] leading-5 text-muted-foreground">The actions did not load.</p>
-          {onRetry ? (
-            <Button size="sm" variant="outline" onClick={onRetry}>
-              Try again
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-      {rows.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-border">
-          {rows.map((row) => (
-            <li key={row.id} className="py-2.5 first:pt-0 last:pb-0">
-              <p className="text-[12px] font-medium text-foreground">{row.title}</p>
-              {row.detail ? <p className="mt-1.5 text-[12px] leading-5 text-muted-foreground">{row.detail}</p> : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
 }
 
 /** The stage description always shows above the tabs. It is context, not a page. */
