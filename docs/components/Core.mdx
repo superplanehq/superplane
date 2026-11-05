@@ -1120,7 +1120,7 @@ and status without downloading the full response payload.
 - **Method**: HTTP method to use
 - **Query Parameters**: Optional URL query parameters
 - **Headers**: Custom HTTP headers (header names cannot use expressions)
-- **Authorization** (optional): Bearer Token, Basic Auth password, or custom header value
+- **Authorization** (optional): Bearer token from an organization secret or connected integration, Basic Auth password, or custom header value. For a connected integration, select its name and enter the exported token key.
 - **Body**: Request body in various formats:
   - **JSON**: Structured JSON payload
   - **Form Data**: URL-encoded form data
