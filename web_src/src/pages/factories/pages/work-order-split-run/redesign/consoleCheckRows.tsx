@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
@@ -77,13 +78,14 @@ export function PullRequestConfidence({
       data-testid="redesign-console-pull-request-checks"
       data-repository={repository ?? ""}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
         aria-expanded={open}
         aria-label={MERGE_CONFIDENCE_SCORE_NAME}
         aria-describedby={summaryId}
         onClick={() => setToggled(!open)}
-        className="flex w-full min-w-0 items-center gap-2 text-left"
+        className="h-auto w-full min-w-0 justify-start gap-2 rounded-md p-0 text-left font-normal hover:bg-transparent dark:hover:bg-transparent"
       >
         <CheckStatusBars checks={checks} className="shrink-0" />
         <span className="min-w-0 flex-1 truncate text-[12px] leading-4">
@@ -97,7 +99,7 @@ export function PullRequestConfidence({
           className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open ? "" : "-rotate-90")}
           aria-hidden
         />
-      </button>
+      </Button>
       {open ? <CheckRowList checks={checks} className="mt-1" /> : null}
     </div>
   );

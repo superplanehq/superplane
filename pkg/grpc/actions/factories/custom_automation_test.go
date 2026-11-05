@@ -219,14 +219,30 @@ func TestVerifyCustomAutomationRunsOncePerWorkspaceRepositoryPullRequest(t *test
 	})
 	require.NoError(t, err)
 
-	var events []models.CanvasEvent
-	require.NoError(t, db.Where("workflow_id = ?", automationID).Find(&events).Error)
-	repositories := make([]string, 0, len(events))
-	for _, event := range events {
-		payload := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
-		repositories = append(repositories, payload["repository"].(map[string]any)["full_name"].(string))
+	startedRepositories := func() []string {
+		var events []models.CanvasEvent
+		require.NoError(t, db.Where("workflow_id = ?", automationID).Find(&events).Error)
+		repositories := make([]string, 0, len(events))
+		for _, event := range events {
+			payload := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
+			repositories = append(repositories, payload["repository"].(map[string]any)["full_name"].(string))
+		}
+		return repositories
 	}
-	assert.ElementsMatch(t, []string{"acme/app", "acme/web"}, repositories, "each pull request must start a run on its own repository")
+	assert.ElementsMatch(t, []string{"acme/app", "acme/web"}, startedRepositories(), "each pull request must start a run on its own repository")
+
+	trigger, err := models.FindCanvasNode(db, uuid.MustParse(automationID), customAutomationTriggerID)
+	require.NoError(t, err)
+	configuration := trigger.Configuration.Data()
+	configuration["repository"] = "acme/app"
+	require.NoError(t, db.Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", trigger.WorkflowID, trigger.NodeID).
+		Update("configuration", datatypes.NewJSONType(configuration)).Error)
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: handOff.Order.GetId(),
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"acme/app", "acme/web", "acme/app"}, startedRepositories(), "an automation saved for one repository must not check out another repository's pull request")
 }
 
 func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {

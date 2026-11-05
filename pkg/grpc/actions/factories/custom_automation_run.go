@@ -152,44 +152,79 @@ func startCustomAutomation(
 		return nil, err
 	}
 
+	openPullRequests = slices.DeleteFunc(openPullRequests, func(pullRequest models.FactoryPullRequest) bool {
+		return !customAutomationCoversRepository(trigger, pullRequest.Repository)
+	})
+	if len(openPullRequests) == 0 {
+		if automatic {
+			return nil, nil
+		}
+		return nil, grpcFailedPrecondition("The task has no open pull request in a repository of this automation.")
+	}
+
 	// A task can have one pull request in each workspace repository. Each
-	// pull request gets its own run, like merge confidence.
-	events := make([]*models.CanvasEvent, 0, len(openPullRequests))
+	// pull request gets its own run, like merge confidence. Load every pull
+	// request before the first event is saved, so a failed GitHub request
+	// does not leave runs that a retry starts again.
+	starts := make([]customAutomationStart, 0, len(openPullRequests))
 	for i := range openPullRequests {
-		event, err := startCustomAutomationForPullRequest(ctx, db, deps, factory, canvas, trigger, order, &openPullRequests[i], automatic)
+		payload, revision, payloadType, err := customAutomationPullRequestPayload(ctx, db, deps, factory, order, &openPullRequests[i])
 		if err != nil {
 			return nil, err
 		}
-		if event != nil {
-			events = append(events, event)
+		starts = append(starts, customAutomationStart{
+			dedupKey: openPullRequests[i].ID.String() + "|" + revision, payloadType: payloadType, payload: payload,
+		})
+	}
+	events := make([]*models.CanvasEvent, 0, len(starts))
+	err = db.Transaction(func(tx *gorm.DB) error {
+		for _, start := range starts {
+			event, err := emitCustomAutomationStart(tx, canvas, trigger, start, automatic)
+			if err != nil {
+				return err
+			}
+			if event != nil {
+				events = append(events, event)
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return events, nil
 }
 
-func startCustomAutomationForPullRequest(
-	ctx context.Context,
+type customAutomationStart struct {
+	dedupKey    string
+	payloadType string
+	payload     map[string]any
+}
+
+// customAutomationCoversRepository reports whether the automation checks out
+// the repository. An automation saved before workspace scope checks out its
+// configured repository only.
+func customAutomationCoversRepository(trigger *models.CanvasNode, repository string) bool {
+	configured, _ := trigger.Configuration.Data()["repository"].(string)
+	return models.IsWorkspaceRepositoriesExpression(configured) || strings.EqualFold(strings.TrimSpace(configured), strings.TrimSpace(repository))
+}
+
+func emitCustomAutomationStart(
 	db *gorm.DB,
-	deps IntakeDependencies,
-	factory *models.Factory,
 	canvas *models.Canvas,
 	trigger *models.CanvasNode,
-	order *models.FactoryWorkOrder,
-	pullRequest *models.FactoryPullRequest,
+	start customAutomationStart,
 	automatic bool,
 ) (*models.CanvasEvent, error) {
-	payload, revision, payloadType, err := customAutomationPullRequestPayload(ctx, db, deps, factory, order, pullRequest)
-	if err != nil {
-		return nil, err
-	}
 	var created []models.CanvasEvent
 	events := contexts.NewEventContext(db, trigger, nil, func(events []models.CanvasEvent) {
 		created = append(created, events...)
 	})
+	var err error
 	if automatic {
-		err = events.EmitDeduplicated(payloadType, payload, pullRequest.ID.String()+"|"+revision)
+		err = events.EmitDeduplicated(start.payloadType, start.payload, start.dedupKey)
 	} else {
-		err = events.Emit("factory.customAutomation", payload)
+		err = events.Emit("factory.customAutomation", start.payload)
 	}
 	if err != nil {
 		return nil, err
