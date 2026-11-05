@@ -815,13 +815,46 @@ func TestTaskCustomAutomationTriggerSkipsTheSchedule(t *testing.T) {
 }
 
 func TestCustomAutomationKeepsAUserStepNamedWriteTaskResult(t *testing.T) {
-	steps, err := customAutomationProtoSteps([]any{
-		map[string]any{"name": backlogTaskResultStepName, "type": "prompt", "prompt": "Write the task result in the pull request."},
-		map[string]any{"name": backlogTaskResultStepName, "type": "bash", "command": "cat /tmp/proposal.json"},
-	})
-	require.NoError(t, err)
-	require.Len(t, steps, 1)
-	assert.Equal(t, "Write the task result in the pull request.", steps[0].GetPrompt())
+	for _, column := range []string{models.CanvasColumnKeyVerify, models.CanvasColumnKeyBacklog} {
+		t.Run(column, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory := seedHandOffFactory(t, r, db)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+			ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
+			settings := &pb.FactoryCustomAutomation_Settings{
+				StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED,
+				Schedule:  &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *"},
+				Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+				Steps: []*pb.FactoryCustomAutomation_Step{
+					{Name: "Write task result", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Write the task result in the pull request."},
+					{Name: "Write task result", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "cat /tmp/proposal.json", WorkingDirectory: "repo"},
+				},
+			}
+			created, err := CreateFactoryCustomAutomation(ctx, deps, orgID, &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), Name: "Task results", ColumnKey: column, Settings: settings,
+			})
+			require.NoError(t, err)
+			id := created.GetCustomAutomation().GetAutomation().GetId()
+			described, err := DescribeFactoryCustomAutomation(ctx, orgID, &pb.DescribeFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id})
+			require.NoError(t, err)
+			require.Equal(t, settings.GetSteps(), described.GetCustomAutomation().GetSettings().GetSteps())
+			_, err = UpdateFactoryCustomAutomation(ctx, deps, orgID, &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: id, Name: "Task results", Settings: described.GetCustomAutomation().GetSettings(),
+			})
+			require.NoError(t, err)
+			canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(id))
+			require.NoError(t, err)
+			version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+			require.NoError(t, err)
+			agent := findComponentNode(t, version.Nodes, "runnerClaudeCode")
+			steps := agent.Configuration["steps"].([]any)
+			require.Len(t, steps, 2)
+			assert.Equal(t, "cat /tmp/proposal.json", steps[1].(map[string]any)["command"])
+		})
+	}
 }
 
 func customAutomationNode(nodes []models.Node, id string) *models.Node {

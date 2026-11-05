@@ -66,7 +66,7 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   expect(screen.getByLabelText("Cron expression")).toHaveValue("0 9 * * *");
   fireEvent.change(screen.getByLabelText("Cron expression"), { target: { value: "0 9 31 2 *" } });
   await user.click(screen.getByRole("combobox", { name: "Timezone" }));
-  await user.click(screen.getByRole("option", { name: "GMT+5:30 (Mumbai, Delhi)" }));
+  await user.click(screen.getByRole("option", { name: "GMT+5:45 (Nepal)" }));
   await user.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Schedule has no future run.");
   expect(screen.getByLabelText("Cron expression")).toHaveValue("0 9 31 2 *");
@@ -74,7 +74,7 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(2));
   const saved = saveAutomation.mock.calls[1]![0];
-  expect(saved.settings.schedule).toEqual({ cronExpression: "30 0 9 * * MON-FRI", utcOffset: 5.5 });
+  expect(saved.settings.schedule).toEqual({ cronExpression: "30 0 9 * * MON-FRI", utcOffset: 5.75 });
   expect(saved.settings.steps).toEqual(automation.settings!.steps);
   view.unmount();
   automation = { automation: automation.automation, settings: saved.settings };
@@ -82,7 +82,12 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   expect(screen.queryByLabelText("Cron expression")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: /^Schedule/ }));
   expect(screen.getByLabelText("Cron expression")).toHaveValue("30 0 9 * * MON-FRI");
-  expect(screen.getByRole("combobox", { name: "Timezone" })).toHaveTextContent("GMT+5:30 (Mumbai, Delhi)");
+  expect(screen.getByRole("combobox", { name: "Timezone" })).toHaveTextContent("GMT+5:45 (Nepal)");
+  await user.click(screen.getByRole("combobox", { name: "Timezone" }));
+  await user.click(screen.getByRole("option", { name: "GMT-3:30 (Newfoundland)" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(3));
+  expect(saveAutomation.mock.calls[2]![0].settings.schedule.utcOffset).toBe(-3.5);
   expect(screen.getByRole("button", { name: /Bash Lint/ })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Prompt Review/ })).toBeInTheDocument();
 });

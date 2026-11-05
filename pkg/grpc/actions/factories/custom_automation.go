@@ -30,7 +30,6 @@ const (
 	customAutomationRunnerID         = "verify"
 	customAutomationScheduleRunnerID = "schedule-run"
 	customAutomationVersion          = 1
-	backlogTaskResultStepName        = "Write task result"
 	backlogTaskRunnerName            = "Run automation"
 )
 
@@ -1119,31 +1118,16 @@ func decodeCustomAutomationTriggers(nodes []models.Node) ([]decodedCustomAutomat
 }
 
 func selectCustomAutomationAgent(nodes []models.Node) *models.Node {
-	var fallback *models.Node
+	if agent := customAutomationAgentForRunner(nodes, customAutomationRunnerID); agent != nil {
+		return agent
+	}
 	for i := range nodes {
 		node := &nodes[i]
-		if !isFactoryAgentHarness(node.ComponentName()) {
-			continue
-		}
-		if fallback == nil {
-			fallback = node
-		}
-		steps, _ := node.Configuration["steps"].([]any)
-		managed := false
-		for _, step := range steps {
-			value, _ := step.(map[string]any)
-			name, _ := value["name"].(string)
-			stepType, _ := value["type"].(string)
-			command, _ := value["command"].(string)
-			if managedBacklogTaskResultStep(name, stepType, command) {
-				managed = true
-			}
-		}
-		if !managed {
+		if isFactoryAgentHarness(node.ComponentName()) {
 			return node
 		}
 	}
-	return fallback
+	return nil
 }
 
 func metadataStrings(template map[string]any, key string) []string {
@@ -1277,13 +1261,6 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 			WorkingDirectory: step.WorkingDirectory,
 			Secrets:          step.Secrets,
 		}
-		command := ""
-		if step.Command != nil {
-			command = *step.Command
-		}
-		if managedBacklogTaskResultStep(step.Name, step.Type, command) {
-			continue
-		}
 		if runner.NormalizeAgentStepType(step.Type) == runner.AgentStepBash {
 			value.Type = pb.FactoryCustomAutomation_Step_TYPE_BASH
 			if step.Command != nil {
@@ -1298,12 +1275,6 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 		result = append(result, value)
 	}
 	return result, nil
-}
-
-func managedBacklogTaskResultStep(name, stepType, command string) bool {
-	return name == backlogTaskResultStepName &&
-		runner.NormalizeAgentStepType(stepType) == runner.AgentStepBash &&
-		strings.Contains(command, "/tmp/proposal.json")
 }
 
 func configInt(configuration map[string]any, key string) int {

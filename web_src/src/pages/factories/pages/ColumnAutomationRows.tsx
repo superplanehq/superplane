@@ -1,5 +1,6 @@
 import { Loader2, Play, Plus, Settings2 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { columnAutomationHeadline } from "../lib/columnAutomationHeadline";
@@ -71,16 +72,18 @@ function EmptyAutomationRow({ title, onAdd, testId }: { title: string; onAdd?: (
   }
 
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="xs"
       type="button"
       data-testid={`${testId}-empty`}
       aria-label={`${COLUMN_AUTOMATIONS_COPY.addLabel} for ${title}`}
       onClick={onAdd}
-      className={cn(ROW_CLASSNAME, ROW_HOVER_CLASSNAME, "text-muted-foreground hover:text-foreground")}
+      className={cn(ROW_CLASSNAME, ROW_HOVER_CLASSNAME, "font-normal text-muted-foreground hover:text-foreground")}
     >
       <Plus className="size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate">{COLUMN_AUTOMATIONS_COPY.addLabel}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -133,18 +136,22 @@ function ColumnAutomationRow({
       onClick={onRowAction ? () => onRowAction(automation, "settings") : undefined}
     >
       {onRowAction ? (
-        <button
+        <Button
+          variant="ghost"
+          size="xs"
           type="button"
           aria-label={`${COLUMN_AUTOMATIONS_COPY.rowMenu}: ${automation.name}`}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          className="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-none p-0 text-left text-[12px] font-normal hover:bg-transparent dark:hover:bg-transparent"
         >
           {details}
-        </button>
+        </Button>
       ) : (
         details
       )}
       {showRun ? (
-        <button
+        <Button
+          variant="ghost"
+          size="icon-xs"
           type="button"
           aria-label={`Run ${automation.name}`}
           disabled={runPending}
@@ -154,17 +161,19 @@ function ColumnAutomationRow({
             event.stopPropagation();
             onRun?.(automation);
           }}
-          className="flex size-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
+          className="size-4 shrink-0 p-0 text-muted-foreground hover:text-foreground"
         >
           {starting ? (
             <Loader2 className="size-3.5 animate-spin" aria-hidden />
           ) : (
             <Play className="size-3.5" aria-hidden />
           )}
-        </button>
+        </Button>
       ) : null}
       {onRowAction ? (
-        <button
+        <Button
+          variant="ghost"
+          size="icon-xs"
           type="button"
           tabIndex={-1}
           aria-hidden
@@ -172,10 +181,10 @@ function ColumnAutomationRow({
             event.stopPropagation();
             onRowAction(automation, "settings");
           }}
-          className="flex size-4 shrink-0 items-center justify-center text-muted-foreground"
+          className="size-4 shrink-0 p-0 text-muted-foreground"
         >
           <Settings2 className="size-3.5" aria-hidden data-testid={`${testId}-settings-${automation.id}`} />
-        </button>
+        </Button>
       ) : null}
     </div>
   );
