@@ -26,7 +26,7 @@ describe("AddIntakePicker", () => {
     const user = userEvent.setup();
     const { onSelect } = renderPicker(vi.fn(), { takenSourceIds: ["custom-verification"] });
     await user.type(screen.getByRole("textbox", { name: "Search intakes" }), "Bash");
-    const card = screen.getByRole("button", { name: /Custom automation/ });
+    const card = screen.getByRole("button", { name: /Build your own/ });
     expect(card).toBeEnabled();
     expect(screen.queryByTestId("add-intake-template-github-issues")).not.toBeInTheDocument();
     await user.click(card);

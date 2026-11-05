@@ -25,7 +25,7 @@ vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
 }));
 vi.mock("./PlanningReviewForm", () => ({ PlanningReviewForm: () => null }));
 
-function Editor() {
+function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
   const model = useCustomAutomationSetupPage({
     organizationId: "org",
     factoryId: "factory",
@@ -36,8 +36,8 @@ function Editor() {
     <CustomAutomationSetupForm
       name={model.name}
       icon={model.icon}
-      mode={model.mode}
-      schedule={model.schedule}
+      triggers={model.triggers}
+      columnKey={columnKey}
       draft={model.draft}
       organizationId="org"
       factoryId="factory"
@@ -47,8 +47,7 @@ function Editor() {
       error={model.saveError}
       onNameChange={model.setName}
       onIconChange={model.setIcon}
-      onModeChange={model.setMode}
-      onScheduleChange={model.setSchedule}
+      onTriggersChange={model.setTriggers}
       onDraftChange={model.setDraft}
       onSave={() => void model.save()}
       onClose={() => {}}
@@ -61,11 +60,13 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   saveAutomation.mockRejectedValueOnce(new Error("Schedule has no future run."));
   saveAutomation.mockResolvedValueOnce({});
   const view = render(<Editor />);
-  await user.click(screen.getByRole("combobox", { name: "Trigger" }));
-  await user.click(screen.getByRole("option", { name: /Schedule/ }));
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
+  await user.click(screen.getByRole("button", { name: "Remove Manual" }));
   expect(screen.getByLabelText("Cron expression")).toHaveValue("0 9 * * *");
   fireEvent.change(screen.getByLabelText("Cron expression"), { target: { value: "0 9 31 2 *" } });
-  fireEvent.change(screen.getByLabelText("UTC offset (hours)"), { target: { value: "5.75" } });
+  await user.click(screen.getByRole("combobox", { name: "Timezone" }));
+  await user.click(screen.getByRole("option", { name: "GMT+5:30 (Mumbai, Delhi)" }));
   await user.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Schedule has no future run.");
   expect(screen.getByLabelText("Cron expression")).toHaveValue("0 9 31 2 *");
@@ -73,13 +74,60 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(2));
   const saved = saveAutomation.mock.calls[1]![0];
-  expect(saved.settings.schedule).toEqual({ cronExpression: "30 0 9 * * MON-FRI", utcOffset: 5.75 });
+  expect(saved.settings.schedule).toEqual({ cronExpression: "30 0 9 * * MON-FRI", utcOffset: 5.5 });
   expect(saved.settings.steps).toEqual(automation.settings!.steps);
   view.unmount();
   automation = { automation: automation.automation, settings: saved.settings };
   render(<Editor />);
+  expect(screen.queryByLabelText("Cron expression")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /^Schedule/ }));
   expect(screen.getByLabelText("Cron expression")).toHaveValue("30 0 9 * * MON-FRI");
-  expect(screen.getByLabelText("UTC offset (hours)")).toHaveValue(5.75);
+  expect(screen.getByRole("combobox", { name: "Timezone" })).toHaveTextContent("GMT+5:30 (Mumbai, Delhi)");
   expect(screen.getByRole("button", { name: /Bash Lint/ })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Prompt Review/ })).toBeInTheDocument();
+});
+
+it("saves a schedule beside the existing trigger", async () => {
+  automation = {
+    automation: { id: "automation", name: "Repository review" },
+    settings: {
+      startMode: "START_MODE_MANUAL",
+      agent: { component: "runnerClaudeCode" },
+      steps: automation.settings!.steps,
+    },
+  };
+  const user = userEvent.setup();
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValueOnce({});
+  render(<Editor columnKey="backlog" />);
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
+  expect(screen.queryByRole("combobox", { name: /Trigger/ })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Cron expression"), { target: { value: "0 18 * * *" } });
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
+  const saved = saveAutomation.mock.calls.at(-1)![0];
+  expect(saved.settings.triggers).toEqual([
+    { startMode: "START_MODE_MANUAL" },
+    {
+      startMode: "START_MODE_SCHEDULED",
+      schedule: { cronExpression: "0 18 * * *", utcOffset: expect.any(Number) },
+    },
+  ]);
+  expect(saved.settings.steps).toEqual(automation.settings!.steps);
+});
+
+it("offers Schedule for a Backlog automation", async () => {
+  const user = userEvent.setup();
+  render(<Editor columnKey="backlog" />);
+  expect(screen.queryByLabelText("Cron expression")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
+  expect(screen.getByText("A person starts each run.")).toBeInTheDocument();
+  expect(screen.getByLabelText("Cron expression")).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Build a cron expression" })).not.toBeInTheDocument();
+  expect(screen.getByRole("combobox", { name: "Timezone" })).toBeInTheDocument();
+  expect(screen.queryByText(/empty result creates no task/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/five fields/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/daylight saving time/)).not.toBeInTheDocument();
 });

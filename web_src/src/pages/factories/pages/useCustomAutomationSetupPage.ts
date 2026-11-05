@@ -9,12 +9,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { FactoriesFactory } from "@/api-client";
 import {
   customAutomationDraft,
-  customAutomationMode,
-  customAutomationSettings,
-  customAutomationSchedule,
+  customAutomationSettingsForTriggers,
+  customAutomationTriggers,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
+  newCustomAutomationTrigger,
   workspaceAgentFromOnboarding,
-  type CustomAutomationMode,
+  type CustomAutomationTrigger,
 } from "../lib/customAutomation";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
@@ -32,8 +32,7 @@ export function useCustomAutomationSetupPage(args: {
   const create = useCreateFactoryCustomAutomation(args.organizationId, args.factoryId);
   const update = useUpdateFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId ?? "");
   const [name, setName] = useState("Custom automation");
-  const [mode, setMode] = useState<CustomAutomationMode>("manual");
-  const [schedule, setSchedule] = useState(() => customAutomationSchedule());
+  const [triggers, setTriggers] = useState<CustomAutomationTrigger[]>(() => [newCustomAutomationTrigger()]);
   const [icon, setIcon] = useState(DEFAULT_CUSTOM_AUTOMATION_ICON);
   const agentHarness = args.factory?.onboarding?.agentHarness;
   const [draft, setDraft] = useState<PlanningReviewDraft>(() =>
@@ -53,8 +52,7 @@ export function useCustomAutomationSetupPage(args: {
       return;
     }
     setName("Custom automation");
-    setMode("manual");
-    setSchedule(customAutomationSchedule());
+    setTriggers([newCustomAutomationTrigger()]);
     setIcon(DEFAULT_CUSTOM_AUTOMATION_ICON);
     setDraft(customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }));
     setSaveError("");
@@ -65,8 +63,7 @@ export function useCustomAutomationSetupPage(args: {
       return;
     }
     setName(automation.automation?.name?.trim() || "Custom automation");
-    setMode(customAutomationMode(automation.settings?.startMode));
-    setSchedule(customAutomationSchedule(automation));
+    setTriggers(customAutomationTriggers(automation));
     setIcon(automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON);
     setDraft(customAutomationDraft(automation));
   }, [automation]);
@@ -77,14 +74,16 @@ export function useCustomAutomationSetupPage(args: {
   const validationError = useMemo(() => validateDraft(name, draft), [draft, name]);
 
   const save = async () => {
-    if (
-      mode === "scheduled" &&
-      (!schedule.cronExpression.trim() ||
-        !Number.isFinite(schedule.utcOffset) ||
-        schedule.utcOffset < -12 ||
-        schedule.utcOffset > 14)
-    ) {
-      setSaveError("Enter a cron expression and a UTC offset from -12 to +14 hours.");
+    const invalidSchedule = triggers.some(
+      (trigger) =>
+        trigger.mode === "scheduled" &&
+        (!trigger.schedule.cronExpression.trim() ||
+          !Number.isFinite(trigger.schedule.utcOffset) ||
+          trigger.schedule.utcOffset < -12 ||
+          trigger.schedule.utcOffset > 14),
+    );
+    if (invalidSchedule) {
+      setSaveError("Enter a cron expression and choose a timezone.");
       return false;
     }
     if (validationError) {
@@ -94,7 +93,7 @@ export function useCustomAutomationSetupPage(args: {
     setSaveError("");
     const input = {
       name: name.trim(),
-      settings: customAutomationSettings(mode, draft, icon, schedule),
+      settings: customAutomationSettingsForTriggers(triggers, draft, icon),
     };
     try {
       if (args.automationId) {
@@ -117,10 +116,8 @@ export function useCustomAutomationSetupPage(args: {
     described,
     name,
     setName,
-    mode,
-    setMode,
-    schedule,
-    setSchedule,
+    triggers,
+    setTriggers,
     icon,
     setIcon,
     draft,

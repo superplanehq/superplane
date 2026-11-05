@@ -86,12 +86,37 @@ describe("ColumnAutomationRows", () => {
       />,
     );
 
-    await user.click(screen.getByTestId("rows-row-intake-github"));
+    await user.click(screen.getByRole("button", { name: "Open automation: GitHub issues" }));
     expect(onRowAction).toHaveBeenCalledWith(GITHUB_INTAKE, "settings");
     expect(screen.queryByTestId("rows-menu-intake-github")).not.toBeInTheDocument();
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("rows-settings-intake-github")).toBeInTheDocument();
     expect(screen.getByTestId("rows-row-intake-github").className).toContain("hover:bg-black/10");
+  });
+
+  it("starts a backlog schedule from the play button without opening settings", async () => {
+    const user = userEvent.setup();
+    const onRun = vi.fn();
+    const onRowAction = vi.fn();
+    const automation = { ...GITHUB_INTAKE, id: "hello", name: "Add Hello Worlds to README", canRunNow: true };
+    render(
+      <ColumnAutomationRows
+        title="Backlog"
+        automations={[automation, ANALYSIS]}
+        rowCount={2}
+        onRowAction={onRowAction}
+        onRun={onRun}
+        testId="rows"
+      />,
+    );
+
+    const run = screen.getByRole("button", { name: "Run Add Hello Worlds to README" });
+    const settings = screen.getByTestId("rows-settings-hello");
+    expect(run.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Run Task analysis" })).not.toBeInTheDocument();
+    await user.click(run);
+    expect(onRun).toHaveBeenCalledWith(automation);
+    expect(onRowAction).not.toHaveBeenCalled();
   });
 
   it("hides the settings icon when the row cannot open settings", () => {

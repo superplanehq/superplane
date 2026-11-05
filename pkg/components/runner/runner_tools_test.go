@@ -30,6 +30,7 @@ func TestFlowTools(t *testing.T) {
 		assert.Equal(t, append(append([]string{}, shared...), extra...), AllowedRunnerTools(ScopesForFlow(flow)), flow)
 	}
 	assert.Empty(t, ScopesForFlow("deploy"))
+	assert.Equal(t, []string{"list_tasks", "create_task"}, AllowedRunnerTools(ScopesForFlow(RunnerFlowSchedule)))
 }
 
 func TestTaskCapabilityScopes(t *testing.T) {
