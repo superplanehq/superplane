@@ -462,6 +462,34 @@ func Test__FactoryAgentResourceContextRepos(t *testing.T) {
 		assert.Equal(t, resource.ID, enabled[0].ID)
 	})
 
+	t.Run("keeps the context repo branch and access", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "acme/web",
+			Ref:        " release/café+1.0 ",
+			Access:     "Write",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "release/café+1.0", resource.Config.Data().Ref)
+		assert.True(t, resource.Config.Data().ContextRepoWritable())
+
+		legacy, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "acme/docs",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryContextRepoAccessRead, legacy.Config.Data().Access)
+
+		for _, config := range []models.FactoryAgentResourceConfig{
+			{Repository: "acme/bad-ref", Ref: "main..dev"},
+			{Repository: "acme/bad-space", Ref: "main dev"},
+			{Repository: "acme/bad-access", Access: "admin"},
+		} {
+			_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, config)
+			assert.Error(t, err, config.Repository)
+		}
+	})
+
 	t.Run("suffixes derived names on collision", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)

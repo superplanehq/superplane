@@ -12,10 +12,15 @@ const stdio = require("./stdio");
 
 const SERVER_NAME = "superplane_global";
 
+// Codex stops waiting for a tool call after 300s. Claude Code and OpenCode wait
+// much longer. Every tool call must return before the shortest agent limit.
+const TOOL_CALL_TIMEOUT_MS = 270000;
+
 function createHandler({
   client = createClient(),
   tools = registry.allTools(),
   prepare = (names) => registry.prepare(names, client),
+  toolCallTimeoutMs = TOOL_CALL_TIMEOUT_MS,
 } = {}) {
   let allowed;
 
@@ -51,7 +56,11 @@ function createHandler({
       return;
     }
     try {
-      const result = await tool.handler((params && params.arguments) || {}, client);
+      const result = await withDeadline(
+        tool.handler((params && params.arguments) || {}, client),
+        toolCallTimeoutMs,
+        `${name} did not finish in ${toolCallTimeoutMs / 1000}s and was stopped.`,
+      );
       transport.sendResult(id, toolResult(result));
     } catch (err) {
       transport.sendResult(id, {
@@ -89,6 +98,14 @@ function createHandler({
   };
 }
 
+function withDeadline(promise, timeoutMs, message) {
+  let timer;
+  const deadline = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([Promise.resolve(promise), deadline]).finally(() => clearTimeout(timer));
+}
+
 // Image tools return their own content blocks, so the base64 image stays out
 // of structuredContent.
 function toolResult(result) {
@@ -100,6 +117,7 @@ function toolResult(result) {
 
 if (require.main === module) {
   stdio.start(createHandler());
+  registry.stopOnExit(process.stdin);
 }
 
 module.exports = { SERVER_NAME, createHandler };
