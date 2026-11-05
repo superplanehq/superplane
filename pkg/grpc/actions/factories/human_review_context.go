@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v84/github"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/factories/humanreview"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -58,7 +59,8 @@ func gatherHumanReviewContext(ctx context.Context, client humanReviewGitHub, pr 
 					resolvedOwners[login] = true
 					permission, _, err := client.GetRepositoryPermissionLevel(ctx, pr.Repository, login)
 					if err != nil {
-						return nil, fmt.Errorf("resolve ownership user %s: %w", login, err)
+						log.WithError(err).WithField("owner", owner).Warn("Human review: skip unavailable CODEOWNERS hint")
+						continue
 					}
 					if permission == nil || permission.GetUser() == nil {
 						continue
@@ -66,7 +68,8 @@ func gatherHumanReviewContext(ctx context.Context, client humanReviewGitHub, pr 
 					user := permission.GetUser()
 					eligible, err := humanReviewerEligible(ctx, client, pr.Repository, user, current.GetUser())
 					if err != nil {
-						return nil, err
+						log.WithError(err).WithField("owner", owner).Warn("Human review: skip unavailable CODEOWNERS hint")
+						continue
 					}
 					if eligible {
 						ownershipCandidates = append(ownershipCandidates, humanreview.Reviewer{ID: user.GetID(), Login: user.GetLogin(), Reason: "Target branch CODEOWNERS names this user."})
@@ -80,9 +83,12 @@ func gatherHumanReviewContext(ctx context.Context, client humanReviewGitHub, pr 
 				if len(ownershipTeams) >= 100 {
 					return nil, errors.New("target branch ownership contains more than 100 teams; reduce team references before running Human review")
 				}
+				// Cache unavailable teams too, so repeated rules do not repeat failures.
+				ownershipTeams[team] = []humanreview.Reviewer{}
 				candidates, err := humanReviewFallbackCandidates(ctx, client, pr.Repository, team, current.GetUser())
 				if err != nil {
-					return nil, fmt.Errorf("resolve ownership team %s: %w", team, err)
+					log.WithError(err).WithField("owner", owner).Warn("Human review: skip unavailable CODEOWNERS hint")
+					continue
 				}
 				ownershipTeams[team] = candidates
 			}
