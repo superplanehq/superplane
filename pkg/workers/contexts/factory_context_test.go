@@ -1081,6 +1081,9 @@ func TestFactoryContext_UpdateWorkOrderStatus_WhenAllPullRequestsDone(t *testing
 
 	closedState := models.FactoryPullRequestStateClosed
 	require.NoError(t, web.Update(database.Conn(), models.FactoryPullRequestPatch{State: &closedState}))
+	require.NoError(t, database.Conn().Model(&models.FactoryWorkOrderExecution{}).
+		Where("run_id = ?", run.ID).
+		Update("status", models.FactoryWorkOrderExecutionStatusFinished).Error, "a running line step keeps the task open")
 
 	closeWhenDone.Result = models.FactoryWorkOrderResultPRClosed
 	updated, changed, err = ctx.UpdateWorkOrderStatus(closeWhenDone)

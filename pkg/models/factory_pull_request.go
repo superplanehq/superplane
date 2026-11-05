@@ -740,14 +740,37 @@ func ListPullRequestsByWorkOrderIDs(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[
 }
 
 // PullRequestCloseOutcome reports how the task closes from its pull
-// requests. A task stays open while any pull request is open or draft.
+// requests. A task stays open while any pull request is open or draft. It
+// also stays open while a line step runs, because an Implement step can still
+// open a pull request in another workspace repository. The step end checks
+// again.
 func (o *FactoryWorkOrder) PullRequestCloseOutcome(tx *gorm.DB) (string, bool, error) {
+	running, err := WorkOrderHasActiveLineStep(tx, o.ID)
+	if err != nil || running {
+		return "", false, err
+	}
 	grouped, err := ListPullRequestsByWorkOrderIDs(tx, []uuid.UUID{o.ID})
 	if err != nil {
 		return "", false, err
 	}
 	result, done := PullRequestsCloseResult(grouped[o.ID])
 	return result, done, nil
+}
+
+// PullRequestFinishedSince reports whether a pull request of the task merged
+// or closed at or after the time.
+func (o *FactoryWorkOrder) PullRequestFinishedSince(tx *gorm.DB, since time.Time) (bool, error) {
+	grouped, err := ListPullRequestsByWorkOrderIDs(tx, []uuid.UUID{o.ID})
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(grouped[o.ID], func(pullRequest FactoryPullRequest) bool {
+		finishedAt := pullRequest.MergedAt
+		if finishedAt == nil {
+			finishedAt = pullRequest.ClosedAt
+		}
+		return finishedAt != nil && !finishedAt.Before(since)
+	}), nil
 }
 
 // PullRequestsCloseResult returns completed when every pull request is done
