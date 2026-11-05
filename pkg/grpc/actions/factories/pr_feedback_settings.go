@@ -3,6 +3,8 @@ package factories
 import (
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/factories/humanreview"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -197,6 +199,9 @@ func validatePRFeedbackSettingsForSource(
 		return invalidArgument("at least one check name is required")
 	}
 	for _, name := range settings.CheckNames {
+		if strings.EqualFold(strings.TrimSpace(name), humanreview.CheckName) {
+			return invalidArgument("Human review approval cannot trigger automatic code repair")
+		}
 		if strings.TrimSpace(name) == "" {
 			return invalidArgument("check names must be non-empty")
 		}

@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -49,6 +50,59 @@ func TestGitHub__ResolveSecrets__PAT(t *testing.T) {
 	assert.NotContains(t, secrets.Setup, "ghp_test_token")
 }
 
+func TestGitHub__ResolveSecrets__InstallationTokenPermissions(t *testing.T) {
+	for _, scenario := range []struct {
+		name        string
+		legacy      bool
+		invalid     bool
+		permissions string
+		expected    string
+	}{
+		{name: "new app keeps runner rights without check or status publication", permissions: `{"checks":"write","contents":"write","pull_requests":"write","statuses":"write","actions":"write","metadata":"read"}`, expected: `{"checks":"read","contents":"write","pull_requests":"write","statuses":"read","actions":"write","metadata":"read"}`},
+		{name: "legacy private app cannot publish checks", legacy: true, permissions: `{"checks":"write","contents":"write","issues":"write"}`, expected: `{"checks":"read","contents":"write","issues":"write"}`},
+		{name: "existing read permission stays read", permissions: `{"checks":"read","contents":"write"}`, expected: `{"checks":"read","contents":"write"}`},
+		{name: "app without checks keeps its existing permissions", permissions: `{"contents":"write","workflows":"write"}`, expected: `{"contents":"write","workflows":"write"}`},
+		{name: "missing permissions cannot return an unrestricted token", permissions: `null`, invalid: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			integrationCtx := &contexts.IntegrationContext{
+				NewSetupFlow: !scenario.legacy,
+				CurrentProperties: map[string]any{
+					common.PropertyAuthMethod:        common.AuthMethodApp,
+					common.PropertyAppID:             "99",
+					common.PropertyAppInstallationID: "501",
+				},
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					common.SecretAppPEM: {Name: common.SecretAppPEM, Value: githubPrivateKeyPEM(t)},
+				},
+				Metadata: common.Metadata{InstallationID: "501", GitHubApp: common.GitHubAppMetadata{ID: 99}},
+			}
+			if scenario.legacy {
+				integrationCtx.CurrentSecrets[common.GitHubAppPEM] = core.IntegrationSecret{Name: common.GitHubAppPEM, Value: githubPrivateKeyPEM(t)}
+			}
+			httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{"permissions":`+scenario.permissions+`}`),
+				mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_runner","expires_at":"`+time.Now().Add(time.Hour).UTC().Format(time.RFC3339)+`"}`),
+			}}
+			secrets, err := (&GitHub{}).ResolveSecrets(core.IntegrationSecretContext{HTTP: httpCtx, Integration: integrationCtx})
+			if scenario.invalid {
+				require.Error(t, err)
+				assert.Empty(t, secrets.Values[integrationSecretGitHubToken])
+				require.Len(t, httpCtx.Requests, 1)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, []byte("ghs_runner"), secrets.Values[integrationSecretGitHubToken])
+			require.Len(t, httpCtx.Requests, 2)
+			assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+			assert.Equal(t, "/app/installations/501", httpCtx.Requests[0].URL.Path)
+			assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
+			assert.Equal(t, "/app/installations/501/access_tokens", httpCtx.Requests[1].URL.Path)
+			assert.JSONEq(t, `{"permissions":`+scenario.expected+`}`, readRequestBody(t, httpCtx.Requests[1]))
+		})
+	}
+}
+
 func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	organization, err := models.CreateOrganization("org-"+uuid.NewString(), "")
@@ -72,6 +126,7 @@ func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), integration.ID, models.ProviderGitHub, 601))
 
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusOK, `{"permissions":{"checks":"write","contents":"write","pull_requests":"write"}}`),
 		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_installation","expires_at":"2030-01-01T00:00:00Z"}`),
 	}}
 	integrationCtx := &contexts.IntegrationContext{
@@ -86,12 +141,12 @@ func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []byte("ghs_installation"), secrets.Values[integrationSecretGitHubToken])
-	require.Len(t, httpCtx.Requests, 1)
-	assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
-	assert.Equal(t, "/app/installations/501/access_tokens", httpCtx.Requests[0].URL.Path)
-	body, err := io.ReadAll(httpCtx.Requests[0].Body)
+	require.Len(t, httpCtx.Requests, 2)
+	assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
+	assert.Equal(t, "/app/installations/501/access_tokens", httpCtx.Requests[1].URL.Path)
+	body, err := io.ReadAll(httpCtx.Requests[1].Body)
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"repository_ids":[601]}`, string(body))
+	assert.JSONEq(t, `{"repository_ids":[601],"permissions":{"checks":"read","contents":"write","pull_requests":"write"}}`, string(body))
 	assert.NotContains(t, secrets.Values, integrationSecretGitHubContextToken)
 }
 
@@ -146,6 +201,7 @@ func TestGitHub__ResolveSecrets__HostedContextRepositoriesAreReadOnly(t *testing
 	require.NoError(t, err)
 
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusOK, `{"permissions":{"checks":"write","contents":"write"}}`),
 		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
 		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_read","expires_at":"2030-01-01T00:00:00Z"}`),
 	}}
@@ -162,10 +218,10 @@ func TestGitHub__ResolveSecrets__HostedContextRepositoriesAreReadOnly(t *testing
 	assert.Equal(t, []byte("ghs_write"), secrets.Values[integrationSecretGitHubToken])
 	assert.Equal(t, []byte("ghs_read"), secrets.Values[integrationSecretGitHubContextToken])
 	assert.Contains(t, secrets.Usage, "read-only token")
-	require.Len(t, httpCtx.Requests, 2)
-	writeBody := readRequestBody(t, httpCtx.Requests[0])
-	readBody := readRequestBody(t, httpCtx.Requests[1])
-	assert.JSONEq(t, `{"repository_ids":[601]}`, writeBody)
+	require.Len(t, httpCtx.Requests, 3)
+	writeBody := readRequestBody(t, httpCtx.Requests[1])
+	readBody := readRequestBody(t, httpCtx.Requests[2])
+	assert.JSONEq(t, `{"repository_ids":[601],"permissions":{"checks":"read","contents":"write"}}`, writeBody)
 	assert.JSONEq(t, `{"repository_ids":[602],"permissions":{"contents":"read","metadata":"read"}}`, readBody)
 }
 
@@ -202,6 +258,7 @@ func TestGitHub__ResolveSecrets__HostedContextRepositoryRefresh(t *testing.T) {
 	require.NoError(t, err)
 
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusOK, `{"permissions":{"checks":"write","contents":"write"}}`),
 		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
 		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_read","expires_at":"2030-01-01T00:00:00Z"}`),
 	}}
@@ -215,8 +272,8 @@ func TestGitHub__ResolveSecrets__HostedContextRepositoryRefresh(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []byte("ghs_read"), secrets.Values[integrationSecretGitHubContextToken])
-	require.Len(t, httpCtx.Requests, 2)
-	assert.JSONEq(t, `{"repository_ids":[602],"permissions":{"contents":"read","metadata":"read"}}`, readRequestBody(t, httpCtx.Requests[1]))
+	require.Len(t, httpCtx.Requests, 3)
+	assert.JSONEq(t, `{"repository_ids":[602],"permissions":{"contents":"read","metadata":"read"}}`, readRequestBody(t, httpCtx.Requests[2]))
 	var jobs int64
 	require.NoError(t, database.Conn().Model(&models.VCSProviderInstallationReconcileJob{}).
 		Where("provider = ? AND installation_id = ?", models.ProviderGitHub, int64(501)).

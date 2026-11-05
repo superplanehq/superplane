@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -276,6 +277,13 @@ func Test__FactoryResourceCleaner__DeletesPullRequestRunLinksBeforePullRequests(
 	})
 	require.NoError(t, err)
 	require.NoError(t, pullRequest.LinkRun(db, run.ID, "Please add tests."))
+	revision, err := pullRequest.ObserveRevision(db, "reviewed-head")
+	require.NoError(t, err)
+	_, err = pullRequest.NewHumanReviewDecision(db, models.FactoryHumanReviewDecision{
+		RevisionID: revision.Revision.ID, SourceRunID: &run.ID, RunID: &run.ID,
+		AssessedCommit: "reviewed-head", State: models.FactoryHumanReviewStateDecided,
+	})
+	require.NoError(t, err)
 	require.NoError(t, factory.SoftDelete(db))
 
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -399,6 +407,52 @@ func Test__FactoryResourceCleaner__LargeFactoryStaysWithinBudget(t *testing.T) {
 	var factoryCount int64
 	require.NoError(t, db.Unscoped().Model(&models.Factory{}).Where("id = ?", factory.ID).Count(&factoryCount).Error)
 	assert.Equal(t, int64(0), factoryCount)
+}
+
+func Test__CanvasRun__DeleteChain__PreservesHumanReviewEvidence(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/79"})
+	require.NoError(t, err)
+	revision, err := pr.ObserveRevision(db, "reviewed-head")
+	require.NoError(t, err)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, nil)
+	source, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "trigger", models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+	require.NoError(t, err)
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "trigger", models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+	require.NoError(t, err)
+	decision, err := pr.NewHumanReviewDecision(db, models.FactoryHumanReviewDecision{
+		RevisionID: revision.Revision.ID, SourceRunID: &source.ID, RunID: &run.ID,
+		AssessedCommit: "reviewed-head", State: models.FactoryHumanReviewStateDecided,
+		Assessment: datatypes.JSONMap{"reviewedCommit": "reviewed-head"},
+		Result:     datatypes.JSONMap{"reviewRequired": false}, Rationale: "All findings are favorable.",
+	})
+	require.NoError(t, err)
+
+	for _, deletion := range []struct {
+		run           *models.CanvasRun
+		retainedRunID *uuid.UUID
+	}{{source, &run.ID}, {run, nil}} {
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			_, err := deletion.run.DeleteChain(tx)
+			return err
+		}))
+		persisted, err := models.FindFactoryHumanReviewDecision(db, decision.ID)
+		require.NoError(t, err)
+		require.Nil(t, persisted.SourceRunID)
+		require.Equal(t, deletion.retainedRunID, persisted.RunID)
+		require.Equal(t, decision.State, persisted.State)
+		require.Equal(t, decision.Assessment, persisted.Assessment)
+		require.Equal(t, decision.Result, persisted.Result)
+		require.Equal(t, decision.Rationale, persisted.Rationale)
+		var runCount int64
+		require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", deletion.run.ID).Count(&runCount).Error)
+		require.Zero(t, runCount)
+	}
 }
 
 func Test__CanvasRun__DeleteChain__NullsFactoryWorkOrderExecutionRunID(t *testing.T) {
