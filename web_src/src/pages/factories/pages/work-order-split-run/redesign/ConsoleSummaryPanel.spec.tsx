@@ -1,13 +1,29 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderCheck } from "@/api-client";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 
 import { OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import { splitRunFixtureForWorkOrder } from "../splitRunMocks";
 import { outcomeSummary } from "./automationsViewModel";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
+
+const multiRepoTasks = { enabled: true };
+
+mock.module("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (id: string) => id === FEATURE_FACTORY_MULTI_REPO_TASKS && multiRepoTasks.enabled,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+    organizationReady: true,
+  }),
+}));
+
+beforeEach(() => {
+  multiRepoTasks.enabled = true;
+});
 
 const pullRequest: FactoriesFactoryPullRequest = {
   id: "pr-482",
@@ -192,5 +208,13 @@ describe("ConsoleSummaryPanel merge confidence per pull request", () => {
 
     expect(screen.queryByTestId("redesign-console-checks")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("redesign-console-pull-request-checks")).toHaveLength(1);
+  });
+
+  it("keeps the merge confidence list apart without multi-repo tasks", () => {
+    multiRepoTasks.enabled = false;
+    renderWith([check("risk-review", 1), check("security-review", 5)], [pullRequest]);
+
+    expect(screen.getByTestId("redesign-console-checks")).toBeInTheDocument();
+    expect(screen.queryByTestId("redesign-console-pull-request-checks")).not.toBeInTheDocument();
   });
 });

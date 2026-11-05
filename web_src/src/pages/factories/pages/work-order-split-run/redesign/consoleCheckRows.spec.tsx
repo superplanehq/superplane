@@ -71,6 +71,7 @@ describe("ConsoleCheckRows", () => {
           { ...checks[0], id: "docs-risk", repository: "acme/docs" },
         ]}
         defaultOpen
+        groupByRepository
       />,
     );
 

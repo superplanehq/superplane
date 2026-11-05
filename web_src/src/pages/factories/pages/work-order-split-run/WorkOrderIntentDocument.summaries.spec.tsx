@@ -21,6 +21,15 @@ import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
 import { REFINE_LAYOUT_STORAGE_KEY } from "./refineLayoutPreference";
 import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+    organizationReady: true,
+  }),
+}));
+
 vi.mock("@/hooks/useOrgUserLookup", () => ({
   useOrgUserLookup: () => ({
     resolveUser: (id: string | undefined, name?: string) =>

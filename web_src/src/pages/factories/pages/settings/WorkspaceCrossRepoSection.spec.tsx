@@ -286,7 +286,7 @@ describe("cross-repo context picker", () => {
     );
   }, 15000);
 
-  it("adds read-only repositories without multi-repo tasks", async () => {
+  it("keeps the cross-repo context card without multi-repo tasks", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
@@ -303,12 +303,9 @@ describe("cross-repo context picker", () => {
     await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
     const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
     await user.click(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 }));
-    const settings = await within(picker).findByTestId("agent-cross-repo-settings", {}, { timeout: 8000 });
-    expect(within(settings).queryByTestId("agent-cross-repo-new-access")).toBeNull();
-    await user.click(within(settings).getByTestId("agent-cross-repo-confirm"));
 
     const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
-    expect(await within(list).findByText("main", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await within(list).findByText("acme/web", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(within(list).queryByText(new RegExp(AGENT_RESOURCES_COPY.accessWrite))).toBeNull();
     expect(within(list).queryByTestId("agent-cross-repo-primary")).toBeNull();
   }, 15000);

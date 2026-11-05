@@ -19,11 +19,14 @@ export function ConsoleCheckRows({
   title = MERGE_CONFIDENCE_SCORE_NAME,
   testId = "redesign-console-checks",
   defaultOpen = false,
+  groupByRepository = false,
 }: {
   checks: WorkOrderCheckPresentation[];
   title?: string;
   testId?: string;
   defaultOpen?: boolean;
+  /** Multi-repo tasks list the checks of each repository apart. */
+  groupByRepository?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   if (checks.length === 0) {
@@ -48,7 +51,7 @@ export function ConsoleCheckRows({
           aria-hidden
         />
       </button>
-      {open ? <CheckList checks={checks} /> : null}
+      {open ? <CheckList checks={checks} groupByRepository={groupByRepository} /> : null}
     </div>
   );
 }
@@ -106,8 +109,14 @@ export function PullRequestConfidence({
 }
 
 /** Merge confidence scores each pull request repository on its own. Several repositories get one labeled list each. */
-function CheckList({ checks }: { checks: WorkOrderCheckPresentation[] }) {
-  const groups = checksByRepository(checks);
+function CheckList({
+  checks,
+  groupByRepository,
+}: {
+  checks: WorkOrderCheckPresentation[];
+  groupByRepository: boolean;
+}) {
+  const groups = groupByRepository ? checksByRepository(checks) : [];
   if (groups.length <= 1) {
     return <CheckRowList checks={checks} className="mt-3 border-t border-border/70" />;
   }

@@ -9,10 +9,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 import { type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 
 import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
 import {
   checksForRepository,
+  consoleCheckList,
   isMergeConfidenceMetric,
   splitMergeChecksByPullRequest,
 } from "../../../lib/mergeConfidenceScore";
@@ -86,7 +89,17 @@ export function ConsoleSummaryPanel({
 }: ConsoleSummaryPanelProps) {
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
-  const panel = consolePanelFacts({ fixture, outcome, stages, pullRequests, artifacts, source, panelReview });
+  const multiRepo = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_MULTI_REPO_TASKS);
+  const panel = consolePanelFacts({
+    fixture,
+    outcome,
+    stages,
+    pullRequests,
+    artifacts,
+    source,
+    panelReview,
+    multiRepo,
+  });
   const shownOwner = owner ?? outcome.owner;
   const shownAssigneeIds = assigneeIds ?? fixture.assigneeIds;
   return (
@@ -112,24 +125,15 @@ export function ConsoleSummaryPanel({
             actionBusy={actionBusy}
             onStop={onStopLiveRun}
           />
-          {panel.panelPullRequests.length > 0 ? (
-            <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
-              <span className="text-[12px] font-medium text-muted-foreground">
-                {panel.panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
-              </span>
-              {panel.panelPullRequests.map((pullRequest, index) => (
-                <PanelPullRequest
-                  key={pullRequest.id ?? pullRequest.url ?? index}
-                  pullRequest={pullRequest}
-                  checks={fixture.checks}
-                  showRepository={panel.showsPullRequestRepository}
-                />
-              ))}
-            </FramePanel>
-          ) : null}
+          <PanelPullRequests
+            pullRequests={panel.panelPullRequests}
+            checks={fixture.checks}
+            showRepository={panel.showsPullRequestRepository}
+            multiRepo={multiRepo}
+          />
           {panel.mergeChecks.length > 0 ? (
             <FramePanel className="py-3">
-              <ConsoleCheckRows checks={panel.mergeChecks} />
+              <ConsoleCheckRows checks={panel.mergeChecks} groupByRepository={multiRepo} />
             </FramePanel>
           ) : null}
           {panel.otherChecks.length > 0 ? (
@@ -181,6 +185,28 @@ export function ConsoleSummaryPanel({
   );
 }
 
+function PanelPullRequests({
+  pullRequests,
+  ...row
+}: {
+  pullRequests: FactoriesFactoryPullRequest[];
+  checks: SplitRunFixture["checks"];
+  showRepository: boolean;
+  multiRepo: boolean;
+}) {
+  if (pullRequests.length === 0) return null;
+  return (
+    <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
+      <span className="text-[12px] font-medium text-muted-foreground">
+        {pullRequests.length === 1 ? "Pull request" : "Pull requests"}
+      </span>
+      {pullRequests.map((pullRequest, index) => (
+        <PanelPullRequest key={pullRequest.id ?? pullRequest.url ?? index} pullRequest={pullRequest} {...row} />
+      ))}
+    </FramePanel>
+  );
+}
+
 function StartSummaryRow({ fixture }: { fixture: SplitRunFixture }) {
   return (
     <SummaryRow label={fixture.autoStarted ? "Auto-started" : "Started"} truncate={false}>
@@ -214,6 +240,7 @@ function consolePanelFacts({
   artifacts,
   source,
   panelReview,
+  multiRepo,
 }: {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
@@ -222,18 +249,16 @@ function consolePanelFacts({
   artifacts?: FactoriesWorkOrderArtifact[];
   source?: SplitRunSource;
   panelReview?: ReactNode;
+  multiRepo: boolean;
 }) {
   const hasDecision = Boolean(fixture.footer.attentionCard && fixture.footer.note);
   const liveStage = stages.find((stage) => stage.status === "running");
   const isLive = fixture.footer.kind === "running" || Boolean(liveStage);
   const taskPullRequests = pullRequests?.length ? pullRequests : outcome.pullRequests;
-  const reviewedHrefs = panelReview ? reviewStripPullRequestHrefs(fixture, taskPullRequests) : [];
+  const repositories = repositoryPanelFacts(fixture.checks, taskPullRequests, multiRepo);
+  const reviewedHrefs = panelReview ? reviewStripPullRequestHrefs(fixture, repositories.reviewPullRequests) : [];
   const panelPullRequests = withoutPullRequests(taskPullRequests, reviewedHrefs);
   const hasPullRequest = panelPullRequests.length > 0 || reviewedHrefs.length > 0;
-  const mergeChecks = splitMergeChecksByPullRequest(
-    fixture.checks,
-    taskPullRequests.map((pullRequest) => pullRequest.repository),
-  );
   const taskArtifacts = artifacts ?? [];
   const taskArtifactIds = new Set(taskArtifacts.map((artifact) => artifact.id).filter(Boolean));
   const stageArtifacts = stages
@@ -253,13 +278,13 @@ function consolePanelFacts({
         )
       : undefined,
     panelPullRequests,
-    showsPullRequestRepository: pullRequestsSpanRepositories(taskPullRequests),
+    showsPullRequestRepository: repositories.showsPullRequestRepository,
     panelArtifacts,
     // Each pull request row shows its own merge checks. The list keeps the
     // rest. Other non-planning checks stay reachable here when no verify
     // card copied them.
-    pullRequestChecks: mergeChecks.byRepository,
-    mergeChecks: mergeChecks.unattached,
+    pullRequestChecks: repositories.mergeChecks.byRepository,
+    mergeChecks: repositories.mergeChecks.unattached,
     otherChecks: fixture.checks.filter(
       (check) =>
         !isMergeConfidenceMetric(check) &&
@@ -269,6 +294,30 @@ function consolePanelFacts({
         check.name !== CONFIDENCE_CHECK_NAME,
     ),
     duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
+  };
+}
+
+// Without multi-repo tasks, the panel keeps one review link and one merge
+// confidence list.
+function repositoryPanelFacts(
+  checks: SplitRunFixture["checks"],
+  pullRequests: FactoriesFactoryPullRequest[],
+  multiRepo: boolean,
+) {
+  if (!multiRepo) {
+    return {
+      reviewPullRequests: [],
+      mergeChecks: { byRepository: null, unattached: consoleCheckList(checks)?.metrics ?? [] },
+      showsPullRequestRepository: false,
+    };
+  }
+  return {
+    reviewPullRequests: pullRequests,
+    mergeChecks: splitMergeChecksByPullRequest(
+      checks,
+      pullRequests.map((pullRequest) => pullRequest.repository),
+    ),
+    showsPullRequestRepository: pullRequestsSpanRepositories(pullRequests),
   };
 }
 
@@ -399,10 +448,12 @@ function PanelPullRequest({
   pullRequest,
   checks,
   showRepository,
+  multiRepo,
 }: {
   pullRequest: FactoriesFactoryPullRequest;
   checks: SplitRunFixture["checks"];
   showRepository: boolean;
+  multiRepo: boolean;
 }) {
   const href = safeExternalUrl(pullRequest.url);
   const title = pullRequest.title?.trim() || pullRequestLabel(pullRequest);
@@ -427,7 +478,10 @@ function PanelPullRequest({
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         <WorkOrderPullRequestChip pullRequest={pullRequest} />
-        {workOrderCardPullRequestShowsMergeable(pullRequest, checksForRepository(checks, pullRequest.repository)) ? (
+        {workOrderCardPullRequestShowsMergeable(
+          pullRequest,
+          multiRepo ? checksForRepository(checks, pullRequest.repository) : checks,
+        ) ? (
           <WorkOrderMergeableChip />
         ) : null}
       </div>

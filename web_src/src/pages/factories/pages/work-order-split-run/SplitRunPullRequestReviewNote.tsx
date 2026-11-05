@@ -5,7 +5,7 @@ import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequestMerge";
-import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
 import { PullRequestConfidence } from "./redesign/consoleCheckRows";
@@ -345,6 +345,7 @@ export function WaitingPullRequestReview({
   onAction?: (action: SplitRunFooterAction) => void;
   children?: ReactNode;
 }) {
+  const multiRepo = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_MULTI_REPO_TASKS);
   const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
   if (!pullRequest || !note.cta) {
     return null;
@@ -353,7 +354,7 @@ export function WaitingPullRequestReview({
   if (actionsOnly) {
     return <MoreActionsMenu actions={actions} disabled={actionBusy} onAction={onAction} />;
   }
-  const openPullRequests = openReviewPullRequests(pullRequests);
+  const openPullRequests = multiRepo ? openReviewPullRequests(pullRequests) : [];
   if (openPullRequests.length > 1) {
     return (
       <MultiPullRequestReviewNote
