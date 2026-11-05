@@ -1,5 +1,5 @@
 export const SENTRY_WEBHOOKS_HELP =
-  "Recent calls from Sentry. The list shows the event type, project, result, and task ID. It does not show the payload or tokens.";
+  "Recent calls from Sentry. The list shows the event type, project, result, and task ID. Skipped and no connection mean no event was saved. These calls cannot be replayed.";
 export const SENTRY_WEBHOOKS_EMPTY = "No Sentry webhooks have arrived.";
 export const SENTRY_WEBHOOKS_PROJECT_EMPTY = "No Sentry webhooks match this project.";
 export const SENTRY_WEBHOOKS_PAGE_EMPTY = "This page has no Sentry webhooks.";
@@ -35,6 +35,8 @@ export function sentryWebhookOutcomeLabel(outcome: string) {
       return "Accepted";
     case "no_connection":
       return "No connection";
+    case "skipped":
+      return "Skipped";
     case "rejected":
       return "Rejected";
     case "failed":

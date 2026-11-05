@@ -61,6 +61,10 @@ spec:
                 name: {{ include "secrets.feedback.name" . }}
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
+            {{- if .Values.sentryApp.secretName }}
+            - secretRef:
+                name: {{ include "secrets.sentryApp.name" . }}
+            {{- end }}
             {{- if .Values.polar.enabled }}
             - secretRef:
                 name: {{ include "secrets.polar.name" . }}

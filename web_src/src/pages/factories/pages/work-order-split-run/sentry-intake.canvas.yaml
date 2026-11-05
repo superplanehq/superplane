@@ -8,8 +8,11 @@ spec:
     - channel: default
       sourceId: on-sentry-issue
       targetId: factory-project
-    - channel: default
+    - channel: 'true'
       sourceId: factory-project
+      targetId: enrich-issue
+    - channel: default
+      sourceId: enrich-issue
       targetId: create-work-order
   nodes:
     - id: on-sentry-issue
@@ -28,19 +31,29 @@ spec:
       type: TYPE_ACTION
       component: filter
       configuration:
-        expression: root().data.issue.project.slug == "refunds"
+        expression: root().data.data.issue.project.slug == "refunds"
       position:
         x: 576
         'y': 618
+      isCollapsed: false
+    - id: enrich-issue
+      name: Enrich Issue
+      type: TYPE_ACTION
+      component: sentry.enrichIssue
+      configuration:
+        issue: '{{ root().data.data.issue }}'
+      position:
+        x: 576
+        'y': 978
       isCollapsed: false
     - id: create-work-order
       name: Create Task
       type: TYPE_ACTION
       component: createWorkOrder
       configuration:
-        title: '{{ root().data.issue.title }}'
-        description: '{{ root().data.description }}'
+        title: '{{ root().data.data.issue.title }}'
+        description: '{{ $["Enrich Issue"].data.description }}'
       position:
         x: 576
-        'y': 978
+        'y': 1338
       isCollapsed: false
