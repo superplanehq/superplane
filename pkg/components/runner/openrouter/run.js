@@ -260,6 +260,13 @@ function classifyOpenRouterError(text) {
   const raw = String(text || "");
   const lower = raw.toLowerCase();
   if (
+    /configinvaliderror|configjsonerror|configuration is invalid|config file at .* is not valid json|v2 permissions are not supported/.test(
+      lower,
+    )
+  ) {
+    return "configuration";
+  }
+  if (
     /invalid api key|incorrect api key|unauthorized|authentication|insufficient credit|insufficient credits|unknown model|model not found|context (length|window|overflow)|maximum context|prompt is too long/.test(
       lower,
     )
@@ -432,8 +439,32 @@ function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking, env }) {
   return args;
 }
 
+// Match V1 instruction selection: AGENTS.md wins over CONTEXT.md, and all
+// ancestors of that name are included up to the repository boundary. Claude
+// compatibility stays disabled. OpenCode still loads nested instructions on read.
+function repositoryInstructions(cwd) {
+  if (!cwd) return [];
+  const directories = [];
+  let current = path.resolve(cwd);
+  while (true) {
+    directories.push(current);
+    if (fs.existsSync(path.join(current, ".git"))) break;
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  for (const name of ["AGENTS.md", "CONTEXT.md"]) {
+    const matches = directories
+      .map((dir) => path.join(dir, name))
+      .filter((file) => fs.existsSync(file));
+    if (matches.length) return matches;
+  }
+  return [];
+}
+
 function buildOpenCodeConfig({
   taskDir,
+  cwd,
   env = process.env,
   planning = false,
   models = [],
@@ -513,6 +544,7 @@ function buildOpenCodeConfig({
     };
   }
   applyWorkspaceMCPDenylist(config, workspaceMCPServers(env));
+  const instructions = repositoryInstructions(cwd);
   const protocol = planningSystemPrompt(env);
   if (protocol && taskDir) {
     const protocolPath = path.join(taskDir, "analysis_protocol.md");
@@ -521,14 +553,16 @@ function buildOpenCodeConfig({
     } catch (_err) {
       // Tests pass a fake task dir. The runner writes this file when the dir exists.
     }
-    config.instructions = [protocolPath];
+    instructions.push(protocolPath);
   }
+  if (instructions.length) config.instructions = instructions;
   return config;
 }
 
-function writeOpenCodeConfig(taskDir, env, models) {
+function writeOpenCodeConfig(taskDir, env, models, cwd) {
   const config = buildOpenCodeConfig({
     taskDir,
+    cwd,
     env,
     planning: planningEnabled(env),
     models,
@@ -541,9 +575,10 @@ function writeOpenCodeConfig(taskDir, env, models) {
 
 function openCodeProcessEnv(taskDir, baseEnv = process.env) {
   const xdg = path.join(taskDir, "xdg");
-  return {
+  const env = {
     ...baseEnv,
     OPENCODE_CONFIG: path.join(taskDir, "opencode.json"),
+    OPENCODE_DISABLE_PROJECT_CONFIG: "1",
     OPENCODE_DISABLE_AUTOUPDATE: "1",
     OPENCODE_DISABLE_MODELS_FETCH: "1",
     OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
@@ -553,6 +588,14 @@ function openCodeProcessEnv(taskDir, baseEnv = process.env) {
     XDG_CONFIG_HOME: path.join(xdg, "config"),
     XDG_CACHE_HOME: path.join(xdg, "cache"),
   };
+  for (const key of [
+    "OPENCODE_CONFIG_CONTENT",
+    "OPENCODE_CONFIG_DIR",
+    "OPENCODE_PERMISSION",
+  ]) {
+    delete env[key];
+  }
+  return env;
 }
 
 function openCodeModelCatalogPath(taskDir) {
@@ -751,7 +794,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
       `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
     );
   }
-  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
+  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : [], cwd);
 
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};
@@ -989,7 +1032,12 @@ function spawnTurnFailed(spawnResult, formatter, allowSoftExitWithReply) {
     return false;
   }
   const kind = classifyOpenRouterError(spawnResult.errorText || "");
-  if (kind === "rate_limit" || kind === "hard" || kind === "retryable") {
+  if (
+    kind === "configuration" ||
+    kind === "rate_limit" ||
+    kind === "hard" ||
+    kind === "retryable"
+  ) {
     return true;
   }
   if (!allowSoftExitWithReply) {
@@ -1583,6 +1631,19 @@ function collectErrorText(value, parts, depth) {
 }
 
 function errorTextFromEvent(event) {
+  const error = event && event.error;
+  if (error && ["ConfigInvalidError", "ConfigJsonError"].includes(error.name)) {
+    const details = error.data || {};
+    const source = details.path ? ` at ${details.path}` : "";
+    const issues = Array.isArray(details.issues) ? details.issues : [];
+    const reasons = issues.map((issue) => {
+      const field = Array.isArray(issue.path) ? issue.path.join(".") : "";
+      return `${issue.message || "Invalid setting"}${field ? ` (${field})` : ""}`;
+    });
+    return [`Configuration is invalid${source}`, details.message, ...reasons]
+      .filter(Boolean)
+      .join("\n");
+  }
   const parts = [];
   collectErrorText(event, parts, 0);
   return [...new Set(parts)].join(" ");
@@ -1836,7 +1897,9 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
         case "error": {
           const text = errorTextFromEvent(event);
           errorText = text;
-          if (classifyOpenRouterError(text) === "hard") {
+          if (
+            ["hard", "configuration"].includes(classifyOpenRouterError(text))
+          ) {
             resultFailed = true;
           }
           break;
