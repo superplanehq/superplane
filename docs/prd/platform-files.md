@@ -305,7 +305,7 @@ flowchart LR
 - `BrokerTaskFile` (inline `path` + `content` in create-task JSON)
 - Customer buckets: [pkg/integrations/gcp/storage](../../pkg/integrations/gcp/storage),
   Hetzner S3, Azure Blob triggers, OCI Object Storage
-- Canvas memory: [canvas-memory.md](canvas-memory.md)
+- Canvas memory: [pkg/models/canvas_memory.go](../../pkg/models/canvas_memory.go)
 
 ## Later work
 

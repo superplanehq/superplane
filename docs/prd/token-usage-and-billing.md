@@ -1,8 +1,7 @@
 # Token usage tracking and billing
 
 > Status: Draft  
-> Audience: Product and engineering  
-> Slides: [PDF](token-usage-and-billing-slides.pdf) · [source](token-usage-and-billing-slides.md)
+> Audience: Product and engineering
 
 This draft is the project playbook for SuperPlane workspace usage tracking
 (LLM tokens and SuperPlane runner-fleet VM time), hosted credits,
@@ -41,8 +40,8 @@ Do not reinvent these pieces:
   and OpenRouter clients exist for factory agents.
 - Factory and organization settings **Spending** read
   `workspace_usage_events`. That ledger is the spend source of truth.
-- The factory PRD defines tracked cost as model tokens plus execution compute.
-  It excludes third-party charges and human labor. Compute in this ledger is
+- Tracked cost includes model tokens and execution compute. It excludes
+  third-party charges and human labor. Compute in this ledger is
   SuperPlane runner-fleet time only (`e1-large-*`, `e1-tiny-*`). Not Daytona.
   Not customer GCP VMs.
 
