@@ -24,6 +24,8 @@ export interface WorkOrderCheckPresentation {
   id: string;
   /** Stable id across reports, e.g. "risk-review". */
   key?: string;
+  /** Pull request repository of a merge confidence check, e.g. "acme/api". */
+  repository?: string;
   /** Short human name, e.g. "Risk score" or "Code quality". */
   name: string;
   score: number;
@@ -202,6 +204,7 @@ export function presentWorkOrderCheck(check: FactoriesWorkOrderCheck): WorkOrder
   return {
     id: check.id ?? check.key ?? "",
     key: emptyToUndefined(check.key),
+    repository: emptyToUndefined(check.repository?.trim()),
     name: workOrderCheckDisplayName({ key: emptyToUndefined(check.key), name: check.name ?? "" }),
     score: check.score ?? 0,
     scoreSupplied: check.score != null,

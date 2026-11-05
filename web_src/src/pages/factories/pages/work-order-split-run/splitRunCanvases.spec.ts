@@ -74,14 +74,10 @@ describe("splitRunCanvasForPhase", () => {
     const canvas = splitRunCanvasForPhase(implement!);
     expect(canvas.title).toBe("Implement");
     expect(canvas.nodes.map((node) => node.name)).toContain("Implement From Task Description");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Add Branch Artifact");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Create Pull Request");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Attach PR to Task");
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("running");
-    expect(canvas.statuses["add-branch-artifact"]).toBe("did_not_run");
-    expect(canvas.statuses["create-pr"]).toBe("did_not_run");
-    expect(canvas.statuses["attach-pr-artifact"]).toBe("did_not_run");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
+    const stream = richStreamForCanvas(canvas);
+    expect(stream.find((line) => line.id === "implementation-agent-no-issue")?.pullRequest).toBeUndefined();
   });
 
   it("opens a pull request after a finished implement run", () => {
@@ -97,17 +93,10 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("passed");
-    expect(canvas.statuses["create-pr"]).toBe("passed");
-    expect(canvas.statuses["attach-pr-artifact"]).toBe("passed");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
 
     const stream = richStreamForCanvas(canvas);
-    expect(stream.find((line) => line.id === "create-pr")).toMatchObject({
-      componentType: "github.createPullRequest",
-      componentName: "Create Pull Request",
-      action: "passed",
-    });
-    expect(stream.find((line) => line.id === "attach-pr-artifact")?.pullRequest?.number).toBe("482");
+    expect(stream.find((line) => line.id === "implementation-agent-no-issue")?.pullRequest?.number).toBe("482");
   });
 
   it("writes one log line per canvas node and extra Claude Code notes", () => {
