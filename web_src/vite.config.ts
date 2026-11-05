@@ -3,6 +3,7 @@ import type { ResolvedConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import * as path from "path";
+import { editorCancelCodeSplittingGroups } from "./src/lib/editorCancelChunks.ts";
 import { keepWebAppManifestLinkOnPageOrigin } from "./src/lib/webAppManifestLink.ts";
 
 // Vite applies `base` to every root-absolute link, including the web app
@@ -112,13 +113,7 @@ export default defineConfig(() => {
       rolldownOptions: {
         output: {
           codeSplitting: {
-            groups: [
-              {
-                name: "monaco-editor",
-                test: /monaco-editor/,
-                includeDependenciesRecursively: false,
-              },
-            ],
+            groups: editorCancelCodeSplittingGroups,
           },
         },
       },
