@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	httpcomponent "github.com/superplanehq/superplane/pkg/components/http"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -15,9 +17,13 @@ import (
 const (
 	// Node identifiers of a generated intake graph. An intake owns its whole
 	// canvas, so the identifiers are fixed rather than derived from the source.
-	intakeTriggerNodeID = "trigger"
-	intakeFilterNodeID  = "filter"
-	intakeCreateNodeID  = "create-work-order"
+	intakeTriggerNodeID     = "trigger"
+	intakeFilterNodeID      = "filter"
+	intakeEnrichIssueNodeID = "enrich-issue"
+	// Existing canvases can still use the HTTP request nodes.
+	intakeSentryIssueRequestNodeID = "get-sentry-issue"
+	intakeSentryEventRequestNodeID = "get-sentry-event"
+	intakeCreateNodeID             = "create-work-order"
 
 	intakeAuthorPermissionNodeID = "get-author-permission"
 	intakeAuthorFilterNodeID     = "author-has-repository-access"
@@ -34,6 +40,8 @@ const (
 	intakeAuthorPermissionComponent = "github.getRepositoryPermission"
 	intakeThresholdComponent        = intakeFilterComponent
 	intakeCreateComponent           = "createWorkOrder"
+	intakeEnrichIssueComponent      = "sentry.enrichIssue"
+	intakeHTTPRequestComponent      = "http"
 
 	intakeAddRunErrorNodeID    = "add-run-error"
 	intakeAddRunErrorNodeName  = "Record Analysis Failure"
@@ -55,6 +63,20 @@ const (
 // runner components reject a node without one, so the generated graph has to
 // name it.
 const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
+
+// sentryRequestAuthorization keeps the credentials current when an existing
+// HTTP-based intake is rebound to a different Sentry integration.
+func sentryRequestAuthorization(binding *intakeBinding) map[string]any {
+	integrationName := "Connect Sentry"
+	if ref := binding.integrationRef(); ref != nil && strings.TrimSpace(ref.Name) != "" {
+		integrationName = ref.Name
+	}
+	return map[string]any{
+		"type":           httpcomponent.AuthorizationTypeIntegrationBearer,
+		"integration":    map[string]any{"name": integrationName},
+		"integrationKey": sentry.IntegrationAuthTokenKey,
+	}
+}
 
 // intakeAnalysisComponents are the runners a backlog canvas can score with.
 // Creation picks the runner of the workspace agent, but a graph the user
@@ -98,7 +120,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerName:          "On Issue Event",
 		triggerConfiguration: map[string]any{"actions": intakeSentryActionsFor(defaultSentryIntakeSettings())},
 		createTitle:          "{{ root().data.data.issue.title }}",
-		createDescription:    "{{ root().data.description }}",
+		createDescription:    `{{ $["Enrich Issue"].data.description }}`,
 	},
 	models.FactoryIntakeSourcePagerDutyIncidents: {
 		name:             "PagerDuty incidents",
@@ -252,6 +274,28 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 		createY = 440
 	} else {
 		edges = append(edges, yaml.Edge{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID})
+	}
+	if request.Source == models.FactoryIntakeSourceSentryExceptions {
+		nodes = append(nodes, yaml.Node{
+			ID:          intakeEnrichIssueNodeID,
+			Name:        "Enrich Issue",
+			Type:        yaml.NodeTypeAction,
+			Component:   intakeEnrichIssueComponent,
+			Integration: request.Binding.integrationRef(),
+			Configuration: map[string]any{
+				"issue": "{{ root().data.data.issue }}",
+			},
+			Concurrency: intakeConcurrency(),
+			Position:    yaml.Position{X: 160, Y: createY},
+		})
+		edges = slices.DeleteFunc(edges, func(edge yaml.Edge) bool {
+			return edge.SourceID == intakeFilterNodeID && edge.TargetID == intakeCreateNodeID
+		})
+		edges = append(edges,
+			yaml.Edge{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeEnrichIssueNodeID},
+			yaml.Edge{Channel: "default", SourceID: intakeEnrichIssueNodeID, TargetID: intakeCreateNodeID},
+		)
+		createY += 180
 	}
 
 	nodes = append(nodes, yaml.Node{

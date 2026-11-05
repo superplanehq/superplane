@@ -33,9 +33,10 @@ const (
 	SuccessOutputChannel = "success"
 	FailureOutputChannel = "failure"
 
-	AuthorizationTypeBearer       = "bearer"
-	AuthorizationTypeBasicAuth    = "basic_auth"
-	AuthorizationTypeCustomHeader = "custom_header"
+	AuthorizationTypeBearer            = "bearer"
+	AuthorizationTypeIntegrationBearer = "integration_bearer"
+	AuthorizationTypeBasicAuth         = "basic_auth"
+	AuthorizationTypeCustomHeader      = "custom_header"
 )
 
 func init() {
@@ -53,12 +54,14 @@ type KeyValue struct {
 }
 
 type AuthorizationSpec struct {
-	Type       string                     `json:"type" mapstructure:"type"`
-	Credential configuration.SecretKeyRef `json:"credential,omitempty" mapstructure:"credential"`
-	Username   string                     `json:"username,omitempty" mapstructure:"username"`
-	Password   configuration.SecretKeyRef `json:"password,omitempty" mapstructure:"password"`
-	HeaderName string                     `json:"headerName,omitempty" mapstructure:"headerName"`
-	Value      configuration.SecretKeyRef `json:"value,omitempty" mapstructure:"value"`
+	Type           string                       `json:"type" mapstructure:"type"`
+	Credential     configuration.SecretKeyRef   `json:"credential,omitempty" mapstructure:"credential"`
+	Integration    configuration.IntegrationRef `json:"integration,omitempty" mapstructure:"integration"`
+	IntegrationKey string                       `json:"integrationKey,omitempty" mapstructure:"integrationKey"`
+	Username       string                       `json:"username,omitempty" mapstructure:"username"`
+	Password       configuration.SecretKeyRef   `json:"password,omitempty" mapstructure:"password"`
+	HeaderName     string                       `json:"headerName,omitempty" mapstructure:"headerName"`
+	Value          configuration.SecretKeyRef   `json:"value,omitempty" mapstructure:"value"`
 }
 
 type Spec struct {
@@ -154,7 +157,7 @@ and status without downloading the full response payload.
 - **Method**: HTTP method to use
 - **Query Parameters**: Optional URL query parameters
 - **Headers**: Custom HTTP headers (header names cannot use expressions)
-- **Authorization** (optional): Bearer Token, Basic Auth password, or custom header value
+- **Authorization** (optional): Bearer token from an organization secret or connected integration, Basic Auth password, or custom header value. For a connected integration, select its name and enter the exported token key.
 - **Body**: Request body in various formats:
   - **JSON**: Structured JSON payload
   - **Form Data**: URL-encoded form data
@@ -265,6 +268,11 @@ func validateAuthorizationSpec(a *AuthorizationSpec) error {
 		return fmt.Errorf("authorization: type is required when authorization is set")
 	case AuthorizationTypeBearer:
 		return validateSecretKeyRef("authorization bearer credential", a.Credential)
+	case AuthorizationTypeIntegrationBearer:
+		if !a.Integration.IsSet() || strings.TrimSpace(a.IntegrationKey) == "" {
+			return fmt.Errorf("authorization integration bearer: integration and key are required")
+		}
+		return nil
 	case AuthorizationTypeBasicAuth:
 		if a.Username == "" {
 			return fmt.Errorf("authorization basic auth: username is required")
@@ -303,6 +311,16 @@ func applyAuthorizationHeader(secrets core.SecretsContext, spec Spec, req *http.
 		value, err := resolveAuthorizationSecret(secrets, "bearer credential", spec.Authorization.Credential)
 		if err != nil {
 			return err
+		}
+		req.Header.Set("Authorization", "Bearer "+string(value))
+	case AuthorizationTypeIntegrationBearer:
+		integration, err := secrets.GetIntegrationSecrets(spec.Authorization.Integration.Name)
+		if err != nil {
+			return fmt.Errorf("authorization integration bearer: resolve integration: %w", err)
+		}
+		value := integration.Values[spec.Authorization.IntegrationKey]
+		if len(value) == 0 {
+			return fmt.Errorf("authorization integration bearer: key %q is unavailable", spec.Authorization.IntegrationKey)
 		}
 		req.Header.Set("Authorization", "Bearer "+string(value))
 	case AuthorizationTypeBasicAuth:
@@ -392,6 +410,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 								Select: &configuration.SelectTypeOptions{
 									Options: []configuration.FieldOption{
 										{Label: "Bearer Token", Value: AuthorizationTypeBearer},
+										{Label: "Connected integration token", Value: AuthorizationTypeIntegrationBearer},
 										{Label: "Basic Auth", Value: AuthorizationTypeBasicAuth},
 										{Label: "Custom Header", Value: AuthorizationTypeCustomHeader},
 									},
@@ -409,6 +428,22 @@ func (e *HTTP) Configuration() []configuration.Field {
 							RequiredConditions: []configuration.RequiredCondition{
 								{Field: "type", Values: []string{AuthorizationTypeBearer}},
 							},
+						},
+						{
+							Name:                 "integration",
+							Label:                "Integration",
+							Type:                 configuration.FieldTypeIntegration,
+							Description:          "Name of the connected integration",
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "type", Values: []string{AuthorizationTypeIntegrationBearer}}},
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "type", Values: []string{AuthorizationTypeIntegrationBearer}}},
+						},
+						{
+							Name:                 "integrationKey",
+							Label:                "Token key",
+							Type:                 configuration.FieldTypeString,
+							Description:          "Key exported by the connected integration",
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "type", Values: []string{AuthorizationTypeIntegrationBearer}}},
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "type", Values: []string{AuthorizationTypeIntegrationBearer}}},
 						},
 						{
 							Name:        "username",
