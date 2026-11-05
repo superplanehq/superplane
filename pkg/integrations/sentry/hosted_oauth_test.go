@@ -176,6 +176,44 @@ func Test__afterHostedAppSetup_codeExchangeFailed_doesNotMint(t *testing.T) {
 	assert.Equal(t, "authorization_code", decodeGrantType(t, httpContext.Requests[0]))
 }
 
+func Test__afterHostedAppSetup_codeExchangeFailedWithWebhookGrant_mints(t *testing.T) {
+	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+	useFakeHostedInstallGrants(t)
+	require.NoError(t, RememberHostedInstallGrant(InstallationGrant{
+		Code:    "grant-code",
+		UUID:    "install-1",
+		OrgSlug: "acme",
+	}))
+
+	impl := &Sentry{}
+	integrationCtx := pendingHostedIntegration()
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			sentryMockResponse(http.StatusBadRequest, `{"detail":"invalid grant"}`),
+			sentryMockResponse(http.StatusCreated, `{"token":"jwt-token","refreshToken":"refresh-token"}`),
+			sentryMockResponse(http.StatusOK, `{"id":"1","slug":"acme","name":"Acme"}`),
+			sentryMockResponse(http.StatusOK, `[{"id":"2","slug":"payments","name":"Payments"}]`),
+			sentryMockResponse(http.StatusOK, `[{"id":"3","slug":"platform","name":"Platform"}]`),
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	req := hostedSetupRequest("/api/v1/sentry/app/setup?code=grant-code&installationId=install-1", "csrf-state")
+
+	impl.afterHostedAppSetup(hostedSetupContext(req, recorder, httpContext, integrationCtx))
+
+	assert.Equal(t, http.StatusSeeOther, recorder.Code)
+	assert.Equal(t, "ready", integrationCtx.State)
+	accessToken, err := integrationCtx.Secrets().Get(SecretAccessToken)
+	require.NoError(t, err)
+	assert.Equal(t, "jwt-token", accessToken)
+	require.GreaterOrEqual(t, len(httpContext.Requests), 2)
+	assert.Equal(t, "authorization_code", decodeGrantType(t, httpContext.Requests[0]))
+	assert.Equal(t, sentryAppJWTGrantType, decodeGrantType(t, httpContext.Requests[1]))
+}
+
 func Test__afterHostedAppSetup_finishesInterruptedInstall(t *testing.T) {
 	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
 	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
@@ -404,25 +442,10 @@ func Test__redirectHostedAppInstall_doesNotBindUnclaimedGrant(t *testing.T) {
 	assert.NotEqual(t, "ready", integrationCtx.State)
 }
 
-func Test__RememberHostedInstallGrant_storesTokensForLaterSetup(t *testing.T) {
-	t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
-	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
-	t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+func Test__RememberHostedInstallGrant_storesCodeWithoutCallingSentry(t *testing.T) {
 	grants := useFakeHostedInstallGrants(t)
 
-	expiresAt := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			sentryMockResponse(http.StatusCreated, fmt.Sprintf(
-				`{"token":"webhook-token","refreshToken":"webhook-refresh","expiresAt":%q}`,
-				expiresAt,
-			)),
-		},
-	}
-	app, ok := HostedAppFromEnv()
-	require.True(t, ok)
-
-	require.NoError(t, RememberHostedInstallGrant(httpContext, app, InstallationGrant{
+	require.NoError(t, RememberHostedInstallGrant(InstallationGrant{
 		Code:    "grant-code",
 		UUID:    "install-1",
 		OrgSlug: "acme",
@@ -431,7 +454,7 @@ func Test__RememberHostedInstallGrant_storesTokensForLaterSetup(t *testing.T) {
 	unclaimed, err := grants.Take("install-1", "grant-code", pendingHostedIntegration().ID().String())
 	require.NoError(t, err)
 	require.NotNil(t, unclaimed)
-	assert.Equal(t, "webhook-token", unclaimed.AccessToken)
+	assert.Empty(t, unclaimed.AccessToken)
 	assert.Equal(t, "acme", unclaimed.Organization.Slug)
 }
 
