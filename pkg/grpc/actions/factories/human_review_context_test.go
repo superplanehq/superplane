@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/go-github/v84/github"
@@ -48,4 +49,52 @@ func (f *humanReviewOwnershipFake) HumanReviewOwnershipFile(_ context.Context, _
 	}
 	f.ownershipRef = ref
 	return f.ownership, nil
+}
+
+func TestHumanReviewContextSkipsUnavailableOwnershipHints(t *testing.T) {
+	for _, owner := range []string{"@acme/deleted-team", "@deleted-user"} {
+		t.Run(owner, func(t *testing.T) {
+			reviewer := reviewTestUser(8, "reviewer", "User")
+			client := &unavailableHumanReviewOwnerFake{humanReviewOwnershipFake: humanReviewOwnershipFake{
+				humanReviewLifecycleFake: humanReviewLifecycleFake{members: []*github.User{reviewer}, permissions: map[string]*github.RepositoryPermissionLevel{"reviewer": {User: reviewer, Permission: github.Ptr("write")}}},
+				ownership:                "unrelated/** " + owner + "\n",
+			}}
+			current := &github.PullRequest{User: reviewTestUser(1, "author", "User")}
+			gathered, err := gatherHumanReviewContext(t.Context(), client, &models.FactoryPullRequest{Repository: "acme/app", Number: 42}, current, "acme/fallback")
+			require.NoError(t, err)
+			candidates := gathered["fallbackCandidates"].([]humanreview.Reviewer)
+			require.Len(t, candidates, 1)
+			require.Equal(t, int64(8), candidates[0].ID)
+			require.Empty(t, gathered["ownershipCandidates"])
+			for _, candidates := range gathered["ownershipTeamCandidates"].(map[string][]humanreview.Reviewer) {
+				require.Empty(t, candidates)
+			}
+
+			client.fallbackFailure = errors.New("fallback team is inaccessible")
+			_, err = gatherHumanReviewContext(t.Context(), client, &models.FactoryPullRequest{Repository: "acme/app", Number: 42}, current, "acme/fallback")
+			require.ErrorIs(t, err, client.fallbackFailure)
+		})
+	}
+}
+
+type unavailableHumanReviewOwnerFake struct {
+	humanReviewOwnershipFake
+	fallbackFailure error
+}
+
+func (f *unavailableHumanReviewOwnerFake) HumanReviewTeamMembers(ctx context.Context, organization, slug string) ([]*github.User, error) {
+	if slug != "fallback" {
+		return nil, errors.New("ownership team is unavailable")
+	}
+	if f.fallbackFailure != nil {
+		return nil, f.fallbackFailure
+	}
+	return f.humanReviewLifecycleFake.HumanReviewTeamMembers(ctx, organization, slug)
+}
+
+func (f *unavailableHumanReviewOwnerFake) GetRepositoryPermissionLevel(ctx context.Context, repository, login string) (*github.RepositoryPermissionLevel, *github.Response, error) {
+	if login == "deleted-user" {
+		return nil, nil, errors.New("ownership user is unavailable")
+	}
+	return f.humanReviewLifecycleFake.GetRepositoryPermissionLevel(ctx, repository, login)
 }
