@@ -63,7 +63,9 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // FeatureFactoryMultiRepoTasks lets agents change every Read & Write
 // workspace repository and open one pull request per repository. Without
 // it, context repositories stay read-only and the Implement app opens the
-// pull request from the canvas.
+// pull request from the canvas. The admin toggle republishes the Implement
+// apps of the organization. Releasing the flag does not: run the
+// installation-wide reset of "line-implementation" after the release.
 const FeatureFactoryMultiRepoTasks = "factory_multi_repo_tasks"
 
 // FeatureSuperPlaneMCPServer is released. Every organization can authorize
