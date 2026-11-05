@@ -249,15 +249,6 @@ func TestRunPromptStopsOnManagedConfigurationError(t *testing.T) {
 	}
 }
 
-func TestPinnedOpenCodeConfigurationLoader(t *testing.T) {
-	if _, err := exec.LookPath("opencode"); err != nil {
-		t.Skip("dependency check requires the local worker image with OpenCode 1.18.31")
-	}
-	cmd := exec.Command("node", "config_test.js")
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, string(out))
-}
-
 func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	config := jsBuildConfig(t, "/task", map[string]string{})
 	permission, _ := config["permission"].(map[string]any)

@@ -1,7 +1,20 @@
-"use strict";
+package openrouter
 
-// Run in the local worker image: node config_test.js. Only a local synthetic
-// model service is used.
+import (
+	"os/exec"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestPinnedOpenCodeConfigurationLoader(t *testing.T) {
+	if _, err := exec.LookPath("opencode"); err != nil {
+		t.Skip("dependency check requires the local worker image with OpenCode 1.18.31")
+	}
+	// The JavaScript harness exercises the real runner and pinned OpenCode
+	// against a local synthetic model service without external credentials.
+	cmd := exec.Command("node", "-e", `
+"use strict";
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -74,7 +87,7 @@ async function main() {
       const finishReason = shouldRead ? "tool_calls" : "stop";
       if (shouldRead) readFile = "";
       res.end(
-        `data: ${JSON.stringify({ id: "synthetic", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [{ index: 0, delta, finish_reason: finishReason }], usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 } })}\n\ndata: [DONE]\n\n`,
+        "data: " + JSON.stringify({ id: "synthetic", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [{ index: 0, delta, finish_reason: finishReason }], usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 } }) + "\n\ndata: [DONE]\n\n",
       );
     });
   });
@@ -119,7 +132,7 @@ async function main() {
         SUPERPLANE_PLANNING_SESSION_KIND: "work_order_analysis",
         CUSTOM_LLM_API_TYPE: "openai-compatible",
         CUSTOM_LLM_API_KEY: "synthetic-key",
-        CUSTOM_LLM_BASE_URL: `http://127.0.0.1:${server.address().port}/v1`,
+        CUSTOM_LLM_BASE_URL: "http://127.0.0.1:" + server.address().port + "/v1",
         OPENCODE_CONFIG: "/inherited/invalid.json",
         OPENCODE_CONFIG_CONTENT: incompatible,
         OPENCODE_CONFIG_DIR: repo,
@@ -236,3 +249,7 @@ main()
     console.error(err);
     process.exitCode = 1;
   });
+`)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+}
