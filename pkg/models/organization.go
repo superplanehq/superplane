@@ -8,6 +8,7 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -705,11 +706,12 @@ func organizationsMatchingFilter(tx *gorm.DB, filter OrganizationListFilter) (*g
 	if err != nil {
 		return nil, err
 	}
-	ids := make([]uuid.UUID, 0, len(organizations))
+	ids := make([]string, 0, len(organizations))
 	for _, organization := range organizations {
-		ids = append(ids, organization.ID)
+		ids = append(ids, organization.ID.String())
 	}
-	return query.Where("organizations.id IN ?", ids).Session(&gorm.Session{}), nil
+	// One array parameter keeps large plan matches below PostgreSQL's parameter limit.
+	return query.Where("organizations.id = ANY(?::uuid[])", pq.Array(ids)).Session(&gorm.Session{}), nil
 }
 
 func filterOrganizationsByPlan(tx *gorm.DB, organizations []OrganizationWithCounts, planKey string) ([]OrganizationWithCounts, error) {
