@@ -9,11 +9,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
 const mergePending = { current: false };
 const mergeMutate = vi.fn();
+const fixMutate = vi.fn();
+const fixPending = { current: false };
 const experimentalFeatureHas = { current: (_id: string) => true };
 
 vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
   useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: mergePending.current }),
+  useFixFactoryPullRequestConflicts: () => ({ mutate: fixMutate, isPending: fixPending.current }),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -68,7 +71,9 @@ beforeAll(() => {
 
 beforeEach(() => {
   mergeMutate.mockReset();
+  fixMutate.mockReset();
   mergePending.current = false;
+  fixPending.current = false;
   experimentalFeatureHas.current = () => true;
   mergeability.current = {
     canMerge: true,
@@ -394,9 +399,73 @@ describe("SplitRunAttentionNote for a pull request", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "The pull request has conflicts" })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.getByTestId("split-run-fix-conflicts")).toBeEnabled();
 
     await user.hover(screen.getByTestId("split-run-merge-reason"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("The pull request has conflicts.");
+  });
+
+  it("starts Address PR feedback when the pull request has conflicts", async () => {
+    const user = userEvent.setup();
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CONFLICTING",
+      message: "The pull request has conflicts.",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    await user.click(screen.getByTestId("split-run-fix-conflicts"));
+    expect(fixMutate).toHaveBeenCalledTimes(1);
+    expect(fixMutate.mock.calls[0]?.[0]).toBe("pr-6812");
+  });
+
+  it("disables Fix conflicts while feedback is already running", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CONFLICTING",
+      message: "The pull request has conflicts.",
+    };
+    renderNote({
+      pullRequests: [
+        {
+          ...GITHUB_PR,
+          activities: [
+            {
+              state: "active",
+              title: "Resolve merge conflicts",
+              run: { id: "run-1", state: "STATE_STARTED" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(screen.getByTestId("split-run-fix-conflicts")).toBeDisabled();
+  });
+
+  it("keeps Fix conflicts disabled while automation is running", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_ACTIVE_RUN",
+      message: "Automation is still running.",
+    };
+    renderNote({
+      pullRequests: [{ ...GITHUB_PR, mergeBlockedReason: "CONFLICTING" }],
+    });
+
+    expect(screen.getByTestId("split-run-fix-conflicts")).toBeDisabled();
+  });
+
+  it("hides Fix conflicts when the pull request merge flag is off", () => {
+    experimentalFeatureHas.current = () => false;
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CONFLICTING",
+      message: "The pull request has conflicts.",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    expect(screen.queryByTestId("split-run-fix-conflicts")).not.toBeInTheDocument();
   });
 
   it("offers only the branch merge strategies for Bitbucket, never rebase", async () => {

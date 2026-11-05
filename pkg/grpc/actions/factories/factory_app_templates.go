@@ -1014,6 +1014,7 @@ func materializePRFeedbackDefaults(
 		AgentSettings:          prFeedbackAgentSettingsFromGraph(graph, spec, savedSettings),
 		TriggerSettings:        prFeedbackTriggerSettingsFromGraph(graph, savedSettings),
 	}
+	applyPRFeedbackConflictSettings(&request, settings)
 
 	templateID := prFeedbackDiscussionTemplateID
 	triggerID := prFeedbackCommentTriggerNodeID

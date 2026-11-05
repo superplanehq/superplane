@@ -29,6 +29,8 @@ const settings: PRFeedbackDraftSettings = {
   allowedBots: [],
   checkNames: [],
   maximumAttempts: 3,
+  fixMergeConflicts: true,
+  mergeConflictHours: 24,
   runnerIntegrationIds: [],
 };
 
@@ -317,11 +319,11 @@ describe("Verify and Done run history", () => {
   it("preserves unsaved PR feedback settings while changing URL tabs", async () => {
     const user = userEvent.setup();
     renderPage(<FeedbackPage />);
-    const attempts = screen.getByRole("spinbutton");
+    const attempts = screen.getByTestId("pr-feedback-maximum-attempts");
     await user.clear(attempts);
     await user.type(attempts, "5");
     await user.click(screen.getByRole("tab", { name: "Runs" }));
     await user.click(screen.getByRole("tab", { name: "General" }));
-    expect(screen.getByRole("spinbutton")).toHaveValue(5);
+    expect(screen.getByTestId("pr-feedback-maximum-attempts")).toHaveValue(5);
   });
 });

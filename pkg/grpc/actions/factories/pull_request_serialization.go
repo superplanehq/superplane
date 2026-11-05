@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -167,22 +168,23 @@ func serializeFactoryPullRequest(
 	ledgerByRun map[uuid.UUID]pullRequestRunLedger,
 ) *pb.FactoryPullRequest {
 	serialized := &pb.FactoryPullRequest{
-		Id:              pullRequest.ID.String(),
-		FactoryId:       pullRequest.FactoryID.String(),
-		WorkOrderId:     pullRequest.WorkOrderID.String(),
-		WorkOrderNumber: workOrderNumber,
-		Provider:        pullRequestProviderToProto(pullRequest.Provider),
-		Repository:      pullRequest.Repository,
-		Number:          pullRequest.Number,
-		Url:             pullRequest.URL,
-		Title:           pullRequest.Title,
-		State:           pullRequestStateToProto(pullRequest.State),
-		CreatedAt:       timestamppb.New(pullRequest.CreatedAt),
-		UpdatedAt:       timestamppb.New(pullRequest.UpdatedAt),
-		Runs:            serializePullRequestRuns(runs, ledgerByRun),
-		Activities:      serializePullRequestActivities(runs, ledgerByRun),
-		CurrentRevision: serializePullRequestRevision(currentRevision),
-		Mergeable:       factoryPullRequestMergeableOnBoard(pullRequest),
+		Id:                 pullRequest.ID.String(),
+		FactoryId:          pullRequest.FactoryID.String(),
+		WorkOrderId:        pullRequest.WorkOrderID.String(),
+		WorkOrderNumber:    workOrderNumber,
+		Provider:           pullRequestProviderToProto(pullRequest.Provider),
+		Repository:         pullRequest.Repository,
+		Number:             pullRequest.Number,
+		Url:                pullRequest.URL,
+		Title:              pullRequest.Title,
+		State:              pullRequestStateToProto(pullRequest.State),
+		CreatedAt:          timestamppb.New(pullRequest.CreatedAt),
+		UpdatedAt:          timestamppb.New(pullRequest.UpdatedAt),
+		Runs:               serializePullRequestRuns(runs, ledgerByRun),
+		Activities:         serializePullRequestActivities(runs, ledgerByRun),
+		CurrentRevision:    serializePullRequestRevision(currentRevision),
+		Mergeable:          factoryPullRequestMergeableOnBoard(pullRequest),
+		MergeBlockedReason: strings.TrimSpace(pullRequest.MergeBlockedReason),
 	}
 	if pullRequest.ExternalID != nil {
 		serialized.ExternalId = *pullRequest.ExternalID

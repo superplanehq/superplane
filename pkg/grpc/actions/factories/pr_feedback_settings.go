@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/google/uuid"
@@ -17,15 +18,19 @@ type prFeedbackSettings struct {
 	AllowedBots            []string
 	CheckNames             []string
 	MaximumAttempts        int
+	FixMergeConflicts      bool
+	MergeConflictHours     int
 	RunnerIntegrationIDs   []string
 	RunnerIntegrationNames []string
 }
 
 func defaultPRFeedbackSettings() prFeedbackSettings {
 	return prFeedbackSettings{
-		Mention:         prFeedbackDefaultMention,
-		IgnoreBots:      true,
-		MaximumAttempts: prFeedbackDefaultMaximumAttempts,
+		Mention:            prFeedbackDefaultMention,
+		IgnoreBots:         true,
+		MaximumAttempts:    prFeedbackDefaultMaximumAttempts,
+		FixMergeConflicts:  true,
+		MergeConflictHours: prFeedbackDefaultMergeConflictHours,
 	}
 }
 
@@ -91,6 +96,40 @@ func allowedBotsNodeValue(bots []string) []any {
 	return values
 }
 
+func prFeedbackNodeInt(node *models.Node, key string) (int, bool) {
+	if node == nil || node.Configuration == nil {
+		return 0, false
+	}
+	value, ok := node.Configuration[key]
+	if !ok || value == nil {
+		return 0, false
+	}
+	switch typed := value.(type) {
+	case int:
+		return typed, true
+	case int32:
+		return int(typed), true
+	case int64:
+		return int(typed), true
+	case float64:
+		return int(typed), true
+	case json.Number:
+		parsed, err := typed.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(parsed), true
+	default:
+		return 0, false
+	}
+}
+
+func applyPRFeedbackConflictSettings(request *prFeedbackBuildRequest, settings prFeedbackSettings) {
+	enabled := settings.FixMergeConflicts
+	request.FixMergeConflicts = &enabled
+	request.MergeConflictHours = settings.MergeConflictHours
+}
+
 func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSpec) prFeedbackSettings {
 	settings := defaultPRFeedbackSettings()
 	for _, nodeID := range graph.triggerNodeIDs() {
@@ -116,6 +155,16 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 		}
 		if settings.Repository == "" {
 			settings.Repository = strings.TrimSpace(prFeedbackNodeString(wait, "repository"))
+		}
+		settings.FixMergeConflicts = true
+		settings.MergeConflictHours = prFeedbackDefaultMergeConflictHours
+		if wait != nil {
+			if _, ok := wait.Configuration["fixMergeConflicts"].(bool); ok {
+				settings.FixMergeConflicts = prFeedbackNodeBool(wait, "fixMergeConflicts", true)
+			}
+			if hours, ok := prFeedbackNodeInt(wait, "mergeConflictHours"); ok && hours > 0 {
+				settings.MergeConflictHours = hours
+			}
 		}
 		settings.RunnerIntegrationNames = runnerExtraIntegrationNames(findIntakeNode(spec.Nodes, graph.RunnerNodeID))
 	}
@@ -158,6 +207,11 @@ func runnerExtraIntegrationNames(node *models.Node) []string {
 func serializePRFeedbackSettings(settings prFeedbackSettings) *pb.FactoryPRFeedbackHandler_Settings {
 	settings = settings.normalized()
 	maximumAttempts := int32(settings.MaximumAttempts)
+	fixMergeConflicts := settings.FixMergeConflicts
+	mergeConflictHours := int32(settings.MergeConflictHours)
+	if mergeConflictHours <= 0 {
+		mergeConflictHours = prFeedbackDefaultMergeConflictHours
+	}
 	return &pb.FactoryPRFeedbackHandler_Settings{
 		Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
 			Repository: settings.Repository,
@@ -172,6 +226,8 @@ func serializePRFeedbackSettings(settings prFeedbackSettings) *pb.FactoryPRFeedb
 			Names:                settings.CheckNames,
 			MaximumAttempts:      &maximumAttempts,
 			RunnerIntegrationIds: settings.RunnerIntegrationIDs,
+			FixMergeConflicts:    &fixMergeConflicts,
+			MergeConflictHours:   &mergeConflictHours,
 		},
 	}
 }
@@ -193,7 +249,10 @@ func validatePRFeedbackSettingsForSource(
 	if settings.MaximumAttempts < prFeedbackMaximumAttemptsMin || settings.MaximumAttempts > prFeedbackMaximumAttemptsMax {
 		return invalidArgument("maximum attempts must be between 1 and 10")
 	}
-	if len(settings.CheckNames) == 0 {
+	if settings.MergeConflictHours < prFeedbackMergeConflictHoursMin || settings.MergeConflictHours > prFeedbackMergeConflictHoursMax {
+		return invalidArgument("merge conflict hours must be between 1 and 168")
+	}
+	if !settings.FixMergeConflicts && len(settings.CheckNames) == 0 {
 		return invalidArgument("at least one check name is required")
 	}
 	for _, name := range settings.CheckNames {
@@ -266,6 +325,12 @@ func parsePRFeedbackSettings(current prFeedbackSettings, requested *pb.FactoryPR
 		updated.CheckNames = requested.GetChecks().GetNames()
 		if requested.GetChecks().MaximumAttempts != nil {
 			updated.MaximumAttempts = int(requested.GetChecks().GetMaximumAttempts())
+		}
+		if requested.GetChecks().FixMergeConflicts != nil {
+			updated.FixMergeConflicts = requested.GetChecks().GetFixMergeConflicts()
+		}
+		if requested.GetChecks().MergeConflictHours != nil {
+			updated.MergeConflictHours = int(requested.GetChecks().GetMergeConflictHours())
 		}
 		updated.RunnerIntegrationIDs = requested.GetChecks().GetRunnerIntegrationIds()
 	}

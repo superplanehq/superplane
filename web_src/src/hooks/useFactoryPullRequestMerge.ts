@@ -1,4 +1,8 @@
-import { factoriesDescribeFactoryPullRequestMergeability, factoriesMergeFactoryPullRequest } from "@/api-client";
+import {
+  factoriesDescribeFactoryPullRequestMergeability,
+  factoriesFixFactoryPullRequestConflicts,
+  factoriesMergeFactoryPullRequest,
+} from "@/api-client";
 import type { FactoriesFactoryPullRequestMergeability, FactoryPullRequestMergeabilityMergeMethod } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +62,32 @@ export function useMergeFactoryPullRequest(organizationId: string, factoryId: st
     onSuccess: (_pullRequest, input) => {
       void queryClient.invalidateQueries({
         queryKey: factoryPullRequestMergeabilityKey(organizationId, factoryId, input.pullRequestId),
+      });
+      invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
+    },
+  });
+}
+
+export function useFixFactoryPullRequestConflicts(organizationId: string, factoryId: string, orderId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (pullRequestId: string) => {
+      const response = await factoriesFixFactoryPullRequestConflicts(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, prId: pullRequestId },
+          body: {},
+        }),
+      );
+      if (!response.data?.pullRequest) {
+        throw new Error("Failed to start the conflict fix");
+      }
+      return response.data.pullRequest;
+    },
+    onSuccess: (_pullRequest, pullRequestId) => {
+      void queryClient.invalidateQueries({
+        queryKey: factoryPullRequestMergeabilityKey(organizationId, factoryId, pullRequestId),
       });
       invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
     },

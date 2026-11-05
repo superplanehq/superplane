@@ -117,7 +117,9 @@ func Test__WaitForBuilds__Execute(t *testing.T) {
 		assert.Empty(t, requests.Action)
 	})
 
-	t.Run("rejects empty build keys", func(t *testing.T) {
+	t.Run("passes without a poll when no build keys are selected", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		requests := &contexts.RequestContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: WaitForBuildsConfiguration{
 				Repository: "acme/widgets",
@@ -125,14 +127,15 @@ func Test__WaitForBuilds__Execute(t *testing.T) {
 			},
 			HTTP:           &contexts.HTTPContext{},
 			Integration:    integration(),
-			ExecutionState: &contexts.ExecutionStateContext{},
-			Requests:       &contexts.RequestContext{},
+			ExecutionState: executionState,
+			Requests:       requests,
 			Metadata:       &contexts.MetadataContext{},
 			Logger:         logrus.NewEntry(logrus.New()),
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "buildKeys is required")
+		require.NoError(t, err)
+		assert.Equal(t, waitBuildsPassedChannel, executionState.Channel)
+		assert.Empty(t, requests.Action)
 	})
 
 	t.Run("stays pending and polls when builds are missing", func(t *testing.T) {

@@ -11,6 +11,7 @@ import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
+import { isPRFeedbackMergeConflictHoursValid, mergeConflictDraft } from "./prFeedbackConflictSettings";
 
 export { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 
@@ -117,6 +118,8 @@ export interface PRFeedbackDraftSettings {
   allowedBots: string[];
   checkNames: string[];
   maximumAttempts: number;
+  fixMergeConflicts: boolean;
+  mergeConflictHours: number;
   runnerIntegrationIds: string[];
 }
 
@@ -134,6 +137,7 @@ export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHa
     allowedBots: discussion?.allowedBots ?? [],
     checkNames: checks?.names ?? [],
     maximumAttempts: checks?.maximumAttempts ?? 3,
+    ...mergeConflictDraft(checks),
     runnerIntegrationIds: checks?.runnerIntegrationIds ?? [],
   };
 }
@@ -170,6 +174,8 @@ export function normalizePRFeedbackDraft(draft: PRFeedbackDraftSettings): PRFeed
     allowedBots: normalizeAllowedBots(draft.allowedBots),
     checkNames: normalizeUniqueStrings(draft.checkNames),
     maximumAttempts: draft.maximumAttempts,
+    fixMergeConflicts: draft.fixMergeConflicts,
+    mergeConflictHours: draft.mergeConflictHours,
     runnerIntegrationIds: normalizeUniqueStrings(draft.runnerIntegrationIds),
   };
 }
@@ -242,7 +248,12 @@ export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean 
     return false;
   }
   if (next.source === "checks") {
-    return next.checkNames.length > 0 && isPRFeedbackMaximumAttemptsValid(next.maximumAttempts);
+    const hasWork = next.fixMergeConflicts || next.checkNames.length > 0;
+    return (
+      hasWork &&
+      isPRFeedbackMaximumAttemptsValid(next.maximumAttempts) &&
+      isPRFeedbackMergeConflictHoursValid(next.mergeConflictHours)
+    );
   }
   return next.mention.length === 0 || next.mention.startsWith("@");
 }
@@ -254,6 +265,8 @@ export function prFeedbackSettingsToApi(draft: PRFeedbackDraftSettings): Factori
       checks: {
         names: draft.checkNames,
         maximumAttempts: draft.maximumAttempts,
+        fixMergeConflicts: draft.fixMergeConflicts,
+        mergeConflictHours: draft.mergeConflictHours,
         runnerIntegrationIds: draft.runnerIntegrationIds,
       },
     };

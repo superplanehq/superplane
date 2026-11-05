@@ -15,6 +15,8 @@ const discussionSettings: PRFeedbackDraftSettings = {
   allowedBots: [],
   checkNames: [],
   maximumAttempts: 3,
+  fixMergeConflicts: true,
+  mergeConflictHours: 24,
   runnerIntegrationIds: [],
 };
 
@@ -28,6 +30,8 @@ const checksSettings: PRFeedbackDraftSettings = {
   allowedBots: [],
   checkNames: ["lint", "unit"],
   maximumAttempts: 3,
+  fixMergeConflicts: true,
+  mergeConflictHours: 24,
   runnerIntegrationIds: [],
 };
 

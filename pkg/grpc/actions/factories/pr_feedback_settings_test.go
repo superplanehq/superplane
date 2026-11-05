@@ -121,7 +121,20 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("rejects an empty check name list", func(t *testing.T) {
+	t.Run("rejects an empty check name list when merge conflicts are off", func(t *testing.T) {
+		settings := defaultPRFeedbackSettings()
+		settings.FixMergeConflicts = false
+		err := validatePRFeedbackSettingsForSource(
+			nil,
+			uuid.Nil,
+			models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
+			settings,
+			nil,
+		)
+		require.Error(t, err)
+	})
+
+	t.Run("allows an empty check name list when merge conflicts stay on", func(t *testing.T) {
 		err := validatePRFeedbackSettingsForSource(
 			nil,
 			uuid.Nil,
@@ -129,7 +142,57 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 			defaultPRFeedbackSettings(),
 			nil,
 		)
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects merge conflict hours outside 1 through 168", func(t *testing.T) {
+		settings := defaultPRFeedbackSettings()
+		settings.CheckNames = []string{"lint"}
+		settings.MergeConflictHours = 0
+		err := validatePRFeedbackSettingsForSource(
+			nil,
+			uuid.Nil,
+			models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
+			settings,
+			nil,
+		)
 		require.Error(t, err)
+
+		settings.MergeConflictHours = 169
+		err = validatePRFeedbackSettingsForSource(
+			nil,
+			uuid.Nil,
+			models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
+			settings,
+			nil,
+		)
+		require.Error(t, err)
+	})
+
+	t.Run("keeps an explicit false toggle and custom hours", func(t *testing.T) {
+		off := false
+		hours := int32(12)
+		parsed := parsePRFeedbackSettings(defaultPRFeedbackSettings(), &pb.FactoryPRFeedbackHandler_Settings{
+			Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
+				Names:              []string{"lint"},
+				FixMergeConflicts:  &off,
+				MergeConflictHours: &hours,
+			},
+		})
+		assert.False(t, parsed.FixMergeConflicts)
+		assert.Equal(t, 12, parsed.MergeConflictHours)
+
+		spec := prFeedbackChecksSpecFromTemplate(t, "acme/app")
+		graph := resolvePRFeedbackGraph(spec)
+		for i := range spec.Nodes {
+			if spec.Nodes[i].ID == graph.WaitChecksNodeID {
+				spec.Nodes[i].Configuration["fixMergeConflicts"] = false
+				spec.Nodes[i].Configuration["mergeConflictHours"] = float64(12)
+			}
+		}
+		settings := prFeedbackSettingsFromGraph(graph, spec)
+		assert.False(t, settings.FixMergeConflicts)
+		assert.Equal(t, 12, settings.MergeConflictHours)
 	})
 
 	t.Run("reads check names from a generated graph", func(t *testing.T) {

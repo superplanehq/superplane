@@ -16,6 +16,11 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   addressAllBotsHelper: "Every bot comment starts pull request feedback, including bots that appear later.",
   allowedBotsLabel: "Allowed bots",
   allowedBotsHelper: "React to comments from these bots even without the mention. Use the bot login.",
+  mergeConflictsLabel: "Merge conflicts",
+  mergeConflictsHelper: "SuperPlane starts a fix while the pull request conflicts.",
+  mergeConflictHoursLabel: "Hours for automatic merge conflict fixes",
+  mergeConflictHoursHelper:
+    "Stop automatic fixes this many hours after SuperPlane tracks the pull request. You can still start a fix from the task.",
   checkNamesLabel: "Status checks",
   checkNamesHelper: "Select the status checks SuperPlane must wait for and automatically attempt to fix.",
   checkNamesNone: "Select at least one status check.",

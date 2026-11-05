@@ -45,6 +45,8 @@ function VerificationPreview({ source, detail = false }: { source: VerificationS
               allowedBots: [],
               checkNames: ["CI"],
               maximumAttempts: 3,
+              fixMergeConflicts: true,
+              mergeConflictHours: 24,
               runnerIntegrationIds: [],
             }}
             onSave={(next) => console.log("Save PR feedback", next)}

@@ -74,6 +74,17 @@ export function WorkOrderPullRequestChip({
   );
 }
 
+export function WorkOrderConflictsChip() {
+  return (
+    <span
+      className="inline-flex max-w-full items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
+      data-testid="work-order-conflicts-chip"
+    >
+      Conflicts
+    </span>
+  );
+}
+
 export function WorkOrderMergeableChip() {
   return (
     <span

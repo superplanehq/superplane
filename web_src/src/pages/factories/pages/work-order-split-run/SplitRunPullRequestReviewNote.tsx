@@ -8,6 +8,7 @@ import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequest
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
+import { SplitRunPullRequestConflictAction } from "./SplitRunPullRequestConflictAction";
 import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 import {
@@ -126,6 +127,13 @@ export function SplitRunPullRequestReviewNote({
               </a>
             </Button>
             <ContinueFixesButton onContinue={continueFixes} disabled={actionBusy} size="lg" />
+            <SplitRunPullRequestConflictAction
+              organizationId={organizationId}
+              factoryId={factoryId}
+              orderId={orderId}
+              pullRequest={trackedPullRequest}
+              canAct={canAct}
+            />
             <SplitRunPullRequestMergeAction
               organizationId={organizationId}
               factoryId={factoryId}
@@ -252,6 +260,14 @@ function ReviewCallToAction({
         </a>
       </Button>
       <ContinueFixesButton onContinue={continueFixes} disabled={actionBusy} />
+      <SplitRunPullRequestConflictAction
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+        pullRequest={trackedPullRequest}
+        canAct={canAct}
+        compact
+      />
       <SplitRunPullRequestMergeAction
         organizationId={organizationId}
         factoryId={factoryId}

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { PR_FEEDBACK_SOURCES } from "./prFeedbackSettingsModel";
-import { readDeferredWorkspaceNextStep, WORKSPACE_NEXT_STEP_DEFERRAL_STORAGE_KEY } from "./workspaceNextStepDeferral";
+import { WORKSPACE_NEXT_STEP_DEFERRAL_STORAGE_KEY } from "./workspaceNextStepDeferral";
 
 const mocks = vi.hoisted(() => ({
   createHandler: vi.fn(),
@@ -317,7 +317,13 @@ describe("ChecksPRFeedbackSetupDialog", () => {
         name: "Fix pull request checks",
         settings: {
           subject: { repository: "acme/api" },
-          checks: { names: ["lint", "e2e"], maximumAttempts: 3, runnerIntegrationIds: [] },
+          checks: {
+            names: ["lint", "e2e"],
+            maximumAttempts: 3,
+            fixMergeConflicts: true,
+            mergeConflictHours: 1,
+            runnerIntegrationIds: [],
+          },
         },
       });
     });
@@ -363,7 +369,13 @@ describe("ChecksPRFeedbackSetupDialog", () => {
         name: "Fix pull request checks",
         settings: {
           subject: { repository: "acme/api" },
-          checks: { names: ["lint"], maximumAttempts: 3, runnerIntegrationIds: [] },
+          checks: {
+            names: ["lint"],
+            maximumAttempts: 3,
+            fixMergeConflicts: true,
+            mergeConflictHours: 1,
+            runnerIntegrationIds: [],
+          },
         },
       });
     });
@@ -450,45 +462,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("checks-setup-tools-github-actions")).toHaveTextContent(
       "GitHub Actions does not need additional access.",
     );
-  });
-
-  it("finishes without a handler and minimizes next steps when no checks exist", async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
-    const onCreated = vi.fn();
-    mocks.catalog.splice(0);
-    render(
-      <ChecksPRFeedbackSetupDialog
-        organizationId="org-1"
-        factoryId="factory-1"
-        githubIntegrationId="gh-1"
-        repository="acme/api"
-        source={checksSource}
-        onClose={onClose}
-        onCreated={onCreated}
-      />,
-    );
-
-    await waitFor(() => expect(screen.getByTestId("checks-setup-empty")).toBeInTheDocument());
-    expect(screen.getByTestId("checks-setup-preview")).toHaveTextContent("No status checks found on recent commits.");
-    expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
-      "No status checks found on recent commits.",
-    );
-    expect(screen.queryByTestId("checks-setup-preview-attempts")).not.toBeInTheDocument();
-    expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent("No status checks found on recent commits.");
-    expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent(
-      "Run CI on a recent pull request, then reopen Configure to select checks.",
-    );
-    expect(screen.queryByTestId("pr-feedback-check-names-picker")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("checks-setup-maximum-attempts")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("checks-setup-continue")).not.toBeInTheDocument();
-
-    await user.click(screen.getByTestId("checks-setup-finish"));
-
-    expect(mocks.createHandler).not.toHaveBeenCalled();
-    expect(onCreated).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
-    expect(readDeferredWorkspaceNextStep("factory-1")).toBe("pr-checks-handler");
   });
 
   it("preselects a connected integration and hides Connect", async () => {

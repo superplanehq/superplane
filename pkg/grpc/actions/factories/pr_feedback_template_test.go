@@ -7,6 +7,7 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 func TestPrFeedbackCommentActivityDescriptionExpression(t *testing.T) {
@@ -166,6 +167,20 @@ func TestPrFeedbackReviewAcknowledgeCommentIDExpression(t *testing.T) {
 		})
 		assert.Equal(t, "", got)
 	})
+}
+
+func TestPrFeedbackConflictFixInstruction_UsesTheEvent(t *testing.T) {
+	source := templateExpressionSource(t, prFeedbackChecksTaskInstruction(false))
+
+	got := evalRootDataExpression(t, source, map[string]any{"conflict_fix": true})
+	assert.Equal(t, "This run resolves merge conflicts with the base branch. Update the branch so it merges cleanly. Do not change anything else.", got)
+	assert.Equal(t, "Failed checks are in FAILED_CHECKS. Address every failed check in that list in this run.", evalRootDataExpression(t, source, map[string]any{}))
+	assert.Equal(t, "Failed checks are in FAILED_CHECKS. Address every failed check in that list in this run.", evalRootDataExpression(t, source, map[string]any{"conflict_fix": false}))
+
+	assert.Contains(t, prFeedbackChecksPrompt(prFeedbackBuildRequest{}), "conflict_fix")
+	assert.Contains(t, prFeedbackChecksPrompt(prFeedbackBuildRequest{VCSProvider: models.ProviderBitbucket}), "conflict_fix")
+	assert.NotContains(t, prFeedbackPromptFor(prFeedbackBuildRequest{}), "conflict_fix")
+	assert.NotContains(t, prFeedbackPromptFor(prFeedbackBuildRequest{VCSProvider: models.ProviderBitbucket}), "conflict_fix")
 }
 
 func TestPrFeedbackPRNumberExpression_IssueCommentPayload(t *testing.T) {

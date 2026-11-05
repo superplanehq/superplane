@@ -97,6 +97,24 @@ describe("WorkOrderCard pull request pill", () => {
     expect(screen.getByTestId("work-order-mergeable-chip")).toHaveTextContent("Mergeable");
   });
 
+  it("shows Conflicts instead of Mergeable when the pull request conflicts", () => {
+    renderCard({
+      pullRequests: [{ ...openPullRequest, mergeable: true, mergeBlockedReason: "CONFLICTING" }],
+    });
+
+    expect(screen.getByTestId("work-order-conflicts-chip")).toHaveTextContent("Conflicts");
+    expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
+  });
+
+  it("hides Conflicts when pull request merge is off", () => {
+    experimentalFeatureHas.current = () => false;
+    renderCard({
+      pullRequests: [{ ...openPullRequest, mergeBlockedReason: "CONFLICTING" }],
+    });
+
+    expect(screen.queryByTestId("work-order-conflicts-chip")).not.toBeInTheDocument();
+  });
+
   it("keeps Waiting for user review when the pull request is closed", () => {
     renderCard({
       pullRequests: [{ ...openPullRequest, id: "pr-closed", state: "STATE_CLOSED" }],

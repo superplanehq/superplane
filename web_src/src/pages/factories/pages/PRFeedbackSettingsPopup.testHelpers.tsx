@@ -44,6 +44,8 @@ export function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}
     allowedBots: [],
     checkNames: [],
     maximumAttempts: 3,
+    fixMergeConflicts: true,
+    mergeConflictHours: 24,
     runnerIntegrationIds: [],
     ...overrides,
   };
@@ -60,6 +62,8 @@ export function checksDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): P
     allowedBots: [],
     checkNames: [],
     maximumAttempts: 3,
+    fixMergeConflicts: true,
+    mergeConflictHours: 24,
     runnerIntegrationIds: [],
     ...overrides,
   };

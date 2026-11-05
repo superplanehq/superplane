@@ -40,14 +40,16 @@ const (
 )
 
 type factoryPullRequestMergeability struct {
-	CanMerge       bool
-	BlockedReason  pb.FactoryPullRequestMergeability_BlockedReason
-	Message        string
-	AllowedMethods []pb.FactoryPullRequestMergeability_MergeMethod
-	HeadSHA        string
-	PullRequest    *models.FactoryPullRequest
-	Client         factoryGitHubAPI
-	canRetry       bool
+	CanMerge            bool
+	BlockedReason       pb.FactoryPullRequestMergeability_BlockedReason
+	Message             string
+	AllowedMethods      []pb.FactoryPullRequestMergeability_MergeMethod
+	HeadSHA             string
+	HeadRef             string
+	MergeabilityUnknown bool
+	PullRequest         *models.FactoryPullRequest
+	Client              factoryGitHubAPI
+	canRetry            bool
 }
 
 func loadFactoryPullRequestForMerge(
@@ -113,6 +115,7 @@ func evaluateFactoryPullRequestMergeability(
 		return nil, errFactoryPullRequestMissing
 	}
 	result.HeadSHA = githubPR.GetHead().GetSHA()
+	result.HeadRef = githubPR.GetHead().GetRef()
 
 	if githubPR.GetDraft() || strings.EqualFold(githubPR.GetMergeableState(), "draft") {
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_DRAFT, mergeBlockedDraft), nil
@@ -121,6 +124,7 @@ func evaluateFactoryPullRequestMergeability(
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING, mergeBlockedConflicting), nil
 	}
 	if strings.EqualFold(githubPR.GetMergeableState(), "unknown") || githubPR.Mergeable == nil {
+		result.MergeabilityUnknown = true
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED, mergeBlockedChecksUnfinished), nil
 	}
 

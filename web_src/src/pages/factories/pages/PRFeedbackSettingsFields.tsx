@@ -1,4 +1,5 @@
 import { Link } from "@/components/Link/link";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
@@ -12,6 +13,10 @@ import { useMemo, useState } from "react";
 
 import { isChecksHandlerCIIntegration } from "./checksPRFeedbackSetup";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
+import {
+  PR_FEEDBACK_MERGE_CONFLICT_HOURS_MAX,
+  PR_FEEDBACK_MERGE_CONFLICT_HOURS_MIN,
+} from "./prFeedbackConflictSettings";
 import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 import { normalizeReviewBotLogin } from "./reviewBotPickerModel";
 import { ReviewBotPicker } from "./ReviewBotPicker";
@@ -86,12 +91,27 @@ export function PRFeedbackChecksFields({
   );
   return (
     <>
+      <MergeConflictsOption
+        selected={draft.fixMergeConflicts}
+        onToggle={() => onUpdate("fixMergeConflicts", !draft.fixMergeConflicts)}
+      />
       <StatusCheckPicker
         names={draft.checkNames}
         catalog={catalogQuery.data ?? []}
         loading={catalogEnabled && (catalogQuery.isPending || catalogQuery.isFetching)}
         loadError={catalogQuery.isError}
         onToggle={(name) => onUpdate("checkNames", toggleUniqueString(draft.checkNames, name))}
+      />
+      <PRFeedbackTextField
+        id="pr-feedback-merge-conflict-hours"
+        label={PR_FEEDBACK_SETTINGS_COPY.mergeConflictHoursLabel}
+        helper={PR_FEEDBACK_SETTINGS_COPY.mergeConflictHoursHelper}
+        value={String(draft.mergeConflictHours)}
+        type="number"
+        min={PR_FEEDBACK_MERGE_CONFLICT_HOURS_MIN}
+        max={PR_FEEDBACK_MERGE_CONFLICT_HOURS_MAX}
+        step={1}
+        onChange={(value) => onUpdate("mergeConflictHours", Number(value))}
       />
       <PRFeedbackTextField
         id="pr-feedback-maximum-attempts"
@@ -110,6 +130,34 @@ export function PRFeedbackChecksFields({
         onChange={(value) => onUpdate("runnerIntegrationIds", value)}
       />
     </>
+  );
+}
+
+export function MergeConflictsOption({ selected, onToggle }: { selected: boolean; onToggle: () => void }) {
+  return (
+    <section>
+      <div className="rounded-lg border border-border" data-testid="pr-feedback-merge-conflicts">
+        <Button
+          type="button"
+          variant="ghost"
+          role="option"
+          aria-selected={selected}
+          onClick={onToggle}
+          className={cn(
+            "h-auto w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] font-medium",
+            selected ? "bg-accent/50" : "hover:bg-accent/30",
+          )}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block">{PR_FEEDBACK_SETTINGS_COPY.mergeConflictsLabel}</span>
+            <span className="mt-0.5 block font-normal text-muted-foreground">
+              {PR_FEEDBACK_SETTINGS_COPY.mergeConflictsHelper}
+            </span>
+          </span>
+          {selected ? <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden /> : null}
+        </Button>
+      </div>
+    </section>
   );
 }
 
