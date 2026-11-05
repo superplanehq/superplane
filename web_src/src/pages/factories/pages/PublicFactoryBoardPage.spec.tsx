@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
@@ -138,6 +138,56 @@ describe("PublicFactoryBoardPage", () => {
     expect(within(card).getByTestId("work-order-row-assignees-backlog-0")).toHaveAttribute("title", "Ada Lovelace");
     expect(screen.getByTestId("work-order-card-source-backlog-0")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open refine agents.md" })).not.toBeInTheDocument();
+  });
+
+  it("opens a read-only task modal from a public card and closes it", async () => {
+    const card = {
+      number: 7,
+      id: "backlog-0",
+      title: "Public task",
+      createdAt: "2026-10-15T12:00:00Z",
+      state: "STATE_DRAFT",
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const task = String(input).endsWith("/tasks/7");
+      return new Response(
+        JSON.stringify(
+          task
+            ? {
+                card,
+                description: "Task description",
+                column: "Backlog",
+                totalTokens: 1234,
+                comments: [{ body: "Ready for review", createdAt: card.createdAt }],
+                runs: [{ name: "Implementation", status: "finished", result: "passed", durationSeconds: 12 }],
+                pullRequests: [{ number: 42, state: "open", url: "https://github.com/acme/app/pull/42" }],
+              }
+            : {
+                workspaceName: "Public workspace",
+                workspaceKey: "PUB",
+                columns: [{ key: "backlog", title: "Backlog", cards: [card], automations: [] }],
+              },
+        ),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderBoard(false);
+    fireEvent.click(await screen.findByRole("button", { name: "Open Public task" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("Task description")).toBeInTheDocument();
+    expect(within(dialog).getByText("Ready for review")).toBeInTheDocument();
+    expect(within(dialog).getByText("Implementation").closest("button")).toBeNull();
+    expect(within(dialog).getByRole("link", { name: "Review PR #42" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/app/pull/42",
+    );
+    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Spend|Artifacts|Logs/)).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/lines/line-1/tasks/7"))).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => /\/api\/v1\/factories\//.test(String(url)))).toBe(false);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows the signed-in user on the rail", async () => {

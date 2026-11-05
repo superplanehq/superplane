@@ -22,12 +22,14 @@ export function PublicBoardColumnLane({
   board,
   automationRowCount,
   colorView,
+  onOpenTask,
 }: {
   column: PublicBoardColumn;
   narrowed: boolean;
   board: PublicBoard;
   automationRowCount: number;
   colorView: LineBoardColumnColorView;
+  onOpenTask: (number: number) => void;
 }) {
   const phase = column.key.startsWith("phase-");
   const lane = lineBoardColumnLaneProps(column.color, colorView, phase ? undefined : { mutedFallback: true });
@@ -52,7 +54,7 @@ export function PublicBoardColumnLane({
       <LineBoardColumnCardList pending={false} className={workOrderKanbanLaneScrollClassName}>
         {column.cards.map((card, index) => (
           <li key={card.id ?? `${column.key}-${index}`}>
-            <PublicBoardTaskCard card={card} board={board} index={index} />
+            <PublicBoardTaskCard card={card} board={board} index={index} onOpenTask={onOpenTask} />
           </li>
         ))}
       </LineBoardColumnCardList>
@@ -60,7 +62,17 @@ export function PublicBoardColumnLane({
   );
 }
 
-function PublicBoardTaskCard({ card, board, index }: { card: PublicBoardCard; board: PublicBoard; index: number }) {
+function PublicBoardTaskCard({
+  card,
+  board,
+  index,
+  onOpenTask,
+}: {
+  card: PublicBoardCard;
+  board: PublicBoard;
+  index: number;
+  onOpenTask: (number: number) => void;
+}) {
   const order = publicBoardOrder(card, `${board.workspaceKey ?? "board"}-${index}`);
   const entry = buildWorkOrderListEntry(order, { key: board.workspaceKey });
 
@@ -82,7 +94,8 @@ function PublicBoardTaskCard({ card, board, index }: { card: PublicBoardCard; bo
       showClarity={board.showClarity}
       showConfidenceScore={board.showConfidence}
       hasAgentQuestion={Boolean(card.agentQuestion)}
-      interactive={false}
+      interactive={Boolean(card.number)}
+      onOpen={card.number ? () => onOpenTask(card.number!) : undefined}
       showOwner
     />
   );
