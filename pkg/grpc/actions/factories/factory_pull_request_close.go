@@ -97,7 +97,7 @@ func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
 		if outcome == nil || !outcome.closed {
 			continue
 		}
-		if !merged {
+		if outcome.result == models.FactoryWorkOrderResultPRClosed {
 			captureExternalFactoryProductEvent(
 				db,
 				factory,
@@ -203,6 +203,15 @@ func closeFactoryWorkOrderForPullRequest(
 	if !order.IsOpen() {
 		return outcome, nil
 	}
+
+	result, done, err := order.PullRequestCloseOutcome(tx)
+	if err != nil {
+		return nil, err
+	}
+	if !done {
+		return outcome, nil
+	}
+	outcome.result = result
 
 	if _, err := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:    models.FactoryWorkOrderStateClosed,

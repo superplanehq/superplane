@@ -3,6 +3,7 @@ package factories
 import (
 	"testing"
 
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -164,6 +165,86 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	require.Error(t, err, "tasks from another factory are not eligible")
 }
 
+func TestVerifyCustomAutomationRunsOncePerWorkspaceRepositoryPullRequest(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	_, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/web",
+		Access:     models.FactoryContextRepoAccessWrite,
+	})
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "review", "start-review")
+	_, err = factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	})
+	require.NoError(t, err)
+	api := openHandOffPullRequest("acme/app", 42, "feat/api")
+	api.Head.SHA = github.Ptr("api-sha")
+	web := openHandOffPullRequest("acme/web", 7, "feat/web")
+	web.Head.SHA = github.Ptr("web-sha")
+	original := newFactoryGitHubAPI
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+		return &fakeFactoryGitHub{pullRequests: map[string]*github.PullRequest{"acme/app#42": api, "acme/web#7": web}}, nil
+	}
+	t.Cleanup(func() { newFactoryGitHubAPI = original })
+	handOff, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID:       factory.ID.String(),
+		Title:           "Ship refunds in API and web",
+		Plan:            "# Plan",
+		Column:          HandOffColumnVerify,
+		PullRequestURL:  "https://github.com/acme/app/pull/42",
+		PullRequestURLs: []string{"https://github.com/acme/web/pull/7"},
+	})
+	require.NoError(t, err)
+	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), Name: "Verify changes", ColumnKey: "verify",
+		Settings: &pb.FactoryCustomAutomation_Settings{
+			StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+			Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+			Steps: []*pb.FactoryCustomAutomation_Step{
+				{Name: "Test", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make test", WorkingDirectory: "repo"},
+			},
+		},
+	})
+	require.NoError(t, err)
+	automationID := created.GetCustomAutomation().GetAutomation().GetId()
+
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: handOff.Order.GetId(),
+	})
+	require.NoError(t, err)
+
+	startedRepositories := func() []string {
+		var events []models.CanvasEvent
+		require.NoError(t, db.Where("workflow_id = ?", automationID).Find(&events).Error)
+		repositories := make([]string, 0, len(events))
+		for _, event := range events {
+			payload := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
+			repositories = append(repositories, payload["repository"].(map[string]any)["full_name"].(string))
+		}
+		return repositories
+	}
+	assert.ElementsMatch(t, []string{"acme/app", "acme/web"}, startedRepositories(), "each pull request must start a run on its own repository")
+
+	trigger, err := models.FindCanvasNode(db, uuid.MustParse(automationID), customAutomationTriggerID)
+	require.NoError(t, err)
+	configuration := trigger.Configuration.Data()
+	configuration["repository"] = "acme/app"
+	require.NoError(t, db.Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", trigger.WorkflowID, trigger.NodeID).
+		Update("configuration", datatypes.NewJSONType(configuration)).Error)
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: handOff.Order.GetId(),
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"acme/app", "acme/web", "acme/app"}, startedRepositories(), "an automation saved for one repository must not check out another repository's pull request")
+}
+
 func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		t.Run(provider, func(t *testing.T) {
@@ -223,10 +304,19 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			assert.Equal(t, runner.EnvironmentFromSourceSecret, secretSource["source"])
 			assert.Equal(t, "deploy-credentials", secretSource["secret"].(map[string]any)["secret"])
 			got := environmentVars(t, agent.Configuration["environment"])
-			assert.Equal(t, "acme/app", got["REPO"])
-			assert.Equal(t, "acme/app", got["SOURCE_REPO"])
-			assert.Equal(t, runner.WorkspaceContextRepoURL(provider, "acme/app", ""), got["REPO_URL"])
-			assert.Equal(t, "develop", got["BASE"])
+			if provider == models.ProviderGitHub {
+				assert.Equal(t, models.WorkspaceRepositoriesExpression, trigger.Configuration["repository"])
+				assert.Equal(t, prFeedbackEventRepositoryExpression, got["REPO"], "the run must check out the repository of its pull request")
+				assert.Equal(t, prFeedbackEventRepositoryExpression, got["SOURCE_REPO"])
+				assert.Equal(t, runner.WorkspaceContextRepoURL(provider, prFeedbackEventRepositoryExpression, ""), got["REPO_URL"])
+				assert.NotContains(t, got, "BASE")
+			} else {
+				assert.Equal(t, "acme/app", trigger.Configuration["repository"])
+				assert.Equal(t, "acme/app", got["REPO"])
+				assert.Equal(t, "acme/app", got["SOURCE_REPO"])
+				assert.Equal(t, runner.WorkspaceContextRepoURL(provider, "acme/app", ""), got["REPO_URL"])
+				assert.Equal(t, "develop", got["BASE"])
+			}
 			assert.Equal(t, prFeedbackPRNumberExpression(), got["PR_NUMBER"])
 			assert.Equal(t, prFeedbackPRHeadExpression(), got["PR_HEAD"])
 			_, err = structpb.NewStruct(agent.Configuration)
