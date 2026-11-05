@@ -274,11 +274,16 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
   } = props;
   const implementSettings = useImplementSettingsDraft(graph?.specNodes);
   const mergeConfidenceAgent = mergeConfidenceSettingsNode(graph);
-  const mergeConfidenceSettings = useMergeConfidenceSettingsDraft(mergeConfidenceAgent, {
-    organizationId,
-    factoryId,
-    canvasId,
-  });
+  const publishing = graph?.specNodes?.find(isMergeConfidencePublisher);
+  const mergeConfidenceSettings = useMergeConfidenceSettingsDraft(
+    mergeConfidenceAgent,
+    {
+      organizationId,
+      factoryId,
+      canvasId,
+    },
+    publishing,
+  );
   const implementAgent = implementSettingsNode(props);
   if (implementAgent && implementSettings.draft) {
     return <ImplementSettingsScreen settings={implementSettings} body={props} />;
@@ -287,6 +292,7 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
     return (
       <MergeConfidenceConfiguration
         agent={mergeConfidenceAgent}
+        publishing={publishing}
         settings={mergeConfidenceSettings}
         organizationId={organizationId}
         factoryId={factoryId}
@@ -466,4 +472,14 @@ function viewEmptyMessage(loading: boolean, error: boolean): string {
     return COLUMN_AUTOMATIONS_COPY.viewLoading;
   }
   return error ? COLUMN_AUTOMATIONS_COPY.viewError : COLUMN_AUTOMATIONS_COPY.viewEmpty;
+}
+
+function isMergeConfidencePublisher(node: { component?: string; configuration?: Record<string, unknown> }): boolean {
+  return (
+    [
+      "updatePullRequestBodySection",
+      "github.updatePullRequestBodySection",
+      "bitbucket.updatePullRequestBodySection",
+    ].includes(node.component ?? "") && node.configuration?.sectionKey === "merge-confidence"
+  );
 }

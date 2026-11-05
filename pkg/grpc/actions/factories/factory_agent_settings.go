@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -143,19 +144,26 @@ type factoryAutomationSettings struct {
 	triggers          map[string]*factoryTriggerSettings
 	draftPullRequests *bool
 	agentSteps        map[string]any
+	bodySections      map[string]map[string]any
 }
 
 func factoryAutomationSettingsFromVersion(version *models.CanvasVersion) *factoryAutomationSettings {
 	settings := &factoryAutomationSettings{
-		agents:     map[string]*factoryAgentSettings{},
-		triggers:   map[string]*factoryTriggerSettings{},
-		agentSteps: map[string]any{},
+		agents:       map[string]*factoryAgentSettings{},
+		triggers:     map[string]*factoryTriggerSettings{},
+		agentSteps:   map[string]any{},
+		bodySections: map[string]map[string]any{},
 	}
 	for i := range version.Nodes {
 		node := &version.Nodes[i]
 		if agent := factoryAgentSettingsFromNode(node); agent != nil {
 			settings.agents[node.ID] = agent
 			settings.agentSteps[node.ID] = node.Configuration["steps"]
+		}
+		if prbody.IsComponent(node.ComponentName()) {
+			if enabled, present := node.Configuration["enabled"]; present {
+				settings.bodySections[node.ID] = map[string]any{"enabled": enabled}
+			}
 		}
 		if node.Type == models.NodeTypeTrigger {
 			settings.triggers[node.ID] = factoryTriggerSettingsFromNode(node)

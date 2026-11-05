@@ -97,31 +97,38 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		assert.Nil(t, reloaded.ColumnKey)
 	})
 
-	t.Run("risk score install attaches the canvas to Verify", func(t *testing.T) {
-		factoryModel := newFactory(t)
-		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		t.Run(provider+" risk score install uses its provider and attaches Verify", func(t *testing.T) {
+			factoryModel := newFactory(t)
+			require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
+			canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
 
-		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
-			FactoryId:  factoryModel.ID.String(),
-			TemplateId: "risk-score",
-			AppId:      canvas.ID.String(),
-			InstallParams: map[string]string{
-				"appRepository": "acme/app",
-				"defaultBranch": "main",
-			},
+			response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+				FactoryId:    factoryModel.ID.String(),
+				TemplateId:   "risk-score",
+				Integrations: []*pb.FactoryAppTemplateIntegration{{Type: provider, Id: provider + "-1", Name: "acme-" + provider}},
+				AppId:        canvas.ID.String(),
+				InstallParams: map[string]string{
+					"appRepository": "acme/app",
+					"defaultBranch": "main",
+				},
+			})
+			require.NoError(t, err)
+
+			materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+			require.NoError(t, err)
+			publication := findYAMLNode(t, materialized, "publish-merge-confidence")
+			assert.Equal(t, provider+".updatePullRequestBodySection", publication.Component)
+			assert.Equal(t, &yaml.IntegrationRef{ID: provider + "-1", Name: "acme-" + provider}, publication.Integration)
+			_, _, err = materialized.Parse(r.Registry, orgID)
+			require.NoError(t, err)
+
+			reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			require.NotNil(t, reloaded.ColumnKey)
+			assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
 		})
-		require.NoError(t, err)
-
-		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
-		require.NoError(t, err)
-		_, _, err = materialized.Parse(r.Registry, orgID)
-		require.NoError(t, err)
-
-		reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
-		require.NoError(t, err)
-		require.NotNil(t, reloaded.ColumnKey)
-		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
-	})
+	}
 
 	t.Run("visual evidence install attaches Verify and keeps capture enabled", func(t *testing.T) {
 		factoryModel := newFactory(t)

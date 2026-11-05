@@ -172,6 +172,9 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 			t.Run(provider+"/"+templateID, func(t *testing.T) {
 				r, factory := resetTestFactory(t)
 				canvas := resetTestTemplate(t, r, factory, templateID, provider, func(doc *yaml.Canvas) {
+					if templateID == "risk-score" {
+						findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"] = false
+					}
 					trigger := findYAMLNode(t, doc, template.entrypointNodeID)
 					trigger.Configuration["onlyFactoryPullRequests"] = false
 					trigger.Configuration["ignoreDrafts"] = false
@@ -201,6 +204,12 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 				version := resetTestLiveVersion(t, canvas)
 				trigger := findIntakeNode(version.Nodes, template.entrypointNodeID)
 				require.NotNil(t, trigger)
+				if templateID == "risk-score" {
+					publication := findIntakeNode(version.Nodes, "publish-merge-confidence")
+					require.NotNil(t, publication)
+					assert.Equal(t, provider+".updatePullRequestBodySection", publication.ComponentName())
+					assert.Equal(t, false, publication.Configuration["enabled"])
+				}
 				assert.Equal(t, false, trigger.Configuration["onlyFactoryPullRequests"])
 				assert.Equal(t, false, trigger.Configuration["ignoreDrafts"])
 				action := "opened"
@@ -348,8 +357,10 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.DatadogTriggeredAlerts, settings.DatadogRetriggeredAlerts = false, true
 				settings.DatadogEnvironments = []string{"production"}
 			case models.FactoryIntakeSourceLinearIssues:
+				settings.LinearTeamID = "team-one"
 				settings.LinearProjectIDs = []string{"project-one"}
-				settings.LinearLabels = []string{}
+				settings.LinearIncludeNoProject = false
+				settings.LinearLabels = []string{"bug"}
 			}
 			binding := &intakeBinding{Configuration: map[string]any{"repository": "acme/app", "project": "APP"}}
 			if source == models.FactoryIntakeSourceGitHubIssues {
@@ -421,6 +432,9 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 			actual := intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 			assert.Equal(t, expected, serializeIntakeSettings(source, actual))
+			if source == models.FactoryIntakeSourceLinearIssues {
+				assertResetLinearIntakeScope(t, version)
+			}
 			if source == models.FactoryIntakeSourceSentryExceptions {
 				assert.Equal(t, r.User.String(), listed.Intakes[0].GetSettings().GetDefaultOwnerId())
 				create := findIntakeNode(version.Nodes, resolveIntakeGraph(source, spec).CreateNodeID)
@@ -731,6 +745,27 @@ func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {
 	}
 }
 
+// assertResetLinearIntakeScope checks that a reset keeps the saved Linear team,
+// project filter, and "no project" choice in the published trigger and filter.
+func assertResetLinearIntakeScope(t *testing.T, version *models.CanvasVersion) {
+	t.Helper()
+
+	trigger := findIntakeNode(version.Nodes, intakeTriggerNodeID)
+	require.NotNil(t, trigger)
+	assert.Equal(t, "team-one", trigger.Configuration["team"])
+	assert.Equal(t, []any{}, trigger.Configuration["projects"])
+	assert.Equal(t, []any{"project-one"}, trigger.Configuration["intakeProjects"])
+	assert.Equal(t, false, trigger.Configuration["includeIssuesWithoutProject"])
+
+	filter := findIntakeNode(version.Nodes, intakeFilterNodeID)
+	require.NotNil(t, filter)
+	expression, _ := filter.Configuration["expression"].(string)
+	inProject := linearIntakeEvent("create", map[string]any{"projectId": "project-one"}, nil)
+	withoutProject := linearIntakeEvent("create", nil, nil)
+	assert.True(t, evalLinearIntakeFilter(t, expression, inProject))
+	assert.False(t, evalLinearIntakeFilter(t, expression, withoutProject))
+}
+
 func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing.T) {
 	r, factory := resetTestFactory(t)
 	db := database.DB(t.Context())
@@ -780,4 +815,35 @@ func TestResetSubscriptionAgentsKeepSubscriptionWhenHostedModelsExist(t *testing
 	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 	require.NoError(t, err)
 	assert.Equal(t, defaultOwnerID, reloaded.OnboardingConfigValue().CodexDefaultOwnerID)
+}
+
+func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	var saved []*models.Canvas
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := resetTestTemplate(t, r, factory, "risk-score", provider, func(doc *yaml.Canvas) {
+			findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"] = false
+		})
+		saved = append(saved, canvas)
+	}
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	result, err := resetBuiltInAutomationForOrganizations(ctx, []models.Organization{*r.Organization}, "risk-score", testIntakeDependencies(r))
+	require.NoError(t, err)
+	require.Empty(t, result.Failed)
+	assert.Equal(t, 2, result.Reset)
+	for _, canvas := range saved {
+		version := resetTestLiveVersion(t, canvas)
+		assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
+		factory, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
+		require.NoError(t, err)
+		// The user-facing restore-defaults path supplies no saved settings.
+		restored, err := materializeNonIntakeFactoryAppDefaults(db, factory, canvas, version, nil)
+		require.NoError(t, err)
+		doc, err := yaml.CanvasFromYAML([]byte(restored.canvasYAML))
+		require.NoError(t, err)
+		assert.Equal(t, true, findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"])
+	}
 }

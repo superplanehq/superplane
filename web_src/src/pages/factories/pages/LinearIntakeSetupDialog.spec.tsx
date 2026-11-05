@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { LinearIntakeSetupDialog } from "./LinearIntakeSetupDialog";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
+import { selectLinearProject } from "./linearScopeFields.testHelpers";
 
 const mocks = vi.hoisted(() => ({
   createIntake: vi.fn(),
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     label: string;
     hostedAppInstall: boolean;
   },
+  resourceCalls: [] as Array<{ type: string; parameters?: Record<string, string> }>,
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -32,15 +34,26 @@ vi.mock("@/hooks/useIntegrations", () => ({
   }),
   useAvailableIntegrations: () => ({ data: [mocks.linearDefinition], isLoading: false }),
   useCreateIntegration: () => ({ mutateAsync: mocks.createIntegration, reset: vi.fn() }),
-  useIntegrationResources: () => ({
-    data: [
-      { id: "project-1", name: "Checkout" },
-      { id: "project-2", name: "Billing" },
-    ],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useIntegrationResources: (
+    _organizationId: string,
+    _integrationId: string,
+    type: string,
+    parameters?: Record<string, string>,
+  ) => {
+    mocks.resourceCalls.push({ type, parameters });
+    const resources: Record<string, Array<{ id: string; name: string }>> = {
+      team: [
+        { id: "team-1", name: "Platform (PLT)" },
+        { id: "team-2", name: "Growth (GRO)" },
+      ],
+      project: [
+        { id: "project-1", name: "Checkout" },
+        { id: "project-2", name: "Billing" },
+      ],
+      label: [{ id: "label-1", name: "bug" }],
+    };
+    return { data: resources[type] ?? [], isLoading: false, isError: false, refetch: vi.fn() };
+  },
 }));
 
 vi.mock("@/ui/IntegrationCreateDialog", () => ({
@@ -60,6 +73,7 @@ describe("LinearIntakeSetupDialog", () => {
   beforeEach(() => {
     mocks.createIntake.mockReset();
     mocks.createIntake.mockResolvedValue({ id: "intake-1" });
+    mocks.resourceCalls.length = 0;
     mocks.linearDefinition.hostedAppInstall = false;
     mocks.connected.splice(0, mocks.connected.length, {
       metadata: { id: "integration-1", name: "Acme Linear", integrationName: "linear" },
@@ -67,31 +81,24 @@ describe("LinearIntakeSetupDialog", () => {
     });
   });
 
-  it("opens the project step when a ready Linear connection already exists", async () => {
+  it("opens the team step when a ready Linear connection already exists", async () => {
     renderDialog();
 
-    expect(
-      await screen.findByRole("heading", { name: LINEAR_INTAKE_SETUP_COPY.wizardStepProject }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: LINEAR_INTAKE_SETUP_COPY.wizardStepTeam })).toBeInTheDocument();
     expect(screen.getByTestId("linear-skip-initial-import")).not.toBeChecked();
     expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.importExistingHelper)).toBeInTheDocument();
     expect(screen.getByTestId("linear-setup-finish")).toBeDisabled();
+    expect(screen.queryByText(LINEAR_INTAKE_SETUP_COPY.projectsLabel)).not.toBeInTheDocument();
   });
 
-  it("creates the intake for the selected projects and every label", async () => {
+  it("creates the intake for a team with no projects and every label", async () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();
     renderDialog(onCreated);
 
-    expect(
-      await screen.findByRole("heading", { name: LINEAR_INTAKE_SETUP_COPY.wizardStepProject }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(LINEAR_INTAKE_SETUP_COPY.labelsLabel)).not.toBeInTheDocument();
-    expect(screen.queryByText(LINEAR_INTAKE_SETUP_COPY.labelsHelper)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelNew })).not.toBeInTheDocument();
-
-    await user.click(screen.getByTestId("linear-project-project-1"));
-    await user.click(screen.getByTestId("linear-project-project-2"));
+    await user.click(await screen.findByTestId("linear-team-team-1"));
+    expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.projectsHelper)).toBeInTheDocument();
+    expect(screen.queryByTestId("linear-include-no-project")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("linear-setup-finish"));
 
     await waitFor(() => {
@@ -99,12 +106,67 @@ describe("LinearIntakeSetupDialog", () => {
         source: "SOURCE_LINEAR_ISSUES",
         integrationId: "integration-1",
         settings: {
-          linearProjectIds: ["project-1", "project-2"],
+          linearTeamId: "team-1",
+          linearProjectIds: [],
+          linearIncludeIssuesWithoutProject: true,
           linearLabels: [],
         },
       });
     });
     expect(onCreated).toHaveBeenCalled();
+  });
+
+  it("creates the intake with the projects and no-project choice of the team", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("linear-team-team-1"));
+    await selectLinearProject(user, "Checkout");
+    await selectLinearProject(user, "Billing");
+    expect(screen.getByTestId("linear-include-no-project")).toBeChecked();
+    await user.click(screen.getByTestId("linear-include-no-project"));
+    await user.click(screen.getByTestId("linear-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_LINEAR_ISSUES",
+        integrationId: "integration-1",
+        settings: {
+          linearTeamId: "team-1",
+          linearProjectIds: ["project-1", "project-2"],
+          linearIncludeIssuesWithoutProject: false,
+          linearLabels: [],
+        },
+      });
+    });
+  });
+
+  it("loads the projects of the selected team without a label filter", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("linear-team-team-2"));
+
+    expect(mocks.resourceCalls).toContainEqual({ type: "project", parameters: { team: "team-2" } });
+    expect(screen.queryByTestId("linear-intake-label-options")).not.toBeInTheDocument();
+  });
+
+  it("clears the projects when the user picks another team", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("linear-team-team-1"));
+    await selectLinearProject(user, "Checkout");
+    await user.click(screen.getByTestId("linear-team-team-2"));
+    await user.click(screen.getByTestId("linear-setup-finish"));
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({ linearTeamId: "team-2", linearProjectIds: [], linearLabels: [] }),
+        }),
+      );
+    });
   });
 
   it("shows only Connect Linear when the hosted application is available and no connection exists", async () => {
@@ -131,7 +193,7 @@ describe("LinearIntakeSetupDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.click(await screen.findByTestId("linear-project-project-1"));
+    await user.click(await screen.findByTestId("linear-team-team-1"));
     await user.click(screen.getByTestId("linear-skip-initial-import"));
     await user.click(screen.getByTestId("linear-setup-finish"));
 
@@ -139,7 +201,7 @@ describe("LinearIntakeSetupDialog", () => {
       expect(mocks.createIntake).toHaveBeenCalledWith(
         expect.objectContaining({
           skipInitialImport: true,
-          settings: { linearProjectIds: ["project-1"], linearLabels: [] },
+          settings: expect.objectContaining({ linearTeamId: "team-1" }),
         }),
       );
     });

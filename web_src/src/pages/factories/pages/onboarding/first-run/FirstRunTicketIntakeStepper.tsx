@@ -5,7 +5,8 @@ import { Switch } from "@/components/ui/switch";
 import type { ReactNode } from "react";
 
 import { JiraProjectStep } from "../../JiraIntakeSetupSteps";
-import { LinearProjectPicker } from "../../LinearProjectPicker";
+import { LinearIntakeScopeFields } from "../../LinearIntakeScopeFields";
+import type { LinearIntakeScope } from "../../linearIntakeScope";
 import { RepositoryPicker } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunStepper } from "./FirstRunStepper";
@@ -47,8 +48,9 @@ export function FirstRunTicketIntakeStepper({
   onSelectRepository,
   onSelectJiraProject,
   onRetryJiraProjects,
-  onToggleLinearProject,
-  onRetryLinearProjects,
+  organizationId,
+  linearIntegrationId,
+  onChangeLinearScope,
   onConfirmProjects,
 }: {
   source: FirstRunTicketSource;
@@ -70,8 +72,9 @@ export function FirstRunTicketIntakeStepper({
   onSelectRepository?: (repository: string) => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
-  onToggleLinearProject?: (id: string) => void;
-  onRetryLinearProjects?: () => void;
+  organizationId: string;
+  linearIntegrationId: string;
+  onChangeLinearScope?: (scope: LinearIntakeScope) => void;
   onConfirmProjects: () => void;
 }) {
   const current = currentTicketStep({ source, connected, projectsConfirmed, changingRepository });
@@ -122,12 +125,13 @@ export function FirstRunTicketIntakeStepper({
           onSelectRepository={onSelectRepository}
           onSelectJiraProject={onSelectJiraProject}
           onRetryJiraProjects={onRetryJiraProjects}
-          onToggleLinearProject={onToggleLinearProject}
-          onRetryLinearProjects={onRetryLinearProjects}
+          organizationId={organizationId}
+          linearIntegrationId={linearIntegrationId}
+          onChangeLinearScope={onChangeLinearScope}
         />
         <Button
           type="button"
-          className="w-full"
+          className="mt-3 w-full"
           disabled={saving || !ticketProjectChoiceComplete(source, projects, repository)}
           onClick={onConfirmProjects}
           data-testid="first-run-confirm-projects"
@@ -171,8 +175,9 @@ function TicketProjectFields({
   onSelectRepository,
   onSelectJiraProject,
   onRetryJiraProjects,
-  onToggleLinearProject,
-  onRetryLinearProjects,
+  organizationId,
+  linearIntegrationId,
+  onChangeLinearScope,
 }: {
   source: FirstRunTicketSource;
   saving: boolean;
@@ -182,8 +187,9 @@ function TicketProjectFields({
   onSelectRepository?: (repository: string) => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
-  onToggleLinearProject?: (id: string) => void;
-  onRetryLinearProjects?: () => void;
+  organizationId: string;
+  linearIntegrationId: string;
+  onChangeLinearScope?: (scope: LinearIntakeScope) => void;
 }) {
   if (source === "github-issues") {
     return (
@@ -215,14 +221,13 @@ function TicketProjectFields({
   }
   if (source === "linear") {
     return (
-      <fieldset disabled={saving} className="contents" data-testid="first-run-linear-projects">
-        <LinearProjectPicker
-          projects={projects.linearProjects}
-          selectedIds={projects.linearProjectIds}
-          loading={projects.linearProjectsLoading}
-          error={projects.linearProjectsError}
-          onToggle={(id) => onToggleLinearProject?.(id)}
-          onRetry={() => onRetryLinearProjects?.()}
+      <fieldset disabled={saving} className="contents" data-testid="first-run-linear-scope">
+        <LinearIntakeScopeFields
+          organizationId={organizationId}
+          integrationId={linearIntegrationId}
+          scope={projects.linearScope}
+          onChange={(scope) => onChangeLinearScope?.(scope)}
+          showLabels={false}
         />
       </fieldset>
     );

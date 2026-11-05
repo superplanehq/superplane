@@ -549,6 +549,7 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 		}),
 	}
 
+	exprOptions = append(exprOptions, exprruntime.MarkdownFunctionOptions()...)
 	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {
 		return "", err

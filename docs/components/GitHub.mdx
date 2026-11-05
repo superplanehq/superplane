@@ -56,6 +56,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
   <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
   <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a pull request's title, body, state, base branch, labels, or assignees in a GitHub repository" />
+  <LinkCard title="Update PR Body Section" href="#update-pr-body-section" description="Update one Markdown section in a GitHub pull request description" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
   <LinkCard title="Wait For Pull Request Checks" href="#wait-for-pull-request-checks" description="Wait until pull request checks on a commit become complete" />
 </CardGrid>
@@ -5299,6 +5300,39 @@ Returns the updated pull request object with all current information.
   },
   "timestamp": "2026-04-22T11:15:00.000000000Z",
   "type": "github.pullRequest"
+}
+```
+
+<a id="update-pr-body-section"></a>
+
+## Update PR Body Section
+
+**Component key:** `github.updatePullRequestBodySection`
+
+Update one marked section in a pull request description. Select the integration, repository, and pull request number.
+
+Use a stable section key with lowercase letters, numbers, and single hyphens. Start with a letter. The maximum length is 64 characters. Expressions are not supported in the section key.
+
+The section uses `<!-- superplane:KEY:start -->` and `<!-- superplane:KEY:end -->` markers. Missing sections are appended. Content outside the section is preserved byte for byte. Invalid markers and unchanged content are skipped.
+
+The body supports canvas expressions. Use `markdownText(value)` in Markdown tables and `markdownLink(url)` in link destinations. The resolved body is saved with the execution and reused on retries.
+
+Set **Expected Head SHA** to skip publication if the pull request commit changes. Closed pull requests are skipped. **Enabled** defaults to true.
+
+Temporary failures retry through scheduled requests. Each attempt reads the latest description. Provider calls run outside database transactions. Execution details show attempts and skipped outcomes.
+
+In factory apps, disabling the published node stops pending writes. Newer runs for the same pull request and section supersede older runs.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attempts": 1,
+    "status": "published"
+  },
+  "timestamp": "2026-11-03T12:00:00Z",
+  "type": "pullRequest.bodySectionUpdated"
 }
 ```
 

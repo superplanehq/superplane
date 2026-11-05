@@ -3,9 +3,11 @@ package factories
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -13,6 +15,36 @@ import (
 )
 
 var errFactoryGitHubNotConnected = errors.New("github is not connected")
+
+// errFactoryVCSSetupFailed marks a configured VCS connection that SuperPlane
+// could not load, for example after a database or credential read failure.
+// These errors also match the provider "not connected" error, so request
+// handlers keep their current response. Background publishers retry them.
+var errFactoryVCSSetupFailed = errors.New("could not load the VCS connection")
+
+func factoryVCSSetupError(notConnected, err error) error {
+	return fmt.Errorf("%w: %w: %w", notConnected, errFactoryVCSSetupFailed, err)
+}
+
+// findFactoryVCSIntegration returns notConnected when the workspace has no
+// ready VCS integration. Other lookup failures are setup failures.
+func findFactoryVCSIntegration(db *gorm.DB, factory *models.Factory, appName string, notConnected error) (*models.Integration, error) {
+	id, err := uuid.Parse(strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID))
+	if err != nil {
+		return nil, notConnected
+	}
+	integration, err := models.FindIntegrationInTransaction(db, factory.OrganizationID, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, notConnected
+	}
+	if err != nil {
+		return nil, factoryVCSSetupError(notConnected, err)
+	}
+	if integration.State != models.IntegrationStateReady || integration.AppName != appName {
+		return nil, notConnected
+	}
+	return integration, nil
+}
 
 type factoryGitHubAPI interface {
 	GetPullRequest(ctx context.Context, repository string, pullNumber int) (*github.PullRequest, *github.Response, error)
@@ -35,17 +67,9 @@ func githubIntegrationClient(db *gorm.DB, deps IntakeDependencies, factory *mode
 		return nil, errFactoryGitHubNotConnected
 	}
 
-	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
-	if integrationID == "" {
-		return nil, errFactoryGitHubNotConnected
-	}
-
-	integration, err := findReadyOnboardingIntegration(db, factory.OrganizationID, integrationID)
+	integration, err := findFactoryVCSIntegration(db, factory, models.ProviderGitHub, errFactoryGitHubNotConnected)
 	if err != nil {
-		return nil, errFactoryGitHubNotConnected
-	}
-	if integration.AppName != "github" {
-		return nil, errFactoryGitHubNotConnected
+		return nil, err
 	}
 
 	client, err := common.NewClient(
@@ -53,7 +77,7 @@ func githubIntegrationClient(db *gorm.DB, deps IntakeDependencies, factory *mode
 		deps.Registry.HTTPContextInTransaction(db),
 	)
 	if err != nil {
-		return nil, errFactoryGitHubNotConnected
+		return nil, factoryVCSSetupError(errFactoryGitHubNotConnected, err)
 	}
 	return client, nil
 }

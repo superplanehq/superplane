@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../../linearIntakeScope";
 import {
   canAnalyzeTicketSource,
   issuesChoiceForTicketSource,
@@ -83,11 +84,22 @@ describe("firstRunTicketSource", () => {
     expect(canAnalyzeTicketSource({ ticketSource: "jira", jiraConnected: true, jiraProjectId: "PAY" })).toBe(true);
   });
 
-  it("allows analysis for Linear only after a connection and a project", () => {
+  it("allows analysis for Linear only after a connection and a team", () => {
     expect(canAnalyzeTicketSource({ ticketSource: "linear" })).toBe(false);
     expect(canAnalyzeTicketSource({ ticketSource: "linear", linearConnected: true })).toBe(false);
     expect(
-      canAnalyzeTicketSource({ ticketSource: "linear", linearConnected: true, linearProjectIds: ["project-1"] }),
+      canAnalyzeTicketSource({
+        ticketSource: "linear",
+        linearConnected: true,
+        linearScope: { ...EMPTY_LINEAR_INTAKE_SCOPE, projectIds: ["project-1"] },
+      }),
+    ).toBe(false);
+    expect(
+      canAnalyzeTicketSource({
+        ticketSource: "linear",
+        linearConnected: true,
+        linearScope: { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" },
+      }),
     ).toBe(true);
   });
 });

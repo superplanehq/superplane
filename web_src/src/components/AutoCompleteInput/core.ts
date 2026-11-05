@@ -494,6 +494,18 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
     example: "fromJSON('{\"a\":1}') == {a: 1}",
   },
   {
+    name: "markdownText",
+    snippet: "markdownText(${1:text})",
+    description: "Escapes text for Markdown, including table cells. Replaces line breaks with spaces.",
+    example: 'markdownText("a|b") == "a&#124;b"',
+  },
+  {
+    name: "markdownLink",
+    snippet: "markdownLink(${1:url})",
+    description: "Escapes a URL for a Markdown link destination enclosed in angle brackets.",
+    example: 'markdownLink("https://example.com/a b") == "https://example.com/a%20b"',
+  },
+  {
     name: "toBase64",
     snippet: "toBase64(${1:v})",
     description: "Encodes the string into Base64 format.",
