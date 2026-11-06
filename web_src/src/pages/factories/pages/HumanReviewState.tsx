@@ -1,5 +1,7 @@
 import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Link } from "@/components/Link/link";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryAppRunPath } from "../lib/factoryPagePaths";
@@ -12,13 +14,10 @@ export function HumanReviewState({ pullRequest }: { pullRequest: FactoriesFactor
   if (!review) return null;
   if (reviewTargetsPreviousRevision(pullRequest))
     return (
-      <section
-        aria-label="Human review"
-        className="space-y-2 rounded-lg border border-border bg-background/60 p-3 text-sm"
-      >
-        <h4 className="font-medium">Human review: Waiting for merge confidence</h4>
-        <p className="text-muted-foreground">
-          The pull request changed. The new commit needs an assessment and review decision.
+      <section aria-label="Human review">
+        <h4 className="text-[14px] font-semibold leading-5">Human review</h4>
+        <p role="status" className="text-[12px] leading-4 text-muted-foreground">
+          Waiting for merge confidence
         </p>
       </section>
     );
@@ -29,19 +28,61 @@ export function HumanReviewState({ pullRequest }: { pullRequest: FactoriesFactor
     layout && sourceRun?.canvasId && sourceRun.id
       ? factoryAppRunPath(layout.organizationId, layout.routeSegment, sourceRun.canvasId, sourceRun.id)
       : undefined;
+  return <HumanReviewDecision review={review} assessmentHref={assessmentHref} />;
+}
+
+function HumanReviewDecision({ review, assessmentHref }: { review: ReviewState; assessmentHref?: string }) {
+  const summary = (
+    <span className="min-w-0 flex-1">
+      <span className="block text-[14px] font-semibold leading-5 text-foreground">Human review</span>
+      <span className="block text-[12px] font-normal leading-4 text-muted-foreground">
+        {decisionLabel(review)}
+        {review.selectedReviewers?.length ? (
+          <> · {review.selectedReviewers.map((reviewer) => `@${reviewer.login}`).join(", ")}</>
+        ) : null}
+      </span>
+    </span>
+  );
 
   return (
-    <section
-      aria-label="Human review"
-      className="space-y-2 rounded-lg border border-border bg-background/60 p-3 text-sm"
-    >
-      <h4 className="font-medium">Human review: {decisionLabel(review)}</h4>
-      {review.rationale ? <p className="text-muted-foreground">{review.rationale}</p> : null}
-      {review.blockingReason ? <p role="status">{review.blockingReason}</p> : null}
-      <SelectedReviewers reviewers={review.selectedReviewers} />
-      {review.publicationError ? <p role="alert">The GitHub check could not update. SuperPlane will retry.</p> : null}
-      <ReviewEvidenceLinks assessmentHref={assessmentHref} checkUrl={review.checkUrl} />
-    </section>
+    <Collapsible asChild>
+      <section aria-label="Human review">
+        <h4>
+          {hasReviewDetails(review, assessmentHref) ? (
+            <CollapsibleTrigger className="group flex w-full items-center gap-2.5 text-left">
+              {summary}
+              <ChevronDown
+                className="size-4 shrink-0 -rotate-90 text-muted-foreground transition-transform group-data-[state=open]:rotate-0"
+                aria-hidden
+              />
+            </CollapsibleTrigger>
+          ) : (
+            summary
+          )}
+        </h4>
+        {review.publicationError ? (
+          <p role="alert" className="mt-2 text-[12px] leading-4">
+            GitHub check update failed. SuperPlane will retry.
+          </p>
+        ) : null}
+        <CollapsibleContent className="mt-2 space-y-2 border-t border-border/70 pt-2 text-[12px] leading-5">
+          {review.blockingReason ? <p role="status">{review.blockingReason}</p> : null}
+          {review.rationale ? <p className="text-muted-foreground">{review.rationale}</p> : null}
+          <SelectedReviewers reviewers={review.selectedReviewers} />
+          <ReviewEvidenceLinks assessmentHref={assessmentHref} checkUrl={review.checkUrl} />
+        </CollapsibleContent>
+      </section>
+    </Collapsible>
+  );
+}
+
+function hasReviewDetails(review: ReviewState, assessmentHref?: string): boolean {
+  return Boolean(
+    review.rationale ||
+      review.blockingReason ||
+      review.selectedReviewers?.some((reviewer) => reviewer.reason) ||
+      assessmentHref ||
+      review.checkUrl,
   );
 }
 
@@ -95,10 +136,10 @@ function decisionLabel(review: ReviewState): string {
     case "disabled":
       return "Disabled";
     case "superseded":
-      return "Superseded by a newer decision";
+      return "Superseded";
     case "decided":
       if (review.blockingReason) return "Blocked";
-      if (!review.reviewRequired) return "Approval is not required";
+      if (!review.reviewRequired) return "Not required";
       return review.approvalIds?.length ? "Approved" : "Approval required";
     default:
       return "Waiting for evaluation";
