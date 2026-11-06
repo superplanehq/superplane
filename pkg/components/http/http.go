@@ -171,6 +171,9 @@ The component emits the response with:
 - **status**: HTTP status code
 - **headers**: Response headers
 - **body**: Parsed response body (JSON if possible, otherwise string)
+
+If the response exceeds the event size limit, the component emits a failure event with the status and error.
+The body and headers are omitted.
 `
 }
 
@@ -854,7 +857,7 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 	}
 
 	if e.isSuccessfulResponse(response.StatusCode, spec.GetSuccessCodes()) {
-		return ctx.ExecutionState.Emit(
+		err := ctx.ExecutionState.Emit(
 			SuccessOutputChannel,
 			"http.request.finished",
 			[]any{map[string]any{
@@ -863,9 +866,10 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 				"body":    bodyData,
 			}},
 		)
+		return handleResponseEmitError(ctx.ExecutionState, response.StatusCode, err)
 	}
 
-	return ctx.ExecutionState.Emit(
+	err = ctx.ExecutionState.Emit(
 		FailureOutputChannel,
 		"http.request.failed",
 		[]any{map[string]any{
@@ -874,6 +878,7 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 			"body":    bodyData,
 		}},
 	)
+	return handleResponseEmitError(ctx.ExecutionState, response.StatusCode, err)
 }
 
 func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, httpCtx core.HTTPContext, spec Spec) (*http.Response, error) {
@@ -993,11 +998,12 @@ func (e *HTTP) handleRequestFailure(metadataCtx core.MetadataWriter, executionSt
 		errorResponse["error"] = reqErr.Error()
 	}
 
-	return executionStateCtx.Emit(
+	err := executionStateCtx.Emit(
 		FailureOutputChannel,
 		"http.request.failure",
 		[]any{errorResponse},
 	)
+	return handleResponseEmitError(executionStateCtx, resp.StatusCode, err)
 }
 
 func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCtx core.ExecutionStateContext, resp *http.Response, spec Spec) error {
@@ -1023,7 +1029,7 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 	}
 
 	if e.isSuccessfulResponse(resp.StatusCode, spec.GetSuccessCodes()) {
-		return executionStateCtx.Emit(
+		err := executionStateCtx.Emit(
 			SuccessOutputChannel,
 			"http.request.finished",
 			[]any{map[string]any{
@@ -1032,9 +1038,10 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 				"body":    bodyData,
 			}},
 		)
+		return handleResponseEmitError(executionStateCtx, resp.StatusCode, err)
 	}
 
-	return executionStateCtx.Emit(
+	err = executionStateCtx.Emit(
 		FailureOutputChannel,
 		"http.request.failed",
 		[]any{map[string]any{
@@ -1043,6 +1050,18 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 			"body":    bodyData,
 		}},
 	)
+	return handleResponseEmitError(executionStateCtx, resp.StatusCode, err)
+}
+
+func handleResponseEmitError(state core.ExecutionStateContext, status int, err error) error {
+	if !errors.Is(err, core.ErrEventPayloadTooLarge) {
+		return err
+	}
+
+	return state.Emit(FailureOutputChannel, "http.request.failed", []any{map[string]any{
+		"status": status,
+		"error":  fmt.Sprintf("response omitted: %v", err),
+	}})
 }
 
 func (e *HTTP) isSuccessfulResponse(statusCode int, successCodes string) bool {
