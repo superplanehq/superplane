@@ -395,6 +395,9 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 					}
 				}
 			}
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				useUnconditionalSentryRequests(doc)
+			}
 			canvas := support.CreateFactoryCanvas(t, r, factory.ID, source)
 			resetTestPublishCanvas(t, r, canvas, doc)
 			intake, err := factory.CreateIntake(database.DB(t.Context()), canvas.ID, source)
@@ -409,6 +412,10 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			})
 			require.NoError(t, err)
 			assert.Equal(t, tc.paused, updated.Intake.GetPaused())
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				version := resetTestLiveVersion(t, canvas)
+				assert.Nil(t, findIntakeNode(version.Nodes, intakeSentryEventHasStackNodeID), "settings updates preserve saved workflows")
+			}
 			expected := updated.Intake.Settings
 			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceJiraIssues {
 				// The editor action historically retains filters, but restores
@@ -454,12 +461,31 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				require.NotNil(t, trigger)
 				require.NotNil(t, trigger.IntegrationID)
 				assert.Equal(t, sentryIntegrationID, *trigger.IntegrationID)
-				enrich := findIntakeNode(version.Nodes, intakeEnrichIssueNodeID)
-				require.NotNil(t, enrich)
-				require.NotNil(t, enrich.IntegrationID)
-				assert.Equal(t, sentryIntegrationID, *enrich.IntegrationID)
-				assert.True(t, hasCanvasPath(spec.Edges, intakeFilterNodeID, enrich.ID))
-				assert.True(t, hasCanvasPath(spec.Edges, enrich.ID, create.ID))
+				integration, err := models.FindIntegrationInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(sentryIntegrationID))
+				require.NoError(t, err)
+				gate := findIntakeNode(version.Nodes, intakeSentryEventHasStackNodeID)
+				require.NotNil(t, gate)
+				assert.Equal(t, intakeFilterComponent, gate.ComponentName())
+				assert.Equal(t, `sentryEventHasStack($["Get Sentry Event"].data?.body)`, gate.Configuration["expression"])
+				for _, edge := range []models.Edge{
+					{SourceID: intakeSentryEventRequestNodeID, TargetID: gate.ID, Channel: "success"},
+					{SourceID: intakeSentryEventRequestNodeID, TargetID: gate.ID, Channel: "failure"},
+					{SourceID: gate.ID, TargetID: create.ID, Channel: "true"},
+					{SourceID: gate.ID, TargetID: intakeSentryRecommendedEventRequestNodeID, Channel: "false"},
+				} {
+					assert.Contains(t, spec.Edges, edge)
+				}
+				previous := intakeFilterNodeID
+				for _, id := range []string{intakeSentryIssueRequestNodeID, intakeSentryEventRequestNodeID, intakeSentryRecommendedEventRequestNodeID} {
+					request := findIntakeNode(version.Nodes, id)
+					require.NotNil(t, request)
+					assert.Equal(t, true, request.Configuration["redactSensitiveHeaders"])
+					authorization := request.Configuration["authorization"].(map[string]any)
+					assert.Equal(t, map[string]any{"name": integration.InstallationName}, authorization["integration"])
+					assert.True(t, hasCanvasPath(spec.Edges, previous, request.ID))
+					previous = request.ID
+				}
+				assert.True(t, hasCanvasPath(spec.Edges, previous, create.ID))
 			}
 			if tc.restrictAuthors {
 				require.NotNil(t, findIntakeNode(version.Nodes, intakeAuthorPermissionNodeID))
