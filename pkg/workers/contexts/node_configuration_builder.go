@@ -2481,7 +2481,8 @@ func (b *NodeConfigurationBuilder) applyExecutionModelPolicy(resolved map[string
 			return nil, err
 		}
 		model, _ := resolved["model"].(string)
-		model, err = models.ResolveFactoryCodexSubscriptionModel(b.tx, canvas.OrganizationID, *canvas.FactoryID, ownerID, model)
+		thinking, _ := resolved[runner.ThinkingLevelKey].(string)
+		model, err = models.ResolveFactoryCodexSubscriptionModel(b.tx, canvas.OrganizationID, *canvas.FactoryID, ownerID, model, thinking)
 		if err != nil {
 			return nil, err
 		}
