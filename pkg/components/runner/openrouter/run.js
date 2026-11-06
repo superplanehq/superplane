@@ -320,6 +320,84 @@ function isRetryableKind(kind) {
   return kind === "rate_limit" || kind === "retryable";
 }
 
+function attemptOutcome(attempt) {
+  const n = Math.min(MAX_ATTEMPTS, Math.max(1, Math.floor(Number(attempt) || 1)));
+  return `attempt_${n}`;
+}
+
+function occurredAtStamp(value) {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0) {
+    const date = n < 1e12 ? new Date(n * 1000) : new Date(n);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  }
+  return new Date().toISOString();
+}
+
+function publishHostedModelCallOutcomes(rows) {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const candidates = [
+    path.join(taskDir, "llm_usage.js"),
+    path.join(__dirname, "..", "llm_usage.js"),
+  ];
+  for (const file of candidates) {
+    if (!file || !fs.existsSync(file)) {
+      continue;
+    }
+    try {
+      const usage = require(file);
+      if (typeof usage.publishModelCallOutcomes === "function") {
+        usage.publishModelCallOutcomes("openrouter", rows);
+      }
+      return;
+    } catch (_err) {
+      return;
+    }
+  }
+}
+
+function appendModelCallOutcomes(outcomes, model, outcome, count, occurredAt) {
+  const id = catalogModelId(model);
+  const n = Math.max(0, Number(count) || 0);
+  if (!id || !outcome || n < 1) {
+    return;
+  }
+  const stamp = occurredAtStamp(occurredAt);
+  const added = [];
+  for (let i = 0; i < n; i += 1) {
+    const row = { model: id, outcome, occurredAt: stamp };
+    outcomes.push(row);
+    added.push(row);
+  }
+  publishHostedModelCallOutcomes(added);
+}
+
+function appendSpawnRoundtripOutcomes(outcomes, model, attempt, count, times) {
+  const id = catalogModelId(model);
+  const n = Math.max(0, Number(count) || 0);
+  if (!id || n < 1) {
+    return;
+  }
+  const stamps = Array.isArray(times) ? times : [];
+  const added = [];
+  for (let i = 0; i < n; i += 1) {
+    const callAttempt = Number(attempt) > 1 && i === 0 ? attempt : 1;
+    const row = {
+      model: id,
+      outcome: attemptOutcome(callAttempt),
+      occurredAt: occurredAtStamp(stamps[i]),
+    };
+    outcomes.push(row);
+    added.push(row);
+  }
+  publishHostedModelCallOutcomes(added);
+}
+
 function uniqueCatalogModels(ids) {
   const seen = new Set();
   const out = [];
@@ -834,6 +912,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let lastErrorText = "";
   let attempt = 1;
   let pendingSuccessfulRoundtrips = 0;
+  const modelCallOutcomes = [];
 
   while (true) {
     printLiveLogLine(callingOpenCodeLine(currentModel, attempt, env));
@@ -869,7 +948,15 @@ async function runPrompt(promptFile, model, helpers = {}) {
     }
     lastErrorText = spawnResult.errorText || "";
     const spawnFailed = spawnTurnFailed(spawnResult, formatter, planning);
-    pendingSuccessfulRoundtrips += Number(spawnResult.successfulRoundtrips) || 0;
+    const successfulRoundtrips = Number(spawnResult.successfulRoundtrips) || 0;
+    appendSpawnRoundtripOutcomes(
+      modelCallOutcomes,
+      currentModel,
+      attempt,
+      successfulRoundtrips,
+      spawnResult.successfulRoundtripTimes,
+    );
+    pendingSuccessfulRoundtrips += successfulRoundtrips;
     const resetHappened =
       pendingSuccessfulRoundtrips >= SUCCESSFUL_ROUNDTRIPS_TO_RESET;
     if (resetHappened) {
@@ -896,6 +983,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (attempt >= MAX_ATTEMPTS) {
       failed = true;
       exitCode = failedExit;
+      appendModelCallOutcomes(modelCallOutcomes, currentModel, "error", 1);
       printRetryOutcome(
         lastErrorText,
         stoppedAfterAttemptsLine(classKind, currentModel),
@@ -907,6 +995,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (remaining < waitMs || remaining <= 0) {
       failed = true;
       exitCode = 1;
+      appendModelCallOutcomes(modelCallOutcomes, currentModel, "error", 1);
       printRetryOutcome(lastErrorText, waitExceededTimeoutLine(classKind));
       break;
     }
@@ -949,6 +1038,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
     model: catalogModelId(currentModel) || catalogModelId(model),
     usage,
   };
+  if (modelCallOutcomes.length > 0) {
+    payload.modelCallOutcomes = modelCallOutcomes;
+  }
   if (lastCost) {
     payload.total_cost_usd = lastCost;
   }
@@ -1128,6 +1220,9 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
     lastEvent: snapshot.lastEvent,
     roundOpen: Boolean(snapshot.roundOpen),
     successfulRoundtrips: Number(snapshot.successfulRoundtrips) || 0,
+    successfulRoundtripTimes: Array.isArray(snapshot.successfulRoundtripTimes)
+      ? snapshot.successfulRoundtripTimes
+      : [],
   };
 }
 
@@ -1762,6 +1857,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
   let roundOpen = false;
   let announcedStart = false;
   let successfulRoundtrips = 0;
+  let successfulRoundtripTimes = [];
 
   function rememberSession(event) {
     const id = String(
@@ -1794,6 +1890,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
       roundOpen = false;
       sessionID = "";
       successfulRoundtrips = 0;
+      successfulRoundtripTimes = [];
     },
     handleLine(raw) {
       const line = String(raw || "").trim();
@@ -1890,6 +1987,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
           }
           if (isSuccessfulRoundtrip(part)) {
             successfulRoundtrips += 1;
+            successfulRoundtripTimes.push(new Date().toISOString());
           }
           roundOpen = false;
           break;
@@ -1924,6 +2022,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
         lastEvent,
         roundOpen,
         successfulRoundtrips,
+        successfulRoundtripTimes,
       };
     },
     lastText() {
@@ -2251,6 +2350,9 @@ module.exports = {
   thinkingArgs,
   planningEnabled,
   classifyOpenRouterError,
+  attemptOutcome,
+  appendModelCallOutcomes,
+  appendSpawnRoundtripOutcomes,
   openRouterModelId,
   buildOpenCodeConfig,
   retryWaitMs,

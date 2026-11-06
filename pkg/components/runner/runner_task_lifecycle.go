@@ -87,6 +87,7 @@ func processTaskStatus(
 	// Record final usage even if the node finished before the runner task.
 	RecordRunnerLLMUsage(usage, logger, finishedEventType, configuration, task.Result)
 	RecordRunnerComputeUsage(usage, logger, state, configuration, task)
+	RecordRunnerModelCallOutcomes(logger, task.ID, finishedEventType, configuration, task.Result)
 
 	if state.IsFinished() {
 		return nil

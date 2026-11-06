@@ -24,6 +24,7 @@ func TestInjectHostedCredentialsStripsExistingBaseURL(t *testing.T) {
 	require.Equal(t, []TaskEnvironmentVariable{
 		{Name: "KEEP", Value: "1"},
 		{Name: "ANTHROPIC_API_KEY", Value: "sk-hosted"},
+		{Name: EnvHostedModelStatus, Value: HostedModelStatusEnabled},
 	}, got)
 
 	got = InjectHostedCredentials(environment, "ANTHROPIC_API_KEY", "sk-hosted", "ANTHROPIC_BASE_URL", "https://api.anthropic.com")
@@ -31,6 +32,7 @@ func TestInjectHostedCredentialsStripsExistingBaseURL(t *testing.T) {
 		{Name: "KEEP", Value: "1"},
 		{Name: "ANTHROPIC_API_KEY", Value: "sk-hosted"},
 		{Name: "ANTHROPIC_BASE_URL", Value: "https://api.anthropic.com"},
+		{Name: EnvHostedModelStatus, Value: HostedModelStatusEnabled},
 	}, got)
 }
 
