@@ -126,9 +126,12 @@ func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 	t.Run("thinking follows the final model catalog", func(t *testing.T) {
 		for _, tc := range []struct {
 			name, model, saved, override, want string
+			savedModel                         string
 			wantErr                            bool
 		}{
 			{name: "dispatch override", model: "gpt-5.4", saved: "low", override: "ultra", want: "ultra"},
+			{name: "expression supports dispatch effort", savedModel: "{{ 'gpt-5.4' }}", override: "ultra", want: "ultra"},
+			{name: "expression rejects unsupported dispatch effort", savedModel: "{{ 'gpt-5-codex' }}", override: "ultra", wantErr: true},
 			{name: "saved catalog effort", model: "gpt-5.4", saved: "future-effort", want: "future-effort"},
 			{name: "unsupported saved effort", model: "gpt-5.4", saved: "high", wantErr: true},
 			{name: "unsupported dispatch effort", model: "gpt-5-codex", override: "ultra", wantErr: true},
@@ -138,8 +141,12 @@ func TestBuildLineDispatchSubscriptionModel(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				require.NoError(t, db.Model(dispatch).Updates(map[string]any{"model": tc.model, "thinking_level": tc.override}).Error)
+				model := tc.model
+				if tc.savedModel != "" {
+					model = tc.savedModel
+				}
 				resolved, err := NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID("agent").WithRootEvent(&rootEvent.ID).Build(map[string]any{
-					"model": tc.model, "thinkingLevel": tc.saved, "credentials": map[string]any{"source": "subscription"},
+					"model": model, "thinkingLevel": tc.saved, "credentials": map[string]any{"source": "subscription"},
 				})
 				if tc.wantErr {
 					require.ErrorContains(t, err, "thinking level")
