@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -213,15 +214,6 @@ func dispatchWorkOrderOnLineTx(
 	}
 
 	model = strings.TrimSpace(model)
-	if model != "" {
-		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name, subscriptionOrderOwnerID(tx, order))
-		if err != nil {
-			return nil, err
-		}
-		if !slices.Contains(allowed, model) {
-			return nil, invalidArgument("model is not available on this line")
-		}
-	}
 	normalizedThinking, err := runner.NormalizeDispatchThinkingLevel(thinkingLevel)
 	if err != nil {
 		return nil, invalidArgument(err.Error())
@@ -295,10 +287,8 @@ func dispatchWorkOrderOnLineTx(
 	}, nil
 }
 
-// validateLineDispatchModel checks the Start model and thinking overrides.
-// A selected model must be available on the line and must support the
-// thinking level. The thinking level also reaches the runners that keep
-// their own model, so the CLI of every runner on the line must accept it.
+// validateLineDispatchModel checks overrides and each agent's effective model
+// and effort before Start, including settings inherited from the agent.
 func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string, ownerID uuid.UUID) error {
 	if model == "" {
 		return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking, ownerID)
@@ -317,14 +307,10 @@ func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *mo
 	return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking, ownerID)
 }
 
-// validateDispatchThinkingForRunners checks the thinking level against the CLI
-// that each runner on the line uses for this dispatch. A SuperPlane agent that
-// accepts the selected model runs the CLI of that model provider. Other agents
-// keep their own CLI.
+// validateDispatchThinkingForRunners checks inherited and explicit efforts
+// against the model each agent will run, including agents that retain a model.
 func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string, ownerID uuid.UUID) error {
-	if !dispatchThinkingOverridesLevel(thinking) {
-		return nil
-	}
+	var catalog *llmcatalog.ThinkingCatalog
 	for _, step := range line.Steps {
 		if step.AppID == uuid.Nil {
 			continue
@@ -334,11 +320,30 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 			return err
 		}
 		for _, node := range version.Nodes {
-			levels, isRunner, err := runnerCLIThinkingLevels(tx, orgID, factoryID, node, model, ownerID)
+			_, isRunner := runnerNodeProvider(node)
+			if !isRunner && node.ComponentName() != models.SuperPlaneRunnerComponent {
+				continue
+			}
+			savedThinking, _ := node.Configuration[runner.ThinkingLevelKey].(string)
+			effectiveThinking, _ := runner.OverlayThinkingLevel(savedThinking, thinking)
+			effectiveThinking, err = runner.NormalizeCatalogThinkingLevel(effectiveThinking)
+			if err != nil {
+				return invalidArgument(err.Error())
+			}
+			if effectiveThinking == "" {
+				continue
+			}
+			if catalog == nil {
+				catalog, err = llmcatalog.LoadThinkingCatalog(tx)
+				if err != nil {
+					return err
+				}
+			}
+			levels, err := dispatchRunnerThinkingLevels(tx, orgID, factoryID, node, model, ownerID, catalog)
 			if err != nil {
 				return err
 			}
-			if isRunner && !slices.Contains(levels, thinking) {
+			if !slices.Contains(levels, effectiveThinking) {
 				return invalidArgument("thinking level is not available for every agent on this line")
 			}
 		}
@@ -450,97 +455,71 @@ func resolvedWorkOrderDefaultBranch(order *models.FactoryWorkOrder, config model
 	return strings.TrimSpace(config.DefaultBranch)
 }
 
-func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {
-	if level != runner.ThinkingLevelMinimal && level != runner.ThinkingLevelXHigh {
-		return nil
-	}
-	for _, step := range line.Steps {
-		if step.AppID == uuid.Nil {
-			continue
-		}
-		version, err := models.FindLiveCanvasVersionInTransaction(tx, step.AppID)
-		if err != nil {
-			return err
-		}
-		for _, node := range version.Nodes {
-			component := node.ComponentName()
-			_, isRunner := runnerComponentProvider(component)
-			if component != runnerCodex && (isRunner || component == models.SuperPlaneRunnerComponent) {
-				return invalidArgument("minimal and xhigh thinking levels require a line with only Codex runners")
-			}
-		}
-	}
-	return nil
-}
-
 // dispatchThinkingOverridesLevel reports whether a Start thinking value sets
 // a level. Empty keeps the agent level and default uses the runner default.
 func dispatchThinkingOverridesLevel(thinking string) bool {
 	return thinking != "" && thinking != runner.DispatchThinkingDefault
 }
 
-// runnerCLIThinkingLevels returns the thinking levels that the CLI of a
-// runner node accepts for a dispatch with the selected model. A SuperPlane
-// agent runs the CLI of the provider of its model. That model is the selected
-// model when the agent accepts it, and the saved model otherwise. An agent
-// without a known provider accepts only the levels that every CLI accepts.
-func runnerCLIThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, model string, ownerID uuid.UUID) ([]string, bool, error) {
-	switch node.ComponentName() {
-	case runnerClaudeCode:
-		return runner.ClaudeCodeThinkingLevels, true, nil
-	case runnerCodex:
-		credentials, _ := node.Configuration["credentials"].(map[string]any)
-		if credentials["source"] == "subscription" {
-			catalog, err := models.FactoryCodexSubscriptionCatalog(tx, orgID, factoryID, ownerID)
-			if err != nil {
-				return nil, true, err
-			}
-			if model == "" {
-				model = storedRunnerModel(node.Configuration)
-			}
-			model, err = models.ResolveFactoryCodexSubscriptionModel(tx, orgID, factoryID, ownerID, model, "")
-			if err != nil {
-				return nil, true, err
-			}
-			return codexSubscriptionThinkingLevels(catalog)(model), true, nil
-		}
-		return runner.CodexThinkingLevels, true, nil
-	case runnerOpenRouter:
-		return runner.OpenCodeThinkingLevels, true, nil
-	case models.SuperPlaneRunnerComponent:
-		provider, err := superPlaneRunnerDispatchProvider(tx, orgID, factoryID, node, model)
+// dispatchRunnerThinkingLevels uses the same model acceptance and default
+// rules as execution, then reads that model's capabilities instead of CLI limits.
+func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, selected string, ownerID uuid.UUID, catalog *llmcatalog.ThinkingCatalog) ([]string, error) {
+	model := storedRunnerModel(node.Configuration)
+	if selected != "" {
+		accepted, err := models.RunnerAcceptsModel(tx, orgID, &factoryID, node.ComponentName(), node.Configuration, selected, ownerID)
 		if err != nil {
-			return nil, true, err
-		}
-		if provider == "" {
-			return runner.CommonThinkingLevels(), true, nil
-		}
-		return runner.ProviderCLIThinkingLevels(provider), true, nil
-	default:
-		return nil, false, nil
-	}
-}
-
-// superPlaneRunnerDispatchProvider returns the provider of the model that a
-// SuperPlane agent runs in a dispatch, or an empty string when it is unknown.
-func superPlaneRunnerDispatchProvider(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, model string) (string, error) {
-	if model != "" {
-		accepted, err := models.RunnerAcceptsModel(tx, orgID, &factoryID, node.ComponentName(), node.Configuration, model)
-		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if accepted {
-			parsed, err := models.ParseHostedLLMModelKey(model)
-			if err == nil && parsed.IsSet() {
-				return parsed.Provider, nil
-			}
+			model = selected
 		}
 	}
-	parsed, err := models.ParseSelectableLLMModelKey(storedRunnerModel(node.Configuration))
-	if err != nil {
-		return "", nil
+	credentials, _ := node.Configuration["credentials"].(map[string]any)
+	if node.ComponentName() == runnerCodex && credentials["source"] == "subscription" {
+		resolved, err := models.ResolveFactoryCodexSubscriptionModel(tx, orgID, factoryID, ownerID, model, "")
+		if err != nil {
+			return nil, err
+		}
+		levels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, catalog, ownerID)
+		if err != nil {
+			return nil, err
+		}
+		return levels(resolved), nil
 	}
-	return parsed.Provider.ID, nil
+	if node.ComponentName() == models.SuperPlaneRunnerComponent {
+		resolved, err := dispatchSuperPlaneModel(tx, orgID, factoryID, node, model)
+		if err != nil {
+			return nil, err
+		}
+		return catalog.ThinkingLevels(resolved.Provider, resolved.Model, models.UsageFundingSourceHosted), nil
+	}
+	if model == "" || models.IsClaudeFamilyAlias(model) {
+		ids, err := lineRunnerModelsForNode(tx, orgID, factoryID, node, ownerID)
+		if err != nil {
+			return nil, err
+		}
+		if model == "" && len(ids) > 0 {
+			model = slices.Min(ids)
+		}
+		model = models.ConcreteClaudeModelID(model, ids)
+	}
+	levels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, catalog, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	return levels(model), nil
+}
+
+func dispatchSuperPlaneModel(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, model string) (models.DefaultHostedLLMModel, error) {
+	if model == "" {
+		return models.ResolveRunnableHostedLLMModel(tx, orgID, &factoryID)
+	}
+	parsed, err := models.ParseHostedLLMModelKey(model)
+	if err == nil && parsed.IsSet() {
+		return parsed, nil
+	}
+	provider, _ := node.Configuration["hostedProvider"].(string)
+	return models.NormalizeDefaultHostedLLMModel(provider, model)
 }
 
 func publishDispatchedWorkOrder(

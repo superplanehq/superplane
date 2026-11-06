@@ -37,34 +37,6 @@ func modelThinkingLevels(provider, id string) []string {
 	}
 }
 
-// ProviderCLIThinkingLevels returns the levels that the agent CLI for a
-// provider accepts, whatever the model.
-func ProviderCLIThinkingLevels(provider string) []string {
-	switch strings.TrimSpace(provider) {
-	case models.UsageProviderAnthropic:
-		return ClaudeCodeThinkingLevels
-	case models.UsageProviderOpenAI:
-		return CodexThinkingLevels
-	case models.UsageProviderOpenRouter, models.UsageProviderCustom:
-		return OpenCodeThinkingLevels
-	default:
-		return CommonThinkingLevels()
-	}
-}
-
-// CommonThinkingLevels returns the levels that every agent CLI accepts.
-func CommonThinkingLevels() []string {
-	var out []string
-	for _, level := range allThinkingLevels {
-		if slices.Contains(ClaudeCodeThinkingLevels, level) &&
-			slices.Contains(CodexThinkingLevels, level) &&
-			slices.Contains(OpenCodeThinkingLevels, level) {
-			out = append(out, level)
-		}
-	}
-	return out
-}
-
 // SupportedThinkingLevels keeps the known levels from a provider catalog,
 // in display order. Subscription catalogs use CatalogThinkingLevels instead.
 func SupportedThinkingLevels(levels []string) []string {
@@ -97,6 +69,8 @@ var (
 	thinkingLowToXHigh     = []string{ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh}
 	thinkingNoneToHigh     = []string{ThinkingLevelNone, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh}
 	thinkingNoneToXHigh    = []string{ThinkingLevelNone, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh}
+	thinkingLowToMax       = []string{ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh, ThinkingLevelMax}
+	thinkingNoneToMax      = []string{ThinkingLevelNone, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh, ThinkingLevelMax}
 	thinkingMinimalToHigh  = []string{ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh}
 	thinkingClaudeAdaptive = []string{ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelMax}
 )
@@ -148,11 +122,22 @@ var (
 	gpt5ProPattern   = regexp.MustCompile(`^gpt-5[.-]?pro(?:[.-]|$)`)
 	gpt5xProPattern  = regexp.MustCompile(`^gpt-5[.-]\d{1,2}[.-]pro(?:[.-]|$)`)
 	oSeriesPattern   = regexp.MustCompile(`^o\d(?:[.-]|$)`)
+	gpt6ModelPattern = regexp.MustCompile(`^(gpt-6-astra|gpt-6-sol|gpt-6-luna|gpt-6\.1-sol|gpt-6\.1-terra)(?:-\d{4}-\d{2}-\d{2})?$`)
 )
 
 // openAIModelThinkingLevels follows the OpenAI reasoning effort values for
 // each model family. Models without reasoning, such as gpt-4o, have none.
 func openAIModelThinkingLevels(id string) []string {
+	// Direct OpenAI catalogs do not report efforts. Keep these model-specific
+	// fallbacks aligned with the official model pages, including dated snapshots.
+	if match := gpt6ModelPattern.FindStringSubmatch(id); match != nil {
+		switch match[1] {
+		case "gpt-6-astra", "gpt-6.1-sol":
+			return thinkingLowToMax
+		default:
+			return thinkingNoneToMax
+		}
+	}
 	if oSeriesPattern.MatchString(id) {
 		return thinkingLowToHigh
 	}
@@ -186,8 +171,6 @@ func openAIModelThinkingLevels(id string) []string {
 
 func codexModelThinkingLevels(id string, minor int, hasMinor bool) []string {
 	switch {
-	case hasMinor && minor >= 3:
-		return thinkingNoneToXHigh
 	case strings.Contains(id, "codex-max") || hasMinor && minor >= 2:
 		return thinkingLowToXHigh
 	default:

@@ -42,9 +42,9 @@ type openAIModel struct {
 }
 
 type openAIModelReasoning struct {
-	SupportedEfforts []string `json:"supported_efforts"`
-	DefaultEffort    string   `json:"default_effort"`
-	Mandatory        bool     `json:"mandatory"`
+	SupportedEfforts json.RawMessage `json:"supported_efforts"`
+	DefaultEffort    string          `json:"default_effort"`
+	Mandatory        bool            `json:"mandatory"`
 }
 
 func (c *openAICompatClient) ListModels(ctx context.Context) ([]Model, error) {
@@ -57,13 +57,36 @@ func (c *openAICompatClient) ListModels(ctx context.Context) ([]Model, error) {
 	for _, item := range listed {
 		model := Model{ID: item.ID}
 		if item.Reasoning != nil {
-			model.ThinkingLevels = item.Reasoning.SupportedEfforts
+			model.ThinkingLevels, err = item.Reasoning.thinkingLevels(c.provider)
+			if err != nil {
+				return nil, fmt.Errorf("decode %s model reasoning: %w", c.provider, err)
+			}
 			model.DefaultThinkingLevel = item.Reasoning.DefaultEffort
 			model.ReasoningMandatory = item.Reasoning.Mandatory
 		}
 		models = append(models, model)
 	}
 	return models, nil
+}
+
+func (r openAIModelReasoning) thinkingLevels(provider string) ([]string, error) {
+	if len(r.SupportedEfforts) == 0 {
+		return nil, nil
+	}
+	var levels []string
+	if err := json.Unmarshal(r.SupportedEfforts, &levels); err != nil {
+		return nil, err
+	}
+	if levels != nil || provider != ProviderOpenRouter {
+		return levels, nil
+	}
+	// OpenRouter's explicit null accepts all gateway efforts. Omission keeps
+	// metadata unavailable, so catalog refresh can retain a previous value.
+	levels = []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"}
+	if r.Mandatory {
+		levels = levels[1:]
+	}
+	return levels, nil
 }
 
 func (c *openAICompatClient) listCatalogPrices(ctx context.Context) ([]CatalogPrice, error) {
