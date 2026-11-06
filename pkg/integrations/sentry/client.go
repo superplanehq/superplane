@@ -973,23 +973,19 @@ func (c *Client) GetIssueEvent(issueID, eventID string) (*IssueEventDetail, erro
 // GetPreferredIssueEvent returns the latest event, then recommended when latest
 // has no stack and recommended has a stack or more entries.
 func (c *Client) GetPreferredIssueEvent(issueID string) (*IssueEventDetail, error) {
-	latest, err := c.GetIssueEvent(issueID, IssueEventLatest)
-	if err != nil {
-		return nil, err
-	}
+	latest, latestErr := c.GetIssueEvent(issueID, IssueEventLatest)
 	if latest.HasStack() {
 		return latest, nil
 	}
 
 	recommended, err := c.GetIssueEvent(issueID, IssueEventRecommended)
 	if err != nil {
+		if latestErr != nil {
+			return nil, latestErr
+		}
 		return latest, nil
 	}
-	if recommended.HasStack() || recommended.EntryCount() > latest.EntryCount() {
-		return recommended, nil
-	}
-
-	return latest, nil
+	return preferredIssueEvent(latest, recommended), nil
 }
 
 func (c *Client) ListSentryApps(orgSlug string) ([]SentryApp, error) {

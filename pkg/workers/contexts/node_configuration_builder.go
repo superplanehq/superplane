@@ -498,6 +498,8 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
 		exprruntime.DateFunctionOption(),
+		exprruntime.SentryIssueDescriptionOption(),
+		exprruntime.SentryEventHasStackOption(),
 		expr.Function("root", func(params ...any) (any, error) {
 			if len(params) != 0 {
 				return nil, fmt.Errorf("root() takes no arguments")
