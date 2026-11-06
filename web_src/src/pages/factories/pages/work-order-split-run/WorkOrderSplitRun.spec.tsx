@@ -382,7 +382,7 @@ describe("WorkOrderSplitRunPopup", () => {
       onDispatch: vi.fn(),
     });
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(await screen.findByRole("button", { name: "Model: Auto" }));
     await user.hover(screen.getByTestId("split-run-draft-model-list"));
     expect(await screen.findByRole("menuitem", { name: assigned ? "owner-model" : "caller-model" })).toBeVisible();
   });
