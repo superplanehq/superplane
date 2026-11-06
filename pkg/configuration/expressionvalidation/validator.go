@@ -187,6 +187,7 @@ func compileWithStubEnv(body string, knownNodeNames map[string]struct{}, extraEn
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
 		exprruntime.DateFunctionOption(),
+		exprruntime.SentryIssueDescriptionOption(),
 		expr.Function("root", func(params ...any) (any, error) { return nil, nil }),
 		expr.Function("previous", func(params ...any) (any, error) { return nil, nil }),
 		expr.Function("run", func(params ...any) (any, error) { return nil, nil }),

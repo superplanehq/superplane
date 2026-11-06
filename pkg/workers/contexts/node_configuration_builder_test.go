@@ -30,6 +30,16 @@ func Test_NodeConfigurationBuilder_EvaluatesMultilineExpression(t *testing.T) {
 	assert.Equal(t, "2\n\n4", got)
 }
 
+func Test_NodeConfigurationBuilder_SentryDescription(t *testing.T) {
+	builder := &NodeConfigurationBuilder{}
+	body, err := builder.ResolveExpressionWithExtraVariables("sentryIssueDescription(issue, nil, nil, nil)", map[string]any{
+		"issue": map[string]any{"id": "123", "title": "Broken deploy", "permalink": "https://sentry.io/issues/123/"},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, body, "[View in Sentry](https://sentry.io/issues/123/)")
+	assert.Contains(t, body, "**Title:** Broken deploy")
+}
+
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

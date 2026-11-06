@@ -348,7 +348,9 @@ describe("lineIntakeModel", () => {
     expect(sentry.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "sentry.onIssue",
       "if",
-      "sentry.enrichIssue",
+      "http",
+      "http",
+      "http",
       "createWorkOrder",
     ]);
 
