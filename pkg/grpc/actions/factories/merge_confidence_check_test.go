@@ -229,7 +229,7 @@ func emitMergeConfidenceCheckAssessment(t *testing.T, f publicationFixture, chan
 	if report {
 		_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, f.run.ID,
 			&factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "assess-risk"},
-			"security", 1, "A security issue needs attention.", []string{"security"}, nil)
+			f.pr.Repository, "security", 1, "A security issue needs attention.", []string{"security"}, nil)
 		require.NoError(t, err)
 	}
 	root, err := f.run.RootEvent(f.db)

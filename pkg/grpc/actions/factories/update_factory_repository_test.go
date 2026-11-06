@@ -625,8 +625,8 @@ func TestUpdateFactoryRepositoryKeepsRequestedGitHubBranch(t *testing.T) {
 	implementVersion := liveRepositoryCanvas(t, db, r.Organization.ID, implement)
 	assert.Equal(t, orderDefaultBranchExpression, findIntakeNode(implementVersion.Nodes, "create-pr").Configuration["base"])
 	assert.Len(t, canvasVersions(t, implement.ID), 3)
-	assert.Equal(t, "acme/api", findIntakeNode(liveRepositoryCanvas(t, db, r.Organization.ID, closure).Nodes, "on-pr-closed").Configuration["repository"])
-	assert.Len(t, canvasVersions(t, closure.ID), 2)
+	assert.Equal(t, models.WorkspaceRepositoriesExpression, findIntakeNode(liveRepositoryCanvas(t, db, r.Organization.ID, closure).Nodes, "on-pr-closed").Configuration["repository"])
+	assert.Len(t, canvasVersions(t, closure.ID), 3)
 
 	_, err = UpdateFactoryRepository(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
 		Id:            factory.ID.String(),
@@ -635,7 +635,7 @@ func TestUpdateFactoryRepositoryKeepsRequestedGitHubBranch(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, canvasVersions(t, implement.ID), 3)
-	assert.Len(t, canvasVersions(t, closure.ID), 2)
+	assert.Len(t, canvasVersions(t, closure.ID), 3)
 }
 
 func TestUpdateFactoryRepositoryCanKeepTasksOnThePreviousBranch(t *testing.T) {

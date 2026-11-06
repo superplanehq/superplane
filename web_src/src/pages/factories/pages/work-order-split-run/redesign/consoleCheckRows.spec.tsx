@@ -63,6 +63,26 @@ describe("ConsoleCheckRows", () => {
     expect(screen.queryByText("All checks passed")).not.toBeInTheDocument();
   });
 
+  it("lists the checks of each pull request repository under its name", () => {
+    render(
+      <ConsoleCheckRows
+        checks={[
+          { ...checks[0], id: "api-risk", repository: "acme/api", level: "critical" },
+          { ...checks[0], id: "docs-risk", repository: "acme/docs" },
+        ]}
+        defaultOpen
+        groupByRepository
+      />,
+    );
+
+    const api = screen.getByRole("region", { name: "acme/api" });
+    const docs = screen.getByRole("region", { name: "acme/docs" });
+    expect(within(api).getByTestId("split-run-check-api-risk")).toBeInTheDocument();
+    expect(within(api).queryByTestId("split-run-check-docs-risk")).not.toBeInTheDocument();
+    expect(within(docs).getByTestId("split-run-check-docs-risk")).toBeInTheDocument();
+    expect(screen.getByText("1 check needs review")).toBeInTheDocument();
+  });
+
   it("shows only reported checks and hides an empty section", () => {
     const view = render(<ConsoleCheckRows checks={[checks[0]]} />);
     expect(screen.getByTestId("redesign-console-checks-meter").children).toHaveLength(1);

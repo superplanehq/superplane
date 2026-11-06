@@ -912,7 +912,8 @@ CREATE TABLE public.factory_work_order_checks (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     recent_scores jsonb,
-    source character varying(16) DEFAULT 'automation'::character varying NOT NULL
+    source character varying(16) DEFAULT 'automation'::character varying NOT NULL,
+    repository character varying(255) DEFAULT ''::character varying NOT NULL
 );
 
 
@@ -4166,10 +4167,10 @@ CREATE INDEX idx_factory_work_order_checks_factory_created ON public.factory_wor
 
 
 --
--- Name: idx_factory_work_order_checks_order_key_unique; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_factory_work_order_checks_order_repository_key_unique; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_factory_work_order_checks_order_key_unique ON public.factory_work_order_checks USING btree (work_order_id, key);
+CREATE UNIQUE INDEX idx_factory_work_order_checks_order_repository_key_unique ON public.factory_work_order_checks USING btree (work_order_id, repository, key);
 
 
 --
@@ -6604,7 +6605,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261105141152	f
+20261106145548	f
 \.
 
 

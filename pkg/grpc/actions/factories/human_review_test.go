@@ -253,6 +253,8 @@ func TestHumanReviewReopensOnlyPullRequestClosedTasksAfterLiveConfirmation(t *te
 			db := database.DB(t.Context())
 			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("human-review"), "", "")
 			require.NoError(t, err)
+			repository := "acme/app"
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository}))
 			order, err := factory.CreateWorkOrder(db, "Review", "", &r.User, nil, nil)
 			require.NoError(t, err)
 			pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/42"})
@@ -261,7 +263,7 @@ func TestHumanReviewReopensOnlyPullRequestClosedTasksAfterLiveConfirmation(t *te
 			_, err = applyGitHubPullRequestClosed(db, factory, pr, false, nil, nil, nil)
 			require.NoError(t, err)
 			require.Equal(t, models.FactoryPullRequestStateClosed, pr.State)
-			createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+			assessmentCanvas := createMergeConfidenceStartupCanvas(t, r, factory, models.WorkspaceRepositoriesExpression)
 			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: models.HumanReviewTriggerNodeID, Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}}), Configuration: datatypes.NewJSONType(map[string]any{"enabled": true, "fallbackTeam": "acme/reviewers"})}}, nil)
 			require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
 			require.NoError(t, canvas.StampFactoryAppTemplate(db, models.HumanReviewTriggerNodeID, models.FactoryAppTemplateHumanReviewID, 1))
@@ -277,6 +279,8 @@ func TestHumanReviewReopensOnlyPullRequestClosedTasksAfterLiveConfirmation(t *te
 			require.NoError(t, err)
 			task, err := factory.FindWorkOrder(db, order.ID)
 			require.NoError(t, err)
+			requests, err := models.ListPullRequestChecksStartRequests(db, pr.ID)
+			require.NoError(t, err)
 			if liveOpen {
 				require.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
 				require.Nil(t, stored.ClosedAt)
@@ -287,10 +291,13 @@ func TestHumanReviewReopensOnlyPullRequestClosedTasksAfterLiveConfirmation(t *te
 				require.Equal(t, "reopened-head", decision.AssessedCommit)
 				require.Equal(t, models.FactoryHumanReviewStateWaitingAssessment, decision.State)
 				require.Equal(t, []string{""}, client.conclusions)
+				require.Len(t, requests, 1)
+				require.Equal(t, assessmentCanvas.ID, requests[0].WorkflowID)
 			} else {
 				require.Equal(t, models.FactoryPullRequestStateClosed, stored.State)
 				require.False(t, task.IsOpen())
 				require.Empty(t, client.externalIDs)
+				require.Empty(t, requests)
 			}
 		})
 	}

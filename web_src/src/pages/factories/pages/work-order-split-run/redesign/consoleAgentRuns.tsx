@@ -1,4 +1,6 @@
 import { useEventExecutions } from "@/hooks/useCanvasData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
@@ -47,6 +49,7 @@ export function AgentRunsPage({
   /** Only this run reports into the card usage chart. */
   usagePhaseId?: string;
 }) {
+  const multiRepo = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_MULTI_REPO_TASKS);
   const single = runs.length === 1 ? runs[0] : undefined;
   if (single) {
     return (
@@ -61,12 +64,14 @@ export function AgentRunsPage({
       />
     );
   }
+  const showsRepository = multiRepo && runsSpanRepositories(runs);
   return (
     <div className="flex flex-col divide-y divide-border">
       {runs.map((run, index) => (
         <AgentRunRow
           key={run.id}
           run={run}
+          repository={showsRepository ? run.repository : undefined}
           phase={phases.find((phase) => phase.id === run.id)}
           organizationId={organizationId}
           factoryKey={factoryKey}
@@ -123,8 +128,14 @@ function SingleRun({
   );
 }
 
+/** Merge confidence runs once per pull request. With several repositories, each row names its repository. */
+function runsSpanRepositories(runs: AutomationStage[]): boolean {
+  return new Set(runs.map((run) => run.repository).filter(Boolean)).size > 1;
+}
+
 function AgentRunRow({
   run,
+  repository,
   phase,
   organizationId,
   factoryKey,
@@ -133,6 +144,7 @@ function AgentRunRow({
   reportUsage,
 }: {
   run: AutomationStage;
+  repository?: string;
   phase?: SplitRunPhase;
   organizationId?: string;
   factoryKey?: string;
@@ -146,7 +158,10 @@ function AgentRunRow({
   return (
     <Collapsible defaultOpen={defaultOpen} className="group py-1.5 first:pt-0 last:pb-0">
       <div className="relative flex items-center gap-1.5 py-1">
-        <CollapsibleTrigger className="absolute inset-0 z-0 cursor-pointer" aria-label={`Toggle ${title}`} />
+        <CollapsibleTrigger
+          className="absolute inset-0 z-0 cursor-pointer"
+          aria-label={repository ? `Toggle ${title} for ${repository}` : `Toggle ${title}`}
+        />
         <div className="pointer-events-none relative z-10 flex min-w-0 flex-1 items-center gap-1.5">
           <ChevronRight
             className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
@@ -162,8 +177,13 @@ function AgentRunRow({
             variant="workspace"
             openLinksInNewTab
             linkClassName={RUN_LINK}
-            className={cn(RUN_TITLE_MARKDOWN, "flex-1 [&_a]:pointer-events-auto")}
+            className={cn(RUN_TITLE_MARKDOWN, repository ? "min-w-0" : "flex-1", "[&_a]:pointer-events-auto")}
           />
+          {repository ? (
+            <span className={cn(META_TEXT_CLASSNAME, "min-w-0 flex-1 truncate")} data-testid="agent-run-repository">
+              {repository}
+            </span>
+          ) : null}
         </div>
       </div>
       <CollapsibleContent className="space-y-3 py-2 pl-5">

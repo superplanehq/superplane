@@ -55,7 +55,8 @@ func (t *OnIssue) Documentation() string {
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
 - **data.issue**: the Sentry issue object from the webhook
-- **description**: Markdown of the Sentry issue and preferred event (event link, highlights, message, stack, request, user, tags, contexts, breadcrumbs). SuperPlane fetches this from the Sentry API. Use this instead of interpolating ` + "`data.issue`" + `, which renders as a Go map
+- **description**: A basic Markdown description built from the webhook issue
+- **issueApiUrl**: The Sentry API URL for this issue. Use HTTP Request after filters to get current issue details and events
 - **actor**: the user or team that triggered the event when available
 
 ## Setup
@@ -130,7 +131,8 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 	if config.Project != "" {
 		project := findProject(ctx.Integration, config.Project)
 		if project == nil {
-			return fmt.Errorf("project %q was not found in the connected Sentry organization", config.Project)
+			// Connection metadata can predate a project selected from the live project list.
+			project = &ProjectSummary{Slug: config.Project, Name: config.Project}
 		}
 		metadata.Project = project
 	} else {
@@ -194,19 +196,8 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		return err
 	}
 
-	if message.Resource != "issue" {
-		logSkippedIssueEvent("resource", message, config)
-		return nil
-	}
-
-	if !issueActionAllowed(config.Actions, message.Action) {
-		logSkippedIssueEvent("action", message, config)
-		return nil
-	}
-
-	projectSlug := issueProjectSlug(message.Data)
-	if !issueProjectAllowed(ctx.Configuration, config, projectSlug) {
-		logSkippedIssueEvent("project", message, config)
+	if reason := issueFilterReason(ctx.Configuration, config, message); reason != "" {
+		logSkippedIssueEvent(reason, message, config)
 		return nil
 	}
 
@@ -217,29 +208,29 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"data":         message.Data,
 		"actor":        message.Actor,
 		"timestamp":    eventTimestamp(message),
-		"description":  t.issueDescription(ctx, message.Data["issue"]),
+		"description":  IssueDescription(message.Data["issue"], nil),
+		"issueApiUrl":  IssueAPIURL(ctx.Integration, issueID(message.Data["issue"])),
 	}
 	if receiptID := strings.TrimSpace(message.ReceiptID); receiptID != "" {
 		payload[SuperplaneReceiptField] = receiptID
 	}
 
-	return ctx.Events.Emit("sentry.issue", payload)
+	return ctx.Events.Emit(IssuePayloadType, payload)
 }
 
-func (t *OnIssue) issueDescription(ctx core.IntegrationMessageContext, issue any) string {
-	if ctx.HTTP == nil || ctx.Integration == nil {
-		return IssueDescription(issue, nil)
+// issueFilterReason names the configured filter that excludes a message.
+// It returns an empty string when the trigger must emit the message.
+func issueFilterReason(configuration any, config OnIssueConfiguration, message *WebhookMessage) string {
+	if message.Resource != "issue" {
+		return "resource"
 	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.Warnf("failed to create sentry client for issue enrichment: %v", err)
-		}
-		return IssueDescription(issue, nil)
+	if !issueActionAllowed(config.Actions, message.Action) {
+		return "action"
 	}
-
-	return FetchedIssueDescription(client, issue, ctx.Logger)
+	if !issueProjectAllowed(configuration, config, issueProjectSlug(message.Data)) {
+		return "project"
+	}
+	return ""
 }
 
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {

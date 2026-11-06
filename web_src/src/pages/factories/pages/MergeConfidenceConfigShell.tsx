@@ -12,7 +12,7 @@ import { ImplementConfiguration } from "./ImplementConfiguration";
 import { MergeConfidenceConfiguration } from "./MergeConfidenceConfiguration";
 import { useMergeConfidenceSettingsDraft } from "./mergeConfidenceSettingsDraft";
 import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
-import { useImplementSettingsDraft } from "./implementSettingsDraft";
+import { implementPullRequestDraft, useImplementSettingsDraft } from "./implementSettingsDraft";
 import { IMPLEMENT_AGENT_NODE_ID, columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
@@ -231,7 +231,7 @@ function ImplementSettingsScreen(props: {
       factoryKey={props.body.factoryKey}
       controller={{
         agentDraft: draft.agentDraft,
-        pullRequest: draft.pullRequestNode,
+        pullRequestDraft: implementPullRequestDraft(draft),
         durationMinutes: draft.durationMinutes,
         durationInvalid: draft.durationInvalid,
         saving: props.settings.saving,
