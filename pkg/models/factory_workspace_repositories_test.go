@@ -33,13 +33,18 @@ func Test__FactoryWorkspaceRepositories(t *testing.T) {
 		return factory
 	}
 
-	addRepo := func(t *testing.T, factory *models.Factory, repository string, enabled bool, access string) {
+	addProviderRepo := func(t *testing.T, factory *models.Factory, provider, repository string, enabled bool, access string) {
 		t.Helper()
 		_, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", enabled, models.FactoryAgentResourceConfig{
-			Repository: repository,
-			Access:     access,
+			Repository:  repository,
+			Access:      access,
+			VCSProvider: provider,
 		})
 		require.NoError(t, err)
+	}
+	addRepo := func(t *testing.T, factory *models.Factory, repository string, enabled bool, access string) {
+		t.Helper()
+		addProviderRepo(t, factory, "", repository, enabled, access)
 	}
 	addContextRepo := func(t *testing.T, factory *models.Factory, repository string, enabled bool) {
 		t.Helper()
@@ -49,6 +54,15 @@ func Test__FactoryWorkspaceRepositories(t *testing.T) {
 	t.Run("keeps only the primary repository without multi-repo tasks", func(t *testing.T) {
 		factory := newWorkspace(t, "")
 		addContextRepo(t, factory, "acme/web", true)
+
+		repositories, err := factory.WorkspaceRepositories(db)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"acme/app"}, repositories)
+	})
+
+	t.Run("keeps only the primary Bitbucket repository without multi-repo tasks", func(t *testing.T) {
+		factory := newWorkspace(t, models.ProviderBitbucket)
+		addProviderRepo(t, factory, models.ProviderBitbucket, "acme/web", true, models.FactoryContextRepoAccessWrite)
 
 		repositories, err := factory.WorkspaceRepositories(db)
 		require.NoError(t, err)
@@ -111,9 +125,20 @@ func Test__FactoryWorkspaceRepositories(t *testing.T) {
 		assert.False(t, ok)
 	})
 
-	t.Run("keeps only the primary repository for Bitbucket", func(t *testing.T) {
+	t.Run("adds the Bitbucket write repositories of a Bitbucket workspace", func(t *testing.T) {
 		factory := newWorkspace(t, models.ProviderBitbucket)
-		addContextRepo(t, factory, "acme/web", true)
+		addProviderRepo(t, factory, models.ProviderBitbucket, "acme/web", true, models.FactoryContextRepoAccessWrite)
+		addProviderRepo(t, factory, models.ProviderBitbucket, "acme/docs", true, models.FactoryContextRepoAccessRead)
+		addProviderRepo(t, factory, models.ProviderGitHub, "acme/github-only", true, models.FactoryContextRepoAccessWrite)
+
+		repositories, err := factory.WorkspaceRepositories(db)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"acme/app", "acme/web"}, repositories)
+	})
+
+	t.Run("leaves out Bitbucket context repositories of a GitHub workspace", func(t *testing.T) {
+		factory := newWorkspace(t, models.ProviderGitHub)
+		addProviderRepo(t, factory, models.ProviderBitbucket, "acme/web", true, models.FactoryContextRepoAccessWrite)
 
 		repositories, err := factory.WorkspaceRepositories(db)
 		require.NoError(t, err)

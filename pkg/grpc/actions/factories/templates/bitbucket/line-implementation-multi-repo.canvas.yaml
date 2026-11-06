@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Implement
+  description: Implement the task in the workspace repositories and open a pull request for each changed repository.
+spec:
+  edges:
+    - channel: default
+      sourceId: onrun-implement
+      targetId: implementation-agent-no-issue
+    - channel: failed
+      sourceId: implementation-agent-no-issue
+      targetId: add-run-error
+  nodes:
+    - id: onrun-implement
+      name: Start Implementation
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration: {}
+      position:
+        x: 1542
+        "y": 144
+      isCollapsed: true
+    - id: implementation-agent-no-issue
+      name: Implement From Task Description
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      concurrency:
+        max: 5
+      configuration:
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        environmentFrom:
+          - source: integration
+            integration:
+              name: bitbucket
+        environment:
+          - name: REPO_URL
+            value: "{{ task().repository_url }}"
+            valueSource: literal
+          - name: BASE
+            value: "{{ task().default_branch }}"
+            valueSource: literal
+          - name: COAUTHORS
+            value: '{{ join(map(filter(task().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
+            valueSource: literal
+          - name: CHECKOUT_COMMIT_SETUP
+            value: "1"
+            valueSource: literal
+          - name: DRAFT_PULL_REQUESTS
+            value: "false"
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        model: claude-opus-5-5
+        steps:
+          - name: Implementation
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              You are implementing a SuperPlane task. The primary repository is cloned in the current working directory on {{ task().default_branch }}. The other workspace repositories, if any, are cloned in ../context/<owner>/<name> on their default branches.
+
+              If the primary repository had no commits, the clone step already pushed an initial commit on {{ task().default_branch }}. Do not change that commit.
+
+              Primary repository: {{ task().repository }}
+              Task title: {{ task().title }}
+
+              Task description:
+              {{ task().description }}{{ task().spec != "" ? "\n\nSpec:\n" + task().spec : "" }}
+
+              Repository instructions:
+
+              Read the applicable repository instructions before making changes. Check AGENTS.md, CLAUDE.md, contribution documentation, and instructions for the affected paths. Discover and read applicable SKILL.md files, including skills referenced by those instructions.
+              Follow repository conventions for implementation, testing, commit messages, and pull requests. Repository instructions take precedence over the general defaults below. The runner still controls commit identity. Do not replace repository-owned instructions or skills with workspace copies.
+
+              1/ Decide which repositories the task needs to change. Change only those repositories. Many tasks change only the primary repository.
+              2/ In each repository that you change, create a new branch. Do not commit on the default branch.
+              3/ Implement the task. Keep the change focused.
+              4/ Commit on the working branch with clear messages.
+              5/ For each repository that you changed, call the SuperPlane open_pull_request tool. Use directory repo for the primary repository and context/<owner>/<name> for the other repositories. The tool pushes the branch and opens or updates the pull request on this task. If the tool is not available, run superplane task pr open --directory DIR --title TITLE --body-file FILE.
+              6/ Do not push branches or open pull requests in another way.
+
+              Pull request title and description:
+
+              1/ Follow the conventions of each repository for the title, description, writing style, and formatting. Discover and use the applicable pull request template.
+              2/ If the repository provides no guidance, write a short, descriptive title and a concise description of the problem and resulting behavior. Include relevant verification and known limitations. Use sections only when they help the reader.
+              3/ When the task changes more than one repository, name the related pull requests in each description.
+              4/ Do not add closing keywords (Closes, Fixes, Resolves) or the task link. SuperPlane adds the task link.
+              5/ Include only verification results you can substantiate. State any checks that could not run and why.
+
+              Guidelines:
+
+              1/ Focus on clean code.
+              2/ Make long term fixes, not fast patches.
+              3/ Follow the testing and verification guidance below.
+              4/ For UI work, implement and wire the change into the production page or component.
+              5/ A Storybook story, preview, or fixture does not replace the product implementation unless the task explicitly requests a prototype.
+              6/ The runner manages commit identity and trailers. Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers.
+              7/ Do not invent a token budget, a time budget, a step limit, or a remaining context size. The application does not set one unless the task text sets one. Do not stop early, skip work, or change the setup because of an imagined limit. If the task text sets a limit, follow that limit.
+
+              Testing and verification:
+
+              1/ Follow the repository's testing instructions. Use its existing tools and conventions.
+              2/ For bug fixes, add a regression test that reproduces the failure when practical.
+              3/ For behavior changes, add or update tests that verify observable behavior.
+              4/ Avoid tests that only mirror implementation details or assert incidental layout, classes, or wording. Purely cosmetic changes do not need new tests unless repository instructions require them. Add coverage if behavior or accessibility changes.
+              5/ Run the relevant tests, lint, and build checks specified by the repository. Fix failures caused by your changes.
+              6/ Report which checks passed or failed. State which checks you could not run and explain why. Do not claim verification you did not perform.
+          - name: Check pull requests
+            type: bash
+            workingDirectory: repo
+            command: |-
+              set -euo pipefail
+
+              # The agent opens the pull requests. Fail when the task has none.
+              count="$(superplane task pr list | jq '.pull_requests | length')"
+              if [ "$count" -eq 0 ]; then
+                echo "The agent did not open a pull request. Call open_pull_request for each changed repository." >&2
+                exit 1
+              fi
+              echo "The task has $count pull request(s)."
+      position:
+        x: 1475
+        "y": 312
+      isCollapsed: false
+    - id: add-run-error
+      name: Record Implementation Failure
+      type: TYPE_ACTION
+      component: addRunError
+      configuration:
+        message: The implementation agent failed. Open the agent logs to find the cause.
+      position:
+        x: 1770
+        "y": 648
+      isCollapsed: true

@@ -176,6 +176,63 @@ func Test__OnPullRequestComment__Setup(t *testing.T) {
 		assert.ElementsMatch(t, []string{"pullrequest:comment_created"}, webhookRequest.EventTypes)
 		assert.Equal(t, "widgets", webhookRequest.RepositorySlug)
 	})
+
+	t.Run("a workspace trigger listens on every workspace repository", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(
+				`{"values":[{"uuid":"{repo-uuid}","name":"widgets","full_name":"acme/widgets","slug":"widgets"}]}`,
+			)),
+		}}}
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"token": "token"}, Metadata: metadata}
+
+		require.NoError(t, trigger.Setup(core.TriggerContext{
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Factory:       &recordingBitbucketFactory{repositories: []string{"acme/widgets", "acme/web"}},
+			Configuration: map[string]any{"repository": "{{ workspace().repositories }}"},
+		}))
+
+		require.Len(t, integrationCtx.WebhookRequests, 1)
+		webhookRequest, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
+		require.True(t, ok)
+		assert.Equal(t, []string{"pullrequest:comment_created"}, webhookRequest.EventTypes)
+		assert.Equal(t, []string{"acme/widgets", "acme/web"}, webhookRequest.Repositories)
+	})
+}
+
+func TestForgeCommentInWorkspaceFetchesFromTheEventRepository(t *testing.T) {
+	bitbucketapp.SetSystemTokenSource(func(string) (string, time.Time, error) { return "token", time.Now().Add(time.Hour), nil })
+	t.Cleanup(func() { bitbucketapp.SetSystemTokenSource(nil) })
+	payload := ForgePullRequestPayload("avi:bitbucket:created:pullrequest-comment", time.Now().Format(time.RFC3339), "{web}", "acme/web", map[string]any{"id": 2}, nil)
+	payload["comment"] = map[string]any{"id": 7}
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+	headers := http.Header{}
+	headers.Set("X-Event-Key", ForgeEventKey("avi:bitbucket:created:pullrequest-comment"))
+	headers.Set("X-Hub-Signature", "sha256="+signBitbucketPayload("secret", body))
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"id":7,"content":{"raw":"@superplaneagent fix it"},"user":{"nickname":"ada"}}`)),
+	}}}
+	events := &contexts.EventContext{}
+
+	code, _, err := (&OnPullRequestComment{}).HandleWebhook(core.WebhookRequestContext{
+		Body: body, Headers: headers, Webhook: &contexts.NodeWebhookContext{Secret: "secret"}, HTTP: httpContext,
+		Metadata: &contexts.MetadataContext{Metadata: NodeMetadata{Repository: &RepositoryMetadata{
+			UUID: "{widgets}", FullName: "acme/widgets", Slug: "widgets", Name: "widgets",
+		}}},
+		Integration:   &contexts.IntegrationContext{Metadata: map[string]any{"authType": AuthTypeForgeApp, "forgeInstallationId": "installation"}},
+		Configuration: map[string]any{"repository": "{{ workspace().repositories }}", "contentFilter": "@superplaneagent"},
+		Events:        events,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, 1, events.Count())
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, "/2.0/repositories/acme/web/pullrequests/2/comments/7", httpContext.Requests[0].URL.Path)
 }
 
 func Test__OnPullRequestComment__HandleWebhook(t *testing.T) {

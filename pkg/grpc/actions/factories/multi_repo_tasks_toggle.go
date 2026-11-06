@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -15,7 +16,8 @@ import (
 // SetOrganizationMultiRepoTasks turns multi-repo tasks on or off for the
 // organization and republishes its Implement automations with the matching
 // template in the same transaction. When the republish fails, the flag stays
-// unchanged.
+// unchanged. The flag also changes the workspace repository list, so after
+// the change the workspace webhooks are refreshed.
 func SetOrganizationMultiRepoTasks(
 	ctx context.Context,
 	organizationID uuid.UUID,
@@ -27,6 +29,7 @@ func SetOrganizationMultiRepoTasks(
 	}
 
 	var result BuiltInAutomationReset
+	changed := false
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		organization, err := models.FindOrganizationByIDInTransaction(
 			tx.Clauses(clause.Locking{Strength: "UPDATE"}),
@@ -51,12 +54,27 @@ func SetOrganizationMultiRepoTasks(
 		result, err = resetOrganizationBuiltInAutomationsInTransaction(
 			ctx, tx, organizationID, lineImplementationTemplateID, hasMultiRepoTemplate, deps,
 		)
+		changed = err == nil
 		return err
 	})
 	if err != nil {
 		return BuiltInAutomationReset{}, err
 	}
+	if changed {
+		refreshOrganizationWorkspaceRepositoryAutomations(ctx, organizationID, deps)
+	}
 	return result, nil
+}
+
+func refreshOrganizationWorkspaceRepositoryAutomations(ctx context.Context, organizationID uuid.UUID, deps IntakeDependencies) {
+	factories, err := models.ListFactories(database.DB(ctx), organizationID)
+	if err != nil {
+		log.WithError(err).Warnf("organization %s: failed to list workspaces for the repository refresh", organizationID)
+		return
+	}
+	for i := range factories {
+		refreshWorkspaceRepositoryAutomations(ctx, deps, &factories[i])
+	}
 }
 
 // hasMultiRepoTemplate skips Implement automations whose provider has one

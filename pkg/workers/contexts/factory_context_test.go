@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -1032,7 +1033,21 @@ func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
 	assert.Len(t, statusEvents, 2, "no-op must not record a second status.updated event")
 }
 
+func multiRepoPullRequestParams(provider, repository string, number int64, state string) models.FactoryPullRequestParams {
+	url := fmt.Sprintf("https://github.com/%s/pull/%d", repository, number)
+	if provider == models.FactoryPullRequestProviderBitbucket {
+		url = fmt.Sprintf("https://bitbucket.org/%s/pull-requests/%d", repository, number)
+	}
+	return models.FactoryPullRequestParams{Provider: provider, Repository: repository, Number: number, URL: url, State: state}
+}
+
 func TestFactoryContext_UpdateWorkOrderStatus_WhenAllPullRequestsDone(t *testing.T) {
+	for _, provider := range []string{models.FactoryPullRequestProviderGitHub, models.FactoryPullRequestProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) { testUpdateWorkOrderStatusWhenAllPullRequestsDone(t, provider) })
+	}
+}
+
+func testUpdateWorkOrderStatusWhenAllPullRequestsDone(t *testing.T, provider string) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -1051,22 +1066,10 @@ func TestFactoryContext_UpdateWorkOrderStatus_WhenAllPullRequestsDone(t *testing
 	})
 	require.NoError(t, err)
 
-	api, err := order.CreatePullRequest(database.Conn(), models.FactoryPullRequestParams{
-		Provider:   models.FactoryPullRequestProviderGitHub,
-		Repository: "acme/api",
-		Number:     1,
-		URL:        "https://github.com/acme/api/pull/1",
-		State:      models.FactoryPullRequestStateMerged,
-	})
+	api, err := order.CreatePullRequest(database.Conn(), multiRepoPullRequestParams(provider, "acme/api", 1, models.FactoryPullRequestStateMerged))
 	require.NoError(t, err)
 	require.NotNil(t, api)
-	web, err := order.CreatePullRequest(database.Conn(), models.FactoryPullRequestParams{
-		Provider:   models.FactoryPullRequestProviderGitHub,
-		Repository: "acme/web",
-		Number:     2,
-		URL:        "https://github.com/acme/web/pull/2",
-		State:      models.FactoryPullRequestStateOpen,
-	})
+	web, err := order.CreatePullRequest(database.Conn(), multiRepoPullRequestParams(provider, "acme/web", 2, models.FactoryPullRequestStateOpen))
 	require.NoError(t, err)
 
 	closeWhenDone := core.UpdateWorkOrderStatusParams{
@@ -1093,6 +1096,12 @@ func TestFactoryContext_UpdateWorkOrderStatus_WhenAllPullRequestsDone(t *testing
 }
 
 func TestFactoryContext_UpdateWorkOrderStatus_ClosesAtOnceWithoutMultiRepoTasks(t *testing.T) {
+	for _, provider := range []string{models.FactoryPullRequestProviderGitHub, models.FactoryPullRequestProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) { testUpdateWorkOrderStatusClosesAtOnceWithoutMultiRepoTasks(t, provider) })
+	}
+}
+
+func testUpdateWorkOrderStatusClosesAtOnceWithoutMultiRepoTasks(t *testing.T, provider string) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -1102,13 +1111,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_ClosesAtOnceWithoutMultiRepoTasks(
 	order, err := factory.CreateWorkOrder(database.Conn(), "Task", "", &r.User, nil, nil)
 	require.NoError(t, err)
 	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
-	_, err = order.CreatePullRequest(database.Conn(), models.FactoryPullRequestParams{
-		Provider:   models.FactoryPullRequestProviderGitHub,
-		Repository: "acme/web",
-		Number:     2,
-		URL:        "https://github.com/acme/web/pull/2",
-		State:      models.FactoryPullRequestStateOpen,
-	})
+	_, err = order.CreatePullRequest(database.Conn(), multiRepoPullRequestParams(provider, "acme/web", 2, models.FactoryPullRequestStateOpen))
 	require.NoError(t, err)
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)

@@ -177,7 +177,7 @@ func isPrFeedbackWaitComponent(component string) bool {
 func prFeedbackWaitChecksConfiguration(request prFeedbackBuildRequest) map[string]any {
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return map[string]any{
-			"repository": request.Repository,
+			"repository": prFeedbackEventRepositoryExpression,
 			"ref":        prFeedbackPRHeadSHAExpression(),
 			"buildKeys":  checkNamesNodeValue(request.CheckNames),
 		}
@@ -191,15 +191,11 @@ func prFeedbackWaitChecksConfiguration(request prFeedbackBuildRequest) map[strin
 
 func prFeedbackPullRequestTriggerConfiguration(request prFeedbackBuildRequest) map[string]any {
 	provider := prFeedbackVCSProvider(request)
-	configuration := map[string]any{
-		"repository":              request.Repository,
+	return map[string]any{
+		"repository":              models.WorkspaceRepositoriesExpression,
 		"actions":                 prFeedbackTriggerActions(provider),
 		"onlyFactoryPullRequests": true,
 	}
-	if provider == models.ProviderGitHub {
-		configuration["repository"] = models.WorkspaceRepositoriesExpression
-	}
-	return configuration
 }
 
 func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[string]any {

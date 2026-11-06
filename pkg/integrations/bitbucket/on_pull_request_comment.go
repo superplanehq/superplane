@@ -136,15 +136,7 @@ func (p *OnPullRequestComment) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	repo, err := ensureRepoInMetadata(ctx.HTTP, ctx.Metadata, ctx.Integration, config.Repository)
-	if err != nil {
-		return err
-	}
-
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventTypes:     []string{pullRequestCommentCreated},
-		RepositorySlug: repo.Slug,
-	})
+	return requestRepositoryWebhook(ctx.HTTP, ctx.Metadata, ctx.Integration, ctx.Factory, config.Repository, []string{pullRequestCommentCreated})
 }
 
 func (p *OnPullRequestComment) Hooks() []core.Hook {
@@ -179,7 +171,12 @@ func (p *OnPullRequestComment) HandleWebhook(ctx core.WebhookRequestContext) (in
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if !payloadRepositoryMatchesTrigger(ctx, config.Repository) {
+	// A workspace trigger gets events from every workspace repository.
+	repository := config.Repository
+	if isExpression(repository) {
+		payloadRepository, _ := data["repository"].(map[string]any)
+		repository, _ = payloadRepository["full_name"].(string)
+	} else if !payloadRepositoryMatchesTrigger(ctx, repository) {
 		return http.StatusOK, nil, nil
 	}
 
@@ -198,7 +195,7 @@ func (p *OnPullRequestComment) HandleWebhook(ctx core.WebhookRequestContext) (in
 			pr, _ := data["pullrequest"].(map[string]any)
 			prID, _ := int64FromJSON(pr["id"])
 			commentID, _ := int64FromJSON(comment["id"])
-			comment, err = client.GetPullRequestComment(config.Repository, prID, commentID)
+			comment, err = client.GetPullRequestComment(repository, prID, commentID)
 			if err != nil {
 				return http.StatusInternalServerError, nil, fmt.Errorf("failed to fetch Forge comment: %w", err)
 			}

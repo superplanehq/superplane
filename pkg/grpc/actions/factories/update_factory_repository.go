@@ -485,7 +485,7 @@ func refreshCustomAutomationCheckout(node *models.Node, factory *models.Factory,
 	if checkoutNamesUseExpressions(current, "REPO", "BASE") && !shared {
 		return false
 	}
-	checkout := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHost)
+	checkout := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHost, false)
 	if shared {
 		checkout = backlogSharedCheckoutEnvironment(factory, githubHost)
 	}

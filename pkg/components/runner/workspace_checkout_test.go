@@ -444,6 +444,27 @@ func TestWorkspaceCheckoutScriptCommitSetupSignsWritableContextRepositories(t *t
 	assert.Empty(t, gitRepoConfig(t, docs, "core.hooksPath"))
 }
 
+func TestWorkspaceCheckoutScriptBlocksPushForPushBlockedRepositories(t *testing.T) {
+	main := initBareRepo(t, "main")
+	blocked := initBareRepo(t, "main")
+	readonly := initBareRepo(t, "main")
+	dir := t.TempDir()
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]any{
+		{"repository": "acme/docs", "url": "file://" + blocked, "directory": "context/acme/docs", "readOnly": true, "pushBlocked": true},
+		{"repository": "acme/lib", "url": "file://" + readonly, "directory": "context/acme/lib", "readOnly": true},
+	}})
+	require.NoError(t, err)
+
+	output, err := runCheckoutScript(t, dir, "file://"+main, "main", string(payload))
+
+	require.NoError(t, err, output)
+	docs := filepath.Join(dir, "context", "acme", "docs")
+	assert.Equal(t, "file://"+blocked, runGitQuiet(t, "", docs, "remote", "get-url", "origin"), "fetch still works")
+	assert.Equal(t, "read-only-repository", runGitQuiet(t, "", docs, "remote", "get-url", "--push", "origin"))
+	lib := filepath.Join(dir, "context", "acme", "lib")
+	assert.Equal(t, "file://"+readonly, runGitQuiet(t, "", lib, "remote", "get-url", "--push", "origin"))
+}
+
 func TestWorkspaceCheckoutScriptCommitSetupCreatesBranchOnEmptyRemote(t *testing.T) {
 	remote := initBareRepo(t, "")
 	dir := t.TempDir()
