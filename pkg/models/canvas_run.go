@@ -404,6 +404,16 @@ func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 		return nil, err
 	}
 
+	// Keep the review evidence after retention or canvas cleanup removes its
+	// source assessment or agent run. Only the deleted run loses its reference.
+	for _, column := range []string{"source_run_id", "run_id"} {
+		if err := db.Model(&FactoryHumanReviewDecision{}).
+			Where(column+" = ?", r.ID).
+			Update(column, nil).Error; err != nil {
+			return nil, fmt.Errorf("clear human review %s reference: %w", column, err)
+		}
+	}
+
 	count, err = deleteRows(db, &CanvasRun{}, "id = ?", r.ID)
 	if err != nil {
 		return nil, err

@@ -143,7 +143,7 @@ installation row.
 5. Grant repository permissions that match the workspace GitHub App manifest:
    - Issues: Read and write
    - Actions: Read and write
-   - Checks: Read-only
+   - Checks: Read and write
    - Contents: Read and write
    - Pull requests: Read and write
    - Repository hooks: Read and write
@@ -233,6 +233,62 @@ If Connect cannot create the app, confirm `BASE_URL` and
 
 CI sets dummy GitHub App values so factory E2E can skip create-app.
 Local `make test.e2e` needs the same dummy values or a real app.
+
+## Merge confidence checks
+
+Merge confidence publishes the `SuperPlane merge confidence` GitHub check
+when an assessment starts. The check reports completion, failure, or cancellation
+and links to the task. Assessment scores remain advisory.
+
+Before deploying this behavior, set the GitHub App permission to
+**Checks: Read and write**. Existing installation owners must accept the
+permission update. Apps created through the general integration setup can
+request read-only Checks access. Update those Apps before using them for
+merge confidence.
+
+The factory App manifests request write access for new Apps. They do not update
+existing Apps or installations. Hosted App owners must update the hosted App
+configuration. This repository does not verify live installation permissions.
+The check uses the existing worker integration credentials. No new environment
+variables, Secret keys, or Helm values are required.
+
+## Human review rollout
+
+Human review is an optional GitHub automation. It starts disabled.
+It uses the existing GitHub integration and agent configuration.
+No new environment variables or Secret keys are required.
+
+1. Upgrade the applicable GitHub App to **Checks: Read and write**.
+2. Retain **Pull requests: Read and write** and **Members: Read-only**.
+3. Ask existing installation owners to accept the permission update.
+4. Deploy the API and worker code with Human review disabled.
+5. Add Human review from the Verify automation catalog.
+6. Configure a fallback GitHub team and review instructions as an organization administrator.
+7. Test assessment completion, reviewer selection, approval, dismissal, new commits, and disablement in a test repository.
+8. Enable Human review only after these lifecycle checks pass.
+9. Configure GitHub branch protection separately to require `merge-confidence/merge-gate` from the correct GitHub App.
+10. Preserve existing CI requirements and verify bypass settings.
+
+The local and self-hosted manifests request the required permissions for new
+Apps. They do not update existing Apps or installations.
+Hosted App owners must update the hosted GitHub App configuration before enablement.
+This repository does not verify that configuration or live branch protection.
+
+The API receives authenticated review events. Workers select reviewers and
+publish checks through the existing integration credentials. Runner agents
+return scoped decisions; they do not publish checks or approve pull requests.
+The existing App credentials must remain available to the API and workers.
+No Helm value changes are required for this feature.
+
+Runner installation tokens cannot publish GitHub checks or commit statuses.
+The Publish Commit Status component uses server credentials and retains write access.
+
+A required check applies to the protected branch, including untracked pull
+requests. Those pull requests wait until Factory imports or accepts them.
+Without a required-check rule, the results remain advisory.
+Review event delivery and reconciliation have latency. Approval revocation
+cannot update a published check immediately in every case.
+SuperPlane does not change repository protection.
 
 ## Bitbucket Forge local development
 

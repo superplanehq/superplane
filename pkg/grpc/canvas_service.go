@@ -125,6 +125,9 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 	if err != nil {
 		return nil, err
 	}
+	if err := canvases.AuthorizeHumanReviewMutation(ctx, db, canvas, s.authService); err != nil {
+		return nil, err
+	}
 	return canvases.UpdateCanvas(ctx, db, canvas, req.Name, req.Description)
 }
 
@@ -404,6 +407,9 @@ func (s *CanvasService) PutCanvasStaging(ctx context.Context, req *pb.PutCanvasS
 	db := database.DB(ctx)
 	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
 	if err != nil {
+		return nil, err
+	}
+	if err := canvases.AuthorizeHumanReviewMutation(ctx, db, canvas, s.authService); err != nil {
 		return nil, err
 	}
 

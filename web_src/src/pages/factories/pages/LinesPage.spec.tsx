@@ -1274,6 +1274,7 @@ describe("LinesPage board extras", () => {
       data: [
         { id: "app-risk", name: "Risk score", columnKey: "verify" },
         { id: "app-evidence", name: "Visual Evidence", columnKey: "verify" },
+        { id: "app-human-review", name: "Human review", columnKey: "verify", templateId: "human-review" },
       ],
     });
     const user = userEvent.setup();
