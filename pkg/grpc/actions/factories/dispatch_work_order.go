@@ -218,7 +218,12 @@ func dispatchWorkOrderOnLineTx(
 	if err != nil {
 		return nil, invalidArgument(err.Error())
 	}
-	if err := validateLineDispatchModel(tx, orgID, factoryID, currentLine, startIndex, model, normalizedThinking, subscriptionOrderOwnerID(tx, order)); err != nil {
+	requested := models.FactoryLineStartOptions{Model: model, ThinkingLevel: normalizedThinking}
+	run, err := planLineDispatchRun(tx, order, currentLine, startIndex, replaceActive, requested)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateLineDispatchModel(tx, orgID, factoryID, run, subscriptionOrderOwnerID(tx, order)); err != nil {
 		return nil, err
 	}
 	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
@@ -287,18 +292,45 @@ func dispatchWorkOrderOnLineTx(
 	}, nil
 }
 
+// lineDispatchRun describes the steps that a start or retry runs and the
+// Start options that apply to them.
+type lineDispatchRun struct {
+	steps   []models.FactoryLineStep
+	options models.FactoryLineStartOptions
+	// savedRun is true when a retry continues a saved traversal. That
+	// traversal keeps its saved steps and Start options.
+	savedRun bool
+}
+
+// planLineDispatchRun resolves the steps that will run. A start runs the
+// current line from startIndex. A retry of a saved traversal runs its saved
+// steps, which can differ from the current line after the line changes.
+func planLineDispatchRun(tx *gorm.DB, order *models.FactoryWorkOrder, line *models.FactoryLine, startIndex int, replaceActive bool, requested models.FactoryLineStartOptions) (lineDispatchRun, error) {
+	if replaceActive && startIndex > 0 {
+		plan, err := order.PlanLineStepRetry(tx, line, startIndex, requested)
+		if err != nil {
+			return lineDispatchRun{}, err
+		}
+		return lineDispatchRun{steps: plan.Steps, options: plan.Options, savedRun: plan.Target != nil}, nil
+	}
+	if startIndex < 0 || startIndex >= len(line.Steps) {
+		return lineDispatchRun{}, models.ErrFactoryLineStepOutOfRange
+	}
+	return lineDispatchRun{steps: line.Steps[startIndex:], options: requested}, nil
+}
+
 // validateLineDispatchModel checks overrides and each agent's effective model
 // and effort before Start, including settings inherited from the agent.
-// Only steps from startIndex onward will run for a start or retry.
-func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, startIndex int, model, thinking string, ownerID uuid.UUID) error {
-	if startIndex < 0 || startIndex >= len(line.Steps) {
-		return models.ErrFactoryLineStepOutOfRange
+// Only the steps that will run are checked.
+func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, run lineDispatchRun, ownerID uuid.UUID) error {
+	model := run.options.Model
+	thinking := run.options.ThinkingLevel
+	if model == "" || run.savedRun {
+		// A saved traversal keeps the model it started with. Agents that no
+		// longer accept that model run their own model, as at execution.
+		return validateDispatchThinkingForRunners(tx, orgID, factoryID, run, ownerID)
 	}
-	steps := line.Steps[startIndex:]
-	if model == "" {
-		return validateDispatchThinkingForRunners(tx, orgID, factoryID, steps, model, thinking, ownerID)
-	}
-	options, _, err := listLineRunnerModelOptionsForSteps(tx, orgID, factoryID, steps, ownerID)
+	options, _, err := listLineRunnerModelOptionsForSteps(tx, orgID, factoryID, run.steps, ownerID)
 	if err != nil {
 		return err
 	}
@@ -309,14 +341,16 @@ func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *mo
 	if dispatchThinkingOverridesLevel(thinking) && !slices.Contains(options[index].ThinkingLevels, thinking) {
 		return invalidArgument("thinking level is not available for this model")
 	}
-	return validateDispatchThinkingForRunners(tx, orgID, factoryID, steps, model, thinking, ownerID)
+	return validateDispatchThinkingForRunners(tx, orgID, factoryID, run, ownerID)
 }
 
 // validateDispatchThinkingForRunners checks inherited and explicit efforts
 // against the model each agent will run, including agents that retain a model.
-func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID, steps []models.FactoryLineStep, model, thinking string, ownerID uuid.UUID) error {
+func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID, run lineDispatchRun, ownerID uuid.UUID) error {
+	model := run.options.Model
+	thinking := run.options.ThinkingLevel
 	var catalog *llmcatalog.ThinkingCatalog
-	for _, step := range steps {
+	for _, step := range run.steps {
 		if step.AppID == uuid.Nil {
 			continue
 		}
@@ -359,6 +393,10 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 				return err
 			}
 			if overridden && !slices.Contains(levels, effectiveThinking) {
+				if run.savedRun {
+					// A retry cannot change the saved Start options.
+					return invalidArgument("The thinking level of this run is no longer available for every agent on this line. Start the line again and choose a thinking level.")
+				}
 				return invalidArgument("thinking level is not available for every agent on this line")
 			}
 			if !overridden && capabilitiesKnown && !slices.Contains(levels, effectiveThinking) {
