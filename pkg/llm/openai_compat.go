@@ -32,12 +32,77 @@ func newOpenAICompatClient(httpClient core.HTTPContext, provider, defaultBase st
 func (c *openAICompatClient) Provider() string { return c.provider }
 
 type openAIModelsResponse struct {
-	Data []struct {
-		ID string `json:"id"`
-	} `json:"data"`
+	Data []openAIModel `json:"data"`
+}
+
+type openAIModel struct {
+	ID        string                `json:"id"`
+	Pricing   RawCatalogRate        `json:"pricing"`
+	Reasoning *openAIModelReasoning `json:"reasoning"`
+}
+
+type openAIModelReasoning struct {
+	SupportedEfforts json.RawMessage `json:"supported_efforts"`
+	DefaultEffort    string          `json:"default_effort"`
+	Mandatory        bool            `json:"mandatory"`
 }
 
 func (c *openAICompatClient) ListModels(ctx context.Context) ([]Model, error) {
+	listed, err := c.listModelCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	models := make([]Model, 0, len(listed))
+	for _, item := range listed {
+		model := Model{ID: item.ID}
+		if item.Reasoning != nil {
+			model.ThinkingLevels, err = item.Reasoning.thinkingLevels(c.provider)
+			if err != nil {
+				return nil, fmt.Errorf("decode %s model reasoning: %w", c.provider, err)
+			}
+			model.DefaultThinkingLevel = item.Reasoning.DefaultEffort
+			model.ReasoningMandatory = item.Reasoning.Mandatory
+		}
+		models = append(models, model)
+	}
+	return models, nil
+}
+
+func (r openAIModelReasoning) thinkingLevels(provider string) ([]string, error) {
+	if len(r.SupportedEfforts) == 0 {
+		return nil, nil
+	}
+	var levels []string
+	if err := json.Unmarshal(r.SupportedEfforts, &levels); err != nil {
+		return nil, err
+	}
+	if levels != nil || provider != ProviderOpenRouter {
+		return levels, nil
+	}
+	// OpenRouter's explicit null accepts all gateway efforts. Omission keeps
+	// metadata unavailable, so catalog refresh can retain a previous value.
+	levels = []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"}
+	if r.Mandatory {
+		levels = levels[1:]
+	}
+	return levels, nil
+}
+
+func (c *openAICompatClient) listCatalogPrices(ctx context.Context) ([]CatalogPrice, error) {
+	listed, err := c.listModelCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	prices := make([]CatalogPrice, 0, len(listed))
+	for _, item := range listed {
+		prices = append(prices, CatalogPrice{ID: item.ID, Pricing: item.Pricing})
+	}
+	return prices, nil
+}
+
+func (c *openAICompatClient) listModelCatalog(ctx context.Context) ([]openAIModel, error) {
 	body, err := c.doJSON(ctx, http.MethodGet, c.baseURL+"/models", nil, false)
 	if err != nil {
 		return nil, err
@@ -48,44 +113,15 @@ func (c *openAICompatClient) ListModels(ctx context.Context) ([]Model, error) {
 		return nil, fmt.Errorf("decode %s models: %w", c.provider, err)
 	}
 
-	models := make([]Model, 0, len(response.Data))
+	models := make([]openAIModel, 0, len(response.Data))
 	for _, item := range response.Data {
-		if id := strings.TrimSpace(item.ID); id != "" {
-			models = append(models, Model{ID: id})
-		}
-	}
-	return models, nil
-}
-
-type openRouterCatalogResponse struct {
-	Data []openRouterCatalogModel `json:"data"`
-}
-
-type openRouterCatalogModel struct {
-	ID      string         `json:"id"`
-	Pricing RawCatalogRate `json:"pricing"`
-}
-
-func (c *openAICompatClient) listCatalogPrices(ctx context.Context) ([]CatalogPrice, error) {
-	body, err := c.doJSON(ctx, http.MethodGet, c.baseURL+"/models", nil, false)
-	if err != nil {
-		return nil, err
-	}
-
-	var response openRouterCatalogResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("decode %s catalog prices: %w", c.provider, err)
-	}
-
-	prices := make([]CatalogPrice, 0, len(response.Data))
-	for _, item := range response.Data {
-		id := strings.TrimSpace(item.ID)
-		if id == "" {
+		item.ID = strings.TrimSpace(item.ID)
+		if item.ID == "" {
 			continue
 		}
-		prices = append(prices, CatalogPrice{ID: id, Pricing: item.Pricing})
+		models = append(models, item)
 	}
-	return prices, nil
+	return models, nil
 }
 
 type openAIChatRequest struct {
@@ -231,7 +267,9 @@ func (c *openAICompatClient) do(ctx context.Context, method, url string, body io
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 	if c.provider == ProviderOpenRouter {
 		req.Header.Set("HTTP-Referer", "https://superplane.com")
 		req.Header.Set("X-Title", "SuperPlane")
