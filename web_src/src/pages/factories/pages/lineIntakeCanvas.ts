@@ -42,7 +42,7 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     triggerName: "On Issue",
     createTitle: "{{ root().data.data.issue.title }}",
     createDescription:
-      '{{ sentryIssueDescription(root().data.data.issue, $["Get Sentry Issue"].data?.body, $["Get Sentry Event"].data?.body, $["Get Recommended Sentry Event"].data?.body) }}',
+      '{{ sentryIssueDescription(root().data.data.issue, $["Get Sentry Issue"].data?.body, $["Get Sentry Event"].data?.body, $["Get Recommended Sentry Event"]?.data?.body) }}',
     title: "Sentry exception intake",
   },
   "pagerduty-incidents": {
@@ -82,6 +82,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
   const filterId = `${source.id}-filter`;
   const issueRequestId = `${source.id}-issue-request`;
   const eventRequestId = `${source.id}-event-request`;
+  const eventHasStackId = `${source.id}-event-has-stack`;
   const recommendedEventRequestId = `${source.id}-recommended-event-request`;
   const sentry = source.id === "sentry-exceptions";
 
@@ -136,6 +137,14 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
             position: { x: 160, y: 620 },
           },
           {
+            id: eventHasStackId,
+            name: "Latest event has a stack?",
+            type: "TYPE_ACTION",
+            component: "if",
+            configuration: { expression: 'sentryEventHasStack($["Get Sentry Event"].data?.body)' },
+            position: { x: 160, y: 800 },
+          },
+          {
             id: recommendedEventRequestId,
             name: "Get Recommended Sentry Event",
             type: "TYPE_ACTION",
@@ -149,7 +158,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
                 integrationKey: "SENTRY_AUTH_TOKEN",
               },
             },
-            position: { x: 160, y: 800 },
+            position: { x: 160, y: 980 },
           },
         ] satisfies ComponentsNode[])
       : []),
@@ -162,7 +171,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
         title: spec.createTitle,
         description: spec.createDescription,
       },
-      position: { x: 160, y: sentry ? 980 : 260 },
+      position: { x: 160, y: sentry ? 1160 : 260 },
     },
   ];
   const edges: ComponentsEdge[] = sentry
@@ -171,8 +180,10 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
         { channel: "true", sourceId: filterId, targetId: issueRequestId },
         { channel: "success", sourceId: issueRequestId, targetId: eventRequestId },
         { channel: "failure", sourceId: issueRequestId, targetId: eventRequestId },
-        { channel: "success", sourceId: eventRequestId, targetId: recommendedEventRequestId },
-        { channel: "failure", sourceId: eventRequestId, targetId: recommendedEventRequestId },
+        { channel: "success", sourceId: eventRequestId, targetId: eventHasStackId },
+        { channel: "failure", sourceId: eventRequestId, targetId: eventHasStackId },
+        { channel: "true", sourceId: eventHasStackId, targetId: createId },
+        { channel: "false", sourceId: eventHasStackId, targetId: recommendedEventRequestId },
         { channel: "success", sourceId: recommendedEventRequestId, targetId: createId },
         { channel: "failure", sourceId: recommendedEventRequestId, targetId: createId },
       ]
@@ -190,6 +201,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
             [filterId]: "passed",
             [issueRequestId]: "passed",
             [eventRequestId]: "passed",
+            [eventHasStackId]: "passed",
             [recommendedEventRequestId]: "passed",
           }
         : {}),

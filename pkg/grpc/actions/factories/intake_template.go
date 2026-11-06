@@ -24,6 +24,7 @@ const (
 	intakeSentryRecommendedEventRequestNodeID = "get-recommended-sentry-event"
 	intakeSentryIssueRequestNodeID            = "get-sentry-issue"
 	intakeSentryEventRequestNodeID            = "get-sentry-event"
+	intakeSentryEventHasStackNodeID           = "latest-sentry-event-has-stack"
 	intakeCreateNodeID                        = "create-work-order"
 
 	intakeAuthorPermissionNodeID = "get-author-permission"
@@ -194,7 +195,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 }
 
 // Both API errors and transport failures leave the original issue available.
-const sentryIntakeDescriptionExpression = `{{ sentryIssueDescription(root().data.data.issue, $["Get Sentry Issue"].data?.body, $["Get Sentry Event"].data?.body, $["Get Recommended Sentry Event"].data?.body) }}`
+const sentryIntakeDescriptionExpression = `{{ sentryIssueDescription(root().data.data.issue, $["Get Sentry Issue"].data?.body, $["Get Sentry Event"].data?.body, $["Get Recommended Sentry Event"]?.data?.body) }}`
 
 // dependabotAlertCreateTitle names the package, not the manifest, because
 // every alert for one package lands on one task. It must match
@@ -301,6 +302,20 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 				Position:    yaml.Position{X: 160, Y: createY},
 			})
 			createY += 180
+			if requestNode.id == intakeSentryEventRequestNodeID {
+				nodes = append(nodes, yaml.Node{
+					ID:        intakeSentryEventHasStackNodeID,
+					Name:      "Latest event has a stack?",
+					Type:      yaml.NodeTypeAction,
+					Component: intakeFilterComponent,
+					Configuration: map[string]any{
+						"expression": `sentryEventHasStack($["Get Sentry Event"].data?.body)`,
+					},
+					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: createY},
+				})
+				createY += 180
+			}
 		}
 		edges = slices.DeleteFunc(edges, func(edge yaml.Edge) bool {
 			return edge.SourceID == intakeFilterNodeID && edge.TargetID == intakeCreateNodeID
@@ -309,8 +324,10 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 			yaml.Edge{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeSentryIssueRequestNodeID},
 			yaml.Edge{Channel: "success", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
 			yaml.Edge{Channel: "failure", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
-			yaml.Edge{Channel: "success", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryRecommendedEventRequestNodeID},
-			yaml.Edge{Channel: "failure", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryRecommendedEventRequestNodeID},
+			yaml.Edge{Channel: "success", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryEventHasStackNodeID},
+			yaml.Edge{Channel: "failure", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryEventHasStackNodeID},
+			yaml.Edge{Channel: "true", SourceID: intakeSentryEventHasStackNodeID, TargetID: intakeCreateNodeID},
+			yaml.Edge{Channel: "false", SourceID: intakeSentryEventHasStackNodeID, TargetID: intakeSentryRecommendedEventRequestNodeID},
 			yaml.Edge{Channel: "success", SourceID: intakeSentryRecommendedEventRequestNodeID, TargetID: intakeCreateNodeID},
 			yaml.Edge{Channel: "failure", SourceID: intakeSentryRecommendedEventRequestNodeID, TargetID: intakeCreateNodeID},
 		)

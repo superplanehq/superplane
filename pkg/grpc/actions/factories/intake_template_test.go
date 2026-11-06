@@ -229,8 +229,10 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeSentryIssueRequestNodeID},
 			{Channel: "success", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
 			{Channel: "failure", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
-			{Channel: "success", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryRecommendedEventRequestNodeID},
-			{Channel: "failure", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryRecommendedEventRequestNodeID},
+			{Channel: "success", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryEventHasStackNodeID},
+			{Channel: "failure", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryEventHasStackNodeID},
+			{Channel: "true", SourceID: intakeSentryEventHasStackNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "false", SourceID: intakeSentryEventHasStackNodeID, TargetID: intakeSentryRecommendedEventRequestNodeID},
 			{Channel: "success", SourceID: intakeSentryRecommendedEventRequestNodeID, TargetID: intakeCreateNodeID},
 			{Channel: "failure", SourceID: intakeSentryRecommendedEventRequestNodeID, TargetID: intakeCreateNodeID},
 		}, canvas.Spec.Edges)

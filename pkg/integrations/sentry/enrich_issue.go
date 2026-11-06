@@ -20,7 +20,11 @@ func (c *EnrichIssue) Description() string {
 func (c *EnrichIssue) Documentation() string {
 	return `Enrich Issue fetches the latest issue details and a preferred event from Sentry. Add it after filters so rejected issues do not make API requests.
 
-New Sentry factory intakes use HTTP Request nodes after filters to fetch the issue, latest event, and recommended event.
+New Sentry factory intakes use HTTP Request nodes after filters to fetch the issue and latest event. They request the recommended event only when the latest event has no stack frames.
+
+The sentryEventHasStack(event) expression returns true when a Sentry event body contains exception or standalone stack frames. Missing or invalid bodies return false. A skipped recommended request does not prevent task creation.
+
+New and reset intakes use this conditional request. Saved intakes keep their existing workflow until reset. Deploy workers with this expression before the API publishes or resets intake templates.
 
 The sentryIssueDescription(issue, fetchedIssue, latestEvent, recommendedEvent) expression uses the same description assembly as manual imports. It prefers the latest event with a stack trace, then a recommended event with a stack trace or more entries. API failures keep the original issue and available event data.
 

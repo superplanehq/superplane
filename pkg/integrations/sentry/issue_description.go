@@ -878,6 +878,12 @@ func AssembleIssueDescription(originalIssue, fetchedIssue, latestEvent, recommen
 	return IssueDescription(issue, preferredIssueEvent(decodeIssueEvent(latestEvent), decodeIssueEvent(recommendedEvent)))
 }
 
+// EventHasStack reports whether a decoded Sentry event contains stack frames.
+// Missing and invalid response bodies do not contain a usable stack.
+func EventHasStack(value any) bool {
+	return decodeIssueEvent(value).HasStack()
+}
+
 func decodeIssueEvent(value any) *IssueEventDetail {
 	if event, ok := value.(*IssueEventDetail); ok {
 		return event

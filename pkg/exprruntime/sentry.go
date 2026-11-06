@@ -16,3 +16,13 @@ func SentryIssueDescriptionOption() expr.Option {
 		return sentry.AssembleIssueDescription(params[0], params[1], params[2], params[3]), nil
 	}, new(func(any, any, any, any) string))
 }
+
+// SentryEventHasStackOption shares Sentry event decoding and stack detection.
+func SentryEventHasStackOption() expr.Option {
+	return expr.Function("sentryEventHasStack", func(params ...any) (any, error) {
+		if len(params) != 1 {
+			return nil, fmt.Errorf("sentryEventHasStack() expects one argument")
+		}
+		return sentry.EventHasStack(params[0]), nil
+	}, new(func(any) bool))
+}

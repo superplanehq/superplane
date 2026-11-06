@@ -19,9 +19,15 @@ spec:
       targetId: get-sentry-event
     - channel: success
       sourceId: get-sentry-event
-      targetId: get-recommended-sentry-event
+      targetId: latest-sentry-event-has-stack
     - channel: failure
       sourceId: get-sentry-event
+      targetId: latest-sentry-event-has-stack
+    - channel: 'true'
+      sourceId: latest-sentry-event-has-stack
+      targetId: create-work-order
+    - channel: 'false'
+      sourceId: latest-sentry-event-has-stack
       targetId: get-recommended-sentry-event
     - channel: success
       sourceId: get-recommended-sentry-event
@@ -83,6 +89,16 @@ spec:
         x: 576
         'y': 1338
       isCollapsed: false
+    - id: latest-sentry-event-has-stack
+      name: Latest event has a stack?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: 'sentryEventHasStack($["Get Sentry Event"].data?.body)'
+      position:
+        x: 576
+        'y': 1698
+      isCollapsed: false
     - id: get-recommended-sentry-event
       name: Get Recommended Sentry Event
       type: TYPE_ACTION
@@ -97,7 +113,7 @@ spec:
           integrationKey: SENTRY_AUTH_TOKEN
       position:
         x: 576
-        'y': 1698
+        'y': 2058
       isCollapsed: false
     - id: create-work-order
       name: Create Task
@@ -105,8 +121,8 @@ spec:
       component: createWorkOrder
       configuration:
         title: '{{ root().data.data.issue.title }}'
-        description: '{{ sentryIssueDescription(root().data.data.issue, $["Get Sentry Issue"].data?.body, $["Get Sentry Event"].data?.body, $["Get Recommended Sentry Event"].data?.body) }}'
+        description: '{{ sentryIssueDescription(root().data.data.issue, $["Get Sentry Issue"].data?.body, $["Get Sentry Event"].data?.body, $["Get Recommended Sentry Event"]?.data?.body) }}'
       position:
         x: 576
-        'y': 2058
+        'y': 2418
       isCollapsed: false
