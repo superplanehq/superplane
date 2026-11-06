@@ -226,7 +226,7 @@ func dispatchWorkOrderOnLineTx(
 	if err := validateLineDispatchModel(tx, orgID, factoryID, run, subscriptionOrderOwnerID(tx, order)); err != nil {
 		return nil, err
 	}
-	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
+	if err := requireSavedBranchForImplementation(tx, factory, order, run.steps); err != nil {
 		return nil, err
 	}
 	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
@@ -410,21 +410,17 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 // requireSavedBranchForImplementation stops Implement when checkout would
 // discover a branch the later pull request cannot read. Create pull request
 // uses the saved task branch. An empty value fails after commits are pushed.
-// The check covers every step from the start index, so a line that reaches
-// Implement later cannot start without a saved branch. Read-only lines still
-// start and follow the remote default.
+// The check covers every step that will run, including saved retry steps.
+// A line that reaches Implement later cannot start without a saved branch.
+// Read-only lines start and follow the remote default.
 func requireSavedBranchForImplementation(
 	tx *gorm.DB,
 	factory *models.Factory,
 	order *models.FactoryWorkOrder,
-	line *models.FactoryLine,
-	startIndex int,
+	steps []models.FactoryLineStep,
 ) error {
-	if line == nil || startIndex < 0 || startIndex >= len(line.Steps) {
-		return nil
-	}
-	appIDs := make([]uuid.UUID, 0, len(line.Steps)-startIndex)
-	for _, step := range line.Steps[startIndex:] {
+	appIDs := make([]uuid.UUID, 0, len(steps))
+	for _, step := range steps {
 		appIDs = append(appIDs, step.AppID)
 	}
 	blocked, err := implementStepsMissingSavedBranch(tx, factory, order, appIDs)

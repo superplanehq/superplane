@@ -1307,6 +1307,67 @@ func Test__DispatchWorkOrder__RequiresASavedBranchBeforeALaterImplementStep(t *t
 	require.NotEmpty(t, response.Order.LineDispatches)
 }
 
+func TestDispatchRetryChecksSavedBranchForSavedSteps(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		savedImplement bool
+	}{
+		{name: "requires a branch for a removed Implement step", savedImplement: true},
+		{name: "ignores an Implement step added after the saved run"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			branch := "main"
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
+			readOnly, readOnlyEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "read-only", "start-read")
+			implement, implementEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start-impl")
+			require.NoError(t, implement.StampFactoryAppTemplate(db, implementEntry, "line-implementation", 1))
+			readOnlyStep := models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: readOnly.ID, Entrypoint: readOnlyEntry}
+			implementStep := models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: implementEntry}
+			steps := []models.FactoryLineStep{readOnlyStep, readOnlyStep, readOnlyStep}
+			if tc.savedImplement {
+				steps[2] = implementStep
+			}
+			line, err := factory.CreateLine(db, "ship", steps)
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Retry the saved steps", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+			started, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+				FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+			})
+			require.NoError(t, err)
+			dispatch, err := models.FindWorkOrderLineDispatch(db, uuid.MustParse(started.Order.LineDispatches[0].Id))
+			require.NoError(t, err)
+			require.NoError(t, dispatch.Finish(db, models.CanvasRunResultFailed))
+			currentSteps := []models.FactoryLineStep{readOnlyStep, readOnlyStep, implementStep}
+			if tc.savedImplement {
+				currentSteps = steps[:2]
+			}
+			require.NoError(t, line.Update(db, nil, currentSteps, nil))
+			branch = ""
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
+			response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+				FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+				StartStepIndex: 2, ReplaceActive: true,
+			})
+			if tc.savedImplement {
+				require.ErrorContains(t, err, missingImplementBranchMessage)
+				assertDispatchRejected(t, db, order, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, response.Order.LineDispatches, 1)
+			retried := response.Order.LineDispatches[0]
+			assert.Equal(t, dispatch.ID.String(), retried.Id)
+			assert.Equal(t, int32(2), retried.StepExecutions[len(retried.StepExecutions)-1].StepIndex)
+		})
+	}
+}
+
 func uuidField(value any) (uuid.UUID, bool) {
 	switch typed := value.(type) {
 	case uuid.UUID:
