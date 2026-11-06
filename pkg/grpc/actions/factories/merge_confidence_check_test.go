@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestMergeConfidenceCheckTracksRunToCompletionOnItsOriginalHead(t *testing.T) {
@@ -186,23 +188,75 @@ func TestMergeConfidenceCheckDoesNotReplaceNewerAssessmentForTheSameHead(t *test
 	}
 }
 
-func TestMergeConfidenceCheckClosesPublishedCheckAfterCanvasDeletion(t *testing.T) {
-	f, request := newMergeConfidenceCheckFixture(t)
-	require.NoError(t, f.db.Model(f.canvas).Update("deleted_at", time.Now()).Error)
-	host := &contexts.HTTPContext{Responses: []*http.Response{
-		mergeConfidenceCheckListResponse(f.run.ID, "in_progress"),
-		publicationHTTPResponse(200, `{"id":123}`),
-	}}
-	installPublicationGitHub(t, host)
-	require.NoError(t, ProcessMergeConfidenceCheckRequest(t.Context(), IntakeDependencies{}, request.ID))
-	require.Len(t, host.Requests, 2)
-	assert.Equal(t, http.MethodPatch, host.Requests[1].Method)
-	body := mergeConfidenceCheckRequestBody(t, host.Requests[1])
-	assert.Equal(t, "completed", body["status"])
-	assert.Equal(t, "cancelled", body["conclusion"])
-	stored, err := models.FindCanvasNodeRequest(f.db, request.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.NodeExecutionRequestStateCompleted, stored.State)
+func TestMergeConfidenceCheckRetriesBeforeRunCleanup(t *testing.T) {
+	for _, cleanup := range []string{"canvas deletion", "retention"} {
+		t.Run(cleanup, func(t *testing.T) {
+			f, request := newMergeConfidenceCheckFixture(t)
+			emitMergeConfidenceCheckAssessment(t, f, "passed", true)
+			f.finish(t, models.CanvasRunResultPassed)
+			now := time.Now()
+			conclusion := "success"
+			if cleanup == "canvas deletion" {
+				require.NoError(t, f.db.Model(f.canvas).Update("deleted_at", now.Add(-24*time.Hour)).Error)
+				conclusion = "cancelled"
+			} else {
+				require.NoError(t, f.db.Model(&models.Organization{}).Where("id = ?", f.workspace.OrganizationID).Update("usage_retention_window_days", 1).Error)
+				require.NoError(t, f.db.Model(f.run).Update("finished_at", now.Add(-48*time.Hour)).Error)
+			}
+			host := &contexts.HTTPContext{Responses: []*http.Response{
+				mergeConfidenceCheckListResponse(f.run.ID, "in_progress"),
+				publicationHTTPResponse(502, `{"message":"GitHub unavailable"}`),
+				mergeConfidenceCheckListResponse(f.run.ID, "in_progress"),
+				publicationHTTPResponse(200, `{"id":123}`),
+			}}
+			installPublicationGitHub(t, host)
+			require.Error(t, ProcessMergeConfidenceCheckRequest(t.Context(), IntakeDependencies{}, request.ID))
+			listRuns := func() ([]models.CanvasRun, error) {
+				if cleanup == "canvas deletion" {
+					return f.canvas.ListRuns(f.db, 50)
+				}
+				return models.ListExpiredFinishedRuns(f.db, now, 50)
+			}
+			cleanRun := func() bool {
+				deleted := false
+				require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error {
+					var run *models.CanvasRun
+					var err error
+					if cleanup == "canvas deletion" {
+						run, err = models.LockCanvasRun(tx, f.canvas.ID, f.run.ID)
+					} else {
+						run, err = models.LockExpiredFinishedRun(tx, now, f.run.ID)
+					}
+					if err != nil || run == nil {
+						return err
+					}
+					_, err = run.DeleteChain(tx)
+					deleted = err == nil
+					return err
+				}))
+				return deleted
+			}
+			runs, err := listRuns()
+			require.NoError(t, err)
+			isAssessment := func(run models.CanvasRun) bool { return run.ID == f.run.ID }
+			require.False(t, slices.ContainsFunc(runs, isAssessment), "pending publication must not consume the cleanup batch")
+			require.False(t, cleanRun(), "cleanup must recheck publication before deleting the run")
+			require.NoError(t, request.Reschedule(f.db, now.Add(-time.Second)))
+			require.NoError(t, ProcessMergeConfidenceCheckRequest(t.Context(), IntakeDependencies{}, request.ID))
+			require.Len(t, host.Requests, 4)
+			assert.Equal(t, http.MethodPatch, host.Requests[3].Method)
+			body := mergeConfidenceCheckRequestBody(t, host.Requests[3])
+			assert.Equal(t, "completed", body["status"])
+			assert.Equal(t, conclusion, body["conclusion"])
+			stored, err := models.FindCanvasNodeRequest(f.db, request.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.NodeExecutionRequestStateCompleted, stored.State)
+			runs, err = listRuns()
+			require.NoError(t, err)
+			require.True(t, slices.ContainsFunc(runs, isAssessment))
+			require.True(t, cleanRun(), "successful publication must allow cleanup to finish")
+		})
+	}
 }
 
 func newMergeConfidenceCheckFixture(t *testing.T) (publicationFixture, *models.CanvasNodeRequest) {

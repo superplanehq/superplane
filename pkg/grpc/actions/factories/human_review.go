@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -72,21 +71,7 @@ func ReconcileFactoryHumanReview(ctx context.Context, deps IntakeDependencies, p
 	if err := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository); err != nil {
 		return err
 	}
-	return db.Connection(func(tx *gorm.DB) error {
-		key := "human-review:" + pullRequest.ID.String()
-		if err := tx.Exec("SELECT pg_advisory_lock(hashtext(?))", key).Error; err != nil {
-			return err
-		}
-		defer func() {
-			releaseCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-			defer cancel()
-			if err := tx.WithContext(releaseCtx).Exec("SELECT pg_advisory_unlock(hashtext(?))", key).Error; err != nil {
-				log.WithError(err).Error("Human review: failed to release publication lock")
-				if connection, ok := tx.Statement.ConnPool.(interface{ Raw(func(any) error) error }); ok {
-					_ = connection.Raw(func(any) error { return driver.ErrBadConn })
-				}
-			}
-		}()
+	return pullRequest.WithHumanReviewPublicationLock(db, func(tx *gorm.DB) error {
 		if err := pullRequest.LockForUpdate(tx); err != nil {
 			return err
 		}
@@ -132,6 +117,11 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 	}
 	if err := synchronizeHumanReviewReopen(db, factory, pr, current); err != nil {
 		return err
+	}
+	// Run admission requires a ready PR. Wait without creating a decision so
+	// the ready transition can start Human review for the same commit.
+	if automation.settings.Enabled && current.GetDraft() {
+		return nil
 	}
 	sha := strings.TrimSpace(current.GetHead().GetSHA())
 	if sha == "" {
