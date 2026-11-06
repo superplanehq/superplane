@@ -62,6 +62,9 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	if err != nil {
 		return err
 	}
+	if err := s.prepareHumanReviewOutput(channel, payloadType, payloads); err != nil {
+		return err
+	}
 
 	outputs := map[string][]any{
 		channel: {},
