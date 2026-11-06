@@ -9,6 +9,7 @@ import (
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
+	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 )
@@ -88,20 +89,26 @@ func runnerPullRequestViewFrom(pullRequest *models.FactoryPullRequest) runnerPul
 func writeRunnerPullRequestError(w http.ResponseWriter, err error) {
 	var inputErr *factoryactions.TaskPullRequestInputError
 	var githubErr *github.ErrorResponse
+	var bitbucketErr *bitbucket.APIError
 	switch {
 	case errors.As(err, &inputErr):
 		http.Error(w, inputErr.Error(), http.StatusBadRequest)
 	case errors.Is(err, models.ErrFactoryPullRequestRepositoryNotInWorkspace):
 		http.Error(w, "The pull request repository is not in this workspace.", http.StatusBadRequest)
-	case errors.Is(err, factoryactions.ErrTaskPullRequestGitHubOnly),
+	case errors.Is(err, factoryactions.ErrTaskPullRequestProviderUnsupported),
 		errors.Is(err, factoryactions.ErrTaskPullRequestGitHubNotConnected),
+		errors.Is(err, factoryactions.ErrTaskPullRequestBitbucketNotConnected),
 		errors.Is(err, factoryactions.ErrTaskPullRequestOtherTask),
 		errors.Is(err, models.ErrFactoryPullRequestAlreadyExists):
 		http.Error(w, err.Error(), http.StatusConflict)
 	case errors.Is(err, factoryactions.ErrTaskPullRequestGitHubTimeout):
 		http.Error(w, "GitHub did not answer in time. Try again later.", http.StatusGatewayTimeout)
+	case errors.Is(err, factoryactions.ErrTaskPullRequestBitbucketTimeout):
+		http.Error(w, "Bitbucket did not answer in time. Try again later.", http.StatusGatewayTimeout)
 	case errors.As(err, &githubErr):
 		http.Error(w, "GitHub rejected the pull request: "+githubErr.Message, http.StatusBadGateway)
+	case errors.As(err, &bitbucketErr):
+		http.Error(w, "Bitbucket rejected the pull request: "+bitbucketErr.Message, http.StatusBadGateway)
 	default:
 		log.WithError(err).Error("runner pull request request failed")
 		http.Error(w, "Pull request request failed", http.StatusInternalServerError)

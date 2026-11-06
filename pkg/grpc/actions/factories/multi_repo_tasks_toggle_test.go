@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -38,31 +39,38 @@ func TestSetOrganizationMultiRepoTasksSwitchesTheImplementTemplate(t *testing.T)
 	github := resetTestTemplate(t, r, factory, lineImplementationTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
 		setResetTestDraftPullRequests(t, doc, true)
 	})
-	bitbucket := resetTestTemplate(t, r, factory, lineImplementationTemplateID, models.ProviderBitbucket, func(*yaml.Canvas) {})
-	bitbucketVersion := resetTestLiveVersion(t, bitbucket).ID
+	bitbucket := resetTestTemplate(t, r, factory, lineImplementationTemplateID, models.ProviderBitbucket, func(doc *yaml.Canvas) {
+		setResetTestDraftPullRequests(t, doc, true)
+	})
 
 	result, err := setMultiRepoTasks(t, r, true)
 	require.NoError(t, err)
-	assert.Equal(t, 1, result.Reset, "only the GitHub template has a multi-repo variant")
+	assert.Equal(t, 2, result.Reset, "both providers have a multi-repo variant")
 	assert.True(t, multiRepoTasksStored(t, r))
-	current := resetTestLiveVersion(t, github)
-	assert.False(t, hasPullRequestNode(current.Nodes), "multi-repo agents open their own pull requests")
-	assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
-	assert.Equal(t, bitbucketVersion, resetTestLiveVersion(t, bitbucket).ID)
+	enabledVersions := map[*models.Canvas]uuid.UUID{}
+	for _, canvas := range []*models.Canvas{github, bitbucket} {
+		current := resetTestLiveVersion(t, canvas)
+		assert.False(t, hasPullRequestNode(current.Nodes), "multi-repo agents open their own pull requests")
+		assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+		enabledVersions[canvas] = current.ID
+	}
 
-	enabledVersion := current.ID
 	result, err = setMultiRepoTasks(t, r, true)
 	require.NoError(t, err)
 	assert.Zero(t, result.Reset, "enabling twice must not publish again")
-	assert.Equal(t, enabledVersion, resetTestLiveVersion(t, github).ID)
+	for canvas, version := range enabledVersions {
+		assert.Equal(t, version, resetTestLiveVersion(t, canvas).ID)
+	}
 
 	result, err = setMultiRepoTasks(t, r, false)
 	require.NoError(t, err)
-	assert.Equal(t, 1, result.Reset)
+	assert.Equal(t, 2, result.Reset)
 	assert.False(t, multiRepoTasksStored(t, r))
-	current = resetTestLiveVersion(t, github)
-	assert.True(t, hasPullRequestNode(current.Nodes))
-	assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+	for _, canvas := range []*models.Canvas{github, bitbucket} {
+		current := resetTestLiveVersion(t, canvas)
+		assert.True(t, hasPullRequestNode(current.Nodes))
+		assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+	}
 }
 
 func TestSetOrganizationMultiRepoTasksKeepsTheFlagWhenSettingsCannotApply(t *testing.T) {

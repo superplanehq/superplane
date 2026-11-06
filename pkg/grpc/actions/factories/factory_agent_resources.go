@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -75,7 +77,7 @@ func CreateFactoryAgentResource(
 	if err := requireContextRepoAccess(factory, req.GetKind(), req.GetAccess()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
-	if err := authorizeContextRepository(ctx, db, organizationID, factory, config); err != nil {
+	if err := authorizeContextRepository(ctx, db, deps, organizationID, factory, config); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
 	resource, err := factory.CreateAgentResource(
@@ -194,7 +196,7 @@ func UpdateFactoryAgentResource(
 		if config != nil {
 			merged = *config
 		}
-		if err := authorizeContextRepository(ctx, db, organizationID, factory, merged); err != nil {
+		if err := authorizeContextRepository(ctx, db, deps, organizationID, factory, merged); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update agent resource")
 		}
 	}
@@ -221,11 +223,15 @@ func UpdateFactoryAgentResource(
 func authorizeContextRepository(
 	ctx context.Context,
 	db *gorm.DB,
+	deps IntakeDependencies,
 	organizationID string,
 	factory *models.Factory,
 	config models.FactoryAgentResourceConfig,
 ) error {
 	provider := strings.ToLower(strings.TrimSpace(config.VCSProvider))
+	if provider == models.ProviderBitbucket {
+		return authorizeBitbucketContextRepository(db, deps, factory, config)
+	}
 	if provider != "" && provider != models.ProviderGitHub {
 		return nil
 	}
@@ -264,6 +270,37 @@ func authorizeContextRepository(
 		return grpcerrors.PermissionDenied(nil, "repository is not accessible")
 	}
 	return nil
+}
+
+// authorizeBitbucketContextRepository rejects a Read & Write Bitbucket
+// repository that the workspace token cannot reach. Bitbucket tokens cannot
+// be limited to some repositories, so agents push with the workspace token.
+// A repository access token reaches only its own repository.
+func authorizeBitbucketContextRepository(
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	config models.FactoryAgentResourceConfig,
+) error {
+	if !config.ContextRepoWritable() || strings.TrimSpace(config.Repository) == "" {
+		return nil
+	}
+	if strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID) == "" {
+		return nil
+	}
+	client, err := newFactoryBitbucketAPI(db, deps, factory)
+	if err != nil {
+		return err
+	}
+	if client.AuthType == bitbucketintegration.AuthTypeRepositoryAccessToken {
+		return grpcerrors.PermissionDenied(nil, "a repository access token cannot change other repositories")
+	}
+	_, err = client.GetRepository(config.Repository)
+	var apiError *bitbucketintegration.APIError
+	if errors.As(err, &apiError) && (apiError.StatusCode == http.StatusForbidden || apiError.StatusCode == http.StatusNotFound) {
+		return grpcerrors.PermissionDenied(err, "repository is not accessible")
+	}
+	return err
 }
 
 func DeleteFactoryAgentResource(

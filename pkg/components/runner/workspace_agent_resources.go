@@ -67,6 +67,10 @@ type workspaceContextRepository struct {
 	Directory  string `json:"directory"`
 	Branch     string `json:"branch,omitempty"`
 	ReadOnly   bool   `json:"readOnly,omitempty"`
+	// PushBlocked removes the push URL of a read-only clone. A Bitbucket
+	// token reaches every repository of its workspace, so the token cannot
+	// keep the repository read-only.
+	PushBlocked bool `json:"pushBlocked,omitempty"`
 }
 
 type workspaceContextFile struct {
@@ -129,7 +133,7 @@ func AttachWorkspaceAgentResources(
 			skills = nil
 		}
 	}
-	setupCommands, contextRepos, err := loadWorkspaceSetupAndContext(db, factory)
+	setupCommands, contextRepos, multiRepo, err := loadWorkspaceSetupAndContext(db, factory)
 	if err != nil {
 		logger.WithError(err).Warn("skip workspace setup and context: list failed")
 		setupCommands = nil
@@ -151,23 +155,23 @@ func AttachWorkspaceAgentResources(
 	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
 	files = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceSetupFiles(setupCommands, files)
-	files = appendWorkspaceContextFiles(db, factory, contextRepos, files)
+	files = appendWorkspaceContextFiles(db, factory, contextRepos, multiRepo, files)
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, setupCommands, contextRepos)
 	return environment, files
 }
 
-func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, error) {
+func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, bool, error) {
 	commands, err := factory.ListEnabledSetupCommands(db)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	repos, err := factory.ListEnabledContextRepos(db)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	multiRepo, err := factory.MultiRepoTasksEnabled(db)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	if !multiRepo {
 		for i := range repos {
@@ -176,7 +180,7 @@ func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]strin
 			repos[i].Config = datatypes.NewJSONType(config)
 		}
 	}
-	return commands, repos, nil
+	return commands, repos, multiRepo, nil
 }
 
 func rejectDisabledSetupCommands(db *gorm.DB, factory *models.Factory, commands []string, disabled map[string]struct{}) []string {
@@ -313,7 +317,7 @@ func WorkspaceContextRepoDirectory(repository string) string {
 	return "context/" + repository
 }
 
-func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, files []TaskFile) []TaskFile {
+func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, multiRepo bool, files []TaskFile) []TaskFile {
 	if len(resources) == 0 {
 		return files
 	}
@@ -340,13 +344,15 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 		if provider == "" {
 			provider = factoryProvider
 		}
+		readOnly := !config.ContextRepoWritable()
 		repos = append(repos, workspaceContextRepository{
-			Name:       resources[i].Name,
-			Repository: repository,
-			URL:        WorkspaceContextRepoURL(provider, repository, githubHost),
-			Directory:  WorkspaceContextRepoDirectory(repository),
-			Branch:     strings.TrimSpace(config.Ref),
-			ReadOnly:   !config.ContextRepoWritable(),
+			Name:        resources[i].Name,
+			Repository:  repository,
+			URL:         WorkspaceContextRepoURL(provider, repository, githubHost),
+			Directory:   WorkspaceContextRepoDirectory(repository),
+			Branch:      strings.TrimSpace(config.Ref),
+			ReadOnly:    readOnly,
+			PushBlocked: multiRepo && readOnly && strings.EqualFold(provider, models.ProviderBitbucket),
 		})
 	}
 	if len(repos) == 0 {
@@ -685,7 +691,7 @@ if [ -f "$ctx" ]; then
     echo "node not found on PATH; skipping context repositories" >&2
   else
     _sp_tab="$(printf '\t')"
-    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];const url=(process.argv[3]||"").trim().replace(/\.git$/,"").match(/[\/:]([^\/:]+\/[^\/:]+)$/);const main=((process.argv[2]||"").trim()||(url?url[1]:"")).toLowerCase();for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();const repo=((e&&e.repository)||"").trim().toLowerCase();const b=((e&&e.branch)||"").trim()||"-";const ro=e&&e.readOnly?"1":"0";if(main&&repo===main){continue;}if(u&&dir){console.log(u+"\t"+dir+"\t"+ro+"\t"+b);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx" "${REPO:-}" "${REPO_URL:-}")" || exit 1
+    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];const url=(process.argv[3]||"").trim().replace(/\.git$/,"").match(/[\/:]([^\/:]+\/[^\/:]+)$/);const main=((process.argv[2]||"").trim()||(url?url[1]:"")).toLowerCase();for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();const repo=((e&&e.repository)||"").trim().toLowerCase();const b=((e&&e.branch)||"").trim()||"-";const ro=e&&e.readOnly?"1":"0";const np=e&&e.pushBlocked?"1":"0";if(main&&repo===main){continue;}if(u&&dir){console.log(u+"\t"+dir+"\t"+ro+"\t"+b+"\t"+np);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx" "${REPO:-}" "${REPO_URL:-}")" || exit 1
     if [ -n "$_sp_ctx_list" ]; then
       clone_context_repository() {
         _sp_branch="$4"
@@ -708,7 +714,7 @@ if [ -f "$ctx" ]; then
           git -C "$2" remote set-head origin "$_sp_branch" || return 1
         fi
       }
-      printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir readonly branch; do
+      printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir readonly branch pushblocked; do
         case "$dir" in
           ""|"."|"/"|*..*)
             echo "Skipping context repository with unsafe directory: $dir" >&2
@@ -727,6 +733,9 @@ if [ -f "$ctx" ]; then
           mkdir -p "$(dirname "$dir")"
           rm -rf "$dir"
           clone_context_repository "$url" "$dir" "$readonly" "$branch" || exit 1
+        fi
+        if [ "$pushblocked" = "1" ]; then
+          git -C "$dir" remote set-url --push origin read-only-repository || exit 1
         fi
         if [ "$readonly" = "0" ] && [ "${` + WorkspaceCheckoutCommitSetupEnv + `:-0}" = "1" ]; then
           (cd "$dir" && bash -c ` + shellSingleQuoted(FactoryRepoCommitSetup()) + `) || exit 1
