@@ -1,6 +1,10 @@
 import { concreteClaudeModelId, displayModelName } from "@/lib/hostedLLMModels";
+import { thinkingOptions, type ThinkingOption } from "@/lib/thinkingLevel";
 
 export const DRAFT_START_MODEL_AUTO = "auto";
+
+const DRAFT_START_THINKING_AGENT_SETTING: ThinkingOption = { value: "", label: "Agent setting" };
+const DRAFT_START_THINKING_DEFAULT: ThinkingOption = { value: "default", label: "Default" };
 
 export function draftStartModelPayload(selected: string): string | undefined {
   const trimmed = selected.trim();
@@ -8,6 +12,41 @@ export function draftStartModelPayload(selected: string): string | undefined {
     return undefined;
   }
   return trimmed;
+}
+
+/**
+ * Thinking levels for the Start model. Auto keeps the model of each agent,
+ * so it has no single set of levels and Start sends no thinking override.
+ */
+export function draftStartThinkingLevels(
+  models: ReadonlyArray<{ id?: string; thinkingLevels?: string[] }> | undefined,
+  selected: string,
+): string[] {
+  if (selected === DRAFT_START_MODEL_AUTO) {
+    return [];
+  }
+  return models?.find((model) => model.id === selected)?.thinkingLevels ?? [];
+}
+
+/**
+ * Agent setting inherits saved efforts. Default clears them for this run,
+ * including models without effort control. Auto keeps each agent's settings.
+ */
+export function draftStartThinkingOptions(levels: ReadonlyArray<string> | undefined, model: string): ThinkingOption[] {
+  if (model === DRAFT_START_MODEL_AUTO) {
+    return [];
+  }
+  return [
+    DRAFT_START_THINKING_AGENT_SETTING,
+    DRAFT_START_THINKING_DEFAULT,
+    ...thinkingOptions(levels, { withDefault: false }),
+  ];
+}
+
+/** Keep only available Start choices, including the run-only Default. */
+export function supportedDraftStartThinkingLevel(value: string, options: ReadonlyArray<ThinkingOption>): string {
+  const level = value.trim().toLowerCase();
+  return options.some((option) => option.value === level) ? level : "";
 }
 
 /** Short label for a stored runner model id. Aliases use a versioned id from modelIds. */

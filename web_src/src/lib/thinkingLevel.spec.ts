@@ -26,6 +26,7 @@ describe("visibleThinkingLevelLabel", () => {
     expect(visibleThinkingLevelLabel("medium")).toBe("Medium");
     expect(visibleThinkingLevelLabel("high")).toBe("High");
     expect(visibleThinkingLevelLabel("xhigh")).toBe("Extra high");
+    expect(visibleThinkingLevelLabel("ultra")).toBe("Ultra");
     expect(visibleThinkingLevelLabel("default")).toBe("Default");
   });
 
@@ -38,7 +39,7 @@ describe("visibleThinkingLevelLabel", () => {
 
 describe("modelNameWithThinking", () => {
   it("puts the thinking word after the model name", () => {
-    expect(modelNameWithThinking("opus 4-6", "medium")).toBe("opus 4-6 Medium");
+    expect(modelNameWithThinking("gpt-6-astra", "ultra")).toBe("gpt-6-astra Ultra");
   });
 
   it("leaves the model name alone for Auto", () => {
