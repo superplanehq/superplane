@@ -65,6 +65,41 @@ func TestHumanReviewReconciliationPreservesConcurrentCompletion(t *testing.T) {
 	require.Equal(t, [][]string{{"owner"}}, f.client.requests)
 }
 
+func TestHumanReviewStartsAfterDraftBecomesReadyOnTheSameCommit(t *testing.T) {
+	f := newHumanReviewReconciliationFixture(t)
+	f.client.current.Draft = github.Ptr(true)
+	f.reconcile(t)
+	decision, err := f.pr.CurrentHumanReview(f.db)
+	require.NoError(t, err)
+	require.Nil(t, decision, "draft pull requests must not start Human review")
+	require.Empty(t, f.client.publications)
+
+	f.client.current.Draft = github.Ptr(false)
+	f.reconcile(t)
+	decision, err = f.pr.CurrentHumanReview(f.db)
+	require.NoError(t, err)
+	require.NotNil(t, decision)
+	require.NotNil(t, decision.RunID)
+	require.Equal(t, "current-head", decision.AssessedCommit)
+	require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error {
+		run, err := models.FindCanvasRunInTransaction(tx, f.automation.canvas.ID, *decision.RunID)
+		if err != nil {
+			return err
+		}
+		root, err := run.RootEvent(tx)
+		if err != nil {
+			return err
+		}
+		return models.MaybeLinkHumanReviewRun(tx, f.automation.canvas, root, run)
+	}))
+	f.complete(t, decision)
+	owner := reviewTestUser(8, "owner", "User")
+	f.client.reviews = []*github.PullRequestReview{{ID: github.Ptr(int64(99)), User: owner, State: github.Ptr("APPROVED"), CommitID: github.Ptr("current-head")}}
+	f.client.permissions = map[string]*github.RepositoryPermissionLevel{"owner": {User: owner, Permission: github.Ptr("write")}}
+	f.reconcile(t)
+	require.Equal(t, humanReviewPublication{Status: "completed", Conclusion: "success"}, f.client.publications[len(f.client.publications)-1])
+}
+
 func TestHumanReviewReconciliationPreservesGateAfterRunRetention(t *testing.T) {
 	f := newHumanReviewReconciliationFixture(t)
 	f.reconcile(t)
