@@ -2,9 +2,9 @@ package workers
 
 import (
 	"context"
-	"golang.org/x/sync/errgroup"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -13,11 +13,17 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const humanReviewReconcileEvery = time.Minute
+const (
+	humanReviewReconcileEvery = time.Minute
+	humanReviewBatchSize      = 100
+)
 
 // FactoryHumanReviewWorker repairs missed webhooks and unfinished external
 // publications. It runs with the existing node-request worker configuration.
-type FactoryHumanReviewWorker struct{ deps factories.IntakeDependencies }
+type FactoryHumanReviewWorker struct {
+	deps    factories.IntakeDependencies
+	afterID uuid.UUID
+}
 
 func NewFactoryHumanReviewWorker(encryptor crypto.Encryptor, registry *registry.Registry) *FactoryHumanReviewWorker {
 	return &FactoryHumanReviewWorker{deps: factories.IntakeDependencies{Encryptor: encryptor, Registry: registry}}
@@ -38,23 +44,21 @@ func (w *FactoryHumanReviewWorker) Start(ctx context.Context) {
 }
 
 func (w *FactoryHumanReviewWorker) reconcile(ctx context.Context) {
-	pullRequests, err := models.ListOpenFactoryHumanReviewPullRequests(database.DB(ctx))
+	pullRequests, err := models.ListOpenFactoryHumanReviewPullRequests(database.DB(ctx), w.afterID, humanReviewBatchSize)
 	if err != nil {
 		log.WithError(err).Error("Human review: failed to list tracked pull requests")
 		return
 	}
-	var group errgroup.Group
-	group.SetLimit(4)
 	for _, pr := range pullRequests {
 		if ctx.Err() != nil {
-			break
+			return
 		}
-		group.Go(func() error {
-			if err := factories.ReconcileFactoryHumanReview(ctx, w.deps, pr); err != nil {
-				log.WithError(err).WithField("pull_request", pr.ID).Warn("Human review reconciliation failed")
-			}
-			return nil
-		})
+		if !factories.ScheduleFactoryHumanReview(ctx, w.deps, pr) {
+			return
+		}
+		w.afterID = pr.ID
 	}
-	_ = group.Wait()
+	if len(pullRequests) < humanReviewBatchSize {
+		w.afterID = uuid.Nil
+	}
 }
