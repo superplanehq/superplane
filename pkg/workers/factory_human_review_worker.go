@@ -44,7 +44,7 @@ func (w *FactoryHumanReviewWorker) Start(ctx context.Context) {
 }
 
 func (w *FactoryHumanReviewWorker) reconcile(ctx context.Context) {
-	pullRequests, err := models.ListOpenFactoryHumanReviewPullRequests(database.DB(ctx), w.afterID, humanReviewBatchSize)
+	pullRequests, err := models.ListFactoryHumanReviewPullRequestsToReconcile(database.DB(ctx), w.afterID, humanReviewBatchSize)
 	if err != nil {
 		log.WithError(err).Error("Human review: failed to list tracked pull requests")
 		return

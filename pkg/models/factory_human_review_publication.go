@@ -13,6 +13,8 @@ import (
 // connection without holding a database transaction open during network calls.
 func (p *FactoryPullRequest) WithHumanReviewPublicationLock(db *gorm.DB, publish func(*gorm.DB) error) error {
 	return db.Connection(func(conn *gorm.DB) error {
+		// Reuse the connection without carrying SQL clauses between queries.
+		conn = conn.Session(&gorm.Session{NewDB: true})
 		key := "human-review:" + p.ID.String()
 		if err := conn.Exec("SELECT pg_advisory_lock(hashtext(?))", key).Error; err != nil {
 			return err

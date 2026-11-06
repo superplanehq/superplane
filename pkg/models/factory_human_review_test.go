@@ -65,7 +65,7 @@ func TestHumanReviewPollingFiltersWorkspacesAndPagesByID(t *testing.T) {
 	var found []uuid.UUID
 	cursor := uuid.Nil
 	for range len(expected) + 1 {
-		page, err := models.ListOpenFactoryHumanReviewPullRequests(db, cursor, 1)
+		page, err := models.ListFactoryHumanReviewPullRequestsToReconcile(db, cursor, 1)
 		require.NoError(t, err)
 		require.LessOrEqual(t, len(page), 1)
 		if len(page) == 0 {
