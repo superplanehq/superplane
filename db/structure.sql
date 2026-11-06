@@ -816,6 +816,7 @@ CREATE TABLE public.factory_pull_requests (
     merge_blocked_message text DEFAULT ''::text NOT NULL,
     mergeable_head_sha text DEFAULT ''::text NOT NULL,
     mergeable_allowed_methods text DEFAULT ''::text NOT NULL,
+    human_review_request_id uuid,
     CONSTRAINT factory_pull_requests_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_pull_requests_state_valid CHECK ((state = ANY (ARRAY['open'::text, 'draft'::text, 'closed'::text, 'merged'::text])))
 );
@@ -4097,6 +4098,13 @@ CREATE UNIQUE INDEX idx_factory_pull_requests_factory_url ON public.factory_pull
 
 
 --
+-- Name: idx_factory_pull_requests_human_review_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_pull_requests_human_review_pending ON public.factory_pull_requests USING btree (id) WHERE (human_review_request_id IS NOT NULL);
+
+
+--
 -- Name: idx_factory_pull_requests_work_order; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6605,7 +6613,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261106145548	f
+20261106161211	f
 \.
 
 
