@@ -312,6 +312,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		{source: models.FactoryIntakeSourceGitHubIssues, paused: true},
 		{source: models.FactoryIntakeSourceJiraIssues},
 		{source: models.FactoryIntakeSourceSentryExceptions},
+		{source: models.FactoryIntakeSourceSentryExceptions, paused: true},
 		{source: models.FactoryIntakeSourceDependabotAlerts},
 		{source: models.FactoryIntakeSourceProductiveTasks},
 		{source: models.FactoryIntakeSourceDatadog},
@@ -367,9 +368,14 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.LinearLabels = []string{"bug"}
 			}
 			binding := &intakeBinding{Configuration: map[string]any{"repository": "acme/app", "project": "APP"}}
+			var sentryIntegrationID string
 			if source == models.FactoryIntakeSourceGitHubIssues {
 				id := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 				binding.Integration = &yaml.IntegrationRef{ID: id}
+			}
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				sentryIntegrationID = createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+				binding.Integration = &yaml.IntegrationRef{ID: sentryIntegrationID}
 			}
 			doc, err := buildIntakeCanvas(intakeCanvasRequest{
 				OrganizationID: r.Organization.ID, FactoryID: factory.ID, Source: source,
@@ -395,7 +401,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			require.NoError(t, err)
 			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 			var paused *bool
-			if source == models.FactoryIntakeSourceGitHubIssues {
+			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceSentryExceptions {
 				paused = &tc.paused
 			}
 			updated, err := UpdateFactoryIntake(ctx, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}, r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
@@ -444,6 +450,16 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				create := findIntakeNode(version.Nodes, resolveIntakeGraph(source, spec).CreateNodeID)
 				require.NotNil(t, create)
 				assert.Equal(t, r.User.String(), create.Configuration["defaultOwnerId"])
+				trigger := findIntakeNode(version.Nodes, intakeTriggerNodeID)
+				require.NotNil(t, trigger)
+				require.NotNil(t, trigger.IntegrationID)
+				assert.Equal(t, sentryIntegrationID, *trigger.IntegrationID)
+				enrich := findIntakeNode(version.Nodes, intakeEnrichIssueNodeID)
+				require.NotNil(t, enrich)
+				require.NotNil(t, enrich.IntegrationID)
+				assert.Equal(t, sentryIntegrationID, *enrich.IntegrationID)
+				assert.True(t, hasCanvasPath(spec.Edges, intakeFilterNodeID, enrich.ID))
+				assert.True(t, hasCanvasPath(spec.Edges, enrich.ID, create.ID))
 			}
 			if tc.restrictAuthors {
 				require.NotNil(t, findIntakeNode(version.Nodes, intakeAuthorPermissionNodeID))
