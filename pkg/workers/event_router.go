@@ -309,7 +309,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, uuid.Nil, fmt.Errorf("attach analysis session for run %s: %w", run.ID, err)
 	}
 	if err := linkFactoryColumnAppRun(tx, canvas, event, run); err != nil {
-		if !models.IsPermanentSubscriptionAdmissionError(err) {
+		if !models.IsPermanentSubscriptionAdmissionError(err) && !errors.Is(err, models.ErrFactoryHumanReviewRunRejected) {
 			return nil, uuid.Nil, err
 		}
 
@@ -379,6 +379,7 @@ func linkFactoryColumnAppRun(tx *gorm.DB, canvas *models.Canvas, event *models.C
 		{"visual evidence", models.MaybeLinkVisualEvidenceRun},
 		{"custom automation", models.MaybeLinkCustomAutomationRun},
 		{"merge confidence", models.MaybeLinkMergeConfidenceRun},
+		{"Human review", models.MaybeLinkHumanReviewRun},
 	}
 	for _, step := range links {
 		err := step.link(tx, canvas, event, run)

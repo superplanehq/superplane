@@ -111,6 +111,16 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 		return deleted, false, nil
 	}
 
+	count, err = deleteRowsLimited(c.tx, &FactoryHumanReviewDecision{}, remaining, "factory_id = ?", c.factory.ID)
+	if err != nil {
+		return deleted, false, fmt.Errorf("delete human review decisions: %w", err)
+	}
+	deleted += count
+	remaining -= int(count)
+	if remaining <= 0 {
+		return deleted, false, nil
+	}
+
 	count, err = clearFactoryPullRequestCurrentRevisionsLimited(c.tx, c.factory.ID, remaining)
 	if err != nil {
 		return deleted, false, fmt.Errorf("clear factory pull request current revisions: %w", err)

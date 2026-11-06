@@ -243,6 +243,7 @@ func ListExpiredFinishedRuns(db *gorm.DB, referenceTime time.Time, limit int) ([
 			withoutRunQueueItems,
 			withoutActiveRunExecutions,
 			withoutPendingRunRequests,
+			withoutPendingMergeConfidenceChecks,
 			oldestCanvasRunsFirst,
 		)
 
@@ -267,6 +268,7 @@ func LockExpiredFinishedRun(db *gorm.DB, referenceTime time.Time, runID uuid.UUI
 			withoutRunQueueItems,
 			withoutActiveRunExecutions,
 			withoutPendingRunRequests,
+			withoutPendingMergeConfidenceChecks,
 		).
 		Where("workflow_runs.id = ?", runID).
 		First(&run).
@@ -300,6 +302,7 @@ func (c *Canvas) ListRuns(db *gorm.DB, limit int) ([]CanvasRun, error) {
 
 	query := db.
 		Model(&CanvasRun{}).
+		Scopes(withoutPendingMergeConfidenceChecks).
 		Where("workflow_id = ?", c.ID).
 		Order("created_at ASC")
 
@@ -319,7 +322,7 @@ func LockCanvasRun(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error)
 	var run CanvasRun
 
 	err := db.
-		Scopes(lockCanvasRunsForUpdate).
+		Scopes(lockCanvasRunsForUpdate, withoutPendingMergeConfidenceChecks).
 		Where("workflow_id = ?", workflowID).
 		Where("id = ?", runID).
 		First(&run).
@@ -404,6 +407,16 @@ func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 		return nil, err
 	}
 
+	// Keep the review evidence after retention or canvas cleanup removes its
+	// source assessment or agent run. Only the deleted run loses its reference.
+	for _, column := range []string{"source_run_id", "run_id"} {
+		if err := db.Model(&FactoryHumanReviewDecision{}).
+			Where(column+" = ?", r.ID).
+			Update(column, nil).Error; err != nil {
+			return nil, fmt.Errorf("clear human review %s reference: %w", column, err)
+		}
+	}
+
 	count, err = deleteRows(db, &CanvasRun{}, "id = ?", r.ID)
 	if err != nil {
 		return nil, err
@@ -476,6 +489,22 @@ func withoutPendingRunRequests(tx *gorm.DB) *gorm.DB {
 			AND workflow_node_requests.state = ?
 		)
 	`, NodeExecutionRequestStatePending)
+}
+
+// Standalone check publications outlive execution cancellation. Keep their run
+// and root event until GitHub accepts the terminal update, including after the
+// canvas is deleted or the run expires.
+func withoutPendingMergeConfidenceChecks(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_requests
+			WHERE workflow_node_requests.workflow_id = workflow_runs.workflow_id
+			AND workflow_node_requests.type = ?
+			AND workflow_node_requests.state = ?
+			AND workflow_node_requests.spec->'merge_confidence_check'->>'run_id' = workflow_runs.id::text
+		)
+	`, NodeRequestTypeMergeConfidenceCheck, NodeExecutionRequestStatePending)
 }
 
 func oldestCanvasRunsFirst(tx *gorm.DB) *gorm.DB {
