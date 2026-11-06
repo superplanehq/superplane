@@ -189,15 +189,19 @@ func TestMergeConfidenceCheckDoesNotReplaceNewerAssessmentForTheSameHead(t *test
 }
 
 func TestMergeConfidenceCheckRetriesBeforeRunCleanup(t *testing.T) {
-	for _, cleanup := range []string{"canvas deletion", "retention"} {
+	for _, cleanup := range []string{"canvas deletion", "workspace deletion", "retention"} {
 		t.Run(cleanup, func(t *testing.T) {
 			f, request := newMergeConfidenceCheckFixture(t)
 			emitMergeConfidenceCheckAssessment(t, f, "passed", true)
 			f.finish(t, models.CanvasRunResultPassed)
 			now := time.Now()
 			conclusion := "success"
-			if cleanup == "canvas deletion" {
-				require.NoError(t, f.db.Model(f.canvas).Update("deleted_at", now.Add(-24*time.Hour)).Error)
+			if cleanup != "retention" {
+				if cleanup == "workspace deletion" {
+					_, err := DeleteFactory(t.Context(), f.workspace.OrganizationID.String(), f.workspace.ID.String())
+					require.NoError(t, err)
+				}
+				require.NoError(t, f.db.Unscoped().Model(f.canvas).Update("deleted_at", now.Add(-24*time.Hour)).Error)
 				conclusion = "cancelled"
 			} else {
 				require.NoError(t, f.db.Model(&models.Organization{}).Where("id = ?", f.workspace.OrganizationID).Update("usage_retention_window_days", 1).Error)
@@ -210,9 +214,9 @@ func TestMergeConfidenceCheckRetriesBeforeRunCleanup(t *testing.T) {
 				publicationHTTPResponse(200, `{"id":123}`),
 			}}
 			installPublicationGitHub(t, host)
-			require.Error(t, ProcessMergeConfidenceCheckRequest(t.Context(), IntakeDependencies{}, request.ID))
+			require.ErrorContains(t, ProcessMergeConfidenceCheckRequest(t.Context(), IntakeDependencies{}, request.ID), "GitHub unavailable")
 			listRuns := func() ([]models.CanvasRun, error) {
-				if cleanup == "canvas deletion" {
+				if cleanup != "retention" {
 					return f.canvas.ListRuns(f.db, 50)
 				}
 				return models.ListExpiredFinishedRuns(f.db, now, 50)
@@ -222,7 +226,7 @@ func TestMergeConfidenceCheckRetriesBeforeRunCleanup(t *testing.T) {
 				require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error {
 					var run *models.CanvasRun
 					var err error
-					if cleanup == "canvas deletion" {
+					if cleanup != "retention" {
 						run, err = models.LockCanvasRun(tx, f.canvas.ID, f.run.ID)
 					} else {
 						run, err = models.LockExpiredFinishedRun(tx, now, f.run.ID)

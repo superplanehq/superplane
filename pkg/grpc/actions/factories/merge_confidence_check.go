@@ -75,7 +75,8 @@ func reconcileMergeConfidenceCheck(ctx context.Context, tx *gorm.DB, deps Intake
 	if canvas.FactoryID == nil {
 		return request.Complete(tx)
 	}
-	factory, err := models.FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	// Pending publications must finish before deleted workspaces can be cleaned up.
+	factory, err := models.FindFactory(tx.Unscoped(), canvas.OrganizationID, *canvas.FactoryID)
 	if err != nil {
 		return err
 	}
