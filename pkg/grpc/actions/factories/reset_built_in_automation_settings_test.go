@@ -454,12 +454,18 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				require.NotNil(t, trigger)
 				require.NotNil(t, trigger.IntegrationID)
 				assert.Equal(t, sentryIntegrationID, *trigger.IntegrationID)
-				enrich := findIntakeNode(version.Nodes, intakeEnrichIssueNodeID)
-				require.NotNil(t, enrich)
-				require.NotNil(t, enrich.IntegrationID)
-				assert.Equal(t, sentryIntegrationID, *enrich.IntegrationID)
-				assert.True(t, hasCanvasPath(spec.Edges, intakeFilterNodeID, enrich.ID))
-				assert.True(t, hasCanvasPath(spec.Edges, enrich.ID, create.ID))
+				integration, err := models.FindIntegrationInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(sentryIntegrationID))
+				require.NoError(t, err)
+				previous := intakeFilterNodeID
+				for _, id := range []string{intakeSentryIssueRequestNodeID, intakeSentryEventRequestNodeID, intakeSentryRecommendedEventRequestNodeID} {
+					request := findIntakeNode(version.Nodes, id)
+					require.NotNil(t, request)
+					authorization := request.Configuration["authorization"].(map[string]any)
+					assert.Equal(t, map[string]any{"name": integration.InstallationName}, authorization["integration"])
+					assert.True(t, hasCanvasPath(spec.Edges, previous, request.ID))
+					previous = request.ID
+				}
+				assert.True(t, hasCanvasPath(spec.Edges, previous, create.ID))
 			}
 			if tc.restrictAuthors {
 				require.NotNil(t, findIntakeNode(version.Nodes, intakeAuthorPermissionNodeID))
