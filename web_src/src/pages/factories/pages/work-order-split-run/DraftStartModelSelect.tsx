@@ -6,9 +6,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dro
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import { modelNameWithThinking, supportedThinkingLevel } from "@/lib/thinkingLevel";
+import { modelNameWithThinking } from "@/lib/thinkingLevel";
 
-import { DRAFT_START_MODEL_AUTO, draftStartThinkingLevels, draftStartThinkingOptions } from "./draftStartModel";
+import {
+  DRAFT_START_MODEL_AUTO,
+  draftStartThinkingLevels,
+  draftStartThinkingOptions,
+  supportedDraftStartThinkingLevel,
+} from "./draftStartModel";
 
 type Appearance = "icon" | "labeled" | "ghost";
 
@@ -31,8 +36,8 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
  * strip settings row. Closed labeled and ghost triggers show the model name
  * and the thinking word when one is chosen. Thinking lists the levels of the
- * selected model and is hidden for Auto or a model without levels. Its
- * Agent setting choice clears the override and keeps the selected model.
+ * selected model and is hidden for Auto. Agent setting inherits saved efforts;
+ * Default clears them for the run, including models without effort control.
  */
 export function DraftStartModelSelect({
   organizationId,
@@ -60,9 +65,10 @@ export function DraftStartModelSelect({
   const catalogName = (runnerModels ?? []).find((item) => item.id === model)?.name;
   const selectedName =
     model === DRAFT_START_MODEL_AUTO ? "Auto" : catalogName || (models.isLoading ? model : `${model} (unavailable)`);
-  const levels = draftStartThinkingLevels(runnerModels, model);
-  const thinking = draftStartThinkingOptions(levels);
-  const selectedThinking = supportedThinkingLevel(thinkingLevel, levels);
+  const thinkingOptionsFor = (value: string) =>
+    draftStartThinkingOptions(draftStartThinkingLevels(runnerModels, value), value);
+  const thinking = thinkingOptionsFor(model);
+  const selectedThinking = supportedDraftStartThinkingLevel(thinkingLevel, thinking);
   const closedLabel = modelNameWithThinking(selectedName, selectedThinking);
   const catalogLoaded = runnerModels !== undefined;
 
@@ -105,7 +111,7 @@ export function DraftStartModelSelect({
           onValueChange={(nextModel) =>
             onChange({
               model: nextModel,
-              thinkingLevel: supportedThinkingLevel(thinkingLevel, draftStartThinkingLevels(runnerModels, nextModel)),
+              thinkingLevel: supportedDraftStartThinkingLevel(thinkingLevel, thinkingOptionsFor(nextModel)),
             })
           }
         />

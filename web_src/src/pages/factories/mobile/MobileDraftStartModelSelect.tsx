@@ -3,7 +3,7 @@ import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import { modelNameWithThinking, supportedThinkingLevel } from "@/lib/thinkingLevel";
+import { modelNameWithThinking } from "@/lib/thinkingLevel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +17,7 @@ import {
   DRAFT_START_MODEL_AUTO,
   draftStartThinkingLevels,
   draftStartThinkingOptions,
+  supportedDraftStartThinkingLevel,
 } from "../pages/work-order-split-run/draftStartModel";
 
 const MENU_ITEM_CLASS = "cursor-pointer text-[13px]";
@@ -51,9 +52,10 @@ export function MobileDraftStartModelSelect({
     : [{ value: DRAFT_START_MODEL_AUTO, label: "Auto" }];
   const catalogName = modelOptions.find((option) => option.value === model)?.label;
   const selectedName = catalogName || (models.isLoading || !lineName ? model : `${model} (unavailable)`);
-  const levelsFor = (value: string) => draftStartThinkingLevels(models.data?.models, value);
-  const thinking = draftStartThinkingOptions(levelsFor(model));
-  const selectedThinking = supportedThinkingLevel(thinkingLevel, levelsFor(model));
+  const thinkingOptionsFor = (value: string) =>
+    draftStartThinkingOptions(draftStartThinkingLevels(models.data?.models, value), value);
+  const thinking = thinkingOptionsFor(model);
+  const selectedThinking = supportedDraftStartThinkingLevel(thinkingLevel, thinking);
   const closedLabel = modelNameWithThinking(selectedName, selectedThinking);
   const catalogLoaded = models.data?.models !== undefined;
 
@@ -96,7 +98,7 @@ export function MobileDraftStartModelSelect({
               onSelect={() =>
                 onChange({
                   model: option.value,
-                  thinkingLevel: supportedThinkingLevel(thinkingLevel, levelsFor(option.value)),
+                  thinkingLevel: supportedDraftStartThinkingLevel(thinkingLevel, thinkingOptionsFor(option.value)),
                 })
               }
             />
