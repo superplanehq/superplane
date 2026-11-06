@@ -2,49 +2,97 @@ package runner
 
 import (
 	"fmt"
+	"regexp"
+	"slices"
 	"strings"
 )
 
 const (
 	ThinkingLevelKey     = "thinkingLevel"
+	ThinkingLevelNone    = "none"
 	ThinkingLevelMinimal = "minimal"
 	ThinkingLevelLow     = "low"
 	ThinkingLevelMedium  = "medium"
 	ThinkingLevelHigh    = "high"
 	ThinkingLevelXHigh   = "xhigh"
+	ThinkingLevelMax     = "max"
 	// DispatchThinkingDefault is the Start override that uses runner Default
 	// instead of the saved agent thinking level. Empty dispatch thinking means Auto.
 	DispatchThinkingDefault = "default"
 )
 
-func NormalizeThinkingLevel(value string) (string, error) {
-	trimmed := strings.ToLower(strings.TrimSpace(value))
-	switch trimmed {
-	case "", ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh:
-		return trimmed, nil
-	default:
-		return "", fmt.Errorf("thinkingLevel must be empty, low, medium, or high")
+// Levels that each agent CLI accepts. A model can support fewer levels;
+// see ModelThinkingLevels.
+var (
+	// ClaudeCodeThinkingLevels are the values of `claude --effort`.
+	ClaudeCodeThinkingLevels = []string{
+		ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh, ThinkingLevelMax,
 	}
+	// CodexThinkingLevels are fallback efforts for API credentials.
+	// Subscriptions use the efforts reported by the native Codex catalog.
+	CodexThinkingLevels = []string{
+		ThinkingLevelNone, ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh,
+	}
+	// OpenCodeThinkingLevels are the `opencode run --variant` values that
+	// SuperPlane sends.
+	OpenCodeThinkingLevels = []string{
+		ThinkingLevelNone, ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh, ThinkingLevelMax,
+	}
+	// allThinkingLevels lists every known level in display order.
+	allThinkingLevels = OpenCodeThinkingLevels
+)
+
+// NormalizeThinkingLevel accepts an empty value or any level that one of the
+// agent CLIs supports.
+func NormalizeThinkingLevel(value string) (string, error) {
+	return normalizeThinkingLevelIn(value, allThinkingLevels)
+}
+
+func NormalizeClaudeCodeThinkingLevel(value string) (string, error) {
+	return normalizeThinkingLevelIn(value, ClaudeCodeThinkingLevels)
 }
 
 func NormalizeCodexThinkingLevel(value string) (string, error) {
-	trimmed := strings.ToLower(strings.TrimSpace(value))
-	switch trimmed {
-	case "", ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh:
-		return trimmed, nil
-	default:
-		return "", fmt.Errorf("thinkingLevel must be empty, minimal, low, medium, high, or xhigh")
+	return normalizeThinkingLevelIn(value, CodexThinkingLevels)
+}
+
+var catalogThinkingLevelPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
+
+// NormalizeCatalogThinkingLevel normalizes an effort identifier. The selected
+// model's catalog determines whether that effort is available.
+func NormalizeCatalogThinkingLevel(value string) (string, error) {
+	level := strings.ToLower(strings.TrimSpace(value))
+	if level == "" {
+		return "", nil
 	}
+	if level == "auto" || level == DispatchThinkingDefault || !catalogThinkingLevelPattern.MatchString(level) {
+		return "", fmt.Errorf("thinkingLevel must be a reasoning effort identifier")
+	}
+	return level, nil
+}
+
+func NormalizeOpenCodeThinkingLevel(value string) (string, error) {
+	return normalizeThinkingLevelIn(value, OpenCodeThinkingLevels)
 }
 
 func NormalizeDispatchThinkingLevel(value string) (string, error) {
 	trimmed := strings.ToLower(strings.TrimSpace(value))
-	switch trimmed {
-	case "", DispatchThinkingDefault, ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh:
+	if trimmed == DispatchThinkingDefault {
 		return trimmed, nil
-	default:
-		return "", fmt.Errorf("thinking_level must be empty, default, minimal, low, medium, high, or xhigh")
 	}
+	normalized, err := NormalizeCatalogThinkingLevel(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("thinking_level must be empty, %s, or a reasoning effort identifier", DispatchThinkingDefault)
+	}
+	return normalized, nil
+}
+
+func normalizeThinkingLevelIn(value string, allowed []string) (string, error) {
+	trimmed := strings.ToLower(strings.TrimSpace(value))
+	if trimmed == "" || slices.Contains(allowed, trimmed) {
+		return trimmed, nil
+	}
+	return "", fmt.Errorf("thinkingLevel must be empty or one of: %s", strings.Join(allowed, ", "))
 }
 
 func OverlayThinkingLevel(agentValue, dispatchValue string) (string, bool) {
