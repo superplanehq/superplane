@@ -1,13 +1,9 @@
 import { Check, ChevronDown } from "lucide-react";
+import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import {
-  THINKING_LEVEL_HIGH,
-  THINKING_LEVEL_LOW,
-  THINKING_LEVEL_MEDIUM,
-  modelNameWithThinking,
-} from "@/lib/thinkingLevel";
+import { modelNameWithThinking, supportedThinkingLevel } from "@/lib/thinkingLevel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,13 +13,11 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
-import { DRAFT_START_MODEL_AUTO } from "../pages/work-order-split-run/draftStartModel";
-
-const THINKING_OPTIONS = [
-  { value: THINKING_LEVEL_LOW, label: "Low" },
-  { value: THINKING_LEVEL_MEDIUM, label: "Medium" },
-  { value: THINKING_LEVEL_HIGH, label: "High" },
-];
+import {
+  DRAFT_START_MODEL_AUTO,
+  draftStartThinkingLevels,
+  draftStartThinkingOptions,
+} from "../pages/work-order-split-run/draftStartModel";
 
 const MENU_ITEM_CLASS = "cursor-pointer text-[13px]";
 
@@ -55,10 +49,20 @@ export function MobileDraftStartModelSelect({
   const modelOptions = lineName
     ? runnerModelOptions(models.data?.models)
     : [{ value: DRAFT_START_MODEL_AUTO, label: "Auto" }];
-  const selectedName =
-    modelOptions.find((option) => option.value === model)?.label ||
-    (models.isLoading ? model : `${model} (unavailable)`);
-  const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
+  const catalogName = modelOptions.find((option) => option.value === model)?.label;
+  const selectedName = catalogName || (models.isLoading || !lineName ? model : `${model} (unavailable)`);
+  const levelsFor = (value: string) => draftStartThinkingLevels(models.data?.models, value);
+  const thinking = draftStartThinkingOptions(levelsFor(model));
+  const selectedThinking = supportedThinkingLevel(thinkingLevel, levelsFor(model));
+  const closedLabel = modelNameWithThinking(selectedName, selectedThinking);
+  const catalogLoaded = models.data?.models !== undefined;
+
+  // A refreshed catalog can drop the chosen level. Clear it so Start never sends a hidden choice.
+  useEffect(() => {
+    if (catalogLoaded && thinkingLevel !== selectedThinking) {
+      onChange({ model, thinkingLevel: selectedThinking });
+    }
+  }, [catalogLoaded, model, thinkingLevel, selectedThinking, onChange]);
 
   return (
     <DropdownMenu>
@@ -89,20 +93,29 @@ export function MobileDraftStartModelSelect({
               key={option.value}
               label={option.label}
               selected={option.value === model}
-              onSelect={() => onChange({ model: option.value, thinkingLevel })}
+              onSelect={() =>
+                onChange({
+                  model: option.value,
+                  thinkingLevel: supportedThinkingLevel(thinkingLevel, levelsFor(option.value)),
+                })
+              }
             />
           ))}
         </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Thinking</DropdownMenuLabel>
-        {THINKING_OPTIONS.map((option) => (
-          <ChoiceItem
-            key={option.value}
-            label={option.label}
-            selected={option.value === thinkingLevel}
-            onSelect={() => onChange({ model, thinkingLevel: option.value })}
-          />
-        ))}
+        {thinking.length > 0 ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Thinking</DropdownMenuLabel>
+            {thinking.map((option) => (
+              <ChoiceItem
+                key={option.value}
+                label={option.label}
+                selected={option.value === selectedThinking}
+                onSelect={() => onChange({ model, thinkingLevel: option.value })}
+              />
+            ))}
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

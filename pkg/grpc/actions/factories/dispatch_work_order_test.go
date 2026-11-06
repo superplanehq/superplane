@@ -2,20 +2,25 @@ package factories
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -70,21 +75,42 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	assert.Equal(t, dispatch.Id, active.ID.String())
 }
 
-func TestDispatchThinkingLevelsRequireCompatibleLineRunners(t *testing.T) {
-	for _, components := range [][]string{
-		{runnerCodex}, {runnerClaudeCode}, {models.SuperPlaneRunnerComponent}, {runnerOpenRouter}, {runnerCodex, runnerClaudeCode},
-	} {
-		for _, level := range []string{"minimal", "xhigh", "high", "default"} {
-			t.Run(strings.Join(components, "+")+"/"+level, func(t *testing.T) {
+func TestAutoDispatchThinkingLevelsRequireCompatibleLineRunners(t *testing.T) {
+	accepted := map[string][]string{
+		runnerCodex:                          {"xhigh", "high", "default"},
+		runnerClaudeCode:                     {"xhigh", "max", "high", "default"},
+		models.SuperPlaneRunnerComponent:     {"xhigh", "high", "default"},
+		runnerOpenRouter:                     {"minimal", "xhigh", "max", "high", "default"},
+		runnerCodex + "+" + runnerClaudeCode: {"xhigh", "high", "default"},
+	}
+	for key, levels := range accepted {
+		components := strings.Split(key, "+")
+		for _, level := range []string{"minimal", "xhigh", "max", "high", "default"} {
+			t.Run(key+"/"+level, func(t *testing.T) {
 				r := support.Setup(t)
 				db := database.DB(t.Context())
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+				modelByComponent := map[string]string{
+					runnerCodex: "gpt-5.4", runnerClaudeCode: "claude-opus-5-5", runnerOpenRouter: "deepseek/model",
+					models.SuperPlaneRunnerComponent: "hosted::openai::gpt-5.4",
+				}
+				for provider, model := range map[string]string{
+					models.UsageProviderOpenAI: "gpt-5.4", models.UsageProviderAnthropic: "claude-opus-5-5", models.UsageProviderOpenRouter: "deepseek/model",
+				} {
+					_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, []string{model})
+					require.NoError(t, err)
+				}
+				seedHostedModels(t, db, models.UsageProviderOpenAI, "gpt-5.4")
+				require.NoError(t, models.ReplaceLLMModelCapabilities(db, models.UsageProviderOpenRouter, llm.DefaultOpenRouterBaseURL, []models.LLMModelCapability{{
+					Model: "deepseek/model", ThinkingLevels: datatypes.NewJSONSlice([]string{"minimal", "high", "xhigh", "max"}),
+				}}))
 				factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 				require.NoError(t, err)
 				order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
 				require.NoError(t, err)
 				var steps []models.FactoryLineStep
 				for _, component := range components {
-					app := createLineAppWithRunner(t, r, factory.ID, component, "integration", "")
+					app := createLineAppWithRunner(t, r, factory.ID, component, "integration", modelByComponent[component])
 					steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"})
 				}
 				line, err := factory.CreateLine(db, "ship", steps)
@@ -93,21 +119,341 @@ func TestDispatchThinkingLevelsRequireCompatibleLineRunners(t *testing.T) {
 				response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
 					FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name, ThinkingLevel: level,
 				})
-				if level == "high" || level == "default" || len(components) == 1 && components[0] == runnerCodex {
+				if slices.Contains(levels, level) {
 					require.NoError(t, err)
 					require.Len(t, response.Order.LineDispatches, 1)
 					assert.Equal(t, level, response.Order.LineDispatches[0].ThinkingLevel)
 					return
 				}
-				require.Error(t, err)
-				code, _, ok := grpcerrors.HandlerStatus(err)
-				require.True(t, ok)
-				assert.Equal(t, codes.InvalidArgument, code)
-				_, err = order.FindActiveLineDispatch(db)
-				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+				assertDispatchRejected(t, db, order, err)
 			})
 		}
 	}
+}
+
+func TestDispatchThinkingLevelMustBeSupportedBySelectedModel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-opus-5-5", "claude-haiku-4-5")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "hosted", "claude-opus-5-5")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: "claude-haiku-4-5", ThinkingLevel: "high",
+	})
+	assertDispatchRejected(t, db, order, err)
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: "claude-opus-5-5", ThinkingLevel: "max",
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+	assert.Equal(t, "max", response.Order.LineDispatches[0].ThinkingLevel)
+}
+
+func TestDispatchOpenRouterThinkingFollowsProviderCatalog(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	const model = "deepseek/deepseek-v4.1-flash"
+	seedHostedModels(t, db, models.UsageProviderOpenRouter, model)
+	require.NoError(t, models.ReplaceLLMModelCapabilities(db, models.UsageProviderOpenRouter, llm.DefaultOpenRouterBaseURL, []models.LLMModelCapability{{
+		Model: model, ThinkingLevels: datatypes.NewJSONSlice([]string{"max", "high", "low", "none"}), RefreshedAt: time.Now(),
+	}}))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app := createLineAppWithRunner(t, r, factory.ID, runnerOpenRouter, "hosted", model)
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	options, err := ListFactoryLineRunnerModels(ctx, r.Organization.ID.String(), &pb.ListFactoryLineRunnerModelsRequest{
+		FactoryId: factory.ID.String(), LineName: line.Name,
+	})
+	require.NoError(t, err)
+	require.Len(t, options.Models, 1)
+	assert.Equal(t, []string{"none", "low", "high", "max"}, options.Models[0].ThinkingLevels)
+
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: model, ThinkingLevel: "medium",
+	})
+	assertDispatchRejected(t, db, order, err)
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: model, ThinkingLevel: "max",
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+	assert.Equal(t, "max", response.Order.LineDispatches[0].ThinkingLevel)
+}
+
+func TestDispatchCodexSubscriptionThinkingFollowsCatalog(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+		{Model: "gpt-6-astra", IsDefault: true, SupportedReasoningEfforts: []models.CodexReasoningEffortOption{
+			{ReasoningEffort: "low"}, {ReasoningEffort: "max"}, {ReasoningEffort: "ultra"}, {ReasoningEffort: "future-effort"},
+		}},
+		{Model: "gpt-6-luna", SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "max"}}},
+	}, time.Now()))
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	app := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "subscription", "")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	for _, tc := range []struct {
+		name, model, effort string
+		savedEffort         string
+		refreshCatalog      bool
+		wantErr             bool
+	}{
+		{name: "max", model: "gpt-6-astra", effort: "max"},
+		{name: "ultra", model: "gpt-6-astra", effort: "ultra"},
+		{name: "future catalog effort", model: "gpt-6-astra", effort: "future-effort"},
+		{name: "native default model", effort: "ultra"},
+		{name: "unreported effort", model: "gpt-6-astra", effort: "high", wantErr: true},
+		{name: "unsupported model effort", model: "gpt-6-luna", effort: "ultra", wantErr: true},
+		{name: "unsupported native default effort", effort: "high", wantErr: true},
+		{name: "inherited effort with model override", model: "gpt-6-luna", savedEffort: "ultra", wantErr: true},
+		{name: "supported inherited effort", model: "gpt-6-astra", savedEffort: "ultra"},
+		{name: "default clears inherited effort", model: "gpt-6-luna", savedEffort: "ultra", effort: "default"},
+		{name: "catalog refresh invalidates saved effort", savedEffort: "ultra", refreshCatalog: true, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			version, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+			require.NoError(t, err)
+			for i := range version.Nodes {
+				if version.Nodes[i].ComponentName() == runnerCodex {
+					version.Nodes[i].Configuration["model"] = ""
+					if tc.savedEffort != "" {
+						version.Nodes[i].Configuration["model"] = "gpt-6-astra"
+					}
+					version.Nodes[i].Configuration["thinkingLevel"] = tc.savedEffort
+				}
+			}
+			require.NoError(t, db.Model(version).Update("nodes", version.Nodes).Error)
+			if tc.refreshCatalog {
+				require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{
+					Model: "gpt-6-astra", IsDefault: true,
+					SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "low"}},
+				}}, time.Now()))
+			}
+			order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, []uuid.UUID{r.User}, nil)
+			require.NoError(t, err)
+			response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+				FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+				Model: tc.model, ThinkingLevel: tc.effort,
+			})
+			if tc.wantErr {
+				require.ErrorContains(t, err, "thinking level")
+				assertDispatchRejected(t, db, order, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, response.Order.LineDispatches, 1)
+			assert.Equal(t, tc.effort, response.Order.LineDispatches[0].ThinkingLevel)
+		})
+	}
+}
+
+func TestDispatchThinkingValidatesOnlyStepsToExecute(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		retry       bool
+		invalidStep int
+		wantErr     bool
+	}{
+		{name: "start skips earlier agent", invalidStep: 0},
+		{name: "retry skips earlier agent", retry: true, invalidStep: 0},
+		{name: "retry checks selected agent", retry: true, invalidStep: 1, wantErr: true},
+		{name: "retry checks later agent", retry: true, invalidStep: 2, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-5-5")
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			var steps []models.FactoryLineStep
+			for i := range 3 {
+				app := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "hosted", "claude-sonnet-5-5")
+				level := "low"
+				if i == tc.invalidStep {
+					level = "high"
+				}
+				setLineAppRunnerThinkingLevel(t, db, app, level)
+				steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"})
+			}
+			line, err := factory.CreateLine(db, "ship", steps)
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+			var originalDispatchID string
+			if tc.retry {
+				response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+					FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+				})
+				require.NoError(t, err)
+				originalDispatchID = response.Order.LineDispatches[0].Id
+				dispatch, err := models.FindWorkOrderLineDispatch(db, uuid.MustParse(originalDispatchID))
+				require.NoError(t, err)
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					if _, err := dispatch.EnqueueOrStartStep(tx, order, 1); err != nil {
+						return err
+					}
+					return dispatch.Finish(tx, models.CanvasRunResultFailed)
+				}))
+			}
+			// A catalog refresh removes high after the original traversal.
+			require.NoError(t, models.UpsertLLMModelCapabilities(db, []models.LLMModelCapability{{
+				Provider: models.UsageProviderAnthropic, BaseURL: llm.DefaultAnthropicBaseURL,
+				Model: "claude-sonnet-5-5", ThinkingLevels: datatypes.NewJSONSlice([]string{"low"}), RefreshedAt: time.Now(),
+			}}))
+			response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+				FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+				StartStepIndex: 1, ReplaceActive: tc.retry,
+			})
+			if tc.wantErr {
+				require.ErrorContains(t, err, "thinking level")
+				assertDispatchRejected(t, db, order, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, response.Order.LineDispatches, 1)
+			dispatch := response.Order.LineDispatches[0]
+			assert.Equal(t, int32(1), dispatch.StepExecutions[len(dispatch.StepExecutions)-1].StepIndex)
+			if tc.retry {
+				assert.Equal(t, originalDispatchID, dispatch.Id)
+				var earlierExecutions int
+				for _, execution := range dispatch.StepExecutions {
+					if execution.StepIndex == 0 {
+						earlierExecutions++
+					}
+				}
+				assert.Equal(t, 1, earlierExecutions)
+			}
+		})
+	}
+}
+
+func TestDispatchThinkingLevelWithModelMustBeAcceptedByEveryLineRunner(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-opus-5-5")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	claudeApp := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "hosted", "claude-opus-5-5")
+	codexApp := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "integration", "gpt-5-codex")
+	steps := []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: claudeApp.ID, Entrypoint: "start"},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: codexApp.ID, Entrypoint: "start"},
+	}
+	line, err := factory.CreateLine(db, "ship", steps)
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: "claude-opus-5-5", ThinkingLevel: "max",
+	})
+	assertDispatchRejected(t, db, order, err)
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: "claude-opus-5-5", ThinkingLevel: "high",
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+}
+
+func TestDispatchThinkingChecksTheRetainedSuperPlaneModel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	seedHostedModels(t, db, models.UsageProviderOpenAI, "gpt-5-codex")
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, []string{"claude-opus-5-5"})
+	require.NoError(t, err)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	claude := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "integration", "claude-opus-5-5")
+	retained := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "hosted::openai::gpt-5-codex")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: claude.ID, Entrypoint: "start"},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: retained.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: "claude-opus-5-5", ThinkingLevel: "xhigh",
+	})
+	assertDispatchRejected(t, db, order, err)
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: "claude-opus-5-5", ThinkingLevel: "high",
+	})
+	require.NoError(t, err)
+}
+
+func TestDispatchThinkingLevelUsesProviderOfSelectedModelForSuperPlaneAgent(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-opus-5-5")
+	seedHostedModels(t, db, models.UsageProviderOpenAI, "gpt-5.1")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	savedModel := models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderOpenAI, "gpt-5.1")
+	app := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", savedModel)
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	selectedModel := models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderAnthropic, "claude-opus-5-5")
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		Model: selectedModel, ThinkingLevel: "max",
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+	assert.Equal(t, "max", response.Order.LineDispatches[0].ThinkingLevel)
+}
+
+func assertDispatchRejected(t *testing.T, db *gorm.DB, order *models.FactoryWorkOrder, err error) {
+	t.Helper()
+	require.Error(t, err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, code)
+	_, err = order.FindActiveLineDispatch(db)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
 func Test__DispatchWorkOrder__ClearsAutoStartLine(t *testing.T) {
@@ -974,4 +1320,95 @@ func uuidField(value any) (uuid.UUID, bool) {
 	default:
 		return uuid.Nil, false
 	}
+}
+
+func TestDispatchKeepsSavedThinkingLevelWhenModelCapabilitiesAreMissing(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	const model = "deepseek/deepseek-v4.1-flash"
+	seedHostedModels(t, db, models.UsageProviderOpenRouter, model)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app := createLineAppWithRunner(t, r, factory.ID, runnerOpenRouter, "hosted", model)
+	setLineAppRunnerThinkingLevel(t, db, app, "high")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+}
+
+func TestDispatchRejectsSavedThinkingLevelThatTheModelCatalogLacks(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-opus-4-5-20251101")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "hosted", "claude-opus-4-5-20251101")
+	setLineAppRunnerThinkingLevel(t, db, app, "max")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+	})
+	require.ErrorContains(t, err, "saved thinking level")
+	assertDispatchRejected(t, db, order, err)
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name, ThinkingLevel: "high",
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+}
+
+func TestDispatchLeavesSavedSubscriptionThinkingToExecutionWithoutConnection(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	withoutEffort := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "subscription", "gpt-6-astra")
+	withEffort := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "subscription", "gpt-6-astra")
+	setLineAppRunnerThinkingLevel(t, db, withEffort, "high")
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+
+	var results []error
+	for _, app := range []*models.Canvas{withoutEffort, withEffort} {
+		line, err := factory.CreateLine(db, support.RandomName("ship"), []models.FactoryLineStep{
+			{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+		})
+		require.NoError(t, err)
+		order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, []uuid.UUID{r.User}, nil)
+		require.NoError(t, err)
+		_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+			FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		})
+		results = append(results, err)
+	}
+	assert.Equal(t, results[0] == nil, results[1] == nil, "a saved thinking level must not change how Start handles a missing ChatGPT connection: %v", results)
+}
+
+func setLineAppRunnerThinkingLevel(t *testing.T, db *gorm.DB, app *models.Canvas, level string) {
+	t.Helper()
+	version, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+	require.NoError(t, err)
+	for i := range version.Nodes {
+		if version.Nodes[i].ID == "agent" {
+			version.Nodes[i].Configuration["thinkingLevel"] = level
+		}
+	}
+	require.NoError(t, db.Model(version).Update("nodes", version.Nodes).Error)
 }
