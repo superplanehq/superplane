@@ -181,6 +181,7 @@ async function main() {
       const skills = cli(["debug", "skill"], childEnv, cwd);
       assert.equal(skills.status, 0, skills.stderr);
       assert.match(skills.stdout, /Fixture skill marker/);
+      const providerOrder = ["azure/us", "azure/eu", "azure"];
       write(
         childEnv.OPENCODE_CONFIG,
         JSON.stringify(
@@ -193,6 +194,7 @@ async function main() {
               OPENROUTER_BASE_URL: "https://models.example/v1",
             },
             models: ["openai/gpt-4o"],
+            providerOrder,
           }),
         ),
       );
@@ -202,6 +204,18 @@ async function main() {
         .openrouter;
       assert.equal(openrouter.options.apiKey, "synthetic-openrouter-key");
       assert.equal(openrouter.options.baseURL, "https://models.example/v1");
+      assert.deepEqual(
+        openrouter.models["openai/gpt-4o"].options.provider.order,
+        providerOrder,
+      );
+      assert.equal(
+        openrouter.models["openai/gpt-4o"].options.provider.allow_fallbacks,
+        true,
+      );
+      assert.equal(
+        openrouter.models["openai/gpt-4o"].options.provider.sort,
+        undefined,
+      );
       if (!hasConfig) continue;
 
       // Negative control proves that the real V1 loader rejects these fields.
