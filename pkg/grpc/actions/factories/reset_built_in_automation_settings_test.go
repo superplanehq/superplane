@@ -479,6 +479,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				for _, id := range []string{intakeSentryIssueRequestNodeID, intakeSentryEventRequestNodeID, intakeSentryRecommendedEventRequestNodeID} {
 					request := findIntakeNode(version.Nodes, id)
 					require.NotNil(t, request)
+					assert.Equal(t, true, request.Configuration["redactSensitiveHeaders"])
 					authorization := request.Configuration["authorization"].(map[string]any)
 					assert.Equal(t, map[string]any{"name": integration.InstallationName}, authorization["integration"])
 					assert.True(t, hasCanvasPath(spec.Edges, previous, request.ID))

@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"slices"
@@ -29,6 +30,7 @@ func TestSentryIntakeExecution(t *testing.T) {
 	latestStack := `{"eventID":"latest","entries":[{"type":"exception","data":{"values":[{"stacktrace":{"frames":[{"filename":"app.go","function":"Latest","lineNo":22}]}}]}}]}`
 	standaloneStack := `{"eventID":"latest","entries":[{"type":"stacktrace","data":{"frames":[{"filename":"app.go","function":"Standalone","lineNo":23}]}}]}`
 	recommendedStack := strings.ReplaceAll(latestStack, "Latest", "Recommended")
+	sensitiveStack := strings.Replace(latestStack, `"entries":[`, `"entries":[{"type":"request","data":{"url":"https://example.com/","headers":[["Authorization","intake-private-header"],["User-Agent","intake-safe-agent"]],"cookies":"intake-private-header"}},`, 1)
 	requestNodeIDs := []string{intakeSentryIssueRequestNodeID, intakeSentryEventRequestNodeID, intakeSentryRecommendedEventRequestNodeID}
 	for _, tc := range []struct {
 		name                            string
@@ -43,6 +45,8 @@ func TestSentryIntakeExecution(t *testing.T) {
 	}{
 		{name: "saved unconditional intake", legacy: true, latest: latestStack, wantRequests: 3, wantDescription: "Latest (app.go:22)"},
 		{name: "latest exception stack skips recommended", latest: latestStack, wantRequests: 2, wantDescription: "Latest (app.go:22)"},
+		{name: "latest headers are removed before storage", latest: sensitiveStack, wantRequests: 2, wantDescription: "intake-safe-agent"},
+		{name: "recommended headers are removed before storage", recommended: sensitiveStack, wantRequests: 3, wantDescription: "intake-safe-agent"},
 		{name: "latest standalone stack skips recommended", latest: standaloneStack, wantRequests: 2, wantDescription: "Standalone (app.go:23)"},
 		{name: "stackless latest selects recommended stack", recommended: recommendedStack, wantRequests: 3, wantDescription: "Recommended (app.go:22)"},
 		{name: "empty latest stack selects recommended", latest: `{"eventID":"latest","entries":[{"type":"exception","data":{"values":[{"stacktrace":{"frames":[]}}]}}]}`, recommended: recommendedStack, wantRequests: 3, wantDescription: "Recommended (app.go:22)"},
@@ -160,6 +164,9 @@ func TestSentryIntakeExecution(t *testing.T) {
 				var outputs []models.CanvasEvent
 				require.NoError(t, db.Where("execution_id = ?", execution.ID).Find(&outputs).Error)
 				require.Len(t, outputs, 1)
+				stored, err := json.Marshal(outputs[0].Data.Data())
+				require.NoError(t, err)
+				assert.NotContains(t, string(stored), "intake-private-header", "stored output of %s", nodeID)
 				incoming = &outputs[0]
 				if slices.Contains(tc.oversized, nodeID) {
 					assert.Equal(t, "failure", incoming.Channel)
@@ -207,6 +214,7 @@ func useUnconditionalSentryRequests(canvas *yaml.Canvas) {
 		}
 	}
 	for i := range canvas.Spec.Nodes {
+		delete(canvas.Spec.Nodes[i].Configuration, "redactSensitiveHeaders")
 		if canvas.Spec.Nodes[i].ID == intakeCreateNodeID {
 			canvas.Spec.Nodes[i].Configuration["description"] = `{{ sentryIssueDescription(root().data.data.issue, $["Get Sentry Issue"].data?.body, $["Get Sentry Event"].data?.body, $["Get Recommended Sentry Event"].data?.body) }}`
 		}

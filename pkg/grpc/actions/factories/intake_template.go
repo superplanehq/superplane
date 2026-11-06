@@ -294,9 +294,10 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 				Type:      yaml.NodeTypeAction,
 				Component: intakeHTTPRequestComponent,
 				Configuration: map[string]any{
-					"method":        "GET",
-					"url":           requestNode.url,
-					"authorization": sentryRequestAuthorization(request.Binding),
+					"method":                 "GET",
+					"url":                    requestNode.url,
+					"authorization":          sentryRequestAuthorization(request.Binding),
+					"redactSensitiveHeaders": true,
 				},
 				Concurrency: intakeConcurrency(),
 				Position:    yaml.Position{X: 160, Y: createY},

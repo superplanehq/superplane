@@ -6,6 +6,8 @@ import (
 	"html"
 	"sort"
 	"strings"
+
+	"github.com/superplanehq/superplane/pkg/httpheaders"
 )
 
 const (
@@ -524,30 +526,10 @@ type requestHeader struct {
 	value string
 }
 
-var sensitiveHeaderParts = []string{
-	"authorization",
-	"cookie",
-	"token",
-	"secret",
-	"password",
-	"api-key",
-	"apikey",
-}
-
-func isSensitiveHeader(name string) bool {
-	lower := strings.ToLower(name)
-	for _, part := range sensitiveHeaderParts {
-		if strings.Contains(lower, part) {
-			return true
-		}
-	}
-	return false
-}
-
 func safeRequestHeaders(raw any) []requestHeader {
 	headers := make([]requestHeader, 0)
 	for _, header := range requestHeaders(raw) {
-		if header.name == "" || header.value == "" || isSensitiveHeader(header.name) {
+		if header.name == "" || header.value == "" || httpheaders.IsSensitive(header.name) {
 			continue
 		}
 		headers = append(headers, header)

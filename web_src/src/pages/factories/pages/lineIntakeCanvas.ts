@@ -111,6 +111,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
             component: "http",
             configuration: {
               method: "GET",
+              redactSensitiveHeaders: true,
               url: "{{ root().data.issueApiUrl }}",
               authorization: {
                 type: "integration_bearer",
@@ -127,6 +128,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
             component: "http",
             configuration: {
               method: "GET",
+              redactSensitiveHeaders: true,
               url: "{{ root().data.issueApiUrl }}events/latest/",
               authorization: {
                 type: "integration_bearer",
@@ -151,6 +153,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
             component: "http",
             configuration: {
               method: "GET",
+              redactSensitiveHeaders: true,
               url: "{{ root().data.issueApiUrl }}events/recommended/",
               authorization: {
                 type: "integration_bearer",

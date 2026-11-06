@@ -22,6 +22,10 @@ func (c *EnrichIssue) Documentation() string {
 
 New Sentry factory intakes use HTTP Request nodes after filters to fetch the issue and latest event. They request the recommended event only when the latest event has no stack frames.
 
+These HTTP nodes remove sensitive response headers, nested JSON headers, and cookie fields before outputs or retry metadata are stored. Other event fields are unchanged.
+Saved HTTP intakes require a reset or the Remove sensitive headers option on each request node. Existing stored responses are unchanged.
+Deploy workers with header redaction before the API publishes or resets these intakes.
+
 The sentryEventHasStack(event) expression returns true when a Sentry event body contains exception or standalone stack frames. Missing or invalid bodies return false. A skipped recommended request does not prevent task creation.
 
 New and reset intakes use this conditional request. Saved intakes keep their existing workflow until reset. Deploy workers with this expression before the API publishes or resets intake templates.

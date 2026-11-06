@@ -65,19 +65,20 @@ type AuthorizationSpec struct {
 }
 
 type Spec struct {
-	Method         string             `json:"method"`
-	URL            string             `json:"url"`
-	QueryParams    *[]KeyValue        `json:"queryParams,omitempty"`
-	Headers        *[]Header          `json:"headers,omitempty"`
-	ContentType    *string            `json:"contentType,omitempty"`
-	JSON           *any               `json:"json,omitempty"`
-	XML            *string            `json:"xml,omitempty"`
-	Text           *string            `json:"text,omitempty"`
-	FormData       *[]KeyValue        `json:"formData,omitempty"`
-	TimeoutSeconds *int               `json:"timeoutSeconds,omitempty"`
-	Retry          *RetrySpec         `json:"retry,omitempty"`
-	SuccessCodes   *string            `json:"successCodes,omitempty"`
-	Authorization  *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
+	Method                 string             `json:"method"`
+	URL                    string             `json:"url"`
+	QueryParams            *[]KeyValue        `json:"queryParams,omitempty"`
+	Headers                *[]Header          `json:"headers,omitempty"`
+	ContentType            *string            `json:"contentType,omitempty"`
+	JSON                   *any               `json:"json,omitempty"`
+	XML                    *string            `json:"xml,omitempty"`
+	Text                   *string            `json:"text,omitempty"`
+	FormData               *[]KeyValue        `json:"formData,omitempty"`
+	TimeoutSeconds         *int               `json:"timeoutSeconds,omitempty"`
+	Retry                  *RetrySpec         `json:"retry,omitempty"`
+	SuccessCodes           *string            `json:"successCodes,omitempty"`
+	Authorization          *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
+	RedactSensitiveHeaders bool               `json:"redactSensitiveHeaders,omitempty" mapstructure:"redactSensitiveHeaders"`
 }
 
 func (s *Spec) Timeout() time.Duration {
@@ -174,6 +175,10 @@ The component emits the response with:
 
 If the response exceeds the event size limit, the component emits a failure event with the status and error.
 The body and headers are omitted.
+
+Enable **Remove sensitive headers** to remove authorization, cookie, token, secret, password, and API key headers before outputs or retry metadata are stored.
+This also filters nested JSON headers and removes cookie fields. Non-JSON bodies and unsupported header formats are omitted.
+Other response fields are unchanged. This option is disabled by default.
 `
 }
 
@@ -673,6 +678,13 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Placeholder: "<?xml version=\"1.0\"?>\n<root>\n  <element>value</element>\n</root>",
 		},
 		{
+			Name:        "redactSensitiveHeaders",
+			Type:        configuration.FieldTypeBool,
+			Label:       "Remove sensitive headers",
+			Default:     false,
+			Description: "Remove sensitive headers and cookies before storage. Filter JSON header fields and omit non-JSON bodies.",
+		},
+		{
 			Name:        "successCodes",
 			Type:        configuration.FieldTypeString,
 			Label:       "Overwrite success definition",
@@ -954,6 +966,9 @@ func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, ht
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if spec.RedactSensitiveHeaders {
+		resp.Header, bodyBytes = redactResponse(resp.Header, bodyBytes)
+	}
 	resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	return resp, nil
 }
