@@ -300,6 +300,37 @@ func TestCreateFactoryAutomationUsesTemplateSpecificFeatureGuards(t *testing.T) 
 	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
 }
 
+func TestFactoryWebhookRoutesRequireWorkspaceReadOrEdit(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	for _, scenario := range []struct {
+		method, path, action string
+	}{
+		{http.MethodGet, "/api/v1/factories/{factory_id}/webhooks", "read"},
+		{http.MethodPost, "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/retry", "update"},
+	} {
+		rule, ok := rules[HTTPRoute{Method: scenario.method, Pattern: scenario.path}]
+		require.True(t, ok, scenario.path)
+		assert.Equal(t, "factories", rule.Resource)
+		assert.Equal(t, scenario.action, rule.Action)
+		assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
+	}
+
+	org, err := models.CreateOrganization("webhook-auth-"+uuid.NewString(), "")
+	require.NoError(t, err)
+	t.Cleanup(clearOrganizationPermissionCacheForTest)
+	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
+	SetOrgExperimentalFeatureCache(org.ID, features.FeatureFactories, true)
+	headers := map[string]string{
+		"x-user-id":         "22222222-2222-4222-8222-222222222222",
+		"x-organization-id": org.ID.String(),
+	}
+	retryRoute := HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/retry"}
+	_, err = NewGatewayAuthorizer(actionPermissionChecker{"factories:read": true}).AuthorizeHTTP(context.Background(), httptestRequest(t, headers), retryRoute, nil)
+	require.Error(t, err, "workspace read access must not authorize a retry")
+	_, err = NewGatewayAuthorizer(actionPermissionChecker{"factories:update": true}).AuthorizeHTTP(context.Background(), httptestRequest(t, headers), retryRoute, nil)
+	require.NoError(t, err)
+}
+
 func TestCreditPurchaseRoutesRequireOrganizationUpdate(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	for _, route := range []HTTPRoute{

@@ -126,6 +126,16 @@ func (s *FactoryService) ListFactoryAutomations(ctx context.Context, req *pb.Lis
 	return actions.ListFactoryAutomations(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryWebhooks(ctx context.Context, req *pb.ListFactoryWebhooksRequest) (*pb.ListFactoryWebhooksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryWebhooks(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RetryFactoryWebhook(ctx context.Context, req *pb.RetryFactoryWebhookRequest) (*pb.RetryFactoryWebhookResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RetryFactoryWebhook(ctx, organizationID, req)
+}
+
 func (s *FactoryService) CreateFactoryAutomation(ctx context.Context, req *pb.CreateFactoryAutomationRequest) (*pb.CreateFactoryAutomationResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateFactoryAutomation(ctx, s.intakeDeps, organizationID, req)

@@ -43,6 +43,7 @@ export function AutomationCard({
   href,
   tick,
   statusLabel,
+  webhookFailed,
   emphasized,
   actions,
 }: {
@@ -50,6 +51,7 @@ export function AutomationCard({
   href?: string;
   tick: FactoryAutomationTick;
   statusLabel: string;
+  webhookFailed?: boolean;
   emphasized?: boolean;
   actions?: AutomationCardActions;
 }) {
@@ -93,6 +95,9 @@ export function AutomationCard({
         <StatusTick tick={tick} />
         <span className="text-[12px] leading-tight text-muted-foreground">{statusLabel}</span>
       </div>
+      {webhookFailed ? (
+        <p className="mt-1 text-[12px] font-medium text-amber-700 dark:text-amber-300">Webhook registration failed</p>
+      ) : null}
       {actions ? (
         <DeleteAutomationDialog
           open={deleteOpen}
@@ -336,12 +341,14 @@ export function AutomationsPageList({
   organizationId,
   factoryKey,
   apps,
+  failedAutomationIds,
   workOrders,
   actionsForApp,
 }: {
   organizationId: string;
   factoryKey: string;
   apps: FactoryAutomation[];
+  failedAutomationIds?: ReadonlySet<string>;
   workOrders: Parameters<typeof resolveFactoryAutomationStatus>[1];
   actionsForApp: (app: FactoryAutomation) => AutomationCardActions;
 }) {
@@ -359,6 +366,7 @@ export function AutomationsPageList({
               href={automationDetailPath(organizationId, factoryKey, app.id)}
               tick={status.tick}
               statusLabel={status.label}
+              webhookFailed={failedAutomationIds?.has(app.id)}
               actions={actionsForApp(app)}
             />
           </li>

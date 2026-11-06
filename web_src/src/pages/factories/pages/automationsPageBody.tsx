@@ -6,6 +6,7 @@ type AutomationsPageBodyProps = {
   organizationId: string;
   factoryKey: string;
   apps: FactoryAutomation[];
+  failedAutomationIds?: ReadonlySet<string>;
   workOrders: Parameters<typeof AutomationsPageList>[0]["workOrders"];
   appsLoading: boolean;
   actionsForApp: (app: FactoryAutomation) => AutomationCardActions;
@@ -17,6 +18,7 @@ export function AutomationsPageBody({
   organizationId,
   factoryKey,
   apps,
+  failedAutomationIds,
   workOrders,
   appsLoading,
   actionsForApp,
@@ -34,6 +36,7 @@ export function AutomationsPageBody({
       organizationId={organizationId}
       factoryKey={factoryKey}
       apps={apps}
+      failedAutomationIds={failedAutomationIds}
       workOrders={workOrders}
       actionsForApp={actionsForApp}
     />

@@ -21,6 +21,7 @@ import { type AutomationCardActions } from "./automationCardActions";
 import { AutomationHeaderActions, DeleteAutomationDialog, StatusTick } from "./automationsPageParts";
 import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 import { LineVelocityPanel } from "./LineVelocityPanel";
+import { FactoryWebhookWarnings } from "./FactoryWebhookWarnings";
 
 export function AutomationDetail({
   organizationId,
@@ -30,6 +31,8 @@ export function AutomationDetail({
   factory,
   workOrders,
   workOrderCardContext,
+  factoryId,
+  canRetryWebhook,
 }: {
   organizationId: string;
   factoryKey: string;
@@ -38,6 +41,8 @@ export function AutomationDetail({
   factory: FactoriesFactory | null | undefined;
   workOrders: FactoriesWorkOrder[];
   workOrderCardContext: WorkOrderCardContext;
+  factoryId: string;
+  canRetryWebhook: boolean;
 }) {
   const canvasId = app.id ?? "";
   useCanvasRuntimeWebsocket(canvasId, organizationId, Boolean(canvasId));
@@ -92,6 +97,13 @@ export function AutomationDetail({
             onRequestDelete={() => setDeleteOpen(true)}
           />
         }
+      />
+
+      <FactoryWebhookWarnings
+        organizationId={organizationId}
+        factoryId={factoryId}
+        automationId={canvasId}
+        canRetry={canRetryWebhook}
       />
 
       <DeleteAutomationDialog
