@@ -140,7 +140,7 @@ func (w *OnWorkflowRun) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(common.WebhookConfiguration{
+	return common.RequestWorkspaceWebhook(ctx, common.WebhookConfiguration{
 		EventType:  "workflow_run",
 		Repository: config.Repository,
 	})

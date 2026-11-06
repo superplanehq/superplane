@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"testing"
 	"time"
 
@@ -414,18 +415,69 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 		Count(&refreshJobs).Error)
 	assert.Equal(t, int64(1), refreshJobs)
 
-	// Uninstall removes the global installation and every local binding, but
-	// deleting a binding alone never deletes the global installation.
+	// Uninstall revokes every local binding while retaining integrations and
+	// workflow references for inspection.
 	binding, err := models.FindOrCreateVCSProviderBinding(db, r.Organization.ID, models.ProviderGitHub, installationID, "acme")
 	require.NoError(t, err)
-	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.InstallationEvent{
+	otherOrganization := support.CreateOrganization(t, r, r.User)
+	otherBinding, err := models.FindOrCreateVCSProviderBinding(db, otherOrganization.ID, models.ProviderGitHub, installationID, "acme")
+	require.NoError(t, err)
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider: models.ProviderGitHub, InstallationID: installationID + 1, AccountLogin: "other",
+	}))
+	unaffected, err := models.FindOrCreateVCSProviderBinding(db, r.Organization.ID, models.ProviderGitHub, installationID+1, "other")
+	require.NoError(t, err)
+	require.NoError(t, db.First(unaffected, "id = ?", unaffected.ID).Error)
+	require.NoError(t, models.UpsertVCSProviderRepositories(db, models.ProviderGitHub, installationID, []models.VCSProviderRepository{{
+		RepositoryID: repositoryID, FullName: "acme/api",
+	}}))
+	for _, integration := range []*models.Integration{binding, otherBinding} {
+		require.NoError(t, models.GrantVCSProviderBindingRepository(db, integration.ID, models.ProviderGitHub, repositoryID))
+	}
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "github", Name: "GitHub", Type: models.NodeTypeComponent,
+	}}, nil)
+	require.NoError(t, db.Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "github").
+		Update("app_installation_id", binding.ID).Error)
+	deleted := &gh.InstallationEvent{
 		Action:       gh.Ptr("deleted"),
 		Installation: installation,
-	}, installationID))
-	_, err = models.FindVCSProviderInstallation(db, models.ProviderGitHub, installationID)
-	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	_, err = models.FindVCSProviderIntegrationBinding(db, binding.ID)
-	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	}
+	for delivery := 0; delivery < 2; delivery++ {
+		require.NoError(t, applyGitHubCatalogWebhook(db, deleted, installationID))
+		_, err = models.FindVCSProviderInstallation(db, models.ProviderGitHub, installationID)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindVCSProviderRepository(db, models.ProviderGitHub, repositoryID)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		for _, original := range []*models.Integration{binding, otherBinding, unaffected} {
+			integrations, err := models.ListIntegrations(db, original.OrganizationID)
+			require.NoError(t, err)
+			index := slices.IndexFunc(integrations, func(integration models.Integration) bool { return integration.ID == original.ID })
+			require.NotEqual(t, -1, index, "integration must survive uninstall")
+			persisted := integrations[index]
+			if original.ID == unaffected.ID {
+				assert.Equal(t, models.IntegrationStateReady, persisted.State)
+				assert.Equal(t, original.StateDescription, persisted.StateDescription)
+				assert.True(t, persisted.UpdatedAt.Equal(*original.UpdatedAt))
+				_, err = models.FindVCSProviderIntegrationBinding(db, original.ID)
+				require.NoError(t, err)
+				continue
+			}
+			assert.Equal(t, models.IntegrationStateError, persisted.State)
+			assert.Contains(t, persisted.StateDescription, "uninstalled")
+			assert.True(t, persisted.UpdatedAt.After(*original.UpdatedAt))
+			_, err = models.FindVCSProviderIntegrationBinding(db, original.ID)
+			assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			var grants int64
+			require.NoError(t, db.Model(&models.VCSProviderIntegrationRepository{}).Where("integration_id = ?", original.ID).Count(&grants).Error)
+			assert.Zero(t, grants)
+		}
+		var node models.CanvasNode
+		require.NoError(t, db.First(&node, "workflow_id = ? AND node_id = ?", canvas.ID, "github").Error)
+		require.NotNil(t, node.AppInstallationID)
+		assert.Equal(t, binding.ID, *node.AppInstallationID)
+	}
 }
 
 func TestApplyGitHubCatalogWebhookRefreshesDefaultBranch(t *testing.T) {

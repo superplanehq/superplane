@@ -45,7 +45,7 @@ export const AGENT_STEP_ENTRY: ColumnAutomationCatalogEntry = {
 export const CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
   id: CUSTOM_CATALOG_ID,
   kind: "custom",
-  name: "Custom automation",
+  name: "Build your own",
   description: "Add a blank automation to this column.",
   trigger: "On task in this column",
   action: "Run the automation",
@@ -57,7 +57,7 @@ export const CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
 export const EVENT_CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
   id: CUSTOM_CATALOG_ID,
   kind: "custom",
-  name: "Custom automation",
+  name: "Build your own",
   description: "Add a blank automation. Choose a trigger and the steps to run.",
   trigger: "On a trigger you choose",
   action: "Run the automation",
@@ -69,7 +69,7 @@ export const EVENT_CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
 export const CUSTOM_AUTOMATION_ENTRY: ColumnAutomationCatalogEntry = {
   id: CUSTOM_AUTOMATION_CATALOG_ID,
   kind: "custom-verification",
-  name: "Custom automation",
+  name: "Build your own",
   description: "Run ordered prompt and Bash steps on a pull request.",
   trigger: "Manual or automatic",
   action: "Run the automation",

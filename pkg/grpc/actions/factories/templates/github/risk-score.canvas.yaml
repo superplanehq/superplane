@@ -8,6 +8,12 @@ spec:
     - channel: default
       sourceId: on-pr-risk
       targetId: assess-risk
+    - channel: passed
+      sourceId: assess-risk
+      targetId: publish-merge-confidence
+    - channel: failed
+      sourceId: assess-risk
+      targetId: publish-merge-confidence
   nodes:
     - id: on-pr-risk
       name: On Pull Request
@@ -21,7 +27,7 @@ spec:
           - ready_for_review
         ignoreDrafts: true
         onlyFactoryPullRequests: true
-        repository: '{{ install_params.appRepository }}'
+        repository: '{{ workspace().repositories }}'
       position:
         x: 80
         "y": 80
@@ -268,5 +274,33 @@ spec:
               Do not repeat the score. Do not write a second sentence.
       position:
         x: 640
+        "y": 80
+      isCollapsed: true
+    - id: publish-merge-confidence
+      name: Publish Merge Confidence
+      type: TYPE_ACTION
+      component: github.updatePullRequestBodySection
+      configuration:
+        repository: '{{ root().data.repository.full_name }}'
+        pullNumber: '{{ root().data.pull_request.number }}'
+        sectionKey: merge-confidence
+        body: |-
+          ## SuperPlane merge confidence
+
+          {{ let report = $["Assess Merge Confidence"].data.mergeConfidence;
+             let indicators = {positive: "✅", neutral: "➖", caution: "⚠️", critical: "❌"};
+             (!report.complete ? "➖ **Incomplete**\n\n" : "")
+             + (len(report.checks) == 0
+               ? "No checks are enabled.\n\n"
+               : "| Check | Status | Summary |\n| --- | :---: | --- |\n"
+                 + join(map(report.checks, { "| " + markdownText(#.label) + " | " +
+                     (#.missing ? "➖ | No result was reported." : (indicators[#.level] ?? "➖") + " | " + markdownText(#.summary))
+                     + " |\n" }), "")
+                 + "\n")
+             + "Reviewed commit: " + markdownText(report.reviewedCommit) + "\n\n[View task](<" + markdownLink(report.taskUrl) + ">)" }}
+        expectedHeadSha: '{{ $["Assess Merge Confidence"].data.mergeConfidence.reviewedCommit }}'
+        enabled: true
+      position:
+        x: 1200
         "y": 80
       isCollapsed: true

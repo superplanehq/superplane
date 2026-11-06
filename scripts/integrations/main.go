@@ -19,7 +19,7 @@ func main() {
 	}
 
 	integrations := reg.ListIntegrations()
-	coreActions := reg.ListActions()
+	coreActions := reg.ListSelectableActions()
 	coreTriggers := reg.ListTriggers()
 
 	actionsCount := len(coreActions)

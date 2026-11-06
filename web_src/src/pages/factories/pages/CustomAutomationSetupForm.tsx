@@ -1,22 +1,18 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn, resolveIcon } from "@/lib/utils";
-import { CircleAlert, GitCommitHorizontal, MousePointerClick } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useState } from "react";
 
-import type { CustomAutomationMode, CustomAutomationColumn } from "../lib/customAutomation";
+import { type CustomAutomationColumn, type CustomAutomationTrigger } from "../lib/customAutomation";
 import { AutomationFlow } from "./customAutomationSetupFlow";
 import { StepEditor } from "./customAutomationStepEditor";
-import { PlanningReviewForm } from "./PlanningReviewForm";
+import { TriggerEditor } from "./CustomAutomationTriggerEditor";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
 type CustomAutomationSetupFormProps = {
   name: string;
   icon: string;
-  mode: CustomAutomationMode;
+  triggers: CustomAutomationTrigger[];
   columnKey?: CustomAutomationColumn;
   draft: PlanningReviewDraft;
   organizationId: string;
@@ -27,7 +23,7 @@ type CustomAutomationSetupFormProps = {
   error: string;
   onNameChange: (name: string) => void;
   onIconChange: (icon: string) => void;
-  onModeChange: (mode: CustomAutomationMode) => void;
+  onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
   onDraftChange: (draft: PlanningReviewDraft) => void;
   onSave: () => void;
   onDelete?: () => void;
@@ -38,7 +34,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
   const {
     name,
     icon,
-    mode,
+    triggers,
     columnKey = "verify",
     draft,
     organizationId,
@@ -49,7 +45,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     error,
     onNameChange,
     onIconChange,
-    onModeChange,
+    onTriggersChange,
     onDraftChange,
     onSave,
     onDelete,
@@ -73,7 +69,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
       <div className="flex min-h-0 flex-1">
         <AutomationFlow
           columnKey={columnKey}
-          mode={mode}
+          triggers={triggers}
           steps={steps}
           selectedStep={selectedStep}
           onSelectTrigger={() => setSelectedStep(null)}
@@ -98,14 +94,14 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
               columnKey={columnKey}
               name={name}
               icon={icon}
-              mode={mode}
+              triggers={triggers}
+              onTriggersChange={onTriggersChange}
               draft={draft}
               organizationId={organizationId}
               factoryId={factoryId}
               factoryKey={factoryKey}
               onNameChange={onNameChange}
               onIconChange={onIconChange}
-              onModeChange={onModeChange}
               onDraftChange={onDraftChange}
             />
           )}
@@ -260,221 +256,5 @@ function SetupFormFooter({
         </div>
       </div>
     </footer>
-  );
-}
-
-function TriggerEditor({
-  columnKey,
-  name,
-  icon,
-  mode,
-  draft,
-  organizationId,
-  factoryId,
-  factoryKey,
-  onNameChange,
-  onIconChange,
-  onModeChange,
-  onDraftChange,
-}: {
-  columnKey: CustomAutomationColumn;
-  name: string;
-  icon: string;
-  mode: CustomAutomationMode;
-  draft: PlanningReviewDraft;
-  organizationId: string;
-  factoryId: string;
-  factoryKey: string;
-  onNameChange: (name: string) => void;
-  onIconChange: (icon: string) => void;
-  onModeChange: (mode: CustomAutomationMode) => void;
-  onDraftChange: (draft: PlanningReviewDraft) => void;
-}) {
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10">
-      <h3 className="text-base font-semibold text-foreground">Edit Trigger</h3>
-      <div>
-        <Label htmlFor="custom-automation-mode" className="sr-only">
-          Trigger
-        </Label>
-        <Select value={mode} onValueChange={(value) => onModeChange(value === "automatic" ? "automatic" : "manual")}>
-          <SelectTrigger id="custom-automation-mode" className="min-h-14 w-full !h-auto py-2.5">
-            <SelectValue>
-              <TriggerOption mode={mode} columnKey={columnKey} />
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
-            <SelectItem value="manual" className="py-2.5">
-              <TriggerOption mode="manual" columnKey={columnKey} />
-            </SelectItem>
-            <SelectItem value="automatic" className="py-2.5">
-              <TriggerOption mode="automatic" columnKey={columnKey} />
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="automation-name">Automation name</Label>
-        <div className="flex items-center gap-2">
-          <AutomationIconPicker icon={icon} onChange={onIconChange} />
-          <Input
-            id="automation-name"
-            value={name}
-            onChange={(event) => onNameChange(event.target.value)}
-            placeholder="Automation name"
-            className="min-w-0 flex-1 shadow-none"
-          />
-        </div>
-      </div>
-      <PlanningReviewForm
-        draft={draft}
-        onChange={onDraftChange}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        appearance="fields"
-        view="implementation"
-        showConcurrency={false}
-        showResources={false}
-        showSteps={false}
-        modelOnly
-      />
-    </div>
-  );
-}
-
-const AUTOMATION_ICONS = [
-  "sparkles",
-  "shield-check",
-  "search",
-  "bug",
-  "file-code",
-  "code",
-  "terminal",
-  "eye",
-  "gauge",
-  "git-pull-request",
-  "cpu",
-  "circle-check",
-  "activity",
-  "alarm-clock",
-  "archive",
-  "bell",
-  "bolt",
-  "book",
-  "box",
-  "boxes",
-  "braces",
-  "calendar",
-  "camera",
-  "chart-line",
-  "check",
-  "clock",
-  "cloud",
-  "cog",
-  "component",
-  "container",
-  "database",
-  "factory",
-  "file-json",
-  "file-text",
-  "fingerprint",
-  "flag",
-  "folder",
-  "git-branch",
-  "git-commit",
-  "git-merge",
-  "globe",
-  "key",
-  "layers",
-  "lock",
-  "message-square",
-  "network",
-  "package",
-  "rocket",
-] as const;
-
-function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (icon: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const Icon = resolveIcon(icon);
-  return (
-    <div className="relative">
-      <Button
-        type="button"
-        variant="outline"
-        size="icon-sm"
-        className="size-8 shrink-0 rounded-md border-[#e5e5e5] shadow-none dark:border-gray-600/70"
-        aria-label="Choose automation icon"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <Icon className="size-4 text-muted-foreground" aria-hidden />
-      </Button>
-      {open ? (
-        <div className="absolute top-full left-0 z-30 mt-1.5 w-56 rounded-md border bg-popover p-2 text-popover-foreground shadow-sm">
-          <div className="grid grid-cols-6 gap-1">
-            {AUTOMATION_ICONS.map((option) => {
-              const OptionIcon = resolveIcon(option);
-              const selected = option === icon;
-              return (
-                <Button
-                  key={option}
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className={cn(
-                    "size-7 text-muted-foreground hover:text-foreground",
-                    selected && "bg-muted text-foreground",
-                  )}
-                  aria-label={option.replace(/-/g, " ")}
-                  aria-pressed={selected}
-                  onClick={() => {
-                    onChange(option);
-                    setOpen(false);
-                  }}
-                >
-                  <OptionIcon className="size-3.5" aria-hidden />
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function TriggerOption({ mode, columnKey }: { mode: CustomAutomationMode; columnKey: CustomAutomationColumn }) {
-  const automatic = mode === "automatic";
-  const Icon = automatic ? GitCommitHorizontal : MousePointerClick;
-  return (
-    <span className="flex min-w-0 items-center gap-3 text-left">
-      <span
-        className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-lg",
-          automatic
-            ? "bg-violet-500/10 text-violet-700 dark:text-violet-400"
-            : "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-        )}
-      >
-        <Icon className="size-4" aria-hidden />
-      </span>
-      <span className="flex min-w-0 flex-col">
-        <span className="text-sm font-medium text-foreground">
-          {automatic
-            ? columnKey === "backlog"
-              ? "When a task enters Backlog"
-              : "Every pull request commit"
-            : "Manual"}
-        </span>
-        <span className="text-xs font-normal text-muted-foreground">
-          {automatic
-            ? columnKey === "backlog"
-              ? "Runs when a task enters Backlog."
-              : "Runs after each new commit."
-            : "Runs only when you start it."}
-        </span>
-      </span>
-    </span>
   );
 }

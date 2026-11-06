@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -36,31 +37,36 @@ func RunFactoryCustomAutomation(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
+	if strings.TrimSpace(req.GetWorkOrderId()) == "" {
+		return startScheduledCustomAutomation(db, canvas)
+	}
 	order, err := findWorkOrder(db, factory, req.GetWorkOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	mode, err := customAutomationCanvasMode(db, canvas)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	if mode != pb.FactoryCustomAutomation_START_MODE_MANUAL {
+	if !customAutomationAllowsManualStart(version) {
 		return nil, factoryErrorToStatus(invalidArgument("automation does not use manual start"), "failed to run custom automation")
 	}
 
-	event, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, false)
+	events, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, false)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	if event == nil {
+	if len(events) == 0 {
 		return nil, factoryErrorToStatus(errors.New("custom automation did not create a run"), "failed to run custom automation")
 	}
-	if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
-		log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
+	for _, event := range events {
+		if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
+			log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
+		}
 	}
 	return &pb.RunFactoryCustomAutomationResponse{
-		RunId:   event.RunID.String(),
-		EventId: event.ID.String(),
+		RunId:   events[0].RunID.String(),
+		EventId: events[0].ID.String(),
 	}, nil
 }
 
@@ -99,17 +105,78 @@ func StartAutomaticCustomAutomations(
 		if err != nil || mode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
 			continue
 		}
-		event, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, true)
+		events, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, true)
 		if err != nil {
 			return err
 		}
-		if event != nil {
+		for _, event := range events {
 			if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
 				log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
 			}
 		}
 	}
 	return nil
+}
+
+// startScheduledCustomAutomation starts the schedule chain. That chain creates a
+// task from the prompt result, so it does not need a task to already exist.
+func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.RunFactoryCustomAutomationResponse, error) {
+	if canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyBacklog {
+		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
+	}
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
+	}
+	scheduleID := scheduledCustomAutomationTriggerID(version)
+	if scheduleID == "" {
+		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
+	}
+	trigger, err := models.FindCanvasNode(db, canvas.ID, scheduleID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
+	}
+
+	var created []models.CanvasEvent
+	events := contexts.NewEventContext(db, trigger, nil, func(newEvents []models.CanvasEvent) {
+		created = append(created, newEvents...)
+	})
+	if err := events.Emit("scheduler.tick", map[string]any{}); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
+	}
+	if len(created) == 0 {
+		return nil, factoryErrorToStatus(errors.New("custom automation did not create a run"), "failed to run custom automation")
+	}
+	event := &created[0]
+	if err := messages.PublishCanvasEventCreatedMessage(event); err != nil {
+		log.WithError(err).Warnf("custom automation: failed to publish event %s", event.ID)
+	}
+	return &pb.RunFactoryCustomAutomationResponse{
+		RunId:   event.RunID.String(),
+		EventId: event.ID.String(),
+	}, nil
+}
+
+func taskCustomAutomationTriggerID(version *models.CanvasVersion) string {
+	for _, node := range version.Nodes {
+		if node.Type == models.NodeTypeTrigger && node.ComponentName() != "schedule" {
+			return node.ID
+		}
+	}
+	return ""
+}
+
+func scheduledCustomAutomationTriggerID(version *models.CanvasVersion) string {
+	connected := map[string]bool{}
+	for _, edge := range version.Edges {
+		connected[edge.SourceID] = true
+	}
+	for _, node := range version.Nodes {
+		if node.Type == models.NodeTypeTrigger && node.ComponentName() == "schedule" && connected[node.ID] {
+			return node.ID
+		}
+	}
+	return ""
 }
 
 func startCustomAutomation(
@@ -120,40 +187,112 @@ func startCustomAutomation(
 	canvas *models.Canvas,
 	order *models.FactoryWorkOrder,
 	automatic bool,
-) (*models.CanvasEvent, error) {
+) ([]*models.CanvasEvent, error) {
 	if canvas.ColumnKey != nil && *canvas.ColumnKey == models.CanvasColumnKeyBacklog {
-		return contexts.StartBacklogCustomAutomation(db, factory, canvas, order, automatic)
+		event, err := contexts.StartBacklogCustomAutomation(db, factory, canvas, order, automatic)
+		if err != nil || event == nil {
+			return nil, err
+		}
+		return []*models.CanvasEvent{event}, nil
 	}
 	if err := requireWorkOrderInVerify(db, order); err != nil {
 		return nil, err
 	}
-	pullRequest, err := latestTrackedPullRequest(db, order.ID)
+	pullRequests, err := trackedPullRequests(db, order.ID)
 	if err != nil {
 		return nil, err
 	}
-	if pullRequest == nil {
+	if len(pullRequests) == 0 {
 		return nil, grpcFailedPrecondition("The task has no pull request.")
 	}
-	if pullRequest.State != models.FactoryPullRequestStateOpen {
+	openPullRequests := slices.DeleteFunc(slices.Clone(pullRequests), func(pullRequest models.FactoryPullRequest) bool {
+		return pullRequest.State != models.FactoryPullRequestStateOpen
+	})
+	if len(openPullRequests) == 0 {
 		return nil, grpcFailedPrecondition("The pull request is not open.")
 	}
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	if err != nil {
+		return nil, err
+	}
+	trigger, err := models.FindCanvasNode(db, canvas.ID, taskCustomAutomationTriggerID(version))
+	if err != nil {
+		return nil, err
+	}
 
-	payload, revision, payloadType, err := customAutomationPullRequestPayload(ctx, db, deps, factory, order, pullRequest)
+	openPullRequests = slices.DeleteFunc(openPullRequests, func(pullRequest models.FactoryPullRequest) bool {
+		return !customAutomationCoversRepository(trigger, pullRequest.Repository)
+	})
+	if len(openPullRequests) == 0 {
+		if automatic {
+			return nil, nil
+		}
+		return nil, grpcFailedPrecondition("The task has no open pull request in a repository of this automation.")
+	}
+
+	// A task can have one pull request in each workspace repository. Each
+	// pull request gets its own run, like merge confidence. Load every pull
+	// request before the first event is saved, so a failed GitHub request
+	// does not leave runs that a retry starts again.
+	starts := make([]customAutomationStart, 0, len(openPullRequests))
+	for i := range openPullRequests {
+		payload, revision, payloadType, err := customAutomationPullRequestPayload(ctx, db, deps, factory, order, &openPullRequests[i])
+		if err != nil {
+			return nil, err
+		}
+		starts = append(starts, customAutomationStart{
+			dedupKey: openPullRequests[i].ID.String() + "|" + revision, payloadType: payloadType, payload: payload,
+		})
+	}
+	events := make([]*models.CanvasEvent, 0, len(starts))
+	err = db.Transaction(func(tx *gorm.DB) error {
+		for _, start := range starts {
+			event, err := emitCustomAutomationStart(tx, canvas, trigger, start, automatic)
+			if err != nil {
+				return err
+			}
+			if event != nil {
+				events = append(events, event)
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	trigger, err := models.FindCanvasNode(db, canvas.ID, customAutomationTriggerID)
-	if err != nil {
-		return nil, err
-	}
+	return events, nil
+}
+
+type customAutomationStart struct {
+	dedupKey    string
+	payloadType string
+	payload     map[string]any
+}
+
+// customAutomationCoversRepository reports whether the automation checks out
+// the repository. An automation saved before workspace scope checks out its
+// configured repository only.
+func customAutomationCoversRepository(trigger *models.CanvasNode, repository string) bool {
+	configured, _ := trigger.Configuration.Data()["repository"].(string)
+	return models.IsWorkspaceRepositoriesExpression(configured) || strings.EqualFold(strings.TrimSpace(configured), strings.TrimSpace(repository))
+}
+
+func emitCustomAutomationStart(
+	db *gorm.DB,
+	canvas *models.Canvas,
+	trigger *models.CanvasNode,
+	start customAutomationStart,
+	automatic bool,
+) (*models.CanvasEvent, error) {
 	var created []models.CanvasEvent
 	events := contexts.NewEventContext(db, trigger, nil, func(events []models.CanvasEvent) {
 		created = append(created, events...)
 	})
+	var err error
 	if automatic {
-		err = events.EmitDeduplicated(payloadType, payload, pullRequest.ID.String()+"|"+revision)
+		err = events.EmitDeduplicated(start.payloadType, start.payload, start.dedupKey)
 	} else {
-		err = events.Emit("factory.customAutomation", payload)
+		err = events.Emit("factory.customAutomation", start.payload)
 	}
 	if err != nil {
 		return nil, err
@@ -281,16 +420,59 @@ func customAutomationCanvasMode(tx *gorm.DB, canvas *models.Canvas) (pb.FactoryC
 }
 
 func customAutomationCanvasModeFromVersion(version *models.CanvasVersion) (pb.FactoryCustomAutomation_StartMode, error) {
+	found := pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED
+	sawTrigger := false
 	for i := range version.Nodes {
 		node := version.Nodes[i]
-		if node.ID != customAutomationTriggerID && node.ID != customAutomationTaskTriggerID {
+		if node.Type != models.NodeTypeTrigger {
+			continue
+		}
+		sawTrigger = true
+		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+		if triggerMetadataHasMode(template, "automatic") {
+			return pb.FactoryCustomAutomation_START_MODE_AUTOMATIC, nil
+		}
+		if triggerMetadataHasMode(template, "manual") {
+			found = pb.FactoryCustomAutomation_START_MODE_MANUAL
+			continue
+		}
+		if found != pb.FactoryCustomAutomation_START_MODE_MANUAL {
+			found = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
+		}
+	}
+	if !sawTrigger || found == pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED {
+		return pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED, errors.New("custom automation trigger is missing")
+	}
+	return found, nil
+}
+
+func customAutomationAllowsManualStart(version *models.CanvasVersion) bool {
+	if version == nil {
+		return false
+	}
+	for i := range version.Nodes {
+		node := version.Nodes[i]
+		if node.Type != models.NodeTypeTrigger {
 			continue
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
-		mode, _ := template["startMode"].(string)
-		return customAutomationStartMode(mode), nil
+		if triggerMetadataHasMode(template, "manual") {
+			return true
+		}
 	}
-	return pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED, errors.New("custom automation trigger is missing")
+	return false
+}
+
+func triggerMetadataHasMode(template map[string]any, mode string) bool {
+	if template["startMode"] == mode {
+		return true
+	}
+	for _, kind := range metadataStrings(template, "triggerKinds") {
+		if kind == mode {
+			return true
+		}
+	}
+	return mode == "manual" && template["manualStart"] == true
 }
 
 func grpcFailedPrecondition(message string) error {

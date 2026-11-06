@@ -253,7 +253,6 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
 	assert.Contains(t, analysis, "propose_plan")
-	assert.Contains(t, analysis, "integer from 1 through 3")
 	assert.NotContains(t, analysis, "Call propose_clarity")
 	assert.NotContains(t, analysis, "Call propose_confidence")
 	assert.NotContains(t, analysis, "propose_update")

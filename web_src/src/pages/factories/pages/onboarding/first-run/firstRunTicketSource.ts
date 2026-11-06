@@ -1,3 +1,4 @@
+import type { LinearIntakeScope } from "../../linearIntakeScope";
 import type { IssuesChoiceId, VcsHostId } from "../onboardingFixtures";
 
 import type { FirstRunTicketSource } from "./firstRunTypes";
@@ -39,10 +40,10 @@ export function canAnalyzeTicketSource(args: {
   jiraConnected?: boolean;
   jiraProjectId?: string;
   linearConnected?: boolean;
-  linearProjectIds?: string[];
+  linearScope?: LinearIntakeScope;
 }): boolean {
   if (args.ticketSource === "github-issues") return Boolean(args.githubConnected);
   if (args.ticketSource === "jira") return Boolean(args.jiraConnected && args.jiraProjectId);
-  if (args.ticketSource === "linear") return Boolean(args.linearConnected && args.linearProjectIds?.length);
+  if (args.ticketSource === "linear") return Boolean(args.linearConnected && args.linearScope?.teamId);
   return false;
 }

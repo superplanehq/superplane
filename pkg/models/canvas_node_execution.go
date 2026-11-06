@@ -406,6 +406,11 @@ func FindNodeExecutionInTransaction(tx *gorm.DB, workflowID, id uuid.UUID) (*Can
 	return &execution, nil
 }
 
+// LockNodeExecution serializes state changes during a short request transaction.
+func LockNodeExecution(tx *gorm.DB, workflowID, id uuid.UUID) (*CanvasNodeExecution, error) {
+	return FindNodeExecutionInTransaction(tx.Clauses(clause.Locking{Strength: "UPDATE"}), workflowID, id)
+}
+
 func FindNodeExecutionWithNodeID(workflowID, id uuid.UUID, nodeID string) (*CanvasNodeExecution, error) {
 	return FindNodeExecutionWithNodeIDInTransaction(database.Conn(), workflowID, id, nodeID)
 }

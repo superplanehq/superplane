@@ -551,6 +551,12 @@ function patchAgentResourceSetupContext(resource: FactoriesFactoryAgentResource,
   if (typeof request.vcsProvider === "string") {
     resource.vcsProvider = request.vcsProvider;
   }
+  if (typeof request.ref === "string") {
+    resource.ref = request.ref;
+  }
+  if (typeof request.access === "string") {
+    resource.access = request.access;
+  }
   if (request.replaceCommands || Array.isArray(request.commands)) {
     resource.commands = Array.isArray(request.commands) ? request.commands : [];
   }
@@ -693,6 +699,8 @@ function createPostedContextRepoResource(
     enabled: request.enabled !== false,
     repository,
     vcsProvider: typeof request.vcsProvider === "string" ? request.vcsProvider : "github",
+    ref: typeof request.ref === "string" ? request.ref.trim() : "",
+    access: request.access === "write" ? "write" : "read",
     createdAt: now,
     updatedAt: now,
   };
