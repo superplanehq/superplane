@@ -77,7 +77,10 @@ describe("add pull request closure", () => {
   }
 });
 
-describe("add visual evidence", () => {
+describe.each([
+  { kind: "visual-evidence" as const, name: "Visual Evidence" },
+  { kind: "human-review" as const, name: "Human review" },
+])("add $name", ({ kind, name }) => {
   it("installs the GitHub canvas and stays on the board", async () => {
     const client = new QueryClient();
     const invalidate = vi.spyOn(client, "invalidateQueries");
@@ -107,11 +110,11 @@ describe("add visual evidence", () => {
       },
     );
     act(() => result.current.automation.openPicker("verify"));
-    const entry = result.current.automation.catalog.find((item) => item.kind === "visual-evidence")!;
+    const entry = result.current.automation.catalog.find((item) => item.kind === kind)!;
     await act(async () => result.current.automation.onSelect(entry));
     expect(installFactory).toHaveBeenCalledWith(
       expect.objectContaining({
-        factoryId: "visual-evidence",
+        factoryId: kind,
         vcsProvider: "github",
         workspaceFactoryId: "factory",
         integrations: { github: { id: "vcs-integration", name: "workspace-vcs", ready: true } },
@@ -124,7 +127,7 @@ describe("add visual evidence", () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["apps", "org", "factory"] });
   });
 
-  it("does not install visual evidence for Bitbucket", async () => {
+  it("does not install a GitHub-only automation for Bitbucket", async () => {
     const { result } = renderHook(
       () =>
         useAddColumnAutomation({
@@ -148,12 +151,12 @@ describe("add visual evidence", () => {
       },
     );
     act(() => result.current.openPicker("verify"));
-    expect(result.current.catalog.some((item) => item.kind === "visual-evidence")).toBe(false);
+    expect(result.current.catalog.some((item) => item.kind === kind)).toBe(false);
     await act(async () =>
       result.current.onSelect({
-        id: "visual-evidence",
-        kind: "visual-evidence",
-        name: "Visual Evidence",
+        id: kind,
+        kind,
+        name,
         description: "Capture screenshots or a short video when a pull request changes the user interface.",
         trigger: "On pull request opened or updated",
         action: "Capture screenshots or a short video",
