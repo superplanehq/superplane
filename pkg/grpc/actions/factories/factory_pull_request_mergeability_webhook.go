@@ -64,8 +64,9 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	}
 
 	_, numbers, sha := githubMergeabilityWebhookRefFromPayload(payload)
+	reopened := strings.EqualFold(eventType, "pull_request") && strings.EqualFold(payload.Action, "reopened")
 	var pullRequests []models.FactoryPullRequest
-	if strings.EqualFold(eventType, "pull_request") && strings.EqualFold(payload.Action, "reopened") {
+	if reopened {
 		pullRequests, err = models.ListGitHubFactoryPullRequestsForWebhook(db, integration.OrganizationID, repository, numbers)
 	} else {
 		pullRequests, err = models.ListOpenGitHubFactoryPullRequestsForWebhook(db, integration.OrganizationID, repository, numbers, sha)
@@ -91,6 +92,12 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 			}
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
+		}
+		if reopened {
+			if err := pullRequest.RequestHumanReviewReconciliation(db); err != nil {
+				log.WithError(err).Warnf("Human review: failed to retain reopen request for pull request %s", pullRequest.ID)
+				continue
+			}
 		}
 		ScheduleFactoryHumanReview(ctx, deps, *pullRequest)
 		if err := refreshFactoryPullRequestMergeabilityWithRetry(ctx, db, deps, factory, pullRequest); err != nil {

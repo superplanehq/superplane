@@ -119,7 +119,7 @@ func (d *FactoryHumanReviewDecision) Save(tx *gorm.DB) error {
 	return tx.Save(d).Error
 }
 
-func ListOpenFactoryHumanReviewPullRequests(tx *gorm.DB, afterID uuid.UUID, limit int) ([]FactoryPullRequest, error) {
+func ListFactoryHumanReviewPullRequestsToReconcile(tx *gorm.DB, afterID uuid.UUID, limit int) ([]FactoryPullRequest, error) {
 	// Disabled policies still publish an explanatory success for required gates.
 	// Only a published Human review installation makes a workspace relevant.
 	marker, err := json.Marshal([]map[string]any{{
@@ -129,7 +129,7 @@ func ListOpenFactoryHumanReviewPullRequests(tx *gorm.DB, afterID uuid.UUID, limi
 	if err != nil {
 		return nil, err
 	}
-	query := tx.Where("provider = ? AND state IN ?", FactoryPullRequestProviderGitHub, []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}).
+	query := tx.Where("provider = ? AND (state IN ? OR human_review_request_id IS NOT NULL)", FactoryPullRequestProviderGitHub, []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}).
 		Where(`EXISTS (
 			SELECT 1 FROM factories
 			JOIN organizations ON organizations.id = factories.organization_id AND organizations.deleted_at IS NULL

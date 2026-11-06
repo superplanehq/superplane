@@ -81,7 +81,11 @@ func reconcileFactoryHumanReview(ctx context.Context, deps IntakeDependencies, p
 		if err != nil || current == nil {
 			return err
 		}
-		return reconcileHumanReview(ctx, tx, deps, factory, &pullRequest, current, client)
+		requestID := pullRequest.HumanReviewRequestID
+		if err := reconcileHumanReview(ctx, tx, deps, factory, &pullRequest, current, client); err != nil {
+			return err
+		}
+		return pullRequest.CompleteHumanReviewReconciliation(tx, requestID)
 	})
 }
 
@@ -397,7 +401,8 @@ func newHumanReviewDecision(db *gorm.DB, pr *models.FactoryPullRequest, params m
 }
 
 // The authenticated Factory webhook path calls this after resolving tracked
-// PRs. A full queue leaves webhook recovery to polling. Polling retains its
+// PRs. Reopen webhooks persist a request before scheduling so polling can also
+// recover closed PRs after a full queue or restart. Polling retains its
 // cursor until the queue accepts the request, so later PRs cannot be starved.
 func ScheduleFactoryHumanReview(ctx context.Context, deps IntakeDependencies, pr models.FactoryPullRequest) bool {
 	return factoryHumanReviewScheduler.schedule(context.WithoutCancel(ctx), deps, pr)
