@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -213,23 +214,19 @@ func dispatchWorkOrderOnLineTx(
 	}
 
 	model = strings.TrimSpace(model)
-	if model != "" {
-		allowed, _, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name, subscriptionOrderOwnerID(tx, order))
-		if err != nil {
-			return nil, err
-		}
-		if !slices.Contains(allowed, model) {
-			return nil, invalidArgument("model is not available on this line")
-		}
-	}
 	normalizedThinking, err := runner.NormalizeDispatchThinkingLevel(thinkingLevel)
 	if err != nil {
 		return nil, invalidArgument(err.Error())
 	}
-	if err := validateLineThinkingLevel(tx, currentLine, normalizedThinking); err != nil {
+	requested := models.FactoryLineStartOptions{Model: model, ThinkingLevel: normalizedThinking}
+	run, err := planLineDispatchRun(tx, order, currentLine, startIndex, replaceActive, requested)
+	if err != nil {
 		return nil, err
 	}
-	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
+	if err := validateLineDispatchModel(tx, orgID, factoryID, run, subscriptionOrderOwnerID(tx, order)); err != nil {
+		return nil, err
+	}
+	if err := requireSavedBranchForImplementation(tx, factory, order, run.steps); err != nil {
 		return nil, err
 	}
 	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
@@ -295,24 +292,135 @@ func dispatchWorkOrderOnLineTx(
 	}, nil
 }
 
+// lineDispatchRun describes the steps that a start or retry runs and the
+// Start options that apply to them.
+type lineDispatchRun struct {
+	steps   []models.FactoryLineStep
+	options models.FactoryLineStartOptions
+	// savedRun is true when a retry continues a saved traversal. That
+	// traversal keeps its saved steps and Start options.
+	savedRun bool
+}
+
+// planLineDispatchRun resolves the steps that will run. A start runs the
+// current line from startIndex. A retry of a saved traversal runs its saved
+// steps, which can differ from the current line after the line changes.
+func planLineDispatchRun(tx *gorm.DB, order *models.FactoryWorkOrder, line *models.FactoryLine, startIndex int, replaceActive bool, requested models.FactoryLineStartOptions) (lineDispatchRun, error) {
+	if replaceActive && startIndex > 0 {
+		plan, err := order.PlanLineStepRetry(tx, line, startIndex, requested)
+		if err != nil {
+			return lineDispatchRun{}, err
+		}
+		return lineDispatchRun{steps: plan.Steps, options: plan.Options, savedRun: plan.Target != nil}, nil
+	}
+	if startIndex < 0 || startIndex >= len(line.Steps) {
+		return lineDispatchRun{}, models.ErrFactoryLineStepOutOfRange
+	}
+	return lineDispatchRun{steps: line.Steps[startIndex:], options: requested}, nil
+}
+
+// validateLineDispatchModel checks overrides and each agent's effective model
+// and effort before Start, including settings inherited from the agent.
+// Only the steps that will run are checked.
+func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, run lineDispatchRun, ownerID uuid.UUID) error {
+	model := run.options.Model
+	thinking := run.options.ThinkingLevel
+	if model == "" || run.savedRun {
+		// A saved traversal keeps the model it started with. Agents that no
+		// longer accept that model run their own model, as at execution.
+		return validateDispatchThinkingForRunners(tx, orgID, factoryID, run, ownerID)
+	}
+	options, _, err := listLineRunnerModelOptionsForSteps(tx, orgID, factoryID, run.steps, ownerID)
+	if err != nil {
+		return err
+	}
+	index := slices.IndexFunc(options, func(option lineRunnerModel) bool { return option.ID == model })
+	if index < 0 {
+		return invalidArgument("model is not available on this line")
+	}
+	if dispatchThinkingOverridesLevel(thinking) && !slices.Contains(options[index].ThinkingLevels, thinking) {
+		return invalidArgument("thinking level is not available for this model")
+	}
+	return validateDispatchThinkingForRunners(tx, orgID, factoryID, run, ownerID)
+}
+
+// validateDispatchThinkingForRunners checks inherited and explicit efforts
+// against the model each agent will run, including agents that retain a model.
+func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID, run lineDispatchRun, ownerID uuid.UUID) error {
+	model := run.options.Model
+	thinking := run.options.ThinkingLevel
+	var catalog *llmcatalog.ThinkingCatalog
+	for _, step := range run.steps {
+		if step.AppID == uuid.Nil {
+			continue
+		}
+		version, err := models.FindLiveCanvasVersionInTransaction(tx, step.AppID)
+		if err != nil {
+			return err
+		}
+		for _, node := range version.Nodes {
+			_, isRunner := runnerNodeProvider(node)
+			if !isRunner && node.ComponentName() != models.SuperPlaneRunnerComponent {
+				continue
+			}
+			savedThinking, _ := node.Configuration[runner.ThinkingLevelKey].(string)
+			effectiveThinking, overridden := runner.OverlayThinkingLevel(savedThinking, thinking)
+			effectiveThinking, err = runner.NormalizeCatalogThinkingLevel(effectiveThinking)
+			if err != nil && !overridden {
+				// Execution decides how to handle a saved value that is not an effort.
+				continue
+			}
+			if err != nil {
+				return invalidArgument(err.Error())
+			}
+			if effectiveThinking == "" {
+				continue
+			}
+			if catalog == nil {
+				catalog, err = llmcatalog.LoadThinkingCatalog(tx)
+				if err != nil {
+					return err
+				}
+			}
+			levels, capabilitiesKnown, err := dispatchRunnerThinkingLevels(tx, orgID, factoryID, node, model, ownerID, catalog)
+			var unresolved *unresolvedDispatchModelError
+			if errors.As(err, &unresolved) && (!overridden || containsTemplateExpression(unresolved.model)) {
+				// Model expressions need execution context, including when Start
+				// overrides the effort. Execution also reports unavailable saved models.
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if overridden && !slices.Contains(levels, effectiveThinking) {
+				if run.savedRun {
+					// A retry cannot change the saved Start options.
+					return invalidArgument("The thinking level of this run is no longer available for every agent on this line. Start the line again and choose a thinking level.")
+				}
+				return invalidArgument("thinking level is not available for every agent on this line")
+			}
+			if !overridden && capabilitiesKnown && !slices.Contains(levels, effectiveThinking) {
+				return invalidArgument("An agent on this line has a saved thinking level that its model does not support. Choose a thinking level, or change the agent settings.")
+			}
+		}
+	}
+	return nil
+}
+
 // requireSavedBranchForImplementation stops Implement when checkout would
 // discover a branch the later pull request cannot read. Create pull request
 // uses the saved task branch. An empty value fails after commits are pushed.
-// The check covers every step from the start index, so a line that reaches
-// Implement later cannot start without a saved branch. Read-only lines still
-// start and follow the remote default.
+// The check covers every step that will run, including saved retry steps.
+// A line that reaches Implement later cannot start without a saved branch.
+// Read-only lines start and follow the remote default.
 func requireSavedBranchForImplementation(
 	tx *gorm.DB,
 	factory *models.Factory,
 	order *models.FactoryWorkOrder,
-	line *models.FactoryLine,
-	startIndex int,
+	steps []models.FactoryLineStep,
 ) error {
-	if line == nil || startIndex < 0 || startIndex >= len(line.Steps) {
-		return nil
-	}
-	appIDs := make([]uuid.UUID, 0, len(line.Steps)-startIndex)
-	for _, step := range line.Steps[startIndex:] {
+	appIDs := make([]uuid.UUID, 0, len(steps))
+	for _, step := range steps {
 		appIDs = append(appIDs, step.AppID)
 	}
 	blocked, err := implementStepsMissingSavedBranch(tx, factory, order, appIDs)
@@ -399,27 +507,91 @@ func resolvedWorkOrderDefaultBranch(order *models.FactoryWorkOrder, config model
 	return strings.TrimSpace(config.DefaultBranch)
 }
 
-func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {
-	if level != runner.ThinkingLevelMinimal && level != runner.ThinkingLevelXHigh {
-		return nil
-	}
-	for _, step := range line.Steps {
-		if step.AppID == uuid.Nil {
-			continue
-		}
-		version, err := models.FindLiveCanvasVersionInTransaction(tx, step.AppID)
+// dispatchThinkingOverridesLevel reports whether a Start thinking value sets
+// a level. Empty keeps the agent level and default uses the runner default.
+func dispatchThinkingOverridesLevel(thinking string) bool {
+	return thinking != "" && thinking != runner.DispatchThinkingDefault
+}
+
+func runnerUsesCodexSubscription(node models.Node) bool {
+	credentials, _ := node.Configuration["credentials"].(map[string]any)
+	return node.ComponentName() == runnerCodex && credentials["source"] == "subscription"
+}
+
+// unresolvedDispatchModelError reports that Start cannot resolve the model
+// that an agent runs. Execution resolves it again and reports the cause.
+type unresolvedDispatchModelError struct {
+	model string
+	err   error
+}
+
+func (e *unresolvedDispatchModelError) Error() string { return e.err.Error() }
+
+func (e *unresolvedDispatchModelError) Unwrap() error { return e.err }
+
+// dispatchRunnerThinkingLevels follows execution's model selection and reports
+// whether capabilities are known, including models with effort control disabled.
+func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, selected string, ownerID uuid.UUID, catalog *llmcatalog.ThinkingCatalog) ([]string, bool, error) {
+	model := storedRunnerModel(node.Configuration)
+	if selected != "" {
+		accepted, err := models.RunnerAcceptsModel(tx, orgID, &factoryID, node.ComponentName(), node.Configuration, selected, ownerID)
 		if err != nil {
-			return err
+			return nil, false, err
 		}
-		for _, node := range version.Nodes {
-			component := node.ComponentName()
-			_, isRunner := runnerComponentProvider(component)
-			if component != runnerCodex && (isRunner || component == models.SuperPlaneRunnerComponent) {
-				return invalidArgument("minimal and xhigh thinking levels require a line with only Codex runners")
-			}
+		if accepted {
+			model = selected
 		}
 	}
-	return nil
+	if runnerUsesCodexSubscription(node) {
+		if containsTemplateExpression(model) {
+			return nil, false, &unresolvedDispatchModelError{model: model, err: errors.New("model expression requires execution context")}
+		}
+		resolved, err := models.ResolveFactoryCodexSubscriptionModel(tx, orgID, factoryID, ownerID, model, "")
+		if err != nil {
+			return nil, false, &unresolvedDispatchModelError{model: model, err: err}
+		}
+		levels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, catalog, ownerID)
+		if err != nil {
+			return nil, false, err
+		}
+		return levels(resolved), true, nil
+	}
+	if node.ComponentName() == models.SuperPlaneRunnerComponent {
+		resolved, err := dispatchSuperPlaneModel(tx, orgID, factoryID, node, model)
+		if err != nil {
+			return nil, false, &unresolvedDispatchModelError{model: model, err: err}
+		}
+		levels, known := catalog.LookupThinkingLevels(resolved.Provider, resolved.Model, models.UsageFundingSourceHosted)
+		return levels, known, nil
+	}
+	if model == "" || models.IsClaudeFamilyAlias(model) {
+		ids, err := lineRunnerModelsForNode(tx, orgID, factoryID, node, ownerID)
+		if err != nil {
+			return nil, false, err
+		}
+		if model == "" && len(ids) > 0 {
+			model = slices.Min(ids)
+		}
+		model = models.ConcreteClaudeModelID(model, ids)
+	}
+	provider, ok := runnerNodeProvider(node)
+	if !ok {
+		return nil, false, nil
+	}
+	levels, known := catalog.LookupThinkingLevels(provider, model, runnerFundingSource(node.Configuration))
+	return levels, known, nil
+}
+
+func dispatchSuperPlaneModel(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, model string) (models.DefaultHostedLLMModel, error) {
+	if model == "" {
+		return models.ResolveRunnableHostedLLMModel(tx, orgID, &factoryID)
+	}
+	parsed, err := models.ParseHostedLLMModelKey(model)
+	if err == nil && parsed.IsSet() {
+		return parsed, nil
+	}
+	provider, _ := node.Configuration["hostedProvider"].(string)
+	return models.NormalizeDefaultHostedLLMModel(provider, model)
 }
 
 func publishDispatchedWorkOrder(
