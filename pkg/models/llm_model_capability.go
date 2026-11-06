@@ -1,6 +1,7 @@
 package models
 
 import (
+	"slices"
 	"time"
 
 	"gorm.io/datatypes"
@@ -10,9 +11,10 @@ import (
 
 // LLMModelCapability stores provider model metadata independently of billing rates.
 type LLMModelCapability struct {
-	Provider             string `gorm:"primaryKey"`
-	BaseURL              string `gorm:"primaryKey"`
-	Model                string `gorm:"primaryKey"`
+	Provider string `gorm:"primaryKey"`
+	BaseURL  string `gorm:"primaryKey"`
+	Model    string `gorm:"primaryKey"`
+	// Nil means unavailable metadata; an empty list explicitly disables efforts.
 	ThinkingLevels       datatypes.JSONSlice[string]
 	DefaultThinkingLevel string
 	ReasoningMandatory   bool
@@ -69,7 +71,7 @@ func ReplaceLLMModelCapabilities(tx *gorm.DB, provider, baseURL string, capabili
 			capabilities[i].BaseURL = baseURL
 			if capabilities[i].ThinkingLevels == nil {
 				cached := previousByModel[capabilities[i].Model]
-				capabilities[i].ThinkingLevels = datatypes.NewJSONSlice(append([]string{}, cached.ThinkingLevels...))
+				capabilities[i].ThinkingLevels = datatypes.NewJSONSlice(slices.Clone(cached.ThinkingLevels))
 				capabilities[i].DefaultThinkingLevel = cached.DefaultThinkingLevel
 				capabilities[i].ReasoningMandatory = cached.ReasoningMandatory
 			}
