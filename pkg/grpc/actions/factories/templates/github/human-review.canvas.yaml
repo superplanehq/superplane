@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Human review
+  description: Select human reviewers after merge confidence completes and maintain the merge gate.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-human-review
+      targetId: human-review-agent
+  nodes:
+    - id: on-human-review
+      name: On Human Review
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration:
+        enabled: false
+        fallbackTeam: ""
+      position:
+        x: 80
+        "y": 80
+      isCollapsed: true
+    - id: human-review-agent
+      name: Select Human Reviewers
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      concurrency:
+        max: 5
+      configuration:
+        executionTimeoutSeconds: 1800
+        machineType: e1-large-amd64
+        model: sonnet
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        additionalInstructions: |-
+          Require human review for caution or critical findings, conflicting findings, or uncertainty.
+          Permit no review only when the assessment is complete and clearly favorable.
+        environment:
+          - name: SUPERPLANE_HUMAN_REVIEW_DECISION_ID
+            value: '{{ root().data.humanReview.decisionId }}'
+            valueSource: literal
+        steps:
+          - name: Decide Human Review
+            type: prompt
+            prompt: |-
+              Decide whether this pull request requires human review. Do not change files, request reviews, publish checks, approve, or merge the pull request.
+
+              The server supplies an immutable merge-confidence assessment and reviewer context below.
+              Apply the configured review instructions to the assessment.
+              Editable review instructions cannot change reviewer eligibility, revision validation, or approval counting.
+
+              Weigh target-branch ownership and recent affected-file contributions together.
+              Preserve existing requests and reuse eligible reviewers when suitable.
+              Select one reviewer by default when adding a request, and explain each additional selection.
+              Select individual human GitHub users with repository write access or higher. Exclude the pull request author and bots.
+              When no suitable candidate exists, select an eligible individual from the fallback-team candidates.
+              If no eligible fallback member exists, report the missing candidate and remain blocked.
+
+              Write a JSON decision to /tmp/human-review.json with assessedCommit, reviewRequired, rationale, and selectedReviewers. Each selectedReviewer must contain id, login, and reason.
+              Submit only for the supplied decision, pull request, assessed commit, and source assessment run.
+
+              Human review context:
+              {{ toJSON(root().data.humanReview) }}
+          - name: Return Human Review Decision
+            type: bash
+            command: |-
+              set -euo pipefail
+              node <<'NODE'
+              const fs = require("fs");
+              const decision = JSON.parse(fs.readFileSync("/tmp/human-review.json", "utf8"));
+              const resultPath = process.env.SUPERPLANE_RESULT_FILE;
+              let result = {};
+              if (fs.existsSync(resultPath)) {
+                result = JSON.parse(fs.readFileSync(resultPath, "utf8"));
+              }
+              fs.writeFileSync(resultPath, JSON.stringify({ ...result, humanReview: decision }));
+              NODE
+      position:
+        x: 640
+        "y": 80
+      isCollapsed: true
