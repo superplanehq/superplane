@@ -96,6 +96,21 @@ func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent
 	if err != nil {
 		return err
 	}
+	payload, _ := objectMap(RootEventSourcePayload(event.Data.Data()))
+	providerPR, _ := objectMap(payload["pull_request"])
+	head, _ := objectMap(providerPR["head"])
+	sha, _ := head["sha"].(string)
+	if sha = strings.TrimSpace(sha); sha != "" && activity.RevisionID == nil {
+		// The event identifies the assessed commit, not an observation of the
+		// live head. Delayed admission must not move the current revision back.
+		revision, _, err := findOrCreatePullRequestRevision(tx, activity.PullRequestID, sha)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(activity).Update("revision_id", revision.ID).Error; err != nil {
+			return err
+		}
+	}
 	factory, err := FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
 	if err != nil {
 		return err
