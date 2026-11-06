@@ -21,6 +21,7 @@ var builtInAutomations = []BuiltInAutomation{
 	{ID: "issue-intake", Name: "Issue label intake"},
 	{ID: "pr-closure", Name: "Pull request closure"},
 	{ID: "risk-score", Name: "Merge confidence"},
+	{ID: models.FactoryAppTemplateHumanReviewID, Name: "Human review"},
 	{ID: "visual-evidence", Name: "Visual Evidence"},
 	{ID: prFeedbackDiscussionTemplateID, Name: "Pull request discussion"},
 	{ID: prFeedbackChecksTemplateID, Name: "Pull request checks"},

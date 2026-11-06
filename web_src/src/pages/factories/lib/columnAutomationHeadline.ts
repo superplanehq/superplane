@@ -30,6 +30,7 @@ const FIXED_HEADLINES: Record<
   "pr-checks": "Fixes failing status checks",
   "pr-closure": "Closes tasks when pull requests merge",
   "risk-score": "Scores merge confidence",
+  "human-review": "Requests human approval when required",
   "visual-evidence": "Captures screenshots or a short video",
 };
 
@@ -43,7 +44,13 @@ export function columnAutomationHeaderRowCount(columns: ReadonlyArray<ReadonlyAr
 
 export const IMPLEMENT_AGENT_NODE_ID = "implementation-agent-no-issue";
 
-const SPLIT_CONFIG_NODE_IDS = new Set(["on-pr-risk", "on-pr-visual-evidence", "on-pr-closed", IMPLEMENT_AGENT_NODE_ID]);
+const SPLIT_CONFIG_NODE_IDS = new Set([
+  "on-human-review",
+  "on-pr-risk",
+  "on-pr-visual-evidence",
+  "on-pr-closed",
+  IMPLEMENT_AGENT_NODE_ID,
+]);
 
 /** Merge confidence, visual evidence, pull-request closure, and the Implement agent open the split settings panel. */
 export function columnAutomationUsesSplitConfig(nodeIds: Iterable<string | undefined>): boolean {
