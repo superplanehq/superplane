@@ -117,6 +117,33 @@ type CodexReasoningEffortOption struct {
 	Description     string `json:"description"`
 }
 
+// CodexModelReasoningEfforts lists the efforts reported for a native model.
+// An empty model uses the native default from the same catalog.
+func CodexModelReasoningEfforts(catalog []CodexModel, model string) []string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		for _, candidate := range catalog {
+			if candidate.IsDefault {
+				model = strings.TrimSpace(candidate.Model)
+				break
+			}
+		}
+	}
+	if model == "" {
+		return nil
+	}
+	var efforts []string
+	for _, candidate := range catalog {
+		if strings.TrimSpace(candidate.Model) != model {
+			continue
+		}
+		for _, option := range candidate.SupportedReasoningEfforts {
+			efforts = append(efforts, option.ReasoningEffort)
+		}
+	}
+	return efforts
+}
+
 func (FactoryCodexConnection) TableName() string {
 	return "factory_codex_connections"
 }
@@ -888,16 +915,68 @@ func (c *FactoryCodexConnection) StoreUsage(tx *gorm.DB, limits []CodexUsageLimi
 }
 
 func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID) ([]string, error) {
-	available, err := FactoryCodexAvailableSubscriptionModels(tx, organizationID, factoryID, ownerID)
+	catalog, err := FactoryCodexSubscriptionCatalog(tx, organizationID, factoryID, ownerID)
 	if err != nil {
 		return nil, err
 	}
-	return ApplyFactoryLLMModelPolicy(tx, factoryID, UsageProviderOpenAI, UsageFundingSourceSubscription, available)
+	models := make([]string, 0, len(catalog))
+	for _, model := range catalog {
+		models = append(models, model.Model)
+	}
+	return CompactModelIDs(models), nil
+}
+
+// FactoryCodexSubscriptionCatalog returns the permitted models of a ready
+// ChatGPT subscription, including the reasoning efforts Codex reports.
+// Other connection states have no models.
+func FactoryCodexSubscriptionCatalog(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID) ([]CodexModel, error) {
+	connection, err := readyCodexSubscription(tx, organizationID, ownerID)
+	if err != nil || connection == nil {
+		return nil, err
+	}
+	byID := make(map[string]CodexModel, len(connection.AvailableModels))
+	available := make([]string, 0, len(connection.AvailableModels))
+	for _, model := range connection.AvailableModels {
+		id := strings.TrimSpace(model.Model)
+		if id == "" {
+			continue
+		}
+		if _, seen := byID[id]; seen {
+			continue
+		}
+		byID[id] = model
+		available = append(available, id)
+	}
+	permitted, err := ApplyFactoryLLMModelPolicy(tx, factoryID, UsageProviderOpenAI, UsageFundingSourceSubscription, CompactModelIDs(available))
+	if err != nil {
+		return nil, err
+	}
+	catalog := make([]CodexModel, 0, len(permitted))
+	for _, id := range permitted {
+		model, ok := byID[id]
+		if !ok {
+			continue
+		}
+		catalog = append(catalog, model)
+	}
+	return catalog, nil
 }
 
 // FactoryCodexAvailableSubscriptionModels returns the owner's native catalog
 // before the workspace policy is applied.
 func FactoryCodexAvailableSubscriptionModels(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID) ([]string, error) {
+	connection, err := readyCodexSubscription(tx, organizationID, ownerID)
+	if err != nil || connection == nil {
+		return nil, err
+	}
+	models := make([]string, 0, len(connection.AvailableModels))
+	for _, model := range connection.AvailableModels {
+		models = append(models, model.Model)
+	}
+	return CompactModelIDs(models), nil
+}
+
+func readyCodexSubscription(tx *gorm.DB, organizationID, ownerID uuid.UUID) (*FactoryCodexConnection, error) {
 	connection, err := FindCodexConnection(tx, organizationID, ownerID)
 	if errors.Is(err, ErrCodexConnectionNotFound) {
 		return nil, nil
@@ -908,21 +987,30 @@ func FactoryCodexAvailableSubscriptionModels(tx *gorm.DB, organizationID, factor
 	if connection.Status != CodexConnectionStatusReady || connection.RevocationPendingAt != nil || connection.CredentialVersion < 1 || len(connection.BundleCiphertext) == 0 {
 		return nil, nil
 	}
-	models := make([]string, 0, len(connection.AvailableModels))
-	for _, model := range connection.AvailableModels {
-		models = append(models, model.Model)
-	}
-	return CompactModelIDs(models), nil
+	return connection, nil
 }
 
 // ResolveFactoryCodexSubscriptionModel preserves the native default while
 // inheriting. Restricted workspaces always dispatch a permitted native ID.
-func ResolveFactoryCodexSubscriptionModel(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID, requested string) (string, error) {
+// Explicit thinking must be available for the final model in the owner's catalog.
+func ResolveFactoryCodexSubscriptionModel(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID, requested, thinking string) (string, error) {
 	connection, err := FindCodexConnection(tx, organizationID, ownerID)
 	if err != nil {
 		return "", err
 	}
-	return connection.resolvePermittedModel(tx, factoryID, requested)
+	model, err := connection.resolvePermittedModel(tx, factoryID, requested)
+	if err != nil {
+		return "", err
+	}
+	thinking = strings.ToLower(strings.TrimSpace(thinking))
+	if thinking == "" {
+		return model, nil
+	}
+	levels := CodexModelReasoningEfforts(connection.AvailableModels, model)
+	if slices.ContainsFunc(levels, func(level string) bool { return strings.EqualFold(strings.TrimSpace(level), thinking) }) {
+		return model, nil
+	}
+	return "", newSubscriptionAdmissionError(fmt.Sprintf("thinking level %q is not available for this ChatGPT model", thinking))
 }
 
 func (c *FactoryCodexConnection) resolvePermittedModel(tx *gorm.DB, factoryID uuid.UUID, requested string) (string, error) {
