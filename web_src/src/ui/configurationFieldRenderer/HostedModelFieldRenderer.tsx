@@ -25,6 +25,7 @@ import {
   normalizeThinkingLevel,
   supportedThinkingLevel,
   thinkingOptions,
+  visibleThinkingLevelLabel,
 } from "@/lib/thinkingLevel";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -258,10 +259,15 @@ function modelThinkingPickerState(options: ModelOption[], model: string, thinkin
   const effectiveModel = model !== "" ? model : (options.find((option) => option.isDefault)?.value ?? "");
   const levels = thinkingLevelsForModel(options, effectiveModel);
   const modelThinking = thinkingOptions(levels, { withDefault: true });
-  const showThinking = !modelOnly && modelThinking.length > 0;
-  const selectedThinking = supportedThinkingLevel(thinkingLevel, levels);
-  const thinkingLabel = modelThinking.find((level) => level.value === selectedThinking)?.label ?? "Default";
-  return { modelThinking, showThinking, selectedThinking, thinkingLabel };
+  const unavailableThinking = thinkingLevel !== "" && supportedThinkingLevel(thinkingLevel, levels) === "";
+  if (unavailableThinking && modelThinking.length === 0) {
+    modelThinking.push({ value: "", label: "Default" });
+  }
+  const showThinking = !modelOnly && (modelThinking.length > 0 || unavailableThinking);
+  const thinkingLabel = unavailableThinking
+    ? `${visibleThinkingLevelLabel(thinkingLevel)} (unavailable)`
+    : (modelThinking.find((level) => level.value === thinkingLevel)?.label ?? "Default");
+  return { modelThinking, showThinking, unavailableThinking, thinkingLabel };
 }
 
 function ModelThinkingSelect({
@@ -292,7 +298,7 @@ function ModelThinkingSelect({
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
   const { unavailable, label: selectedLabel } = modelSelectionLabel(model, options, placeholder);
-  const { modelThinking, showThinking, selectedThinking, thinkingLabel } = modelThinkingPickerState(
+  const { modelThinking, showThinking, unavailableThinking, thinkingLabel } = modelThinkingPickerState(
     options,
     model,
     thinkingLevel,
@@ -311,7 +317,7 @@ function ModelThinkingSelect({
           <Button
             type="button"
             variant="outline"
-            disabled={readOnly || options.length === 0}
+            disabled={readOnly || (options.length === 0 && !showThinking)}
             aria-invalid={(unavailable && unavailableSeverity === "error") || undefined}
             data-testid={modelFieldTestId(fieldName, "model")}
             className={cn(
@@ -345,7 +351,7 @@ function ModelThinkingSelect({
                   key="thinking"
                   label="Thinking"
                   testId={thinkingTestId}
-                  value={selectedThinking}
+                  value={thinkingLevel}
                   options={modelThinking}
                   disabled={unavailable}
                   onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
@@ -359,6 +365,18 @@ function ModelThinkingSelect({
               ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      {unavailableThinking ? (
+        <div>
+          <Text role="status" className="text-sm text-amber-700 dark:text-amber-400">
+            The saved thinking level is unavailable for this model. Select an available level or use Default.
+          </Text>
+          {!readOnly ? (
+            <Button type="button" variant="link" onClick={() => onCommit(committedModel, "")}>
+              Use default
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {unavailable ? (
         <Text
           role={unavailableSeverity === "warning" ? "status" : "alert"}

@@ -947,15 +947,24 @@ func FactoryCodexSubscriptionCatalog(tx *gorm.DB, organizationID, factoryID, own
 		byID[id] = model
 		available = append(available, id)
 	}
-	permitted, err := ApplyFactoryLLMModelPolicy(tx, factoryID, UsageProviderOpenAI, UsageFundingSourceSubscription, CompactModelIDs(available))
+	policy, err := FindFactoryLLMModelAllowlist(tx, factoryID, UsageProviderOpenAI, UsageFundingSourceSubscription)
 	if err != nil {
 		return nil, err
+	}
+	permitted := CompactModelIDs(available)
+	defaultModel := ""
+	if !policy.InheritsParent() {
+		permitted = IntersectModelIDs(permitted, policy.AllowedModels)
+		defaultModel = permittedCodexDefault(connection.AvailableModels, permitted)
 	}
 	catalog := make([]CodexModel, 0, len(permitted))
 	for _, id := range permitted {
 		model, ok := byID[id]
 		if !ok {
 			continue
+		}
+		if defaultModel != "" {
+			model.IsDefault = id == defaultModel
 		}
 		catalog = append(catalog, model)
 	}
@@ -1039,13 +1048,21 @@ func (c *FactoryCodexConnection) resolvePermittedModel(tx *gorm.DB, factoryID uu
 	if len(permitted) == 0 {
 		return "", fmt.Errorf("No ChatGPT models are enabled for this task owner. Update Models in workspace settings: %w", ErrSubscriptionModelUnavailable)
 	}
-	for _, candidate := range c.AvailableModels {
+	return permittedCodexDefault(c.AvailableModels, permitted), nil
+}
+
+// permittedCodexDefault matches execution when workspace policy excludes the
+// native default: use the first permitted model in alphabetical order.
+func permittedCodexDefault(catalog []CodexModel, permitted []string) string {
+	for _, candidate := range catalog {
 		if candidate.IsDefault && slices.Contains(permitted, candidate.Model) {
-			return candidate.Model, nil
+			return candidate.Model
 		}
 	}
-	slices.Sort(permitted)
-	return permitted[0], nil
+	if len(permitted) == 0 {
+		return ""
+	}
+	return slices.Min(permitted)
 }
 
 func requireCodexFactoriesAccess(tx *gorm.DB, organizationID uuid.UUID) error {

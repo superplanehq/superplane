@@ -1,4 +1,5 @@
-import { screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
@@ -163,7 +164,7 @@ describe("HostedModelFieldRenderer thinking levels", () => {
         value="claude-haiku-4-5"
         onChange={vi.fn()}
         onValuesChange={onValuesChange}
-        allValues={{ model: "claude-haiku-4-5", thinkingLevel: "high" }}
+        allValues={{ model: "claude-haiku-4-5" }}
         organizationId="org-1"
       />,
     );
@@ -172,8 +173,33 @@ describe("HostedModelFieldRenderer thinking levels", () => {
     await user.click(screen.getByTestId("field-model-hosted-model"));
     expect(screen.queryByTestId("field-model-hosted-thinking")).not.toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "sonnet 4-6" }));
-    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: undefined });
   });
+
+  it.each([{ levels: ["low"] }, { levels: [] as string[] }])(
+    "shows an unavailable saved effort after a catalog refresh to $levels",
+    async ({ levels }) => {
+      const user = userEvent.setup();
+      const onValuesChange = vi.fn();
+      const props = {
+        field: createField("openai"),
+        value: "gpt-6-astra",
+        onChange: vi.fn(),
+        onValuesChange,
+        allValues: { model: "gpt-6-astra", thinkingLevel: "high", credentials: { source: "subscription" } },
+        organizationId: "org-1",
+      };
+      mockSelectableModels([selectableModel("subscription", "openai", "gpt-6-astra", ["low", "high"])]);
+      const view = render(<HostedModelFieldRenderer {...props} />, { wrapper: MemoryRouter });
+      expectClosedThinkingWord("gpt-6-astra", "High");
+      mockSelectableModels([selectableModel("subscription", "openai", "gpt-6-astra", levels)]);
+      view.rerender(<HostedModelFieldRenderer {...props} />);
+      expectClosedThinkingWord("gpt-6-astra", "High (unavailable)");
+      expect(screen.getByRole("status")).toHaveTextContent("saved thinking level");
+      await user.click(screen.getByRole("button", { name: "Use default" }));
+      expect(onValuesChange).toHaveBeenCalledWith({ model: "gpt-6-astra", thinkingLevel: undefined });
+    },
+  );
 
   it("clears a thinking level that the new model does not support", async () => {
     const user = userEvent.setup();
