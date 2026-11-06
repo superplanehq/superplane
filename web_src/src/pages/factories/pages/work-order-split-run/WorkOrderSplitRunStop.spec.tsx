@@ -38,7 +38,9 @@ vi.mock("@/hooks/useFactoryData", () => {
 
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   useFactoryLineRunnerModels: () => ({
-    data: { models: [{ id: "claude-opus-4-6", name: "claude-opus-4-6" }] },
+    data: {
+      models: [{ id: "claude-opus-4-6", name: "claude-opus-4-6", thinkingLevels: ["low", "medium", "high", "max"] }],
+    },
     isLoading: false,
   }),
 }));
@@ -242,17 +244,17 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const settings = implementationSettings();
-    const model = within(settings).getByRole("button", { name: "Model: Auto Medium" });
-    expect(model).toHaveTextContent("Auto Medium");
+    const model = within(settings).getByRole("button", { name: "Model: Auto" });
+    expect(model).toHaveTextContent("Auto");
     await user.click(model);
     await user.hover(screen.getByTestId("split-run-draft-model-list"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.keyboard("{Escape}");
-    expect(within(settings).getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toBeInTheDocument();
+    expect(within(settings).getByRole("button", { name: "Model: claude-opus-4-6" })).toBeInTheDocument();
     const actions = within(settings).getByTestId("split-run-draft-action-group");
     expect(within(actions).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     await user.click(within(actions).getByRole("button", { name: "Start" }));
-    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", "medium");
+    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", undefined);
   });
 
   it("starts a draft with the picked thinking level", async () => {
@@ -275,15 +277,17 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const settings = implementationSettings();
-    await user.click(within(settings).getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(within(settings).getByRole("button", { name: "Model: Auto" }));
+    await user.hover(screen.getByTestId("split-run-draft-model-list"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Low" }));
     await user.keyboard("{Escape}");
     await user.click(within(settings).getByRole("button", { name: "Start" }));
-    expect(onDispatch).toHaveBeenCalledWith(undefined, "low");
+    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", "low");
   });
 
-  it("keeps the picked thinking level when the model changes", async () => {
+  it("drops the picked thinking level when the model changes back to Auto", async () => {
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(
@@ -303,14 +307,16 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const settings = implementationSettings();
-    await user.click(within(settings).getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(within(settings).getByRole("button", { name: "Model: Auto" }));
+    await user.hover(screen.getByTestId("split-run-draft-model-list"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "High" }));
     await user.hover(screen.getByTestId("split-run-draft-model-list"));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Auto" }));
     await user.keyboard("{Escape}");
     await user.click(within(settings).getByRole("button", { name: "Start" }));
-    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", "high");
+    expect(onDispatch).toHaveBeenCalledWith(undefined, undefined);
   });
 
   it("reruns a failed open task from the note", async () => {
