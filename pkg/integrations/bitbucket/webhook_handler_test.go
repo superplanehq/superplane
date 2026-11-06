@@ -160,6 +160,36 @@ func Test__BitbucketWebhookHandler__WorkspaceRepositories(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[3].URL.Path, "/partner/web/hooks/")
 	})
 
+	t.Run("cleanup deletes every hook when one hook is already gone", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			response(http.StatusNotFound, `{"error":{"message":"not found"}}`),
+			response(http.StatusNoContent, ""),
+		}}
+		webhook := &contexts.WebhookContext{Configuration: config, Metadata: &BitbucketWebhook{UUID: "{hook-api}", Hooks: []RepositoryWebhook{
+			{Repository: "acme/api", UUID: "{hook-api}"},
+			{Repository: "partner/web", UUID: "{hook-web}"},
+		}}}
+
+		require.NoError(t, handler.Cleanup(core.WebhookHandlerContext{HTTP: httpContext, Integration: integration, Webhook: webhook}))
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.Path, "/partner/web/hooks/")
+	})
+
+	t.Run("cleanup tries every hook and reports each failure", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			response(http.StatusInternalServerError, `{}`),
+			response(http.StatusNoContent, ""),
+		}}
+		webhook := &contexts.WebhookContext{Configuration: config, Metadata: &BitbucketWebhook{UUID: "{hook-api}", Hooks: []RepositoryWebhook{
+			{Repository: "acme/api", UUID: "{hook-api}"},
+			{Repository: "partner/web", UUID: "{hook-web}"},
+		}}}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{HTTP: httpContext, Integration: integration, Webhook: webhook})
+		require.ErrorContains(t, err, "acme/api")
+		require.Len(t, httpContext.Requests, 2)
+	})
+
 	t.Run("removes the hooks it created when a repository fails", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 			response(http.StatusCreated, `{"uuid":"{hook-api}"}`),

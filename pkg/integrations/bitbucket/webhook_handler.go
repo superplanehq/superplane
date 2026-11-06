@@ -272,14 +272,19 @@ func saveRepositoryWebhook(client *Client, workspace, slug, existingUUID, url, s
 	return hook.UUID, true, nil
 }
 
+// deleteRepositoryWebhooks tries every hook, because the caller deletes the
+// saved hook IDs even when cleanup fails. A hook that is already gone counts
+// as deleted.
 func deleteRepositoryWebhooks(client *Client, hooks []RepositoryWebhook) error {
+	var errs []error
 	for _, hook := range hooks {
 		workspace, slug, _ := strings.Cut(hook.Repository, "/")
-		if err := client.DeleteWebhook(workspace, slug, hook.UUID); err != nil {
-			return fmt.Errorf("error deleting webhook in %s: %w", hook.Repository, err)
+		err := client.DeleteWebhook(workspace, slug, hook.UUID)
+		if err != nil && !errors.Is(err, errBitbucketWebhookNotFound) {
+			errs = append(errs, fmt.Errorf("error deleting webhook in %s: %w", hook.Repository, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (h *BitbucketWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {

@@ -9,11 +9,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
 
@@ -71,6 +73,57 @@ func TestSetOrganizationMultiRepoTasksSwitchesTheImplementTemplate(t *testing.T)
 		assert.True(t, hasPullRequestNode(current.Nodes))
 		assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
 	}
+}
+
+func TestSetOrganizationMultiRepoTasksRefreshesWorkspaceListeners(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "bitbucket", support.RandomName("bitbucket"), nil)
+	require.NoError(t, err)
+	factory := bitbucketFactory(t, r)
+	integrationID := integration.ID.String()
+	repository := "acme/api"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID: &integrationID,
+		AppRepository:    &repository,
+	}))
+	var setupRepositories [][]string
+	r.Registry.Integrations["bitbucket"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{impl.NewDummyTrigger(impl.DummyTriggerOptions{
+			Name: "bitbucket.onPullRequest",
+			SetupFunc: func(ctx core.TriggerContext) error {
+				repositories, err := ctx.Factory.ListRepositories()
+				setupRepositories = append(setupRepositories, repositories)
+				return err
+			},
+		})},
+	})
+	closure := support.CreateFactoryCanvas(t, r, factory.ID, "Close")
+	publishRepositoryCanvas(t, r, testIntakeDependencies(r), closure, []models.Node{{
+		ID: prClosureTriggerNodeID, Name: "On pull request closed", Type: models.NodeTypeTrigger,
+		Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: "bitbucket.onPullRequest"}},
+		IntegrationID: &integrationID,
+		Configuration: map[string]any{"repository": models.WorkspaceRepositoriesExpression, "actions": []any{"merged"}},
+		Metadata:      models.FactoryAppTemplateMetadataFor("pr-closure", 1, models.ProviderBitbucket),
+	}})
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository:  "acme/web",
+		Access:      models.FactoryContextRepoAccessWrite,
+		VCSProvider: models.ProviderBitbucket,
+	})
+	require.NoError(t, err)
+
+	setupRepositories = nil
+	_, err = setMultiRepoTasks(t, r, true)
+	require.NoError(t, err)
+	require.NotEmpty(t, setupRepositories, "enabling must refresh the workspace webhooks")
+	assert.Equal(t, []string{"acme/api", "acme/web"}, setupRepositories[len(setupRepositories)-1])
+
+	setupRepositories = nil
+	_, err = setMultiRepoTasks(t, r, false)
+	require.NoError(t, err)
+	require.NotEmpty(t, setupRepositories, "disabling must refresh the workspace webhooks")
+	assert.Equal(t, []string{"acme/api"}, setupRepositories[len(setupRepositories)-1])
 }
 
 func TestSetOrganizationMultiRepoTasksKeepsTheFlagWhenSettingsCannotApply(t *testing.T) {
