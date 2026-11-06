@@ -20,6 +20,10 @@ export type SelectableLLMModel = {
   model: SelectableLLMNamedID;
   key: string;
   label: string;
+  /** Thinking levels that the model supports. Empty means that the model has no thinking control. */
+  thinkingLevels: string[];
+  /** True when the provider catalog marks this model as its default. */
+  isDefault?: boolean;
 };
 
 export function selectableLLMModelKey(source: string, provider: string, model: string): string {
@@ -98,8 +102,14 @@ export function defaultByokRunnerModel(current: string, provider: string, modelI
   return modelIds.filter((id) => !usesClaudeAliases || !LEGACY_CLAUDE_MODEL_ALIASES.has(modelLeaf(id))).sort()[0];
 }
 
-export function byokRunnerModelOptions(models: SelectableLLMModel[]): Array<{ value: string; label: string }> {
-  return models.map((model) => ({ value: model.model.id, label: model.label }));
+export function byokRunnerModelOptions(
+  models: SelectableLLMModel[],
+): Array<{ value: string; label: string; thinkingLevels: string[] }> {
+  return models.map((model) => ({
+    value: model.model.id,
+    label: model.label,
+    thinkingLevels: model.thinkingLevels,
+  }));
 }
 
 export function selectableLLMModelsFromResponse(
@@ -109,6 +119,8 @@ export function selectableLLMModelsFromResponse(
     model?: { id?: string; name?: string };
     key?: string;
     label?: string;
+    thinkingLevels?: string[];
+    isDefault?: boolean;
   }>,
   sources?: SelectableLLMSourceID[],
 ): SelectableLLMModel[] {
@@ -140,6 +152,8 @@ function selectableLLMModelFromResponse(item: {
   model?: { id?: string; name?: string };
   key?: string;
   label?: string;
+  thinkingLevels?: string[];
+  isDefault?: boolean;
 }): SelectableLLMModel | undefined {
   const key = item.key?.trim() ?? "";
   const source = selectableNamedID(item.source);
@@ -154,6 +168,8 @@ function selectableLLMModelFromResponse(item: {
     model,
     key,
     label: item.label?.trim() || model.id,
+    thinkingLevels: item.thinkingLevels ?? [],
+    isDefault: item.isDefault,
   };
 }
 

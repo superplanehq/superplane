@@ -39,7 +39,10 @@ func TestBuildRefinementModel(t *testing.T) {
 			if tc.source == "subscription" {
 				connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 				require.NoError(t, err)
-				require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: tc.override}, {Model: tc.stored}}, time.Now()))
+				require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+					{Model: tc.override, SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "low"}, {ReasoningEffort: "high"}}},
+					{Model: tc.stored, SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "low"}, {ReasoningEffort: "high"}}},
+				}, time.Now()))
 				require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 			}
 			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
