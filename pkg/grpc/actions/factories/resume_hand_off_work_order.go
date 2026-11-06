@@ -94,7 +94,7 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 			}
 			return err
 		}
-		if err := validateHandOffOverrides(tx, factory, order, line, req.GetModel(), req.GetThinkingLevel()); err != nil {
+		if err := validateHandOffOverrides(tx, factory, order, line, index, req.GetModel(), req.GetThinkingLevel()); err != nil {
 			return err
 		}
 		normalizedThinking, err := runner.NormalizeDispatchThinkingLevel(req.GetThinkingLevel())
@@ -198,26 +198,11 @@ func discardStaleHandOff(ctx context.Context, factory *models.Factory, order *mo
 	return &pb.ResumeHandOffWorkOrderResponse{Order: serialized, Column: "backlog"}, nil
 }
 
-func validateHandOffOverrides(tx *gorm.DB, f *models.Factory, o *models.FactoryWorkOrder, line *models.FactoryLine, model, thinking string) error {
-	if strings.TrimSpace(model) != "" {
-		allowed, _, err := listLineRunnerModels(tx, f.OrganizationID, f.ID, line.Name, subscriptionOrderOwnerID(tx, o))
-		if err != nil {
-			return err
-		}
-		found := false
-		for _, id := range allowed {
-			if id == strings.TrimSpace(model) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return invalidArgument("The selected model is unavailable for this task owner.")
-		}
-	}
+func validateHandOffOverrides(tx *gorm.DB, f *models.Factory, o *models.FactoryWorkOrder, line *models.FactoryLine, startIndex int, model, thinking string) error {
+
 	normalized, err := runner.NormalizeDispatchThinkingLevel(thinking)
 	if err != nil {
 		return invalidArgument(err.Error())
 	}
-	return validateLineThinkingLevel(tx, line, normalized)
+	return validateLineDispatchModel(tx, f.OrganizationID, f.ID, line, startIndex, strings.TrimSpace(model), normalized, subscriptionOrderOwnerID(tx, o))
 }

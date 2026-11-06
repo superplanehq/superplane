@@ -921,3 +921,38 @@ func TestPersonalCodexMigrationPreservesCredentialsAndLeases(t *testing.T) {
 		return nil
 	}))
 }
+
+func TestSubscriptionCatalogDefaultMatchesExecutionAfterWorkspaceFiltering(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		allowed []string
+		want    string
+	}{
+		{name: "native default remains", allowed: []string{"zeta", "alpha"}, want: "zeta"},
+		{name: "native default excluded", allowed: []string{"beta", "alpha"}, want: "alpha"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, connection, _, _ := newReadyCodexConnection(t)
+			factoryID := support.CodexWorkspaceID(t, db, connection.OrganizationID)
+			require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+				{Model: "beta"}, {Model: "zeta", IsDefault: true}, {Model: "alpha"},
+			}, time.Now()))
+			inherit := false
+			_, err := models.UpsertFactoryLLMModelAllowlist(db, connection.OrganizationID, factoryID,
+				models.UsageProviderOpenAI, models.UsageFundingSourceSubscription, tc.allowed, &inherit)
+			require.NoError(t, err)
+			catalog, err := models.FactoryCodexSubscriptionCatalog(db, connection.OrganizationID, factoryID, connection.OwnerUserID)
+			require.NoError(t, err)
+			var defaults []string
+			for _, model := range catalog {
+				if model.IsDefault {
+					defaults = append(defaults, model.Model)
+				}
+			}
+			assert.Equal(t, []string{tc.want}, defaults)
+			resolved, err := models.ResolveFactoryCodexSubscriptionModel(db, connection.OrganizationID, factoryID, connection.OwnerUserID, "", "")
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, resolved)
+		})
+	}
+}
