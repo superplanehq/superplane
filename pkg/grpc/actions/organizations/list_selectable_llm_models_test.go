@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/superplanehq/superplane/pkg/features"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -11,13 +12,52 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 )
+
+func TestSelectableOpenRouterModelsUseCapabilitiesOfTheirSource(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	saveEmptyHostedModelSelections(t, db, r.Organization.ID)
+	const model = "deepseek/deepseek-v4.1-flash"
+	const hostedURL = "https://gateway.example/openrouter"
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider: models.UsageProviderOpenRouter, Enabled: true, APIKey: []byte("encrypted"), BaseURL: hostedURL,
+		AllowedModels: datatypes.NewJSONSlice([]string{model}),
+	})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.NewJSONSlice([]string{model}))
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.NewJSONSlice([]string{model}))
+	require.NoError(t, err)
+	for source, levels := range map[string][]string{
+		llm.DefaultOpenRouterBaseURL: {"max", "high", "low", "none"},
+		hostedURL:                    {"xhigh", "high"},
+	} {
+		require.NoError(t, models.ReplaceLLMModelCapabilities(db, models.UsageProviderOpenRouter, source, []models.LLMModelCapability{{
+			Model: model, ThinkingLevels: datatypes.NewJSONSlice(levels), RefreshedAt: time.Now(),
+		}}))
+	}
+
+	response, err := ListSelectableLLMModels(t.Context(), nil, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
+	require.NoError(t, err)
+	levels := make(map[string][]string)
+	for _, option := range response.Models {
+		levels[option.Source.Id] = option.ThinkingLevels
+	}
+	assert.Equal(t, map[string][]string{
+		models.UsageFundingSourceBYOK:   {"none", "low", "high", "max"},
+		models.UsageFundingSourceHosted: {"high", "xhigh"},
+	}, levels)
+}
 
 func Test__ListSelectableLLMModels(t *testing.T) {
 	r := support.Setup(t)
@@ -58,6 +98,7 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 	assert.Equal(t, "hosted::anthropic::claude-sonnet-4-6", resp.Models[1].Key)
 	assert.Equal(t, "SuperPlane", resp.Models[1].Source.Name)
 	assert.Equal(t, "anthropic/claude-sonnet-4-6", resp.Models[1].Label)
+	assert.Equal(t, []string{"low", "medium", "high", "max"}, resp.Models[1].ThinkingLevels)
 
 	_, err = ListSelectableLLMModels(context.Background(), r.Registry, "not-a-uuid", &pb.ListSelectableLLMModelsRequest{})
 	require.Error(t, err)
@@ -105,6 +146,52 @@ func Test__ListSelectableLLMModels__EnablesConnectedKeyModelsByDefault(t *testin
 	resp, err = ListSelectableLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
 	require.NoError(t, err)
 	assert.Empty(t, resp.Models)
+}
+
+func TestSelectableSubscriptionModelsUseCodexCatalogEfforts(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	subscription := true
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+		{Model: "gpt-5.3"},
+		{
+			Model:     "gpt-5.4",
+			IsDefault: true,
+			SupportedReasoningEfforts: []models.CodexReasoningEffortOption{
+				{ReasoningEffort: "high"},
+				{ReasoningEffort: "low"},
+				{ReasoningEffort: "ultra"},
+				{ReasoningEffort: "max"},
+				{ReasoningEffort: "future-effort"},
+			},
+		},
+	}, time.Now()))
+	require.NoError(t, db.Model(connection).Updates(map[string]any{
+		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle"),
+	}).Error)
+
+	resp, err := ListSelectableLLMModels(
+		authentication.SetUserIdInMetadata(t.Context(), r.User.String()),
+		nil,
+		r.Organization.ID.String(),
+		&pb.ListSelectableLLMModelsRequest{FactoryId: factory.ID.String()},
+	)
+	require.NoError(t, err)
+	byID := map[string]*pb.SelectableLLMModel{}
+	for _, model := range resp.Models {
+		byID[model.GetModel().GetId()] = model
+	}
+	require.Contains(t, byID, "gpt-5.4")
+	assert.Equal(t, []string{"low", "high", "max", "ultra", "future-effort"}, byID["gpt-5.4"].GetThinkingLevels())
+	assert.True(t, byID["gpt-5.4"].GetIsDefault())
+	assert.Equal(t, "subscription", byID["gpt-5.4"].GetSource().GetId())
+	assert.Empty(t, byID["gpt-5.3"].GetThinkingLevels())
+	assert.False(t, byID["gpt-5.3"].GetIsDefault())
 }
 
 func saveEmptyHostedModelSelections(t *testing.T, db *gorm.DB, orgID uuid.UUID) {

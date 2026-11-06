@@ -164,7 +164,7 @@ func TestSubscriptionStartPreservesOwnersOfOpenTasksAndStepRetries(t *testing.T)
 		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
 		catalog := []models.CodexModel{{Model: "shared-model"}}
 		if userID == previous.ID {
-			catalog = append(catalog, models.CodexModel{Model: "previous-owner-model"})
+			catalog = append(catalog, models.CodexModel{Model: "previous-owner-model", SupportedReasoningEfforts: []models.CodexReasoningEffortOption{{ReasoningEffort: "low"}}})
 		}
 		require.NoError(t, connection.StoreUsage(db, nil, catalog, time.Now()))
 	}
