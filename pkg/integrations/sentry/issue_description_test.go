@@ -288,6 +288,17 @@ func Test__IssueDescription(t *testing.T) {
 	})
 }
 
+func TestAssembleIssueDescriptionKeepsOriginalOnAPIFailure(t *testing.T) {
+	issue := map[string]any{"id": "123", "title": "Broken deploy", "permalink": "https://sentry.io/issues/123/"}
+	for _, response := range []any{nil, "<html>Bad Gateway</html>", map[string]any{"detail": "unavailable"}} {
+		assert.Equal(t, IssueDescription(issue, nil), AssembleIssueDescription(issue, response, response, response))
+	}
+	body := AssembleIssueDescription(issue, map[string]any{"id": "123", "count": "8"}, nil, nil)
+	assert.Contains(t, body, "[View in Sentry](https://sentry.io/issues/123/)")
+	assert.Contains(t, body, "**Count:** 8")
+	assert.NotContains(t, issue, "count", "assembly must not mutate the trigger payload")
+}
+
 func Test__FetchedIssueDescription(t *testing.T) {
 	t.Run("uses a string release and stack from the latest event", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{

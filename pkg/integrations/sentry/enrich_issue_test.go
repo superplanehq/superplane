@@ -54,6 +54,7 @@ func TestEnrichIssueUsesSentryDetailsAndFallsBackToWebhook(t *testing.T) {
 			responses: []*http.Response{
 				sentryMockResponse(http.StatusServiceUnavailable, `{"detail":"unavailable"}`),
 				sentryMockResponse(http.StatusServiceUnavailable, `{"detail":"unavailable"}`),
+				sentryMockResponse(http.StatusServiceUnavailable, `{"detail":"unavailable"}`),
 			},
 			want: "[View in Sentry](https://sentry.io/issues/123/)",
 		},
@@ -71,7 +72,11 @@ func TestEnrichIssueUsesSentryDetailsAndFallsBackToWebhook(t *testing.T) {
 			require.Len(t, state.Payloads, 1)
 			data := state.Payloads[0].(map[string]any)["data"].(map[string]any)
 			assert.Contains(t, data["description"], test.want)
-			assert.Len(t, httpCtx.Requests, 2)
+			if test.name == "Sentry API error" {
+				assert.Len(t, httpCtx.Requests, 3)
+			} else {
+				assert.Len(t, httpCtx.Requests, 2)
+			}
 			if test.name == "Sentry API error" {
 				assert.Equal(t, IssueDescription(issue, nil), data["description"])
 			}
