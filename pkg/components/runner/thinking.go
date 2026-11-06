@@ -31,7 +31,7 @@ var (
 	// CodexThinkingLevels are fallback efforts for API credentials.
 	// Subscriptions use the efforts reported by the native Codex catalog.
 	CodexThinkingLevels = []string{
-		ThinkingLevelNone, ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh,
+		ThinkingLevelNone, ThinkingLevelMinimal, ThinkingLevelLow, ThinkingLevelMedium, ThinkingLevelHigh, ThinkingLevelXHigh, ThinkingLevelMax,
 	}
 	// OpenCodeThinkingLevels are the `opencode run --variant` values that
 	// SuperPlane sends.

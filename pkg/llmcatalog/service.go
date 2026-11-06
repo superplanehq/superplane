@@ -35,12 +35,15 @@ func CatalogBaseURL(configured string) string {
 	return baseURL
 }
 
-// Refresh replaces one source catalog after a successful, nonempty fetch.
+// Refresh stores capabilities after a successful, nonempty fetch.
 func (s *Service) Refresh(ctx context.Context, tx *gorm.DB, provider models.HostedLLMProvider) error {
-	if provider.Provider != models.UsageProviderOpenRouter {
+	if provider.Provider != models.UsageProviderOpenRouter && provider.Provider != models.UsageProviderAnthropic {
 		return fmt.Errorf("model catalog is unavailable for provider %s", provider.Provider)
 	}
 	baseURL := CatalogBaseURL(provider.BaseURL)
+	if provider.Provider == models.UsageProviderAnthropic && strings.TrimSpace(provider.BaseURL) == "" {
+		baseURL = llm.DefaultAnthropicBaseURL
+	}
 	if err := llm.ValidateBaseURL(baseURL); err != nil {
 		return err
 	}
@@ -51,6 +54,9 @@ func (s *Service) Refresh(ctx context.Context, tx *gorm.DB, provider models.Host
 			return err
 		}
 		credentials.APIKey = apiKey
+	}
+	if provider.Provider == models.UsageProviderAnthropic {
+		return s.refreshAnthropic(ctx, tx, credentials)
 	}
 	listed, err := llm.ListOpenRouterModels(ctx, s.http, credentials)
 	if err != nil {
@@ -79,9 +85,27 @@ func (s *Service) Refresh(ctx context.Context, tx *gorm.DB, provider models.Host
 	return nil
 }
 
-// RefreshConfigured refreshes the saved hosted source and the public catalog
-// that workspaces use when they connect their own OpenRouter credentials.
+// RefreshConfigured refreshes hosted sources and the public OpenRouter catalog
+// that workspaces use when they connect their own credentials.
 func (s *Service) RefreshConfigured(ctx context.Context, tx *gorm.DB) error {
+	return errors.Join(s.refreshConfiguredOpenRouter(ctx, tx), s.refreshConfiguredAnthropic(ctx, tx))
+}
+
+func (s *Service) refreshConfiguredAnthropic(ctx context.Context, tx *gorm.DB) error {
+	provider, err := models.FindHostedLLMProvider(tx, models.UsageProviderAnthropic)
+	if errors.Is(err, models.ErrHostedLLMProviderNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !provider.HasAPIKey() {
+		return nil
+	}
+	return s.Refresh(ctx, tx, *provider)
+}
+
+func (s *Service) refreshConfiguredOpenRouter(ctx context.Context, tx *gorm.DB) error {
 	provider, err := models.FindHostedLLMProvider(tx, models.UsageProviderOpenRouter)
 	if err != nil && !errors.Is(err, models.ErrHostedLLMProviderNotFound) {
 		return err

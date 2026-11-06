@@ -6,7 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -81,4 +83,31 @@ func TestAnthropicRefreshRetainsCapabilitiesWhenUnavailable(t *testing.T) {
 	after, err := models.ListLLMModelCapabilities(db, models.UsageProviderAnthropic)
 	require.NoError(t, err)
 	assert.Equal(t, before, after)
+}
+
+func TestConfiguredHostedAnthropicRefreshPopulatesAndPreservesCapabilities(t *testing.T) {
+	_ = support.Setup(t)
+	db := database.DB(t.Context())
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider: models.UsageProviderAnthropic, APIKey: []byte("hosted-key"),
+	})
+	require.NoError(t, err)
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		catalogResponse(http.StatusOK, `{"data":[{"id":"public/model"}]}`),
+		catalogResponse(http.StatusOK, `{"data":[{"id":"claude-haiku-5-5","capabilities":{"effort":{"supported":true,"low":{"supported":true},"high":{"supported":true}}}}]}`),
+		catalogResponse(http.StatusOK, `{"data":[{"id":"public/model"}]}`),
+		catalogResponse(http.StatusServiceUnavailable, `{"error":{"message":"unavailable"}}`),
+	}}
+	svc := llmcatalog.New(crypto.NewNoOpEncryptor(), httpCtx)
+	require.NoError(t, svc.RefreshConfigured(t.Context(), db))
+	catalog, err := llmcatalog.LoadThinkingCatalog(db)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"low", "high"}, catalog.ThinkingLevels(models.UsageProviderAnthropic, "claude-haiku-5-5", models.UsageFundingSourceHosted))
+	require.Len(t, httpCtx.Requests, 2)
+	assert.Equal(t, llm.DefaultAnthropicBaseURL+"/models", httpCtx.Requests[1].URL.String())
+	assert.Equal(t, "hosted-key", httpCtx.Requests[1].Header.Get("x-api-key"))
+	require.Error(t, svc.RefreshConfigured(t.Context(), db))
+	catalog, err = llmcatalog.LoadThinkingCatalog(db)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"low", "high"}, catalog.ThinkingLevels(models.UsageProviderAnthropic, "claude-haiku-5-5", models.UsageFundingSourceHosted))
 }

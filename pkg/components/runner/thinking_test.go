@@ -33,12 +33,12 @@ func TestNormalizeThinkingLevelPerCLI(t *testing.T) {
 	_, err := NormalizeClaudeCodeThinkingLevel("minimal")
 	require.Error(t, err)
 
-	for _, level := range []string{"none", "minimal", "low", "medium", "high", "xhigh"} {
+	for _, level := range []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"} {
 		got, err := NormalizeCodexThinkingLevel(level)
 		require.NoError(t, err)
 		assert.Equal(t, level, got)
 	}
-	_, err = NormalizeCodexThinkingLevel("max")
+	_, err = NormalizeCodexThinkingLevel("ultra")
 	require.Error(t, err)
 
 	got, err := NormalizeOpenCodeThinkingLevel("max")

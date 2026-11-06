@@ -1,6 +1,7 @@
 package llmcatalog_test
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -87,7 +88,6 @@ func TestRefreshPreservesOmittedEffortMetadata(t *testing.T) {
 	}{
 		{name: "no reasoning metadata"},
 		{name: "no supported efforts", reasoning: `,"reasoning":{"default_effort":"low","mandatory":false}`},
-		{name: "null supported efforts", reasoning: `,"reasoning":{"supported_efforts":null}`},
 		{name: "explicit empty efforts", reasoning: `,"reasoning":{"supported_efforts":[]}`, cleared: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -118,6 +118,35 @@ func TestRefreshPreservesOmittedEffortMetadata(t *testing.T) {
 			assert.Equal(t, []string{"high", "xhigh"}, levels)
 			assert.Equal(t, "high", stored[0].DefaultThinkingLevel)
 			assert.True(t, stored[0].ReasoningMandatory)
+		})
+	}
+}
+
+func TestRefreshExpandsNullEffortsAndReplacesRestrictedCache(t *testing.T) {
+	for _, mandatory := range []bool{false, true} {
+		t.Run(fmt.Sprint(mandatory), func(t *testing.T) {
+			_ = support.Setup(t)
+			db := database.DB(t.Context())
+			httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+				catalogResponse(http.StatusOK, `{"data":[{"id":"cached/model","reasoning":{"supported_efforts":["high"]}}]}`),
+				catalogResponse(http.StatusOK, fmt.Sprintf(`{"data":[
+					{"id":"cached/model","reasoning":{"supported_efforts":null,"default_effort":"low","mandatory":%t}},
+					{"id":"new/model","reasoning":{"supported_efforts":null,"mandatory":%t}}
+				]}`, mandatory, mandatory)),
+			}}
+			svc := llmcatalog.New(nil, httpCtx)
+			provider := models.HostedLLMProvider{Provider: models.UsageProviderOpenRouter}
+			require.NoError(t, svc.Refresh(t.Context(), db, provider))
+			require.NoError(t, svc.Refresh(t.Context(), db, provider))
+			catalog, err := llmcatalog.LoadThinkingCatalog(db)
+			require.NoError(t, err)
+			want := []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"}
+			if mandatory {
+				want = want[1:]
+			}
+			for _, model := range []string{"cached/model", "new/model"} {
+				assert.Equal(t, want, catalog.ThinkingLevels(provider.Provider, model, models.UsageFundingSourceBYOK))
+			}
 		})
 	}
 }

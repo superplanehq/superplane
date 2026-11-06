@@ -20,7 +20,11 @@ func (s *Service) RefreshAnthropicIntegration(ctx context.Context, tx *gorm.DB, 
 	if err != nil {
 		return fmt.Errorf("read Claude integration API key: %w", err)
 	}
-	client, err := llm.New(s.http, llm.ProviderAnthropic, llm.Credentials{APIKey: string(apiKey)})
+	return s.refreshAnthropic(ctx, tx, llm.Credentials{APIKey: string(apiKey)})
+}
+
+func (s *Service) refreshAnthropic(ctx context.Context, tx *gorm.DB, credentials llm.Credentials) error {
+	client, err := llm.New(s.http, llm.ProviderAnthropic, credentials)
 	if err != nil {
 		return err
 	}

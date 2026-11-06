@@ -241,7 +241,7 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if saved.Provider == models.UsageProviderOpenRouter && saved.HasAPIKey() {
+	if (saved.Provider == models.UsageProviderOpenRouter || saved.Provider == models.UsageProviderAnthropic) && saved.HasAPIKey() {
 		catalog := llmcatalog.New(s.encryptor, s.registry.HTTPContext())
 		if refreshErr := catalog.Refresh(r.Context(), database.DB(r.Context()), *saved); refreshErr != nil {
 			log.Warnf("admin: saved hosted LLM provider %s but failed to refresh model capabilities: %v", provider, refreshErr)
