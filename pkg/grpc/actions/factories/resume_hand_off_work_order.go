@@ -204,5 +204,10 @@ func validateHandOffOverrides(tx *gorm.DB, f *models.Factory, o *models.FactoryW
 	if err != nil {
 		return invalidArgument(err.Error())
 	}
-	return validateLineDispatchModel(tx, f.OrganizationID, f.ID, line, startIndex, strings.TrimSpace(model), normalized, subscriptionOrderOwnerID(tx, o))
+	requested := models.FactoryLineStartOptions{Model: strings.TrimSpace(model), ThinkingLevel: normalized}
+	run, err := planLineDispatchRun(tx, o, line, startIndex, false, requested)
+	if err != nil {
+		return err
+	}
+	return validateLineDispatchModel(tx, f.OrganizationID, f.ID, run, subscriptionOrderOwnerID(tx, o))
 }
