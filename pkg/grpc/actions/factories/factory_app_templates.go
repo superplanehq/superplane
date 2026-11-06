@@ -41,10 +41,12 @@ type factoryTemplateKey struct {
 }
 
 type factoryAppTemplate struct {
-	id                    string
-	provider              string
-	entrypointNodeID      string
-	canvasFile            string
+	id               string
+	provider         string
+	entrypointNodeID string
+	canvasFile       string
+	// multiRepoCanvasFile replaces canvasFile for organizations with multi-repo tasks.
+	multiRepoCanvasFile   string
 	consoleFile           string
 	componentIntegrations map[string]string
 	// columnKey attaches the canvas to Verify or Done when the template is installed.
@@ -72,10 +74,11 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 	{id: scheduledIntakeTemplateID, provider: models.ProviderGitHub}:    scheduledIntakeTemplate(models.ProviderGitHub),
 	{id: scheduledIntakeTemplateID, provider: models.ProviderBitbucket}: scheduledIntakeTemplate(models.ProviderBitbucket),
 	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
-		id:               "line-implementation",
-		entrypointNodeID: "onrun-implement",
-		canvasFile:       "templates/github/line-implementation.canvas.yaml",
-		consoleFile:      "templates/github/line-app.console.yaml",
+		id:                  "line-implementation",
+		entrypointNodeID:    "onrun-implement",
+		canvasFile:          "templates/github/line-implementation.canvas.yaml",
+		multiRepoCanvasFile: "templates/github/line-implementation-multi-repo.canvas.yaml",
+		consoleFile:         "templates/github/line-app.console.yaml",
 		componentIntegrations: map[string]string{
 			"github.createPullRequest": "github",
 			"github.findPullRequest":   "github",
@@ -176,7 +179,8 @@ type factoryTemplateInput struct {
 	includeVisualEvidence *bool
 	agentSettings         map[string]*factoryAgentSettings
 	triggerSettings       *factoryTriggerSettings
-	pullRequestSettings   map[string]any
+	draftPullRequests     *bool
+	multiRepo             bool
 	mergeCheckSteps       any
 	bodySectionSettings   map[string]map[string]any
 }
@@ -249,7 +253,11 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 		return nil, invalidArgument("unknown factory app template")
 	}
 
-	raw, err := factoryTemplateFiles.ReadFile(template.canvasFile)
+	canvasFile := template.canvasFile
+	if input.multiRepo && template.multiRepoCanvasFile != "" {
+		canvasFile = template.multiRepoCanvasFile
+	}
+	raw, err := factoryTemplateFiles.ReadFile(canvasFile)
 	if err != nil {
 		return nil, fmt.Errorf("read factory app template: %w", err)
 	}
@@ -405,9 +413,7 @@ func wireFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate, input
 		if node.ID == template.entrypointNodeID {
 			*node = input.triggerSettings.configure(*node)
 		}
-		if node.Component == "github.createPullRequest" || node.Component == "bitbucket.createPullRequest" {
-			maps.Copy(node.Configuration, input.pullRequestSettings)
-		}
+		applyFactoryDraftPullRequests(node, input.draftPullRequests)
 		if node.Component == "runApp" && configString(node.Configuration, "app") == input.appID {
 			node.Metadata = maps.Clone(node.Metadata)
 			if node.Metadata == nil {
@@ -616,7 +622,7 @@ func deriveFactoryTemplateInput(
 	if settings != nil {
 		input.agentSettings = settings.agents
 		input.triggerSettings = settings.triggers[template.entrypointNodeID]
-		input.pullRequestSettings = settings.pullRequests["create-pr"]
+		input.draftPullRequests = settings.draftPullRequests
 		if template.id == "risk-score" {
 			input.mergeCheckSteps = settings.agentSteps["assess-risk"]
 			input.bodySectionSettings = settings.bodySections
@@ -1003,7 +1009,7 @@ func materializePRFeedbackDefaults(
 ) (*materializedFactoryTemplate, error) {
 	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 	graph := resolvePRFeedbackGraph(spec)
-	settings := prFeedbackSettingsFromGraph(graph, spec)
+	settings := prFeedbackSettingsFromGraph(graph, spec).withPrimaryRepository(factory)
 	request := prFeedbackBuildRequest{
 		Name:                   canvas.Name,
 		Repository:             settings.Repository,
@@ -1119,11 +1125,12 @@ func materializeNonIntakeFactoryAppDefaults(
 	if !ok {
 		return nil, invalidArgument("factory app has no bundled defaults")
 	}
+	input := deriveFactoryTemplateInput(tx, factory, canvas, version, resolved, savedSettings)
+	input.multiRepo, err = factory.MultiRepoTasksEnabled(tx)
+	if err != nil {
+		return nil, err
+	}
 	// Reset uses the provider saved on the app. A later workspace host change
 	// must not select a template the app was not installed with.
-	return materializeFactoryTemplate(
-		resolved.id,
-		resolved.provider,
-		deriveFactoryTemplateInput(tx, factory, canvas, version, resolved, savedSettings),
-	)
+	return materializeFactoryTemplate(resolved.id, resolved.provider, input)
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -969,6 +970,32 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 			assert.Equal(t, state, stored.State)
 		})
 	}
+
+	t.Run("keeps the task open until every pull request is done", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+		defer func() {
+			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+		}()
+		factory, order, webhook := setupOpenOrder(t, "acme/app", 67)
+		_, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/web",
+			Number:     68,
+			URL:        "https://github.com/acme/web/pull/68",
+			State:      models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+
+		deliver(webhook, closedPayload("acme/app", 67, true))
+		reloaded := reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+		assert.Empty(t, reloaded.Result)
+
+		deliver(webhook, closedPayload("acme/web", 68, false))
+		reloaded = reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result, "one merged pull request completes the task")
+	})
 
 	t.Run("ignores a repository with no matching pull request", func(t *testing.T) {
 		factory, order, webhook := setupOpenOrder(t, "acme/app", 64)

@@ -241,9 +241,13 @@ func (p *FactoryPullRequest) RequestVerificationChecks(tx *gorm.DB) error {
 	if p.Provider != FactoryPullRequestProviderGitHub || p.State != FactoryPullRequestStateOpen {
 		return nil
 	}
+	workspaceRepository, err := isFactoryWorkspaceRepository(tx, p.OrganizationID, p.FactoryID, p.Repository)
+	if err != nil {
+		return err
+	}
 	nodes, err := verificationTriggers(tx.Where(
 		"workflows.organization_id = ? AND workflows.factory_id = ?", p.OrganizationID, p.FactoryID,
-	).Where(`EXISTS (SELECT 1 FROM workflow_nodes merge_node WHERE merge_node.workflow_id = workflows.id AND merge_node.deleted_at IS NULL AND merge_node.metadata->'factoryTemplate'->>'id' = 'risk-score')`), p.Provider, p.Repository)
+	).Where(`EXISTS (SELECT 1 FROM workflow_nodes merge_node WHERE merge_node.workflow_id = workflows.id AND merge_node.deleted_at IS NULL AND merge_node.metadata->'factoryTemplate'->>'id' = 'risk-score')`), p.Provider, p.Repository, workspaceRepository)
 	if err != nil {
 		return err
 	}

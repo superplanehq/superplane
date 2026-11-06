@@ -559,6 +559,58 @@ func TestHTTP__Execute__SetsBasicAuthFromSecret(t *testing.T) {
 	assert.Equal(t, "Basic ZGVwbG95OmFiYw==", gotAuth)
 }
 
+func TestHTTP__Execute__UsesConnectedIntegrationBearerToken(t *testing.T) {
+	var authorization string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	ctx, state, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authorization": map[string]any{
+			"type":           AuthorizationTypeIntegrationBearer,
+			"integration":    map[string]any{"name": "Sentry"},
+			"integrationKey": "SENTRY_AUTH_TOKEN",
+		},
+	})
+	ctx.Secrets = &contexts.SecretsContext{IntegrationKeys: map[string]map[string][]byte{
+		"Sentry": {"SENTRY_AUTH_TOKEN": []byte("connected-token")},
+	}}
+
+	require.NoError(t, (&HTTP{}).Execute(ctx))
+	assert.Equal(t, SuccessOutputChannel, state.Channel)
+	assert.Equal(t, "Bearer connected-token", authorization)
+}
+
+func TestHTTP__Execute__DoesNotSendRequestWithoutIntegrationToken(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, state, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authorization": map[string]any{
+			"type":           AuthorizationTypeIntegrationBearer,
+			"integration":    map[string]any{"name": "Sentry"},
+			"integrationKey": "SENTRY_AUTH_TOKEN",
+		},
+	})
+	ctx.Secrets = &contexts.SecretsContext{IntegrationKeys: map[string]map[string][]byte{"Sentry": {}}}
+
+	require.NoError(t, (&HTTP{}).Execute(ctx))
+	assert.Equal(t, 0, requests)
+	assert.Equal(t, FailureOutputChannel, state.Channel)
+	assert.Contains(t, responsePayload(t, state)["error"], "SENTRY_AUTH_TOKEN")
+}
+
 func TestHTTP__Execute__SetsCustomHeaderFromSecret(t *testing.T) {
 	h := &HTTP{}
 	var gotHeader string

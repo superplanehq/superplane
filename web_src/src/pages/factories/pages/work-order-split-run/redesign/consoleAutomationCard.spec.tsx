@@ -7,6 +7,15 @@ import { stageFromPhase } from "./automationsViewModel";
 import type { AutomationStage } from "./automationsViewModel";
 import * as canvasData from "@/hooks/useCanvasData";
 
+mock.module("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+    organizationReady: true,
+  }),
+}));
+
 const useSplitRunLiveCanvas = mock(() => ({
   enabled: false,
   isError: false,

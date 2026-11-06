@@ -470,6 +470,8 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/task/artifacts", s.handleRunnerGlobalArtifactUpload).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/links", s.handleRunnerGlobalArtifactLink).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/markdown", s.handleRunnerGlobalArtifactMarkdown).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/pull-requests", s.handleRunnerListPullRequests).Methods(http.MethodGet)
+	s.Router.HandleFunc("/api/v1/runner/task/pull-requests", s.handleRunnerOpenPullRequest).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts/links", s.handleRunnerArtifactLink).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts/markdown", s.handleRunnerArtifactMarkdown).Methods(http.MethodPost)
@@ -962,6 +964,11 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 
 	if status := hostedSentryAppBrowserCallbackStatus(r.Context(), r, integrationInstance); status != 0 {
 		writeHostedGitHubAppAuthError(w, status)
+		return
+	}
+
+	if isSentryWebhookRequest(r, integrationInstance) {
+		s.acceptSentryIntegrationWebhook(w, r, integrationInstance)
 		return
 	}
 
@@ -2271,6 +2278,14 @@ func (l *lazyWebhookFactory) GitHubHost() (string, error) {
 		return "", err
 	}
 	return inner.GitHubHost()
+}
+
+func (l *lazyWebhookFactory) ListRepositories() ([]string, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.ListRepositories()
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {

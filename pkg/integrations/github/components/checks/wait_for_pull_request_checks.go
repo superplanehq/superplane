@@ -184,10 +184,14 @@ func (c *WaitForPullRequestChecks) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return ctx.Integration.RequestWebhook(common.WebhookConfiguration{
+	webhookConfig, err := common.WorkspaceWebhookConfiguration(ctx.Factory, common.WebhookConfiguration{
 		EventTypes: []string{"check_run", "check_suite", "status"},
 		Repository: config.Repository,
 	})
+	if err != nil {
+		return err
+	}
+	return ctx.Integration.RequestWebhook(webhookConfig)
 }
 
 func (c *WaitForPullRequestChecks) Execute(ctx core.ExecutionContext) error {
@@ -288,7 +292,10 @@ func (c *WaitForPullRequestChecks) HandleWebhook(ctx core.WebhookRequestContext)
 		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - missing repository or commit SHA")
 		return http.StatusOK, nil, nil
 	}
-	if !repositoryMatches(config.Repository, repository) {
+	// The stored configuration keeps the expression. An expression in a
+	// workspace app takes the repository from the event.
+	fromEvent := common.IsExpression(config.Repository)
+	if !fromEvent && !repositoryMatches(config.Repository, repository) {
 		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - repository does not match")
 		return http.StatusOK, nil, nil
 	}
@@ -298,7 +305,11 @@ func (c *WaitForPullRequestChecks) HandleWebhook(ctx core.WebhookRequestContext)
 		return http.StatusOK, nil, nil
 	}
 
-	executionCtx, err := ctx.FindExecutionByKV(waitChecksRefKV, waitChecksRefValue(config.Repository, sha))
+	refRepository := config.Repository
+	if fromEvent {
+		refRepository = waitChecksFullNameFromPayload(payload)
+	}
+	executionCtx, err := ctx.FindExecutionByKV(waitChecksRefKV, waitChecksRefKey(refRepository, sha))
 	if err != nil || executionCtx == nil {
 		logWaitChecks(ctx.Logger, fields, "Ignoring webhook - no waiting execution for this commit")
 		return http.StatusOK, nil, nil
@@ -375,7 +386,7 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 	metadata.SelectedChecks = evaluation.SelectedChecks
 	metadata.FailedChecks = evaluation.FailedChecks
 
-	if err := ctx.ExecutionState.SetKV(waitChecksRefKV, waitChecksRefValue(ctx.Configuration.Repository, sha)); err != nil {
+	if err := ctx.ExecutionState.SetKV(waitChecksRefKV, waitChecksRefKey(ctx.Configuration.Repository, sha)); err != nil {
 		return err
 	}
 
@@ -586,6 +597,20 @@ func parseWaitChecksTime(value string) (time.Time, error) {
 
 func waitChecksRefValue(repository, sha string) string {
 	return repository + "@" + sha
+}
+
+// waitChecksRefKey keys a wait by the lowercase full name of the
+// repository, so a webhook finds it from the event payload in any case.
+func waitChecksRefKey(repository, sha string) string {
+	return waitChecksRefValue(strings.ToLower(strings.TrimSpace(repository)), sha)
+}
+
+func waitChecksFullNameFromPayload(payload map[string]any) string {
+	repo, ok := payload["repository"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	return stringValue(repo["full_name"])
 }
 
 func isWaitChecksEvent(eventType string) bool {
