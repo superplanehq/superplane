@@ -1,44 +1,94 @@
 package factories
 
 import (
-	"regexp"
+	"encoding/json"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/expr-lang/expr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/exprruntime"
 	dependabotcomp "github.com/superplanehq/superplane/pkg/integrations/github/components/dependabot"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	"github.com/superplanehq/superplane/test/support/contexts"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func TestSentryIntakeUsesEnrichedIssueDescription(t *testing.T) {
-	canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
-	require.NoError(t, err)
-	create := findSpecNode(t, canvas, intakeCreateNodeID)
-	description := create.Configuration["description"].(string)
-
-	enriched := "[View in Sentry](https://sentry.io/issues/123/events/abc/)\n\n## HTTP Request\n\nGET /checkout"
-	// Include the former HTTP outputs so the test catches a short saved body.
-	env := map[string]any{"$": map[string]any{
-		"Enrich Issue":     map[string]any{"data": map[string]any{"description": enriched}},
-		"Get Sentry Issue": map[string]any{"data": map[string]any{}},
-		"Get Sentry Event": map[string]any{"data": map[string]any{}},
-	}}
-	root := map[string]any{"data": map[string]any{"description": "[View in Sentry](https://sentry.io/issues/123/)"}}
-	var actual strings.Builder
-	for _, match := range regexp.MustCompile(`(?s)\{\{(.*?)\}\}`).FindAllStringSubmatch(description, -1) {
-		program, err := expr.Compile(match[1], expr.Env(env), expr.AsAny(),
-			expr.Function("root", func(...any) (any, error) { return root, nil }))
-		require.NoError(t, err)
-		value, err := expr.Run(program, env)
-		require.NoError(t, err)
-		actual.WriteString(value.(string))
+func TestSentryIntakeDescriptionMatchesManualImport(t *testing.T) {
+	issueJSON := `{"id":"123","title":"Broken deploy","permalink":"https://sentry.io/issues/123/","count":"8","project":{"slug":"backend"}}`
+	latestWithStack := `{"eventID":"latest","release":"1.2.3","entries":[{"type":"exception","data":{"values":[{"stacktrace":{"frames":[{"filename":"app.go","function":"Handle","lineNo":22}]}}]}}]}`
+	recommendedWithStack := strings.ReplaceAll(strings.ReplaceAll(latestWithStack, "latest", "recommended"), "Handle", "Recommended")
+	for _, tc := range []struct {
+		name, latest, recommended, want string
+		latestStatus, recommendedStatus int
+	}{
+		{"latest stack", latestWithStack, recommendedWithStack, "Handle (app.go:22)", 200, 200},
+		{"recommended stack", `{"eventID":"latest","message":"brief"}`, recommendedWithStack, "Recommended (app.go:22)", 200, 200},
+		{"recommended unavailable", `{"eventID":"latest","message":"latest message"}`, `{"detail":"unavailable"}`, "latest message", 200, 503},
+		{"latest unavailable", `<html>unavailable</html>`, recommendedWithStack, "Recommended (app.go:22)", 502, 200},
+		{"events unavailable", `{"detail":"unavailable"}`, `<html>unavailable</html>`, "**Count:** 8", 503, 502},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			integration := &contexts.IntegrationContext{
+				Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "token"},
+				Metadata:      sentry.Metadata{Organization: &sentry.OrganizationSummary{Slug: "example"}},
+			}
+			newClient := func() *sentry.Client {
+				client, err := sentry.NewClient(&contexts.HTTPContext{Responses: []*http.Response{
+					{StatusCode: 200, Body: io.NopCloser(strings.NewReader(issueJSON))},
+					{StatusCode: tc.latestStatus, Body: io.NopCloser(strings.NewReader(tc.latest))},
+					{StatusCode: tc.recommendedStatus, Body: io.NopCloser(strings.NewReader(tc.recommended))},
+				}}, integration)
+				require.NoError(t, err)
+				return client
+			}
+			imported, err := (&sentryIntakeItemSource{sentry: newClient(), project: "backend"}).Get(t.Context(), "123")
+			require.NoError(t, err)
+			assert.Contains(t, imported.Body, tc.want)
+			var issue sentry.Issue
+			require.NoError(t, json.Unmarshal([]byte(issueJSON), &issue))
+			var webhookIssue map[string]any
+			require.NoError(t, json.Unmarshal([]byte(issueJSON), &webhookIssue))
+			events := &contexts.EventContext{}
+			require.NoError(t, (&sentry.OnIssue{}).OnIntegrationMessage(core.IntegrationMessageContext{
+				Message:       sentry.WebhookMessage{Resource: "issue", Action: "created", Data: map[string]any{"issue": webhookIssue}},
+				Configuration: map[string]any{"actions": []string{"created"}}, Integration: integration, Events: events,
+			}))
+			require.Len(t, events.Payloads, 1)
+			bodies := map[string]any{}
+			for name, body := range map[string]string{"Get Sentry Issue": issueJSON, "Get Sentry Event": tc.latest, "Get Recommended Sentry Event": tc.recommended} {
+				var decoded any
+				if json.Unmarshal([]byte(body), &decoded) != nil {
+					decoded = body
+				}
+				bodies[name] = map[string]any{"data": map[string]any{"body": decoded}}
+			}
+			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceSentryExceptions})
+			require.NoError(t, err)
+			description := findSpecNode(t, canvas, intakeCreateNodeID).Configuration["description"].(string)
+			expression := strings.TrimSuffix(strings.TrimPrefix(description, "{{"), "}}")
+			knownNodes := map[string]struct{}{"Get Sentry Issue": {}, "Get Sentry Event": {}, "Get Recommended Sentry Event": {}}
+			require.NoError(t, expressionvalidation.ValidateExpression(expression, knownNodes))
+			for _, payload := range []any{events.Payloads[0].Data, sentryIssueEvent(issue, newClient().IssueAPIURL(issue.ID))} {
+				env := map[string]any{"$": bodies}
+				program, err := expr.Compile(expression, expr.Env(env), exprruntime.SentryIssueDescriptionOption(),
+					expr.Function("root", func(...any) (any, error) { return map[string]any{"data": payload}, nil }))
+				require.NoError(t, err)
+				body, err := expr.Run(program, env)
+				require.NoError(t, err)
+				assert.Equal(t, imported.Body, body)
+			}
+			assert.Equal(t, imported.Body, sentry.FetchedIssueDescription(newClient(), webhookIssue, nil))
+		})
 	}
-	assert.Equal(t, enriched, actual.String())
 }
 
 func Test__BuildIntakeCanvas(t *testing.T) {
@@ -176,8 +226,15 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 		assert.Equal(t, []yaml.Edge{
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
-			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeEnrichIssueNodeID},
-			{Channel: "default", SourceID: intakeEnrichIssueNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeSentryIssueRequestNodeID},
+			{Channel: "success", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
+			{Channel: "failure", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
+			{Channel: "success", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryEventHasStackNodeID},
+			{Channel: "failure", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryEventHasStackNodeID},
+			{Channel: "true", SourceID: intakeSentryEventHasStackNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "false", SourceID: intakeSentryEventHasStackNodeID, TargetID: intakeSentryRecommendedEventRequestNodeID},
+			{Channel: "success", SourceID: intakeSentryRecommendedEventRequestNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "failure", SourceID: intakeSentryRecommendedEventRequestNodeID, TargetID: intakeCreateNodeID},
 		}, canvas.Spec.Edges)
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
@@ -186,9 +243,13 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, filter.Component)
 		assert.Equal(t, "true", filter.Configuration["expression"])
-		enrich := findSpecNode(t, canvas, intakeEnrichIssueNodeID)
-		assert.Equal(t, intakeEnrichIssueComponent, enrich.Component)
-		assert.Equal(t, "{{ root().data.data.issue }}", enrich.Configuration["issue"])
+		for _, request := range []struct{ id, suffix string }{
+			{intakeSentryIssueRequestNodeID, ""}, {intakeSentryEventRequestNodeID, "events/latest/"}, {intakeSentryRecommendedEventRequestNodeID, "events/recommended/"},
+		} {
+			node := findSpecNode(t, canvas, request.id)
+			assert.Equal(t, intakeHTTPRequestComponent, node.Component)
+			assert.Equal(t, "{{ root().data.issueApiUrl }}"+request.suffix, node.Configuration["url"])
+		}
 	})
 
 	t.Run("a Datadog issue flows from the trigger through the filter to the work order", func(t *testing.T) {

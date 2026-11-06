@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -43,17 +44,23 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 	)
 
 	t.Run("rejects large payload", func(t *testing.T) {
-		rootData := map[string]any{"root": "event"}
-		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
-		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
+		for _, keepActive := range []bool{false, true} {
+			t.Run(map[bool]string{false: "emit", true: "emit and continue"}[keepActive], func(t *testing.T) {
+				rootData := map[string]any{"root": "event"}
+				rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNodeID, "default", nil, rootData)
+				execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
+				ctx := NewExecutionStateContext(database.Conn(), execution, nil)
+				emit := ctx.Emit
+				if keepActive {
+					emit = ctx.EmitAndContinue
+				}
+				largePayload := strings.Repeat("a", config.MaxPayloadSize()+100)
 
-		ctx := NewExecutionStateContext(database.Conn(), execution, nil)
-		largePayload := strings.Repeat("a", config.MaxPayloadSize()+100)
-
-		err := ctx.Emit("default", "test.payload", []any{largePayload})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "event payload too large")
-		support.VerifyCanvasNodeEventsCount(t, canvas.ID, componentNodeID, 0)
+				err := emit("default", "test.payload", []any{largePayload})
+				require.ErrorIs(t, err, core.ErrEventPayloadTooLarge)
+				support.VerifyCanvasNodeEventsCount(t, canvas.ID, componentNodeID, 0)
+			})
+		}
 	})
 
 	t.Run("rejects too many payloads", func(t *testing.T) {

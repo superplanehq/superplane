@@ -458,6 +458,14 @@ func (a *packageAnalyzer) collectEmitSpecsFromBlock(block *ast.BlockStmt, env ma
 
 func (a *packageAnalyzer) collectEmitSpecsFromStmt(stmt ast.Stmt, env map[string]schema) []emitSpec {
 	switch s := stmt.(type) {
+	case *ast.AssignStmt:
+		var specs []emitSpec
+		for _, value := range s.Rhs {
+			if spec, ok := a.emitSpecFromCall(value, env); ok {
+				specs = append(specs, spec)
+			}
+		}
+		return specs
 	case *ast.ExprStmt:
 		if spec, ok := a.emitSpecFromCall(s.X, env); ok {
 			return []emitSpec{spec}
