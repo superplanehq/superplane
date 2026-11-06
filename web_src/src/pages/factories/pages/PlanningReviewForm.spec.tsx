@@ -63,13 +63,14 @@ const superPlaneModelField: ConfigurationField = {
   typeOptions: { hostedModel: { provider: HOSTED_MODEL_ALL_PROVIDERS } },
 };
 
-function selectableModel(provider: string, id: string) {
+function selectableModel(provider: string, id: string, thinkingLevels: string[] = ["low", "medium", "high"]) {
   return {
     source: { id: "hosted", name: "SuperPlane" },
     provider: { id: provider, name: provider },
     model: { id, name: id },
     key: `hosted::${provider}::${id}`,
     label: provider === "openrouter" ? id : `${provider}/${id}`,
+    thinkingLevels,
   };
 }
 

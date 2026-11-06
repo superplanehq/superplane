@@ -207,11 +207,8 @@ func (s *providerSSONoAccountSteps) clickContinue() {
 }
 
 func (s *providerSSONoAccountSteps) assertAccountCreatedAndSignedIn() {
-	waitErr := s.session.Page().WaitForURL("**/welcome**", pw.PageWaitForURLOptions{
-		Timeout: pw.Float(s.sessionTimeout()),
-	})
-	require.NoError(s.t, waitErr)
-	assert.NotContains(s.t, s.session.Page().URL(), "auth_error")
+	// /welcome redirects to / immediately. Waiting for that URL misses it on a fast CI shard.
+	s.assertLeftLoginPage()
 
 	account, err := models.FindAccountByEmail(googleDevAccountEmail)
 	require.NoError(s.t, err)
@@ -243,8 +240,4 @@ func (s *providerSSONoAccountSteps) capture(name string) {
 	}); err != nil {
 		s.t.Fatalf("screenshot %s: %v", name, err)
 	}
-}
-
-func (s *providerSSONoAccountSteps) sessionTimeout() float64 {
-	return 15000
 }

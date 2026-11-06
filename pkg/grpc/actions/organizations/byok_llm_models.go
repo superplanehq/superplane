@@ -11,6 +11,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/llm"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -145,6 +147,16 @@ func listBYOKCandidateModels(tx *gorm.DB, reg *registry.Registry, instance *mode
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if instance.AppName == "claude" {
+		listed := make([]llm.Model, 0, len(resources))
+		for _, resource := range resources {
+			listed = append(listed, llm.Model{ID: resource.ID, ThinkingLevels: resource.ThinkingLevels})
+		}
+		if err := llmcatalog.StoreAnthropicCapabilities(tx, listed); err != nil {
+			return nil, err
+		}
 	}
 
 	out := make([]*pb.HostedLLMModel, 0, len(resources))
