@@ -20,7 +20,19 @@ func (c *EnrichIssue) Description() string {
 func (c *EnrichIssue) Documentation() string {
 	return `Enrich Issue fetches the latest issue details and a preferred event from Sentry. Add it after filters so rejected issues do not make API requests.
 
-Sentry factory intakes use this action to create work orders with the same issue details as manual imports.
+New Sentry factory intakes use HTTP Request nodes after filters to fetch the issue and latest event. They request the recommended event only when the latest event has no stack frames.
+
+These HTTP nodes remove sensitive response headers, nested JSON headers, and cookie fields before outputs or retry metadata are stored. Other event fields are unchanged.
+Saved HTTP intakes require a reset or the Remove sensitive headers option on each request node. Existing stored responses are unchanged.
+Deploy workers with header redaction before the API publishes or resets these intakes.
+
+The sentryEventHasStack(event) expression returns true when a Sentry event body contains exception or standalone stack frames. Missing or invalid bodies return false. A skipped recommended request does not prevent task creation.
+
+New and reset intakes use this conditional request. Saved intakes keep their existing workflow until reset. Deploy workers with this expression before the API publishes or resets intake templates.
+
+The sentryIssueDescription(issue, fetchedIssue, latestEvent, recommendedEvent) expression uses the same description assembly as manual imports. It prefers the latest event with a stack trace, then a recommended event with a stack trace or more entries. API failures keep the original issue and available event data.
+
+SuperPlane stores and acknowledges webhook deliveries before these API requests. Existing workflows can continue to use Enrich Issue.
 
 ## Configuration
 

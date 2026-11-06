@@ -67,6 +67,8 @@ func TestValidateExpression_Valid(t *testing.T) {
 		{name: "date builtin", raw: `date('2026-01-01')`},
 		{name: "type conversion", raw: `int($['Build'].count) + 1`, knownNames: []string{"Build"}},
 		{name: "standalone dollar", raw: `$`},
+		{name: "sentry stack", raw: `sentryEventHasStack($["Latest"].data?.body)`, knownNames: []string{"Latest"}},
+		{name: "sentry missing event", raw: `sentryEventHasStack(nil)`},
 	})
 }
 
@@ -90,6 +92,8 @@ func TestValidateExpression_UnknownNodeRef(t *testing.T) {
 
 func TestValidateExpression_BadArity(t *testing.T) {
 	runExprCases(t, "bad_arity", []exprCase{
+		{name: "sentry missing argument", raw: `sentryEventHasStack()`, wantErr: "compile error"},
+		{name: "sentry too many arguments", raw: `sentryEventHasStack(nil, nil)`, wantErr: "compile error"},
 		{name: "root with int", raw: `root(1)`, wantErr: "root() takes no arguments"},
 		{name: "root with string", raw: `root('x')`, wantErr: "root() takes no arguments"},
 		{name: "previous too many", raw: `previous(1, 2)`, wantErr: "previous() accepts zero or one argument"},
