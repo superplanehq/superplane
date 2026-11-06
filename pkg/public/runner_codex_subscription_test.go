@@ -341,6 +341,117 @@ func TestCodexRunningTaskCredentialsAfterOrganizationChange(t *testing.T) {
 	}
 }
 
+func TestCodexSubscriptionRejectsContinuationBeforeRefreshingCredentials(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		wantStatus int
+		wantError  error
+	}{
+		{"ineligible owner", http.StatusConflict, models.ErrSubscriptionOwnerInvalid},
+		{"changed eligible owner", http.StatusConflict, models.ErrSubscriptionOwnerInvalid},
+		{"missing owner", http.StatusConflict, models.ErrSubscriptionOwnerRequired},
+		{"missing execution", http.StatusConflict, models.ErrSubscriptionTaskAssociation},
+		{"missing task association", http.StatusConflict, models.ErrSubscriptionTaskAssociation},
+		{"ambiguous task association", http.StatusConflict, models.ErrSubscriptionTaskAssociation},
+		{"ownership lock contention", http.StatusServiceUnavailable, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			connection, factory, secret := readyCodexRun(t, r)
+			original := append([]byte(nil), connection.BundleCiphertext...)
+			version := connection.CredentialVersion
+			lease, err := models.FindCodexRunLeaseBySecret(db, secret)
+			require.NoError(t, err)
+			task, err := models.FindRunnerTask(db, lease.TaskID)
+			require.NoError(t, err)
+			execution, err := task.FindExecution(db)
+			require.NoError(t, err)
+			order, err := models.FindSubscriptionWorkOrderForRun(db, r.Organization.ID, factory.ID, execution.RunID)
+			require.NoError(t, err)
+
+			switch tc.name {
+			case "ineligible owner", "changed eligible owner":
+				owner := support.CreateUser(t, r, r.Organization.ID)
+				if tc.name == "changed eligible owner" {
+					otherConnection, err := models.CreateCodexConnection(db, r.Organization.ID, owner.ID, time.Now())
+					require.NoError(t, err)
+					require.NoError(t, db.Model(otherConnection).Updates(map[string]any{
+						"status": models.CodexConnectionStatusReady, "credential_version": 1,
+						"bundle_ciphertext": []byte("other-owner-bundle"),
+					}).Error)
+				}
+				// Start can change the owner while the previous planning runner stops.
+				require.NoError(t, db.Model(task).Updates(map[string]any{
+					"state": models.RunnerTaskStateRunning, "cancel_requested_at": time.Now(),
+				}).Error)
+				require.NoError(t, order.ReplaceAssignees(db, []uuid.UUID{owner.ID}))
+			case "missing owner":
+				require.NoError(t, order.ReplaceAssignees(db, nil))
+			case "missing execution":
+				require.NoError(t, db.Where("key = ? AND value = ?", "task_id", task.ID.String()).Delete(&models.CanvasNodeExecutionKV{}).Error)
+			case "missing task association":
+				require.NoError(t, db.Model(order).Update("source_run_id", nil).Error)
+			case "ambiguous task association":
+				_, err := factory.CreateWorkOrder(db, "Another task for the run", "", &r.User, []uuid.UUID{r.User}, &execution.RunID)
+				require.NoError(t, err)
+			case "ownership lock contention":
+				lock := db.Begin()
+				require.NoError(t, lock.Error)
+				defer func() { require.NoError(t, lock.Rollback().Error) }()
+				require.NoError(t, order.LockForUpdate(lock))
+			}
+			continuationErr := task.RequireSubscriptionLeaseContinuation(db)
+			if tc.wantError != nil {
+				require.ErrorIs(t, continuationErr, tc.wantError)
+			} else {
+				var busy *models.CodexConnectionBusyError
+				require.ErrorAs(t, continuationErr, &busy)
+			}
+
+			signer := jwt.NewSigner("test-codex-continuation")
+			token, err := runneraction.MintCodexSubscriptionToken(signer, runneraction.CodexSubscriptionScope{
+				OrganizationID: r.Organization.ID, FactoryID: factory.ID, ConnectionID: connection.ID,
+				TaskID: lease.TaskID, Generation: lease.Generation,
+			}, time.Hour)
+			require.NoError(t, err)
+			var refreshCalls int
+			nextAccess := codexTestAccessToken(time.Now().Add(time.Hour))
+			server := &Server{
+				jwt: signer, encryptor: r.Encryptor,
+				codexTokenRefresh: func(context.Context, string) (runneraction.CodexTokenSet, error) {
+					refreshCalls++
+					return runneraction.CodexTokenSet{AccessToken: nextAccess, RefreshToken: "provider-refresh-2", IDToken: "id-token-2"}, nil
+				},
+			}
+			for _, endpoint := range []string{"refresh", "credentials"} {
+				t.Run(endpoint, func(t *testing.T) {
+					request := httptest.NewRequest(http.MethodPost, "/api/v1/runner/codex-subscription/refresh", strings.NewReader(`{"refresh_token":"`+secret+`"}`))
+					response := httptest.NewRecorder()
+					if endpoint == "credentials" {
+						request = httptest.NewRequest(http.MethodGet, "/api/v1/runner/codex-subscription/credentials", nil)
+						request.Header.Set("Authorization", "Bearer "+token)
+						server.handleRunnerCodexSubscriptionCredentials(response, request)
+					} else {
+						server.handleRunnerCodexSubscriptionRefresh(response, request)
+					}
+					assert.Equal(t, tc.wantStatus, response.Code, response.Body.String())
+					if tc.wantStatus == http.StatusServiceUnavailable {
+						assert.JSONEq(t, `{"error":"connection_busy"}`, response.Body.String())
+					}
+					for _, credential := range []string{secret, "openai-refresh", nextAccess, "provider-refresh-2", "id-token-2"} {
+						assert.NotContains(t, response.Body.String(), credential)
+					}
+					assert.Zero(t, refreshCalls, "continuation rejection must not reach the provider")
+					require.NoError(t, db.First(connection, "id = ?", connection.ID).Error)
+					assert.Equal(t, original, []byte(connection.BundleCiphertext))
+					assert.Equal(t, version, connection.CredentialVersion)
+				})
+			}
+		})
+	}
+}
+
 func TestCodexRefreshIsSingleFlightAndHidesTheRefreshToken(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
