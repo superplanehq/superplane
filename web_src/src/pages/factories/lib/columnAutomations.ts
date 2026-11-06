@@ -21,6 +21,7 @@ import {
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
 import { customColumnAutomations, type ColumnAutomationApp } from "./customColumnAutomations";
+import { humanReviewColumnAutomations } from "./humanReviewColumnAutomations";
 import {
   factoryColumnAutomationViewPath,
   factoryIntakePath,
@@ -45,6 +46,7 @@ export type ColumnAutomationKind =
   | "pr-discussion"
   | "pr-checks"
   | "pr-closure"
+  | "human-review"
   | "risk-score"
   | "visual-evidence";
 
@@ -160,12 +162,16 @@ function automationsForColumn(
   if (key === "verify") {
     const riskScore = riskScoreAutomation(input.apps ?? [], workOrders);
     const visualEvidence = visualEvidenceAutomation(input.apps ?? [], workOrders);
+    const humanReview = humanReviewColumnAutomations(input.apps ?? [], workOrders, runningCountForApp);
     const skip = new Set(
-      [...riskScore, ...visualEvidence].flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])),
+      [...riskScore, ...humanReview, ...visualEvidence].flatMap((automation) =>
+        automation.canvasId ? [automation.canvasId] : [],
+      ),
     );
     return [
       ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders, input.vcsProvider),
       ...riskScore,
+      ...humanReview,
       ...visualEvidence,
       ...customColumnAutomations(input.apps ?? [], "verify", workOrders, skip, runningCountForApp),
     ];

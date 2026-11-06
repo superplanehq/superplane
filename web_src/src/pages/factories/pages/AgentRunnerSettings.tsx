@@ -1,5 +1,7 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { useEffect, useRef, useState } from "react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 import { canvasNodeToPlanningReviewComponent, type CanvasSpecNode } from "../lib/columnCanvasAgent";
 import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
@@ -165,6 +167,7 @@ function StepAgentRunnerSettings({
       <PlanningReviewForm
         appearance="fields"
         view={view === "implementation" ? "implementation" : "full"}
+        showSteps={node.id !== "human-review-agent"}
         showResources={view === "step" && showsImplementAgentControls(node)}
         showConcurrency={showsImplementAgentControls(node)}
         draft={draft}
@@ -173,6 +176,33 @@ function StepAgentRunnerSettings({
         factoryId={factoryId}
         factoryKey={factoryKey}
       />
+      {node.id === "human-review-agent" ? (
+        <div className="mt-6 space-y-2">
+          <Label htmlFor="human-review-instructions">Review instructions</Label>
+          <Textarea
+            id="human-review-instructions"
+            rows={12}
+            value={String(draft.components[0]?.configuration.additionalInstructions ?? "")}
+            onChange={(event) =>
+              applyDraft(
+                saveState.current,
+                {
+                  ...draft,
+                  components: draft.components.map((component) => ({
+                    ...component,
+                    configuration: { ...component.configuration, additionalInstructions: event.target.value },
+                  })),
+                },
+                setDraft,
+              )
+            }
+            aria-describedby="human-review-instructions-help"
+          />
+          <p id="human-review-instructions-help" className="text-sm text-muted-foreground">
+            Instructions guide the decision. SuperPlane validates reviewers, the assessed commit, and approvals.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -277,7 +307,7 @@ function sameDraft(left: PlanningReviewDraft, right: PlanningReviewDraft): boole
 }
 
 function structuralSnapshot(component: PlanningReviewComponent): string {
-  const { steps: _steps, ...configuration } = component.configuration;
+  const { steps: _steps, additionalInstructions: _additionalInstructions, ...configuration } = component.configuration;
   return JSON.stringify({
     id: component.id,
     title: component.title,
