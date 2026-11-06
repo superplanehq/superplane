@@ -39,6 +39,10 @@
 {{- end }}
 {{- end }}
 
+{{- define "secrets.sentryApp.name" }}
+{{- .Values.sentryApp.secretName }}
+{{- end }}
+
 {{- define "secrets.dash0Web.name" }}
 {{- if eq .Values.dash0Web.secretName "" }}
 {{- printf "%s-dash0-web" .Release.Name }}

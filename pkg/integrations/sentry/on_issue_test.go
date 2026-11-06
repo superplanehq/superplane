@@ -42,7 +42,7 @@ func Test__OnIssue__Setup(t *testing.T) {
 		assert.Equal(t, "backend", metadata.Project.Slug)
 	})
 
-	t.Run("invalid project does not create a subscription", func(t *testing.T) {
+	t.Run("project added after connection setup creates a subscription", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{
 				Projects: []ProjectSummary{
@@ -54,16 +54,20 @@ func Test__OnIssue__Setup(t *testing.T) {
 
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{
-				"project": "missing",
+				"project": "new-project",
 				"actions": []string{"created"},
 			},
 			Integration: integrationCtx,
 			Metadata:    metadataCtx,
 		})
 
-		require.ErrorContains(t, err, `project "missing" was not found`)
-		assert.Empty(t, integrationCtx.Subscriptions)
-		assert.Nil(t, metadataCtx.Metadata)
+		require.NoError(t, err)
+		require.Len(t, integrationCtx.Subscriptions, 1)
+		metadata, ok := metadataCtx.Metadata.(OnIssueMetadata)
+		require.True(t, ok)
+		require.NotNil(t, metadata.AppSubscriptionID)
+		require.NotNil(t, metadata.Project)
+		assert.Equal(t, "new-project", metadata.Project.Slug)
 	})
 
 	t.Run("does not panic when the trigger has no integration", func(t *testing.T) {
@@ -114,6 +118,10 @@ func Test__OnIssue__OnIntegrationMessage(t *testing.T) {
 
 	err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
 		Message: message,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{"baseUrl": "https://sentry.example.com"},
+			Metadata:      Metadata{Organization: &OrganizationSummary{Slug: "your-org"}},
+		},
 		Configuration: map[string]any{
 			"project": "backend",
 			"actions": []string{"resolved"},
@@ -129,6 +137,7 @@ func Test__OnIssue__OnIntegrationMessage(t *testing.T) {
 	payload, ok := eventCtx.Payloads[0].Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, IssueDescription(issue, nil), payload["description"])
+	assert.Equal(t, "https://sentry.example.com/api/0/organizations/your-org/issues/123/", payload["issueApiUrl"])
 	assert.Equal(t, issue, payload["data"].(map[string]any)["issue"])
 }
 
@@ -256,96 +265,50 @@ func Test__OnIssue__OnIntegrationMessage__OmittedActionsEmitEvents(t *testing.T)
 	assert.Equal(t, "sentry.issue", eventCtx.Payloads[0].Type)
 }
 
-func Test__OnIssue__OnIntegrationMessage__EnrichesDescriptionFromAPI(t *testing.T) {
+func Test__OnIssue__OnIntegrationMessage__UsesWebhookWithoutSentryAPI(t *testing.T) {
 	trigger := &OnIssue{}
-	eventCtx := &contexts.EventContext{}
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			sentryMockResponse(http.StatusOK, `{
-				"id":"123",
-				"title":"TypeError: boom",
-				"permalink":"https://your-org.sentry.io/issues/123/",
-				"count":"8",
-				"status":"unresolved",
-				"project":{"name":"Backend","slug":"backend"}
-			}`),
-			sentryMockResponse(http.StatusOK, `{
-				"eventID":"evt-latest",
-				"entries":[{"type":"exception","data":{"values":[{"type":"TypeError","value":"boom","stacktrace":{"frames":[{"filename":"app.go","function":"Handle","lineNo":22,"inApp":true}]}}]}}]
-			}`),
-		},
-	}
-
+	events := &contexts.EventContext{}
+	httpCtx := &contexts.HTTPContext{}
 	issue := map[string]any{
-		"id":        "123",
-		"title":     "TypeError: boom",
-		"permalink": "https://your-org.sentry.io/issues/123/",
-		"project":   map[string]any{"slug": "backend"},
+		"id": "123", "title": "Broken deploy",
+		"permalink": "https://sentry.io/issues/123/",
 	}
-
 	err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
 		Message: WebhookMessage{
-			Resource: "issue",
-			Action:   "created",
-			Data:     map[string]any{"issue": issue},
+			Resource: "issue", Action: "created", ReceiptID: "receipt-1",
+			Data: map[string]any{"issue": issue},
 		},
 		Configuration: map[string]any{"actions": []string{"created"}},
-		Events:        eventCtx,
+		Events:        events,
 		HTTP:          httpCtx,
-		Integration: &contexts.IntegrationContext{
-			Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "user-token"},
-			Metadata:      Metadata{Organization: &OrganizationSummary{Slug: "example"}},
-		},
-		Logger: logrus.NewEntry(logrus.New()),
+		Integration:   &contexts.IntegrationContext{},
+		Logger:        logrus.NewEntry(logrus.New()),
 	})
-
 	require.NoError(t, err)
-	payload, ok := eventCtx.Payloads[0].Data.(map[string]any)
-	require.True(t, ok)
-	description, _ := payload["description"].(string)
-	assert.Contains(t, description, "## Stack Trace")
-	assert.Contains(t, description, "Handle (app.go:22) [in app]")
-	assert.Contains(t, description, "**Count:** 8")
-	assert.NotContains(t, description, "```json")
-	require.Len(t, httpCtx.Requests, 2)
+	require.Len(t, events.Payloads, 1)
+	payload := events.Payloads[0].Data.(map[string]any)
+	assert.Equal(t, IssueDescription(issue, nil), payload["description"])
+	assert.Equal(t, "receipt-1", payload[SuperplaneReceiptField])
+	assert.Empty(t, httpCtx.Requests)
 }
 
-func Test__OnIssue__OnIntegrationMessage__KeepsWebhookWhenEnrichmentFails(t *testing.T) {
-	trigger := &OnIssue{}
-	eventCtx := &contexts.EventContext{}
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			sentryMockResponse(http.StatusInternalServerError, `{"detail":"error"}`),
-			sentryMockResponse(http.StatusInternalServerError, `{"detail":"error"}`),
-		},
-	}
-
-	issue := map[string]any{
-		"id":        "123",
-		"title":     "Broken deploy",
-		"permalink": "https://your-org.sentry.io/issues/123/",
-	}
-
-	err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+func TestOnIssueUsesHostedSentryAPIURL(t *testing.T) {
+	events := &contexts.EventContext{}
+	err := (&OnIssue{}).OnIntegrationMessage(core.IntegrationMessageContext{
 		Message: WebhookMessage{
-			Resource: "issue",
-			Action:   "created",
-			Data:     map[string]any{"issue": issue},
+			Resource: "issue", Action: "created",
+			Data: map[string]any{"issue": map[string]any{"id": "123"}},
 		},
-		Configuration: map[string]any{"actions": []string{"created"}},
-		Events:        eventCtx,
-		HTTP:          httpCtx,
 		Integration: &contexts.IntegrationContext{
-			Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "user-token"},
-			Metadata:      Metadata{Organization: &OrganizationSummary{Slug: "example"}},
+			Metadata: Metadata{HostedApp: true, Organization: &OrganizationSummary{Slug: "example"}},
 		},
-		Logger: logrus.NewEntry(logrus.New()),
+		Events: events,
 	})
 
 	require.NoError(t, err)
-	payload, ok := eventCtx.Payloads[0].Data.(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, IssueDescription(issue, nil), payload["description"])
+	require.Len(t, events.Payloads, 1)
+	payload := events.Payloads[0].Data.(map[string]any)
+	assert.Equal(t, "https://sentry.io/api/0/organizations/example/issues/123/", payload["issueApiUrl"])
 }
 
 func Test__OnIssue__OnIntegrationMessage__MissingIssue(t *testing.T) {

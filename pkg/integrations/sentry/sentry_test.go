@@ -971,6 +971,37 @@ func Test__Sentry__HandleWebhook__MissingClientSecret(t *testing.T) {
 func Test__Sentry__ListResources(t *testing.T) {
 	impl := &Sentry{}
 
+	t.Run("lists projects added after the connection was created", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{Slug: "example"},
+				Projects:     []ProjectSummary{{Slug: "myt-home-app", Name: "myt-home-app"}},
+			},
+		}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"id":"1","slug":"myt-home-app","name":"myt-home-app"},{"id":"2","slug":"sentry-intake-test-project","name":"sentry-intake-test-project"}]`),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeProject, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeProject, ID: "myt-home-app", Name: "myt-home-app"},
+			{Type: ResourceTypeProject, ID: "sentry-intake-test-project", Name: "sentry-intake-test-project"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://sentry.io/api/0/organizations/example/projects/", httpContext.Requests[0].URL.String())
+	})
+
 	t.Run("lists issues from the connected organization", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{

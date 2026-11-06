@@ -8,10 +8,18 @@ echo "Installing Go Migrate v4.18.2"
 ARCH=$(dpkg --print-architecture)
 
 if [ "$ARCH" = "arm64" ]; then
-  curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-connrefused -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-arm64.tar.gz | tar xvz;
+  MIGRATE_ARCH="arm64"
 else
-  curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-connrefused -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xvz;
+  MIGRATE_ARCH="amd64"
 fi
+
+# Download to a file first. A failed download then stops the script
+# before tar reads a partial or non-gzip response.
+curl --retry 8 --retry-delay 5 --retry-max-time 180 --retry-all-errors -fsSL \
+  "https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-${MIGRATE_ARCH}.tar.gz" \
+  -o migrate.tar.gz
+tar xzvf migrate.tar.gz
+rm -f migrate.tar.gz
 
 mv ./migrate /usr/bin/migrate
 chmod +x /usr/bin/migrate
