@@ -161,6 +161,31 @@ func TestDispatchThinkingLevelMustBeSupportedBySelectedModel(t *testing.T) {
 	assert.Equal(t, "max", response.Order.LineDispatches[0].ThinkingLevel)
 }
 
+func TestDispatchThinkingDefersSuperPlaneModelExpressionsToExecution(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-opus-5-5")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	savedModel := models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, models.UsageProviderAnthropic, "claude-opus-5-5")
+	app := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "{{ '"+savedModel+"' }}")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name, ThinkingLevel: "max",
+	})
+
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+	assert.Equal(t, "max", response.Order.LineDispatches[0].ThinkingLevel)
+}
+
 func TestDispatchOpenRouterThinkingFollowsProviderCatalog(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
