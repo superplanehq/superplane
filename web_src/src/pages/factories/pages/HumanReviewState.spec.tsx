@@ -1,5 +1,6 @@
 import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "bun:test";
 import { MemoryRouter } from "react-router";
 
@@ -38,11 +39,11 @@ describe("HumanReviewState", () => {
     renderReview({ status: "waiting_assessment", reviewRequired: false, blockingReason: "Waiting for an assessment." });
 
     expect(screen.getByRole("heading")).toHaveTextContent("Waiting for merge confidence");
-    expect(screen.getByRole("status")).toHaveTextContent("Waiting for an assessment");
-    expect(screen.queryByText("Approval is not required", { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not required/)).not.toBeInTheDocument();
   });
 
-  it("shows decision evidence, selected reviewers, and assessment and check links", () => {
+  it("keeps reviewers visible and reveals decision evidence when expanded", async () => {
+    const user = userEvent.setup();
     renderReview({
       status: "decided",
       reviewRequired: true,
@@ -54,7 +55,17 @@ describe("HumanReviewState", () => {
     });
 
     expect(screen.getByRole("heading")).toHaveTextContent("Blocked");
+    expect(screen.getByRole("heading")).toHaveTextContent("@reviewer");
+    expect(screen.queryByText("A security finding requires review.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Owns the affected files.", { exact: false })).not.toBeInTheDocument();
+
+    const toggle = screen.getByRole("button", { name: /Human review/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("A security finding requires review.")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Waiting for an approval");
     expect(screen.getByRole("listitem")).toHaveTextContent("@reviewer");
     expect(screen.getByRole("listitem")).toHaveTextContent("Owns the affected files.");
     expect(screen.getByRole("link", { name: "View assessment" })).toHaveAttribute(
@@ -65,6 +76,9 @@ describe("HumanReviewState", () => {
       "href",
       "https://github.com/acme/app/runs/7",
     );
+
+    await user.click(toggle);
+    expect(screen.queryByRole("link", { name: "View assessment" })).not.toBeInTheDocument();
   });
 
   it("does not show a previous revision approval as approval for a new commit", () => {
@@ -73,11 +87,12 @@ describe("HumanReviewState", () => {
       "current",
     );
 
-    expect(screen.getByRole("heading")).toHaveTextContent("Waiting for merge confidence");
+    expect(screen.getByRole("status")).toHaveTextContent("Waiting for merge confidence");
     expect(screen.queryByText("Approved", { exact: false })).not.toBeInTheDocument();
   });
 
-  it("keeps a change request visible after a selected reviewer approves", () => {
+  it("keeps a change request blocked after a selected reviewer approves", async () => {
+    const user = userEvent.setup();
     renderReview({
       status: "decided",
       reviewRequired: true,
@@ -86,6 +101,13 @@ describe("HumanReviewState", () => {
     });
 
     expect(screen.getByRole("heading")).toHaveTextContent("Blocked");
+    await user.click(screen.getByRole("button", { name: /Human review/ }));
     expect(screen.getByRole("status")).toHaveTextContent("A reviewer requested changes");
+  });
+
+  it("keeps publication errors visible without expanding details", () => {
+    renderReview({ status: "decided", reviewRequired: true, publicationError: "GitHub is unavailable" });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("GitHub check");
   });
 });

@@ -14,7 +14,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <ComponentStoryShell className="max-w-xl p-5">
+      <ComponentStoryShell className="w-[320px] max-w-full rounded-lg border border-border bg-background p-3">
         <Story />
       </ComponentStoryShell>
     ),
@@ -33,6 +33,24 @@ export const ApprovalRequired: Story = {
         reviewRequired: true,
         rationale: "A database migration needs review from its owner.",
         selectedReviewers: [{ id: "7", login: "alex", reason: "Owns the affected database files." }],
+        blockingReason: "A selected reviewer must approve the current head commit.",
+        checkUrl: "https://github.com/acme/app/runs/7",
+      },
+    },
+  },
+};
+export const DetailedAssessment: Story = {
+  args: {
+    pullRequest: {
+      humanReview: {
+        status: "decided",
+        reviewRequired: true,
+        rationale:
+          "The drift check found changes outside the task scope. The pull request modifies application code, but the task only requests documentation. The code owners are already requested and eligible. No additional reviewers are needed.",
+        selectedReviewers: [
+          { id: "7", login: "shiroyasha", reason: "Configured default reviewer with repository write access." },
+          { id: "8", login: "alex", reason: "Owns the affected application files." },
+        ],
         blockingReason: "A selected reviewer must approve the current head commit.",
         checkUrl: "https://github.com/acme/app/runs/7",
       },
