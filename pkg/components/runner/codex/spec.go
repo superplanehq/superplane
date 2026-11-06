@@ -32,7 +32,7 @@ func decodeRunCodexSpec(raw any) (RunCodexSpec, error) {
 	if spec.ExecutionTimeoutSeconds <= 0 {
 		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
 	}
-	if thinking, err := runner.NormalizeCodexThinkingLevel(spec.ThinkingLevel); err == nil {
+	if thinking, err := normalizeRunCodexThinkingLevel(spec); err == nil {
 		spec.ThinkingLevel = thinking
 	}
 	return spec, nil
@@ -62,8 +62,15 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
 	}
-	_, err := runner.NormalizeCodexThinkingLevel(spec.ThinkingLevel)
+	_, err := normalizeRunCodexThinkingLevel(spec)
 	return err
+}
+
+func normalizeRunCodexThinkingLevel(spec RunCodexSpec) (string, error) {
+	if spec.Credentials.Source == runner.CredentialsSourceSubscription {
+		return runner.NormalizeCatalogThinkingLevel(spec.ThinkingLevel)
+	}
+	return runner.NormalizeCodexThinkingLevel(spec.ThinkingLevel)
 }
 
 func validateCodexCredentials(spec RunCodexSpec) error {
