@@ -859,6 +859,62 @@ func issueID(issue any) string {
 	return mapString(issueMap, "id")
 }
 
+// AssembleIssueDescription applies the same fallback and event selection to
+// workflow HTTP responses and manual imports. Invalid API bodies are ignored.
+func AssembleIssueDescription(originalIssue, fetchedIssue, latestEvent, recommendedEvent any) string {
+	issue := map[string]any{}
+	for key, value := range asStringMap(originalIssue) {
+		issue[key] = value
+	}
+	fetched := asStringMap(fetchedIssue)
+	// Error responses can also be JSON objects. Only accept an issue response.
+	if mapString(fetched, "id") != "" {
+		for key, value := range fetched {
+			if value != nil && value != "" {
+				issue[key] = value
+			}
+		}
+	}
+	return IssueDescription(issue, preferredIssueEvent(decodeIssueEvent(latestEvent), decodeIssueEvent(recommendedEvent)))
+}
+
+// EventHasStack reports whether a decoded Sentry event contains stack frames.
+// Missing and invalid response bodies do not contain a usable stack.
+func EventHasStack(value any) bool {
+	return decodeIssueEvent(value).HasStack()
+}
+
+func decodeIssueEvent(value any) *IssueEventDetail {
+	if event, ok := value.(*IssueEventDetail); ok {
+		return event
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	var event IssueEventDetail
+	if err := json.Unmarshal(encoded, &event); err != nil {
+		return nil
+	}
+	if event.ID == "" && event.EventID == "" {
+		return nil
+	}
+	return &event
+}
+
+func preferredIssueEvent(latest, recommended *IssueEventDetail) *IssueEventDetail {
+	if latest.HasStack() {
+		return latest
+	}
+	if recommended.HasStack() || recommended.EntryCount() > latest.EntryCount() {
+		return recommended
+	}
+	if latest == nil {
+		return recommended
+	}
+	return latest
+}
+
 type warningLogger interface {
 	Warnf(format string, args ...any)
 }
@@ -875,12 +931,9 @@ func FetchedIssueDescription(client *Client, issue any, logger warningLogger) st
 		return IssueDescription(issue, nil)
 	}
 
-	described := issue
 	fetched, err := client.GetIssue(id)
 	if err != nil {
 		warnf(logger, "failed to retrieve sentry issue %s: %v", id, err)
-	} else if fetched != nil {
-		described = fetched
 	}
 
 	event, err := client.GetPreferredIssueEvent(id)
@@ -888,7 +941,7 @@ func FetchedIssueDescription(client *Client, issue any, logger warningLogger) st
 		warnf(logger, "failed to retrieve sentry issue event %s: %v", id, err)
 	}
 
-	return IssueDescription(described, event)
+	return AssembleIssueDescription(issue, fetched, event, nil)
 }
 
 func warnf(logger warningLogger, format string, args ...any) {

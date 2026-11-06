@@ -828,7 +828,7 @@ func (s *sentryIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem,
 	if err != nil {
 		event = nil
 	}
-	item.Body = sentry.IssueDescription(issue, event)
+	item.Body = sentry.AssembleIssueDescription(issue, nil, event, nil)
 	return &item, nil
 }
 
