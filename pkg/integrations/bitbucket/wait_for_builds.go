@@ -234,15 +234,10 @@ func (c *WaitForBuilds) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	repo, err := ensureRepoInMetadata(ctx.HTTP, ctx.Metadata, ctx.Integration, config.Repository)
-	if err != nil {
-		return err
-	}
-
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventTypes:     []string{waitBuildsStatusCreated, waitBuildsStatusUpdated},
-		RepositorySlug: repo.Slug,
-	})
+	return requestRepositoryWebhook(
+		ctx.HTTP, ctx.Metadata, ctx.Integration, ctx.Factory, config.Repository,
+		[]string{waitBuildsStatusCreated, waitBuildsStatusUpdated},
+	)
 }
 
 func (c *WaitForBuilds) Execute(ctx core.ExecutionContext) error {
@@ -338,12 +333,14 @@ func (c *WaitForBuilds) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	if repository == "" || sha == "" {
 		return http.StatusOK, nil, nil
 	}
-	if !strings.EqualFold(strings.TrimSpace(repository), strings.TrimSpace(config.Repository)) {
+	// The stored configuration keeps the expression. An expression in a
+	// workspace app takes the repository from the event.
+	if !isExpression(config.Repository) && !strings.EqualFold(strings.TrimSpace(repository), strings.TrimSpace(config.Repository)) {
 		return http.StatusOK, nil, nil
 	}
 
 	if ctx.FindActiveExecutionByKV != nil {
-		executionCtx, err := ctx.FindActiveExecutionByKV(waitBuildsRefKV, waitBuildsRefValue(config.Repository, sha))
+		executionCtx, err := ctx.FindActiveExecutionByKV(waitBuildsRefKV, waitBuildsRefValue(repository, sha))
 		if err != nil || executionCtx == nil {
 			return http.StatusOK, nil, nil
 		}
@@ -360,7 +357,7 @@ func (c *WaitForBuilds) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 		return http.StatusOK, nil, nil
 	}
 
-	executionCtx, err := ctx.FindExecutionByKV(waitBuildsRefKV, waitBuildsRefValue(config.Repository, sha))
+	executionCtx, err := ctx.FindExecutionByKV(waitBuildsRefKV, waitBuildsRefValue(repository, sha))
 	if err != nil || executionCtx == nil {
 		return http.StatusOK, nil, nil
 	}
