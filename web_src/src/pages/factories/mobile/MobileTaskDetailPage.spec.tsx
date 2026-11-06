@@ -128,8 +128,8 @@ beforeEach(() => {
     if (new URL(request.url).pathname.endsWith("/line-runner-models")) {
       return Response.json({
         models: [
-          { id: "claude-opus-4-6", name: "claude-opus-4-6" },
-          { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
+          { id: "claude-opus-4-6", name: "claude-opus-4-6", thinkingLevels: ["low", "medium", "high", "max"] },
+          { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context", thinkingLevels: [] },
         ],
       });
     }
@@ -334,6 +334,13 @@ function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?line
   );
 }
 
+// The refine chat model control can show the same "Model: Auto" name, so pick the Start control by test id.
+function startModelButton(name: string) {
+  const button = screen.getByTestId("split-run-draft-model");
+  expect(button).toHaveAttribute("aria-label", name);
+  return button;
+}
+
 describe("MobileTaskDetailPage model select", () => {
   beforeEach(() => {
     resetPlanningSession();
@@ -348,7 +355,7 @@ describe("MobileTaskDetailPage model select", () => {
   it("shows a model control next to Start on a draft when planning is on", () => {
     renderDraft();
 
-    expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
+    expect(startModelButton("Model: Auto")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
   });
 
@@ -366,47 +373,97 @@ describe("MobileTaskDetailPage model select", () => {
     });
     const user = userEvent.setup();
     renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${order.number}?lineId=${REFUND_LINE_PLAN_ID}`);
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(startModelButton("Model: Auto"));
     const expectedModel = assigned ? "owner-model" : "caller-model";
     await user.click(await screen.findByRole("menuitem", { name: expectedModel }));
     await user.click(screen.getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith(order.id, {
       lineName: PLAN_LINE_NAME,
       model: expectedModel,
-      thinkingLevel: "medium",
+      thinkingLevel: undefined,
     });
   });
 
-  it("opens model and thinking choices in one menu and updates the closed label", async () => {
+  it("lists the thinking levels of the chosen model and updates the closed label", async () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(startModelButton("Model: Auto"));
 
     expect(screen.getByRole("menuitem", { name: "Auto" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "claude-opus-4-6" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "Low" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "Medium" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "High" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Medium" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6" }));
+    expect(screen.getByRole("menuitem", { name: "Low" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Max" })).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Medium" }));
 
     expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toBeInTheDocument();
+  });
+
+  it.each([
+    { model: "claude-opus-4-6", nextModel: "long-model", nextLabel: "Anthropic Claude Opus 4.6 with extended context" },
+    {
+      model: "Anthropic Claude Opus 4.6 with extended context",
+      nextModel: "claude-opus-4-6",
+      nextLabel: "claude-opus-4-6",
+    },
+  ])(
+    "starts with the run default after selecting $model and changing models",
+    async ({ model, nextModel, nextLabel }) => {
+      const user = userEvent.setup();
+      renderDraft();
+
+      await user.click(startModelButton("Model: Auto"));
+      await user.click(await screen.findByRole("menuitem", { name: model }));
+      await user.click(screen.getByTestId("split-run-draft-model"));
+      await user.click(screen.getByRole("menuitem", { name: "Default" }));
+      await user.click(screen.getByTestId("split-run-draft-model"));
+      await user.click(screen.getByRole("menuitem", { name: nextLabel }));
+      await user.click(screen.getByRole("button", { name: "Start" }));
+
+      expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+        lineName: PLAN_LINE_NAME,
+        model: nextModel,
+        thinkingLevel: "default",
+      });
+    },
+  );
+
+  it("starts without a thinking override after the user picks the agent setting", async () => {
+    const user = userEvent.setup();
+    renderDraft();
+
+    await user.click(startModelButton("Model: Auto"));
+    await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6" }));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6 High" }));
+    await user.click(screen.getByRole("menuitem", { name: "Agent setting" }));
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+      lineName: PLAN_LINE_NAME,
+      model: "claude-opus-4-6",
+      thinkingLevel: undefined,
+    });
   });
 
   it("keeps the full model name in the accessible label", async () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(startModelButton("Model: Auto"));
     await user.click(screen.getByRole("menuitem", { name: "Anthropic Claude Opus 4.6 with extended context" }));
 
     expect(
-      screen.getByRole("button", { name: "Model: Anthropic Claude Opus 4.6 with extended context Medium" }),
+      screen.getByRole("button", { name: "Model: Anthropic Claude Opus 4.6 with extended context" }),
     ).toBeInTheDocument();
   });
 
-  it("starts on Auto without a model id and sends the thinking level", async () => {
+  it("starts on Auto without a model id or a thinking level", async () => {
     const user = userEvent.setup();
     renderDraft();
 
@@ -415,7 +472,7 @@ describe("MobileTaskDetailPage model select", () => {
     expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
       lineName: PLAN_LINE_NAME,
       model: undefined,
-      thinkingLevel: "medium",
+      thinkingLevel: undefined,
     });
   });
 
@@ -423,10 +480,10 @@ describe("MobileTaskDetailPage model select", () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
-    await user.click(screen.getByRole("menuitem", { name: "High" }));
-    await user.click(screen.getByRole("button", { name: "Model: Auto High" }));
+    await user.click(startModelButton("Model: Auto"));
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6" }));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
     await user.click(screen.getByRole("button", { name: "Start" }));
 
     expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
@@ -436,23 +493,23 @@ describe("MobileTaskDetailPage model select", () => {
     });
   });
 
-  it("does not start with a model from the previous line", async () => {
+  it("does not start with a model or thinking level from the previous line", async () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
-    await user.click(screen.getByRole("menuitem", { name: "High" }));
-    await user.click(screen.getByRole("button", { name: "Model: Auto High" }));
+    await user.click(startModelButton("Model: Auto"));
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByRole("button", { name: "Model: claude-opus-4-6" }));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
     await user.click(screen.getByTestId("mobile-task-test-line"));
 
-    expect(screen.getByRole("button", { name: "Model: Auto High" })).toBeInTheDocument();
+    expect(startModelButton("Model: Auto")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start" }));
 
     expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
       lineName: "hotfix",
       model: undefined,
-      thinkingLevel: "high",
+      thinkingLevel: undefined,
     });
   });
 
@@ -483,7 +540,7 @@ describe("MobileTaskDetailPage model select", () => {
     dispatchingIds.current = new Set([DRAFT_WORK_ORDER.id ?? ""]);
     renderDraft();
 
-    expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeDisabled();
+    expect(startModelButton("Model: Auto")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
   });
 
@@ -500,7 +557,7 @@ describe("MobileTaskDetailPage model select", () => {
     );
 
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await userEvent.setup().click(startModelButton("Model: Auto"));
     expect(screen.queryByRole("menuitem", { name: "claude-opus-4-6" })).not.toBeInTheDocument();
   });
 });
