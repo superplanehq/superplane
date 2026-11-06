@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest } from "@/api-client";
 
@@ -19,10 +20,12 @@ const meta = {
   },
   decorators: [
     withFactoriesTheme,
-    (Story) => (
-      <ComponentStoryShell className="min-h-svh bg-muted/30 p-6">
-        <Story />
-      </ComponentStoryShell>
+    (Story, context) => (
+      <StoryQueryClient key={context.id}>
+        <ComponentStoryShell className="min-h-svh bg-muted/30 p-6">
+          <Story />
+        </ComponentStoryShell>
+      </StoryQueryClient>
     ),
   ],
 } satisfies Meta;
@@ -30,6 +33,12 @@ const meta = {
 export default meta;
 
 type Story = StoryObj;
+
+/** Each story gets its own cache, so the merge story does not leak merge controls into the others. */
+function StoryQueryClient({ children }: { children: ReactNode }) {
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
 
 const API_REPOSITORY = "forestileao/arq-comp-microprocessor";
 const CHAIN_REPOSITORY = "forestileao/actor-based-blockchain";
@@ -223,7 +232,7 @@ export const FixesPaused: Story = {
         [API_REPOSITORY, NEEDS_REVIEW],
         [CHAIN_REPOSITORY, PASSED],
       ])}
-      continueFixes={() => {}}
+      continueFixes={() => console.log("continue fixes")}
     />
   ),
 };
