@@ -271,6 +271,13 @@ export function IntegrationCreateDialog({
         }
         return;
       }
+      // Save succeeds even when setup fails. Keep the connection so the next submit updates it.
+      if (integration?.status?.state === "error") {
+        if (integration.metadata?.id) setCreatedIntegrationId(integration.metadata.id);
+        throw {
+          message: integration.status.stateDescription || "Setup failed. Check the configuration and try again.",
+        };
+      }
       if (integration?.metadata?.id && webhookUrl) {
         setPendingWebhookSetup({
           id: integration.metadata.id,
