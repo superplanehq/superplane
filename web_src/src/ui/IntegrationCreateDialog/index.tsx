@@ -223,21 +223,32 @@ export function IntegrationCreateDialog({
     setIsCreatePending(true);
     try {
       const createConfiguration = configurationWithSetupReturnPath(configuration, setupReturnTo);
-      const created = isGitHub
-        ? await createWithGeneratedName({
+      const save = async (): Promise<{ result: OrganizationsCreateIntegrationResponse; name: string }> => {
+        // A resumed connection already exists, so a new create fails with a name conflict.
+        if (resolvedIntegrationId) {
+          const response = await updateIntegrationMutation.mutateAsync({
+            name: isGitHub ? undefined : nextName,
+            configuration: createConfiguration,
+          });
+          const integration = response.data?.integration;
+          return { result: { integration }, name: integration?.metadata?.name || nextName };
+        }
+        if (isGitHub) {
+          return createWithGeneratedName({
             baseName: githubBaseName,
             takenNames: existingIntegrationNames,
             create: (name) =>
               onCreateIntegration({ integrationName: definitionName, name, configuration: createConfiguration }),
-          })
-        : {
-            result: await onCreateIntegration({
-              integrationName: definitionName,
-              name: nextName,
-              configuration: createConfiguration,
-            }),
-            name: nextName,
-          };
+          });
+        }
+        const result = await onCreateIntegration({
+          integrationName: definitionName,
+          name: nextName,
+          configuration: createConfiguration,
+        });
+        return { result, name: nextName };
+      };
+      const created = await save();
 
       setCreatedName(created.name);
       const integration = created.result.integration;
@@ -294,6 +305,8 @@ export function IntegrationCreateDialog({
     setCreateIntegrationBrowserAction,
     setCreatedName,
     setupReturnTo,
+    resolvedIntegrationId,
+    updateIntegrationMutation,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {
