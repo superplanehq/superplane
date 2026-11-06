@@ -325,8 +325,12 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 				continue
 			}
 			savedThinking, _ := node.Configuration[runner.ThinkingLevelKey].(string)
-			effectiveThinking, _ := runner.OverlayThinkingLevel(savedThinking, thinking)
+			effectiveThinking, overridden := runner.OverlayThinkingLevel(savedThinking, thinking)
 			effectiveThinking, err = runner.NormalizeCatalogThinkingLevel(effectiveThinking)
+			if err != nil && !overridden {
+				// Execution decides how to handle a saved value that is not an effort.
+				continue
+			}
 			if err != nil {
 				return invalidArgument(err.Error())
 			}
@@ -340,11 +344,20 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 				}
 			}
 			levels, err := dispatchRunnerThinkingLevels(tx, orgID, factoryID, node, model, ownerID, catalog)
+			var unresolved *unresolvedDispatchModelError
+			if !overridden && errors.As(err, &unresolved) {
+				// Execution resolves the model and reports problems such as a
+				// missing ChatGPT connection, as it does for agents without a level.
+				continue
+			}
 			if err != nil {
 				return err
 			}
-			if !slices.Contains(levels, effectiveThinking) {
+			if overridden && !slices.Contains(levels, effectiveThinking) {
 				return invalidArgument("thinking level is not available for every agent on this line")
+			}
+			if !overridden && savedThinkingUnsupported(node, levels, effectiveThinking) {
+				return invalidArgument("An agent on this line has a saved thinking level that its model does not support. Choose a thinking level, or change the agent settings.")
 			}
 		}
 	}
@@ -463,6 +476,33 @@ func dispatchThinkingOverridesLevel(thinking string) bool {
 
 // dispatchRunnerThinkingLevels uses the same model acceptance and default
 // rules as execution, then reads that model's capabilities instead of CLI limits.
+// savedThinkingUnsupported reports whether the model catalog shows that the
+// effective model lacks a saved agent level. A ChatGPT subscription catalog
+// is complete. For other providers, a model without listed levels can lack
+// cached metadata, for example before the first catalog refresh, so the saved
+// level reaches the agent as it did before.
+func savedThinkingUnsupported(node models.Node, levels []string, thinking string) bool {
+	if slices.Contains(levels, thinking) {
+		return false
+	}
+	return len(levels) > 0 || runnerUsesCodexSubscription(node)
+}
+
+func runnerUsesCodexSubscription(node models.Node) bool {
+	credentials, _ := node.Configuration["credentials"].(map[string]any)
+	return node.ComponentName() == runnerCodex && credentials["source"] == "subscription"
+}
+
+// unresolvedDispatchModelError reports that Start cannot resolve the model
+// that an agent runs. Execution resolves it again and reports the cause.
+type unresolvedDispatchModelError struct {
+	err error
+}
+
+func (e *unresolvedDispatchModelError) Error() string { return e.err.Error() }
+
+func (e *unresolvedDispatchModelError) Unwrap() error { return e.err }
+
 func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, selected string, ownerID uuid.UUID, catalog *llmcatalog.ThinkingCatalog) ([]string, error) {
 	model := storedRunnerModel(node.Configuration)
 	if selected != "" {
@@ -474,11 +514,10 @@ func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node 
 			model = selected
 		}
 	}
-	credentials, _ := node.Configuration["credentials"].(map[string]any)
-	if node.ComponentName() == runnerCodex && credentials["source"] == "subscription" {
+	if runnerUsesCodexSubscription(node) {
 		resolved, err := models.ResolveFactoryCodexSubscriptionModel(tx, orgID, factoryID, ownerID, model, "")
 		if err != nil {
-			return nil, err
+			return nil, &unresolvedDispatchModelError{err: err}
 		}
 		levels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, catalog, ownerID)
 		if err != nil {
@@ -489,7 +528,7 @@ func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node 
 	if node.ComponentName() == models.SuperPlaneRunnerComponent {
 		resolved, err := dispatchSuperPlaneModel(tx, orgID, factoryID, node, model)
 		if err != nil {
-			return nil, err
+			return nil, &unresolvedDispatchModelError{err: err}
 		}
 		return catalog.ThinkingLevels(resolved.Provider, resolved.Model, models.UsageFundingSourceHosted), nil
 	}
