@@ -20,6 +20,9 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/models")?.id).toBe(
       "workspace-models",
     );
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/model-status")?.id).toBe(
+      "organization-model-status",
+    );
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/superplane-mcp-server")?.id).toBe(
       "workspace-superplane-mcp-server",
     );
@@ -57,6 +60,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Members",
       "Fleets",
       "Integrations",
+      "Model status",
       "API keys",
       "Secrets",
       "Billing",
@@ -141,6 +145,7 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
     expect(filtered.find((group) => group.id === "organization")?.items.map((item) => item.id)).toEqual([
       "organization-general",
       "organization-fleets",
+      "organization-model-status",
       "organization-billing",
       "organization-spending",
     ]);

@@ -41,9 +41,41 @@ func controlRecord(message string) (map[string]any, bool) {
 		return toolStartRecord(message)
 	case "tool_end":
 		return toolEndRecord(message)
+	case "model_call":
+		return modelCallRecord(message)
 	default:
 		return nil, false
 	}
+}
+
+func modelCallRecord(message string) (map[string]any, bool) {
+	var record struct {
+		Provider   string `json:"provider"`
+		Model      string `json:"model"`
+		Outcome    string `json:"outcome"`
+		OccurredAt string `json:"occurredAt"`
+		Sequence   int    `json:"sequence"`
+	}
+	if err := json.Unmarshal([]byte(message), &record); err != nil || record.Sequence < 1 {
+		return nil, false
+	}
+	provider := strings.TrimSpace(record.Provider)
+	model := strings.TrimSpace(record.Model)
+	outcome := strings.TrimSpace(record.Outcome)
+	if provider == "" || model == "" || outcome == "" {
+		return nil, false
+	}
+	output := map[string]any{
+		"type":     "model_call",
+		"provider": provider,
+		"model":    model,
+		"outcome":  outcome,
+		"sequence": record.Sequence,
+	}
+	if stamp := strings.TrimSpace(record.OccurredAt); stamp != "" {
+		output["occurredAt"] = stamp
+	}
+	return output, true
 }
 
 func commandStartRecord(message string) (map[string]any, bool) {
