@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -98,7 +99,7 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 		if node == nil {
 			continue
 		}
-		if repository := strings.TrimSpace(prFeedbackNodeString(node, "repository")); repository != "" {
+		if repository := strings.TrimSpace(prFeedbackNodeString(node, "repository")); !githubcommon.IsExpression(repository) {
 			settings.Repository = repository
 		}
 		settings.Mention = strings.TrimSpace(prFeedbackNodeString(node, "contentFilter"))
@@ -114,13 +115,22 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 		if len(settings.CheckNames) == 0 {
 			settings.CheckNames = prFeedbackNodeStringSlice(wait, "buildKeys")
 		}
-		if settings.Repository == "" {
-			settings.Repository = strings.TrimSpace(prFeedbackNodeString(wait, "repository"))
+		if repository := strings.TrimSpace(prFeedbackNodeString(wait, "repository")); settings.Repository == "" && !githubcommon.IsExpression(repository) {
+			settings.Repository = repository
 		}
 		settings.RunnerIntegrationNames = runnerExtraIntegrationNames(findIntakeNode(spec.Nodes, graph.RunnerNodeID))
 	}
 
 	return settings.normalized()
+}
+
+// withPrimaryRepository fills the subject repository from the workspace
+// when every node listens on the workspace repositories.
+func (s prFeedbackSettings) withPrimaryRepository(factory *models.Factory) prFeedbackSettings {
+	if s.Repository == "" && factory != nil {
+		s.Repository = strings.TrimSpace(factory.OnboardingConfigValue().AppRepository)
+	}
+	return s
 }
 
 func runnerExtraIntegrationNames(node *models.Node) []string {

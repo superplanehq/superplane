@@ -84,6 +84,8 @@ func writeRunnerLiveLogSessionError(w http.ResponseWriter, r *http.Request, err 
 			"Logs are not available for this execution yet. Check again shortly.",
 			http.StatusNotFound,
 		)
+	case isRunnerRequestCanceled(r, err):
+		w.WriteHeader(statusClientClosedRequest)
 	default:
 		middleware.SetServerError(r.Context(), err, nil)
 		http.Error(w, "Lookup failed", http.StatusInternalServerError)

@@ -202,10 +202,12 @@ func TestWorkspaceCheckoutScriptClonesGitHubContextReadOnly(t *testing.T) {
 	dir := t.TempDir()
 	logPath := filepath.Join(dir, "git-args")
 	const readToken = "read-token-secret"
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]any{
+		{"repository": "acme/extra", "url": "https://github.com/acme/extra.git", "directory": "context/acme/extra", "readOnly": true},
+	}})
+	require.NoError(t, err)
 	output, err := runCheckoutScriptFull(t, dir, "file://"+main, "main", checkoutScriptOptions{
-		context: contextJSON(t, map[string]string{
-			"context/acme/extra": "https://github.com/acme/extra.git",
-		}),
+		context: string(payload),
 		extraEnv: []string{
 			runner.GitHubContextTokenEnv + "=" + readToken,
 			"GIT_ARGV_LOG=" + logPath,
@@ -236,6 +238,62 @@ exec "$REAL_GIT" "$@"
 	assert.Contains(t, commands, "password=$"+runner.GitHubContextTokenEnv)
 	assert.NotContains(t, commands, readToken)
 	assert.NotContains(t, commands, "x-access-token")
+}
+
+func TestWorkspaceCheckoutScriptSkipsRepositoryInRepoDirectory(t *testing.T) {
+	main := initBareRepo(t, "main")
+	other := initBareRepo(t, "main")
+	dir := t.TempDir()
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]string{
+		{"repository": "acme/app", "url": "file://" + main, "directory": "context/acme/app"},
+		{"repository": "acme/web", "url": "file://" + other, "directory": "context/acme/web"},
+	}})
+	require.NoError(t, err)
+
+	output, err := runCheckoutScriptFull(t, dir, "file://"+other, "main", checkoutScriptOptions{
+		context:  string(payload),
+		extraEnv: []string{"REPO=ACME/web"},
+	})
+
+	require.NoError(t, err, output)
+	assert.DirExists(t, filepath.Join(dir, "repo", ".git"))
+	assert.DirExists(t, filepath.Join(dir, "context", "acme", "app", ".git"))
+	assert.NoDirExists(t, filepath.Join(dir, "context", "acme", "web"))
+}
+
+func TestWorkspaceCheckoutScriptSkipsRepositoryFromRepoURL(t *testing.T) {
+	web := filepath.Join(t.TempDir(), "acme", "web.git")
+	require.NoError(t, os.MkdirAll(filepath.Dir(web), 0o755))
+	require.NoError(t, os.Rename(initBareRepo(t, "main"), web))
+	dir := t.TempDir()
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]string{
+		{"repository": "acme/web", "url": "file://" + web, "directory": "context/acme/web"},
+	}})
+	require.NoError(t, err)
+
+	output, err := runCheckoutScriptFull(t, dir, "file://"+web, "main", checkoutScriptOptions{context: string(payload)})
+
+	require.NoError(t, err, output)
+	assert.DirExists(t, filepath.Join(dir, "repo", ".git"))
+	assert.NoDirExists(t, filepath.Join(dir, "context", "acme", "web"))
+}
+
+func TestWorkspaceCheckoutScriptClonesContextBranch(t *testing.T) {
+	main := initBareRepo(t, "main")
+	extra := initBareRepo(t, "main")
+	pushCommit(t, extra, "refs/heads/release", "release", "release\n")
+	dir := t.TempDir()
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]any{
+		{"repository": "acme/extra", "url": "file://" + extra, "directory": "context/acme/extra", "branch": "release", "readOnly": true},
+	}})
+	require.NoError(t, err)
+
+	output, err := runCheckoutScript(t, dir, "file://"+main, "main", string(payload))
+
+	require.NoError(t, err, output)
+	clone := filepath.Join(dir, "context", "acme", "extra")
+	assert.Equal(t, "release", runGitQuiet(t, "", clone, "rev-parse", "--abbrev-ref", "HEAD"))
+	assert.Equal(t, "origin/release", runGitQuiet(t, "", clone, "rev-parse", "--abbrev-ref", "origin/HEAD"))
 }
 
 func TestWorkspaceCheckoutScriptReusesExistingCheckouts(t *testing.T) {
@@ -359,6 +417,31 @@ func TestWorkspaceCheckoutScriptCommitSetupInstallsIdentity(t *testing.T) {
 	// Context clones still land relative to the task directory: the
 	// commit setup restores the working directory it borrows.
 	assert.DirExists(t, filepath.Join(dir, "context", "acme", "extra", ".git"))
+}
+
+func TestWorkspaceCheckoutScriptCommitSetupSignsWritableContextRepositories(t *testing.T) {
+	main := initBareRepo(t, "main")
+	writable := initBareRepo(t, "main")
+	readonly := initBareRepo(t, "main")
+	dir := t.TempDir()
+	payload, err := json.Marshal(map[string]any{"repositories": []map[string]any{
+		{"repository": "acme/web", "url": "file://" + writable, "directory": "context/acme/web"},
+		{"repository": "acme/docs", "url": "file://" + readonly, "directory": "context/acme/docs", "readOnly": true},
+	}})
+	require.NoError(t, err)
+
+	output, err := runCheckoutScriptFull(t, dir, "file://"+main, "main", checkoutScriptOptions{
+		commitSetup: "1",
+		context:     string(payload),
+	})
+
+	require.NoError(t, err, output)
+	web := filepath.Join(dir, "context", "acme", "web")
+	assert.Equal(t, runner.FactoryAgentEmail, gitRepoConfig(t, web, "user.email"))
+	assert.FileExists(t, filepath.Join(web, ".git", "superplane-hooks", "superplane-pre-push"))
+	assert.Equal(t, filepath.Join(web, ".git", "superplane-hooks"), gitRepoConfig(t, web, "core.hooksPath"))
+	docs := filepath.Join(dir, "context", "acme", "docs")
+	assert.Empty(t, gitRepoConfig(t, docs, "core.hooksPath"))
 }
 
 func TestWorkspaceCheckoutScriptCommitSetupCreatesBranchOnEmptyRemote(t *testing.T) {
@@ -665,7 +748,7 @@ func TestApplyFactoryCheckoutMarksInstructionsDone(t *testing.T) {
 	require.Len(t, out, 2)
 	assert.Equal(t, "Checkout", out[0].Name)
 	assert.Contains(t, files[0].Content, "Setup commands already ran in repo/ after checkout, in order: npm ci")
-	assert.Contains(t, files[0].Content, "Context repositories are already checked out next to repo/. From repo/, read: acme/extra (../context/acme/extra)")
+	assert.Contains(t, files[0].Content, "The other workspace repositories are already checked out next to repo/. From repo/, they are at: acme/extra (../context/acme/extra)")
 	assert.NotContains(t, files[0].Content, "run `checkout`")
 }
 
@@ -675,7 +758,7 @@ func checkoutHintFiles() []runner.TaskFile {
 			Path: "prompts/implement.txt",
 			Content: "Implement.\nYou can use these resources." +
 				"\nSetup commands (run in repo/ after clone, in order): npm ci" +
-				"\nCheckout: run `checkout` to check out repo/ and the context repositories. From repo/, read: acme/extra (../context/acme/extra)\n",
+				"\nCheckout: run `checkout` to check out repo/ and the other workspace repositories. From repo/, they are at: acme/extra (../context/acme/extra)\n",
 		},
 		{Path: runner.WorkspaceCheckoutScriptPath, Content: "#!/bin/bash\n"},
 	}

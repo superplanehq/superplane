@@ -176,7 +176,7 @@ describe("OrgExperimentalFeaturesTable", () => {
           return jsonResponse({ status: "disabled" });
         }
         if (url === featureTogglePath("new_canvas") && init?.method === "DELETE") {
-          return new Response("failed", { status: 500 });
+          return new Response("Could not update the Implement automations.", { status: 500 });
         }
         return new Response("not found", { status: 404 });
       }),
@@ -186,7 +186,7 @@ describe("OrgExperimentalFeaturesTable", () => {
 
     await user.click(await screen.findByRole("switch", { name: "Toggle all experimental features" }));
 
-    expect(await screen.findByText("Failed to disable experimental features")).toBeInTheDocument();
+    expect(await screen.findByText("Could not update the Implement automations.")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByRole("switch", { name: "Toggle Factories" })).toHaveAttribute("data-state", "unchecked");
     });

@@ -126,6 +126,28 @@ export function implementConfigGraph(
   };
 }
 
+/** A GitHub Implement app: the agent opens the pull requests. */
+export function implementAgentPullRequestGraph(): IntakeAutomationGraph {
+  const graph = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Keep this prompt" }]);
+  const [trigger, agent] = graph.specNodes ?? [];
+  return {
+    ...graph,
+    specNodes: [
+      trigger,
+      {
+        ...agent,
+        configuration: {
+          ...agent.configuration,
+          environment: [
+            { name: "BASE", value: "main", valueSource: "literal" },
+            { name: "DRAFT_PULL_REQUESTS", value: "false", valueSource: "literal" },
+          ],
+        },
+      },
+    ],
+  };
+}
+
 export function confidenceGraph(triggerId = "on-pr-risk"): IntakeAutomationGraph {
   const { nodes, edges } = prepareData({
     workflow: {

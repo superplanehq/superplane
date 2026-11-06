@@ -175,6 +175,72 @@ func TestFactoryWorkOrder_ReportCheck_ReReportUpdatesInPlace(t *testing.T) {
 	assert.Nil(t, reported[1].Check.PreviousScore)
 }
 
+func TestFactoryWorkOrder_ReportCheck_KeepsOneRowPerRepository(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "check-repositories")
+
+	order, err := factoryModel.CreateWorkOrder(db, "Check target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	report := func(repository string, score float64) *FactoryWorkOrderCheck {
+		check, reportErr := order.ReportCheck(db, FactoryWorkOrderCheckParams{
+			Key:        "risk-review",
+			Repository: repository,
+			Name:       "Blast radius",
+			Score:      score,
+			MaxScore:   5,
+		})
+		require.NoError(t, reportErr)
+		return check
+	}
+
+	api := report("acme/api", 4)
+	docs := report("acme/docs", 1)
+	apiAgain := report("acme/api", 2)
+
+	assert.NotEqual(t, api.ID, docs.ID)
+	assert.Equal(t, api.ID, apiAgain.ID)
+	assert.Nil(t, docs.PreviousScore)
+	require.NotNil(t, apiAgain.PreviousScore)
+	assert.Equal(t, float64(4), *apiAgain.PreviousScore)
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 2)
+	assert.Equal(t, "acme/api", checks[0].Repository)
+	assert.Equal(t, float64(2), checks[0].Score)
+	assert.Equal(t, "acme/docs", checks[1].Repository)
+	assert.Equal(t, float64(1), checks[1].Score)
+}
+
+func TestFactoryWorkOrder_ReportCheck_TakesOverTheCheckWithoutRepository(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "check-legacy-repository")
+
+	order, err := factoryModel.CreateWorkOrder(db, "Check target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	params := FactoryWorkOrderCheckParams{Key: "risk-review", Name: "Blast radius", Score: 3, MaxScore: 5}
+	legacy, err := order.ReportCheck(db, params)
+	require.NoError(t, err)
+
+	params.Repository = "acme/api"
+	params.Score = 2
+	claimed, err := order.ReportCheck(db, params)
+	require.NoError(t, err)
+
+	assert.Equal(t, legacy.ID, claimed.ID)
+	assert.Equal(t, "acme/api", claimed.Repository)
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, "acme/api", checks[0].Repository)
+}
+
 func TestFactoryWorkOrder_ReportCheck_TracksRecentScores(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

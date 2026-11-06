@@ -492,6 +492,7 @@ func buildCustomAutomationCanvas(
 	}
 	if provider == models.ProviderGitHub {
 		triggerConfiguration["ignoreDrafts"] = true
+		triggerConfiguration["repository"] = models.WorkspaceRepositoriesExpression
 	}
 	triggerID := customAutomationTriggerID
 	triggerName := "On Pull Request"
@@ -618,6 +619,7 @@ func buildMultiTriggerCustomAutomationCanvas(
 		}
 		if provider == models.ProviderGitHub {
 			taskConfiguration["ignoreDrafts"] = true
+			taskConfiguration["repository"] = models.WorkspaceRepositoriesExpression
 		}
 		taskEnvironment := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_MANUAL, githubHost)
 		runnerName := "Verify"
@@ -873,8 +875,20 @@ func stripBacklogTaskInstructions(prompt string) string {
 	return prompt
 }
 
+// customAutomationCheckoutEnvironment checks out the pull request that
+// started the run. A GitHub pull request automation listens on every
+// workspace repository, so it reads the repository from the event.
 func customAutomationCheckoutEnvironment(factory *models.Factory, mode pb.FactoryCustomAutomation_StartMode, githubHost string) []any {
 	config := factory.OnboardingConfigValue()
+	if config.EffectiveVCSProvider() == models.ProviderGitHub && mode != pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		return []any{
+			checkoutEnvironmentVar("REPO", prFeedbackEventRepositoryExpression),
+			checkoutEnvironmentVar("REPO_URL", runner.WorkspaceContextRepoURL(models.ProviderGitHub, prFeedbackEventRepositoryExpression, githubHost)),
+			checkoutEnvironmentVar("SOURCE_REPO", prFeedbackEventRepositoryExpression),
+			checkoutEnvironmentVar("PR_NUMBER", prFeedbackPRNumberExpression()),
+			checkoutEnvironmentVar("PR_HEAD", prFeedbackPRHeadExpression()),
+		}
+	}
 	repository := strings.TrimSpace(config.AppRepository)
 	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository, githubHost)
 	env := []any{

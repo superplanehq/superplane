@@ -143,6 +143,6 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 
 		settings := prFeedbackSettingsFromGraph(graph, spec)
 		assert.Equal(t, []string{"lint", "unit"}, settings.CheckNames)
-		assert.Equal(t, "acme/app", settings.Repository)
+		assert.Empty(t, settings.Repository, "workspace nodes do not name a repository")
 	})
 }

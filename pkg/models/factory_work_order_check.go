@@ -34,9 +34,10 @@ const (
 	FactoryWorkOrderCheckFormatPercent  = factory.CheckFormatPercent
 	FactoryWorkOrderCheckFormatBoolean  = factory.CheckFormatBoolean
 
-	// MaxFactoryWorkOrderCheckKeyBytes and name match the column widths.
-	MaxFactoryWorkOrderCheckKeyBytes  = 255
-	MaxFactoryWorkOrderCheckNameBytes = 255
+	// MaxFactoryWorkOrderCheckKeyBytes, name, and repository match the column widths.
+	MaxFactoryWorkOrderCheckKeyBytes        = 255
+	MaxFactoryWorkOrderCheckNameBytes       = 255
+	MaxFactoryWorkOrderCheckRepositoryBytes = 255
 
 	// MaxFactoryWorkOrderCheckAnalysisBytes caps the markdown analysis,
 	// mirroring the artifact data cap.
@@ -55,7 +56,7 @@ var (
 	ErrFactoryWorkOrderCheckOwned = errors.New("check key belongs to SuperPlane")
 )
 
-const factoryWorkOrderCheckKeyUniqueConstraint = "idx_factory_work_order_checks_order_key_unique"
+const factoryWorkOrderCheckKeyUniqueConstraint = "idx_factory_work_order_checks_order_repository_key_unique"
 
 // mergeConfidenceCheckKeySuffix ends every merge confidence check key.
 const mergeConfidenceCheckKeySuffix = "-review"
@@ -77,7 +78,7 @@ var planningReviewCheckKeys = []string{
 }
 
 // FactoryWorkOrderCheck is latest-only state: one row per (work order,
-// key), updated in place on every report. History lives in
+// repository, key), updated in place on every report. History lives in
 // `order.check.reported` timeline events, not in extra rows.
 type FactoryWorkOrderCheck struct {
 	ID             uuid.UUID
@@ -85,12 +86,15 @@ type FactoryWorkOrderCheck struct {
 	FactoryID      uuid.UUID
 	WorkOrderID    uuid.UUID
 	Key            string
-	Name           string
-	Score          float64
-	MaxScore       float64
-	Format         string
-	Level          string
-	PreviousScore  *float64
+	// Repository is the pull request repository of a merge confidence
+	// check. It is empty for a check of the whole task.
+	Repository    string
+	Name          string
+	Score         float64
+	MaxScore      float64
+	Format        string
+	Level         string
+	PreviousScore *float64
 	// RecentScores holds the latest report scores, oldest first and
 	// ending with Score, capped at MaxFactoryWorkOrderCheckRecentScores.
 	RecentScores datatypes.JSONSlice[float64]
@@ -109,6 +113,7 @@ func (FactoryWorkOrderCheck) TableName() string {
 
 type FactoryWorkOrderCheckParams struct {
 	Key        string
+	Repository string
 	Name       string
 	Score      float64
 	MaxScore   float64
@@ -137,7 +142,7 @@ func (c *FactoryWorkOrderCheck) AutomationRef() (*factory.AutomationRef, error) 
 	return &ref, nil
 }
 
-// ReportCheck upserts the check row keyed by (work order, key) and
+// ReportCheck upserts the check row keyed by (work order, repository, key) and
 // records an `order.check.reported` event in the same transaction. A
 // re-report of an existing key keeps that report's score as
 // PreviousScore so the UI can show the movement.
@@ -296,8 +301,8 @@ func (o *FactoryWorkOrder) reportCheck(
 ) (*FactoryWorkOrderCheck, error) {
 	var check *FactoryWorkOrderCheck
 	err := db.Transaction(func(tx *gorm.DB) error {
-		existing, findErr := o.findCheckByKey(tx, normalized.Key)
-		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+		existing, findErr := o.findCheck(tx, normalized.Repository, normalized.Key)
+		if findErr != nil {
 			return findErr
 		}
 
@@ -308,6 +313,7 @@ func (o *FactoryWorkOrder) reportCheck(
 		now := time.Now()
 		if existing != nil {
 			previousScore := existing.Score
+			existing.Repository = normalized.Repository
 			existing.Name = normalized.Name
 			existing.Score = normalized.Score
 			existing.MaxScore = normalized.MaxScore
@@ -332,6 +338,7 @@ func (o *FactoryWorkOrder) reportCheck(
 				FactoryID:      o.FactoryID,
 				WorkOrderID:    o.ID,
 				Key:            normalized.Key,
+				Repository:     normalized.Repository,
 				Name:           normalized.Name,
 				Score:          normalized.Score,
 				MaxScore:       normalized.MaxScore,
@@ -361,13 +368,33 @@ func (o *FactoryWorkOrder) reportCheck(
 	return check, nil
 }
 
-func (o *FactoryWorkOrder) findCheckByKey(tx *gorm.DB, key string) (*FactoryWorkOrderCheck, error) {
+// findCheck returns the row a report updates, or nil for a first report.
+// A row without a repository is from before checks had one. The first
+// report with a repository takes it over, so the old score does not stay
+// beside the new one.
+func (o *FactoryWorkOrder) findCheck(tx *gorm.DB, repository, key string) (*FactoryWorkOrderCheck, error) {
+	check, err := o.lockCheck(tx, repository, key)
+	if err != nil || check != nil || repository == "" {
+		return check, err
+	}
+
+	legacy, err := o.lockCheck(tx, "", key)
+	if err != nil || legacy == nil || legacy.Source != FactoryWorkOrderCheckSourceAutomation {
+		return nil, err
+	}
+	return legacy, nil
+}
+
+func (o *FactoryWorkOrder) lockCheck(tx *gorm.DB, repository, key string) (*FactoryWorkOrderCheck, error) {
 	var check FactoryWorkOrderCheck
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("work_order_id = ? AND key = ?", o.ID, key).
+		Where("work_order_id = ? AND repository = ? AND key = ?", o.ID, repository, key).
 		First(&check).
 		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -386,6 +413,7 @@ func (o *FactoryWorkOrder) recordCheckReported(
 		Check: &factory.CheckRef{
 			ID:            check.ID,
 			Key:           check.Key,
+			Repository:    check.Repository,
 			Name:          check.Name,
 			Score:         check.Score,
 			MaxScore:      check.MaxScore,
@@ -406,6 +434,7 @@ func (o *FactoryWorkOrder) recordCheckReported(
 // instead of landing a half-formed check.
 func normalizeCheckParams(params FactoryWorkOrderCheckParams) (FactoryWorkOrderCheckParams, error) {
 	params.Key = strings.TrimSpace(params.Key)
+	params.Repository = strings.TrimSpace(params.Repository)
 	params.Name = strings.TrimSpace(params.Name)
 	params.Summary = strings.TrimSpace(params.Summary)
 	params.Analysis = strings.TrimSpace(params.Analysis)
@@ -415,6 +444,9 @@ func normalizeCheckParams(params FactoryWorkOrderCheckParams) (FactoryWorkOrderC
 	}
 	if len(params.Key) > MaxFactoryWorkOrderCheckKeyBytes {
 		return params, fmt.Errorf("%w: key exceeds %d bytes", ErrFactoryWorkOrderCheckInvalid, MaxFactoryWorkOrderCheckKeyBytes)
+	}
+	if len(params.Repository) > MaxFactoryWorkOrderCheckRepositoryBytes {
+		return params, fmt.Errorf("%w: repository exceeds %d bytes", ErrFactoryWorkOrderCheckInvalid, MaxFactoryWorkOrderCheckRepositoryBytes)
 	}
 	if params.Name == "" {
 		return params, fmt.Errorf("%w: name is required", ErrFactoryWorkOrderCheckInvalid)
@@ -498,7 +530,7 @@ func isFiniteCheckNumber(value float64) bool {
 }
 
 // isFactoryWorkOrderCheckKeyConflict reports whether err is a violation
-// of the per-order unique `key` index, mirroring
+// of the per-order unique (repository, key) index, mirroring
 // MapFactoryWorkOrderArtifactKeyUniqueConstraintError.
 func isFactoryWorkOrderCheckKeyConflict(err error) bool {
 	var pgErr *pgconn.PgError

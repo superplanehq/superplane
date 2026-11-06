@@ -2745,6 +2745,9 @@ message WorkOrderCheck {
   // automation for a SuperPlane check, agent for a check from add_checks
   // or from a person.
   string source = 16;
+  // Pull request repository of a merge confidence check. Empty for a check
+  // of the whole task.
+  string repository = 17;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.
@@ -3197,6 +3200,8 @@ message FactoryAgentResource {
   repeated string commands = 20;
   string vcs_provider = 21;
   SystemSkill system_skill = 22;
+  // Context repository access: "write" or "read".
+  string access = 23;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -3220,6 +3225,8 @@ message CreateFactoryAgentResourceRequest {
   string repository = 9;
   repeated string commands = 10;
   string vcs_provider = 11;
+  string ref = 12;
+  string access = 13;
 }
 
 message CreateFactoryAgentResourceResponse {
@@ -3241,6 +3248,8 @@ message UpdateFactoryAgentResourceRequest {
   repeated string commands = 12;
   optional bool replace_commands = 13;
   optional string vcs_provider = 14;
+  optional string ref = 15;
+  optional string access = 16;
 }
 
 message UpdateFactoryAgentResourceResponse {
@@ -3553,6 +3562,7 @@ message PendingHandOff {
   string line_id = 1;
   string column = 2;
   string pull_request_url = 3;
+  repeated string pull_request_urls = 4;
 }
 
 message ResumeHandOffWorkOrderRequest {
