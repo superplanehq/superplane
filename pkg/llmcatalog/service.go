@@ -28,9 +28,13 @@ func New(encryptor crypto.Encryptor, httpClient core.HTTPContext) *Service {
 
 // CatalogBaseURL identifies the configured source of an OpenRouter model catalog.
 func CatalogBaseURL(configured string) string {
+	return catalogBaseURL(configured, llm.DefaultOpenRouterBaseURL)
+}
+
+func catalogBaseURL(configured, fallback string) string {
 	baseURL := strings.TrimRight(strings.TrimSpace(configured), "/")
 	if baseURL == "" {
-		return llm.DefaultOpenRouterBaseURL
+		return fallback
 	}
 	return baseURL
 }
@@ -41,8 +45,8 @@ func (s *Service) Refresh(ctx context.Context, tx *gorm.DB, provider models.Host
 		return fmt.Errorf("model catalog is unavailable for provider %s", provider.Provider)
 	}
 	baseURL := CatalogBaseURL(provider.BaseURL)
-	if provider.Provider == models.UsageProviderAnthropic && strings.TrimSpace(provider.BaseURL) == "" {
-		baseURL = llm.DefaultAnthropicBaseURL
+	if provider.Provider == models.UsageProviderAnthropic {
+		baseURL = catalogBaseURL(provider.BaseURL, llm.DefaultAnthropicBaseURL)
 	}
 	if err := llm.ValidateBaseURL(baseURL); err != nil {
 		return err

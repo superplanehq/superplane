@@ -84,6 +84,10 @@ func listLineRunnerModelOptions(tx *gorm.DB, orgID, factoryID uuid.UUID, lineNam
 	if err != nil {
 		return nil, false, err
 	}
+	return listLineRunnerModelOptionsForSteps(tx, orgID, factoryID, line.Steps, ownerIDs...)
+}
+
+func listLineRunnerModelOptionsForSteps(tx *gorm.DB, orgID, factoryID uuid.UUID, steps []models.FactoryLineStep, ownerIDs ...uuid.UUID) ([]lineRunnerModel, bool, error) {
 	catalog, err := llmcatalog.LoadThinkingCatalog(tx)
 	if err != nil {
 		return nil, false, err
@@ -91,7 +95,7 @@ func listLineRunnerModelOptions(tx *gorm.DB, orgID, factoryID uuid.UUID, lineNam
 
 	usesHostedFunding := false
 	var out []lineRunnerModel
-	for _, step := range line.Steps {
+	for _, step := range steps {
 		if step.AppID == uuid.Nil {
 			continue
 		}
