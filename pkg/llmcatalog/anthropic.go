@@ -35,12 +35,14 @@ func (s *Service) refreshAnthropic(ctx context.Context, tx *gorm.DB, credentials
 	if len(listed) == 0 {
 		return errors.New("Anthropic model catalog is empty")
 	}
-	return StoreAnthropicCapabilities(tx, listed)
+	return StoreAnthropicCapabilities(tx, credentials.BaseURL, listed)
 }
 
 // StoreAnthropicCapabilities preserves the last successful metadata when a
-// response omits capabilities. An explicit empty list disables effort choices.
-func StoreAnthropicCapabilities(tx *gorm.DB, listed []llm.Model) error {
+// response omits capabilities, scoped to the fetched source. An explicit
+// empty list disables effort choices.
+func StoreAnthropicCapabilities(tx *gorm.DB, baseURL string, listed []llm.Model) error {
+	baseURL = catalogBaseURL(baseURL, llm.DefaultAnthropicBaseURL)
 	refreshedAt := time.Now()
 	capabilities := make([]models.LLMModelCapability, 0, len(listed))
 	seen := map[string]bool{}
@@ -52,7 +54,7 @@ func StoreAnthropicCapabilities(tx *gorm.DB, listed []llm.Model) error {
 		seen[id] = true
 		capabilities = append(capabilities, models.LLMModelCapability{
 			Provider:       models.UsageProviderAnthropic,
-			BaseURL:        llm.DefaultAnthropicBaseURL,
+			BaseURL:        baseURL,
 			Model:          id,
 			ThinkingLevels: datatypes.NewJSONSlice(model.ThinkingLevels),
 			RefreshedAt:    refreshedAt,

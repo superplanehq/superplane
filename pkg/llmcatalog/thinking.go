@@ -16,7 +16,8 @@ import (
 type ThinkingCatalog struct {
 	openRouterHostedSource string
 	openRouter             map[string]map[string][]string
-	anthropic              map[string][]string
+	anthropicHostedSource  string
+	anthropic              map[string]map[string][]string
 }
 
 func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
@@ -27,7 +28,8 @@ func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
 	catalog := &ThinkingCatalog{
 		openRouterHostedSource: llm.DefaultOpenRouterBaseURL,
 		openRouter:             make(map[string]map[string][]string),
-		anthropic:              make(map[string][]string),
+		anthropicHostedSource:  llm.DefaultAnthropicBaseURL,
+		anthropic:              make(map[string]map[string][]string),
 	}
 	provider, err := models.FindHostedLLMProvider(tx, models.UsageProviderOpenRouter)
 	if err != nil && !errors.Is(err, models.ErrHostedLLMProviderNotFound) {
@@ -48,13 +50,21 @@ func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
 	if err != nil {
 		return nil, err
 	}
+	provider, err = models.FindHostedLLMProvider(tx, models.UsageProviderAnthropic)
+	if err != nil && !errors.Is(err, models.ErrHostedLLMProviderNotFound) {
+		return nil, err
+	}
+	if provider != nil {
+		catalog.anthropicHostedSource = catalogBaseURL(provider.BaseURL, llm.DefaultAnthropicBaseURL)
+	}
 	for _, capability := range anthropic {
-		if capability.BaseURL != llm.DefaultAnthropicBaseURL {
-			continue
+		source := catalogBaseURL(capability.BaseURL, llm.DefaultAnthropicBaseURL)
+		if catalog.anthropic[source] == nil {
+			catalog.anthropic[source] = make(map[string][]string)
 		}
 		id := strings.ToLower(modelid.CatalogModelID(capability.Model))
 		levels := runner.SupportedThinkingLevels(capability.ThinkingLevels)
-		catalog.anthropic[id] = slices.DeleteFunc(levels, func(level string) bool {
+		catalog.anthropic[source][id] = slices.DeleteFunc(levels, func(level string) bool {
 			return !slices.Contains(runner.ClaudeCodeThinkingLevels, level)
 		})
 	}
@@ -63,8 +73,12 @@ func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
 
 func (c *ThinkingCatalog) ThinkingLevels(provider, model, fundingSource string) []string {
 	if provider == models.UsageProviderAnthropic {
+		source := llm.DefaultAnthropicBaseURL
+		if fundingSource == models.UsageFundingSourceHosted {
+			source = c.anthropicHostedSource
+		}
 		id := strings.ToLower(modelid.CatalogModelID(model))
-		if levels, found := c.anthropic[id]; found {
+		if levels, found := c.anthropic[source][id]; found {
 			return slices.Clone(levels)
 		}
 	}

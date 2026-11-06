@@ -218,7 +218,7 @@ func dispatchWorkOrderOnLineTx(
 	if err != nil {
 		return nil, invalidArgument(err.Error())
 	}
-	if err := validateLineDispatchModel(tx, orgID, factoryID, currentLine, model, normalizedThinking, subscriptionOrderOwnerID(tx, order)); err != nil {
+	if err := validateLineDispatchModel(tx, orgID, factoryID, currentLine, startIndex, model, normalizedThinking, subscriptionOrderOwnerID(tx, order)); err != nil {
 		return nil, err
 	}
 	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
@@ -289,11 +289,16 @@ func dispatchWorkOrderOnLineTx(
 
 // validateLineDispatchModel checks overrides and each agent's effective model
 // and effort before Start, including settings inherited from the agent.
-func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string, ownerID uuid.UUID) error {
-	if model == "" {
-		return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking, ownerID)
+// Only steps from startIndex onward will run for a start or retry.
+func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, startIndex int, model, thinking string, ownerID uuid.UUID) error {
+	if startIndex < 0 || startIndex >= len(line.Steps) {
+		return models.ErrFactoryLineStepOutOfRange
 	}
-	options, _, err := listLineRunnerModelOptions(tx, orgID, factoryID, line.Name, ownerID)
+	steps := line.Steps[startIndex:]
+	if model == "" {
+		return validateDispatchThinkingForRunners(tx, orgID, factoryID, steps, model, thinking, ownerID)
+	}
+	options, _, err := listLineRunnerModelOptionsForSteps(tx, orgID, factoryID, steps, ownerID)
 	if err != nil {
 		return err
 	}
@@ -304,14 +309,14 @@ func validateLineDispatchModel(tx *gorm.DB, orgID, factoryID uuid.UUID, line *mo
 	if dispatchThinkingOverridesLevel(thinking) && !slices.Contains(options[index].ThinkingLevels, thinking) {
 		return invalidArgument("thinking level is not available for this model")
 	}
-	return validateDispatchThinkingForRunners(tx, orgID, factoryID, line, model, thinking, ownerID)
+	return validateDispatchThinkingForRunners(tx, orgID, factoryID, steps, model, thinking, ownerID)
 }
 
 // validateDispatchThinkingForRunners checks inherited and explicit efforts
 // against the model each agent will run, including agents that retain a model.
-func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID, line *models.FactoryLine, model, thinking string, ownerID uuid.UUID) error {
+func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID, steps []models.FactoryLineStep, model, thinking string, ownerID uuid.UUID) error {
 	var catalog *llmcatalog.ThinkingCatalog
-	for _, step := range line.Steps {
+	for _, step := range steps {
 		if step.AppID == uuid.Nil {
 			continue
 		}

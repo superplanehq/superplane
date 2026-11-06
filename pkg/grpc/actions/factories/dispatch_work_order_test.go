@@ -275,6 +275,87 @@ func TestDispatchCodexSubscriptionThinkingFollowsCatalog(t *testing.T) {
 	}
 }
 
+func TestDispatchThinkingValidatesOnlyStepsToExecute(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		retry       bool
+		invalidStep int
+		wantErr     bool
+	}{
+		{name: "start skips earlier agent", invalidStep: 0},
+		{name: "retry skips earlier agent", retry: true, invalidStep: 0},
+		{name: "retry checks selected agent", retry: true, invalidStep: 1, wantErr: true},
+		{name: "retry checks later agent", retry: true, invalidStep: 2, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-5-5")
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			var steps []models.FactoryLineStep
+			for i := range 3 {
+				app := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "hosted", "claude-sonnet-5-5")
+				level := "low"
+				if i == tc.invalidStep {
+					level = "high"
+				}
+				setLineAppRunnerThinkingLevel(t, db, app, level)
+				steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"})
+			}
+			line, err := factory.CreateLine(db, "ship", steps)
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+			var originalDispatchID string
+			if tc.retry {
+				response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+					FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+				})
+				require.NoError(t, err)
+				originalDispatchID = response.Order.LineDispatches[0].Id
+				dispatch, err := models.FindWorkOrderLineDispatch(db, uuid.MustParse(originalDispatchID))
+				require.NoError(t, err)
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					if _, err := dispatch.EnqueueOrStartStep(tx, order, 1); err != nil {
+						return err
+					}
+					return dispatch.Finish(tx, models.CanvasRunResultFailed)
+				}))
+			}
+			// A catalog refresh removes high after the original traversal.
+			require.NoError(t, models.UpsertLLMModelCapabilities(db, []models.LLMModelCapability{{
+				Provider: models.UsageProviderAnthropic, BaseURL: llm.DefaultAnthropicBaseURL,
+				Model: "claude-sonnet-5-5", ThinkingLevels: datatypes.NewJSONSlice([]string{"low"}), RefreshedAt: time.Now(),
+			}}))
+			response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+				FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+				StartStepIndex: 1, ReplaceActive: tc.retry,
+			})
+			if tc.wantErr {
+				require.ErrorContains(t, err, "thinking level")
+				assertDispatchRejected(t, db, order, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, response.Order.LineDispatches, 1)
+			dispatch := response.Order.LineDispatches[0]
+			assert.Equal(t, int32(1), dispatch.StepExecutions[len(dispatch.StepExecutions)-1].StepIndex)
+			if tc.retry {
+				assert.Equal(t, originalDispatchID, dispatch.Id)
+				var earlierExecutions int
+				for _, execution := range dispatch.StepExecutions {
+					if execution.StepIndex == 0 {
+						earlierExecutions++
+					}
+				}
+				assert.Equal(t, 1, earlierExecutions)
+			}
+		})
+	}
+}
+
 func TestDispatchThinkingLevelWithModelMustBeAcceptedByEveryLineRunner(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
