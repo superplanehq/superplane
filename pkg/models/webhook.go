@@ -242,7 +242,12 @@ func ListBitbucketForgeWebhooks(tx *gorm.DB, installationID, repositoryUUID stri
 		Where("app_installations.metadata->>'forgeInstallationId' = ?", installationID).
 		Where("app_installations.metadata->>'authType' = ?", "forgeApp").
 		Where("webhooks.state = ?", WebhookStateReady).
-		Where("trim(both '{}' from webhooks.metadata->>'repositoryUUID') = ?", repositoryUUID).
+		Where(
+			"(trim(both '{}' from webhooks.metadata->>'repositoryUUID') = ? OR EXISTS ("+
+				"SELECT 1 FROM jsonb_array_elements(COALESCE(webhooks.metadata->'hooks', '[]'::jsonb)) AS hook "+
+				"WHERE trim(both '{}' from hook->>'repositoryUUID') = ?))",
+			repositoryUUID, repositoryUUID,
+		).
 		Find(&webhooks).Error
 	return webhooks, err
 }

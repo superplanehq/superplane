@@ -29,13 +29,11 @@ type RepositoryBranchProps = {
 export function WorkspaceRepositoryFields({
   idPrefix,
   value,
-  showAccess,
   onChange,
   ...branch
 }: Omit<RepositoryBranchProps, "id" | "branch" | "onChange"> & {
   idPrefix: string;
   value: WorkspaceRepositorySettings;
-  showAccess: boolean;
   onChange: (next: WorkspaceRepositorySettings) => void;
 }) {
   const accessId = `${idPrefix}-access`;
@@ -47,14 +45,12 @@ export function WorkspaceRepositoryFields({
         branch={value.ref}
         onChange={(ref) => onChange({ ...value, ref })}
       />
-      {showAccess ? (
-        <RepositoryAccessField
-          id={accessId}
-          value={value.access}
-          disabled={branch.disabled}
-          onChange={(access) => onChange({ ...value, access })}
-        />
-      ) : null}
+      <RepositoryAccessField
+        id={accessId}
+        value={value.access}
+        disabled={branch.disabled}
+        onChange={(access) => onChange({ ...value, access })}
+      />
     </div>
   );
 }

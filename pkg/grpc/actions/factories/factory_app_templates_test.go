@@ -190,6 +190,43 @@ func TestMaterializeMultiRepoImplementationTemplate(t *testing.T) {
 	requireValidCanvasExpressions(t, canvas)
 }
 
+func TestMaterializeBitbucketMultiRepoImplementationTemplate(t *testing.T) {
+	result, err := materializeFactoryTemplate("line-implementation", models.ProviderBitbucket, factoryTemplateInput{
+		appID:         "app-1",
+		appName:       "Implement refunds",
+		installParams: map[string]string{"appRepository": "acme/refunds", "defaultBranch": "develop"},
+		integrations:  map[string]factoryTemplateIntegration{"bitbucket": {id: "bitbucket-1", name: "acme-bitbucket"}},
+		agent:         &factoryTemplateAgent{component: "runnerOpenRouter", model: "anthropic/claude-sonnet-4-6", credentialSource: "integration", credentialIntegrationName: "acme-openrouter"},
+		multiRepo:     true,
+		draftPullRequests: func() *bool {
+			draft := true
+			return &draft
+		}(),
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	agent := findYAMLNode(t, canvas, "implementation-agent-no-issue")
+	assert.Equal(t, []any{map[string]any{"source": "integration", "integration": map[string]any{"name": "acme-bitbucket"}}}, agent.Configuration["environmentFrom"])
+	environment, ok := agent.Configuration["environment"].([]any)
+	require.True(t, ok, "expected the agent to declare step environment")
+	assert.Contains(t, environment, map[string]any{
+		"name":        factoryDraftPullRequestsEnv,
+		"value":       "true",
+		"valueSource": "literal",
+	})
+	implementationPrompt, ok := implementationStep(t, agent, "Implementation")["prompt"].(string)
+	require.True(t, ok)
+	assert.Contains(t, implementationPrompt, "open_pull_request")
+	assert.NotContains(t, implementationPrompt, "GitHub")
+	for _, component := range []string{"bitbucket.findPullRequest", "bitbucket.createPullRequest", "bitbucket.updatePullRequest", "addPullRequest", "addWorkOrderArtifact"} {
+		assert.NotContains(t, result.canvasYAML, component)
+	}
+
+	requireValidCanvasExpressions(t, canvas)
+}
+
 func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	result, err := materializeFactoryTemplate("risk-score", "", factoryTemplateInput{
 		appID:   "app-risk",
@@ -294,7 +331,7 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
 	assert.Equal(t, "bitbucket.onPullRequest", entrypoint.Component)
 	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
-	assert.Equal(t, "acme/widgets", entrypoint.Configuration["repository"])
+	assert.Equal(t, models.WorkspaceRepositoriesExpression, entrypoint.Configuration["repository"])
 	assert.Equal(t, []any{"created", "updated"}, entrypoint.Configuration["actions"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, entrypoint.Integration)
 
@@ -922,9 +959,12 @@ func TestMaterializeFactoryTemplateBitbucketPRClosure(t *testing.T) {
 	assert.Equal(t, "bitbucket.onPullRequest", trigger.Component)
 	assert.Equal(t, []any{"merged", "declined"}, trigger.Configuration["actions"])
 	assert.Equal(t, true, trigger.Configuration["onlyFactoryPullRequests"])
-	assert.Equal(t, "acme/widgets", trigger.Configuration["repository"])
+	assert.Equal(t, models.WorkspaceRepositoriesExpression, trigger.Configuration["repository"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, trigger.Integration)
 	assert.Equal(t, models.ProviderBitbucket, trigger.Metadata[factoryTemplateMetadataKey].(map[string]any)["provider"])
+	for _, nodeID := range []string{"complete-work-order", "reject-work-order"} {
+		assert.Equal(t, true, findYAMLNode(t, canvas, nodeID).Configuration["whenAllPullRequestsDone"], nodeID)
+	}
 
 	merged := findYAMLNode(t, canvas, "is-pr-merged")
 	assert.Contains(t, merged.Configuration["expression"], "pull_request.merged")
