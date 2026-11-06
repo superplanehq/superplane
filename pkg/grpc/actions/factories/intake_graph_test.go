@@ -146,6 +146,8 @@ func TestSentryIntakeConnectionUpdatesRequestCredentials(t *testing.T) {
 		triggerNode(intakeTriggerNodeID, "sentry.onIssue"),
 		componentNode(intakeSentryIssueRequestNodeID, intakeHTTPRequestComponent),
 		componentNode(intakeSentryEventRequestNodeID, intakeHTTPRequestComponent),
+		componentNode(intakeSentryRecommendedEventRequestNodeID, intakeHTTPRequestComponent),
+		componentNode(intakeEnrichIssueNodeID, intakeEnrichIssueComponent),
 		componentNode(intakeCreateNodeID, intakeCreateComponent),
 	}
 	graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, models.LiveCanvasSpec{Nodes: nodes})
@@ -154,7 +156,8 @@ func TestSentryIntakeConnectionUpdatesRequestCredentials(t *testing.T) {
 	}, nodes)
 	require.NoError(t, err)
 	assert.Equal(t, "new-sentry", *findModelNode(t, updated, intakeTriggerNodeID).IntegrationID)
-	for _, id := range []string{intakeSentryIssueRequestNodeID, intakeSentryEventRequestNodeID} {
+	assert.Equal(t, "new-sentry", *findModelNode(t, updated, intakeEnrichIssueNodeID).IntegrationID)
+	for _, id := range []string{intakeSentryIssueRequestNodeID, intakeSentryEventRequestNodeID, intakeSentryRecommendedEventRequestNodeID} {
 		request := findModelNode(t, updated, id)
 		authorization, ok := request.Configuration["authorization"].(map[string]any)
 		require.True(t, ok)
