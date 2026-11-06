@@ -41,10 +41,10 @@ type humanReviewAutomation struct {
 	settings models.HumanReviewSettings
 }
 
-// ReconcileFactoryHumanReview reads current provider state on every attempt.
+// reconcileFactoryHumanReview reads current provider state on every attempt.
 // A per-PR advisory lock serializes requests, webhook refreshes, and retries.
 // Pending publication stays in the decision row across worker restarts.
-func ReconcileFactoryHumanReview(ctx context.Context, deps IntakeDependencies, pullRequest models.FactoryPullRequest) error {
+func reconcileFactoryHumanReview(ctx context.Context, deps IntakeDependencies, pullRequest models.FactoryPullRequest) error {
 	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
 		return nil
 	}
@@ -397,14 +397,10 @@ func newHumanReviewDecision(db *gorm.DB, pr *models.FactoryPullRequest, params m
 }
 
 // The authenticated Factory webhook path calls this after resolving tracked
-// PRs. Reconciliation fetches reviews from GitHub, so event order is irrelevant.
-func ScheduleFactoryHumanReview(ctx context.Context, deps IntakeDependencies, pr models.FactoryPullRequest) {
-	ctx = context.WithoutCancel(ctx)
-	go func() {
-		if err := ReconcileFactoryHumanReview(ctx, deps, pr); err != nil {
-			log.WithError(err).WithField("pull_request", pr.ID).Warn("Human review webhook reconciliation failed")
-		}
-	}()
+// PRs. A full queue leaves webhook recovery to polling. Polling retains its
+// cursor until the queue accepts the request, so later PRs cannot be starved.
+func ScheduleFactoryHumanReview(ctx context.Context, deps IntakeDependencies, pr models.FactoryPullRequest) bool {
+	return factoryHumanReviewScheduler.schedule(context.WithoutCancel(ctx), deps, pr)
 }
 
 func notifyHumanReviewDecision(db *gorm.DB, pr *models.FactoryPullRequest, decision *models.FactoryHumanReviewDecision) {

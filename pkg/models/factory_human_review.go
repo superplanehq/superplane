@@ -119,10 +119,31 @@ func (d *FactoryHumanReviewDecision) Save(tx *gorm.DB) error {
 	return tx.Save(d).Error
 }
 
-func ListOpenFactoryHumanReviewPullRequests(tx *gorm.DB) ([]FactoryPullRequest, error) {
+func ListOpenFactoryHumanReviewPullRequests(tx *gorm.DB, afterID uuid.UUID, limit int) ([]FactoryPullRequest, error) {
+	// Disabled policies still publish an explanatory success for required gates.
+	// Only a published Human review installation makes a workspace relevant.
+	marker, err := json.Marshal([]map[string]any{{
+		"id": HumanReviewTriggerNodeID, "type": NodeTypeTrigger,
+		"metadata": map[string]any{FactoryAppTemplateMetadataKey: map[string]any{"id": FactoryAppTemplateHumanReviewID}},
+	}})
+	if err != nil {
+		return nil, err
+	}
+	query := tx.Where("provider = ? AND state IN ?", FactoryPullRequestProviderGitHub, []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}).
+		Where(`EXISTS (
+			SELECT 1 FROM factories
+			JOIN organizations ON organizations.id = factories.organization_id AND organizations.deleted_at IS NULL
+			JOIN workflows ON workflows.factory_id = factories.id AND workflows.organization_id = factories.organization_id AND workflows.deleted_at IS NULL
+			JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id AND live_version.workflow_id = workflows.id
+			WHERE factories.id = factory_pull_requests.factory_id
+			  AND factories.organization_id = factory_pull_requests.organization_id
+			  AND factories.deleted_at IS NULL AND live_version.nodes @> ?::jsonb
+		)`, string(marker))
+	if afterID != uuid.Nil {
+		query = query.Where("factory_pull_requests.id > ?", afterID)
+	}
 	var prs []FactoryPullRequest
-	err := tx.Where("provider = ? AND state IN ?", FactoryPullRequestProviderGitHub, []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}).
-		Order("updated_at ASC, id ASC").Find(&prs).Error
+	err = query.Order("factory_pull_requests.id ASC").Limit(limit).Find(&prs).Error
 	return prs, err
 }
 
