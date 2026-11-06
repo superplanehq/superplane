@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/factories/humanreview"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
@@ -209,7 +210,7 @@ func mergeStatusCheckResources(protectionNames []string, observed []observedStat
 
 	appendCheck := func(name, checkURL string) {
 		name = strings.TrimSpace(name)
-		if name == "" {
+		if name == "" || strings.EqualFold(name, humanreview.CheckName) {
 			return
 		}
 		key := strings.ToLower(name)
