@@ -1240,3 +1240,94 @@ func uuidField(value any) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 }
+
+func TestDispatchKeepsSavedThinkingLevelWhenModelCapabilitiesAreMissing(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	const model = "deepseek/deepseek-v4.1-flash"
+	seedHostedModels(t, db, models.UsageProviderOpenRouter, model)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app := createLineAppWithRunner(t, r, factory.ID, runnerOpenRouter, "hosted", model)
+	setLineAppRunnerThinkingLevel(t, db, app, "high")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+}
+
+func TestDispatchRejectsSavedThinkingLevelThatTheModelCatalogLacks(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-opus-4-5-20251101")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app := createLineAppWithRunner(t, r, factory.ID, runnerClaudeCode, "hosted", "claude-opus-4-5-20251101")
+	setLineAppRunnerThinkingLevel(t, db, app, "max")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+	})
+	require.ErrorContains(t, err, "saved thinking level")
+	assertDispatchRejected(t, db, order, err)
+
+	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name, ThinkingLevel: "high",
+	})
+	require.NoError(t, err)
+	require.Len(t, response.Order.LineDispatches, 1)
+}
+
+func TestDispatchLeavesSavedSubscriptionThinkingToExecutionWithoutConnection(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	withoutEffort := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "subscription", "gpt-6-astra")
+	withEffort := createLineAppWithRunner(t, r, factory.ID, runnerCodex, "subscription", "gpt-6-astra")
+	setLineAppRunnerThinkingLevel(t, db, withEffort, "high")
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+
+	var results []error
+	for _, app := range []*models.Canvas{withoutEffort, withEffort} {
+		line, err := factory.CreateLine(db, support.RandomName("ship"), []models.FactoryLineStep{
+			{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+		})
+		require.NoError(t, err)
+		order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, []uuid.UUID{r.User}, nil)
+		require.NoError(t, err)
+		_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+			FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+		})
+		results = append(results, err)
+	}
+	assert.Equal(t, results[0] == nil, results[1] == nil, "a saved thinking level must not change how Start handles a missing ChatGPT connection: %v", results)
+}
+
+func setLineAppRunnerThinkingLevel(t *testing.T, db *gorm.DB, app *models.Canvas, level string) {
+	t.Helper()
+	version, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+	require.NoError(t, err)
+	for i := range version.Nodes {
+		if version.Nodes[i].ID == "agent" {
+			version.Nodes[i].Configuration["thinkingLevel"] = level
+		}
+	}
+	require.NoError(t, db.Model(version).Update("nodes", version.Nodes).Error)
+}
