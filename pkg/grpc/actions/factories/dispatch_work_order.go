@@ -348,7 +348,7 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 					return err
 				}
 			}
-			levels, err := dispatchRunnerThinkingLevels(tx, orgID, factoryID, node, model, ownerID, catalog)
+			levels, capabilitiesKnown, err := dispatchRunnerThinkingLevels(tx, orgID, factoryID, node, model, ownerID, catalog)
 			var unresolved *unresolvedDispatchModelError
 			if !overridden && errors.As(err, &unresolved) {
 				// Execution resolves the model and reports problems such as a
@@ -361,7 +361,7 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 			if overridden && !slices.Contains(levels, effectiveThinking) {
 				return invalidArgument("thinking level is not available for every agent on this line")
 			}
-			if !overridden && savedThinkingUnsupported(node, levels, effectiveThinking) {
+			if !overridden && capabilitiesKnown && !slices.Contains(levels, effectiveThinking) {
 				return invalidArgument("An agent on this line has a saved thinking level that its model does not support. Choose a thinking level, or change the agent settings.")
 			}
 		}
@@ -479,20 +479,6 @@ func dispatchThinkingOverridesLevel(thinking string) bool {
 	return thinking != "" && thinking != runner.DispatchThinkingDefault
 }
 
-// dispatchRunnerThinkingLevels uses the same model acceptance and default
-// rules as execution, then reads that model's capabilities instead of CLI limits.
-// savedThinkingUnsupported reports whether the model catalog shows that the
-// effective model lacks a saved agent level. A ChatGPT subscription catalog
-// is complete. For other providers, a model without listed levels can lack
-// cached metadata, for example before the first catalog refresh, so the saved
-// level reaches the agent as it did before.
-func savedThinkingUnsupported(node models.Node, levels []string, thinking string) bool {
-	if slices.Contains(levels, thinking) {
-		return false
-	}
-	return len(levels) > 0 || runnerUsesCodexSubscription(node)
-}
-
 func runnerUsesCodexSubscription(node models.Node) bool {
 	credentials, _ := node.Configuration["credentials"].(map[string]any)
 	return node.ComponentName() == runnerCodex && credentials["source"] == "subscription"
@@ -508,12 +494,14 @@ func (e *unresolvedDispatchModelError) Error() string { return e.err.Error() }
 
 func (e *unresolvedDispatchModelError) Unwrap() error { return e.err }
 
-func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, selected string, ownerID uuid.UUID, catalog *llmcatalog.ThinkingCatalog) ([]string, error) {
+// dispatchRunnerThinkingLevels follows execution's model selection and reports
+// whether capabilities are known, including models with effort control disabled.
+func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, selected string, ownerID uuid.UUID, catalog *llmcatalog.ThinkingCatalog) ([]string, bool, error) {
 	model := storedRunnerModel(node.Configuration)
 	if selected != "" {
 		accepted, err := models.RunnerAcceptsModel(tx, orgID, &factoryID, node.ComponentName(), node.Configuration, selected, ownerID)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if accepted {
 			model = selected
@@ -522,36 +510,38 @@ func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node 
 	if runnerUsesCodexSubscription(node) {
 		resolved, err := models.ResolveFactoryCodexSubscriptionModel(tx, orgID, factoryID, ownerID, model, "")
 		if err != nil {
-			return nil, &unresolvedDispatchModelError{err: err}
+			return nil, false, &unresolvedDispatchModelError{err: err}
 		}
 		levels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, catalog, ownerID)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		return levels(resolved), nil
+		return levels(resolved), true, nil
 	}
 	if node.ComponentName() == models.SuperPlaneRunnerComponent {
 		resolved, err := dispatchSuperPlaneModel(tx, orgID, factoryID, node, model)
 		if err != nil {
-			return nil, &unresolvedDispatchModelError{err: err}
+			return nil, false, &unresolvedDispatchModelError{err: err}
 		}
-		return catalog.ThinkingLevels(resolved.Provider, resolved.Model, models.UsageFundingSourceHosted), nil
+		levels, known := catalog.LookupThinkingLevels(resolved.Provider, resolved.Model, models.UsageFundingSourceHosted)
+		return levels, known, nil
 	}
 	if model == "" || models.IsClaudeFamilyAlias(model) {
 		ids, err := lineRunnerModelsForNode(tx, orgID, factoryID, node, ownerID)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if model == "" && len(ids) > 0 {
 			model = slices.Min(ids)
 		}
 		model = models.ConcreteClaudeModelID(model, ids)
 	}
-	levels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, catalog, ownerID)
-	if err != nil {
-		return nil, err
+	provider, ok := runnerNodeProvider(node)
+	if !ok {
+		return nil, false, nil
 	}
-	return levels(model), nil
+	levels, known := catalog.LookupThinkingLevels(provider, model, runnerFundingSource(node.Configuration))
+	return levels, known, nil
 }
 
 func dispatchSuperPlaneModel(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node, model string) (models.DefaultHostedLLMModel, error) {

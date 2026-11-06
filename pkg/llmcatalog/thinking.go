@@ -39,6 +39,9 @@ func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
 		catalog.openRouterHostedSource = CatalogBaseURL(provider.BaseURL)
 	}
 	for _, capability := range capabilities {
+		if capability.ThinkingLevels == nil {
+			continue
+		}
 		source := CatalogBaseURL(capability.BaseURL)
 		if catalog.openRouter[source] == nil {
 			catalog.openRouter[source] = make(map[string][]string)
@@ -58,6 +61,9 @@ func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
 		catalog.anthropicHostedSource = catalogBaseURL(provider.BaseURL, llm.DefaultAnthropicBaseURL)
 	}
 	for _, capability := range anthropic {
+		if capability.ThinkingLevels == nil {
+			continue
+		}
 		source := catalogBaseURL(capability.BaseURL, llm.DefaultAnthropicBaseURL)
 		if catalog.anthropic[source] == nil {
 			catalog.anthropic[source] = make(map[string][]string)
@@ -72,6 +78,13 @@ func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
 }
 
 func (c *ThinkingCatalog) ThinkingLevels(provider, model, fundingSource string) []string {
+	levels, _ := c.LookupThinkingLevels(provider, model, fundingSource)
+	return levels
+}
+
+// LookupThinkingLevels reports whether cached or static effort capabilities
+// are available. An explicitly empty cached list is authoritative.
+func (c *ThinkingCatalog) LookupThinkingLevels(provider, model, fundingSource string) ([]string, bool) {
 	if provider == models.UsageProviderAnthropic {
 		source := llm.DefaultAnthropicBaseURL
 		if fundingSource == models.UsageFundingSourceHosted {
@@ -79,16 +92,18 @@ func (c *ThinkingCatalog) ThinkingLevels(provider, model, fundingSource string) 
 		}
 		id := strings.ToLower(modelid.CatalogModelID(model))
 		if levels, found := c.anthropic[source][id]; found {
-			return slices.Clone(levels)
+			return slices.Clone(levels), true
 		}
 	}
 	if provider != models.UsageProviderOpenRouter {
-		return runner.ModelThinkingLevels(provider, model)
+		levels := runner.ModelThinkingLevels(provider, model)
+		return levels, len(levels) > 0
 	}
 	source := llm.DefaultOpenRouterBaseURL
 	if fundingSource == models.UsageFundingSourceHosted {
 		source = c.openRouterHostedSource
 	}
 	id := strings.ToLower(modelid.CatalogModelID(model))
-	return c.openRouter[source][id]
+	levels, found := c.openRouter[source][id]
+	return slices.Clone(levels), found
 }

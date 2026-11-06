@@ -1322,28 +1322,76 @@ func uuidField(value any) (uuid.UUID, bool) {
 	}
 }
 
-func TestDispatchKeepsSavedThinkingLevelWhenModelCapabilitiesAreMissing(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	const model = "deepseek/deepseek-v4.1-flash"
-	seedHostedModels(t, db, models.UsageProviderOpenRouter, model)
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	app := createLineAppWithRunner(t, r, factory.ID, runnerOpenRouter, "hosted", model)
-	setLineAppRunnerThinkingLevel(t, db, app, "high")
-	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
-		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
-	})
-	require.NoError(t, err)
-	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
-	require.NoError(t, err)
-	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
-
-	response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
-		FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
-	})
-	require.NoError(t, err)
-	require.Len(t, response.Order.LineDispatches, 1)
+func TestDispatchSavedThinkingDistinguishesMissingAndDisabledCapabilities(t *testing.T) {
+	for _, tc := range []struct {
+		name, component, source, provider, model string
+	}{
+		{"OpenRouter hosted", runnerOpenRouter, "hosted", models.UsageProviderOpenRouter, "deepseek/deepseek-v4.1-flash"},
+		{"OpenRouter BYOK", runnerOpenRouter, "integration", models.UsageProviderOpenRouter, "deepseek/deepseek-v4.1-flash"},
+		{"Claude hosted", runnerClaudeCode, "hosted", models.UsageProviderAnthropic, "claude-opus-5-5"},
+		{"Claude BYOK", runnerClaudeCode, "integration", models.UsageProviderAnthropic, "claude-opus-5-5"},
+		{"SuperPlane OpenRouter", models.SuperPlaneRunnerComponent, "hosted", models.UsageProviderOpenRouter, "deepseek/deepseek-v4.1-flash"},
+		{"SuperPlane Claude", models.SuperPlaneRunnerComponent, "hosted", models.UsageProviderAnthropic, "claude-opus-5-5"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			if tc.source == "hosted" {
+				seedHostedModels(t, db, tc.provider, tc.model)
+			}
+			if tc.source == "integration" {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+				_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, tc.provider, []string{tc.model})
+				require.NoError(t, err)
+			}
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			model := tc.model
+			if tc.component == models.SuperPlaneRunnerComponent {
+				model = "hosted::" + tc.provider + "::" + model
+			}
+			app := createLineAppWithRunner(t, r, factory.ID, tc.component, tc.source, model)
+			setLineAppRunnerThinkingLevel(t, db, app, "high")
+			line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+				{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+			})
+			require.NoError(t, err)
+			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+			baseURL := llm.DefaultOpenRouterBaseURL
+			if tc.provider == models.UsageProviderAnthropic {
+				baseURL = llm.DefaultAnthropicBaseURL
+			}
+			for _, state := range []struct {
+				name         string
+				capabilities []models.LLMModelCapability
+				wantErr      bool
+			}{
+				{name: "uncached"},
+				{name: "omitted efforts", capabilities: []models.LLMModelCapability{{Model: tc.model}}},
+				{name: "supported effort", capabilities: []models.LLMModelCapability{{Model: tc.model, ThinkingLevels: datatypes.NewJSONSlice([]string{"high"})}}},
+				{name: "disabled effort", capabilities: []models.LLMModelCapability{{Model: tc.model, ThinkingLevels: datatypes.NewJSONSlice([]string{})}}, wantErr: true},
+				{name: "omitted after disabled", capabilities: []models.LLMModelCapability{{Model: tc.model}}, wantErr: true},
+			} {
+				t.Run(state.name, func(t *testing.T) {
+					require.NoError(t, models.ReplaceLLMModelCapabilities(db, tc.provider, baseURL, state.capabilities))
+					order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+					require.NoError(t, err)
+					request := &pb.DispatchWorkOrderRequest{
+						FactoryId: factory.ID.String(), OrderId: order.ID.String(), LineName: line.Name,
+					}
+					response, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), request)
+					if state.wantErr {
+						require.ErrorContains(t, err, "saved thinking level")
+						assertDispatchRejected(t, db, order, err)
+						request.ThinkingLevel = "default"
+						response, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), request)
+					}
+					require.NoError(t, err)
+					require.Len(t, response.Order.LineDispatches, 1)
+				})
+			}
+		})
+	}
 }
 
 func TestDispatchRejectsSavedThinkingLevelThatTheModelCatalogLacks(t *testing.T) {
