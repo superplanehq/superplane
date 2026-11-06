@@ -33,9 +33,24 @@ func TestAnthropicRefreshUsesAPILevelsAndKeepsOtherKeysModels(t *testing.T) {
 	require.NoError(t, err)
 	catalog, err := llmcatalog.LoadThinkingCatalog(db)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"medium", "high"}, catalog.ThinkingLevels(models.UsageProviderAnthropic, "claude-sonnet-5-5", models.UsageFundingSourceBYOK))
-	assert.Equal(t, []string{"low", "max"}, catalog.ThinkingLevels(models.UsageProviderAnthropic, "claude-new-model", models.UsageFundingSourceBYOK))
-	assert.Empty(t, catalog.ThinkingLevels(models.UsageProviderAnthropic, "claude-opus-5-5", models.UsageFundingSourceBYOK))
+	for _, fundingSource := range []string{models.UsageFundingSourceBYOK, models.UsageFundingSourceHosted} {
+		t.Run(fundingSource, func(t *testing.T) {
+			for _, tc := range []struct {
+				name   string
+				model  string
+				levels []string
+			}{
+				{name: "cached levels", model: "claude-sonnet-5-5", levels: []string{"medium", "high"}},
+				{name: "new model", model: "claude-new-model", levels: []string{"low", "max"}},
+				{name: "effort disabled", model: "claude-opus-5-5", levels: []string{}},
+				{name: "missing metadata", model: "claude-opus-4-5-20251101", levels: []string{"low", "medium", "high"}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					assert.Equal(t, tc.levels, catalog.ThinkingLevels(models.UsageProviderAnthropic, tc.model, fundingSource))
+				})
+			}
+		})
+	}
 	require.Len(t, httpCtx.Requests, 2)
 	assert.Equal(t, "key-two", httpCtx.Requests[1].Header.Get("x-api-key"))
 }

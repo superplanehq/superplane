@@ -62,7 +62,7 @@ func LoadThinkingCatalog(tx *gorm.DB) (*ThinkingCatalog, error) {
 }
 
 func (c *ThinkingCatalog) ThinkingLevels(provider, model, fundingSource string) []string {
-	if provider == models.UsageProviderAnthropic && fundingSource == models.UsageFundingSourceBYOK {
+	if provider == models.UsageProviderAnthropic {
 		id := strings.ToLower(modelid.CatalogModelID(model))
 		if levels, found := c.anthropic[id]; found {
 			return slices.Clone(levels)
