@@ -79,6 +79,49 @@ func TestRefreshReplacesCapabilitiesAndPreservesCacheAfterFailures(t *testing.T)
 	assert.Equal(t, []string{"none", "high", "xhigh"}, catalog.ThinkingLevels(provider.Provider, deepseek.Model, models.UsageFundingSourceBYOK))
 }
 
+func TestRefreshPreservesOmittedEffortMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		reasoning string
+		cleared   bool
+	}{
+		{name: "no reasoning metadata"},
+		{name: "no supported efforts", reasoning: `,"reasoning":{"default_effort":"low","mandatory":false}`},
+		{name: "null supported efforts", reasoning: `,"reasoning":{"supported_efforts":null}`},
+		{name: "explicit empty efforts", reasoning: `,"reasoning":{"supported_efforts":[]}`, cleared: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = support.Setup(t)
+			db := database.DB(t.Context())
+			httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+				catalogResponse(http.StatusOK, `{"data":[{"id":"deepseek/deepseek-v4-flash","reasoning":{"supported_efforts":["high","xhigh"],"default_effort":"high","mandatory":true}}]}`),
+				catalogResponse(http.StatusOK, `{"data":[{"id":"openrouter/DeepSeek/DEEPSEEK-v4-flash"`+tc.reasoning+`}]}`),
+			}}
+			svc := llmcatalog.New(nil, httpCtx)
+			provider := models.HostedLLMProvider{Provider: models.UsageProviderOpenRouter}
+			require.NoError(t, svc.Refresh(t.Context(), db, provider))
+			require.NoError(t, svc.Refresh(t.Context(), db, provider))
+
+			stored, err := models.ListLLMModelCapabilities(db, provider.Provider)
+			require.NoError(t, err)
+			require.Len(t, stored, 1)
+			catalog, err := llmcatalog.LoadThinkingCatalog(db)
+			require.NoError(t, err)
+			levels := catalog.ThinkingLevels(provider.Provider, "deepseek/deepseek-v4-flash", models.UsageFundingSourceBYOK)
+			if tc.cleared {
+				assert.Empty(t, levels)
+				assert.Equal(t, datatypes.JSONSlice[string]{}, stored[0].ThinkingLevels)
+				assert.Empty(t, stored[0].DefaultThinkingLevel)
+				assert.False(t, stored[0].ReasoningMandatory)
+				return
+			}
+			assert.Equal(t, []string{"high", "xhigh"}, levels)
+			assert.Equal(t, "high", stored[0].DefaultThinkingLevel)
+			assert.True(t, stored[0].ReasoningMandatory)
+		})
+	}
+}
+
 func TestRefreshConfiguredLoadsPublicCatalogWithoutHostedSetup(t *testing.T) {
 	_ = support.Setup(t)
 	db := database.DB(t.Context())
@@ -141,6 +184,7 @@ func TestRefreshConfiguredKeepsProviderSourcesIndependent(t *testing.T) {
 		catalogResponse(http.StatusOK, `{"data":[{"id":"deepseek/deepseek-v4-flash","reasoning":{"supported_efforts":["high"]}}]}`),
 		catalogResponse(http.StatusBadGateway, `{"error":"proxy unavailable"}`),
 		catalogResponse(http.StatusOK, `{"data":[{"id":"deepseek/deepseek-v4-flash","reasoning":{"supported_efforts":["high","xhigh"]}}]}`),
+		catalogResponse(http.StatusOK, `{"data":[{"id":"deepseek/deepseek-v4-flash"}]}`),
 	}}
 	svc := llmcatalog.New(crypto.NewNoOpEncryptor(), httpCtx)
 	require.NoError(t, svc.Refresh(t.Context(), db, *provider))
@@ -163,6 +207,13 @@ func TestRefreshConfiguredKeepsProviderSourcesIndependent(t *testing.T) {
 	assert.Equal(t, "Bearer sk-saved", httpCtx.Requests[1].Header.Get("Authorization"))
 	assert.Equal(t, llm.DefaultOpenRouterBaseURL+"/models", httpCtx.Requests[2].URL.String())
 	assert.Empty(t, httpCtx.Requests[2].Header.Get("Authorization"))
+
+	publicProvider := models.HostedLLMProvider{Provider: models.UsageProviderOpenRouter}
+	require.NoError(t, svc.Refresh(t.Context(), db, publicProvider))
+	catalog, err = llmcatalog.LoadThinkingCatalog(db)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"high"}, catalog.ThinkingLevels(provider.Provider, "deepseek/deepseek-v4-flash", models.UsageFundingSourceHosted))
+	assert.Equal(t, []string{"high", "xhigh"}, catalog.ThinkingLevels(provider.Provider, "deepseek/deepseek-v4-flash", models.UsageFundingSourceBYOK))
 }
 
 func catalogResponse(status int, body string) *http.Response {

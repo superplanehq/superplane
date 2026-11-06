@@ -67,7 +67,7 @@ func (s *Service) Refresh(ctx context.Context, tx *gorm.DB, provider models.Host
 			Provider:             provider.Provider,
 			BaseURL:              baseURL,
 			Model:                strings.ToLower(modelid.CatalogModelID(model.ID)),
-			ThinkingLevels:       datatypes.NewJSONSlice(append([]string{}, model.ThinkingLevels...)),
+			ThinkingLevels:       datatypes.NewJSONSlice(model.ThinkingLevels),
 			DefaultThinkingLevel: model.DefaultThinkingLevel,
 			ReasoningMandatory:   model.ReasoningMandatory,
 			RefreshedAt:          refreshedAt,
