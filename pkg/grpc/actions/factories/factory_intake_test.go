@@ -838,7 +838,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.Len(t, response.GetIntakes(), 1)
 		assert.False(t, response.GetIntakes()[0].GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_FAILED, response.GetIntakes()[0].GetHealth())
-		assert.Contains(t, response.GetIntakes()[0].GetHealthMessage(), "20 webhooks")
+		assert.Equal(t, "GitHub reached the webhook limit for issues. Remove unused webhooks in the repository settings, then try again.", response.GetIntakes()[0].GetHealthMessage())
 	})
 
 	t.Run("saving intake settings retries a failed GitHub webhook", func(t *testing.T) {

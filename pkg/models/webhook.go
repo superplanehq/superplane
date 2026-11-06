@@ -210,6 +210,21 @@ func FindActiveWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]Ca
 	return nodes, nil
 }
 
+// ListFactoryWebhookNodes returns live nodes of active workspace canvases that
+// reference a webhook. The canvas join prevents nodes in another workspace
+// from granting access to the same registration.
+func ListFactoryWebhookNodes(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]CanvasNode, error) {
+	var nodes []CanvasNode
+	err := tx.Table("workflow_nodes").
+		Select("workflow_nodes.*").
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id").
+		Where("workflows.organization_id = ? AND workflows.factory_id = ?", organizationID, factoryID).
+		Where("workflows.deleted_at IS NULL AND workflows.live_version_id IS NOT NULL").
+		Where("workflow_nodes.deleted_at IS NULL AND workflow_nodes.webhook_id IS NOT NULL").
+		Find(&nodes).Error
+	return nodes, err
+}
+
 // SoftDeleteWebhookIfUnreferenced soft-deletes webhookID when no live canvas
 // node still references it. Live means the node, canvas, and organization are
 // not deleted.

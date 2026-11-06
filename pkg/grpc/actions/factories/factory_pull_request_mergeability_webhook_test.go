@@ -113,8 +113,16 @@ func TestEnsureGitHubFactoryMergeabilityWebhook(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, webhooks, 1)
 	assert.Equal(t, firstID, webhooks[0].ID)
-	assert.Equal(t, models.WebhookStatePending, webhooks[0].State)
+	assert.Equal(t, models.WebhookStateFailed, webhooks[0].State)
 	assert.Equal(t, "acme/app", factoryMergeabilityWebhookRepository(webhooks[0].Configuration.Data()))
+	configuration := factoryMergeabilityWebhookConfiguration("acme/app")
+	configuration["eventTypes"] = []string{"pull_request"}
+	require.NoError(t, webhooks[0].UpdateConfiguration(db, configuration))
+	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/app"))
+	updated, err := models.FindWebhookInTransaction(db, firstID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WebhookStatePending, updated.State)
+	assert.Equal(t, factoryMergeabilityGitHubEvents, githubWebhookEventTypes(updated.Configuration.Data().(map[string]any)))
 
 	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/other"))
 	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)

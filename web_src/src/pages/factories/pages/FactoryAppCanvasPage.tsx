@@ -1,5 +1,6 @@
 import { AppPage } from "@/pages/app";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { usePermissions } from "@/contexts/usePermissions";
 import {
   DEFAULT_SUPERPLANE_BASE_URL,
   buildAgentCliInstallCommands,
@@ -10,6 +11,7 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryAppRunPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { AgentSetupPromptDialog } from "./AgentSetupPromptDialog";
 import { FactoryAppCanvasHeader } from "./FactoryAppCanvasHeader";
+import { FactoryWebhookWarnings } from "./FactoryWebhookWarnings";
 import { FactoryAppCanvasRedirect } from "./factoryAppCanvasGuards";
 import { FactoryAppResetConfirmDialog } from "./FactoryAppResetConfirmDialog";
 import { FactoryCanvasYamlModal } from "./FactoryCanvasYamlModal";
@@ -27,6 +29,7 @@ type FactoryAppCanvasPageModel = ReturnType<typeof useFactoryAppCanvasPageModel>
 export function FactoryAppCanvasPage() {
   const { factory } = useFactoriesLayout();
   const model = useFactoryAppCanvasPageModel();
+  const { canAct } = usePermissions();
   const agentInstallInstructions = buildAgentCliInstallInstructions({
     baseUrl: DEFAULT_SUPERPLANE_BASE_URL,
   });
@@ -76,6 +79,12 @@ export function FactoryAppCanvasPage() {
               }
             : undefined
         }
+      />
+      <FactoryWebhookWarnings
+        organizationId={model.organizationId}
+        factoryId={model.factoryId}
+        automationId={model.appId}
+        canRetry={canAct("factories", "update")}
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <FactoryAppCanvasWorkspace model={model} />

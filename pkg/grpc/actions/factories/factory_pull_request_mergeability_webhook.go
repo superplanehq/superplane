@@ -374,7 +374,7 @@ func ensureGitHubFactoryMergeabilityWebhook(
 		if factoryMergeabilityWebhookRepository(hook.Configuration.Data()) != repository {
 			continue
 		}
-		return updateFactoryMergeabilityWebhook(tx, hook)
+		return updateFactoryMergeabilityWebhook(tx, hook, repository)
 	}
 
 	return createFactoryMergeabilityWebhook(ctx, tx, encryptor, integration.ID, repository)
@@ -413,16 +413,16 @@ func factoryMergeabilityWebhookRepository(configuration any) string {
 	return strings.TrimSpace(repository)
 }
 
-func updateFactoryMergeabilityWebhook(tx *gorm.DB, hook *models.Webhook) error {
+func updateFactoryMergeabilityWebhook(tx *gorm.DB, hook *models.Webhook, repository string) error {
 	if hook.State != models.WebhookStateFailed {
 		return nil
 	}
-
-	return tx.Model(hook).Updates(map[string]any{
-		"state":       models.WebhookStatePending,
-		"retry_count": 0,
-		"updated_at":  time.Now(),
-	}).Error
+	configuration, _ := hook.Configuration.Data().(map[string]any)
+	if slices.Equal(githubWebhookEventTypes(configuration), factoryMergeabilityGitHubEvents) {
+		return nil
+	}
+	_, err := hook.Reprovision(tx, factoryMergeabilityWebhookConfiguration(repository))
+	return err
 }
 
 func createFactoryMergeabilityWebhook(
