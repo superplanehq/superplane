@@ -24,7 +24,7 @@ spec:
           - created
           - updated
         onlyFactoryPullRequests: true
-        repository: '{{ install_params.appRepository }}'
+        repository: '{{ workspace().repositories }}'
       position:
         x: 80
         "y": 80

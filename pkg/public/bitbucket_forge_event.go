@@ -38,14 +38,15 @@ func (s *Server) deliverBitbucketForgeEvent(r *http.Request, installationID stri
 		if err := mapstructure.Decode(webhook.Metadata.Data(), &metadata); err != nil {
 			return err
 		}
-		if metadata.RepositoryFullName == "" {
+		repositoryFullName := metadata.RepositoryFullNameFor(event.Repository.UUID)
+		if repositoryFullName == "" {
 			return fmt.Errorf("missing repository name for webhook %s", webhook.ID)
 		}
 		var normalized map[string]any
 		if bitbucket.IsForgeBuildEvent(event.EventType) {
-			normalized = bitbucket.ForgeBuildStatusPayload(event.Timestamp, event.Repository.UUID, metadata.RepositoryFullName, event.BuildStatus, event.Actor)
+			normalized = bitbucket.ForgeBuildStatusPayload(event.Timestamp, event.Repository.UUID, repositoryFullName, event.BuildStatus, event.Actor)
 		} else {
-			normalized = bitbucket.ForgePullRequestPayload(event.EventType, event.Timestamp, event.Repository.UUID, metadata.RepositoryFullName, event.PullRequest, event.Actor)
+			normalized = bitbucket.ForgePullRequestPayload(event.EventType, event.Timestamp, event.Repository.UUID, repositoryFullName, event.PullRequest, event.Actor)
 			if event.Comment != nil {
 				normalized["comment"] = event.Comment
 			}

@@ -119,19 +119,15 @@ func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	repo, err := ensureRepoInMetadata(ctx.HTTP, ctx.Metadata, ctx.Integration, config.Repository)
-	if err != nil {
-		return err
+	if config.Repository == "" {
+		return fmt.Errorf("repository is required")
 	}
 
 	keys, err := pullRequestEventKeysForActions(config.Actions)
 	if err != nil {
 		return err
 	}
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventTypes:     keys,
-		RepositorySlug: repo.Slug,
-	})
+	return requestRepositoryWebhook(ctx.HTTP, ctx.Metadata, ctx.Integration, ctx.Factory, config.Repository, keys)
 }
 
 func (p *OnPullRequest) Hooks() []core.Hook {
@@ -166,7 +162,8 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if !payloadRepositoryMatchesTrigger(ctx, config.Repository) {
+	// A workspace trigger gets events from every workspace repository.
+	if !isExpression(config.Repository) && !payloadRepositoryMatchesTrigger(ctx, config.Repository) {
 		return http.StatusOK, nil, nil
 	}
 

@@ -79,10 +79,11 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		},
 	}),
 	{id: "line-implementation", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
-		id:               "line-implementation",
-		entrypointNodeID: "onrun-implement",
-		canvasFile:       "templates/bitbucket/line-implementation.canvas.yaml",
-		consoleFile:      "templates/bitbucket/line-app.console.yaml",
+		id:                  "line-implementation",
+		entrypointNodeID:    "onrun-implement",
+		canvasFile:          "templates/bitbucket/line-implementation.canvas.yaml",
+		multiRepoCanvasFile: "templates/bitbucket/line-implementation-multi-repo.canvas.yaml",
+		consoleFile:         "templates/bitbucket/line-app.console.yaml",
 		componentIntegrations: map[string]string{
 			"bitbucket.createPullRequest": "bitbucket",
 			"bitbucket.findPullRequest":   "bitbucket",

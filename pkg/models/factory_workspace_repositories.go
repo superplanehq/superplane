@@ -36,9 +36,9 @@ func (f *Factory) MultiRepoTasksEnabled(tx *gorm.DB) (bool, error) {
 }
 
 // WorkspaceRepositories returns the owner/name values that the workspace may
-// change. The primary repository comes first. Only GitHub workspaces with
-// multi-repo tasks add the enabled write-access context repositories; other
-// workspaces keep one repository.
+// change. The primary repository comes first. Workspaces with multi-repo
+// tasks add the enabled write-access context repositories of the workspace
+// provider; other workspaces keep one repository.
 func (f *Factory) WorkspaceRepositories(tx *gorm.DB) ([]string, error) {
 	config := f.OnboardingConfigValue()
 	repositories := []string{}
@@ -57,7 +57,8 @@ func (f *Factory) WorkspaceRepositories(tx *gorm.DB) ([]string, error) {
 	}
 
 	add(config.AppRepository)
-	if config.EffectiveVCSProvider() != ProviderGitHub {
+	provider := config.EffectiveVCSProvider()
+	if provider != ProviderGitHub && provider != ProviderBitbucket {
 		return repositories, nil
 	}
 	multiRepo, err := f.MultiRepoTasksEnabled(tx)
@@ -71,7 +72,7 @@ func (f *Factory) WorkspaceRepositories(tx *gorm.DB) ([]string, error) {
 	}
 	for i := range resources {
 		resourceConfig := resources[i].Config.Data()
-		if !isGitHubContextRepo(resourceConfig) || !resourceConfig.ContextRepoWritable() {
+		if contextRepoProvider(resourceConfig) != provider || !resourceConfig.ContextRepoWritable() {
 			continue
 		}
 		add(resourceConfig.Repository)
@@ -136,7 +137,12 @@ func (f *Factory) RequireTaskPullRequest(tx *gorm.DB, order *FactoryWorkOrder, p
 	return nil
 }
 
-func isGitHubContextRepo(config FactoryAgentResourceConfig) bool {
+// contextRepoProvider returns the host of a context repository. Context
+// repositories saved before the provider field are GitHub repositories.
+func contextRepoProvider(config FactoryAgentResourceConfig) string {
 	provider := strings.ToLower(strings.TrimSpace(config.VCSProvider))
-	return provider == "" || provider == ProviderGitHub
+	if provider == "" {
+		return ProviderGitHub
+	}
+	return provider
 }
