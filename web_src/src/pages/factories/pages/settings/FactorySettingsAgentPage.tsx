@@ -3,7 +3,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { AgentResourceConnectionDialog } from "./AgentResourceConnectionDialog";
 import { factoryAgentMcpConnectionPath, factoryRouteSegment } from "../../lib/factoryPagePaths";
@@ -14,6 +14,7 @@ import { MCPCatalogSetupDialog } from "./MCPCatalogSetupDialog";
 import { MCPServerList } from "./MCPServerList";
 import { useMCPPage } from "./useMCPPage";
 import { CrossRepoContextCard } from "./WorkspaceCrossRepoSection";
+import { WorkspaceRepositoriesCard } from "./WorkspaceRepositoriesSection";
 import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
 import { WorkspaceSkillsSection } from "./WorkspaceSkillsSection";
 
@@ -21,6 +22,7 @@ export function FactorySettingsAgentPage() {
   const page = useMCPPage();
   const { has } = useExperimentalFeature(page.organizationId);
   const showSkills = has(FEATURE_WORKSPACE_SKILLS);
+  const multiRepo = has(FEATURE_FACTORY_MULTI_REPO_TASKS);
   usePageTitle([AGENT_RESOURCES_COPY.agentTitle, page.factory?.name ?? "Workspace"]);
 
   return (
@@ -36,12 +38,21 @@ export function FactorySettingsAgentPage() {
           factoryKey={factoryRouteSegment(page.factory)}
           canUpdate={page.canUpdate}
         />
-        <CrossRepoContextCard
-          organizationId={page.organizationId}
-          factoryId={page.factoryId}
-          factory={page.factory}
-          canUpdate={page.canUpdate}
-        />
+        {multiRepo ? (
+          <WorkspaceRepositoriesCard
+            organizationId={page.organizationId}
+            factoryId={page.factoryId}
+            factory={page.factory}
+            canUpdate={page.canUpdate}
+          />
+        ) : (
+          <CrossRepoContextCard
+            organizationId={page.organizationId}
+            factoryId={page.factoryId}
+            factory={page.factory}
+            canUpdate={page.canUpdate}
+          />
+        )}
         <WorkspaceMCPServers page={page} />
         {showSkills ? (
           <WorkspaceSkillsSection

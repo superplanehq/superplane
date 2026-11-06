@@ -141,6 +141,27 @@ func Test__IntakeTriggerBinding(t *testing.T) {
 	assert.Equal(t, "payments", graph.TriggerResourceID(spec))
 }
 
+func TestSentryIntakeConnectionUpdatesRequestCredentials(t *testing.T) {
+	nodes := []models.Node{
+		triggerNode(intakeTriggerNodeID, "sentry.onIssue"),
+		componentNode(intakeSentryIssueRequestNodeID, intakeHTTPRequestComponent),
+		componentNode(intakeSentryEventRequestNodeID, intakeHTTPRequestComponent),
+		componentNode(intakeCreateNodeID, intakeCreateComponent),
+	}
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceSentryExceptions, models.LiveCanvasSpec{Nodes: nodes})
+	updated, err := applyIntakeBindingToGraph(graph, &intakeBinding{
+		Integration: &yaml.IntegrationRef{ID: "new-sentry", Name: "New Sentry"},
+	}, nodes)
+	require.NoError(t, err)
+	assert.Equal(t, "new-sentry", *findModelNode(t, updated, intakeTriggerNodeID).IntegrationID)
+	for _, id := range []string{intakeSentryIssueRequestNodeID, intakeSentryEventRequestNodeID} {
+		request := findModelNode(t, updated, id)
+		authorization, ok := request.Configuration["authorization"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{"name": "New Sentry"}, authorization["integration"])
+	}
+}
+
 func Test__IntakeTriggerBinding_DatadogService(t *testing.T) {
 	integrationID := "int-ready"
 	node := triggerNode(intakeTriggerNodeID, "datadog.onErrorTrackingAlert")

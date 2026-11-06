@@ -174,6 +174,19 @@ test("the client returns the backend message on an HTTP error", async () => {
   );
 });
 
+test("the client stops a request that SuperPlane does not answer in time", async () => {
+  const neverAnswers = (_url, init) =>
+    new Promise((_resolve, reject) => {
+      init.signal.addEventListener("abort", () => reject(init.signal.reason));
+    });
+  const client = createClient(env, neverAnswers, { request: 20, upload: 20 });
+
+  await assert.rejects(
+    () => call("suggest_task_owner", {}, client),
+    /SuperPlane did not answer POST \/api\/v1\/runner\/task\/suggest-owners in 0.02s/,
+  );
+});
+
 test("list_members reads the organization members", async () => {
   const calls = [];
   const client = createClient(env, recordingFetch(calls, '{"members":[]}'));

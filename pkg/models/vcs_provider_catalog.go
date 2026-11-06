@@ -1517,6 +1517,17 @@ func ListVCSProviderIntegrationBindings(
 	return bindings, err
 }
 
+// MatchBindingContextRepositoryIDs returns the catalog IDs of the enabled
+// write-access GitHub context repositories that use the integration, and the names that
+// the installation catalog does not have yet.
+func MatchBindingContextRepositoryIDs(tx *gorm.DB, integrationID uuid.UUID, installationID int64) ([]int64, []string, error) {
+	names, err := ListEnabledGitHubContextRepositoryNames(tx, integrationID, FactoryContextRepoAccessWrite)
+	if err != nil || len(names) == 0 {
+		return nil, nil, err
+	}
+	return MatchVCSProviderRepositoryIDs(tx, ProviderGitHub, installationID, names)
+}
+
 func normalizeVCSProvider(provider string) (string, error) {
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	if provider == "" {

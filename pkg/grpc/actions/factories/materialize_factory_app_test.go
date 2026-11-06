@@ -441,7 +441,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 		require.NoError(t, err)
 		trigger := findYAMLNode(t, defaults, prFeedbackCommentTriggerNodeID)
-		assert.Equal(t, "acme/ship", trigger.Configuration["repository"])
+		assert.Equal(t, models.WorkspaceRepositoriesExpression, trigger.Configuration["repository"])
 		assert.Equal(t, "@shipbot", trigger.Configuration["contentFilter"])
 		assert.Equal(t, map[string]any{
 			"id":      prFeedbackDiscussionTemplateID,
@@ -481,7 +481,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 		require.NoError(t, err)
 		trigger := findYAMLNode(t, defaults, prFeedbackPullRequestTriggerNodeID)
-		assert.Equal(t, "acme/ship", trigger.Configuration["repository"])
+		assert.Equal(t, models.WorkspaceRepositoriesExpression, trigger.Configuration["repository"])
 		assert.NotNil(t, findYAMLNode(t, defaults, prFeedbackWaitChecksNodeID))
 		assert.Equal(t, map[string]any{
 			"id":      prFeedbackChecksTemplateID,

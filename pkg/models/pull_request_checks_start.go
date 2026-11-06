@@ -20,14 +20,29 @@ func (c *Canvas) VerificationTrigger(tx *gorm.DB, provider, repository string) (
 	if c.FactoryID == nil || c.DeletedAt.Valid {
 		return nil, nil
 	}
+	workspaceRepository, err := isFactoryWorkspaceRepository(tx, c.OrganizationID, *c.FactoryID, repository)
+	if err != nil {
+		return nil, err
+	}
 	nodes, err := verificationTriggers(tx.Where(
 		"workflows.organization_id = ? AND workflows.factory_id = ? AND workflows.id = ?",
 		c.OrganizationID, *c.FactoryID, c.ID,
-	), provider, repository)
+	), provider, repository, workspaceRepository)
 	if err != nil || len(nodes) == 0 {
 		return nil, err
 	}
 	return &nodes[0], nil
+}
+
+func isFactoryWorkspaceRepository(tx *gorm.DB, organizationID, factoryID uuid.UUID, repository string) (bool, error) {
+	factory, err := FindFactory(tx, organizationID, factoryID)
+	if errors.Is(err, ErrFactoryNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return factory.IsWorkspaceRepository(tx, repository)
 }
 
 type verificationTriggerRow struct {
@@ -38,7 +53,7 @@ type verificationTriggerRow struct {
 
 // Load candidate triggers and their live graphs together. The caller scopes
 // workflows to the organization and factory, optionally to one canvas.
-func verificationTriggers(tx *gorm.DB, provider, repository string) ([]CanvasNode, error) {
+func verificationTriggers(tx *gorm.DB, provider, repository string, workspaceRepository bool) ([]CanvasNode, error) {
 	var rows []verificationTriggerRow
 	err := tx.Model(&CanvasNode{}).
 		Select("workflow_nodes.*", "live_version.nodes AS live_nodes", "handler.id IS NOT NULL AS checks_handler").
@@ -73,19 +88,24 @@ func verificationTriggers(tx *gorm.DB, provider, repository string) ([]CanvasNod
 		if !row.ChecksHandler && FactoryAppTemplateID(row.LiveNodes) != "risk-score" {
 			continue
 		}
-		if livePullRequestTriggerID(row.LiveNodes, provider, repository) == row.NodeID {
+		if livePullRequestTriggerID(row.LiveNodes, provider, repository, workspaceRepository) == row.NodeID {
 			nodes = append(nodes, row.CanvasNode)
 		}
 	}
 	return nodes, nil
 }
 
-func livePullRequestTriggerID(nodes []Node, provider, repository string) string {
+// livePullRequestTriggerID matches a trigger on its repository. A trigger
+// that listens on all workspace repositories matches any workspace repository.
+func livePullRequestTriggerID(nodes []Node, provider, repository string, workspaceRepository bool) string {
 	for _, candidate := range nodes {
 		if candidate.Type != NodeTypeTrigger || candidate.ComponentName() != provider+".onPullRequest" {
 			continue
 		}
 		configured, _ := candidate.Configuration["repository"].(string)
+		if IsWorkspaceRepositoriesExpression(configured) && workspaceRepository {
+			return candidate.ID
+		}
 		if strings.EqualFold(strings.TrimSpace(configured), repository) {
 			return candidate.ID
 		}
@@ -183,9 +203,13 @@ func (p *FactoryPullRequest) enqueueChecksStart(tx *gorm.DB) error {
 	if (p.Provider != FactoryPullRequestProviderGitHub && p.Provider != FactoryPullRequestProviderBitbucket) || p.State != FactoryPullRequestStateOpen {
 		return nil
 	}
+	workspaceRepository, err := isFactoryWorkspaceRepository(tx, p.OrganizationID, p.FactoryID, p.Repository)
+	if err != nil {
+		return err
+	}
 	nodes, err := verificationTriggers(tx.Where(
 		"workflows.organization_id = ? AND workflows.factory_id = ?", p.OrganizationID, p.FactoryID,
-	), p.Provider, p.Repository)
+	), p.Provider, p.Repository, workspaceRepository)
 	if err != nil || len(nodes) == 0 {
 		return err
 	}
