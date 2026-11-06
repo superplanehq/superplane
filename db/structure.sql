@@ -1243,6 +1243,21 @@ CREATE TABLE public.linear_webhook_receipts (
 
 
 --
+-- Name: llm_model_capabilities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.llm_model_capabilities (
+    provider text NOT NULL,
+    base_url text NOT NULL,
+    model text NOT NULL,
+    thinking_levels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    default_thinking_level text DEFAULT ''::text NOT NULL,
+    reasoning_mandatory boolean DEFAULT false NOT NULL,
+    refreshed_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: mcp_oauth_clients; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2981,6 +2996,14 @@ ALTER TABLE ONLY public.installation_metadata
 
 ALTER TABLE ONLY public.linear_webhook_receipts
     ADD CONSTRAINT linear_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: llm_model_capabilities llm_model_capabilities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.llm_model_capabilities
+    ADD CONSTRAINT llm_model_capabilities_pkey PRIMARY KEY (provider, base_url, model);
 
 
 --
@@ -6503,7 +6526,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261104015738	f
+20261106101306	f
 \.
 
 

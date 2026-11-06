@@ -21,16 +21,23 @@ import {
 } from "@/lib/selectableLLMModels";
 import { toTestId } from "@/lib/testID";
 import {
-  CODEX_THINKING_LEVELS,
   THINKING_LEVEL_KEY,
-  THINKING_LEVELS,
   normalizeThinkingLevel,
+  supportedThinkingLevel,
+  thinkingOptions,
+  visibleThinkingLevelLabel,
 } from "@/lib/thinkingLevel";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 import type { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
+
+/**
+ * One model in a picker. `thinkingLevels` comes from the model catalog.
+ * `isDefault` marks the model that the provider uses when the saved model is unset.
+ */
+type ModelOption = { value: string; label: string; thinkingLevels?: string[]; isDefault?: boolean };
 
 export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) => {
   const provider = props.field.typeOptions?.hostedModel?.provider ?? "";
@@ -80,7 +87,11 @@ function SuperPlaneModelField({
     );
   }
 
-  const options = selection.models.map((model) => ({ value: model.key, label: model.label }));
+  const options = selection.models.map((model) => ({
+    value: model.key,
+    label: model.label,
+    thinkingLevels: model.thinkingLevels,
+  }));
   const current = normalizeSuperPlaneModelValue(typeof value === "string" ? value : "");
   const selected = superPlanePickerValue(
     current,
@@ -140,9 +151,13 @@ function SubscriptionModelField(props: FieldRendererProps) {
       thinkingLevel={normalizeThinkingLevel(props.allValues?.[THINKING_LEVEL_KEY])}
       placeholder="Default"
       readOnly={props.readOnly}
-      options={selection.models.map((model) => ({ value: model.model.id, label: model.model.name }))}
+      options={selection.models.map((model) => ({
+        value: model.model.id,
+        label: model.model.name,
+        thinkingLevels: model.thinkingLevels,
+        isDefault: model.isDefault,
+      }))}
       modelOnly={props.modelOnly ?? false}
-      thinkingOptions={CODEX_THINKING_LEVELS}
       unavailableSeverity="warning"
       unavailableMessage="Your Codex account cannot run this model. Choose an available model here or for a specific task."
       triggerClassName={props.triggerClassName}
@@ -171,7 +186,7 @@ function ProviderBYOKModelField({
     return status;
   }
 
-  const { provider, current, shown, options } = byokFieldSelection({ field, value, allValues }, selection.models);
+  const { current, shown, options } = byokFieldSelection({ field, value, allValues }, selection.models);
   if (options.length === 0 && current === "") {
     return (
       <Text className="text-sm text-gray-500 dark:text-gray-400">
@@ -191,7 +206,6 @@ function ProviderBYOKModelField({
       readOnly={readOnly}
       options={options}
       modelOnly={modelOnly}
-      thinkingOptions={provider === "openai" ? CODEX_THINKING_LEVELS : THINKING_LEVELS}
       triggerClassName={triggerClassName}
       onCommit={(nextModel, nextThinking) =>
         commitModelAndThinking(field.name, nextModel, nextThinking, onChange, onValuesChange)
@@ -215,8 +229,9 @@ function byokFieldSelection(
   const options = byokRunnerModelOptions(providerModels).map((option) => ({
     value: option.value,
     label: shortClaudeModelLabel(option.value) ?? option.label,
+    thinkingLevels: option.thinkingLevels,
   }));
-  return { provider, current, shown: resolved ?? current, options };
+  return { current, shown: resolved ?? current, options };
 }
 
 function commitModelAndThinking(
@@ -235,6 +250,26 @@ function commitModelAndThinking(
   onChange(modelValue);
 }
 
+function thinkingLevelsForModel(options: ModelOption[], model: string) {
+  return options.find((option) => option.value === model)?.thinkingLevels;
+}
+
+function modelThinkingPickerState(options: ModelOption[], model: string, thinkingLevel: string, modelOnly: boolean) {
+  // An unset model runs as the catalog default, so show that model's levels.
+  const effectiveModel = model !== "" ? model : (options.find((option) => option.isDefault)?.value ?? "");
+  const levels = thinkingLevelsForModel(options, effectiveModel);
+  const modelThinking = thinkingOptions(levels, { withDefault: true });
+  const unavailableThinking = thinkingLevel !== "" && supportedThinkingLevel(thinkingLevel, levels) === "";
+  if (unavailableThinking && modelThinking.length === 0) {
+    modelThinking.push({ value: "", label: "Default" });
+  }
+  const showThinking = !modelOnly && (modelThinking.length > 0 || unavailableThinking);
+  const thinkingLabel = unavailableThinking
+    ? `${visibleThinkingLevelLabel(thinkingLevel)} (unavailable)`
+    : (modelThinking.find((level) => level.value === thinkingLevel)?.label ?? "Default");
+  return { modelThinking, showThinking, unavailableThinking, thinkingLabel };
+}
+
 function ModelThinkingSelect({
   fieldName,
   model,
@@ -244,7 +279,6 @@ function ModelThinkingSelect({
   readOnly,
   options,
   modelOnly,
-  thinkingOptions = THINKING_LEVELS,
   unavailableSeverity = "error",
   unavailableMessage = "Select an available model to replace the saved model.",
   triggerClassName,
@@ -256,18 +290,25 @@ function ModelThinkingSelect({
   thinkingLevel: string;
   placeholder: string;
   readOnly?: boolean;
-  options: Array<{ value: string; label: string }>;
+  options: ModelOption[];
   modelOnly: boolean;
-  thinkingOptions?: ReadonlyArray<{ value: string; label: string }>;
   unavailableSeverity?: "warning" | "error";
   unavailableMessage?: string;
   triggerClassName?: string;
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
   const { unavailable, label: selectedLabel } = modelSelectionLabel(model, options, placeholder);
-  const thinkingLabel = thinkingOptions.find((level) => level.value === thinkingLevel)?.label ?? "Default";
+  const { modelThinking, showThinking, unavailableThinking, thinkingLabel } = modelThinkingPickerState(
+    options,
+    model,
+    thinkingLevel,
+    modelOnly,
+  );
   const modelListTestId = modelFieldTestId(fieldName, "model-list");
   const thinkingTestId = modelFieldTestId(fieldName, "thinking");
+  // A new model keeps the thinking level only when it supports that level.
+  const commitModel = (nextModel: string) =>
+    onCommit(nextModel, supportedThinkingLevel(thinkingLevel, thinkingLevelsForModel(options, nextModel)));
 
   return (
     <>
@@ -276,7 +317,7 @@ function ModelThinkingSelect({
           <Button
             type="button"
             variant="outline"
-            disabled={readOnly || options.length === 0}
+            disabled={readOnly || (options.length === 0 && !showThinking)}
             aria-invalid={(unavailable && unavailableSeverity === "error") || undefined}
             data-testid={modelFieldTestId(fieldName, "model")}
             className={cn(
@@ -285,41 +326,57 @@ function ModelThinkingSelect({
             )}
           >
             <span className="min-w-0 truncate">{selectedLabel}</span>
-            {modelOnly ? null : (
+            {showThinking ? (
               <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{thinkingLabel}</span>
-            )}
+            ) : null}
             <ChevronDown className="size-4 opacity-50" aria-hidden />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-44" data-testid={modelOnly ? modelListTestId : undefined}>
-          {modelOnly
-            ? options.map((option) => (
-                <DropdownMenuItem key={option.value} onSelect={() => onCommit(option.value, thinkingLevel)}>
-                  {option.label}
-                  {option.value === model ? <Check className="ml-auto size-4" aria-hidden /> : null}
-                </DropdownMenuItem>
-              ))
-            : [
+        <DropdownMenuContent
+          align="start"
+          className="min-w-44"
+          data-testid={showThinking ? undefined : modelListTestId}
+        >
+          {showThinking
+            ? [
                 <DropdownMenuValueSub
                   key="model"
                   label="Model"
                   testId={modelListTestId}
                   value={model}
                   options={options}
-                  onValueChange={(nextModel) => onCommit(nextModel, thinkingLevel)}
+                  onValueChange={commitModel}
                 />,
                 <DropdownMenuValueSub
                   key="thinking"
                   label="Thinking"
                   testId={thinkingTestId}
                   value={thinkingLevel}
-                  options={[...thinkingOptions]}
+                  options={modelThinking}
                   disabled={unavailable}
                   onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
                 />,
-              ]}
+              ]
+            : options.map((option) => (
+                <DropdownMenuItem key={option.value} onSelect={() => commitModel(option.value)}>
+                  {option.label}
+                  {option.value === model ? <Check className="ml-auto size-4" aria-hidden /> : null}
+                </DropdownMenuItem>
+              ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      {unavailableThinking ? (
+        <div>
+          <Text role="status" className="text-sm text-amber-700 dark:text-amber-400">
+            The saved thinking level is unavailable for this model. Select an available level or use Default.
+          </Text>
+          {!readOnly ? (
+            <Button type="button" variant="link" onClick={() => onCommit(committedModel, "")}>
+              Use default
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {unavailable ? (
         <Text
           role={unavailableSeverity === "warning" ? "status" : "alert"}

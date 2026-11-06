@@ -518,19 +518,26 @@ func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) ([]*FactoryLin
 	return released, nil
 }
 
-// RetryLineStep starts stepIndex again on a traversal that already ran
-// earlier steps. It does not open a new dispatch, so earlier steps stay
-// on the same history. The second return includes admitted runs and failed
-// attempts, including waiters this retry admitted. The caller publishes
-// runs and task refreshes after commit.
-func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepIndex int, startOptions ...FactoryLineStartOptions) (*FactoryLineStepResult, []*FactoryLineStepResult, error) {
+// FactoryLineStepRetryPlan describes what RetryLineStep runs. A retry of a
+// saved traversal runs the remaining saved steps with the saved Start
+// options. Target is nil when the order never ran the line, so the retry
+// opens a new traversal from the current line with the requested options.
+type FactoryLineStepRetryPlan struct {
+	Target  *FactoryWorkOrderLineDispatch
+	Steps   []FactoryLineStep
+	Options FactoryLineStartOptions
+}
+
+// PlanLineStepRetry resolves the traversal, steps, and Start options that a
+// retry of stepIndex uses. Steps start at stepIndex.
+func (o *FactoryWorkOrder) PlanLineStepRetry(tx *gorm.DB, line *FactoryLine, stepIndex int, requested FactoryLineStartOptions) (*FactoryLineStepRetryPlan, error) {
 	if stepIndex < 0 {
-		return nil, nil, ErrFactoryLineStepOutOfRange
+		return nil, ErrFactoryLineStepOutOfRange
 	}
 
 	byOrder, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{o.ID})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var onLine []FactoryWorkOrderLineDispatchRecord
@@ -540,43 +547,59 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		}
 	}
 
+	target := pickDispatchForStepRetry(onLine, stepIndex)
+	if target == nil {
+		if stepIndex >= len(line.Steps) {
+			return nil, ErrFactoryLineStepOutOfRange
+		}
+		return &FactoryLineStepRetryPlan{Steps: line.Steps[stepIndex:], Options: requested}, nil
+	}
+	if stepIndex >= len(target.Steps) {
+		return nil, ErrFactoryLineStepOutOfRange
+	}
+	return &FactoryLineStepRetryPlan{
+		Target:  target,
+		Steps:   target.Steps[stepIndex:],
+		Options: FactoryLineStartOptions{Model: target.Model, ThinkingLevel: target.ThinkingLevel},
+	}, nil
+}
+
+// RetryLineStep starts stepIndex again on a traversal that already ran
+// earlier steps. It does not open a new dispatch, so earlier steps stay
+// on the same history. The second return includes admitted runs and failed
+// attempts, including waiters this retry admitted. The caller publishes
+// runs and task refreshes after commit.
+func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepIndex int, startOptions ...FactoryLineStartOptions) (*FactoryLineStepResult, []*FactoryLineStepResult, error) {
+	var requested FactoryLineStartOptions
+	if len(startOptions) > 0 {
+		requested = startOptions[0]
+	}
+	plan, err := o.PlanLineStepRetry(tx, line, stepIndex, requested)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, step := range plan.Steps {
+		if err := o.ValidateSubscriptionCanvasModels(tx, step.AppID, plan.Options.Model); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	// The order never ran this line, so there is no history to keep. A
 	// traversal on another line is still the one active traversal of the
 	// order, so it must end before the new one opens.
-	target := pickDispatchForStepRetry(onLine, stepIndex)
+	target := plan.Target
 	if target == nil {
-		var options FactoryLineStartOptions
-		if len(startOptions) > 0 {
-			options = startOptions[0]
-		}
-		if stepIndex >= len(line.Steps) {
-			return nil, nil, ErrFactoryLineStepOutOfRange
-		}
-		for _, step := range line.Steps[stepIndex:] {
-			if err := o.ValidateSubscriptionCanvasModels(tx, step.AppID, options.Model); err != nil {
-				return nil, nil, err
-			}
-		}
 		abandoned, err := o.AbandonActiveLineDispatch(tx)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		_, result, err := line.DispatchFromWithModel(tx, o, stepIndex, options.Model, options.ThinkingLevel)
+		_, result, err := line.DispatchFromWithModel(tx, o, stepIndex, plan.Options.Model, plan.Options.ThinkingLevel)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		return result, append(abandoned, lineStepExecutionResults(result)...), nil
-	}
-	options := FactoryLineStartOptions{Model: target.Model, ThinkingLevel: target.ThinkingLevel}
-	if stepIndex >= len(target.Steps) {
-		return nil, nil, ErrFactoryLineStepOutOfRange
-	}
-	for _, step := range target.Steps[stepIndex:] {
-		if err := o.ValidateSubscriptionCanvasModels(tx, step.AppID, options.Model); err != nil {
-			return nil, nil, err
-		}
 	}
 
 	var started []*FactoryLineStepResult
