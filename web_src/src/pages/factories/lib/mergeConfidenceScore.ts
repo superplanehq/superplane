@@ -1,3 +1,7 @@
+import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestActivity } from "@/api-client";
+
+import { pullRequestsSpanRepositories } from "./workOrderPullRequest";
+
 import { workOrderCheckStatus, type WorkOrderCheckLevel, type WorkOrderCheckPresentation } from "./workOrderChecks";
 
 /** Check keys written by the merge confidence automation. */
@@ -84,6 +88,7 @@ export function mergeConfidencePanelTone(check: Pick<WorkOrderCheckPresentation,
 export interface MergeConfidenceCheckGroup {
   check: WorkOrderCheckPresentation;
   metrics: WorkOrderCheckPresentation[];
+  assessmentFailed: boolean;
 }
 
 export function isMergeConfidenceMetric(check: { key?: string }): boolean {
@@ -194,12 +199,102 @@ function attachedPullRequestKey(check: WorkOrderCheckPresentation, keys: string[
  * The task summary shows merge confidence only. Planning confidence and other
  * checks stay off this list once work has started.
  */
-export function consoleCheckList(checks: WorkOrderCheckPresentation[]): MergeConfidenceCheckGroup | null {
+export function consoleCheckList(
+  checks: WorkOrderCheckPresentation[],
+  pullRequests: FactoriesFactoryPullRequest[] = [],
+): MergeConfidenceCheckGroup | null {
   const metrics = orderMergeConfidenceMetrics(checks.filter(isMergeConfidenceMetric));
   if (metrics.length === 0) {
     return null;
   }
-  return { check: mergeConfidenceScore(metrics), metrics };
+  const current = metrics.map((check) => currentMergeConfidenceCheck(check, pullRequests));
+  const presented = current.map((result) => result.check);
+  return {
+    check: mergeConfidenceScore(presented),
+    metrics: presented,
+    assessmentFailed: current.some((result) => result.assessmentFailed),
+  };
+}
+
+function currentMergeConfidenceCheck(
+  check: WorkOrderCheckPresentation,
+  pullRequests: FactoriesFactoryPullRequest[],
+): { check: WorkOrderCheckPresentation; assessmentFailed: boolean } {
+  const assessment = latestMergeConfidenceActivity(check, pullRequests);
+  const staleRevision = Boolean(
+    assessment?.currentRevision && assessment.revision && assessment.currentRevision !== assessment.revision,
+  );
+  const assessmentFailed = !staleRevision && assessment?.run?.result === "RESULT_FAILED";
+  if (!assessment || (check.runId === assessment.run?.id && !staleRevision)) {
+    return { check, assessmentFailed };
+  }
+  // A newer assessment invalidates older scores, even for the same commit.
+  return {
+    assessmentFailed,
+    check: {
+      ...check,
+      score: 0,
+      maxScore: 0,
+      scoreSupplied: false,
+      level: "neutral",
+      summary: "No result was reported for the current assessment.",
+      analysis: undefined,
+      previousScore: undefined,
+      recentScores: undefined,
+    },
+  };
+}
+
+function latestMergeConfidenceActivity(check: WorkOrderCheckPresentation, pullRequests: FactoriesFactoryPullRequest[]) {
+  if (!check.appId) return undefined;
+  const repository = pullRequestChecksKey(check.repository);
+  return pullRequests
+    .filter((pr) => !repository || pullRequestChecksKey(pr.repository) === repository)
+    .flatMap((pr) => {
+      const activities: FactoriesFactoryPullRequestActivity[] = pr.activities?.length ? pr.activities : (pr.runs ?? []);
+      return activities.map((activity) => ({
+        run: activity.run,
+        revision: activity.revision?.id,
+        currentRevision: pr.currentRevision?.id,
+      }));
+    })
+    .filter((activity) => activity.run?.canvasId === check.appId)
+    .sort((left, right) => (right.run?.createdAt ?? "").localeCompare(left.run?.createdAt ?? ""))[0];
+}
+
+// Without multi-repo tasks, the panel keeps one review link and one merge
+// confidence list.
+export function mergeConfidencePanelFacts(
+  checks: WorkOrderCheckPresentation[],
+  pullRequests: FactoriesFactoryPullRequest[],
+  multiRepo: boolean,
+) {
+  const assessment = consoleCheckList(checks, pullRequests);
+  const currentChecks = assessment?.metrics ?? [];
+  const failedRepositories = new Set(
+    pullRequests
+      .filter((pr) => consoleCheckList(checksForRepository(checks, pr.repository), [pr])?.assessmentFailed)
+      .map((pr) => pr.repository?.trim().toLowerCase() ?? ""),
+  );
+  if (!multiRepo) {
+    return {
+      assessmentFailed: assessment?.assessmentFailed ?? false,
+      failedRepositories,
+      reviewPullRequests: [],
+      mergeChecks: { byRepository: null, unattached: currentChecks },
+      showsPullRequestRepository: false,
+    };
+  }
+  return {
+    assessmentFailed: assessment?.assessmentFailed ?? false,
+    failedRepositories,
+    reviewPullRequests: pullRequests,
+    mergeChecks: splitMergeChecksByPullRequest(
+      currentChecks,
+      pullRequests.map((pullRequest) => pullRequest.repository),
+    ),
+    showsPullRequestRepository: pullRequestsSpanRepositories(pullRequests),
+  };
 }
 
 /** Higher is better. Risk and drift are flipped so 5 means the change is safe to merge. */

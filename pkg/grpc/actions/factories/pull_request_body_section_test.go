@@ -130,15 +130,25 @@ func installPublicationGitHub(t *testing.T, httpCtx core.HTTPContext) {
 }
 
 func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
-	for _, channel := range []string{"passed", "failed"} {
-		t.Run(channel, func(t *testing.T) {
+	for _, scenario := range []struct {
+		name     string
+		channel  string
+		reported bool
+	}{
+		{name: "complete", channel: "passed", reported: true},
+		{name: "agent failed", channel: "failed", reported: true},
+		{name: "agent succeeded without reporting", channel: "passed"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
 			f := newPublicationFixture(t)
-			f.report(t, f.run, 4)
+			if scenario.reported {
+				f.report(t, f.run, 4)
+			}
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			agent := support.CreateCanvasNodeExecution(t, f.canvas.ID, "agent", root.ID, root.ID)
 			state := workercontexts.NewExecutionStateContext(f.db, agent, nil)
-			require.NoError(t, state.Emit(channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
+			require.NoError(t, state.Emit(scenario.channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
 			var event models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&event).Error)
 			payload := event.Data.Data().(map[string]any)["data"].(map[string]any)
@@ -146,9 +156,21 @@ func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
 			require.True(t, ok, "assessment completion must expose saved report data to downstream templates")
 			assert.Equal(t, f.pr.ID.String(), report["pullRequestId"])
 			assert.Equal(t, "abc", report["reviewedCommit"])
-			assert.Equal(t, channel == "passed", report["complete"])
+			complete := scenario.channel == "passed" && scenario.reported
+			assert.Equal(t, complete, report["complete"])
 			require.NoError(t, f.db.First(f.run, "id = ?", f.run.ID).Error)
-			assert.Equal(t, channel == "failed", len(f.run.Errors) > 0)
+			result, err := f.run.CalculateResult(f.db)
+			require.NoError(t, err)
+			if complete {
+				assert.Equal(t, models.CanvasRunResultPassed, result)
+				assert.Empty(t, f.run.Errors)
+				return
+			}
+			assert.Equal(t, models.CanvasRunResultFailed, result)
+			require.NotEmpty(t, f.run.Errors)
+			if !scenario.reported {
+				assert.Contains(t, f.run.Errors[0].Message, "Security")
+			}
 		})
 	}
 }
