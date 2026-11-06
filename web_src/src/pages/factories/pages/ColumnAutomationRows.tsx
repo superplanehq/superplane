@@ -141,7 +141,7 @@ function ColumnAutomationRow({
           size="xs"
           type="button"
           aria-label={`${COLUMN_AUTOMATIONS_COPY.rowMenu}: ${automation.name}`}
-          className="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-none p-0 text-left text-[12px] font-normal hover:bg-transparent dark:hover:bg-transparent"
+          className="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-none p-0! text-left text-[12px] font-normal hover:bg-transparent dark:hover:bg-transparent"
         >
           {details}
         </Button>
