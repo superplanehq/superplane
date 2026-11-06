@@ -10,6 +10,7 @@ import { RunnerLogsTerminal } from "@/ui/Runs/RunInspectorRunnerLogs";
 import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import type { RunHistoryIntakeSource } from "./intakeRunData";
 import { runDuration, taskPageNumber, toAutomationRun, toRunActivities } from "./runHistoryData";
+import { HumanReviewRunState } from "./HumanReviewRunState";
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 
 interface FactoryAutomationRunHistoryProps {
@@ -105,6 +106,7 @@ function FactoryAutomationRunDetails(props: FactoryAutomationRunHistoryProps & {
 function LoadedFactoryAutomationRunDetails({
   canvasId,
   organizationId,
+  factoryId,
   onSelectRun,
   now,
   run,
@@ -143,6 +145,9 @@ function LoadedFactoryAutomationRunDetails({
           onRetry={() => void versionQuery.refetch()}
         />
       )}
+      {nodes.some((node) => node.id === "human-review-agent") ? (
+        <HumanReviewRunState run={run} organizationId={organizationId} factoryId={factoryId} />
+      ) : null}
       <AutomationRunDetails
         run={details}
         selectedActivityId={params.get("activity")}

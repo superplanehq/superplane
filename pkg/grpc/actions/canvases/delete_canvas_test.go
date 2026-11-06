@@ -8,11 +8,33 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+func TestDeleteCanvasProtectsHumanReviewAfterLiveVersionChanges(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	node := models.Node{
+		ID:       models.HumanReviewTriggerNodeID,
+		Type:     models.NodeTypeTrigger,
+		Ref:      models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}},
+		Metadata: models.FactoryAppTemplateMetadataFor(models.FactoryAppTemplateHumanReviewID, 1, models.ProviderGitHub),
+	}
+	version, err := models.CreateCommitVersionWithSpecInTransaction(db, canvas.ID, r.User, "Install Human review", []models.Node{node}, nil)
+	require.NoError(t, err)
+	require.NoError(t, models.PromoteToLiveInTransaction(db, version, version.Nodes, version.Edges))
+	// The delete request has a canvas snapshot from before installation.
+	_, err = DeleteCanvas(t.Context(), db, canvas)
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	_, err = models.FindCanvasInTransaction(db, canvas.OrganizationID, canvas.ID)
+	require.NoError(t, err)
+}
 
 func Test__DeleteCanvas(t *testing.T) {
 	r := support.Setup(t)
