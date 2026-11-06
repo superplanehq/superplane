@@ -222,6 +222,7 @@ func TestDispatchCodexSubscriptionThinkingFollowsCatalog(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
 	for _, tc := range []struct {
 		name, model, effort string
+		savedModel          string
 		savedEffort         string
 		refreshCatalog      bool
 		wantErr             bool
@@ -230,6 +231,11 @@ func TestDispatchCodexSubscriptionThinkingFollowsCatalog(t *testing.T) {
 		{name: "ultra", model: "gpt-6-astra", effort: "ultra"},
 		{name: "future catalog effort", model: "gpt-6-astra", effort: "future-effort"},
 		{name: "native default model", effort: "ultra"},
+		{name: "saved model expression defers explicit effort validation", savedModel: "{{ 'gpt-6-astra' }}", effort: "ultra"},
+		{name: "saved model expression keeps inherited effort", savedModel: "{{ 'gpt-6-astra' }}", savedEffort: "ultra"},
+		{name: "concrete override replaces saved model expression", savedModel: "{{ 'gpt-6-luna' }}", model: "gpt-6-astra", effort: "ultra"},
+		{name: "concrete override still rejects unsupported effort", savedModel: "{{ 'gpt-6-astra' }}", model: "gpt-6-luna", effort: "ultra", wantErr: true},
+		{name: "concrete saved model rejects unsupported effort", savedModel: "gpt-6-luna", effort: "ultra", wantErr: true},
 		{name: "unreported effort", model: "gpt-6-astra", effort: "high", wantErr: true},
 		{name: "unsupported model effort", model: "gpt-6-luna", effort: "ultra", wantErr: true},
 		{name: "unsupported native default effort", effort: "high", wantErr: true},
@@ -246,6 +252,9 @@ func TestDispatchCodexSubscriptionThinkingFollowsCatalog(t *testing.T) {
 					version.Nodes[i].Configuration["model"] = ""
 					if tc.savedEffort != "" {
 						version.Nodes[i].Configuration["model"] = "gpt-6-astra"
+					}
+					if tc.savedModel != "" {
+						version.Nodes[i].Configuration["model"] = tc.savedModel
 					}
 					version.Nodes[i].Configuration["thinkingLevel"] = tc.savedEffort
 				}

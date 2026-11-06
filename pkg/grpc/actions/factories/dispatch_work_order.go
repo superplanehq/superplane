@@ -384,9 +384,9 @@ func validateDispatchThinkingForRunners(tx *gorm.DB, orgID, factoryID uuid.UUID,
 			}
 			levels, capabilitiesKnown, err := dispatchRunnerThinkingLevels(tx, orgID, factoryID, node, model, ownerID, catalog)
 			var unresolved *unresolvedDispatchModelError
-			if !overridden && errors.As(err, &unresolved) {
-				// Execution resolves the model and reports problems such as a
-				// missing ChatGPT connection, as it does for agents without a level.
+			if errors.As(err, &unresolved) && (!overridden || containsTemplateExpression(unresolved.model)) {
+				// Model expressions need execution context, including when Start
+				// overrides the effort. Execution also reports unavailable saved models.
 				continue
 			}
 			if err != nil {
@@ -521,7 +521,8 @@ func runnerUsesCodexSubscription(node models.Node) bool {
 // unresolvedDispatchModelError reports that Start cannot resolve the model
 // that an agent runs. Execution resolves it again and reports the cause.
 type unresolvedDispatchModelError struct {
-	err error
+	model string
+	err   error
 }
 
 func (e *unresolvedDispatchModelError) Error() string { return e.err.Error() }
@@ -542,9 +543,12 @@ func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node 
 		}
 	}
 	if runnerUsesCodexSubscription(node) {
+		if containsTemplateExpression(model) {
+			return nil, false, &unresolvedDispatchModelError{model: model, err: errors.New("model expression requires execution context")}
+		}
 		resolved, err := models.ResolveFactoryCodexSubscriptionModel(tx, orgID, factoryID, ownerID, model, "")
 		if err != nil {
-			return nil, false, &unresolvedDispatchModelError{err: err}
+			return nil, false, &unresolvedDispatchModelError{model: model, err: err}
 		}
 		levels, err := lineRunnerThinkingLevels(tx, orgID, factoryID, node, catalog, ownerID)
 		if err != nil {
@@ -555,7 +559,7 @@ func dispatchRunnerThinkingLevels(tx *gorm.DB, orgID, factoryID uuid.UUID, node 
 	if node.ComponentName() == models.SuperPlaneRunnerComponent {
 		resolved, err := dispatchSuperPlaneModel(tx, orgID, factoryID, node, model)
 		if err != nil {
-			return nil, false, &unresolvedDispatchModelError{err: err}
+			return nil, false, &unresolvedDispatchModelError{model: model, err: err}
 		}
 		levels, known := catalog.LookupThinkingLevels(resolved.Provider, resolved.Model, models.UsageFundingSourceHosted)
 		return levels, known, nil
