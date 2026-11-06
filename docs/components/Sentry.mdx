@@ -355,7 +355,11 @@ Returns the deleted alert ID and name so downstream steps can record the removal
 
 Enrich Issue fetches the latest issue details and a preferred event from Sentry. Add it after filters so rejected issues do not make API requests.
 
-Sentry factory intakes use this action to create work orders with the same issue details as manual imports.
+New Sentry factory intakes use HTTP Request nodes after filters to fetch the issue, latest event, and recommended event.
+
+The sentryIssueDescription(issue, fetchedIssue, latestEvent, recommendedEvent) expression uses the same description assembly as manual imports. It prefers the latest event with a stack trace, then a recommended event with a stack trace or more entries. API failures keep the original issue and available event data.
+
+SuperPlane stores and acknowledges webhook deliveries before these API requests. Existing workflows can continue to use Enrich Issue.
 
 ### Configuration
 

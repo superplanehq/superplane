@@ -1135,6 +1135,9 @@ The component emits the response with:
 - **headers**: Response headers
 - **body**: Parsed response body (JSON if possible, otherwise string)
 
+If the response exceeds the event size limit, the component emits a failure event with the status and error.
+The body and headers are omitted.
+
 ### Example Output
 
 ```json
