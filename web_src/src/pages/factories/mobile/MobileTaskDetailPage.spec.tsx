@@ -403,6 +403,35 @@ describe("MobileTaskDetailPage model select", () => {
     expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toBeInTheDocument();
   });
 
+  it.each([
+    { model: "claude-opus-4-6", nextModel: "long-model", nextLabel: "Anthropic Claude Opus 4.6 with extended context" },
+    {
+      model: "Anthropic Claude Opus 4.6 with extended context",
+      nextModel: "claude-opus-4-6",
+      nextLabel: "claude-opus-4-6",
+    },
+  ])(
+    "starts with the run default after selecting $model and changing models",
+    async ({ model, nextModel, nextLabel }) => {
+      const user = userEvent.setup();
+      renderDraft();
+
+      await user.click(startModelButton("Model: Auto"));
+      await user.click(await screen.findByRole("menuitem", { name: model }));
+      await user.click(screen.getByTestId("split-run-draft-model"));
+      await user.click(screen.getByRole("menuitem", { name: "Default" }));
+      await user.click(screen.getByTestId("split-run-draft-model"));
+      await user.click(screen.getByRole("menuitem", { name: nextLabel }));
+      await user.click(screen.getByRole("button", { name: "Start" }));
+
+      expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+        lineName: PLAN_LINE_NAME,
+        model: nextModel,
+        thinkingLevel: "default",
+      });
+    },
+  );
+
   it("starts without a thinking override after the user picks the agent setting", async () => {
     const user = userEvent.setup();
     renderDraft();

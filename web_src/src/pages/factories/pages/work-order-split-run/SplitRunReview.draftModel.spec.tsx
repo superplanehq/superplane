@@ -158,18 +158,32 @@ describe("SplitRunReview draft model select", () => {
     expect(screen.getByRole("menuitem", { name: "High" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Max" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Minimal" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Default" })).not.toBeInTheDocument();
     await selectFlyoutOption(user, "split-run-draft-thinking", "Max");
     expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: "max" });
   });
 
-  it("hides Thinking for a model without thinking levels", async () => {
-    const user = userEvent.setup();
-    renderDraftFooter(vi.fn(), "claude-haiku-4-5", vi.fn(), false, "high");
+  it.each(["claude-opus-4-6", "claude-haiku-4-5"])(
+    "keeps the run default for %s and across model changes until Auto is selected",
+    async (model) => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<StatefulDraftModelSelect onChange={onChange} />);
 
-    await user.click(screen.getByRole("button", { name: "Model: claude-haiku-4-5" }));
-    expect(screen.queryByTestId("split-run-draft-thinking")).not.toBeInTheDocument();
-  });
+      await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+      await selectFlyoutOption(user, "split-run-draft-model-list", model);
+      await selectFlyoutOption(user, "split-run-draft-thinking", "Default");
+      expect(onChange).toHaveBeenLastCalledWith({ model, thinkingLevel: "default" });
+      expect(screen.getByTestId("split-run-draft-model")).toHaveAttribute("aria-label", `Model: ${model} Default`);
+
+      await selectFlyoutOption(user, "split-run-draft-model-list", "claude-sonnet-4-6");
+      await selectFlyoutOption(user, "split-run-draft-model-list", "claude-haiku-4-5");
+      expect(onChange).toHaveBeenLastCalledWith({ model: "claude-haiku-4-5", thinkingLevel: "default" });
+
+      await selectFlyoutOption(user, "split-run-draft-model-list", "Auto");
+      expect(onChange).toHaveBeenLastCalledWith({ model: DRAFT_START_MODEL_AUTO, thinkingLevel: "" });
+      expect(screen.queryByTestId("split-run-draft-thinking")).not.toBeInTheDocument();
+    },
+  );
 
   it("keeps the picked thinking level only while the model supports it", async () => {
     const user = userEvent.setup();
