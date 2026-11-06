@@ -111,3 +111,75 @@ func TestConfiguredHostedAnthropicRefreshPopulatesAndPreservesCapabilities(t *te
 	require.NoError(t, err)
 	assert.Equal(t, []string{"low", "high"}, catalog.ThinkingLevels(models.UsageProviderAnthropic, "claude-haiku-5-5", models.UsageFundingSourceHosted))
 }
+
+func TestAnthropicRefreshKeepsCatalogSourcesIndependent(t *testing.T) {
+	for _, hostedFirst := range []bool{true, false} {
+		name := "BYOK first"
+		if hostedFirst {
+			name = "hosted first"
+		}
+		t.Run(name, func(t *testing.T) {
+			_ = support.Setup(t)
+			db := database.DB(t.Context())
+			provider, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+				Provider: models.UsageProviderAnthropic, APIKey: []byte("hosted-key"),
+				BaseURL: " https://anthropic-proxy.example/v1/// ",
+			})
+			require.NoError(t, err)
+			hostedResponse := catalogResponse(http.StatusOK, `{"data":[
+				{"id":"claude-opus-5-5","capabilities":{"effort":{"supported":false}}},
+				{"id":"claude-sonnet-5-5","capabilities":{"effort":{"supported":true,"high":{"supported":true}}}},
+				{"id":"claude-hosted-model","capabilities":{"effort":{"supported":true,"max":{"supported":true}}}}
+			]}`)
+			byokResponse := catalogResponse(http.StatusOK, `{"data":[
+				{"id":"claude-opus-5-5","capabilities":{"effort":{"supported":true,"max":{"supported":true}}}},
+				{"id":"claude-sonnet-5-5","capabilities":{"effort":{"supported":true,"low":{"supported":true}}}},
+				{"id":"claude-byok-model","capabilities":{"effort":{"supported":true,"medium":{"supported":true}}}}
+			]}`)
+			httpCtx := &contexts.HTTPContext{}
+			svc := llmcatalog.New(crypto.NewNoOpEncryptor(), httpCtx)
+			refreshHosted := func() {
+				httpCtx.Responses = append(httpCtx.Responses, hostedResponse)
+				require.NoError(t, svc.Refresh(t.Context(), db, *provider))
+				assert.Equal(t, "https://anthropic-proxy.example/v1/models", httpCtx.Requests[len(httpCtx.Requests)-1].URL.String())
+			}
+			refreshBYOK := func() {
+				httpCtx.Responses = append(httpCtx.Responses, byokResponse)
+				require.NoError(t, svc.RefreshAnthropicIntegration(t.Context(), db, &contexts.IntegrationContext{
+					Configuration: map[string]any{"apiKey": "byok-key"},
+				}))
+				assert.Equal(t, llm.DefaultAnthropicBaseURL+"/models", httpCtx.Requests[len(httpCtx.Requests)-1].URL.String())
+			}
+			if hostedFirst {
+				refreshHosted()
+				refreshBYOK()
+			} else {
+				refreshBYOK()
+				refreshHosted()
+			}
+			catalog, err := llmcatalog.LoadThinkingCatalog(db)
+			require.NoError(t, err)
+			for _, tc := range []struct {
+				model        string
+				hosted, byok []string
+			}{
+				{model: "claude-opus-5-5", hosted: []string{}, byok: []string{"max"}},
+				{model: "claude-sonnet-5-5", hosted: []string{"high"}, byok: []string{"low"}},
+				{model: "claude-hosted-model", hosted: []string{"max"}},
+				{model: "claude-byok-model", byok: []string{"medium"}},
+			} {
+				assert.Equal(t, tc.hosted, catalog.ThinkingLevels(models.UsageProviderAnthropic, tc.model, models.UsageFundingSourceHosted), tc.model)
+				assert.Equal(t, tc.byok, catalog.ThinkingLevels(models.UsageProviderAnthropic, tc.model, models.UsageFundingSourceBYOK), tc.model)
+			}
+
+			// Switching the hosted endpoint must not reuse the previous gateway's metadata.
+			provider.BaseURL = "https://other-anthropic-proxy.example/v1"
+			_, err = models.UpsertHostedLLMProvider(db, *provider)
+			require.NoError(t, err)
+			catalog, err = llmcatalog.LoadThinkingCatalog(db)
+			require.NoError(t, err)
+			assert.Empty(t, catalog.ThinkingLevels(models.UsageProviderAnthropic, "claude-hosted-model", models.UsageFundingSourceHosted))
+			assert.Equal(t, []string{"low"}, catalog.ThinkingLevels(models.UsageProviderAnthropic, "claude-sonnet-5-5", models.UsageFundingSourceBYOK))
+		})
+	}
+}

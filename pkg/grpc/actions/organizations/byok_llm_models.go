@@ -154,7 +154,7 @@ func listBYOKCandidateModels(tx *gorm.DB, reg *registry.Registry, instance *mode
 		for _, resource := range resources {
 			listed = append(listed, llm.Model{ID: resource.ID, ThinkingLevels: resource.ThinkingLevels})
 		}
-		if err := llmcatalog.StoreAnthropicCapabilities(tx, listed); err != nil {
+		if err := llmcatalog.StoreAnthropicCapabilities(tx, llm.DefaultAnthropicBaseURL, listed); err != nil {
 			return nil, err
 		}
 	}
