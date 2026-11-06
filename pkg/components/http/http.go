@@ -65,19 +65,20 @@ type AuthorizationSpec struct {
 }
 
 type Spec struct {
-	Method         string             `json:"method"`
-	URL            string             `json:"url"`
-	QueryParams    *[]KeyValue        `json:"queryParams,omitempty"`
-	Headers        *[]Header          `json:"headers,omitempty"`
-	ContentType    *string            `json:"contentType,omitempty"`
-	JSON           *any               `json:"json,omitempty"`
-	XML            *string            `json:"xml,omitempty"`
-	Text           *string            `json:"text,omitempty"`
-	FormData       *[]KeyValue        `json:"formData,omitempty"`
-	TimeoutSeconds *int               `json:"timeoutSeconds,omitempty"`
-	Retry          *RetrySpec         `json:"retry,omitempty"`
-	SuccessCodes   *string            `json:"successCodes,omitempty"`
-	Authorization  *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
+	Method                 string             `json:"method"`
+	URL                    string             `json:"url"`
+	QueryParams            *[]KeyValue        `json:"queryParams,omitempty"`
+	Headers                *[]Header          `json:"headers,omitempty"`
+	ContentType            *string            `json:"contentType,omitempty"`
+	JSON                   *any               `json:"json,omitempty"`
+	XML                    *string            `json:"xml,omitempty"`
+	Text                   *string            `json:"text,omitempty"`
+	FormData               *[]KeyValue        `json:"formData,omitempty"`
+	TimeoutSeconds         *int               `json:"timeoutSeconds,omitempty"`
+	Retry                  *RetrySpec         `json:"retry,omitempty"`
+	SuccessCodes           *string            `json:"successCodes,omitempty"`
+	Authorization          *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
+	RedactSensitiveHeaders bool               `json:"redactSensitiveHeaders,omitempty" mapstructure:"redactSensitiveHeaders"`
 }
 
 func (s *Spec) Timeout() time.Duration {
@@ -171,6 +172,13 @@ The component emits the response with:
 - **status**: HTTP status code
 - **headers**: Response headers
 - **body**: Parsed response body (JSON if possible, otherwise string)
+
+If the response exceeds the event size limit, the component emits a failure event with the status and error.
+The body and headers are omitted.
+
+Enable **Remove sensitive headers** to remove authorization, cookie, token, secret, password, and API key headers before outputs or retry metadata are stored.
+This also filters nested JSON headers and removes cookie fields. Non-JSON bodies and unsupported header formats are omitted.
+Other response fields are unchanged. This option is disabled by default.
 `
 }
 
@@ -670,6 +678,13 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Placeholder: "<?xml version=\"1.0\"?>\n<root>\n  <element>value</element>\n</root>",
 		},
 		{
+			Name:        "redactSensitiveHeaders",
+			Type:        configuration.FieldTypeBool,
+			Label:       "Remove sensitive headers",
+			Default:     false,
+			Description: "Remove sensitive headers and cookies before storage. Filter JSON header fields and omit non-JSON bodies.",
+		},
+		{
 			Name:        "successCodes",
 			Type:        configuration.FieldTypeString,
 			Label:       "Overwrite success definition",
@@ -854,7 +869,7 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 	}
 
 	if e.isSuccessfulResponse(response.StatusCode, spec.GetSuccessCodes()) {
-		return ctx.ExecutionState.Emit(
+		err := ctx.ExecutionState.Emit(
 			SuccessOutputChannel,
 			"http.request.finished",
 			[]any{map[string]any{
@@ -863,9 +878,10 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 				"body":    bodyData,
 			}},
 		)
+		return handleResponseEmitError(ctx.ExecutionState, response.StatusCode, err)
 	}
 
-	return ctx.ExecutionState.Emit(
+	err = ctx.ExecutionState.Emit(
 		FailureOutputChannel,
 		"http.request.failed",
 		[]any{map[string]any{
@@ -874,6 +890,7 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 			"body":    bodyData,
 		}},
 	)
+	return handleResponseEmitError(ctx.ExecutionState, response.StatusCode, err)
 }
 
 func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, httpCtx core.HTTPContext, spec Spec) (*http.Response, error) {
@@ -949,6 +966,9 @@ func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, ht
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if spec.RedactSensitiveHeaders {
+		resp.Header, bodyBytes = redactResponse(resp.Header, bodyBytes)
+	}
 	resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	return resp, nil
 }
@@ -993,11 +1013,12 @@ func (e *HTTP) handleRequestFailure(metadataCtx core.MetadataWriter, executionSt
 		errorResponse["error"] = reqErr.Error()
 	}
 
-	return executionStateCtx.Emit(
+	err := executionStateCtx.Emit(
 		FailureOutputChannel,
 		"http.request.failure",
 		[]any{errorResponse},
 	)
+	return handleResponseEmitError(executionStateCtx, resp.StatusCode, err)
 }
 
 func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCtx core.ExecutionStateContext, resp *http.Response, spec Spec) error {
@@ -1023,7 +1044,7 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 	}
 
 	if e.isSuccessfulResponse(resp.StatusCode, spec.GetSuccessCodes()) {
-		return executionStateCtx.Emit(
+		err := executionStateCtx.Emit(
 			SuccessOutputChannel,
 			"http.request.finished",
 			[]any{map[string]any{
@@ -1032,9 +1053,10 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 				"body":    bodyData,
 			}},
 		)
+		return handleResponseEmitError(executionStateCtx, resp.StatusCode, err)
 	}
 
-	return executionStateCtx.Emit(
+	err = executionStateCtx.Emit(
 		FailureOutputChannel,
 		"http.request.failed",
 		[]any{map[string]any{
@@ -1043,6 +1065,18 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 			"body":    bodyData,
 		}},
 	)
+	return handleResponseEmitError(executionStateCtx, resp.StatusCode, err)
+}
+
+func handleResponseEmitError(state core.ExecutionStateContext, status int, err error) error {
+	if !errors.Is(err, core.ErrEventPayloadTooLarge) {
+		return err
+	}
+
+	return state.Emit(FailureOutputChannel, "http.request.failed", []any{map[string]any{
+		"status": status,
+		"error":  fmt.Sprintf("response omitted: %v", err),
+	}})
 }
 
 func (e *HTTP) isSuccessfulResponse(statusCode int, successCodes string) bool {

@@ -1135,6 +1135,13 @@ The component emits the response with:
 - **headers**: Response headers
 - **body**: Parsed response body (JSON if possible, otherwise string)
 
+If the response exceeds the event size limit, the component emits a failure event with the status and error.
+The body and headers are omitted.
+
+Enable **Remove sensitive headers** to remove authorization, cookie, token, secret, password, and API key headers before outputs or retry metadata are stored.
+This also filters nested JSON headers and removes cookie fields. Non-JSON bodies and unsupported header formats are omitted.
+Other response fields are unchanged. This option is disabled by default.
+
 ### Example Output
 
 ```json
