@@ -19,11 +19,71 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	factorypb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
+
+func Test__NodeRequestExecutor_PreservesNewerActionDeadline(t *testing.T) {
+	for _, webhookDelay := range []time.Duration{time.Second, 10 * time.Minute} {
+		t.Run(webhookDelay.String(), func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			db := database.DB(t.Context())
+			componentName := "concurrent_poll_" + uuid.New().String()
+			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+				NodeID: "checks", Type: models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			}}, nil)
+			event := support.EmitCanvasEventForNode(t, canvas.ID, "checks", "default", nil)
+			execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, "checks", event.ID, event.ID, map[string]any{})
+			spec := models.NodeExecutionRequestSpec{InvokeAction: &models.InvokeAction{ActionName: "evaluate", Parameters: map[string]any{}}}
+			runAt := time.Now().Add(-time.Minute)
+			require.NoError(t, execution.CreateRequest(db, models.NodeRequestTypeInvokeAction, spec, &runAt))
+			var current models.CanvasNodeRequest
+			require.NoError(t, db.Where("execution_id = ?", execution.ID).First(&current).Error)
+			var webhookRunAt time.Time
+			hookCalls := 0
+			r.Registry.Actions[componentName] = impl.NewDummyAction(impl.DummyActionOptions{
+				Name: componentName, Hooks: []core.Hook{{Name: "evaluate", Type: core.HookTypeInternal}},
+				HandleHookFunc: func(ctx core.ActionHookContext) error {
+					hookCalls++
+					if hookCalls == 1 {
+						// The real webhook scheduler must finish while this hook holds the current request lock.
+						webhookCtx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+						defer cancel()
+						err := contexts.NewExecutionRequestContext(db.WithContext(webhookCtx), execution).ScheduleActionCall("evaluate", nil, webhookDelay)
+						require.NoError(t, err)
+						var webhook models.CanvasNodeRequest
+						require.NoError(t, db.Where("execution_id = ? AND id <> ? AND state = ?", execution.ID, current.ID, models.NodeExecutionRequestStatePending).First(&webhook).Error)
+						webhookRunAt = webhook.RunAt
+					}
+					return ctx.Requests.ScheduleActionCall("evaluate", nil, 5*time.Minute)
+				},
+			})
+			executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
+			before := time.Now()
+			require.NoError(t, executor.RunNow(current))
+			var pending []models.CanvasNodeRequest
+			require.NoError(t, db.Where("execution_id = ? AND state = ?", execution.ID, models.NodeExecutionRequestStatePending).Find(&pending).Error)
+			require.Len(t, pending, 1, "keep one scheduling chain")
+			if webhookDelay < 5*time.Minute {
+				assert.WithinDuration(t, webhookRunAt, pending[0].RunAt, time.Microsecond)
+			} else {
+				assert.False(t, pending[0].RunAt.Before(before.Add(5*time.Minute)))
+				assert.True(t, pending[0].RunAt.Before(webhookRunAt))
+			}
+			// Consuming the replacement must start a normal poll, not reuse its earlier deadline.
+			before = time.Now()
+			require.NoError(t, executor.RunNow(pending[0]))
+			require.NoError(t, db.Where("execution_id = ? AND state = ?", execution.ID, models.NodeExecutionRequestStatePending).Find(&pending).Error)
+			require.Len(t, pending, 1)
+			assert.False(t, pending[0].RunAt.Before(before.Add(5*time.Minute)))
+		})
+	}
+}
 
 func Test__NodeRequestExecutor_CustomScheduleLifecycle(t *testing.T) {
 	r := support.Setup(t)
