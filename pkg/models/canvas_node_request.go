@@ -227,27 +227,36 @@ func ClaimDueVisualEvidenceCaptureRequest(tx *gorm.DB, id uuid.UUID, leaseUntil 
 	return request, nil
 }
 
-func CompletePendingExecutionActionRequests(tx *gorm.DB, executionID uuid.UUID, actionName string, parameters map[string]any) error {
+// CompletePendingExecutionActionRequests returns the earlier of runAt and deadlines created after createdBefore.
+func CompletePendingExecutionActionRequests(tx *gorm.DB, executionID uuid.UUID, actionName string, parameters map[string]any, createdBefore, runAt time.Time) (time.Time, error) {
 	params, err := json.Marshal(parameters)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 
 	// Keep selection locks through the update, including for autocommit webhook callers.
-	return tx.Exec(`
-		UPDATE workflow_node_requests
-		SET state = ?, updated_at = ?
-		WHERE id IN (
-			SELECT id FROM workflow_node_requests
-			WHERE execution_id = ?
-			  AND state = ?
-			  AND type = ?
-			  AND spec->'invoke_action'->>'action_name' = ?
-			  AND spec->'invoke_action'->'parameters' = ?::jsonb
-			FOR UPDATE SKIP LOCKED
+	var schedule struct{ RunAt time.Time }
+	err = tx.Raw(`
+		WITH completed AS (
+			UPDATE workflow_node_requests
+			SET state = ?, updated_at = ?
+			WHERE id IN (
+				SELECT id FROM workflow_node_requests
+				WHERE execution_id = ?
+				  AND state = ?
+				  AND type = ?
+				  AND spec->'invoke_action'->>'action_name' = ?
+				  AND spec->'invoke_action'->'parameters' = ?::jsonb
+				FOR UPDATE SKIP LOCKED
+			)
+			RETURNING run_at, created_at
 		)
+		SELECT LEAST(?, COALESCE(MIN(run_at) FILTER (WHERE created_at > ?), ?)) AS run_at
+		FROM completed
 	`, NodeExecutionRequestStateCompleted, time.Now(), executionID,
-		NodeExecutionRequestStatePending, NodeRequestTypeInvokeAction, actionName, string(params)).Error
+		NodeExecutionRequestStatePending, NodeRequestTypeInvokeAction, actionName, string(params),
+		runAt, createdBefore, runAt).Scan(&schedule).Error
+	return schedule.RunAt, err
 }
 
 func CompletePendingRequestsForExecution(tx *gorm.DB, executionID uuid.UUID) error {
