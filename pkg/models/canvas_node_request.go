@@ -233,28 +233,21 @@ func CompletePendingExecutionActionRequests(tx *gorm.DB, executionID uuid.UUID, 
 		return err
 	}
 
-	var ids []uuid.UUID
-	err = tx.Model(&CanvasNodeRequest{}).
-		Where("execution_id = ?", executionID).
-		Where("state = ?", NodeExecutionRequestStatePending).
-		Where("type = ?", NodeRequestTypeInvokeAction).
-		Where("spec->'invoke_action'->>'action_name' = ?", actionName).
-		Where("spec->'invoke_action'->'parameters' = ?::jsonb", string(params)).
-		Pluck("id", &ids).
-		Error
-	if err != nil {
-		return err
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-
-	return tx.Model(&CanvasNodeRequest{}).
-		Where("id IN ?", ids).
-		Updates(map[string]any{
-			"state":      NodeExecutionRequestStateCompleted,
-			"updated_at": time.Now(),
-		}).Error
+	// Keep selection locks through the update, including for autocommit webhook callers.
+	return tx.Exec(`
+		UPDATE workflow_node_requests
+		SET state = ?, updated_at = ?
+		WHERE id IN (
+			SELECT id FROM workflow_node_requests
+			WHERE execution_id = ?
+			  AND state = ?
+			  AND type = ?
+			  AND spec->'invoke_action'->>'action_name' = ?
+			  AND spec->'invoke_action'->'parameters' = ?::jsonb
+			FOR UPDATE SKIP LOCKED
+		)
+	`, NodeExecutionRequestStateCompleted, time.Now(), executionID,
+		NodeExecutionRequestStatePending, NodeRequestTypeInvokeAction, actionName, string(params)).Error
 }
 
 func CompletePendingRequestsForExecution(tx *gorm.DB, executionID uuid.UUID) error {
