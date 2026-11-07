@@ -52,6 +52,8 @@ vi.mock("./LineVelocityPanel", () => ({
   LineVelocityPanel: () => <div data-testid="line-velocity-panel">Velocity</div>,
 }));
 
+vi.mock("./FactoryWebhookWarnings", () => ({ FactoryWebhookWarnings: () => null }));
+
 vi.mock("@/hooks/useOrgUserLookup", () => ({
   useOrgUserLookup: () => ({
     resolveUser: (id: string | undefined, name?: string) =>
@@ -101,6 +103,12 @@ describe("AutomationCard menu", () => {
     canDuplicate: true,
     canDelete: true,
   };
+
+  it("shows webhook failure separately from the last run result", () => {
+    renderCard({ webhookFailed: true });
+    expect(screen.getByText("Passed")).toBeInTheDocument();
+    expect(screen.getByText("Webhook registration failed")).toBeInTheDocument();
+  });
 
   it("hides the list-card menu until hover, then opens Edit, Duplicate, and Delete", async () => {
     const user = userEvent.setup();
@@ -204,6 +212,8 @@ describe("AutomationDetail tabs", () => {
           factory={{ id: "factory-1", name: "Refunds", key: "SP" }}
           workOrders={workOrders}
           workOrderCardContext={workOrderCardContext}
+          factoryId="factory-1"
+          canRetryWebhook
         />
       </MemoryRouter>,
     );

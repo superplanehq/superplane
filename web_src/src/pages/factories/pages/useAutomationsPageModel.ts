@@ -17,6 +17,7 @@ export function useAutomationsPageModel() {
   const canCreateApp = canAct("canvases", "create");
   const canUpdateApp = canAct("canvases", "update");
   const canDeleteApp = canAct("canvases", "delete");
+  const canRetryWebhook = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -81,6 +82,7 @@ export function useAutomationsPageModel() {
     workOrders,
     canCreateApp,
     canUpdateWorkOrders,
+    canRetryWebhook,
     permissionsLoading,
     createOpen,
     setCreateOpen,
