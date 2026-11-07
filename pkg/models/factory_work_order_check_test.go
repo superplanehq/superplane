@@ -175,6 +175,72 @@ func TestFactoryWorkOrder_ReportCheck_ReReportUpdatesInPlace(t *testing.T) {
 	assert.Nil(t, reported[1].Check.PreviousScore)
 }
 
+func TestFactoryWorkOrder_ReportCheck_KeepsOneRowPerRepository(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "check-repositories")
+
+	order, err := factoryModel.CreateWorkOrder(db, "Check target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	report := func(repository string, score float64) *FactoryWorkOrderCheck {
+		check, reportErr := order.ReportCheck(db, FactoryWorkOrderCheckParams{
+			Key:        "risk-review",
+			Repository: repository,
+			Name:       "Blast radius",
+			Score:      score,
+			MaxScore:   5,
+		})
+		require.NoError(t, reportErr)
+		return check
+	}
+
+	api := report("acme/api", 4)
+	docs := report("acme/docs", 1)
+	apiAgain := report("acme/api", 2)
+
+	assert.NotEqual(t, api.ID, docs.ID)
+	assert.Equal(t, api.ID, apiAgain.ID)
+	assert.Nil(t, docs.PreviousScore)
+	require.NotNil(t, apiAgain.PreviousScore)
+	assert.Equal(t, float64(4), *apiAgain.PreviousScore)
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 2)
+	assert.Equal(t, "acme/api", checks[0].Repository)
+	assert.Equal(t, float64(2), checks[0].Score)
+	assert.Equal(t, "acme/docs", checks[1].Repository)
+	assert.Equal(t, float64(1), checks[1].Score)
+}
+
+func TestFactoryWorkOrder_ReportCheck_TakesOverTheCheckWithoutRepository(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "check-legacy-repository")
+
+	order, err := factoryModel.CreateWorkOrder(db, "Check target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	params := FactoryWorkOrderCheckParams{Key: "risk-review", Name: "Blast radius", Score: 3, MaxScore: 5}
+	legacy, err := order.ReportCheck(db, params)
+	require.NoError(t, err)
+
+	params.Repository = "acme/api"
+	params.Score = 2
+	claimed, err := order.ReportCheck(db, params)
+	require.NoError(t, err)
+
+	assert.Equal(t, legacy.ID, claimed.ID)
+	assert.Equal(t, "acme/api", claimed.Repository)
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, "acme/api", checks[0].Repository)
+}
+
 func TestFactoryWorkOrder_ReportCheck_TracksRecentScores(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -273,4 +339,120 @@ func TestFactoryWorkOrder_ListChecks_OrdersByFirstReport(t *testing.T) {
 	assert.Equal(t, "risk-review", checks[0].Key)
 	assert.Equal(t, "code-coverage", checks[1].Key)
 	assert.Equal(t, "confidence", checks[2].Key)
+}
+
+func TestFactoryWorkOrder_ReportAgentChecks(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "agent-checks")
+	order, err := factoryModel.CreateWorkOrder(db, "Check target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	agentCheck := func(key string, score float64) FactoryWorkOrderCheckParams {
+		return FactoryWorkOrderCheckParams{Key: key, Name: key, Score: score, MaxScore: 5, Level: FactoryWorkOrderCheckLevelCaution, Summary: "Reason."}
+	}
+
+	t.Run("saves agent checks and replaces an agent check with the same key", func(t *testing.T) {
+		_, err := order.ReportAgentChecks(db, []FactoryWorkOrderCheckParams{agentCheck("api-latency", 2)})
+		require.NoError(t, err)
+		checks, err := order.ReportAgentChecks(db, []FactoryWorkOrderCheckParams{agentCheck("api-latency", 4)})
+		require.NoError(t, err)
+
+		require.Len(t, checks, 1)
+		assert.Equal(t, FactoryWorkOrderCheckSourceAgent, checks[0].Source)
+		assert.Equal(t, 4.0, checks[0].Score)
+		require.NotNil(t, checks[0].PreviousScore)
+		assert.Equal(t, 2.0, *checks[0].PreviousScore)
+	})
+
+	t.Run("does not replace a check that an agent did not add", func(t *testing.T) {
+		_, err := order.ReportCheck(db, agentCheck("coverage", 5))
+		require.NoError(t, err)
+
+		_, err = order.ReportAgentChecks(db, []FactoryWorkOrderCheckParams{agentCheck("coverage", 1)})
+
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderCheckOwned)
+		checks, err := order.ListChecks(db)
+		require.NoError(t, err)
+		coverage := findCheck(t, checks, "coverage")
+		assert.Equal(t, 5.0, coverage.Score)
+		assert.Equal(t, FactoryWorkOrderCheckSourceAutomation, coverage.Source)
+	})
+
+	t.Run("rejects plan score and merge confidence keys before the first report", func(t *testing.T) {
+		for _, key := range []string{PlanningClarityCheckKey, PlanningConfidenceCheckKey, "risk-review", "custom-review"} {
+			_, err := order.ReportAgentChecks(db, []FactoryWorkOrderCheckParams{agentCheck(key, 5)})
+			assert.ErrorIs(t, err, ErrFactoryWorkOrderCheckOwned, key)
+		}
+	})
+
+	t.Run("rejects plan score names under another key", func(t *testing.T) {
+		for _, name := range []string{PlanningClarityCheckName, " confidence SCORE "} {
+			check := agentCheck("agent-score", 5)
+			check.Name = name
+			_, err := order.ReportAgentChecks(db, []FactoryWorkOrderCheckParams{check})
+			assert.ErrorIs(t, err, ErrFactoryWorkOrderCheckInvalid, name)
+		}
+	})
+
+	t.Run("saves no check when one check fails", func(t *testing.T) {
+		_, err := order.ReportAgentChecks(db, []FactoryWorkOrderCheckParams{
+			agentCheck("first-new", 3),
+			agentCheck(PlanningClarityCheckKey, 3),
+		})
+		require.ErrorIs(t, err, ErrFactoryWorkOrderCheckOwned)
+
+		checks, err := order.ListChecks(db)
+		require.NoError(t, err)
+		for _, check := range checks {
+			assert.NotEqual(t, "first-new", check.Key)
+		}
+	})
+
+	t.Run("a plan or merge confidence report replaces an agent check", func(t *testing.T) {
+		_, err := order.ReportAgentChecks(db, []FactoryWorkOrderCheckParams{agentCheck("handover", 1)})
+		require.NoError(t, err)
+
+		check, err := order.ReportCheck(db, agentCheck("handover", 3))
+
+		require.NoError(t, err)
+		assert.Equal(t, FactoryWorkOrderCheckSourceAutomation, check.Source)
+	})
+}
+
+func TestFactoryWorkOrder_RemoveAgentChecks(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "remove-agent-checks")
+	order, err := factoryModel.CreateWorkOrder(db, "Check target", "", &userID, nil, nil)
+	require.NoError(t, err)
+	params := func(key string) FactoryWorkOrderCheckParams {
+		return FactoryWorkOrderCheckParams{Key: key, Name: key, Score: 1, MaxScore: 5}
+	}
+	_, err = order.ReportAgentChecks(db, []FactoryWorkOrderCheckParams{params("api-latency")})
+	require.NoError(t, err)
+	_, err = order.ReportCheck(db, params("coverage"))
+	require.NoError(t, err)
+
+	removed, err := order.RemoveAgentChecks(db, []string{"api-latency", "coverage", "missing"})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"api-latency"}, removed)
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, "coverage", checks[0].Key)
+}
+
+func findCheck(t *testing.T, checks []FactoryWorkOrderCheck, key string) FactoryWorkOrderCheck {
+	t.Helper()
+	for _, check := range checks {
+		if check.Key == key {
+			return check
+		}
+	}
+	t.Fatalf("check %q not found", key)
+	return FactoryWorkOrderCheck{}
 }

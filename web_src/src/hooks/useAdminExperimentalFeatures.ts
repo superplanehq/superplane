@@ -49,7 +49,8 @@ async function toggleAdminExperimentalFeature(orgId: string, featureId: string, 
     credentials: "include",
   });
   if (!res.ok) {
-    throw new Error(`Failed to ${enabled ? "enable" : "disable"} ${featureId}`);
+    const message = (await res.text()).trim();
+    throw new Error(message || `Failed to ${enabled ? "enable" : "disable"} ${featureId}`);
   }
 }
 

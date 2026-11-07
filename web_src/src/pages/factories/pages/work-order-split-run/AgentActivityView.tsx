@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 
 import { agentToolDisplayText, isCommandTool } from "@/lib/agentToolLabels";
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronRight } from "lucide-react";
+import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import { useOptionalFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { CodexActionContext } from "../../codex/codexActionContext";
+import { Button } from "@/components/ui/button";
+import { Link } from "@/components/Link/link";
 
 import type {
   AgentActivity,
@@ -94,7 +99,7 @@ function CompletedActivity({
 }) {
   const [open, setOpen] = useState(false);
   const label = completedActivitySummaryLabel(tools);
-  const errors = entries.filter(isCodexErrorNotice);
+  const errors = entries.filter((item): item is AgentNoticeItem => item.type === "notice" && isCodexErrorNotice(item));
   const details = entries.filter((item) => !isCodexErrorNotice(item));
 
   return (
@@ -157,12 +162,13 @@ function ActivityEntries({
           }
           return <ReasoningContent key={item.id} item={item} collapseReasoning={collapseReasoning} live={live} />;
         }
-        if (isCodexErrorNotice(item)) {
+        if (item.type === "notice" && isCodexErrorNotice(item)) {
           return <CodexErrorNotice key={item.id} notice={item} />;
         }
         return (
           <p
             key={item.id}
+            role={item.code === "chatgpt_refreshing" ? "status" : undefined}
             className={cn(
               "px-2 py-1 text-[13px] leading-5",
               tone === "log" ? "text-foreground" : "text-muted-foreground",
@@ -179,15 +185,44 @@ function ActivityEntries({
   );
 }
 
-function isCodexErrorNotice(item: AgentActivityItem): item is AgentNoticeItem & { code: "codex_error" } {
-  return item.type === "notice" && item.code === "codex_error";
+function isCodexErrorNotice(item: AgentActivityItem): boolean {
+  return (
+    item.type === "notice" &&
+    (item.code === "codex_error" || item.code.startsWith("chatgpt_")) &&
+    item.code !== "chatgpt_refreshing"
+  );
 }
 
 function CodexErrorNotice({ notice }: { notice: AgentNoticeItem }) {
+  const layout = useOptionalFactoriesLayout();
+  const connect = useContext(CodexActionContext);
+  const accountPath = window.location.pathname.match(/^\/([^/]+)\/workspaces\/([^/]+)/);
+  const connectionHref = accountPath
+    ? factorySettingsSectionPath(accountPath[1], accountPath[2], "account", "codex-usage")
+    : undefined;
   return (
     <Alert variant="destructive" className="my-2">
-      <AlertTitle>Codex error</AlertTitle>
-      <AlertDescription className="whitespace-pre-wrap break-words">{notice.text}</AlertDescription>
+      <AlertTitle>{notice.code === "codex_error" ? "Codex error" : "ChatGPT connection error"}</AlertTitle>
+      <AlertDescription className="whitespace-pre-wrap break-words">
+        {notice.text}
+        {notice.code === "chatgpt_reconnect_required" && connect && layout ? (
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => void connect(layout.organizationId, layout.factoryId, "setup")}
+            >
+              Reconnect ChatGPT
+            </Button>
+          </div>
+        ) : notice.code === "chatgpt_reconnect_required" && connectionHref ? (
+          <Link className="ml-1 underline" href={connectionHref}>
+            Reconnect ChatGPT
+          </Link>
+        ) : null}
+      </AlertDescription>
     </Alert>
   );
 }
@@ -304,7 +339,68 @@ function ToolLabel({ tool, tone }: { tool: AgentToolItem; tone: "chat" | "log" }
 }
 
 function visibleActivityItems(items: AgentActivityItem[], live: boolean, keepAssistant: boolean): AgentActivityItem[] {
-  return items.filter((item, index) => isVisibleActivityItem(item, index, items, live, keepAssistant));
+  const authenticationNotices = items.filter(isAuthenticationNotice);
+  const finalNotice = [...authenticationNotices]
+    .reverse()
+    .find((item) => item.code !== "chatgpt_refreshing" && !isLegacyRefreshProgress(item.text));
+  const candidate =
+    finalNotice ||
+    (authenticationNotices.at(-1)?.code !== "chatgpt_refreshing" || live ? authenticationNotices.at(-1) : undefined);
+  const lastNotice = candidate && refreshFinished(candidate, items) ? undefined : candidate;
+  return items
+    .filter((item, index) => isVisibleActivityItem(item, index, items, live, keepAssistant))
+    .filter((item) => !isAuthenticationNotice(item) || item === lastNotice)
+    .map((item) => (item === lastNotice ? normalizeAuthenticationNotice(item, live) : item));
+}
+
+// Agent output after refresh progress means that the refresh succeeded.
+function refreshFinished(notice: AgentNoticeItem, items: AgentActivityItem[]): boolean {
+  if (notice.code !== "chatgpt_refreshing" && !isLegacyRefreshProgress(notice.text)) return false;
+  return items.slice(items.indexOf(notice) + 1).some(isAgentWork);
+}
+
+function isAgentWork(item: AgentActivityItem): boolean {
+  if (item.type === "tool") return true;
+  return item.type === "content" && Boolean(item.text.trim()) && !isThinkingPlaceholder(item.text);
+}
+
+function isLegacyRefreshProgress(text: string): boolean {
+  return /reconnecting[.…\s]*\d+\s*\/\s*\d+/i.test(text);
+}
+
+function isAuthenticationNotice(item: AgentActivityItem): item is AgentNoticeItem {
+  if (item.type !== "notice") return false;
+  if (item.code.startsWith("chatgpt_")) return true;
+  if (item.code !== "codex_error") return false;
+  return (
+    isLegacyRefreshProgress(item.text) ||
+    /chatgpt.*(?:session.*expired|refresh|unauthorized)|(?:401|unauthorized).*workspace.routing/i.test(item.text)
+  );
+}
+
+function normalizeAuthenticationNotice(item: AgentNoticeItem, live: boolean): AgentNoticeItem {
+  if (item.code.startsWith("chatgpt_")) return item;
+  if (isLegacyRefreshProgress(item.text)) {
+    return live
+      ? { ...item, code: "chatgpt_refreshing", text: "Refreshing your ChatGPT connection…" }
+      : {
+          ...item,
+          code: "chatgpt_refresh_failed",
+          text: "SuperPlane could not refresh your ChatGPT connection. Try again.",
+        };
+  }
+  if (/refresh.token.*(?:invalid|expired|reused)|invalid.grant/i.test(item.text)) {
+    return {
+      ...item,
+      code: "chatgpt_reconnect_required",
+      text: "SuperPlane could not refresh your ChatGPT connection. Reconnect ChatGPT to continue.",
+    };
+  }
+  return {
+    ...item,
+    code: "chatgpt_unauthorized",
+    text: "SuperPlane could not authorize your ChatGPT connection. Try again or reconnect ChatGPT.",
+  };
 }
 
 function isVisibleActivityItem(

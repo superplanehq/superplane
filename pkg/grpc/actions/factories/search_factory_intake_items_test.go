@@ -15,7 +15,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -47,14 +46,21 @@ func Test__ProductiveTaskItem(t *testing.T) {
 }
 
 func TestParseGitHubIssueURL(t *testing.T) {
-	repository, number, ok := parseGitHubIssueURL("https://github.com/acme/payments/issues/12#issuecomment-1")
+	host, repository, number, ok := parseGitHubIssueURL("https://github.com/acme/payments/issues/12#issuecomment-1")
 	assert.True(t, ok)
+	assert.Equal(t, "github.com", host.WebHostname())
 	assert.Equal(t, "acme/payments", repository)
 	assert.Equal(t, 12, number)
 
-	_, _, ok = parseGitHubIssueURL("https://github.com/acme/payments/pull/12")
+	host, repository, number, ok = parseGitHubIssueURL("https://acme.ghe.com/acme/payments/issues/12")
+	assert.True(t, ok)
+	assert.Equal(t, "acme.ghe.com", host.WebHostname())
+	assert.Equal(t, "acme/payments", repository)
+	assert.Equal(t, 12, number)
+
+	_, _, _, ok = parseGitHubIssueURL("https://github.com/acme/payments/pull/12")
 	assert.False(t, ok)
-	_, _, ok = parseGitHubIssueURL("https://example.com/acme/payments/issues/12")
+	_, _, _, ok = parseGitHubIssueURL("https://example.com/acme/payments/issues/12")
 	assert.False(t, ok)
 }
 
@@ -349,7 +355,6 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		factory := newFactory(t)
 		intake := createIntake(t, factory)
 		db := database.DB(t.Context())
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 		subscription := true
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
 		req := &pb.ImportFactoryIntakeItemRequest{FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), ItemId: item.ID}

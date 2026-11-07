@@ -14,6 +14,9 @@ import (
 const (
 	RunnerTokenPurpose       = "runner_run"
 	EnvSuperplaneRunnerToken = "SUPERPLANE_RUNNER_TOKEN"
+	// EnvSuperplaneTaskID is the number of the task of the run. The task CLI
+	// uses it when a command needs a task and the caller gives none.
+	EnvSuperplaneTaskID = "SUPERPLANE_TASK_ID"
 )
 
 // RunnerScope is the signed identity of one agent run. The global runner MCP
@@ -31,10 +34,13 @@ type RunnerScope struct {
 	NodeID            string
 	Flow              RunnerFlow
 	Scopes            []RunnerToolScope
-	// MergeChecks and MergeCheckLabels come from the merge confidence token.
+	// MergeChecks and MergeCheckLabels come from the merge confidence scope.
 	// The backend reports a merge check only when its id is in MergeChecks.
 	MergeChecks      []string
 	MergeCheckLabels map[string]string
+	// MergeRepository is the pull request repository that a merge confidence
+	// run scores. The backend stores each check under it.
+	MergeRepository string
 }
 
 func (s *RunnerScope) HasScope(scope RunnerToolScope) bool {
@@ -52,7 +58,7 @@ func (s RunnerScope) complete() error {
 	if s.Flow == RunnerFlowPlanning && s.PlanningSessionID == uuid.Nil {
 		return fmt.Errorf("planning runner scope needs a planning session")
 	}
-	if s.Flow != RunnerFlowPlanning && s.WorkOrderID == uuid.Nil {
+	if s.Flow != RunnerFlowPlanning && s.Flow != RunnerFlowSchedule && s.WorkOrderID == uuid.Nil {
 		return fmt.Errorf("runner scope needs a task")
 	}
 	return nil
@@ -81,6 +87,7 @@ func MintRunnerToken(signer *jwt.Signer, scope RunnerScope, ttl time.Duration) (
 		"flow":                string(scope.Flow),
 		"scopes":              joinRunnerScopes(scope.Scopes),
 		"merge_checks":        strings.Join(scope.MergeChecks, ","),
+		"merge_repository":    scope.MergeRepository,
 	}
 	if len(scope.MergeCheckLabels) > 0 {
 		encoded, err := json.Marshal(scope.MergeCheckLabels)
@@ -131,6 +138,7 @@ func ParseRunnerToken(signer *jwt.Signer, token string) (*RunnerScope, error) {
 	}
 	labels, _ := claims["merge_check_labels"].(string)
 	scope.MergeCheckLabels = parseMergeConfidenceCheckLabels(labels)
+	scope.MergeRepository, _ = claims["merge_repository"].(string)
 	if err := scope.complete(); err != nil {
 		return nil, err
 	}
@@ -179,6 +187,7 @@ func (s *RunnerScope) MergeConfidenceScope() (*MergeConfidenceScope, bool) {
 		NodeExecutionID: s.NodeExecutionID,
 		EnabledChecks:   s.MergeChecks,
 		CheckLabels:     s.MergeCheckLabels,
+		Repository:      s.MergeRepository,
 	}, true
 }
 

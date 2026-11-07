@@ -498,6 +498,8 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
 		exprruntime.DateFunctionOption(),
+		exprruntime.SentryIssueDescriptionOption(),
+		exprruntime.SentryEventHasStackOption(),
 		expr.Function("root", func(params ...any) (any, error) {
 			if len(params) != 0 {
 				return nil, fmt.Errorf("root() takes no arguments")
@@ -549,6 +551,7 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 		}),
 	}
 
+	exprOptions = append(exprOptions, exprruntime.MarkdownFunctionOptions()...)
 	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {
 		return "", err
@@ -1029,12 +1032,17 @@ func (b *NodeConfigurationBuilder) resolveWorkspacePayload() (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("workspace() could not resolve the current workspace: %w", err)
 	}
+	repositories, err := factory.WorkspaceRepositories(b.tx)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not list the workspace repositories: %w", err)
+	}
 	config := factory.OnboardingConfigValue()
 	return map[string]any{
 		"id":                 factory.ID.String(),
 		"key":                factory.Key,
 		"name":               factory.Name,
 		"repository":         config.AppRepository,
+		"repositories":       repositories,
 		"backlog_repository": config.BacklogRepository,
 		"default_branch":     config.DefaultBranch,
 	}, nil
@@ -1112,7 +1120,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"state":          order.State,
 		"result":         order.Result,
 		"repository":     repository,
-		"repository_url": models.VCSRepositoryCloneURL(provider, repository),
+		"repository_url": models.VCSRepositoryCloneURL(provider, repository, githubServerURL(b.tx, owningFactory.OrganizationID, config)),
 		"default_branch": defaultBranch,
 		// Keep this compatibility value until stored canvases no longer reference it.
 		"visual_evidence_enabled": false,
@@ -2425,7 +2433,7 @@ func (b *NodeConfigurationBuilder) applyModelOverride(resolved map[string]any, m
 	}
 	if !ok {
 		if credentials["source"] == "subscription" {
-			return nil, models.ErrSubscriptionModelUnavailable
+			return nil, models.SubscriptionModelUnavailableError(override)
 		}
 		if llmFundingSource(resolved) == models.UsageFundingSourceBYOK {
 			return nil, models.ErrSelectableLLMModelNotAllowed

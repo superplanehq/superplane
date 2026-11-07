@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -10,6 +11,16 @@ import (
 // ValidateRunnerScope rechecks the signed run associations on every request.
 // A token outlives its run, so the backend must not trust the claims alone.
 func ValidateRunnerScope(db *gorm.DB, scope *RunnerScope) error {
+	return validateRunnerScope(db, scope, []string{models.CanvasNodeExecutionStateStarted})
+}
+
+// validateRunnerTokenScope permits startup before NodeExecutor commits the
+// started state. Requests still require a committed, started merge execution.
+func validateRunnerTokenScope(db *gorm.DB, scope *RunnerScope) error {
+	return validateRunnerScope(db, scope, []string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted})
+}
+
+func validateRunnerScope(db *gorm.DB, scope *RunnerScope, mergeExecutionStates []string) error {
 	execution, err := validateRunnerExecution(db, scope)
 	if err != nil {
 		return err
@@ -26,8 +37,13 @@ func ValidateRunnerScope(db *gorm.DB, scope *RunnerScope) error {
 		if canvas.FactoryID == nil || *canvas.FactoryID != scope.FactoryID {
 			return fmt.Errorf("runner canvas does not match")
 		}
-		if execution.State != models.CanvasNodeExecutionStateStarted {
+		if !slices.Contains(mergeExecutionStates, execution.State) {
 			return fmt.Errorf("merge confidence execution is inactive")
+		}
+		return nil
+	case RunnerFlowSchedule:
+		if canvas.FactoryID == nil || *canvas.FactoryID != scope.FactoryID {
+			return fmt.Errorf("runner canvas does not match")
 		}
 		return nil
 	case RunnerFlowTask:

@@ -1,5 +1,5 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ export type ColumnPaging = {
 
 export function MobileColumn({
   column,
+  action,
   hidden,
   cardsPending,
   lane,
@@ -26,6 +27,7 @@ export function MobileColumn({
   renderCard,
 }: {
   column: MobileBoardColumn;
+  action?: ReactNode;
   hidden: boolean;
   cardsPending: boolean;
   lane: { className?: string; surfaceClassName?: string };
@@ -46,6 +48,7 @@ export function MobileColumn({
       data-testid={`mobile-board-column-${column.key}`}
       className={cn("flex h-full w-full shrink-0 snap-start flex-col p-3", lane.className, lane.surfaceClassName)}
     >
+      {action}
       {showEmpty ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 pb-12 text-center">
           <Inbox className="mb-2 size-12 text-muted-foreground/60" strokeWidth={1.25} aria-hidden />

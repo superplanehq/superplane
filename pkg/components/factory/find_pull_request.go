@@ -73,7 +73,7 @@ func (c *FindPullRequest) ExampleOutput() map[string]any {
 			"pullRequest": map[string]any{
 				"id":     "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4",
 				"number": 42,
-				"url":    "https://github.com/acme/app/pull/42",
+				"url":    exampleGitHubHost().RepoURL("acme/app") + "/pull/42",
 			},
 			"workOrder": map[string]any{
 				"id":     "9ac921bc-68e4-46dc-a78b-60b955f3bbf2",
@@ -81,7 +81,7 @@ func (c *FindPullRequest) ExampleOutput() map[string]any {
 				"key":    "SP-123",
 				"url":    "https://app.superplane.com/3ee1aa47-3a60-4c1f-b645-0b9859ab91f8/workspaces/sp-k7m2xqab/work-order/123",
 				"origin": map[string]any{
-					"url":   "https://github.com/acme/app/issues/42",
+					"url":   exampleGitHubHost().RepoURL("acme/app") + "/issues/42",
 					"label": "acme/app#42",
 				},
 			},

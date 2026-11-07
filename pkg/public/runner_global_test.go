@@ -12,6 +12,7 @@ import (
 	runner "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -22,10 +23,14 @@ func TestRunnerToolsFollowTheTokenScopes(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, _, _ := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
 	require.NotEmpty(t, token)
 
 	assert.Equal(t, everyGlobalRunnerTool, listRunnerTools(t, server, token))
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	multiRepoToken := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	assert.Equal(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests"), listRunnerTools(t, server, multiRepoToken))
 
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
 	require.NoError(t, err)
@@ -33,7 +38,7 @@ func TestRunnerToolsFollowTheTokenScopes(t *testing.T) {
 	readOnly, err := runner.MintRunnerToken(jwt.NewSigner("test"), *scope, time.Minute)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"suggest_owners"}, listRunnerTools(t, server, readOnly))
+	assert.Equal(t, []string{"suggest_task_owner"}, listRunnerTools(t, server, readOnly))
 	rec := suggestRunnerOwners(t, server, readOnly, `{}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	rec = assignRunnerOwner(t, server, readOnly, `{"user":"`+r.User.String()+`","reason":"Owns pkg."}`)
@@ -82,7 +87,7 @@ func TestPlanningRunnerTokenOwnsTheDraftTask(t *testing.T) {
 	env := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplanePlanningID, Value: session.ID.String()},
 		{Name: runner.EnvSuperplaneRunToken, Value: planningToken},
-	}, 60)
+	}, 60, nil)
 	token := runnerTokenFrom(env)
 	require.NotEmpty(t, token)
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
@@ -103,11 +108,18 @@ func TestPlanningRunnerTokenOwnsTheDraftTask(t *testing.T) {
 	require.NoError(t, db.Model(session).Update("state", models.PlanningSessionStateEnded).Error)
 	rec = assignRunnerOwner(t, server, token, `{"user":"planning-dev","reason":"Owns pkg/payments."}`)
 	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
-	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, env, 60)))
+	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, env, 60, nil)))
 }
 
+// everyGlobalRunnerTool lists the tools that every run receives.
 var everyGlobalRunnerTool = []string{
-	"suggest_owners", "assign_owner", "list_tasks", "create_task", "close_task", "remove_artifact",
+	"list_members", "assign_task_owner", "suggest_task_owner", "list_tasks", "create_task", "close_task",
+	"list_checks", "add_checks", "remove_checks",
+	"list_artifacts", "get_artifact", "add_artifact", "remove_artifact",
+}
+
+func globalRunnerToolsWith(tools ...string) []string {
+	return append(append([]string{}, everyGlobalRunnerTool...), tools...)
 }
 
 func listRunnerTools(t *testing.T, server *Server, token string) []string {

@@ -5,18 +5,14 @@ import { Button } from "@/components/ui/button";
 import { useCodexUsage } from "@/hooks/useCodexUsage";
 import { useFactoryCodexConnection } from "../onboarding/useFactoryCodexConnection";
 import { FactoryCodexSubscriptionConnection } from "./FactoryCodexSubscriptionConnection";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
 export function FactorySettingsAccountCodexUsagePage() {
   const { organizationId, factoryId } = useFactorySettingsLayout();
-  const features = useExperimentalFeature(organizationId);
-  const enabled = !features.isLoading && features.has(FEATURE_CODEX_SUBSCRIPTIONS);
-  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
-  const query = useCodexUsage(organizationId, enabled);
+  const codex = useFactoryCodexConnection(organizationId, factoryId, true);
+  const query = useCodexUsage(organizationId);
 
   return (
     <FactorySettingsPageFrame title="Codex">
@@ -53,7 +49,9 @@ export function CodexUsageConnections({ connections }: { connections: MeCodexUsa
           <p>Connect your ChatGPT subscription again to update usage.</p>
         ) : null}
         {connection.observedAt &&
-        connection.limits?.some((limit) => limit.primary || limit.secondary || limit.credits) ? (
+        connection.limits?.some(
+          (limit) => limit.primary || limit.secondary || limit.credits || limit.individualLimit,
+        ) ? (
           connection.limits.map((limit) => (
             <div key={limit.limitId} className="space-y-3">
               <p className="font-medium">
@@ -62,7 +60,9 @@ export function CodexUsageConnections({ connections }: { connections: MeCodexUsa
               </p>
               {limit.primary ? <CodexQuotaWindow window={limit.primary} label="Primary window" /> : null}
               {limit.secondary ? <CodexQuotaWindow window={limit.secondary} label="Secondary window" /> : null}
-              {limit.credits ? <CodexCreditsRemaining credits={limit.credits} /> : null}
+              {limit.credits || limit.individualLimit ? (
+                <CodexCreditsRemaining credits={limit.credits} individualLimit={limit.individualLimit} />
+              ) : null}
             </div>
           ))
         ) : (

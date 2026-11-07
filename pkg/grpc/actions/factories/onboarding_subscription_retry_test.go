@@ -21,7 +21,6 @@ func TestOnboardingRetryChangesSubscriptionCredentials(t *testing.T) {
 			support.AssignOpenSystemTrial(t, r.Organization.ID)
 			db := database.DB(t.Context())
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 			require.NoError(t, err)
 			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")

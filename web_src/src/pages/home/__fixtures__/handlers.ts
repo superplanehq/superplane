@@ -145,20 +145,14 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         json: {
           features: [
             {
-              id: "claude_managed_agents",
-              label: "Managed agents",
-              description: "Canvas agent chat",
-              released: true,
+              id: "organization_runners",
+              label: "Organization runners",
+              description: "Manage organization fleets and runners",
             },
             {
               id: "factories",
               label: "Factories",
               description: "Software factories for tasks",
-            },
-            {
-              id: "workspace_models",
-              label: "Workspace Models",
-              description: "Show the in-progress workspace Models settings page",
             },
             {
               id: "organization_byok",
@@ -171,14 +165,15 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Add a custom model provider with a URL, token, and API type",
             },
             {
-              id: "codex_subscriptions",
-              label: "ChatGPT subscriptions",
-              description: "Use personal ChatGPT subscriptions for workspace tasks",
-            },
-            {
               id: "workspace_skills",
               label: "Workspace Skills",
               description: "Add skills for workspace agents",
+            },
+            {
+              id: "factory_multi_repo_tasks",
+              label: "Multi-repo tasks",
+              description:
+                "Let agents change every Read & Write workspace repository and open one pull request per repository",
             },
             {
               id: "superplane_mcp_server",

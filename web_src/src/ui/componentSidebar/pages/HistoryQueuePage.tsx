@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Plus } from "lucide-react";
-import { RUNS_SIDEBAR_ROW_CLASS } from "@/components/CanvasToolSidebar/runsSidebarRowLayout";
+import { RUNS_SIDEBAR_ROW_CLASS } from "@/lib/runsSidebarRowLayout";
 import { cn } from "@/lib/utils";
 import { CompactSidebarEventRow } from "../CompactSidebarEventRow";
 import { SidebarEventItem } from "../SidebarEventItem";

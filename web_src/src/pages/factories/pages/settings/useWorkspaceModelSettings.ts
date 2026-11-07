@@ -3,9 +3,7 @@ import { useRef, useState } from "react";
 import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 
 import type { LLMModelsSwitchProvider, LLMModelsSwitchTarget } from "./FactorySettingsLLMModelsSwitchPreview";
@@ -70,7 +68,7 @@ export function useWorkspaceModelSettings() {
   const canCreateIntegration = permissions.canAct("integrations", "create") && !permissions.isLoading;
   const providers = useModelProviderConnections(organizationId, factoryId, canRead);
   const selection = useCommittedModelSource(factory, providers);
-  const subscription = useCodexSubscriptionAccess(organizationId);
+  const subscription = useCodexSubscriptionAccess();
   const switcher = useModelSourceSwitch(
     organizationId,
     factoryId,
@@ -111,13 +109,9 @@ export function useWorkspaceModelSettings() {
   };
 }
 
-function useCodexSubscriptionAccess(organizationId: string) {
-  const features = useExperimentalFeature(organizationId);
+function useCodexSubscriptionAccess() {
   const { canAct } = usePermissions();
-  const enabled = [!features.isLoading, features.has(FEATURE_CODEX_SUBSCRIPTIONS), canAct("factories", "read")].every(
-    Boolean,
-  );
-  return { offered: enabled };
+  return { offered: canAct("factories", "read") };
 }
 
 function resolveCurrentProvider(

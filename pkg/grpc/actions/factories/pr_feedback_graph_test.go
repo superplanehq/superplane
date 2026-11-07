@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
-func TestPRFeedbackOmitsCommitIdentity(t *testing.T) {
+func TestPRFeedbackIncludesCommitIdentity(t *testing.T) {
 	cases := []struct {
 		name     string
 		provider string
@@ -27,16 +27,15 @@ func TestPRFeedbackOmitsCommitIdentity(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			canvas := testCase.build(prFeedbackBuildRequest{
-				Repository:         "acme/app",
-				Mention:            prFeedbackDefaultMention,
-				VCSProvider:        testCase.provider,
-				OmitCommitIdentity: true,
-				MaximumAttempts:    prFeedbackDefaultMaximumAttempts,
-				CheckNames:         []string{"lint"},
+				Repository:      "acme/app",
+				Mention:         prFeedbackDefaultMention,
+				VCSProvider:     testCase.provider,
+				MaximumAttempts: prFeedbackDefaultMaximumAttempts,
+				CheckNames:      []string{"lint"},
 			})
 			runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
-			assert.False(t, runnerHasStep(t, runner, "Set Up Git User"))
-			assert.False(t, runnerHasStep(t, runner, "Set Up DCO Signing"))
+			assert.True(t, runnerHasStep(t, runner, "Set Up Git User"))
+			assert.True(t, runnerHasStep(t, runner, "Set Up DCO Signing"))
 			assert.True(t, runnerHasStep(t, runner, testCase.prompt))
 			assert.True(t, runnerHasStep(t, runner, "Commit and Push"))
 		})
@@ -109,6 +108,9 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 
 	t.Run("a missing repository binding is not healthy", func(t *testing.T) {
 		spec := prFeedbackSpecFromTemplate(t, "")
+		for i := range spec.Nodes {
+			delete(spec.Nodes[i].Configuration, "repository")
+		}
 
 		graph := resolvePRFeedbackGraph(spec)
 		assert.False(t, graph.Healthy(spec))

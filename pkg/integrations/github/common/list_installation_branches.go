@@ -73,9 +73,17 @@ func newInstallationGitHubClient(
 	if err := RestrictHostedAppTransport(installationTransport, []int64{repositoryID}); err != nil {
 		return nil, err
 	}
+
+	host := DotCom()
+	ApplyHostToInstallationTransport(installationTransport, host)
+	underlying, err := ApplyHostToGitHubClient(github.NewClient(&http.Client{Transport: installationTransport}), host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure GitHub API host: %w", err)
+	}
 	return &Client{
 		authMethod: AuthMethodApp,
-		underlying: github.NewClient(&http.Client{Transport: installationTransport}),
+		host:       host,
+		underlying: underlying,
 	}, nil
 }
 

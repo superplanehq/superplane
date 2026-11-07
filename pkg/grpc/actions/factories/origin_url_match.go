@@ -25,12 +25,12 @@ func workOrderOriginMatch(raw string) (*models.WorkOrderOriginMatch, error) {
 		return nil, err
 	}
 
-	if repository, number, ok := parseGitHubIssueURL(raw); ok {
+	if host, repository, number, ok := parseGitHubIssueURL(raw); ok {
 		owner, repo, found := strings.Cut(repository, "/")
 		if found && owner != "" && repo != "" {
 			pattern := fmt.Sprintf(
-				`^https?://github\.com/%s/%s/issues/%d/?([?#].*)?$`,
-				posixQuote(owner), posixQuote(repo), number,
+				`^https?://%s/%s/%s/issues/%d/?([?#].*)?$`,
+				posixQuote(host.WebHostname()), posixQuote(owner), posixQuote(repo), number,
 			)
 			return originRegexpMatch(pattern), nil
 		}

@@ -14,55 +14,103 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// GitHubChecksTrigger resolves registered checks triggers from the live graph,
-// including graphs whose trigger IDs have been renamed.
-func (h *FactoryPRFeedbackHandler) GitHubChecksTrigger(tx *gorm.DB, repository string) (*CanvasNode, error) {
-	if h.Source != FactoryPRFeedbackHandlerSourcePullRequestChecks || h.Subject != FactoryPRFeedbackHandlerSubjectGitHubPullRequest {
+// VerificationTrigger identifies PR checks and merge confidence from
+// the live graph. Attachment and delivery use the same eligibility rules.
+func (c *Canvas) VerificationTrigger(tx *gorm.DB, provider, repository string) (*CanvasNode, error) {
+	if c.FactoryID == nil || c.DeletedAt.Valid {
 		return nil, nil
 	}
-	if _, err := FindOrganizationByIDInTransaction(tx, h.OrganizationID.String()); errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	canvas, err := FindCanvasInTransaction(tx, h.OrganizationID, h.CanvasID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
+	workspaceRepository, err := isFactoryWorkspaceRepository(tx, c.OrganizationID, *c.FactoryID, repository)
 	if err != nil {
 		return nil, err
 	}
-	if canvas.FactoryID == nil || *canvas.FactoryID != h.FactoryID {
-		return nil, nil
+	nodes, err := verificationTriggers(tx.Where(
+		"workflows.organization_id = ? AND workflows.factory_id = ? AND workflows.id = ?",
+		c.OrganizationID, *c.FactoryID, c.ID,
+	), provider, repository, workspaceRepository)
+	if err != nil || len(nodes) == 0 {
+		return nil, err
 	}
-	version, err := FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	return &nodes[0], nil
+}
+
+func isFactoryWorkspaceRepository(tx *gorm.DB, organizationID, factoryID uuid.UUID, repository string) (bool, error) {
+	factory, err := FindFactory(tx, organizationID, factoryID)
+	if errors.Is(err, ErrFactoryNotFound) {
+		return false, nil
 	}
+	if err != nil {
+		return false, err
+	}
+	return factory.IsWorkspaceRepository(tx, repository)
+}
+
+type verificationTriggerRow struct {
+	CanvasNode    `gorm:"embedded"`
+	LiveNodes     datatypes.JSONSlice[Node]
+	ChecksHandler bool
+}
+
+// Load candidate triggers and their live graphs together. The caller scopes
+// workflows to the organization and factory, optionally to one canvas.
+func verificationTriggers(tx *gorm.DB, provider, repository string, workspaceRepository bool) ([]CanvasNode, error) {
+	var rows []verificationTriggerRow
+	err := tx.Model(&CanvasNode{}).
+		Select("workflow_nodes.*", "live_version.nodes AS live_nodes", "handler.id IS NOT NULL AS checks_handler").
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id AND workflows.deleted_at IS NULL").
+		Joins("JOIN organizations ON organizations.id = workflows.organization_id AND organizations.deleted_at IS NULL").
+		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id AND live_version.workflow_id = workflows.id").
+		Joins("LEFT JOIN factory_pr_feedback_handlers handler ON handler.canvas_id = workflows.id").
+		Where("workflow_nodes.type = ? AND workflow_nodes.state <> ?", NodeTypeTrigger, CanvasNodeStateError).
+		Where(`(
+			(handler.organization_id = workflows.organization_id AND handler.factory_id = workflows.factory_id
+			 AND handler.subject = ? AND handler.source = ?)
+			OR (handler.id IS NULL AND EXISTS (
+				SELECT 1 FROM workflow_nodes template_node
+				WHERE template_node.workflow_id = workflows.id AND template_node.deleted_at IS NULL
+				  AND template_node.metadata -> 'factoryTemplate' ->> 'id' = ?
+			))
+		)`, FactoryPRFeedbackHandlerSubjectGitHubPullRequest, FactoryPRFeedbackHandlerSourcePullRequestChecks, "risk-score").
+		Find(&rows).Error
 	if err != nil {
 		return nil, err
 	}
-	for _, candidate := range version.Nodes {
-		if candidate.Type != NodeTypeTrigger || candidate.ComponentName() != "github.onPullRequest" {
+
+	nodes := make([]CanvasNode, 0, len(rows))
+	for _, row := range rows {
+		if row.ComponentName() != provider+".onPullRequest" {
+			continue
+		}
+		// Bitbucket attachment starts built-in Merge confidence only.
+		if row.ChecksHandler && provider != FactoryPullRequestProviderGitHub {
+			continue
+		}
+		if !row.ChecksHandler && FactoryAppTemplateID(row.LiveNodes) != "risk-score" {
+			continue
+		}
+		if livePullRequestTriggerID(row.LiveNodes, provider, repository, workspaceRepository) == row.NodeID {
+			nodes = append(nodes, row.CanvasNode)
+		}
+	}
+	return nodes, nil
+}
+
+// livePullRequestTriggerID matches a trigger on its repository. A trigger
+// that listens on all workspace repositories matches any workspace repository.
+func livePullRequestTriggerID(nodes []Node, provider, repository string, workspaceRepository bool) string {
+	for _, candidate := range nodes {
+		if candidate.Type != NodeTypeTrigger || candidate.ComponentName() != provider+".onPullRequest" {
 			continue
 		}
 		configured, _ := candidate.Configuration["repository"].(string)
-		if !strings.EqualFold(strings.TrimSpace(configured), repository) {
-			continue
+		if IsWorkspaceRepositoriesExpression(configured) && workspaceRepository {
+			return candidate.ID
 		}
-		node, err := FindCanvasNode(tx, h.CanvasID, candidate.ID)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
+		if strings.EqualFold(strings.TrimSpace(configured), repository) {
+			return candidate.ID
 		}
-		if err != nil {
-			return nil, err
-		}
-		if node.State == CanvasNodeStateError || node.Type != NodeTypeTrigger || node.ComponentName() != "github.onPullRequest" {
-			return nil, nil
-		}
-		return node, nil
 	}
-	return nil, nil
+	return ""
 }
 
 // Include requests whose canvas was deleted so the processor can retire them.
@@ -92,20 +140,18 @@ func ClaimDuePullRequestChecksStartRequest(tx *gorm.DB, id uuid.UUID, leaseUntil
 	return &request, nil
 }
 
-// CreateGitHubChecksEvent serializes startup and webhook delivery for one
-// handler revision. The same delivery stays a duplicate after the run finishes.
-// A later reopen, ready-for-review, or new push starts again only when its
+// CreatePullRequestChecksEvent serializes startup and webhook delivery for PR
+// checks and merge confidence. The same delivery stays a duplicate after the
+// run finishes.
+// A later reopen, ready-for-review, push, or Bitbucket update starts only when its
 // pull request time is newer than the stored snapshot.
-func (n *CanvasNode) CreateGitHubChecksEvent(tx *gorm.DB, event *CanvasEvent) (bool, error) {
-	handler, err := FindPRFeedbackHandlerByCanvasID(tx, n.WorkflowID)
+func (n *CanvasNode) CreatePullRequestChecksEvent(tx *gorm.DB, event *CanvasEvent) (bool, error) {
+	canvas, err := FindUnscopedCanvasInTransaction(tx, n.WorkflowID)
 	if err != nil {
 		return false, err
 	}
-	if handler == nil || handler.Source != FactoryPRFeedbackHandlerSourcePullRequestChecks || handler.Subject != FactoryPRFeedbackHandlerSubjectGitHubPullRequest {
-		return true, tx.Create(event).Error
-	}
 	configuredRepository, _ := n.Configuration.Data()["repository"].(string)
-	trigger, err := handler.GitHubChecksTrigger(tx, configuredRepository)
+	trigger, err := canvas.VerificationTrigger(tx, strings.TrimSuffix(n.ComponentName(), ".onPullRequest"), configuredRepository)
 	if err != nil {
 		return false, err
 	}
@@ -154,36 +200,32 @@ func (n *CanvasNode) CreateGitHubChecksEvent(tx *gorm.DB, event *CanvasEvent) (b
 }
 
 func (p *FactoryPullRequest) enqueueChecksStart(tx *gorm.DB) error {
-	if p.Provider != FactoryPullRequestProviderGitHub || p.State != FactoryPullRequestStateOpen {
+	if (p.Provider != FactoryPullRequestProviderGitHub && p.Provider != FactoryPullRequestProviderBitbucket) || p.State != FactoryPullRequestStateOpen {
 		return nil
 	}
-	factory := &Factory{ID: p.FactoryID, OrganizationID: p.OrganizationID}
-	handlers, err := factory.ListPRFeedbackHandlers(tx)
+	workspaceRepository, err := isFactoryWorkspaceRepository(tx, p.OrganizationID, p.FactoryID, p.Repository)
 	if err != nil {
 		return err
 	}
-	for i := range handlers {
-		node, err := handlers[i].GitHubChecksTrigger(tx, p.Repository)
-		if err != nil {
-			return err
-		}
-		if node == nil {
-			continue
-		}
-		now := time.Now()
-		request := CanvasNodeRequest{
+	nodes, err := verificationTriggers(tx.Where(
+		"workflows.organization_id = ? AND workflows.factory_id = ?", p.OrganizationID, p.FactoryID,
+	), p.Provider, p.Repository, workspaceRepository)
+	if err != nil || len(nodes) == 0 {
+		return err
+	}
+	now := time.Now()
+	requests := make([]CanvasNodeRequest, 0, len(nodes))
+	for _, node := range nodes {
+		requests = append(requests, CanvasNodeRequest{
 			ID: uuid.New(), WorkflowID: node.WorkflowID, NodeID: node.NodeID,
 			Type: NodeRequestTypePullRequestChecksStart, State: NodeExecutionRequestStatePending,
 			Spec: datatypes.NewJSONType(NodeExecutionRequestSpec{PullRequestChecksStart: &PullRequestChecksStartRequest{
 				OrganizationID: p.OrganizationID.String(), FactoryID: p.FactoryID.String(), PullRequestID: p.ID.String(),
 			}}),
 			RunAt: now, CreatedAt: now, UpdatedAt: now,
-		}
-		if err := tx.Create(&request).Error; err != nil {
-			return err
-		}
+		})
 	}
-	return nil
+	return tx.Create(&requests).Error
 }
 
 type checksEventIdentity struct {
@@ -207,7 +249,7 @@ func repairLegacyChecksDedupKeys(tx *gorm.DB, node *CanvasNode, key string, inco
 		UPDATE workflow_events
 		SET dedup_key = ?
 		WHERE workflow_id = ? AND node_id = ? AND dedup_key IS NULL
-		  AND data ->> 'type' = 'github.pullRequest'
+		  AND data ->> 'type' IN ('github.pullRequest', 'bitbucket.pullRequest')
 		  AND lower(data #>> '{data,repository,full_name}') = ?
 		  AND data #>> '{data,pull_request,number}' = ?
 		  AND data #>> '{data,pull_request,head,sha}' = ?
@@ -216,6 +258,7 @@ func repairLegacyChecksDedupKeys(tx *gorm.DB, node *CanvasNode, key string, inco
 
 func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 	var payload struct {
+		Type string `json:"type"`
 		Data struct {
 			Action     string `json:"action"`
 			Before     string `json:"before"`
@@ -229,6 +272,9 @@ func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 					SHA string `json:"sha"`
 				} `json:"head"`
 			} `json:"pull_request"`
+			BitbucketPullRequest struct {
+				UpdatedOn string `json:"updated_on"`
+			} `json:"pullrequest"`
 		} `json:"data"`
 	}
 	raw, err := event.Data.MarshalJSON()
@@ -241,9 +287,13 @@ func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 	repository := strings.ToLower(strings.TrimSpace(payload.Data.Repository.FullName))
 	sha := strings.TrimSpace(payload.Data.PullRequest.Head.SHA)
 	if repository == "" || payload.Data.PullRequest.Number <= 0 || sha == "" {
-		return checksEventIdentity{}, errors.New("GitHub checks event has no repository, PR number, or head SHA")
+		return checksEventIdentity{}, errors.New("pull request checks event has no repository, PR number, or head SHA")
 	}
 	updatedAt, hasUpdatedAt := parseChecksUpdatedAt(payload.Data.PullRequest.UpdatedAt)
+	if !hasUpdatedAt && payload.Type == "bitbucket.pullRequest" {
+		// Older Bitbucket events keep only the provider's original timestamp.
+		updatedAt, hasUpdatedAt = parseChecksUpdatedAt(payload.Data.BitbucketPullRequest.UpdatedOn)
+	}
 	return checksEventIdentity{
 		repository:   repository,
 		number:       strconv.FormatInt(payload.Data.PullRequest.Number, 10),
@@ -294,7 +344,7 @@ func sameChecksDelivery(left, right checksEventIdentity) bool {
 
 func checksEventIsLaterLifecycle(stored []checksEventIdentity, incoming checksEventIdentity) bool {
 	switch incoming.action {
-	case "reopened", "ready_for_review", "synchronize":
+	case "reopened", "ready_for_review", "synchronize", "updated":
 		if !incoming.hasUpdatedAt {
 			return false
 		}

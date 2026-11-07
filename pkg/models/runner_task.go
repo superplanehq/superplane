@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -70,6 +71,7 @@ type RunnerTask struct {
 
 	/*
 	 * PayloadCiphertext protects task inputs, which can contain credentials and other secrets.
+	 * Terminal transitions discard it; nil represents SQL NULL.
 	 */
 	PayloadCiphertext []byte
 
@@ -147,9 +149,10 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 		result := tx.Model(t).
 			Where("state IN ? AND runner_id IS NULL", []string{RunnerTaskStatePending, RunnerTaskStateQueued}).
 			Updates(map[string]any{
-				"state":       RunnerTaskStateCanceled,
-				"finished_at": now,
-				"updated_at":  now,
+				"state":              RunnerTaskStateCanceled,
+				"payload_ciphertext": nil,
+				"finished_at":        now,
+				"updated_at":         now,
 			})
 		if result.Error != nil {
 			return result.Error
@@ -158,6 +161,7 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 			return ErrRunnerTaskNotReservable
 		}
 		t.State = RunnerTaskStateCanceled
+		t.PayloadCiphertext = nil
 		t.FinishedAt = &now
 		t.UpdatedAt = now
 		return nil
@@ -187,17 +191,52 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 	return nil
 }
 
-// FailQueued rejects an attempt that no runner has observed. Failure and lease
-// release commit together, including when called without an outer transaction.
-func (t *RunnerTask) FailQueued(tx *gorm.DB, message string, now time.Time) error {
+// RequestCancelRunnerTasks requests cancellation of tasks that the caller
+// read without a lock. It locks runners before tasks, like reservation and
+// completion, and reloads each task so a task that finished or changed state
+// after the read is cancelled from its current state. It returns the reloaded
+// tasks in the input order.
+func RequestCancelRunnerTasks(tx *gorm.DB, tasks []RunnerTask, now time.Time) ([]RunnerTask, error) {
+	var runnerIDs []uuid.UUID
+	for _, task := range tasks {
+		if task.RunnerID != nil {
+			runnerIDs = append(runnerIDs, *task.RunnerID)
+		}
+	}
+	if len(runnerIDs) > 0 {
+		var runners []Runner
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id IN ?", runnerIDs).Order("id").Find(&runners).Error; err != nil {
+			return nil, err
+		}
+	}
+	current := make([]RunnerTask, 0, len(tasks))
+	for _, task := range tasks {
+		locked, err := FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE"}), task.ID)
+		if err != nil {
+			return nil, err
+		}
+		if err := locked.RequestCancel(tx, now); err != nil {
+			return nil, err
+		}
+		current = append(current, *locked)
+	}
+	return current, nil
+}
+
+// FailUnassigned rejects a pending or queued attempt that no runner has
+// observed. Failure and lease release commit together, including when called
+// without an outer transaction.
+func (t *RunnerTask) FailUnassigned(tx *gorm.DB, message string, now time.Time) error {
 	err := tx.Transaction(func(tx *gorm.DB) error {
 		result := tx.Model(&RunnerTask{}).
-			Where("id = ? AND state = ? AND runner_id IS NULL", t.ID, RunnerTaskStateQueued).
+			Where("id = ? AND state IN ? AND runner_id IS NULL", t.ID,
+				[]string{RunnerTaskStatePending, RunnerTaskStateQueued}).
 			Updates(map[string]any{
-				"state":         RunnerTaskStateFailed,
-				"error_message": message,
-				"finished_at":   now,
-				"updated_at":    now,
+				"state":              RunnerTaskStateFailed,
+				"payload_ciphertext": nil,
+				"error_message":      message,
+				"finished_at":        now,
+				"updated_at":         now,
 			})
 		if result.Error != nil {
 			return result.Error
@@ -211,6 +250,7 @@ func (t *RunnerTask) FailQueued(tx *gorm.DB, message string, now time.Time) erro
 		return err
 	}
 	t.State = RunnerTaskStateFailed
+	t.PayloadCiphertext = nil
 	t.ErrorMessage = &message
 	t.FinishedAt = &now
 	t.UpdatedAt = now
@@ -473,13 +513,14 @@ func (t *RunnerTask) Complete(
 		storedError = &errorMessage
 	}
 	taskResult := tx.Model(t).Updates(map[string]any{
-		"state":           state,
-		"result":          result,
-		"exit_code":       exitCode,
-		"error_message":   storedError,
-		"completion_hash": completionHash,
-		"finished_at":     now,
-		"updated_at":      now,
+		"state":              state,
+		"payload_ciphertext": nil,
+		"result":             result,
+		"exit_code":          exitCode,
+		"error_message":      storedError,
+		"completion_hash":    completionHash,
+		"finished_at":        now,
+		"updated_at":         now,
 	})
 	if taskResult.Error != nil {
 		return false, taskResult.Error
@@ -515,6 +556,7 @@ func (t *RunnerTask) Complete(
 		return false, ErrRunnerTaskNotCompletable
 	}
 	t.State = state
+	t.PayloadCiphertext = nil
 	t.Result = result
 	t.ExitCode = &exitCode
 	t.ErrorMessage = storedError
@@ -606,8 +648,8 @@ func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTas
 			return err
 		}
 		if err := task.reserveLocked(tx, r); err != nil {
-			if IsPermanentSubscriptionAdmissionError(err) || errors.Is(err, ErrSelectableLLMModelNotAllowed) {
-				reservation, err = task.rejectSubscriptionAdmission(tx, err)
+			if IsPermanentSubscriptionAdmissionError(err) || errors.Is(err, ErrSelectableLLMModelNotAllowed) || errors.Is(err, billing.ErrHostedCreditEmpty) {
+				reservation, err = task.rejectAdmission(tx, err)
 			}
 			return err
 		}
@@ -617,7 +659,44 @@ func (r *Runner) reserveCandidate(tx *gorm.DB, candidate *RunnerTask) (RunnerTas
 	return reservation, err
 }
 
-func (t *RunnerTask) rejectSubscriptionAdmission(tx *gorm.DB, admissionError error) (RunnerTaskReservationResult, error) {
+// RejectRunnerTaskWithoutComputeCredit fails an unassigned task when its fleet
+// bills compute and the organization has no hosted credit. Task-bound runner
+// creation calls it after its own transaction rolls back, so the task does not
+// keep its organization slot. The result is empty when the task still has
+// credit or is no longer unassigned.
+func RejectRunnerTaskWithoutComputeCredit(tx *gorm.DB, taskID uuid.UUID) (RunnerTaskReservationResult, error) {
+	var result RunnerTaskReservationResult
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		task, err := FindRunnerTask(tx.Clauses(clause.Locking{Strength: "UPDATE"}), taskID)
+		if err != nil {
+			return err
+		}
+		if !task.isUnassigned() {
+			return nil
+		}
+		fleet, err := FindRunnerFleet(tx, task.FleetID)
+		if err != nil {
+			return err
+		}
+		creditErr := fleet.RequireComputeCredit(tx, task.OrganizationID)
+		if !errors.Is(creditErr, billing.ErrHostedCreditEmpty) {
+			return creditErr
+		}
+		result, err = task.rejectAdmission(tx, creditErr)
+		return err
+	})
+	if err != nil {
+		return RunnerTaskReservationResult{}, err
+	}
+	return result, nil
+}
+
+func (t *RunnerTask) isUnassigned() bool {
+	return t.RunnerID == nil && t.Backend == RunnerTaskBackendIntegrated &&
+		(t.State == RunnerTaskStatePending || t.State == RunnerTaskStateQueued)
+}
+
+func (t *RunnerTask) rejectAdmission(tx *gorm.DB, admissionError error) (RunnerTaskReservationResult, error) {
 	var result RunnerTaskReservationResult
 	lease, err := FindCodexLeaseByTask(tx, t.ID)
 	if err != nil {
@@ -632,7 +711,7 @@ func (t *RunnerTask) rejectSubscriptionAdmission(tx *gorm.DB, admissionError err
 			result.LoginConnections = append(result.LoginConnections, *connection)
 		}
 	}
-	if err := t.FailQueued(tx, admissionError.Error(), time.Now()); err != nil {
+	if err := t.FailUnassigned(tx, admissionError.Error(), time.Now()); err != nil {
 		return RunnerTaskReservationResult{}, err
 	}
 	result.FailedTasks = append(result.FailedTasks, t)
@@ -665,6 +744,9 @@ func (t *RunnerTask) reserveLocked(tx *gorm.DB, runner *Runner) error {
 			return err
 		}
 		return ErrRunnerTaskAlreadyAssigned
+	}
+	if err := fleet.RequireComputeCredit(tx, t.OrganizationID); err != nil {
+		return err
 	}
 	if err := t.RequireSubscriptionLeaseAdmission(tx); err != nil {
 		return err

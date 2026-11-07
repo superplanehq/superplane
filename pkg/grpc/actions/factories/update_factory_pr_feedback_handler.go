@@ -60,7 +60,7 @@ func UpdateFactoryPRFeedbackHandler(
 		if name == "" {
 			return nil, factoryErrorToStatus(invalidArgument("handler name cannot be empty"), "failed to update factory PR feedback handler")
 		}
-		if _, err := canvases.UpdateCanvas(ctx, db, canvas, &name, nil, nil); err != nil {
+		if _, err := canvases.UpdateCanvas(ctx, db, canvas, &name, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -153,7 +153,9 @@ func applyPRFeedbackSettings(
 				if configuration == nil {
 					configuration = map[string]any{}
 				}
-				configuration["repository"] = updated.Repository
+				if !prFeedbackWorkspaceScope(configuration) {
+					configuration["repository"] = updated.Repository
+				}
 				if !graph.isChecks() {
 					configuration["contentFilter"] = updated.Mention
 					configuration["ignoreBots"] = updated.IgnoreBots
@@ -168,7 +170,9 @@ func applyPRFeedbackSettings(
 				if configuration == nil {
 					configuration = map[string]any{}
 				}
-				configuration["repository"] = updated.Repository
+				if !prFeedbackWorkspaceScope(configuration) {
+					configuration["repository"] = updated.Repository
+				}
 				// ponytail: wait nodes name required builds per provider
 				delete(configuration, "checkNames")
 				delete(configuration, "buildKeys")

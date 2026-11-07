@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -349,6 +350,25 @@ func (f *RunnerFleet) RequireAdmission(tx *gorm.DB) error {
 	return nil
 }
 
+// RequireComputeCredit checks the wallet only when this fleet bills VM time.
+func (f *RunnerFleet) RequireComputeCredit(tx *gorm.DB, organizationID uuid.UUID) error {
+	if !billing.Enabled() {
+		return nil
+	}
+	price, err := billing.PriceCompute(billing.ComputeUsage{MachineType: f.Slug, FleetID: f.Slug, DurationSeconds: 1})
+	if err != nil || price.CostMicros <= 0 {
+		return err
+	}
+	credit, err := billing.DescribeCredit(tx, organizationID)
+	if err != nil {
+		return err
+	}
+	if credit.RemainingMicros <= 0 {
+		return billing.ErrHostedCreditEmpty
+	}
+	return nil
+}
+
 func FindRunnerFleet(tx *gorm.DB, id uuid.UUID) (*RunnerFleet, error) {
 	var fleet RunnerFleet
 	err := tx.First(&fleet, "id = ?", id).Error
@@ -434,6 +454,13 @@ func (f *RunnerFleet) ListRunners(tx *gorm.DB, page ListPage) (RunnerListPage, e
 }
 
 func (f *RunnerFleet) ListTasks(tx *gorm.DB, page ListPage) (TaskListPage, error) {
+	if f.ScopeType == RunnerFleetScopeOrganization {
+		if f.ScopeID == nil {
+			return TaskListPage{}, ErrRunnerFleetNotFound
+		}
+		// Clone the scoped statement for counts, cursors, and page queries.
+		tx = tx.Where("organization_id = ?", *f.ScopeID).Session(&gorm.Session{})
+	}
 	total, err := countFleetRecords(tx, &RunnerTask{}, f.ID, page.States)
 	if err != nil {
 		return TaskListPage{}, err

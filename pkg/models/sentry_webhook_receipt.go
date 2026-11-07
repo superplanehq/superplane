@@ -14,6 +14,7 @@ import (
 const (
 	SentryWebhookOutcomeAccepted     = "accepted"
 	SentryWebhookOutcomeNoConnection = "no_connection"
+	SentryWebhookOutcomeSkipped      = "skipped"
 	SentryWebhookOutcomeRejected     = "rejected"
 	SentryWebhookOutcomeFailed       = "failed"
 

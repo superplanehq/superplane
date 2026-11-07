@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -17,7 +18,7 @@ import (
 // GitHub's create-ref API does not return a browse URL. After the
 // branch exists we already have owner/repo + name, so we persist this
 // at attach time instead of waiting for a pull request.
-func branchTreeURL(provider, repository, name string) string {
+func branchTreeURL(provider, githubHost, repository, name string) string {
 	repo := strings.TrimRight(strings.TrimSpace(repository), "/")
 	branch := strings.TrimSpace(name)
 	if repo == "" || branch == "" {
@@ -43,7 +44,11 @@ func branchTreeURL(provider, repository, name string) string {
 	if bitbucketProvider(provider) {
 		return "https://bitbucket.org/" + owner + "/" + rest + "/src/" + encodeBranchPath(branch)
 	}
-	return "https://github.com/" + owner + "/" + rest + "/tree/" + encodeBranchPath(branch)
+	host, err := githubcommon.ParseHost(githubHost)
+	if err != nil {
+		host = githubcommon.DotCom()
+	}
+	return host.TreeURL(owner+"/"+rest, encodeBranchPath(branch))
 }
 
 // branchRootSegment is the path piece before the branch name.
@@ -76,7 +81,7 @@ func encodeBranchPath(name string) string {
 	return strings.Join(encoded, "/")
 }
 
-func applyBranchTreeURL(provider string, config AddWorkOrderArtifactConfiguration, data map[string]any) map[string]any {
+func applyBranchTreeURL(provider, githubHost string, config AddWorkOrderArtifactConfiguration, data map[string]any) map[string]any {
 	if config.ArtifactType != "branch" {
 		return data
 	}
@@ -102,7 +107,7 @@ func applyBranchTreeURL(provider string, config AddWorkOrderArtifactConfiguratio
 		name = artifactString(data, "name")
 	}
 
-	tree := branchTreeURL(provider, repo, name)
+	tree := branchTreeURL(provider, githubHost, repo, name)
 	if tree == "" {
 		return data
 	}

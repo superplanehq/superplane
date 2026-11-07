@@ -16,6 +16,8 @@ import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMo
 type SettingsContext = { organizationId?: string; factoryId?: string; canvasId?: string };
 type SettingsDraft = {
   agentBase: SuperplaneComponentsNode;
+  publishingBase?: SuperplaneComponentsNode;
+  publishResults: boolean;
   agentDraft: PlanningReviewDraft;
   checks: MergeConfidenceCheck[];
   savedSnapshot: string;
@@ -41,18 +43,21 @@ function nodeUpdate(draft: SettingsDraft): NodeConfigurationUpdate {
 function snapshot(draft: SettingsDraft): string {
   return JSON.stringify({
     update: nodeUpdate(draft),
+    publishResults: draft.publishResults,
     checks: draft.checks,
     durationMinutes: draft.durationMinutes,
     durationInvalid: draft.durationInvalid,
   });
 }
 
-function createDraft(agent: SuperplaneComponentsNode): SettingsDraft {
+function createDraft(agent: SuperplaneComponentsNode, publishing?: SuperplaneComponentsNode): SettingsDraft {
   const agentBase = structuredClone(agent);
   const component = canvasNodeToPlanningReviewComponent(agentBase as CanvasSpecNode);
   const agentDraft = { title: component.title, components: [component] };
   const draft: SettingsDraft = {
     agentBase,
+    publishingBase: publishing ? structuredClone(publishing) : undefined,
+    publishResults: publishing?.configuration?.enabled !== false,
     agentDraft,
     checks: enabledMergeChecks(expandMergeConfidenceSteps(draftSteps(agentDraft))),
     savedSnapshot: "",
@@ -93,8 +98,12 @@ async function updateForSave(current: SettingsDraft, context: SettingsContext): 
   };
 }
 
-export function useMergeConfidenceSettingsDraft(agent: SuperplaneComponentsNode | undefined, context: SettingsContext) {
-  const [draft, setDraft] = useState<SettingsDraft | null>(() => (agent ? createDraft(agent) : null));
+export function useMergeConfidenceSettingsDraft(
+  agent: SuperplaneComponentsNode | undefined,
+  context: SettingsContext,
+  publishing?: SuperplaneComponentsNode,
+) {
+  const [draft, setDraft] = useState<SettingsDraft | null>(() => (agent ? createDraft(agent, publishing) : null));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
   const draftRef = useRef(draft);
@@ -107,10 +116,10 @@ export function useMergeConfidenceSettingsDraft(agent: SuperplaneComponentsNode 
       (draftRef.current && snapshot(draftRef.current) !== draftRef.current.savedSnapshot)
     )
       return;
-    const incoming = createDraft(agent);
+    const incoming = createDraft(agent, publishing);
     draftRef.current = incoming;
     setDraft(incoming);
-  }, [agent]);
+  }, [agent, publishing]);
 
   const patchDraft = (patch: Partial<SettingsDraft>) => {
     if (!draftRef.current) return;
@@ -130,8 +139,21 @@ export function useMergeConfidenceSettingsDraft(agent: SuperplaneComponentsNode 
     setSaveError(undefined);
     try {
       const update = await updateForSave(current, context);
+      const publication = current.publishingBase;
+      const updates: NodeConfigurationSave = publication
+        ? [
+            update,
+            {
+              nodeId: publication.id ?? "",
+              name: publication.name ?? "",
+              configuration: { ...publication.configuration, enabled: current.publishResults },
+              integration: publication.integration,
+              concurrency: publication.concurrency,
+            },
+          ]
+        : update;
       try {
-        await onSave(update);
+        await onSave(updates);
       } catch {
         throw new Error("Could not save Merge confidence settings. Try saving again.");
       }
@@ -160,6 +182,7 @@ export function useMergeConfidenceSettingsDraft(agent: SuperplaneComponentsNode 
     saveError,
     save,
     updateAgentDraft: (agentDraft: PlanningReviewDraft) => patchDraft({ agentDraft }),
+    updatePublishResults: (publishResults: boolean) => patchDraft({ publishResults }),
     updateChecks: (check: MergeConfidenceCheck, enabled: boolean) => {
       if (!draftRef.current) return;
       const checks = enabled

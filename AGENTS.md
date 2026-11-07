@@ -69,7 +69,7 @@ approvals, and an operational UI.
   integrated runner and Fleet Manager. Local development uses this stack.
 - Legacy runner source lives in
   [superplanehq/runner](https://github.com/superplanehq/runner). The application
-  retains broker access only for historical logs.
+  reads historical task records and archived logs from SuperPlane storage.
 - `Makefile` — the entrypoint for all common tasks.
 - `.semaphore/` — CI pipelines. There is no `.github/workflows/` directory.
 
@@ -112,8 +112,8 @@ token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
 `make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
-runner API and Docker Fleet Manager. Keep `TASK_BROKER_*` in `.env` only
-when historical execution logs remain on the legacy broker (see `.env.example`).
+runner API and Docker Fleet Manager. Historical tasks use the same task
+database and blob storage as integrated tasks.
 
 The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
 `jq`, ffmpeg, ffprobe, whisper-cli, yt-dlp, and the Whisper tiny model. Factory
@@ -236,14 +236,19 @@ from published charts and verified deployed configuration.
   [pkg/grpc/actions/factories/AGENTS.md](pkg/grpc/actions/factories/AGENTS.md).
 - Before adding a test, identify the observable behavior and a credible
   regression that existing coverage does not catch.
-- Do not pin cosmetic CSS classes, wrapper structure, or copied display
-  constants without an explicit product contract. Preserve checks for
-  visibility, accessibility, theme behavior, and other functional requirements.
+- Test observable behavior, not incidental presentation. Prefer accessible
+  roles and stable test IDs. Assert exact UI text only when its wording is the
+  behavior under test. Avoid repeated assertions about copy, CSS classes,
+  layout, or DOM structure. Preserve checks for visibility, accessibility,
+  theme behavior, and other functional requirements.
 - Prefer tests that execute the real behavior over duplicate private-helper
   or generated-source assertions. Before removing overlapping coverage,
   confirm that the retained test exercises the same regression and runs in CI.
 - Tests end with `_test.go`.
 - Always prefer early returns over else blocks when possible.
+- Name non-obvious UI state rules. If a condition combines several states or
+  exceptions, extract it into a function that names the decision. Add a short
+  comment when the product reason is not clear from the code.
 - Go: prefer `any` over `interface{}`.
 - Go: to check membership in a slice, use `slices.Contains` or `slices.ContainsFunc`.
 - Avoid variable names like `*Str` or `*UUID`; Go is typed, so types don't belong

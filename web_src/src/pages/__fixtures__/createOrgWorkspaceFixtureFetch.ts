@@ -1,8 +1,3 @@
-import {
-  buildStorybookAgentChat,
-  createStorybookAgentMessageStore,
-  matchStorybookAgentMessageRoute,
-} from "@/pages/app/__fixtures__/agentChatResponses";
 import { matchCanvasAppFixture, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import {
   factoriesOrganizationUsersResponse,
@@ -70,7 +65,6 @@ export function createOrgWorkspaceFixtureFetch(
   const factoriesFixture = options?.factoriesFixture ? structuredClone(options.factoriesFixture) : undefined;
   // Connect flows push into this list, so each fetch impl owns a private copy.
   const orgIntegrations: StorybookOrgIntegration[] = structuredClone(options?.orgIntegrations ?? []);
-  const agentMessages = createStorybookAgentMessageStore(appFixture?.agentMessages?.messages);
   const accountState = createStorybookAccountState(homeFixture.organizationId, {
     billingEnabled: homeFixture.billingEnabled,
   });
@@ -89,17 +83,6 @@ export function createOrgWorkspaceFixtureFetch(
           : factoriesFixture?.workspaceModelPolicyDelayMs?.GET;
       if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
     }
-    const agentRoute = matchStorybookAgentMessageRoute({
-      pathname: url.pathname,
-      method,
-      body,
-      agentMessages,
-      resetChat: () => appFixture?.agentChat ?? buildStorybookAgentChat(appFixture?.canvasId ?? ""),
-    });
-    if (agentRoute) {
-      return fixtureResponse(agentRoute);
-    }
-
     const resolved = await resolveOrgWorkspaceFixture({
       url,
       method,

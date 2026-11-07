@@ -1,6 +1,7 @@
 "use strict";
 
 const fs = require("node:fs");
+const path = require("node:path");
 
 const { createClient } = require("./superplane_mcp/client");
 const registry = require("./superplane_mcp/registry");
@@ -10,12 +11,18 @@ const labelAlias = { name: "title" };
 
 const COMMANDS = [
   {
+    words: ["task", "members"],
+    usage: "superplane task members",
+    flags: [],
+    tool: "list_members",
+  },
+  {
     words: ["task", "owner", "suggest"],
     usage: "superplane task owner suggest [--path PATH]",
     flags: ["path"],
     repeat: ["path"],
     alias: { path: "paths" },
-    tool: "suggest_owners",
+    tool: "suggest_task_owner",
   },
   {
     words: ["task", "owner", "assign"],
@@ -24,7 +31,7 @@ const COMMANDS = [
     boolean: ["only-if-unassigned"],
     alias: { "only-if-unassigned": "only_if_unassigned" },
     required: ["user"],
-    tool: "assign_owner",
+    tool: "assign_task_owner",
   },
   {
     words: ["task", "list"],
@@ -50,23 +57,8 @@ const COMMANDS = [
     words: ["task", "plan"],
     usage: "superplane task plan [--file PATH] [--scores PATH] [--survey PATH]",
     flags: ["file", "scores", "survey"],
-    tool: "propose_update",
+    tool: "propose_plan",
     prepare: planInput,
-  },
-  {
-    words: ["task", "attachment", "inspect"],
-    usage: "superplane task attachment inspect --path PATH",
-    flags: ["path"],
-    required: ["path"],
-    tool: "inspect_attachment",
-  },
-  {
-    words: ["task", "evidence", "inspect"],
-    usage: "superplane task evidence inspect --file PATH",
-    flags: ["file"],
-    alias: { file: "path" },
-    required: ["path"],
-    tool: "inspect_screenshot",
   },
   {
     words: ["task", "evidence", "unavailable"],
@@ -77,12 +69,26 @@ const COMMANDS = [
     prepare: evidenceUnavailableInput,
   },
   {
+    words: ["task", "artifact", "list"],
+    usage: "superplane task artifact list [--type markdown|link|file]",
+    flags: ["type"],
+    tool: "list_artifacts",
+  },
+  {
+    words: ["task", "artifact", "get"],
+    usage: "superplane task artifact get (--id ID | --key KEY | --path PATH)",
+    flags: ["id", "key", "path"],
+    tool: "get_artifact",
+    prepare: shellPaths,
+  },
+  {
     words: ["task", "artifact", "add-link"],
     usage: "superplane task artifact add-link --url URL [--name NAME] [--key KEY]",
     flags: ["url", ...labelFlags],
     alias: labelAlias,
     required: ["url"],
-    tool: "publish_link",
+    tool: "add_artifact",
+    prepare: (input) => ({ ...input, type: "link" }),
     line: (result) => result.url,
   },
   {
@@ -91,16 +97,18 @@ const COMMANDS = [
     flags: ["file", ...labelFlags],
     alias: labelAlias,
     required: ["file"],
+    tool: "add_artifact",
+    prepare: markdownInput,
     line: (result) => result.title,
-    run: publishMarkdownFile,
   },
   {
     words: ["task", "artifact", "add-file"],
-    usage: "superplane task artifact add-file --file PATH [--poster PATH] [--name NAME]",
-    flags: ["file", "poster", "name", "title"],
-    alias: { file: "path", poster: "posterPath", name: "title" },
+    usage: "superplane task artifact add-file --file PATH [--poster PATH] [--name NAME] [--key KEY]",
+    flags: ["file", "poster", ...labelFlags],
+    alias: { file: "path", poster: "posterPath", ...labelAlias },
     required: ["path"],
-    tool: "upload_artifact",
+    tool: "add_artifact",
+    prepare: (input) => ({ ...shellPaths(input), type: "file" }),
     line: (result) => result.title,
   },
   {
@@ -118,16 +126,48 @@ const COMMANDS = [
     tool: "report_merge_check",
   },
   {
+    words: ["task", "check", "list"],
+    usage: "superplane task check list [--task TASK]",
+    flags: ["task"],
+    env: { task: "SUPERPLANE_TASK_ID" },
+    required: ["task"],
+    tool: "list_checks",
+  },
+  {
     words: ["task", "check", "add"],
-    usage: "superplane task check add --name NAME",
-    flags: ["name"],
-    required: ["name"],
+    usage:
+      "superplane task check add --key KEY --name NAME --score N --max-score N --level positive|caution|critical --reason TEXT",
+    flags: ["key", "name", "score", "max-score", "level", "reason"],
+    alias: { "max-score": "max_score" },
+    required: ["key", "name", "score", "max_score", "level", "reason"],
+    tool: "add_checks",
+    prepare: (input) => ({ checks: [input] }),
   },
   {
     words: ["task", "check", "remove"],
-    usage: "superplane task check remove --name NAME",
-    flags: ["name"],
-    required: ["name"],
+    usage: "superplane task check remove --key KEY [--key KEY]",
+    flags: ["key"],
+    repeat: ["key"],
+    alias: { key: "keys" },
+    required: ["keys"],
+    tool: "remove_checks",
+  },
+  {
+    words: ["task", "pr", "open"],
+    usage: "superplane task pr open --title TITLE [--body-file PATH] [--directory DIR] [--base BRANCH] [--draft]",
+    flags: ["title", "body-file", "directory", "base", "draft"],
+    boolean: ["draft"],
+    alias: { "body-file": "bodyFile" },
+    required: ["title"],
+    tool: "open_pull_request",
+    prepare: pullRequestInput,
+    line: (result) => result.url,
+  },
+  {
+    words: ["task", "pr", "list"],
+    usage: "superplane task pr list",
+    flags: [],
+    tool: "list_pull_requests",
   },
   {
     words: ["task", "move"],
@@ -145,7 +185,8 @@ function findCommand(args) {
   return COMMANDS.find((command) => command.words.every((word, index) => args[index] === word));
 }
 
-function parseCommand(argv) {
+// env names the environment variable that fills a flag the caller omits.
+function parseCommand(argv, env = {}) {
   const args = Array.isArray(argv) ? argv : [];
   const command = findCommand(args);
   if (!command) throw new Error(usage());
@@ -171,6 +212,11 @@ function parseCommand(argv) {
       input[stored] = value;
     }
     index += 1;
+  }
+
+  for (const [name, variable] of Object.entries(command.env || {})) {
+    const value = String(env[variable] || "").trim();
+    if (input[name] === undefined && value) input[name] = value;
   }
 
   for (const name of command.required || []) {
@@ -204,6 +250,15 @@ function readJSON(file) {
   }
 }
 
+// A shell path is relative to the current directory, not the task directory.
+function shellPaths(input) {
+  const resolved = { ...input };
+  for (const name of ["path", "posterPath"]) {
+    if (resolved[name]) resolved[name] = path.resolve(resolved[name]);
+  }
+  return resolved;
+}
+
 function planInput(input) {
   const body = {};
   if (input.file) body.spec = readText(input.file);
@@ -219,9 +274,17 @@ function evidenceUnavailableInput(input) {
   return { reason: input.reason, attempts: readJSON(input.attempts) };
 }
 
-async function publishMarkdownFile(input, env, fetchImpl) {
-  const { publishMarkdown } = require("./publish_markdown");
-  return publishMarkdown({ body: readText(input.file).trim(), title: input.title, key: input.key }, env, fetchImpl);
+// A shell directory is relative to the current directory.
+function pullRequestInput(input) {
+  const { bodyFile, ...rest } = input;
+  const prepared = { ...rest };
+  if (bodyFile) prepared.body = readText(bodyFile);
+  if (prepared.directory) prepared.directory = path.resolve(prepared.directory);
+  return prepared;
+}
+
+function markdownInput(input) {
+  return { type: "markdown", body: readText(input.file), title: input.title, key: input.key };
 }
 
 function render(result) {
@@ -234,26 +297,23 @@ async function callTool(name, input, env, fetchImpl) {
   if (!tool) throw new Error(`unknown tool: ${name}`);
   const client = createClient(env, fetchImpl);
   // A shell cannot return an image content block. Do not record an
-  // inspection here. inspect_screenshot records it when the model sees
-  // the image.
-  if (name === "inspect_screenshot" || name === "inspect_attachment") client.recordInspection = false;
+  // inspection here. get_artifact records it when the model sees the image.
+  if (name === "get_artifact") client.recordInspection = false;
   return tool.handler(input, client);
 }
 
 async function main(argv, env = process.env, fetchImpl = fetch, stdout = process.stdout, stderr = process.stderr) {
-  if (Array.isArray(argv) && argv[0] === "task" && argv[1] === "help") {
+  if (Array.isArray(argv) && argv[0] === "task" && ["help", "--help", "-h"].includes(argv[1])) {
     stdout.write(`${usage()}\n`);
     return 0;
   }
   try {
-    const { command, input } = parseCommand(argv);
-    if (!command.tool && !command.run) {
+    const { command, input } = parseCommand(argv, env);
+    if (!command.tool) {
       throw new Error(`superplane ${command.words.join(" ")} is not available yet`);
     }
     const toolInput = command.prepare ? command.prepare(input) : input;
-    const result = command.run
-      ? await command.run(toolInput, env, fetchImpl)
-      : await callTool(command.tool, toolInput, env, fetchImpl);
+    const result = await callTool(command.tool, toolInput, env, fetchImpl);
     const shown = command.line ? command.line(result) : JSON.stringify(render(result));
     stdout.write(`${String(shown ?? "").trim()}\n`);
   } catch (error) {
@@ -264,6 +324,7 @@ async function main(argv, env = process.env, fetchImpl = fetch, stdout = process
 }
 
 if (require.main === module) {
+  registry.stopOnExit();
   main(process.argv.slice(2)).then((code) => process.exit(code));
 }
 

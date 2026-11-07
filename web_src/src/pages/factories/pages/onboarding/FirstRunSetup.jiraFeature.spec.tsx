@@ -4,6 +4,8 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
+import { selectLinearProject } from "../linearScopeFields.testHelpers";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -44,13 +46,30 @@ vi.mock("@/hooks/useMe", () => ({
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
+vi.mock("./useFirstRunGitHubEnterprise", () => ({
+  useFirstRunGitHubEnterprise: () => ({
+    connect: vi.fn(),
+    submitOwner: vi.fn(),
+    resume: vi.fn(),
+    ready: false,
+    currentStepName: "",
+  }),
+}));
+
 vi.mock("@/hooks/useIntegrations", () => ({
-  useIntegrationResources: () => ({
-    data: [
-      { id: "todo", name: "To Do" },
-      { id: "qa", name: "QA" },
-      { id: "done", name: "Done" },
-    ],
+  useIntegrationResources: (_organizationId: string, _integrationId: string, resourceType: string) => ({
+    data:
+      resourceType === "team"
+        ? [{ id: "team-1", name: "Platform (PLT)" }]
+        : resourceType === "project"
+          ? [{ id: "project-1", name: "Checkout" }]
+          : resourceType === "label"
+            ? [{ id: "label-1", name: "bug" }]
+            : [
+                { id: "todo", name: "To Do" },
+                { id: "qa", name: "QA" },
+                { id: "done", name: "Done" },
+              ],
     isLoading: false,
     isError: false,
     isPending: false,
@@ -136,6 +155,10 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
+    selectGitHubEnterpriseRepository: vi.fn().mockResolvedValue(true),
+    bindGitHubEnterpriseIntegration: vi.fn(),
+    githubIntegrationId: "",
+    githubHost: "",
     bitbucketIntegrationId: "",
     branchIntegrationId: "",
     defaultBranchRequired: false,
@@ -162,12 +185,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
     linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
+    linearScope: EMPTY_LINEAR_INTAKE_SCOPE,
+    changeLinearScope: vi.fn(),
     ...overrides,
   };
 }
@@ -265,8 +284,7 @@ describe("FirstRunSetup Jira intake", () => {
       hostedAgentReady: true,
       hostedModelsAvailable: true,
       linearIntegrationId: "linear-1",
-      linearProjectIds: ["project-1"],
-      linearProjects: [{ id: "project-1", name: "Platform" }],
+      linearScope: { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" },
     });
 
     const { setupRef } = renderLiveSetup(model, {
@@ -277,11 +295,15 @@ describe("FirstRunSetup Jira intake", () => {
 
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-linear-choice-notice")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-linear-scope")).toBeInTheDocument();
     expect(setupRef.current?.issuesChoice).toBe("linear");
 
-    await user.click(screen.getByTestId("linear-project-project-1"));
-    expect(model.toggleLinearProject).toHaveBeenCalledWith("project-1");
+    await selectLinearProject(user, "Checkout");
+    expect(model.changeLinearScope).toHaveBeenCalledWith({
+      ...EMPTY_LINEAR_INTAKE_SCOPE,
+      teamId: "team-1",
+      projectIds: ["project-1"],
+    });
   });
 
   it("keeps setup available after Connect GitHub selects a saved connection", async () => {
@@ -309,8 +331,7 @@ describe("FirstRunSetup Jira intake", () => {
       hostedAgentReady: true,
       hostedModelsAvailable: true,
       linearIntegrationId: "linear-1",
-      linearProjectIds: ["project-1"],
-      linearProjects: [{ id: "project-1", name: "Platform" }],
+      linearScope: { ...EMPTY_LINEAR_INTAKE_SCOPE, teamId: "team-1" },
     });
 
     const { setupRef } = renderLiveSetup(model, {
@@ -320,7 +341,7 @@ describe("FirstRunSetup Jira intake", () => {
     });
 
     expect(screen.queryByTestId("first-run-linear-choice-notice")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-linear-scope")).toBeInTheDocument();
     expect(screen.getByTestId("first-run-confirm-projects")).toBeEnabled();
     expect(setupRef.current?.issuesChoice).toBe("linear");
   });

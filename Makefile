@@ -1,4 +1,4 @@
-.PHONY: lint test test.release test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners runner.new doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status check.ee.imports simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
+.PHONY: lint test test.release test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status check.ee.imports simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -47,10 +47,6 @@ COMPOSE_RUNNER=$(COMPOSE) --profile local-runner --profile local-runner-image
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
 OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 
-# Tests must not inherit compose local-broker defaults. Empty values
-# override docker-compose.dev.yml for this command only.
-TEST_TASK_BROKER_ENV := -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e TASK_BROKER_FLEET_ID= -e TASK_BROKER_PUBLIC_URL=
-
 #
 # Long sausage command to run tests with gotestsum
 #
@@ -59,7 +55,7 @@ TEST_TASK_BROKER_ENV := -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e T
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
+GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
 
 #
 # Targets for test environment
@@ -72,10 +68,10 @@ tidy:
 	$(COMPOSE) exec app go mod tidy
 
 test.e2e:
-	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
+	$(COMPOSE) exec -e DB_NAME=superplane_test app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
 
 test.e2e.autoparallel:
-	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
+	$(COMPOSE) exec -e DB_NAME=superplane_test -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
@@ -95,7 +91,7 @@ test.coverage.check:
 	$(MAKE) check.coverage.go
 
 test.coverage.autoparallel:
-	$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test -e SHARD_INDEX -e SHARD_COUNT -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
 
 test.coverage.baseline.update:
 	$(MAKE) test.coverage
@@ -108,7 +104,7 @@ test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.shell:
-	$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash
 
 #
 # Code formatting
@@ -195,6 +191,7 @@ ci.setup.unit:
 ci.setup.e2e:
 	$(MAKE) ci.setup.ui
 	$(MAKE) pb.gen.go
+	$(MAKE) openapi.client.gen
 	$(MAKE) ci.setup.modules
 	$(MAKE) ci.setup.test-db
 
@@ -241,9 +238,6 @@ dev.runners:
 	@$(MAKE) dev.setup.runner.fleet
 	$(COMPOSE_RUNNER) up -d --no-build --no-deps fleet-manager
 	@echo "Fleet Manager is running with ephemeral Docker runners."
-
-runner.new:
-	@bash ./scripts/runner-new
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
@@ -589,7 +583,6 @@ MODULES := \
 	widgets, \
 	canvases, \
 	api_keys, \
-	agents, \
 	files, \
 	admin/fleets, \
 	admin/keys, \
@@ -610,7 +603,6 @@ REST_API_MODULES := \
 	widgets, \
 	canvases, \
 	api_keys, \
-	agents, \
 	files, \
 	admin/fleets, \
 	admin/keys, \
@@ -680,15 +672,8 @@ cli.build.binary:
 cli.build: cli.build.prepare
 	$(MAKE) cli.build.binary
 
-admincli.build:
-	$(MAKE) pb.gen
-	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/admin cmd/admin/main.go'
-
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
-
-admincli.build.m1:
-	$(MAKE) admincli.build OS=darwin ARCH=arm64
 
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)

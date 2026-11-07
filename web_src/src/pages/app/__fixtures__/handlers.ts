@@ -1,12 +1,5 @@
 import { materializeConsoleSpec } from "../lib/workflow-spec-files";
 
-import {
-  buildStorybookAgentChat,
-  buildStorybookAgentMessages,
-  createStorybookAgentMessageStore,
-  matchStorybookAgentMessageRoute,
-  STORYBOOK_AGENT_CHAT_ID,
-} from "./agentChatResponses";
 import defaultRaw from "./canvasAppResponses.json";
 import softwareFactoryHowItWorks from "./repository/softwareFactory.howItWorks.md?raw";
 import softwareFactoryReadme from "./repository/softwareFactory.README.md?raw";
@@ -65,10 +58,6 @@ export interface CanvasAppFixture {
    * `console.yaml` still prefers `consoleYaml` when both are set.
    */
   repositoryFileContents?: Record<string, string>;
-  /** GET /api/v1/agents/canvases/{canvasId}/chat */
-  agentChat?: { chat?: Record<string, unknown> };
-  /** GET /api/v1/agents/chats/{chatId}/messages */
-  agentMessages?: { messages?: Array<Record<string, unknown>>; hasMore?: boolean };
 }
 
 const capturedFixture = defaultRaw as CanvasAppFixture;
@@ -377,48 +366,6 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     { pattern: re(CANVAS), resolve: () => ({ json: canvasDetailResponse(fixture) }) },
     { pattern: re("/api/v1/canvases"), resolve: () => ({ json: { canvases: [], totalCount: 0, hasNextPage: false } }) },
 
-    {
-      pattern: re("/api/v1/agents/canvases/([^/]+)/chat/reset"),
-      resolve: (_m, _url, method) => {
-        if (method !== "POST") return null;
-        return { json: fixture.agentChat ?? buildStorybookAgentChat(fixture.canvasId) };
-      },
-    },
-    {
-      pattern: re("/api/v1/agents/canvases/([^/]+)/chat"),
-      resolve: () => ({ json: fixture.agentChat ?? buildStorybookAgentChat(fixture.canvasId) }),
-    },
-    {
-      pattern: re("/api/v1/agents/chats/([^/]+)/messages"),
-      resolve: (_m, _url, method, body) => {
-        if (method === "POST") {
-          const content =
-            body && typeof body === "object" && "content" in body
-              ? String((body as { content?: unknown }).content ?? "")
-              : "";
-          return {
-            json: {
-              message: {
-                id: `storybook-sent-${Date.now()}`,
-                role: "user",
-                content,
-                createdAt: new Date().toISOString(),
-              },
-            },
-          };
-        }
-        return { json: fixture.agentMessages ?? buildStorybookAgentMessages() };
-      },
-    },
-    {
-      pattern: re("/api/v1/agents/chats/([^/]+)/interrupt"),
-      resolve: (_m, _url, method) => (method === "POST" ? { json: {} } : null),
-    },
-    {
-      pattern: re("/api/v1/agents/chats/([^/]+)/outcome"),
-      resolve: (_m, _url, method) => (method === "POST" ? { json: {} } : null),
-    },
-
     { pattern: re("/api/v1/organizations/[^/]+/integrations"), resolve: () => ({ json: { integrations: [] } }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
@@ -433,12 +380,6 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
       resolve: () => ({
         json: {
           features: [
-            {
-              id: "claude_managed_agents",
-              label: "Managed agents",
-              description: "Canvas agent chat",
-              released: true,
-            },
             {
               id: "factories",
               label: "Factories",
@@ -475,8 +416,6 @@ export function matchCanvasAppFixture(
   return null;
 }
 
-export { STORYBOOK_AGENT_CHAT_ID };
-
 function emptyCanvasApiCatchAll(url: URL): FixtureResult {
   // Safety net: any other API call degrades gracefully to an empty object
   // instead of escaping to the network.
@@ -511,8 +450,6 @@ function fixtureResponse(resolved: NonNullable<FixtureResult>): Response {
  * data no matter how Storybook is accessed.
  */
 export function createFixtureFetch(fallback: typeof fetch, fixture: CanvasAppFixture = defaultFixture): typeof fetch {
-  const agentMessages = createStorybookAgentMessageStore(fixture.agentMessages?.messages);
-
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
     const method = (
@@ -521,17 +458,6 @@ export function createFixtureFetch(fallback: typeof fetch, fixture: CanvasAppFix
       "GET"
     ).toUpperCase();
     const body = await readRequestJson(input, init);
-    const agentRoute = matchStorybookAgentMessageRoute({
-      pathname: url.pathname,
-      method,
-      body,
-      agentMessages,
-      resetChat: () => fixture.agentChat ?? buildStorybookAgentChat(fixture.canvasId),
-    });
-    if (agentRoute) {
-      return fixtureResponse(agentRoute);
-    }
-
     const resolved = matchCanvasAppFixture(url, fixture, method, body) ?? emptyCanvasApiCatchAll(url);
     if (!resolved) {
       return fallback(input, init);

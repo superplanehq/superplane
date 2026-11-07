@@ -19,9 +19,6 @@ vi.mock("@/api-client", () => ({
   meDescribeCodexConnection: vi.fn(),
   meStartCodexConnection: vi.fn(),
 }));
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ has: () => true, isLoading: false }),
-}));
 beforeEach(() => {
   vi.mocked(meDescribeCodexConnection).mockResolvedValue({
     data: { connection: { status: "disconnected", eligible: true } },
@@ -133,6 +130,42 @@ describe("Codex usage", () => {
     expect(screen.getByText(/Usage unavailable/)).toBeInTheDocument();
     view.rerender(<CodexUsageConnections connections={[]} />);
     expect(view.container).toBeEmptyDOMElement();
+  });
+
+  it.each([
+    { name: "with credit metadata and reset time", credits: { hasCredits: true }, hasReset: true },
+    { name: "without credit metadata", hasReset: true },
+    { name: "without a reset time", credits: { hasCredits: true }, hasReset: false },
+  ])("shows monthly credits $name", ({ credits, hasReset }) => {
+    const resetsAt = new Date(Date.now() + 86400000 * 20).toISOString();
+    render(
+      <CodexUsageConnections
+        connections={[
+          {
+            id: "connection-1",
+            observedAt: new Date().toISOString(),
+            limits: [
+              {
+                limitId: "codex",
+                credits,
+                individualLimit: {
+                  limit: "5000",
+                  used: "288.32",
+                  remainingPercent: 94,
+                  resetsAt: hasReset ? resetsAt : undefined,
+                },
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Monthly credits")).toBeInTheDocument();
+    expect(screen.getByText("4,712 credits")).toBeInTheDocument();
+    const reset = screen.queryByText(`Resets: ${new Date(resetsAt).toLocaleString()}`);
+    if (hasReset) expect(reset).toBeInTheDocument();
+    if (!hasReset) expect(reset).not.toBeInTheDocument();
+    expect(screen.queryByText(/Usage unavailable/)).not.toBeInTheDocument();
   });
 
   it("loads saved usage for the organization and lets the user retry a failed request", async () => {

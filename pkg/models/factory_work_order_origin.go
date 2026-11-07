@@ -265,6 +265,14 @@ func findMapWithOriginURL(value any, originURL string, depth int) map[string]any
 	return nil
 }
 
+func isGitHubWebHostname(hostname string) bool {
+	hostname = strings.ToLower(strings.TrimSpace(hostname))
+	if hostname == "github.com" || hostname == "www.github.com" {
+		return true
+	}
+	return strings.HasSuffix(hostname, ".ghe.com") && hostname != "ghe.com"
+}
+
 func originURLMatches(value any, originURL string) bool {
 	raw, ok := value.(string)
 	if !ok {
@@ -278,7 +286,7 @@ func normalizeOriginLabel(title string) string {
 }
 
 func githubOriginLabel(parsed *url.URL) string {
-	if parsed.Hostname() != "github.com" {
+	if !isGitHubWebHostname(parsed.Hostname()) {
 		return ""
 	}
 

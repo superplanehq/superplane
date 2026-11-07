@@ -350,6 +350,16 @@ func (s *FactoryService) RemoveWorkOrderArtifact(ctx context.Context, req *pb.Re
 	return actions.RemoveWorkOrderArtifact(ctx, organizationID, req)
 }
 
+func (s *FactoryService) AddWorkOrderChecks(ctx context.Context, req *pb.AddWorkOrderChecksRequest) (*pb.AddWorkOrderChecksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.AddWorkOrderChecks(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RemoveWorkOrderChecks(ctx context.Context, req *pb.RemoveWorkOrderChecksRequest) (*pb.RemoveWorkOrderChecksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RemoveWorkOrderChecks(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DescribeFactoryVelocity(ctx context.Context, req *pb.DescribeFactoryVelocityRequest) (*pb.DescribeFactoryVelocityResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeFactoryVelocity(ctx, organizationID, req)
@@ -473,4 +483,14 @@ func (s *FactoryService) ListFactoryOwnerEligibility(ctx context.Context, req *p
 func (s *FactoryService) ResumeHandOffWorkOrder(ctx context.Context, req *pb.ResumeHandOffWorkOrderRequest) (*pb.ResumeHandOffWorkOrderResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ResumeHandOffWorkOrder(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) SearchFactoryPullRequestImportItems(ctx context.Context, req *pb.SearchFactoryPullRequestImportItemsRequest) (*pb.SearchFactoryPullRequestImportItemsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SearchFactoryPullRequestImportItems(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) ImportFactoryPullRequest(ctx context.Context, req *pb.ImportFactoryPullRequestRequest) (*pb.ImportFactoryPullRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ImportFactoryPullRequest(ctx, s.intakeDeps, organizationID, req)
 }

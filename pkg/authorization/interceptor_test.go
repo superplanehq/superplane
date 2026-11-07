@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -269,22 +270,6 @@ func TestGatewayAuthorizerSetsOrganizationContext(t *testing.T) {
 	assert.Equal(t, "canvas-123", PathParamsFromContext(ctx)["id"])
 }
 
-func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
-	rules := DefaultAuthorizationRules()
-	routes := []HTTPRoute{
-		{Method: http.MethodGet, Pattern: "/api/v1/agents/canvases/{canvas_id}/chat"},
-		{Method: http.MethodPost, Pattern: "/api/v1/agents/canvases/{canvas_id}/chat/reset"},
-		{Method: http.MethodPost, Pattern: "/api/v1/agents/chats/{chat_id}/messages"},
-		{Method: http.MethodGet, Pattern: "/api/v1/agents/chats/{chat_id}/messages"},
-	}
-
-	for _, route := range routes {
-		rule, ok := rules[route]
-		require.True(t, ok, route.String())
-		assert.Equal(t, []string{features.FeatureClaudeManagedAgents}, rule.RequiredExperimentalFeatures)
-	}
-}
-
 func TestSetFactoryVisibilityRequiresPublish(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	rule, ok := rules[HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/factories/{id}/visibility"}]
@@ -362,6 +347,21 @@ func TestContinueFixesRouteRequiresWorkOrderUpdate(t *testing.T) {
 	assert.Equal(t, "work_orders", rule.Resource)
 	assert.Equal(t, "update", rule.Action)
 	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
+}
+
+func TestWorkOrderCheckRoutesRequireWorkOrderUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	routes := []HTTPRoute{
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"},
+		{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/checks/remove"},
+	}
+	for _, route := range routes {
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
+		assert.Equal(t, "work_orders", rule.Resource)
+		assert.Equal(t, "update", rule.Action)
+		assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
+	}
 }
 
 func TestAgentResourceRoutesRequireFactoriesFeature(t *testing.T) {
@@ -621,4 +621,40 @@ type actionPermissionChecker map[string]bool
 
 func (c actionPermissionChecker) CheckOrganizationPermission(_ context.Context, _, _, resource, action string) (bool, error) {
 	return c[resource+":"+action], nil
+}
+
+func TestPullRequestImportAuthorization(t *testing.T) {
+	org, err := models.CreateOrganization("pr-import-"+uuid.NewString(), "")
+	require.NoError(t, err)
+	orgID := org.ID.String()
+	t.Cleanup(clearOrganizationPermissionCacheForTest)
+	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
+	for _, scenario := range []struct {
+		name, method, path string
+		permissions        actionPermissionChecker
+		scopes             []string
+		enabled, allowed   bool
+	}{
+		{"search needs task read", "GET", "/candidates", actionPermissionChecker{"work_orders:read": true}, nil, true, true},
+		{"search denies create only", "GET", "/candidates", actionPermissionChecker{"work_orders:create": true}, nil, true, false},
+		{"import needs create and update", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, nil, true, true},
+		{"import denies create only", "POST", "", actionPermissionChecker{"work_orders:create": true}, nil, true, false},
+		{"import denies update only", "POST", "", actionPermissionChecker{"work_orders:update": true}, nil, true, false},
+		{"scoped token needs update", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, []string{"work_orders:create"}, true, false},
+		{"scoped token allows both", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, []string{"work_orders:create", "work_orders:update"}, true, true},
+		{"flag off denies search", "GET", "/candidates", actionPermissionChecker{"work_orders:read": true}, nil, false, false},
+		{"flag off denies import", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, nil, false, false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			clearOrganizationPermissionCacheForTest()
+			SetOrgExperimentalFeatureCache(uuid.MustParse(orgID), features.FeatureFactories, true)
+			SetOrgExperimentalFeatureCache(uuid.MustParse(orgID), features.FeatureFactoryPullRequestImport, scenario.enabled)
+			headers := map[string]string{"x-user-id": "22222222-2222-4222-8222-222222222222", "x-organization-id": orgID}
+			if scenario.scopes != nil {
+				headers["x-token-scopes"] = marshalScopes(t, scenario.scopes)
+			}
+			_, err := NewGatewayAuthorizer(scenario.permissions).AuthorizeHTTP(context.Background(), httptestRequest(t, headers), HTTPRoute{Method: scenario.method, Pattern: "/api/v1/factories/{factory_id}/pull-request-imports" + scenario.path}, nil)
+			assert.Equal(t, scenario.allowed, err == nil)
+		})
+	}
 }

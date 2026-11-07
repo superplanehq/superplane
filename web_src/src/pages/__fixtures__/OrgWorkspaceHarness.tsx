@@ -7,19 +7,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
 
-import { requestCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
-import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
 import { RequirePermission } from "@/components/PermissionGate";
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { agentChatKeys } from "@/hooks/useAgentChats";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
-import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
-import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import {
   AutomationsPage,
@@ -71,7 +66,6 @@ import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture, type StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
 import { OrganizationSettings } from "@/pages/organization/settings";
-import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
@@ -124,17 +118,10 @@ export interface OrgWorkspaceHarnessProps {
   pathSuffix?: string;
   /** Query string for the app route (without leading `?`). */
   appQuery?: string;
-  /**
-   * When true, opens the canvas agent sidebar via localStorage before mount.
-   * Always written (true/false) so story switches do not leak open state.
-   */
-  openAgentSidebar?: boolean;
   homeFixture?: HomePageFixture;
   appFixture?: CanvasAppFixture;
   /** Backing fixture for factory pages (list, detail, orders, lines, apps). */
   factoriesFixture?: FactoriesFixture;
-  /** Storybook-only: seed post-install Agent improvement suggestions for the canvas. */
-  agentSuggestions?: AgentSuggestion[];
   /** Organization connections the story starts with (e.g. an installed GitHub). */
   orgIntegrations?: StorybookOrgIntegration[];
   /** Storybook-only: replace selected factory page elements (e.g. wiki wireframe). */
@@ -142,24 +129,15 @@ export interface OrgWorkspaceHarnessProps {
 }
 
 interface FixtureFetchOptions {
-  canvasId: string;
-  openAgentSidebar: boolean;
   homeFixture?: HomePageFixture;
   appFixture?: CanvasAppFixture;
   factoriesFixture?: FactoriesFixture;
-  agentSuggestions?: AgentSuggestion[];
   orgIntegrations?: StorybookOrgIntegration[];
 }
 
 function useOrgWorkspaceFixtureFetch(options: FixtureFetchOptions) {
-  const { canvasId, openAgentSidebar, homeFixture, appFixture, factoriesFixture, agentSuggestions, orgIntegrations } =
-    options;
+  const { homeFixture, appFixture, factoriesFixture, orgIntegrations } = options;
   const [fixtureFetch] = useState(() => {
-    // Persist before AppPage reads the preference in useState initializers.
-    writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
-    if (agentSuggestions?.length) {
-      setAgentSuggestions(canvasId, agentSuggestions);
-    }
     const state = fixtureFetchState();
     const impl = createOrgWorkspaceFixtureFetch(state.original, {
       homeFixture,
@@ -172,10 +150,6 @@ function useOrgWorkspaceFixtureFetch(options: FixtureFetchOptions) {
   });
 
   useEffect(() => {
-    writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
-    if (openAgentSidebar) {
-      requestCanvasAgentSidebarOpen(canvasId);
-    }
     const state = fixtureFetchState();
     if (state.delegate === null) {
       state.delegate = fixtureFetch;
@@ -185,7 +159,7 @@ function useOrgWorkspaceFixtureFetch(options: FixtureFetchOptions) {
         state.delegate = null;
       }
     };
-  }, [canvasId, fixtureFetch, openAgentSidebar]);
+  }, [fixtureFetch]);
 
   return fixtureFetch;
 }
@@ -389,22 +363,17 @@ export function OrgWorkspaceHarness({
   startAt = "home",
   pathSuffix = "",
   appQuery = "",
-  openAgentSidebar = false,
   homeFixture,
   appFixture,
   factoriesFixture,
-  agentSuggestions,
   orgIntegrations,
   pageOverrides,
 }: OrgWorkspaceHarnessProps) {
   const { orgId, canvasId } = resolveWorkspaceIds(homeFixture, appFixture, factoriesFixture);
   useOrgWorkspaceFixtureFetch({
-    canvasId,
-    openAgentSidebar,
     homeFixture,
     appFixture,
     factoriesFixture,
-    agentSuggestions,
     orgIntegrations,
   });
 
@@ -413,14 +382,6 @@ export function OrgWorkspaceHarness({
   const initialPath = startAt === "app" ? appPath : homePath;
 
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
-
-  useEffect(() => {
-    const onMessagesUpdated = () => {
-      void queryClient.invalidateQueries({ queryKey: agentChatKeys.all });
-    };
-    window.addEventListener(STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT, onMessagesUpdated);
-    return () => window.removeEventListener(STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT, onMessagesUpdated);
-  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

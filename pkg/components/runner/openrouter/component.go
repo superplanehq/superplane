@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -73,7 +74,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
-SuperPlane keeps the selected OpenRouter model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. Every 2 successful model calls set the attempt count back to 1. After 4 failed attempts without that reset, the prompt step fails. The live log shows each wait and retry.
+SuperPlane keeps the selected OpenRouter model. OpenRouter can try other endpoints that serve that same model. When OpenRouter returns a rate limit or a temporary error, SuperPlane waits, then retries the same model. The wait uses Retry-After when the provider sends it. Otherwise SuperPlane waits 30 seconds, then 45 seconds, then 60 seconds. Every 2 successful model calls set the attempt count back to 1. After 4 failed attempts without that reset, the prompt step fails. The live log shows each wait and retry.
 
 Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
@@ -97,7 +98,7 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 		runner.AgentStepsField(
 			"Ordered bash commands and OpenRouter agent prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",
-			"git clone https://github.com/org/repo.git /tmp/repo",
+			"git clone "+githubcommon.DotCom().CloneURL("org/repo")+" /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
 		runner.AgentAdditionalInstructionsField(),
@@ -144,7 +145,8 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
-	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
+	var merge *runner.MergeConfidenceScope
+	environment, merge, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps)
 	if err != nil {
 		return err
 	}
@@ -157,7 +159,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasVisualEvidence(environment))
 	dispatched.Steps = runner.AppendPublishLinkProtocol(dispatched.Steps, runner.HasPublishLinks(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
-	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds, merge)
 	task := buildOpenRouterTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)

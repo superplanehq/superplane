@@ -88,6 +88,7 @@ func CreateWorkOrderFile(ctx context.Context, organizationID string, req *pb.Cre
 		Filename:       req.GetFilename(),
 		ContentType:    req.GetContentType(),
 		CreatedByID:    createdByID,
+		Purpose:        req.GetPurpose(),
 	})
 	if err != nil {
 		return nil, fileErrorToStatus(err, "failed to create task file")

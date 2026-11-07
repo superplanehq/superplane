@@ -29,18 +29,18 @@ function recorder() {
 
 test("tools/list shows only the tools that the backend allows", async () => {
   const transport = recorder();
-  const handle = createHandler({ client: fakeClient(["suggest_owners"]) });
+  const handle = createHandler({ client: fakeClient(["suggest_task_owner"]) });
 
   await handle({ id: 1, method: "tools/list" }, transport);
 
   assert.deepEqual(
     transport.replies[0].result.tools.map((tool) => tool.name),
-    ["suggest_owners"],
+    ["suggest_task_owner"],
   );
 });
 
 test("tools/list fails on a failed lookup and retries on the next request", async () => {
-  const lookups = [new Error("Service Unavailable"), ["suggest_owners"]];
+  const lookups = [new Error("Service Unavailable"), ["suggest_task_owner"]];
   const client = {
     request: async () => {
       const next = lookups.shift();
@@ -56,20 +56,20 @@ test("tools/list fails on a failed lookup and retries on the next request", asyn
 
   assert.deepEqual(
     transport.replies[0].result.tools.map((tool) => tool.name),
-    ["suggest_owners"],
+    ["suggest_task_owner"],
   );
 });
 
 test("tools/call rejects a hidden tool and runs an allowed tool", async () => {
   const calls = [];
   const transport = recorder();
-  const handle = createHandler({ client: fakeClient(["suggest_owners"], calls) });
+  const handle = createHandler({ client: fakeClient(["suggest_task_owner"], calls) });
 
   await handle(
-    { id: 1, method: "tools/call", params: { name: "assign_owner", arguments: { user: "u", reason: "r" } } },
+    { id: 1, method: "tools/call", params: { name: "assign_task_owner", arguments: { user: "u", reason: "r" } } },
     transport,
   );
-  await handle({ id: 2, method: "tools/call", params: { name: "suggest_owners", arguments: {} } }, transport);
+  await handle({ id: 2, method: "tools/call", params: { name: "suggest_task_owner", arguments: {} } }, transport);
   await handle({ id: 3, method: "tools/call", params: { name: "drop_database", arguments: {} } }, transport);
 
   assert.equal(transport.replies[0].error.code, -32601);
@@ -83,19 +83,38 @@ test("tools/call returns a backend error as a tool error", async () => {
   const transport = recorder();
   const client = {
     request: async (_method, path) => {
-      if (path === "/api/v1/runner/tools") return { tools: ["assign_owner"] };
+      if (path === "/api/v1/runner/tools") return { tools: ["assign_task_owner"] };
       throw new Error("Task is closed or archived");
     },
   };
   const handle = createHandler({ client });
 
   await handle(
-    { id: 1, method: "tools/call", params: { name: "assign_owner", arguments: { user: "u", reason: "r" } } },
+    { id: 1, method: "tools/call", params: { name: "assign_task_owner", arguments: { user: "u", reason: "r" } } },
     transport,
   );
 
   assert.equal(transport.replies[0].result.isError, true);
   assert.equal(transport.replies[0].result.content[0].text, "Task is closed or archived");
+});
+
+test("tools/call returns a tool error when a tool does not finish in time and keeps serving", async () => {
+  const transport = recorder();
+  const stuck = { definition: { name: "stuck_tool" }, handler: () => new Promise(() => {}) };
+  const quick = { definition: { name: "quick_tool" }, handler: async () => ({ status: "ok" }) };
+  const handle = createHandler({
+    client: fakeClient(["stuck_tool", "quick_tool"]),
+    tools: [stuck, quick],
+    prepare: () => {},
+    toolCallTimeoutMs: 20,
+  });
+
+  await handle({ id: 1, method: "tools/call", params: { name: "stuck_tool", arguments: {} } }, transport);
+  await handle({ id: 2, method: "tools/call", params: { name: "quick_tool", arguments: {} } }, transport);
+
+  assert.equal(transport.replies[0].result.isError, true);
+  assert.match(transport.replies[0].result.content[0].text, /stuck_tool did not finish/);
+  assert.equal(transport.replies[1].result.structuredContent.status, "ok");
 });
 
 test("initialize names the global server", async () => {

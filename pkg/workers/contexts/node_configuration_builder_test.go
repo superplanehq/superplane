@@ -30,6 +30,16 @@ func Test_NodeConfigurationBuilder_EvaluatesMultilineExpression(t *testing.T) {
 	assert.Equal(t, "2\n\n4", got)
 }
 
+func Test_NodeConfigurationBuilder_SentryDescription(t *testing.T) {
+	builder := &NodeConfigurationBuilder{}
+	body, err := builder.ResolveExpressionWithExtraVariables("sentryIssueDescription(issue, nil, nil, nil)", map[string]any{
+		"issue": map[string]any{"id": "123", "title": "Broken deploy", "permalink": "https://sentry.io/issues/123/"},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, body, "[View in Sentry](https://sentry.io/issues/123/)")
+	assert.Contains(t, body, "**Title:** Broken deploy")
+}
+
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -243,6 +253,10 @@ func Test_NodeConfigurationBuilder_WorkspaceFunction(t *testing.T) {
 	assert.Equal(t, "WK", payload["key"])
 	assert.Equal(t, repository, payload["repository"])
 	assert.Equal(t, defaultBranch, payload["default_branch"])
+
+	repositories, err := builder.ResolveExpression(`workspace().repositories`)
+	require.NoError(t, err)
+	assert.Equal(t, []string{repository}, repositories)
 
 	_, err = builder.ResolveExpression(`workspace(1)`)
 	require.ErrorContains(t, err, "workspace() takes no arguments")

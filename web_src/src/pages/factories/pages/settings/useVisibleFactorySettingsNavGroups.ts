@@ -1,7 +1,8 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
-import { FEATURE_CODEX_SUBSCRIPTIONS, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
+import { useOrganizationFleetAccess } from "@/hooks/useOrganizationFleetManagement";
+import { FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 
 import {
   type FactorySettingsNavGroup,
@@ -23,9 +24,6 @@ function visibleFactorySettingsNavGroups(
   hasExperimentalFeature: (featureId: string) => boolean,
 ): FactorySettingsNavGroup[] {
   const hiddenNavItemIds = new Set<string>();
-  if (!hasExperimentalFeature(FEATURE_CODEX_SUBSCRIPTIONS)) {
-    hiddenNavItemIds.add("account-codex-usage");
-  }
   if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
     hiddenNavItemIds.add(WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID);
   }
@@ -50,8 +48,17 @@ export function useVisibleFactorySettingsNavGroups(organizationId: string): Fact
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const billingProductEnabled = useBillingProductEnabled();
+  const fleetAccess = useOrganizationFleetAccess(organizationId);
   const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, hasPermission, permissionsLoading);
-  const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
+  const featureVisible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
+  const visible = fleetAccess.showNavigation
+    ? featureVisible
+    : featureVisible
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) => item.id !== "organization-fleets"),
+        }))
+        .filter((group) => group.items.length > 0);
   if (billingProductEnabled) {
     return visible;
   }

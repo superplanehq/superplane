@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -99,7 +100,7 @@ func (c *RunCodex) Configuration() []configuration.Field {
 		runner.AgentStepsField(
 			"Ordered bash commands and Codex prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",
-			"git clone https://github.com/org/repo.git /tmp/repo",
+			"git clone "+githubcommon.DotCom().CloneURL("org/repo")+" /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
 		runner.AgentAdditionalInstructionsField(),
@@ -143,7 +144,8 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
-	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
+	var merge *runner.MergeConfidenceScope
+	environment, merge, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps)
 	if err != nil {
 		return err
 	}
@@ -159,7 +161,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasVisualEvidence(environment))
 	dispatched.Steps = runner.AppendPublishLinkProtocol(dispatched.Steps, runner.HasPublishLinks(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
-	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds, merge)
 	task := buildCodexTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {

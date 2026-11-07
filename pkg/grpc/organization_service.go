@@ -100,6 +100,10 @@ func (s *OrganizationService) ListManagedRunnerFleets(ctx context.Context, req *
 	return s.runners.ListManagedRunnerFleets(ctx, req)
 }
 
+func (s *OrganizationService) ListRunnerFleetTasks(ctx context.Context, req *pb.ListRunnerFleetTasksRequest) (*pb.ListRunnerFleetTasksResponse, error) {
+	return s.runners.ListRunnerFleetTasks(ctx, req)
+}
+
 func (s *OrganizationService) CreateRunnerFleet(ctx context.Context, req *pb.CreateRunnerFleetRequest) (*pb.CreateRunnerFleetResponse, error) {
 	return s.runners.CreateRunnerFleet(ctx, req)
 }

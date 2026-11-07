@@ -43,6 +43,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPreconditionWithReason("Connect your Codex account to take ownership of this task.", "CODEX_CONNECTION_REQUIRED")
 	case errors.Is(err, billing.ErrPaymentMethodRequired):
 		return grpcerrors.FailedPrecondition(err, "Add a payment method before you complete workspace setup.")
+	case errors.Is(err, billing.ErrHostedCreditEmpty):
+		return grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerNoCreditMessage+" Add hosted credit to continue.")
 	case errors.Is(err, billing.ErrHostedSubscriptionRequired), errors.Is(err, billing.ErrHostedPaymentPastDue), errors.Is(err, billing.ErrHostedSubscriptionPaused):
 		return grpcerrors.FailedPrecondition(err, models.SuperPlaneRunnerReadinessMessage(err))
 	case errors.Is(err, models.ErrSubscriptionModelUnavailable), errors.Is(err, models.ErrSubscriptionOwnerRequired), errors.Is(err, models.ErrSubscriptionOwnerInvalid), errors.Is(err, models.ErrSubscriptionOwnerBusy), errors.Is(err, models.ErrSubscriptionTaskAssociation):
@@ -143,6 +145,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "factory pull request not found")
 	case errors.Is(err, models.ErrFactoryPullRequestInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPullRequestRepositoryNotInWorkspace):
+		return grpcerrors.InvalidArgument(err, errPullRequestRepositoryNotInWorkspace)
 	case errors.Is(err, models.ErrFactoryPullRequestActivityNotFound):
 		return grpcerrors.NotFound(err, "pull request activity not found")
 	case errors.Is(err, models.ErrFactoryPullRequestFixesNotPaused):
@@ -225,6 +229,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "repository is required")
 	case errors.Is(err, models.ErrFactoryAgentResourceRepositoryInvalid):
 		return grpcerrors.InvalidArgument(err, "repository must use the owner/name format")
+	case errors.Is(err, models.ErrFactoryAgentResourceRefInvalid):
+		return grpcerrors.InvalidArgument(err, "branch name is not valid")
+	case errors.Is(err, models.ErrFactoryAgentResourceAccessInvalid):
+		return grpcerrors.InvalidArgument(err, "access must be write or read")
 	case errors.Is(err, models.ErrFactoryAgentResourceRepositoryTaken):
 		return grpcerrors.AlreadyExists(err, "this repository is already added")
 	case errors.Is(err, models.ErrFactoryAgentResourceContextRepoCapReached):
@@ -269,11 +277,17 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
+	case errors.Is(err, errMultiRepoTasksDisabled):
+		return grpcerrors.FailedPrecondition(err, "Multi-repo tasks are not enabled for this organization.")
 	case errors.Is(err, errSuperPlaneMCPServerDisabled):
 		return grpcerrors.FailedPrecondition(err, "MCP Server is not enabled for this organization.")
 	case errors.Is(err, models.ErrMCPOAuthRefreshNotFound):
 		return grpcerrors.NotFound(err, "MCP client not found")
 	case errors.Is(err, errInvalidArgument):
+		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryWorkOrderCheckOwned):
+		return grpcerrors.FailedPrecondition(err, err.Error()+"; use another key")
+	case errors.Is(err, models.ErrFactoryWorkOrderCheckInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		return grpcerrors.NotFound(err, "resource not found")
@@ -303,6 +317,7 @@ var errListMCPTools = errors.New("could not list MCP tools")
 var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
+var errMultiRepoTasksDisabled = errors.New("multi-repo tasks are not enabled")
 var errSuperPlaneMCPServerDisabled = errors.New("superplane MCP server is not enabled")
 var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")
 var errCannotClosePullRequest = errors.New("could not close a previous pull request")

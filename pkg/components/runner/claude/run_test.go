@@ -95,7 +95,7 @@ func TestClaudeStartsOnlyTheGlobalMCPServerWithARunnerToken(t *testing.T) {
 	}{
 		{name: "task run", env: []string{"SUPERPLANE_ARTIFACT_TOKEN=artifact-token", "SUPERPLANE_PUBLISH_LINKS=yes"}, tools: "Bash,Read,Edit,Write,mcp__superplane_global"},
 		{name: "planning", env: []string{"SUPERPLANE_PLANNING_SESSION_ID=session-1", "SUPERPLANE_PLANNING_SESSION_KIND=work_order_analysis"}, tools: "Read,Bash,mcp__superplane_global"},
-		{name: "merge confidence", env: []string{"SUPERPLANE_MERGE_CONFIDENCE_TOKEN=merge-token"}, tools: "Bash,Read,Edit,Write,mcp__superplane_global"},
+		{name: "merge confidence", env: nil, tools: "Bash,Read,Edit,Write,mcp__superplane_global"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			run := runClaudeWithFakeCLI(t, append(tc.env, "SUPERPLANE_RUNNER_TOKEN=runner-token")...)
@@ -109,7 +109,7 @@ func TestClaudeStartsOnlyTheGlobalMCPServerWithARunnerToken(t *testing.T) {
 }
 
 func TestClaudeStartsTheLegacyMCPServerWithoutARunnerToken(t *testing.T) {
-	run := runClaudeWithFakeCLI(t, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN=merge-token")
+	run := runClaudeWithFakeCLI(t)
 
 	assert.Equal(t, "Bash,Read,Edit,Write", run.allowedTools)
 	assert.Nil(t, run.mcpServers)
@@ -201,8 +201,7 @@ func TestAllowedClaudeToolsIgnoresLegacyScoreEnv(t *testing.T) {
 
 func TestAllowedClaudeToolsAllowsMergeConfidenceReport(t *testing.T) {
 	tools := allowedClaudeToolsFromScript(t, map[string]string{
-		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
-		"SUPERPLANE_BASE_URL":               "https://app.example",
+		"SUPERPLANE_BASE_URL": "https://app.example",
 	})
 
 	assert.Contains(t, tools, "Bash")
@@ -252,11 +251,10 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
-	assert.Contains(t, analysis, "propose_update")
-	assert.Contains(t, analysis, "integer from 1 through 3")
+	assert.Contains(t, analysis, "propose_plan")
 	assert.NotContains(t, analysis, "Call propose_clarity")
 	assert.NotContains(t, analysis, "Call propose_confidence")
-	assert.NotContains(t, analysis, "propose_plan")
+	assert.NotContains(t, analysis, "propose_update")
 	assert.Contains(t, analysis, "Use the managed refinement guidance")
 	assert.Contains(t, analysis, "Use only the analysis tools")
 	assert.Contains(t, analysis, "Do not call propose_spec, propose_clarity, propose_confidence, or survey")
@@ -264,7 +262,7 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 	assert.Contains(t, analysis, "does not publish the specification or the scores")
 	assert.NotContains(t, analysis, "Do not leave a written plan unpublished")
 	assert.NotContains(t, analysis, "Call propose_spec when the task prompt says")
-	assert.Contains(t, analysis, "inspect_attachment")
+	assert.Contains(t, analysis, "get_artifact")
 	assert.Contains(t, analysis, "Do not curl a signed URL")
 	assert.Contains(t, analysis, "Do not use OCR")
 	assert.Contains(t, analysis, "Do not name files")

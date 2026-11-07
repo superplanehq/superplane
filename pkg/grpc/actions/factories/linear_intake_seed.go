@@ -32,9 +32,9 @@ func seedLinearIssues(
 		return intakeSeedResult{}, err
 	}
 
-	projectIDs := configurationStrings(binding.Configuration["projects"])
+	scope := linearIssueScope(binding.Configuration)
 	labels := linearLabelsFromConfiguration(binding.Configuration["labels"])
-	issues, err := newestLinearSeedIssues(client, projectIDs, labels)
+	issues, err := newestLinearSeedIssues(client, scope, labels)
 	if err != nil {
 		return intakeSeedResult{}, err
 	}
@@ -54,12 +54,8 @@ func seedLinearIssues(
 	return intakeSeedResult{itemCount: len(payloads)}, nil
 }
 
-func newestLinearSeedIssues(client *linear.Client, projectIDs, labels []string) ([]linear.Issue, error) {
-	if len(projectIDs) == 0 {
-		return nil, fmt.Errorf("linear intake has no projects")
-	}
-
-	issues, err := client.ListOpenProjectIssues(projectIDs, intakeLinearSeedFetchSize)
+func newestLinearSeedIssues(client *linear.Client, scope linear.IssueScope, labels []string) ([]linear.Issue, error) {
+	issues, err := client.ListOpenIssues(scope, intakeLinearSeedFetchSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list Linear issues: %w", err)
 	}

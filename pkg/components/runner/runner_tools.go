@@ -12,18 +12,23 @@ const (
 	RunnerFlowPlanning        RunnerFlow = "planning"
 	RunnerFlowTask            RunnerFlow = "task"
 	RunnerFlowMergeConfidence RunnerFlow = "merge_confidence"
+	RunnerFlowSchedule        RunnerFlow = "schedule"
 
-	ScopeOwnerRead        RunnerToolScope = "owner:read"
-	ScopeOwnerWrite       RunnerToolScope = "owner:write"
-	ScopeTasksRead        RunnerToolScope = "tasks:read"
-	ScopeTasksCreate      RunnerToolScope = "tasks:create"
-	ScopeTasksClose       RunnerToolScope = "tasks:close"
-	ScopeArtifactsWrite   RunnerToolScope = "artifacts:write"
-	ScopePlanWrite        RunnerToolScope = "plan:write"
-	ScopeAttachmentsRead  RunnerToolScope = "attachments:read"
-	ScopeEvidenceWrite    RunnerToolScope = "evidence:write"
-	ScopeLinksWrite       RunnerToolScope = "links:write"
-	ScopeMergeChecksWrite RunnerToolScope = "merge_checks:write"
+	ScopeMembersRead       RunnerToolScope = "members:read"
+	ScopeOwnerRead         RunnerToolScope = "owner:read"
+	ScopeOwnerWrite        RunnerToolScope = "owner:write"
+	ScopeTasksRead         RunnerToolScope = "tasks:read"
+	ScopeTasksCreate       RunnerToolScope = "tasks:create"
+	ScopeTasksClose        RunnerToolScope = "tasks:close"
+	ScopeChecksRead        RunnerToolScope = "checks:read"
+	ScopeChecksWrite       RunnerToolScope = "checks:write"
+	ScopeArtifactsRead     RunnerToolScope = "artifacts:read"
+	ScopeArtifactsWrite    RunnerToolScope = "artifacts:write"
+	ScopePlanWrite         RunnerToolScope = "plan:write"
+	ScopeEvidenceWrite     RunnerToolScope = "evidence:write"
+	ScopeMergeChecksWrite  RunnerToolScope = "merge_checks:write"
+	ScopePullRequestsRead  RunnerToolScope = "pull_requests:read"
+	ScopePullRequestsWrite RunnerToolScope = "pull_requests:write"
 )
 
 // RunnerTool is one tool of the global runner MCP server and the scope that
@@ -34,37 +39,48 @@ type RunnerTool struct {
 }
 
 var runnerTools = []RunnerTool{
-	{Name: "suggest_owners", Scope: ScopeOwnerRead},
-	{Name: "assign_owner", Scope: ScopeOwnerWrite},
+	{Name: "list_members", Scope: ScopeMembersRead},
+	{Name: "assign_task_owner", Scope: ScopeOwnerWrite},
+	{Name: "suggest_task_owner", Scope: ScopeOwnerRead},
 	{Name: "list_tasks", Scope: ScopeTasksRead},
 	{Name: "create_task", Scope: ScopeTasksCreate},
 	{Name: "close_task", Scope: ScopeTasksClose},
+	{Name: "list_checks", Scope: ScopeChecksRead},
+	{Name: "add_checks", Scope: ScopeChecksWrite},
+	{Name: "remove_checks", Scope: ScopeChecksWrite},
+	{Name: "list_artifacts", Scope: ScopeArtifactsRead},
+	{Name: "get_artifact", Scope: ScopeArtifactsRead},
+	{Name: "add_artifact", Scope: ScopeArtifactsWrite},
 	{Name: "remove_artifact", Scope: ScopeArtifactsWrite},
-	{Name: "propose_update", Scope: ScopePlanWrite},
-	{Name: "inspect_attachment", Scope: ScopeAttachmentsRead},
-	{Name: "inspect_screenshot", Scope: ScopeEvidenceWrite},
-	{Name: "upload_artifact", Scope: ScopeEvidenceWrite},
+	{Name: "propose_plan", Scope: ScopePlanWrite},
 	{Name: "report_visual_evidence_unavailable", Scope: ScopeEvidenceWrite},
-	{Name: "publish_link", Scope: ScopeLinksWrite},
 	{Name: "report_merge_check", Scope: ScopeMergeChecksWrite},
+	{Name: "open_pull_request", Scope: ScopePullRequestsWrite},
+	{Name: "list_pull_requests", Scope: ScopePullRequestsRead},
 }
 
 // Every flow receives these tools for now. Narrow the list here later.
 var sharedRunnerScopes = []RunnerToolScope{
+	ScopeMembersRead,
 	ScopeOwnerRead,
 	ScopeOwnerWrite,
 	ScopeTasksRead,
 	ScopeTasksCreate,
 	ScopeTasksClose,
+	ScopeChecksRead,
+	ScopeChecksWrite,
+	ScopeArtifactsRead,
 	ScopeArtifactsWrite,
 }
 
-// Flow tools work only in their flow. Task runs get the evidence and link
-// scopes from the run settings, see TaskCapabilityScopes.
+// Flow tools work only in their flow. Task runs get the evidence scope from
+// the run settings, see TaskCapabilityScopes.
 var runnerFlowScopes = map[RunnerFlow][]RunnerToolScope{
-	RunnerFlowPlanning:        withScopes(ScopePlanWrite, ScopeAttachmentsRead),
+	RunnerFlowPlanning:        withScopes(ScopePlanWrite),
 	RunnerFlowTask:            withScopes(),
 	RunnerFlowMergeConfidence: withScopes(ScopeMergeChecksWrite),
+	// A schedule run has no task yet. It can list and create tasks.
+	RunnerFlowSchedule: {ScopeTasksRead, ScopeTasksCreate},
 }
 
 func withScopes(extra ...RunnerToolScope) []RunnerToolScope {
@@ -81,20 +97,18 @@ func ScopesForFlow(flow RunnerFlow) []RunnerToolScope {
 	return slices.Clone(runnerFlowScopes[flow])
 }
 
-// TaskCapabilityScopes returns the evidence and link scopes that the artifact
-// attach call turned on for this run. The rule matches the legacy task
-// artifact MCP server, so both servers list the same tools.
+// TaskCapabilityScopes returns the evidence scope when the artifact attach
+// call turned it on for this run.
 func TaskCapabilityScopes(environment []TaskEnvironmentVariable) []RunnerToolScope {
-	scopes := []RunnerToolScope{}
-	publishLinks := HasPublishLinks(environment)
-	if HasVisualEvidence(environment) || (HasArtifactUploadToken(environment) && !publishLinks) {
-		scopes = append(scopes, ScopeEvidenceWrite)
+	if HasVisualEvidence(environment) || (HasArtifactUploadToken(environment) && !HasPublishLinks(environment)) {
+		return []RunnerToolScope{ScopeEvidenceWrite}
 	}
-	if publishLinks {
-		scopes = append(scopes, ScopeLinksWrite)
-	}
-	return scopes
+	return []RunnerToolScope{}
 }
+
+// MultiRepoTaskScopes lets a task run open pull requests in the workspace
+// repositories. Organizations with multi-repo tasks get it.
+var MultiRepoTaskScopes = []RunnerToolScope{ScopePullRequestsRead, ScopePullRequestsWrite}
 
 // AllowedRunnerTools returns the tool names that the scopes allow, in catalog
 // order.

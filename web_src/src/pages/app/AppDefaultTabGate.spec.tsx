@@ -210,7 +210,7 @@ describe("AppDefaultTabGate — factory apps", () => {
     renderGate({ initialEntry: "/org-1/apps/canvas-1" });
 
     expect(getLocation().pathname).toBe("/org-1/workspaces/rf/automations/canvas-1");
-    expect(getLocation().search).toBe("?configure=1&agent=1");
+    expect(getLocation().search).toBe("?configure=1");
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
 
@@ -234,7 +234,7 @@ describe("AppDefaultTabGate — factory apps", () => {
     });
 
     expect(getLocation().pathname).toBe("/org-1/workspaces/rf/automations/canvas-1");
-    expect(getLocation().search).toBe("?configure=1&agent=1&sidebar=1&node=create-pr&version=v1");
+    expect(getLocation().search).toBe("?configure=1&sidebar=1&node=create-pr&version=v1");
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
 });

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -208,6 +209,9 @@ func UpdateFactoryRepository(
 		}
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
+	// Workspace-scope triggers keep the same expression, so only a new Setup
+	// moves their webhooks to the new primary repository.
+	refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
 
 	lines, err := factory.ListLines(db)
 	if err != nil {
@@ -289,6 +293,8 @@ func reconcileFactoryRepository(
 	}
 	config := factory.OnboardingConfigValue()
 	nextBranch := strings.TrimSpace(config.DefaultBranch)
+	previousGitHubHost := githubHostForVCSIntegration(tx, factory.OrganizationID, previousVCSIntegrationID)
+	nextGitHubHost := githubHostForVCSIntegration(tx, factory.OrganizationID, vcsIntegrationID)
 	if retargetTasks {
 		if err := factory.RetargetUnfinishedWorkOrderBranches(
 			tx,
@@ -368,14 +374,24 @@ func reconcileFactoryRepository(
 				managedRunnerNodeIDs["capture-visual-evidence"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
 			case scheduledIntakeTemplateID:
-				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch) || changed
+				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 			}
 			if template.id == "line-implementation" {
 				changed = replaceLegacyCheckoutBaseToken(nodes, managedRunnerNodeIDs) || changed
 			}
 		}
 		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID {
-			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch) || changed
+			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
+		}
+		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID &&
+			slices.ContainsFunc(nodes, func(node models.Node) bool { return node.ComponentName() == "schedule" }) {
+			for i := range nodes {
+				if !isFactoryAgentHarness(nodes[i].ComponentName()) {
+					continue
+				}
+				managedRunnerNodeIDs[nodes[i].ID] = true
+				changed = refreshCustomAutomationCheckout(&nodes[i], factory, nextGitHubHost) || changed
+			}
 		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
 			graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{
@@ -437,6 +453,54 @@ func reconcileFactoryRepository(
 	}
 
 	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
+}
+
+func sharedTaskCheckout(environment []any) bool {
+	for _, value := range environment {
+		entry, ok := value.(map[string]any)
+		if ok && configString(entry, "name") == "REPO" && strings.Contains(configString(entry, "value"), "workOrder?.repository") {
+			return true
+		}
+	}
+	return false
+}
+
+func checkoutNamesUseExpressions(environment []any, names ...string) bool {
+	for _, value := range environment {
+		entry, ok := value.(map[string]any)
+		if !ok || !slices.Contains(names, configString(entry, "name")) {
+			continue
+		}
+		if strings.Contains(configString(entry, "value"), "{{") {
+			return true
+		}
+	}
+	return false
+}
+
+func refreshCustomAutomationCheckout(node *models.Node, factory *models.Factory, githubHost string) bool {
+	current, _ := node.Configuration["environment"].([]any)
+	shared := sharedTaskCheckout(current)
+	// A task trigger checks out the task repository. Keep those expressions.
+	if checkoutNamesUseExpressions(current, "REPO", "BASE") && !shared {
+		return false
+	}
+	checkout := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHost, false)
+	if shared {
+		checkout = backlogSharedCheckoutEnvironment(factory, githubHost)
+	}
+	// Only checkout variables belong to the workspace. Preserve user-added values.
+	updated := slices.DeleteFunc(slices.Clone(current), func(value any) bool {
+		entry, ok := value.(map[string]any)
+		return ok && slices.Contains([]string{"REPO", "REPO_URL", "SOURCE_REPO", "BASE"}, configString(entry, "name"))
+	})
+	updated = append(updated, checkout...)
+	if reflect.DeepEqual(current, updated) {
+		return false
+	}
+	node.Configuration = maps.Clone(node.Configuration)
+	node.Configuration["environment"] = updated
+	return true
 }
 
 func factoryTemplateVCSNodeIDs(templateID string) []string {
@@ -656,7 +720,7 @@ func replaceConfigurationValues(value any, replacements []configurationReplaceme
 // replaceWorkspaceCheckoutTarget keeps a baked checkout on the workspace
 // repository and branch together. A repository change rewrites the repository
 // slug and its clone URL. A branch change rewrites only BASE.
-func replaceWorkspaceCheckoutTarget(nodes []models.Node, provider, previousRepository, nextRepository, previousBranch, nextBranch string) bool {
+func replaceWorkspaceCheckoutTarget(nodes []models.Node, provider, previousRepository, nextRepository, previousBranch, nextBranch, previousGitHubHost, nextGitHubHost string) bool {
 	changed := replaceLiteralCheckoutBase(nodes, previousBranch, nextBranch)
 	previousRepository = strings.TrimSpace(previousRepository)
 	nextRepository = strings.TrimSpace(nextRepository)
@@ -665,7 +729,7 @@ func replaceWorkspaceCheckoutTarget(nodes []models.Node, provider, previousRepos
 	}
 	return replaceNodeConfigurationValues(nodes, []configurationReplacement{
 		{from: previousRepository, to: nextRepository},
-		{from: runner.WorkspaceContextRepoURL(provider, previousRepository), to: runner.WorkspaceContextRepoURL(provider, nextRepository)},
+		{from: runner.WorkspaceContextRepoURL(provider, previousRepository, previousGitHubHost), to: runner.WorkspaceContextRepoURL(provider, nextRepository, nextGitHubHost)},
 	}) || changed
 }
 

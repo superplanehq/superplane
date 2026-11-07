@@ -40,6 +40,7 @@ func TestStartVisualEvidenceCaptureEmitsTheAttachedRevision(t *testing.T) {
 	assert.Equal(t, headSHA, head["sha"])
 	assert.Equal(t, "Closes the checkout gap.", pullRequestPayload["body"])
 	assert.Equal(t, order.ID.String(), payload["workOrder"].(map[string]any)["id"])
+
 }
 
 func TestStartVisualEvidenceCaptureRetriesAfterGitHubFailure(t *testing.T) {

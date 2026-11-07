@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/runner"
@@ -665,6 +666,137 @@ func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
 	assert.Equal(t, "context/superplanehq/suss", contextFile.Repositories[0].Directory)
 	assert.Contains(t, paths["prompts/implement.txt"], "Setup commands")
 	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss (../context/superplanehq/suss)")
+}
+
+func TestAttachWorkspaceAgentResourcesUsesEnterpriseContextHost(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{"host": "acme.ghe.com"})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	vcsID := integration.ID.String()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/extra",
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+
+	paths := map[string]string{}
+	for _, file := range files {
+		paths[file.Path] = file.Content
+	}
+	require.Contains(t, paths, runner.WorkspaceContextConfigPath)
+	var contextFile struct {
+		Repositories []struct {
+			URL string `json:"url"`
+		} `json:"repositories"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(paths[runner.WorkspaceContextConfigPath]), &contextFile))
+	require.Len(t, contextFile.Repositories, 1)
+	assert.Equal(t, "https://acme.ghe.com/acme/extra.git", contextFile.Repositories[0].URL)
+}
+
+func TestAttachWorkspaceAgentResourcesListsPrimaryRepositoryWithContext(t *testing.T) {
+	r := setupWorkspaceAgentResources(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/app"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository}))
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/web",
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+
+	paths := map[string]string{}
+	for _, file := range files {
+		paths[file.Path] = file.Content
+	}
+	var contextFile struct {
+		Repositories []struct {
+			Repository string `json:"repository"`
+			Directory  string `json:"directory"`
+		} `json:"repositories"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(paths[runner.WorkspaceContextConfigPath]), &contextFile))
+	require.Len(t, contextFile.Repositories, 2)
+	assert.Equal(t, "acme/app", contextFile.Repositories[0].Repository)
+	assert.Equal(t, "context/acme/app", contextFile.Repositories[0].Directory)
+	assert.Equal(t, "acme/web", contextFile.Repositories[1].Repository)
+}
+
+func TestAttachWorkspaceAgentResourcesBlocksPushToReadOnlyBitbucketRepositories(t *testing.T) {
+	r := setupWorkspaceAgentResources(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/app"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository, VCSProvider: &provider}))
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	for repository, access := range map[string]string{"acme/web": models.FactoryContextRepoAccessWrite, "acme/docs": models.FactoryContextRepoAccessRead} {
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: repository, VCSProvider: models.ProviderBitbucket, Access: access,
+		})
+		require.NoError(t, err)
+	}
+	type contextEntry struct {
+		Repository  string `json:"repository"`
+		ReadOnly    bool   `json:"readOnly"`
+		PushBlocked bool   `json:"pushBlocked"`
+	}
+	contextEntries := func(t *testing.T) map[string]contextEntry {
+		t.Helper()
+		_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+			OrganizationID: r.Organization.ID.String(),
+			WorkflowID:     canvas.ID.String(),
+		}, nil, nil)
+		var contextFile struct {
+			Repositories []contextEntry `json:"repositories"`
+		}
+		for _, file := range files {
+			if file.Path == runner.WorkspaceContextConfigPath {
+				require.NoError(t, json.Unmarshal([]byte(file.Content), &contextFile))
+			}
+		}
+		entries := map[string]contextEntry{}
+		for _, entry := range contextFile.Repositories {
+			entries[entry.Repository] = entry
+		}
+		return entries
+	}
+
+	t.Run("keeps push without multi-repo tasks", func(t *testing.T) {
+		entries := contextEntries(t)
+		assert.True(t, entries["acme/web"].ReadOnly)
+		assert.False(t, entries["acme/web"].PushBlocked)
+		assert.False(t, entries["acme/docs"].PushBlocked)
+	})
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+
+	t.Run("blocks push only for read-only repositories with multi-repo tasks", func(t *testing.T) {
+		entries := contextEntries(t)
+		assert.False(t, entries["acme/web"].ReadOnly)
+		assert.False(t, entries["acme/web"].PushBlocked)
+		assert.True(t, entries["acme/docs"].ReadOnly)
+		assert.True(t, entries["acme/docs"].PushBlocked)
+		assert.False(t, entries["acme/app"].PushBlocked, "the primary repository keeps push")
+	})
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testing.T) {

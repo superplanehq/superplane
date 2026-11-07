@@ -145,7 +145,14 @@ func resolveUpdatedIntakeBinding(
 		)
 	}
 
-	binding, err := resolveIntakeBinding(db, factory, intake.Source, req.GetIntegrationId(), req.GetResourceId())
+	binding, err := resolveIntakeBinding(
+		db,
+		factory,
+		intake.Source,
+		req.GetIntegrationId(),
+		req.GetResourceId(),
+		updatedLinearTeamID(db, intake, req),
+	)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")
 	}
@@ -157,6 +164,19 @@ func resolveUpdatedIntakeBinding(
 	}
 
 	return binding, nil
+}
+
+// updatedLinearTeamID is the team a Linear intake has after the update. The
+// request wins. Otherwise the saved team stays, so a new connection does not
+// turn a team intake back into a project intake.
+func updatedLinearTeamID(db *gorm.DB, intake *models.FactoryIntake, req *pb.UpdateFactoryIntakeRequest) string {
+	if intake.Source != models.FactoryIntakeSourceLinearIssues {
+		return ""
+	}
+	if teamID := strings.TrimSpace(req.GetSettings().GetLinearTeamId()); teamID != "" {
+		return teamID
+	}
+	return liveIntakeSettings(db, intake.Source, intake.CanvasID, defaultLinearIntakeSettings()).LinearTeamID
 }
 
 // applyIntakeUpdate writes every requested change in one transaction. Settings
@@ -193,7 +213,7 @@ func applyIntakeUpdate(
 			}
 		}
 		if name != nil {
-			if err := canvases.UpdateCanvasInTransaction(tx, canvas, name, nil, nil); err != nil {
+			if err := canvases.UpdateCanvasInTransaction(tx, canvas, name, nil); err != nil {
 				return err
 			}
 		}
@@ -329,8 +349,8 @@ func applyIntakeSettingsToGraph(
 	if source == models.FactoryIntakeSourceGitHubIssues {
 		updated = deriveGitHubIssueListening(updated)
 	}
-	if source == models.FactoryIntakeSourceLinearIssues && len(updated.LinearProjectIDs) == 0 {
-		return nil, nil, invalidArgument("at least one Linear project is required")
+	if source == models.FactoryIntakeSourceLinearIssues && !linearIntakeHasScope(updated) {
+		return nil, nil, invalidArgument("a Linear team is required")
 	}
 	if source == models.FactoryIntakeSourceSentryExceptions && len(updated.SentryProjectIDs) == 0 {
 		return nil, nil, invalidArgument("at least one Sentry project is required")
@@ -376,9 +396,7 @@ func applyIntakeSettingsToGraph(
 				configuration["alertTransitions"] = intakeDatadogAlertTransitions(updated)
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceLinearIssues:
-				configuration["projects"] = configurationAnyStrings(updated.LinearProjectIDs)
-				configuration["labels"] = linearLabelPredicates(updated.LinearLabels)
-				configuration["actions"] = []any{"create", "update"}
+				applyLinearTriggerConfiguration(configuration, updated)
 				nodes[i].Configuration = configuration
 			default:
 				continue
@@ -415,7 +433,21 @@ func applyIntakeBindingToGraph(
 
 	boundID := binding.integrationRef().ID
 	for i := range nodes {
-		if nodes[i].ID != graph.TriggerNodeID {
+		if nodes[i].ID != graph.TriggerNodeID && nodes[i].ID != graph.EnrichIssueNodeID &&
+			nodes[i].ID != graph.SentryIssueRequestNodeID && nodes[i].ID != graph.SentryEventRequestNodeID && nodes[i].ID != graph.SentryRecommendedEventRequestNodeID {
+			continue
+		}
+		if nodes[i].ID == graph.SentryIssueRequestNodeID || nodes[i].ID == graph.SentryEventRequestNodeID || nodes[i].ID == graph.SentryRecommendedEventRequestNodeID {
+			configuration := maps.Clone(nodes[i].Configuration)
+			if configuration == nil {
+				configuration = map[string]any{}
+			}
+			configuration["authorization"] = sentryRequestAuthorization(binding)
+			nodes[i].Configuration = configuration
+			continue
+		}
+		if nodes[i].ID == graph.EnrichIssueNodeID {
+			nodes[i].IntegrationID = &boundID
 			continue
 		}
 		configuration := maps.Clone(nodes[i].Configuration)

@@ -388,6 +388,12 @@ func Test__HandOffWorkOrder__VerifyRejectsUnsupportedPullRequestURL(t *testing.T
 		assertNamesSupportedPullRequestURL(t, err)
 	})
 
+	t.Run("enterprise url on a github.com workspace", func(t *testing.T) {
+		err := reject(t, githubFactory.ID.String(), "https://other.ghe.com/acme/app/pull/42")
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, grpcerrors.StatusMessage(err), "workspace GitHub host")
+	})
+
 	t.Run("malformed url", func(t *testing.T) {
 		err := reject(t, bitbucketFactory.ID.String(), "https://bitbucket.org/acme/app/pull/42")
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
@@ -398,7 +404,7 @@ func Test__HandOffWorkOrder__VerifyRejectsUnsupportedPullRequestURL(t *testing.T
 		stubBitbucketMergeAPI(t, bitbucketHandOffPRResponse("other/repo", 9, "OPEN", "feat/other"))
 		err := reject(t, bitbucketFactory.ID.String(), "https://bitbucket.org/other/repo/pull-requests/9")
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-		assert.Contains(t, grpcerrors.StatusMessage(err), "does not match the task repository")
+		assert.Contains(t, grpcerrors.StatusMessage(err), "is not in this workspace")
 	})
 
 	t.Run("declined bitbucket pull request", func(t *testing.T) {
@@ -413,6 +419,65 @@ func Test__HandOffWorkOrder__VerifyRejectsUnsupportedPullRequestURL(t *testing.T
 		err := reject(t, bitbucketFactory.ID.String(), "https://bitbucket.org/acme/app/pull-requests/8")
 		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 		assert.Contains(t, grpcerrors.StatusMessage(err), "not open")
+	})
+}
+
+func Test__HandOffWorkOrder__VerifyAttachesPullRequestsFromEveryWorkspaceRepository(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel := seedHandOffFactory(t, r, db)
+	_, err := factoryModel.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "acme/web",
+		Access:     models.FactoryContextRepoAccessWrite,
+	})
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "review", "start-review")
+	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	})
+	require.NoError(t, err)
+
+	original := newFactoryGitHubAPI
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+		return &fakeFactoryGitHub{pullRequests: map[string]*github.PullRequest{
+			"acme/app#42": openHandOffPullRequest("acme/app", 42, "feat/api"),
+			"acme/web#7":  openHandOffPullRequest("acme/web", 7, "feat/web"),
+			"other/x#3":   openHandOffPullRequest("other/x", 3, "feat/x"),
+		}}, nil
+	}
+	t.Cleanup(func() { newFactoryGitHubAPI = original })
+
+	t.Run("attaches one pull request in each repository to the same task", func(t *testing.T) {
+		result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+			FactoryID:       factoryModel.ID.String(),
+			Title:           "Ship refunds in API and web",
+			Plan:            "# Plan",
+			Column:          HandOffColumnVerify,
+			PullRequestURL:  "https://github.com/acme/app/pull/42",
+			PullRequestURLs: []string{"https://github.com/acme/web/pull/7"},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, result.Order.GetPullRequests(), 2)
+		repositories := []string{result.Order.GetPullRequests()[0].GetRepository(), result.Order.GetPullRequests()[1].GetRepository()}
+		assert.ElementsMatch(t, []string{"acme/app", "acme/web"}, repositories)
+		assert.ElementsMatch(t, []string{"https://github.com/acme/app/pull/42", "https://github.com/acme/web/pull/7"}, result.PullRequestURLs)
+	})
+
+	t.Run("rejects a pull request outside the workspace repositories", func(t *testing.T) {
+		_, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+			FactoryID:       factoryModel.ID.String(),
+			Title:           "Ship it",
+			Plan:            "# Plan",
+			Column:          HandOffColumnVerify,
+			PullRequestURLs: []string{"https://github.com/other/x/pull/3"},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, grpcerrors.StatusMessage(err), "is not in this workspace")
 	})
 }
 
@@ -487,7 +552,7 @@ func Test__HandOffWorkOrder__RejectsInvalidInput(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-		assert.Contains(t, grpcerrors.StatusMessage(err), "does not match the task repository")
+		assert.Contains(t, grpcerrors.StatusMessage(err), "is not in this workspace")
 	})
 
 	t.Run("closed pull request", func(t *testing.T) {
@@ -715,7 +780,6 @@ func TestSubscriptionHandOffWaitsForAssignmentAndExplicitStart(t *testing.T) {
 			column := scenario.column
 			r := support.Setup(t)
 			db := database.DB(t.Context())
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 			f := seedHandOffFactory(t, r, db)
 			subscription := true
 			require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
@@ -800,7 +864,6 @@ func seedPendingVerifyHandOff(t *testing.T) (context.Context, *support.ResourceR
 	t.Helper()
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	f := seedHandOffFactory(t, r, db)
 	subscription := true
 	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
@@ -884,7 +947,6 @@ func TestIsHandOffPullRequestGoneRecognizesBitbucketNotFound(t *testing.T) {
 func TestSubscriptionHandOffRejectsInvalidPullRequestURLBeforeSaving(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
 	githubFactory := seedHandOffFactory(t, r, db)
 	bitbucketFactory := seedBitbucketHandOffFactory(t, r, db)

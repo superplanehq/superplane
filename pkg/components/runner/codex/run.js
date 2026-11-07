@@ -15,8 +15,11 @@ const { spawn } = require("child_process");
 
 const SESSION_FILE = "codex_session";
 
-// Codex starts stdio MCP servers with a minimal environment. Forward by name,
-// not with mcp_servers.<id>.env, so tokens stay out of the codex argv.
+// Codex starts stdio MCP servers with a minimal environment. The global server
+// pushes branches with the task's git credentials and reads task settings such
+// as BASE, so it must see the same environment as the agent, as it does under
+// Claude Code and OpenCode. Forward by name, not with mcp_servers.<id>.env, so
+// values stay out of the codex argv. The model credentials stay with Codex.
 const GLOBAL_MCP_SERVER = "superplane_global";
 const GLOBAL_MCP_ENV_VARS = [
   "SUPERPLANE_BASE_URL",
@@ -24,6 +27,16 @@ const GLOBAL_MCP_ENV_VARS = [
   "SUPERPLANE_TASK_DIR",
   "SUPERPLANE_ANALYSIS_SPEC_FILE",
 ];
+const ENV_VAR_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const CODEX_CREDENTIAL_ENV_VAR = /^(CODEX_|OPENAI_|SUPERPLANE_CODEX_)/;
+
+function globalMCPEnvVars(env) {
+  const names = new Set(GLOBAL_MCP_ENV_VARS);
+  for (const name of Object.keys(env || {}).sort()) {
+    if (ENV_VAR_NAME.test(name) && !CODEX_CREDENTIAL_ENV_VAR.test(name)) names.add(name);
+  }
+  return [...names];
+}
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
@@ -263,7 +276,7 @@ function globalMCPConfigOverrides(taskDir, env = process.env) {
     "-c",
     `mcp_servers.${GLOBAL_MCP_SERVER}.args=${tomlStringArray([path.join(taskDir, "superplane_mcp", "server.js")])}`,
     "-c",
-    `mcp_servers.${GLOBAL_MCP_SERVER}.env_vars=${tomlStringArray(GLOBAL_MCP_ENV_VARS)}`,
+    `mcp_servers.${GLOBAL_MCP_SERVER}.env_vars=${tomlStringArray(globalMCPEnvVars(env))}`,
     ...toolNames.flatMap((name) => [
       "-c",
       `mcp_servers.${GLOBAL_MCP_SERVER}.tools.${tomlKey(name)}.approval_mode="approve"`,
@@ -428,6 +441,100 @@ function superviseCodexProcessGroup(child) {
   return stop;
 }
 
+function isChatGPTAuthenticationError(value) {
+  const message = String(value || "");
+  return /(?:chatgpt|codex).*(?:session (?:has )?expired|credentials? (?:expired|refresh failed|could not be refreshed)|authentication failed|unauthorized)|(?:failed|could not) to refresh.*chatgpt credentials|(?:access|auth(?:entication)?) token.*expired|(?:401|unauthorized).*(?:workspace.routing|chatgpt|codex)|workspace.routing.*(?:401|unauthorized)|^(?:refresh_token_expired|token_expired)$/i.test(message);
+}
+
+async function runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, onStop }) {
+  const child = spawn("codex", codexArgs, {
+    env: childEnv,
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: Boolean(subscription?.setCredentialFailureHandler),
+  });
+  const stop = child.pid && subscription?.setCredentialFailureHandler
+    ? superviseCodexProcessGroup(child)
+    : () => child.kill("SIGKILL");
+  onStop(stop);
+  const formatter = createCodexFormatter(telemetry, activity);
+  let lastResult = {};
+  let workStarted = false;
+  let authenticationFailed = false;
+  let authenticationFailedAt = 0;
+  const detectAuthentication = (message) => {
+    if (authenticationFailed || !subscription?.subscriptionEnabled?.() || !isChatGPTAuthenticationError(message)) return;
+    authenticationFailed = true;
+    authenticationFailedAt = Date.now();
+    stop();
+  };
+  const stderrDone = pipeRedactedStderr(child.stderr, detectAuthentication);
+  const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+  rl.on("line", (raw) => {
+    const line = raw.trim();
+    if (!line) return;
+    try {
+      const event = JSON.parse(line);
+      if (!event || typeof event !== "object") return;
+      if (event.item && /^(item.started|item.updated|item.completed)$/.test(event.type)) {
+        workStarted = true;
+      }
+      if (authenticationFailed) return;
+      if (event.type === "error" || event.type === "turn.failed") {
+        detectAuthentication(event.message || event.error?.message || event.error?.code);
+        if (authenticationFailed) return;
+      }
+      const nextSessionID = codexSessionIDFromEvent(event);
+      if (nextSessionID) writeSessionID(sp, nextSessionID);
+      if (event.usage || (event.item && event.item.usage)) lastResult = event;
+      if (["item.completed", "turn.completed", "result"].includes(event.type) &&
+          !lastResult.usage && !(lastResult.item && lastResult.item.usage)) lastResult = event;
+      formatter.handleEvent(event);
+    } catch (_err) {
+      writeStdout(`${line}\n`);
+    }
+  });
+  const [processExitCode, , stderr] = await Promise.all([
+    new Promise((resolve, reject) => {
+      child.on("error", reject);
+      child.on("close", (code) => resolve(code == null ? 1 : code));
+    }),
+    new Promise((resolve) => rl.on("close", resolve)),
+    stderrDone,
+  ]);
+  return { processExitCode, stderr, lastResult, formatter, authenticationFailed, authenticationFailedAt, workStarted };
+}
+
+async function recoverChatGPTAuthentication(subscription, deadline, activity) {
+  activity.notice("chatgpt_refreshing", "Refreshing your ChatGPT connection…");
+  const remaining = () => Math.max(1, deadline - Date.now());
+  try {
+    const rejected = subscription.readAccessToken?.() || "";
+    await subscription.refreshRejectedCredentials(rejected, remaining());
+    if (Date.now() >= deadline) throw new Error("ChatGPT recovery timed out");
+    await subscription.restore(process.env, remaining());
+    if (Date.now() >= deadline) throw new Error("ChatGPT recovery timed out");
+    return null;
+  } catch (error) {
+    if (["refresh_token_invalidated", "refresh_token_expired", "refresh_token_reused", "invalid_grant", "invalid_refresh_token", "token_expired"].includes(error?.code)) {
+      return "chatgpt_reconnect_required";
+    }
+    return error?.code === "connection_busy" ? "chatgpt_connection_busy" : "chatgpt_refresh_failed";
+  }
+}
+
+function chatGPTAuthenticationMessage(code) {
+  if (code === "chatgpt_reconnect_required") {
+    return "SuperPlane could not refresh your ChatGPT connection. Reconnect ChatGPT to continue.";
+  }
+  if (code === "chatgpt_refresh_failed") {
+    return "SuperPlane could not refresh your ChatGPT connection. Try again.";
+  }
+  if (code === "chatgpt_connection_busy") {
+    return "Your ChatGPT connection is busy. Try again.";
+  }
+  return "SuperPlane could not authorize your ChatGPT connection. Try again or reconnect ChatGPT.";
+}
+
 async function runPrompt(promptFile, model, thinking) {
   const sp = process.env.SUPERPLANE_TASK_DIR;
   if (!sp) {
@@ -483,6 +590,24 @@ async function runPrompt(promptFile, model, thinking) {
     turn: promptCount + 1,
   });
   activity.start();
+  if (subscription?.subscriptionEnabled?.() && subscription.restore) {
+    if (subscription.accessTokenNeedsRefresh?.()) {
+      activity.notice("chatgpt_refreshing", "Refreshing your ChatGPT connection…");
+    }
+    try {
+      await subscription.restore(process.env, 30000);
+    } catch (error) {
+      const failure = subscription.authenticationFailure?.(error) || {
+        code: "chatgpt_refresh_failed",
+        message: "SuperPlane could not refresh your ChatGPT connection. Try again.",
+      };
+      activity.notice(failure.code, failure.message);
+      activity.end("failed");
+      await activity.flush();
+      fs.writeFileSync(resultFile, `${JSON.stringify({ type: "result", is_error: true, error: failure.message, authentication_code: failure.code, result: "" })}\n`);
+      return 1;
+    }
+  }
   const codexArgs = codexExecArgs(
     process.env,
     model,
@@ -498,68 +623,24 @@ async function runPrompt(promptFile, model, thinking) {
   }
   codexArgs.push(prompt);
 
-  const detached = Boolean(subscription?.setCredentialFailureHandler);
-  const child = spawn("codex", codexArgs, {
-    env: childEnv,
-    stdio: ["ignore", "pipe", "pipe"],
-    detached,
-  });
-  if (detached) stopChild = superviseCodexProcessGroup(child);
-  const stderrDone = pipeRedactedStderr(child.stderr);
-
-  let lastResult = {};
   const telemetry = loadTurnTelemetry();
-  const formatter = createCodexFormatter(telemetry, activity);
-  const rl = readline.createInterface({
-    input: child.stdout,
-    crlfDelay: Infinity,
-  });
-  rl.on("line", (raw) => {
-    const line = raw.trim();
-    if (!line) {
-      return;
+  let attempt = await runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, onStop: (stop) => { stopChild = stop; } });
+  let authenticationCode = "";
+  if (attempt.authenticationFailed && !attempt.workStarted) {
+    const deadline = attempt.authenticationFailedAt + 30000;
+    authenticationCode = await recoverChatGPTAuthentication(subscription, deadline, activity) || "";
+    if (!authenticationCode) {
+      attempt = await runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, onStop: (stop) => { stopChild = stop; } });
+      if (attempt.authenticationFailed) authenticationCode = "chatgpt_unauthorized";
     }
-    try {
-      const event = JSON.parse(line);
-      if (event && typeof event === "object") {
-        const nextSessionID = codexSessionIDFromEvent(event);
-        if (nextSessionID) {
-          writeSessionID(sp, nextSessionID);
-        }
-        if (event.usage || (event.item && event.item.usage)) {
-          lastResult = event;
-        }
-        if (
-          event.type === "item.completed" ||
-          event.type === "turn.completed" ||
-          event.type === "result"
-        ) {
-          if (
-            !lastResult.usage &&
-            !(lastResult.item && lastResult.item.usage)
-          ) {
-            lastResult = event;
-          }
-        }
-        formatter.handleEvent(event);
-        return;
-      }
-    } catch (_err) {
-      writeStdout(`${line}\n`);
-    }
-  });
-
-  const [processExitCode, , stderr] = await Promise.all([
-    new Promise((resolve, reject) => {
-      child.on("error", reject);
-      child.on("close", (code) => resolve(code == null ? 1 : code));
-    }),
-    new Promise((resolve) => rl.on("close", resolve)),
-    stderrDone,
-  ]);
-
-  const exitCode = formatter.errorMessage() && processExitCode === 0 ? 1 : processExitCode;
-  if (exitCode !== 0 && !formatter.errorMessage()) {
+  } else if (attempt.authenticationFailed) {
+    authenticationCode = "chatgpt_unauthorized";
+  }
+  const { formatter, stderr, lastResult, processExitCode } = attempt;
+  const exitCode = authenticationCode ? 1 : formatter.errorMessage() && processExitCode === 0 ? 1 : processExitCode;
+  if (authenticationCode) {
+    formatter.reportAuthenticationFailure(chatGPTAuthenticationMessage(authenticationCode), authenticationCode);
+  } else if (exitCode !== 0 && !formatter.errorMessage()) {
     const message = `Codex failed with exit code ${exitCode}.`;
     formatter.reportError(stderr ? `${message}\n${stderr}` : message);
   }
@@ -576,6 +657,7 @@ async function runPrompt(promptFile, model, thinking) {
     type: "result",
     is_error: exitCode !== 0,
     ...(exitCode !== 0 ? { error: formatter.errorMessage() } : {}),
+    ...(authenticationCode ? { authentication_code: authenticationCode } : {}),
     result: formatter.lastText() || lastResult.result || lastResult.text || "",
     model: rollout.model || lastResult.model || model,
     thinkingLevel: rollout.effort || thinking,
@@ -747,13 +829,14 @@ function safeLogText(value) {
   return redactSubscription(safe);
 }
 
-function pipeRedactedStderr(stream) {
+function pipeRedactedStderr(stream, onLine = () => {}) {
   let tail = "";
   const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
   lines.on("line", (line) => {
     const safe = safeLogText(line);
     tail = `${tail}${safe}\n`.slice(-8192);
     writeStderr(`${safe}\n`);
+    onLine(safe);
   });
   return new Promise((resolve) => lines.on("close", () => resolve(tail.trim())));
 }
@@ -781,6 +864,13 @@ function createCodexFormatter(telemetry, activityOverride) {
     lastError = safe;
     writeStderr(`Codex error: ${safe}\n`);
     activity.notice("codex_error", safe);
+  }
+
+  function reportAuthenticationFailure(message, code) {
+    const safe = safeLogText(message);
+    lastError = safe;
+    writeStderr(`Codex error: ${safe}\n`);
+    activity.notice(code, safe);
   }
 
   function itemType(item) {
@@ -1012,6 +1102,7 @@ function createCodexFormatter(telemetry, activityOverride) {
       return lastError;
     },
     reportError,
+    reportAuthenticationFailure,
   };
 }
 

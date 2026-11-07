@@ -20,6 +20,7 @@ const (
 )
 
 type PullRequestListOptions struct {
+	TitleContains     string
 	SourceBranch      string
 	DestinationBranch string
 	States            []string
@@ -37,7 +38,7 @@ type CreatePullRequestRequest struct {
 
 type UpdatePullRequestRequest struct {
 	Title       string
-	Description string
+	Description *string
 }
 
 // APIError carries the Bitbucket HTTP status with the response message so
@@ -130,6 +131,10 @@ func (c *Client) ListPullRequests(repository string, opts PullRequestListOptions
 
 	query := url.Values{}
 	filters := []string{}
+	if opts.TitleContains != "" {
+		encoded, _ := json.Marshal(opts.TitleContains)
+		filters = append(filters, "title ~ "+string(encoded))
+	}
 	if opts.SourceBranch != "" {
 		filters = append(filters, fmt.Sprintf("source.branch.name=%q", opts.SourceBranch))
 	}
@@ -191,8 +196,8 @@ func (c *Client) UpdatePullRequest(repository string, id int64, request UpdatePu
 	if request.Title != "" {
 		body["title"] = request.Title
 	}
-	if request.Description != "" {
-		body["description"] = request.Description
+	if request.Description != nil {
+		body["description"] = *request.Description
 	}
 
 	var pullRequest map[string]any
@@ -280,6 +285,7 @@ type BitbucketPullRequest struct {
 	State               string `json:"state"`
 	Draft               bool   `json:"draft"`
 	Title               string `json:"title"`
+	Description         string `json:"description"`
 	HTMLURL             string
 	SourceRepository    string
 	SourceHash          string
@@ -297,11 +303,12 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 	}
 
 	var response struct {
-		ID    int64  `json:"id"`
-		State string `json:"state"`
-		Draft bool   `json:"draft"`
-		Title string `json:"title"`
-		Links struct {
+		ID          int64  `json:"id"`
+		State       string `json:"state"`
+		Draft       bool   `json:"draft"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Links       struct {
 			HTML struct {
 				Href string `json:"href"`
 			} `json:"html"`
@@ -339,6 +346,7 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 		State:               response.State,
 		Draft:               response.Draft,
 		Title:               response.Title,
+		Description:         response.Description,
 		HTMLURL:             response.Links.HTML.Href,
 		SourceRepository:    response.Source.Repository.FullName,
 		SourceHash:          response.Source.Commit.Hash,
@@ -347,6 +355,27 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 		DestMergeStrategies: response.Destination.Branch.MergeStrategies,
 		MergeCommit:         response.MergeCommit.Hash,
 	}, nil
+}
+
+// GetPullRequestEvent reads a current snapshot using the webhook event contract.
+// Keep the full provider payload so fork, author, and branch data survive startup.
+func (c *Client) GetPullRequestEvent(repository string, id int64) (map[string]any, error) {
+	path, err := repositoryPath(repository)
+	if err != nil {
+		return nil, err
+	}
+	var current map[string]any
+	endpoint := fmt.Sprintf("%s/repositories/%s/pullrequests/%d", baseURL, path, id)
+	if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &current); err != nil {
+		return nil, err
+	}
+	event, ok := normalizeBitbucketPullRequestEvent(pullRequestEventCreated, map[string]any{
+		"pullrequest": current, "repository": map[string]any{"full_name": repository},
+	})
+	if !ok {
+		return nil, fmt.Errorf("pull request %s#%d has no event snapshot", repository, id)
+	}
+	return event, nil
 }
 
 // errBitbucketMergeAsync reports a merge that Bitbucket accepted for

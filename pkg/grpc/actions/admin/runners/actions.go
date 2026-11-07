@@ -3,7 +3,6 @@ package runners
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
@@ -96,21 +95,9 @@ func (s *Service) ListFleetTasks(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateTaskStates(req.GetStates()); err != nil {
-		return nil, err
-	}
-	afterID, err := parseOptionalID(req.GetAfterId(), "after ID")
+	page, err := runneractions.ListFleetTasks(ctx, fleet, req.GetStates(), req.GetLimit(), req.GetAfterId())
 	if err != nil {
 		return nil, err
-	}
-
-	page, err := fleet.ListTasks(database.DB(ctx), models.ListPage{
-		States:  req.GetStates(),
-		Limit:   listLimit(req.GetLimit()),
-		AfterID: afterID,
-	})
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list fleet tasks")
 	}
 
 	out := make([]*pb.Task, 0, len(page.Tasks))
@@ -145,51 +132,6 @@ func parseFleetID(value string) (string, error) {
 		return "", grpcerrors.InvalidArgument(nil, "fleet ID is required")
 	}
 	return id, nil
-}
-
-func parseID(value, field string) (uuid.UUID, error) {
-	id, err := uuid.Parse(strings.TrimSpace(value))
-	if err != nil {
-		return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid "+field)
-	}
-	return id, nil
-}
-
-func parseOptionalID(value, field string) (*uuid.UUID, error) {
-	if strings.TrimSpace(value) == "" {
-		return nil, nil
-	}
-	id, err := parseID(value, field)
-	if err != nil {
-		return nil, err
-	}
-	return &id, nil
-}
-
-func validateTaskStates(states []string) error {
-	valid := []string{
-		models.RunnerTaskStatePending,
-		models.RunnerTaskStateQueued,
-		models.RunnerTaskStateReserved,
-		models.RunnerTaskStateRunning,
-		models.RunnerTaskStateSucceeded,
-		models.RunnerTaskStateFailed,
-		models.RunnerTaskStateCanceled,
-		models.RunnerTaskStateLost,
-	}
-	for _, state := range states {
-		if !slices.Contains(valid, state) {
-			return grpcerrors.InvalidArgument(nil, "invalid task state")
-		}
-	}
-	return nil
-}
-
-func listLimit(requested int32) int {
-	if requested <= 0 {
-		return 200
-	}
-	return min(int(requested), 1000)
 }
 
 func (s *Service) UpdateFleet(ctx context.Context, req *pb.UpdateFleetRequest) (*pb.UpdateFleetResponse, error) {

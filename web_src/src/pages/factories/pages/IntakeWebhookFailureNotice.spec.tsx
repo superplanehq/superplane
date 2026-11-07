@@ -21,6 +21,22 @@ describe("IntakeWebhookFailureNotice", () => {
     );
   });
 
+  it("opens repository webhooks on the GitHub Enterprise host", () => {
+    render(
+      <IntakeWebhookFailureNotice
+        message="GitHub did not create the webhook."
+        repository="acme/app"
+        host="acme.ghe.com"
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Open repository webhooks" })).toHaveAttribute(
+      "href",
+      "https://acme.ghe.com/acme/app/settings/hooks",
+    );
+  });
+
   it("tries again when the user asks", async () => {
     const onRetry = vi.fn();
     const user = userEvent.setup();

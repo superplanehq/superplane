@@ -487,6 +487,19 @@ service Factories {
     };
   }
 
+  rpc SearchFactoryPullRequestImportItems(SearchFactoryPullRequestImportItemsRequest) returns (SearchFactoryPullRequestImportItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/pull-request-imports/candidates"
+    };
+  }
+
+  rpc ImportFactoryPullRequest(ImportFactoryPullRequestRequest) returns (ImportFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/pull-request-imports"
+      body: "*"
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -707,6 +720,30 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove one work order artifact";
       description: "Removes one artifact from a work order by key or title";
+      tags: "Factory";
+    };
+  }
+
+  rpc AddWorkOrderChecks(AddWorkOrderChecksRequest) returns (AddWorkOrderChecksResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add work order checks";
+      description: "Adds or replaces checks on a work order. A check that SuperPlane owns cannot change.";
+      tags: "Factory";
+    };
+  }
+
+  rpc RemoveWorkOrderChecks(RemoveWorkOrderChecksRequest) returns (RemoveWorkOrderChecksResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/checks/remove"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove work order checks";
+      description: "Removes checks by key. Checks that SuperPlane owns stay.";
       tags: "Factory";
     };
   }
@@ -1368,6 +1405,7 @@ message FactoryCustomAutomation {
     START_MODE_UNSPECIFIED = 0;
     START_MODE_MANUAL = 1;
     START_MODE_AUTOMATIC = 2;
+    START_MODE_SCHEDULED = 3;
   }
 
   message Step {
@@ -1385,12 +1423,24 @@ message FactoryCustomAutomation {
     repeated string secrets = 6;
   }
 
+  message Schedule {
+    string cron_expression = 1;
+    double utc_offset = 2;
+  }
+
+  message StartTrigger {
+    StartMode start_mode = 1;
+    Schedule schedule = 2;
+  }
+
   message Settings {
     StartMode start_mode = 1;
     FactoryAppTemplateAgent agent = 2;
     repeated Step steps = 3;
     string icon = 4;
     int32 execution_timeout_seconds = 5;
+    Schedule schedule = 6;
+    repeated StartTrigger triggers = 7;
   }
 
   Factory.Automation automation = 1;
@@ -1402,6 +1452,7 @@ message CreateFactoryCustomAutomationRequest {
   string factory_id = 1;
   string name = 2;
   FactoryCustomAutomation.Settings settings = 3;
+  string column_key = 4;
 }
 
 message CreateFactoryCustomAutomationResponse {
@@ -1599,7 +1650,8 @@ message FactoryIntake {
     // Environments that still create a task. Empty means every environment.
     // Datadog intakes only.
     repeated string datadog_environments = 20;
-    // Projects that still create a task. Required for a Linear intake.
+    // Projects that still create a task. Optional for a Linear intake that
+    // has a team. Empty means every project in the team.
     // Linear issue intakes only.
     repeated string linear_project_ids = 21;
     // Label names that still create a task. Empty means every label.
@@ -1610,6 +1662,14 @@ message FactoryIntake {
     repeated string sentry_project_ids = 23;
     // Organization user ID. Omitted updates preserve the selection; empty clears it.
     optional string default_owner_id = 24;
+    // Linear team that the intake listens to. Required for a new Linear
+    // intake. An older intake that has projects and no team still works.
+    // Linear issue intakes only.
+    string linear_team_id = 25;
+    // Create a task for an issue that has no project. Applies only when
+    // linear_project_ids is not empty. Omitted means true.
+    // Linear issue intakes only.
+    optional bool linear_include_issues_without_project = 26;
   }
 
   string id = 1;
@@ -2173,6 +2233,13 @@ message WorkOrder {
   WorkOrderMcpClient mcp_client = 26;
   string refinement_model = 27;
   PendingHandOff pending_handoff = 28;
+  // Person who first moved this task from draft to open. Independent of ownership.
+  // Empty when the first start was automated or the task has not started.
+  UserRef started_by = 29;
+  // True when the first start was automatic. False before the task starts.
+  bool auto_started = 30;
+  // Timestamp of the first start. Empty before the task starts.
+  google.protobuf.Timestamp started_at = 31;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -2588,6 +2655,35 @@ message RemoveWorkOrderArtifactResponse {
   string title = 2;
 }
 
+message AddWorkOrderChecksRequest {
+  message Check {
+    string key = 1;
+    string name = 2;
+    double score = 3;
+    double max_score = 4;
+    WorkOrderCheck.Level level = 5;
+    string reason = 6;
+  }
+
+  string factory_id = 1;
+  string order_id = 2;
+  repeated Check checks = 3;
+}
+
+message AddWorkOrderChecksResponse {
+  repeated WorkOrderCheck checks = 1;
+}
+
+message RemoveWorkOrderChecksRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  repeated string keys = 3;
+}
+
+message RemoveWorkOrderChecksResponse {
+  repeated string removed = 1;
+}
+
 message WorkOrderArtifact {
   enum Type {
     TYPE_UNSPECIFIED = 0;
@@ -2602,6 +2698,8 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
+  // Stable id that an agent gave the artifact, if any.
+  string key = 6;
 }
 
 // WorkOrderCheck is a scored assessment an automation reported on a work
@@ -2644,6 +2742,12 @@ message WorkOrderCheck {
   // Recent report scores, oldest first, ending with the current score.
   // Capped server-side; powers the run-history strip on boolean checks.
   repeated double recent_scores = 15;
+  // automation for a SuperPlane check, agent for a check from add_checks
+  // or from a person.
+  string source = 16;
+  // Pull request repository of a merge confidence check. Empty for a check
+  // of the whole task.
+  string repository = 17;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.
@@ -3090,6 +3194,8 @@ message FactoryAgentResource {
   repeated string commands = 20;
   string vcs_provider = 21;
   SystemSkill system_skill = 22;
+  // Context repository access: "write" or "read".
+  string access = 23;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -3113,6 +3219,8 @@ message CreateFactoryAgentResourceRequest {
   string repository = 9;
   repeated string commands = 10;
   string vcs_provider = 11;
+  string ref = 12;
+  string access = 13;
 }
 
 message CreateFactoryAgentResourceResponse {
@@ -3134,6 +3242,8 @@ message UpdateFactoryAgentResourceRequest {
   repeated string commands = 12;
   optional bool replace_commands = 13;
   optional string vcs_provider = 14;
+  optional string ref = 15;
+  optional string access = 16;
 }
 
 message UpdateFactoryAgentResourceResponse {
@@ -3444,6 +3554,7 @@ message PendingHandOff {
   string line_id = 1;
   string column = 2;
   string pull_request_url = 3;
+  repeated string pull_request_urls = 4;
 }
 
 message ResumeHandOffWorkOrderRequest {
@@ -3500,6 +3611,14 @@ message CodexUsageLimit {
   CodexUsageWindow primary = 4;
   CodexUsageWindow secondary = 5;
   CodexUsageCredits credits = 6;
+  CodexUsageIndividualLimit individual_limit = 7;
+}
+
+message CodexUsageIndividualLimit {
+  string limit = 1;
+  string used = 2;
+  double remaining_percent = 3;
+  google.protobuf.Timestamp resets_at = 4;
 }
 
 message CodexUsageCredits {
@@ -3512,4 +3631,36 @@ message CodexUsageWindow {
   double used_percent = 1;
   optional int64 window_duration_mins = 2;
   google.protobuf.Timestamp resets_at = 3;
+}
+
+message SearchFactoryPullRequestImportItemsRequest {
+  string factory_id = 1;
+  string query = 2;
+  int32 limit = 3;
+}
+
+message FactoryPullRequestImportItem {
+  string url = 1;
+  string title = 2;
+  string description = 3;
+  int64 number = 4;
+  bool draft = 5;
+  string repository = 6;
+  string provider = 7;
+  WorkOrderSummary existing_task = 8;
+}
+
+message SearchFactoryPullRequestImportItemsResponse {
+  repeated FactoryPullRequestImportItem items = 1;
+}
+
+message ImportFactoryPullRequestRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  string pull_request_url = 3;
+}
+
+message ImportFactoryPullRequestResponse {
+  WorkOrder order = 1;
+  bool created = 2;
 }

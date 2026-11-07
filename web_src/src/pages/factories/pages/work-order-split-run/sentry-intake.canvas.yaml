@@ -8,8 +8,32 @@ spec:
     - channel: default
       sourceId: on-sentry-issue
       targetId: factory-project
-    - channel: default
+    - channel: 'true'
       sourceId: factory-project
+      targetId: get-sentry-issue
+    - channel: success
+      sourceId: get-sentry-issue
+      targetId: get-sentry-event
+    - channel: failure
+      sourceId: get-sentry-issue
+      targetId: get-sentry-event
+    - channel: success
+      sourceId: get-sentry-event
+      targetId: latest-sentry-event-has-stack
+    - channel: failure
+      sourceId: get-sentry-event
+      targetId: latest-sentry-event-has-stack
+    - channel: 'true'
+      sourceId: latest-sentry-event-has-stack
+      targetId: create-work-order
+    - channel: 'false'
+      sourceId: latest-sentry-event-has-stack
+      targetId: get-recommended-sentry-event
+    - channel: success
+      sourceId: get-recommended-sentry-event
+      targetId: create-work-order
+    - channel: failure
+      sourceId: get-recommended-sentry-event
       targetId: create-work-order
   nodes:
     - id: on-sentry-issue
@@ -28,19 +52,80 @@ spec:
       type: TYPE_ACTION
       component: filter
       configuration:
-        expression: root().data.issue.project.slug == "refunds"
+        expression: root().data.data.issue.project.slug == "refunds"
       position:
         x: 576
         'y': 618
+      isCollapsed: false
+    - id: get-sentry-issue
+      name: Get Sentry Issue
+      type: TYPE_ACTION
+      component: http
+      configuration:
+        method: GET
+        redactSensitiveHeaders: true
+        url: '{{ root().data.issueApiUrl }}'
+        authorization:
+          type: integration_bearer
+          integration:
+            name: Sentry
+          integrationKey: SENTRY_AUTH_TOKEN
+      position:
+        x: 576
+        'y': 978
+      isCollapsed: false
+    - id: get-sentry-event
+      name: Get Sentry Event
+      type: TYPE_ACTION
+      component: http
+      configuration:
+        method: GET
+        redactSensitiveHeaders: true
+        url: '{{ root().data.issueApiUrl }}events/latest/'
+        authorization:
+          type: integration_bearer
+          integration:
+            name: Sentry
+          integrationKey: SENTRY_AUTH_TOKEN
+      position:
+        x: 576
+        'y': 1338
+      isCollapsed: false
+    - id: latest-sentry-event-has-stack
+      name: Latest event has a stack?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: 'sentryEventHasStack($["Get Sentry Event"].data?.body)'
+      position:
+        x: 576
+        'y': 1698
+      isCollapsed: false
+    - id: get-recommended-sentry-event
+      name: Get Recommended Sentry Event
+      type: TYPE_ACTION
+      component: http
+      configuration:
+        method: GET
+        redactSensitiveHeaders: true
+        url: '{{ root().data.issueApiUrl }}events/recommended/'
+        authorization:
+          type: integration_bearer
+          integration:
+            name: Sentry
+          integrationKey: SENTRY_AUTH_TOKEN
+      position:
+        x: 576
+        'y': 2058
       isCollapsed: false
     - id: create-work-order
       name: Create Task
       type: TYPE_ACTION
       component: createWorkOrder
       configuration:
-        title: '{{ root().data.issue.title }}'
-        description: '{{ root().data.description }}'
+        title: '{{ root().data.data.issue.title }}'
+        description: '{{ sentryIssueDescription(root().data.data.issue, $["Get Sentry Issue"].data?.body, $["Get Sentry Event"].data?.body, $["Get Recommended Sentry Event"]?.data?.body) }}'
       position:
         x: 576
-        'y': 978
+        'y': 2418
       isCollapsed: false

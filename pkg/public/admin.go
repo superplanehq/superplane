@@ -382,10 +382,11 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 	}
 
 	search, limit, offset := parsePagination(r)
+	filter := models.OrganizationListFilter{Search: search, PlanKey: r.URL.Query().Get("plan_key")}
 	sortBy, sortDirection := parseSorting(r)
 	db := database.DB(ctx)
 
-	pinnedOrganizations, err := models.ListPinnedOrganizationsForAccount(db, account.ID)
+	pinnedOrganizations, err := models.ListPinnedOrganizationsForAccount(db, account.ID, filter.PlanKey)
 	if err != nil {
 		log.Errorf("admin: failed to list pinned organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
@@ -397,7 +398,7 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 		excludeIDs = append(excludeIDs, organization.ID)
 	}
 
-	organizations, total, matchTotal, err := listUnpinnedOrganizations(ctx, search, limit, offset, sortBy, sortDirection, excludeIDs)
+	organizations, total, matchTotal, err := listUnpinnedOrganizations(ctx, filter, limit, offset, sortBy, sortDirection, excludeIDs)
 	if err != nil {
 		log.Errorf("admin: failed to list organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
@@ -998,7 +999,7 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 	orgID := mux.Vars(r)["orgId"]
 	featureID := mux.Vars(r)["featureId"]
 
-	if !features.Exists(featureID) {
+	if !features.Exists(featureID) || features.IsHidden(featureID) {
 		http.Error(w, "Unknown experimental feature", http.StatusBadRequest)
 		return
 	}
@@ -1011,6 +1012,10 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 
 	if _, err := models.FindOrganizationByID(orgID); err != nil {
 		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+	if featureID == features.FeatureFactoryMultiRepoTasks {
+		s.adminSetMultiRepoTasks(w, r, parsedOrgID, true)
 		return
 	}
 	if err := models.EnableExperimentalFeature(parsedOrgID, featureID); err != nil {
@@ -1037,6 +1042,10 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 
 	if _, err := models.FindOrganizationByID(orgID); err != nil {
 		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+	if featureID == features.FeatureFactoryMultiRepoTasks {
+		s.adminSetMultiRepoTasks(w, r, parsedOrgID, false)
 		return
 	}
 
@@ -1082,11 +1091,11 @@ type adminOrganizationPinState struct {
 	Pinned bool `json:"pinned"`
 }
 
-func listUnpinnedOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) (organizations []models.OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
+func listUnpinnedOrganizations(ctx context.Context, filter models.OrganizationListFilter, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) (organizations []models.OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
 	ctx, done := telemetry.Span(ctx, "organizations.list")
 	defer done(&err)
 
-	return models.ListUnpinnedOrganizations(database.DB(ctx), search, limit, offset, sortBy, sortDirection, excludeIDs)
+	return models.ListUnpinnedOrganizations(database.DB(ctx), filter, limit, offset, sortBy, sortDirection, excludeIDs)
 }
 
 func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) (items []adminOrgItem, err error) {

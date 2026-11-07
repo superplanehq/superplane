@@ -1,5 +1,7 @@
 import { FileImage, FileText, FileVideo } from "lucide-react";
 
+import { githubWebOrigin } from "@/lib/githubHost";
+
 export type ArtifactData = Record<string, unknown> | undefined;
 
 /** Image, video, or document icon. Same choice the artifact row already uses. */
@@ -85,7 +87,7 @@ export function extractArtifactUrl(data: ArtifactData): string | undefined {
  * branches attached before that: they hold `repository` (`owner/repo` or a
  * repository http(s) URL) plus the branch `name`.
  */
-export function branchTreeUrl(data: ArtifactData): string | undefined {
+export function branchTreeUrl(data: ArtifactData, host?: string | null): string | undefined {
   const repository = extractArtifactField(data, "repository") ?? extractArtifactField(data, "repo");
   const branch = extractArtifactName(data)?.trim();
   if (!repository || !branch) {
@@ -97,7 +99,7 @@ export function branchTreeUrl(data: ArtifactData): string | undefined {
   if (/^https?:\/\//i.test(repo)) {
     return treeUrlFromRepositoryUrl(repo, path);
   }
-  return /^[^/\s]+\/[^/\s]+$/.test(repo) ? `https://github.com/${repo}/tree/${path}` : undefined;
+  return /^[^/\s]+\/[^/\s]+$/.test(repo) ? `${githubWebOrigin(host)}/${repo}/tree/${path}` : undefined;
 }
 
 export function extractArtifactTitle(data: ArtifactData): string | undefined {
