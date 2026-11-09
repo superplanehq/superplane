@@ -98,7 +98,15 @@ test.coverage.baseline.update:
 	$(MAKE) check.coverage.go.baseline.update
 
 test.license.check:
-	bash ./scripts/license-check.sh
+	$(COMPOSE) exec -T app bash ./scripts/license-check.sh
+
+.PHONY: test.license.scanner
+test.license.scanner:
+	$(COMPOSE) exec -T app bash ./scripts/license-check-test.sh
+
+.PHONY: check.vulnerabilities
+check.vulnerabilities:
+	$(COMPOSE) exec -T app bash ./scripts/vulnerability-check.sh
 
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
