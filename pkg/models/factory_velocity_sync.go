@@ -17,6 +17,8 @@ const (
 	FactoryVelocitySyncStateCatchUp = -2
 	// CatchingUp continues a newer-window read before BackfilledFrom.
 	FactoryVelocitySyncStateCatchingUp = -3
+
+	factoryVelocitySyncCandidatePageSize = 200
 )
 
 // FactoryVelocitySync records how far a workspace's repository sync has
@@ -47,6 +49,7 @@ type FactoryVelocitySyncTarget struct {
 	VCSProvider      string
 	SyncedRepository string
 	SyncedAt         *time.Time
+	UpdatedAt        *time.Time
 	BackfilledFrom   *time.Time
 	SyncState        int
 }
@@ -153,12 +156,14 @@ func FactoryVelocityRepositoryTargets(tx *gorm.DB, target FactoryVelocitySyncTar
 		next := target
 		next.Repository = repository
 		next.SyncedRepository, next.SyncedAt, next.BackfilledFrom, next.SyncState = "", nil, nil, 0
+		next.UpdatedAt = nil
 		sync, err := FindFactoryVelocityRepositorySync(tx, factory.ID, repository)
 		if err != nil && err != gorm.ErrRecordNotFound {
 			return nil, err
 		}
 		if err == nil {
 			next.SyncedRepository, next.SyncedAt, next.BackfilledFrom, next.SyncState = sync.Repository, sync.SyncedAt, sync.BackfilledFrom, sync.SyncState
+			next.UpdatedAt = &sync.UpdatedAt
 		}
 		targets = append(targets, next)
 	}
@@ -177,33 +182,34 @@ func ListFactoryVelocitySyncTargets(
 	staleBefore, claimableBefore time.Time,
 	limit int,
 ) ([]FactoryVelocitySyncTarget, error) {
-	var targets []FactoryVelocitySyncTarget
-	err := tx.Raw(listFactoryVelocitySyncTargetsSQL).
-		Scan(&targets).Error
-	if err != nil {
-		return nil, err
-	}
 	result := []FactoryVelocitySyncTarget{}
-	for _, target := range targets {
-		expanded, err := FactoryVelocityRepositoryTargets(tx, target)
+	for offset := 0; ; offset += factoryVelocitySyncCandidatePageSize {
+		var targets []FactoryVelocitySyncTarget
+		err := tx.Raw(listFactoryVelocitySyncTargetsSQL, factoryVelocitySyncCandidatePageSize, offset).
+			Scan(&targets).Error
 		if err != nil {
 			return nil, err
 		}
-		for _, candidate := range expanded {
-			sync, err := FindFactoryVelocityRepositorySync(tx, candidate.FactoryID, candidate.Repository)
-			if err != nil && err != gorm.ErrRecordNotFound {
+		for _, target := range targets {
+			expanded, err := FactoryVelocityRepositoryTargets(tx, target)
+			if err != nil {
 				return nil, err
 			}
-			if err == nil && ((sync.SyncedAt != nil && !sync.SyncedAt.Before(staleBefore)) || !sync.UpdatedAt.Before(claimableBefore)) {
-				continue
-			}
-			result = append(result, candidate)
-			if limit > 0 && len(result) >= limit {
-				return result, nil
+			for _, candidate := range expanded {
+				if (candidate.SyncedAt != nil && !candidate.SyncedAt.Before(staleBefore)) ||
+					(candidate.UpdatedAt != nil && !candidate.UpdatedAt.Before(claimableBefore)) {
+					continue
+				}
+				result = append(result, candidate)
+				if limit > 0 && len(result) >= limit {
+					return result, nil
+				}
 			}
 		}
+		if len(targets) < factoryVelocitySyncCandidatePageSize {
+			return result, nil
+		}
 	}
-	return result, nil
 }
 
 const listFactoryVelocitySyncTargetsSQL = `
@@ -213,7 +219,8 @@ LEFT JOIN factory_velocity_syncs s ON s.factory_id = f.id AND s.scope_repository
 WHERE f.deleted_at IS NULL
 	AND COALESCE(f.onboarding_config->>'vcs_integration_id', '') <> ''
 	AND COALESCE(f.onboarding_config->>'app_repository', '') <> ''
-ORDER BY s.synced_at ASC NULLS FIRST
+ORDER BY s.synced_at ASC NULLS FIRST, f.id
+LIMIT ? OFFSET ?
 `
 
 // FindFactoryVelocitySyncTarget returns one workspace's sync target, whatever
@@ -255,6 +262,7 @@ const factoryVelocitySyncTargetColumns = `
 	COALESCE(f.onboarding_config->>'vcs_provider', '') AS vcs_provider,
 	COALESCE(s.repository, '') AS synced_repository,
 	s.synced_at,
+	s.updated_at,
 	s.backfilled_from,
 	COALESCE(s.sync_state, 0) AS sync_state`
 

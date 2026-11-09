@@ -1,6 +1,8 @@
 package models_test
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func Test__FactoryVelocityRepositoryMerge__ReplaceIsIdempotent(t *testing.T) {
@@ -370,8 +374,9 @@ func Test__ListFactoryVelocitySyncTargets__LimitsOnlyAvailableRepositories(t *te
 	integrationID := uuid.New().String()
 	repository := "example/repo"
 	now := time.Now()
-	for range 3 {
-		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	for i := range 201 {
+		key := fmt.Sprintf("VA%c%c", 'A'+i/26, 'A'+i%26)
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", key)
 		require.NoError(t, err)
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID, AppRepository: &repository}))
 		sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now, repository)
@@ -387,11 +392,24 @@ func Test__ListFactoryVelocitySyncTargets__LimitsOnlyAvailableRepositories(t *te
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "example/context", Access: models.FactoryContextRepoAccessWrite})
 	require.NoError(t, err)
 
-	targets, err := models.ListFactoryVelocitySyncTargets(db, now.Add(-5*time.Minute), now.Add(-15*time.Minute), 1)
+	queryRows := &velocityQueryRows{Interface: db.Logger}
+	targets, err := models.ListFactoryVelocitySyncTargets(db.Session(&gorm.Session{Logger: queryRows}), now.Add(-5*time.Minute), now.Add(-15*time.Minute), 1)
 	require.NoError(t, err)
 	require.Len(t, targets, 1)
 	assert.Equal(t, factory.ID, targets[0].FactoryID)
 	assert.Equal(t, "example/context", targets[0].Repository)
+	assert.LessOrEqual(t, queryRows.maxRows, int64(200), "candidate reads stay bounded even when the first page is unavailable")
+}
+
+type velocityQueryRows struct {
+	logger.Interface
+	maxRows int64
+}
+
+func (l *velocityQueryRows) Trace(ctx context.Context, begin time.Time, query func() (string, int64), err error) {
+	sql, rows := query()
+	l.maxRows = max(l.maxRows, rows)
+	l.Interface.Trace(ctx, begin, func() (string, int64) { return sql, rows }, err)
 }
 
 func factoryIDs(targets []models.FactoryVelocitySyncTarget) []uuid.UUID {
