@@ -192,7 +192,9 @@ async function openPullRequest(input, client, timeouts = DEFAULT_TIMEOUTS) {
       base,
       title,
       body: String((input && input.body) || ""),
-      draft: (input && input.draft === true) || String(env.DRAFT_PULL_REQUESTS || "").trim() === "true",
+      draft: env.DRAFT_PULL_REQUESTS === undefined
+        ? input?.draft === true
+        : String(env.DRAFT_PULL_REQUESTS).trim() === "true",
     });
   } catch (error) {
     throw withRetryAdvice(error);
@@ -215,7 +217,7 @@ const OPEN_PULL_REQUEST = {
         title: { type: "string", maxLength: MAX_TITLE_LENGTH, description: "The pull request title." },
         body: { type: "string", description: "Optional. The pull request description in Markdown." },
         base: { type: "string", description: "Optional. The base branch. The default is the task branch for repo and the repository default branch for other repositories." },
-        draft: { type: "boolean", description: "Optional. Open the pull request as a draft. The workspace setting can also make every pull request a draft." },
+        draft: { type: "boolean", description: "Optional. Open the pull request as a draft when no workspace draft setting is present. A present workspace setting overrides this value." },
       },
       required: ["title"],
     },
