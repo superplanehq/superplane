@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { factoriesDescribeFactoryVelocity, factoriesSyncFactoryVelocity } from "@/api-client";
 import type {
@@ -22,6 +22,7 @@ import { factoryQueryKeys } from "./useFactoryData";
 export interface FactoryVelocityParams {
   periodDays: number;
   repository?: string;
+  enabled?: boolean;
   /** Column the People table sorts on. Defaults to `"total"`. */
   peopleSort?: PeopleSortKey;
   /** Defaults to `"desc"`. */
@@ -69,12 +70,22 @@ export function useFactoryVelocity(organizationId: string, factoryId: string, pa
       );
       return response.data ?? {};
     },
-    enabled: Boolean(organizationId && factoryId),
+    enabled: params.enabled !== false && Boolean(organizationId && factoryId),
     staleTime: 60 * 1000,
     // The People sort and offset are part of the key, so "Show more" and a new
     // sort start a query with an empty cache. Hold the report that is on screen
     // until the next one arrives, or the page blanks into its loading state.
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, previousQuery) => {
+      const key = previousQuery?.queryKey;
+      if (
+        key?.[1] !== organizationId ||
+        key?.[2] !== factoryId ||
+        key?.[4] !== params.periodDays ||
+        (key?.[5] ?? "") !== (params.repository ?? "")
+      )
+        return undefined;
+      return previous;
+    },
   });
 }
 
@@ -98,12 +109,12 @@ const VELOCITY_SYNC_TIMEOUT_MS = 120_000;
  * to the worker, which is why the report is polled rather than read once: the
  * duration belongs to the repository, not to a delay this code can guess.
  */
-export function useSyncFactoryVelocity(organizationId: string, factoryId: string) {
+export function useSyncFactoryVelocity(organizationId: string, factoryId: string, repository?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
-      const syncedBefore = newestSyncedAt(queryClient, organizationId, factoryId);
+      const syncedBefore = newestSyncedAt(queryClient, organizationId, factoryId, repository);
 
       const response = await factoriesSyncFactoryVelocity(
         withOrganizationHeader({
@@ -116,7 +127,7 @@ export function useSyncFactoryVelocity(organizationId: string, factoryId: string
     },
     onSuccess: async ({ started, syncedBefore }) => {
       if (!started) return;
-      await waitForFreshReport(queryClient, organizationId, factoryId, syncedBefore);
+      await waitForFreshReport(queryClient, organizationId, factoryId, syncedBefore, repository);
     },
   });
 }
@@ -127,12 +138,19 @@ export function useSyncFactoryVelocity(organizationId: string, factoryId: string
  * The page can hold a report per period, and any of them proves the sync
  * finished. A report with no sync yet counts as zero.
  */
-function newestSyncedAt(queryClient: QueryClient, organizationId: string, factoryId: string): number {
+function newestSyncedAt(
+  queryClient: QueryClient,
+  organizationId: string,
+  factoryId: string,
+  repository?: string,
+): number {
   const cached = queryClient.getQueriesData<FactoriesDescribeFactoryVelocityResponse>({
     queryKey: factoryQueryKeys.velocityAll(organizationId, factoryId),
   });
 
-  return cached.reduce((newest, [, report]) => {
+  return cached.reduce((newest, [key, report]) => {
+    if (repository !== undefined && (key[5] ?? "") !== repository) return newest;
+    if (report?.peopleSyncPending) return newest;
     const syncedAt = report?.peopleSyncedAt ? Date.parse(report.peopleSyncedAt) : 0;
     return Number.isNaN(syncedAt) ? newest : Math.max(newest, syncedAt);
   }, 0);
@@ -143,6 +161,7 @@ async function waitForFreshReport(
   organizationId: string,
   factoryId: string,
   syncedBefore: number,
+  repository?: string,
 ): Promise<void> {
   const queryKey = factoryQueryKeys.velocityAll(organizationId, factoryId);
   const deadline = Date.now() + VELOCITY_SYNC_TIMEOUT_MS;
@@ -151,6 +170,6 @@ async function waitForFreshReport(
     await new Promise((resolve) => setTimeout(resolve, VELOCITY_SYNC_POLL_MS));
     await queryClient.invalidateQueries({ queryKey });
 
-    if (newestSyncedAt(queryClient, organizationId, factoryId) > syncedBefore) return;
+    if (newestSyncedAt(queryClient, organizationId, factoryId, repository) > syncedBefore) return;
   }
 }

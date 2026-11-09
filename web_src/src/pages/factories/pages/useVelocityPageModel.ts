@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { FactoriesFactory } from "@/api-client";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 import { useFactoryVelocity, useSyncFactoryVelocity } from "@/hooks/useFactoryVelocity";
 
 import {
@@ -37,6 +39,7 @@ export interface VelocityPageModel {
   integrationId: string;
   /** App repository selected during workspace setup, as `owner/repo`. */
   repository: string;
+  repositoryFilter: { enabled: boolean; choices: string[]; selected: string; select: (repository: string) => void };
 
   velocity: {
     report?: VelocityReport;
@@ -97,8 +100,16 @@ export function useVelocityPageModel(
 
   const integrationId = onboarding?.vcsIntegrationId?.trim() ?? "";
   const repository = onboarding?.appRepository?.trim() ?? "";
+  const multiRepo = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_MULTI_REPO_TASKS);
+  const [selection, setSelection] = useState({ workspace: factoryId, repository: "" });
+  const selectedRepository = multiRepo && selection.workspace === factoryId ? selection.repository : "";
+  const requestedRepository = multiRepo ? selectedRepository : repository;
 
-  const peopleSort = usePeopleSortAndPaging(periodDays, repository);
+  const peopleSort = usePeopleSortAndPaging(periodDays, `${organizationId}|${factoryId}|${requestedRepository}`);
+  const { data: repositoriesResponse, refetch: refetchRepositories } = useFactoryVelocity(organizationId, factoryId, {
+    periodDays,
+    enabled: multiRepo,
+  });
 
   const {
     data: velocityResponse,
@@ -109,14 +120,21 @@ export function useVelocityPageModel(
     refetch: refetchVelocity,
   } = useFactoryVelocity(organizationId, factoryId, {
     periodDays,
-    repository: repository || undefined,
+    repository: requestedRepository || undefined,
     peopleSort: peopleSort.sortKey,
     peopleSortDirection: peopleSort.sortDirection,
     peopleOffset: peopleSort.offset,
     peoplePageSize: peoplePageSizeForOffset(peopleSort.offset),
   });
 
-  const syncVelocity = useSyncFactoryVelocity(organizationId, factoryId);
+  const syncVelocity = useSyncFactoryVelocity(organizationId, factoryId, requestedRepository);
+  const repositoryChoices = repositoriesResponse?.repositories ?? velocityResponse?.repositories ?? [];
+  useEffect(() => {
+    if (multiRepo && selectedRepository && velocityError) void refetchRepositories();
+  }, [multiRepo, selectedRepository, velocityError, refetchRepositories]);
+  if (multiRepo && selectedRepository && repositoriesResponse && !repositoryChoices.includes(selectedRepository)) {
+    setSelection({ workspace: factoryId, repository: "" });
+  }
 
   const {
     data: workOrders = [],
@@ -156,6 +174,12 @@ export function useVelocityPageModel(
 
     integrationId,
     repository,
+    repositoryFilter: {
+      enabled: multiRepo,
+      choices: repositoryChoices,
+      selected: selectedRepository,
+      select: (repository) => setSelection({ workspace: factoryId, repository }),
+    },
 
     velocity: {
       report,
@@ -163,7 +187,7 @@ export function useVelocityPageModel(
       error: velocityError,
       refetch: () => void refetchVelocity(),
       peopleSyncPending: Boolean(velocityResponse?.peopleSyncPending),
-      isEmpty: report ? !hasVelocityOutput(report) : false,
+      isEmpty: report ? !hasVelocityOutput(report) && !velocityResponse?.peopleSyncPending : false,
       syncedAt: report?.peopleSyncedAt,
     },
 
@@ -250,6 +274,12 @@ function useAccumulatedPeople(
 ) {
   const [list, setList] = useState<VelocityPerson[]>([]);
   const appliedPageRef = useRef<string | null>(null);
+  const [cohortKey, setCohortKey] = useState(resetKey);
+  if (cohortKey !== resetKey) {
+    setCohortKey(resetKey);
+    setList([]);
+    appliedPageRef.current = null;
+  }
 
   useEffect(() => {
     if (!report || holdsPreviousReport) return;

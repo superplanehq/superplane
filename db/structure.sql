@@ -825,7 +825,8 @@ CREATE TABLE public.factory_velocity_syncs (
     error text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    sync_state integer DEFAULT 0 NOT NULL
+    sync_state integer DEFAULT 0 NOT NULL,
+    scope_repository text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2764,7 +2765,7 @@ ALTER TABLE ONLY public.factory_velocity_repository_merges
 --
 
 ALTER TABLE ONLY public.factory_velocity_syncs
-    ADD CONSTRAINT factory_velocity_syncs_pkey PRIMARY KEY (factory_id);
+    ADD CONSTRAINT factory_velocity_syncs_pkey PRIMARY KEY (factory_id, scope_repository);
 
 
 --
@@ -6503,7 +6504,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261104015738	f
+20261109155106	f
 \.
 
 

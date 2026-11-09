@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
@@ -59,6 +60,26 @@ function renderVelocity(report: FactoriesFixture["velocityByFactoryId"]) {
 
 export const Default: Story = {
   render: () => renderVelocity({ [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY }),
+};
+
+export const MultiRepository: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={velocityPath}
+      experimentalFeatures={[FEATURE_FACTORY_MULTI_REPO_TASKS]}
+      factoriesFixture={{
+        ...factoriesFixtureWithSetupAnswers(velocityWorkspaceSetup),
+        velocityByFactoryId: {
+          [PRIMARY_FACTORY_ID]: {
+            ...DEFAULT_FACTORY_VELOCITY,
+            repository: "",
+            repositories: [VELOCITY_REPOSITORY, "example/web"],
+          },
+        },
+      }}
+      orgIntegrations={GITHUB_SETUP_INTEGRATIONS}
+    />
+  ),
 };
 
 /** New workspace with no merges and no spend — empty state that points at the board. */
