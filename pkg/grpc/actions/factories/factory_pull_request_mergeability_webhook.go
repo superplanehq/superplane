@@ -82,6 +82,17 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	factoriesByID := map[string]*models.Factory{}
 	for i := range pullRequests {
 		pullRequest := &pullRequests[i]
+		if isGitHubPullRequestDraftStateEvent(eventType, payload) && pullRequest.Number == payload.PullRequest.Number {
+			changed, syncErr := pullRequest.SyncDraftState(db, *payload.PullRequest.Draft)
+			if syncErr != nil {
+				log.WithError(syncErr).Warnf("factory mergeability: failed to sync draft state for pull request %s", pullRequest.ID)
+			}
+			if changed {
+				if err := publishFactoryWorkOrderUpdated(pullRequest.FactoryID.String(), pullRequest.WorkOrderID.String(), factoryevents.EventTypeOrderPullRequestUpdated); err != nil {
+					log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
+				}
+			}
+		}
 		factory := factoriesByID[pullRequest.FactoryID.String()]
 		if factory == nil {
 			loaded, findErr := models.FindFactory(db, pullRequest.OrganizationID, pullRequest.FactoryID)
@@ -255,6 +266,7 @@ type githubMergeabilityWebhookPayload struct {
 	Sender      *githubWebhookUser `json:"sender"`
 	PullRequest *struct {
 		Number   int64              `json:"number"`
+		Draft    *bool              `json:"draft"`
 		Merged   bool               `json:"merged"`
 		MergedAt string             `json:"merged_at"`
 		ClosedAt string             `json:"closed_at"`
@@ -483,6 +495,12 @@ func isGitHubPullRequestClosedEvent(eventType string, payload githubMergeability
 	return strings.EqualFold(strings.TrimSpace(eventType), "pull_request") &&
 		strings.EqualFold(strings.TrimSpace(payload.Action), "closed") &&
 		payload.PullRequest != nil
+}
+
+func isGitHubPullRequestDraftStateEvent(eventType string, payload githubMergeabilityWebhookPayload) bool {
+	return strings.EqualFold(strings.TrimSpace(eventType), "pull_request") &&
+		payload.PullRequest != nil && payload.PullRequest.Number > 0 && payload.PullRequest.Draft != nil &&
+		slices.Contains([]string{"ready_for_review", "converted_to_draft"}, strings.ToLower(strings.TrimSpace(payload.Action)))
 }
 
 func parseGitHubMergeabilityWebhookPayload(eventType string, body []byte) (githubMergeabilityWebhookPayload, bool) {

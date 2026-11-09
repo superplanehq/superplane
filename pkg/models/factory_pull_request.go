@@ -344,6 +344,33 @@ type FactoryPullRequestMergeabilitySnapshot struct {
 	AllowedMethods string
 }
 
+// SyncDraftState preserves terminal states and records each transition once.
+func (p *FactoryPullRequest) SyncDraftState(tx *gorm.DB, draft bool) (bool, error) {
+	state := FactoryPullRequestStateOpen
+	if draft {
+		state = FactoryPullRequestStateDraft
+	}
+	changed := false
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		// Startup and merge lock the task before the PR.
+		if err := LockFactoryWorkOrder(inner, p.WorkOrderID); err != nil {
+			return err
+		}
+		if err := p.LockForUpdate(inner); err != nil {
+			return err
+		}
+		if !slices.Contains([]string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}, p.State) || p.State == state {
+			return nil
+		}
+		if err := p.Update(inner, FactoryPullRequestPatch{State: &state}); err != nil {
+			return err
+		}
+		changed = true
+		return nil
+	})
+	return changed && err == nil, err
+}
+
 func (p *FactoryPullRequest) SetMergeability(tx *gorm.DB, snapshot FactoryPullRequestMergeabilitySnapshot) error {
 	now := time.Now()
 	headSHA := strings.TrimSpace(snapshot.HeadSHA)
