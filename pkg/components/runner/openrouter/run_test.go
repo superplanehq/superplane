@@ -192,7 +192,7 @@ func TestPlanningFollowUpReceivesToolGuidanceInSharedInstructions(t *testing.T) 
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "follow_up_loop.js"), []byte(runner.FollowUpLoopScript()), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("1\n"), 0o644))
-	cmd := exec.Command("node", "-e", `process.stdout.write(require(process.argv[1]).writePrompt(process.argv[2], "Inspect the UI with Playwright and search Mobbin."));`, filepath.Join(dir, "follow_up_loop.js"), dir)
+	cmd := exec.Command("node", "-e", `process.stdout.write(require(process.argv[1]).writePrompt(process.argv[2], "Inspect the UI in a browser and search for design references."));`, filepath.Join(dir, "follow_up_loop.js"), dir)
 	promptFile, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(promptFile))
 	promptName, err := filepath.Rel(dir, string(promptFile))
