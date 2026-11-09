@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
@@ -71,6 +72,27 @@ describe("FactorySettingsLayout at phone width", () => {
     await user.click(back);
     expect(await screen.findByTestId("factory-settings-mobile-index")).toBeInTheDocument();
   }, 15000);
+
+  it.each([false, true])(
+    "keeps Repository in the mobile index only when multi-repo is off (enabled: %s)",
+    async (enabled) => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings`}
+          experimentalFeatures={enabled ? [FEATURE_FACTORY_MULTI_REPO_TASKS] : []}
+        />,
+      );
+
+      const index = await screen.findByTestId("factory-settings-mobile-index");
+      expect(within(index).getByTestId("factory-settings-nav-workspace-models")).toBeInTheDocument();
+      const repository = within(index).queryByTestId("factory-settings-nav-workspace-repository");
+      if (enabled) {
+        expect(repository).not.toBeInTheDocument();
+      } else {
+        expect(repository).toBeInTheDocument();
+      }
+    },
+  );
 
   it("filters the index from Find settings", async () => {
     const user = userEvent.setup();
