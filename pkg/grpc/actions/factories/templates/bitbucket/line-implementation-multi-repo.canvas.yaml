@@ -79,16 +79,8 @@ spec:
               2/ In each repository that you change, create a new branch. Do not commit on the default branch.
               3/ Implement the task. Keep the change focused.
               4/ Commit on the working branch with clear messages.
-              5/ For each repository that you changed, call the SuperPlane open_pull_request tool. Use directory repo for the primary repository and context/<owner>/<name> for the other repositories. The tool pushes the branch and opens or updates the pull request on this task. If the tool is not available, run superplane task pr open --directory DIR --title TITLE --body-file FILE.
-              6/ Do not push branches or open pull requests in another way.
-
-              Pull request title and description:
-
-              1/ Follow the conventions of each repository for the title, description, writing style, and formatting. Discover and use the applicable pull request template.
-              2/ If the repository provides no guidance, write a short, descriptive title and a concise description of the problem and resulting behavior. Include relevant verification and known limitations. Use sections only when they help the reader.
-              3/ When the task changes more than one repository, name the related pull requests in each description.
-              4/ Do not add closing keywords (Closes, Fixes, Resolves) or the task link. SuperPlane adds the task link.
-              5/ Include only verification results you can substantiate. State any checks that could not run and why.
+              5/ Leave PR creation to the next Open pull requests step. Do not push branches yourself.
+              6/ Finish with a handoff listing changed repository directories, branches, commits, verification results, assumptions, and known limitations.
 
               Guidelines:
 
@@ -109,6 +101,63 @@ spec:
               4/ Avoid tests that only mirror implementation details or assert incidental layout, classes, or wording. Purely cosmetic changes do not need new tests unless repository instructions require them. Add coverage if behavior or accessibility changes.
               5/ Run the relevant tests, lint, and build checks specified by the repository. Fix failures caused by your changes.
               6/ Report which checks passed or failed. State which checks you could not run and explain why. Do not claim verification you did not perform.
+          - name: Open pull requests
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              Open or update and register a pull request for each repository with task changes.
+              You must invoke the opening tool or command. A written title, description, or final reply does not complete this step.
+
+              Primary repository: {{ task().repository }}
+              Primary default branch: {{ task().default_branch }}
+              Task title: {{ task().title }}
+
+              Repository review:
+
+              1/ Review the implementation handoff and inspect repo and each relevant repository under ../context/<owner>/<name>.
+              2/ Inspect each repository's status, current branch, commits, and diff against its own origin default branch.
+              3/ Use {{ task().default_branch }} for the primary repository. Read origin/HEAD for each context repository's default branch.
+              4/ Select only repositories with task changes. Include committed changes even when the working tree is clean.
+              5/ For primary-only changes, open only the primary PR. For context-only changes, open only the changed context PRs.
+              6/ For changes across repositories, open a PR for every changed repository. Do not create empty PRs for unchanged repositories.
+
+              Pull request title and description:
+
+              Read each changed repository's applicable AGENTS.md, CLAUDE.md, contribution documentation, and SKILL.md files, including referenced skills.
+              Follow repository instructions for PR writing. Discover and use each repository's applicable pull request template.
+              Repository instructions take precedence over these writing defaults. Do not replace repository-owned instructions or skills with workspace copies.
+
+              1/ Write a repository-specific title and body that explain the problem and resulting behavior.
+              2/ Follow each repository's title, description, writing style, and formatting conventions.
+              3/ If the repository provides no guidance, use a short, descriptive title and concise Markdown description.
+              4/ Include relevant verification and known limitations. Use sections only when they help the reader.
+              5/ If there are no formatting rules, put each paragraph on one line. Separate paragraphs, headings, and list items with blank lines.
+              6/ Include only verification results you can substantiate. State any checks that could not run and why.
+              7/ When multiple repositories change, name the related PRs in each description.
+              8/ After all PR URLs are available, call the same opening tool again to update descriptions with related PR references.
+              9/ Do not add closing keywords (Closes, Fixes, Resolves) or the task link. SuperPlane adds the task link.
+
+              Open and register pull requests:
+
+              1/ For each changed repository, call the SuperPlane open_pull_request tool with its directory, repository-specific title, and body.
+              2/ Use directory repo for the primary repository and context/<owner>/<name> for each context repository.
+              3/ Tool directories are relative to the workspace root, not the current repository directory. Do not pass ../context paths to the tool.
+              4/ The tool pushes the current branch and opens or updates its PR on this task.
+              5/ If the tool is unavailable, use superplane task pr open --directory DIR --title TITLE --body-file FILE.
+              6/ Run the fallback command from the workspace root, which contains repo and context. The CLI resolves directories from its current directory.
+              7/ Use a separate temporary description file for each repository when needed. Do not commit those files.
+              8/ Preserve the configured draft setting. Let SuperPlane apply DRAFT_PULL_REQUESTS; do not change the environment to override it.
+              9/ The runner manages commit identity and trailers. Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers.
+              10/ Do not push branches or open PRs through another mechanism.
+
+              Confirm registration:
+
+              1/ Call list_pull_requests, or run superplane task pr list, after the opening calls finish.
+              2/ Confirm that the task lists a registered PR for each changed repository. Match each repository and its PR URL.
+              3/ A pushed branch or externally opened PR alone is insufficient. A written description does not confirm registration.
+              4/ Report each opening or registration failure accurately, with the repository and error. Do not claim success for missing PRs.
+              5/ Finish with the confirmed repository-to-PR list and any failures before the Check pull requests step runs.
+              6/ The final check only rejects zero total PRs. It does not verify coverage for each changed repository.
           - name: Check pull requests
             type: bash
             workingDirectory: repo

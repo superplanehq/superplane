@@ -174,10 +174,9 @@ func TestMaterializeMultiRepoImplementationTemplate(t *testing.T) {
 	implementationPrompt, ok := implementationStep(t, agent, "Implementation")["prompt"].(string)
 	require.True(t, ok)
 	assert.Contains(t, implementationPrompt, "../context/<owner>/<name>")
-	assert.Contains(t, implementationPrompt, "open_pull_request")
-	assert.Contains(t, implementationPrompt, "Do not add GitHub closing keywords")
-	checkCommand, _ := implementationStep(t, agent, "Check pull requests")["command"].(string)
-	assert.Contains(t, checkCommand, "superplane task pr list")
+	requireMultiRepoPullRequestSteps(t, agent)
+	openingPrompt := implementationStep(t, agent, "Open pull requests")["prompt"].(string)
+	assert.Contains(t, openingPrompt, "Do not add GitHub closing keywords")
 	assert.NotContains(t, result.canvasYAML, "git push")
 	for _, component := range []string{"github.findPullRequest", "github.createPullRequest", "github.updatePullRequest", "addPullRequest", "addWorkOrderArtifact"} {
 		assert.NotContains(t, result.canvasYAML, component)
@@ -218,13 +217,49 @@ func TestMaterializeBitbucketMultiRepoImplementationTemplate(t *testing.T) {
 	})
 	implementationPrompt, ok := implementationStep(t, agent, "Implementation")["prompt"].(string)
 	require.True(t, ok)
-	assert.Contains(t, implementationPrompt, "open_pull_request")
 	assert.NotContains(t, implementationPrompt, "GitHub")
+	requireMultiRepoPullRequestSteps(t, agent)
+	openingPrompt := implementationStep(t, agent, "Open pull requests")["prompt"].(string)
+	assert.NotContains(t, openingPrompt, "GitHub")
 	for _, component := range []string{"bitbucket.findPullRequest", "bitbucket.createPullRequest", "bitbucket.updatePullRequest", "addPullRequest", "addWorkOrderArtifact"} {
 		assert.NotContains(t, result.canvasYAML, component)
 	}
 
 	requireValidCanvasExpressions(t, canvas)
+}
+
+func requireMultiRepoPullRequestSteps(t *testing.T, agent *yaml.Node) {
+	t.Helper()
+	steps, ok := agent.Configuration["steps"].([]any)
+	require.True(t, ok)
+	require.Len(t, steps, 3)
+	for i, expected := range []struct{ name, kind string }{
+		{"Implementation", "prompt"},
+		{"Open pull requests", "prompt"},
+		{"Check pull requests", "bash"},
+	} {
+		step := steps[i].(map[string]any)
+		assert.Equal(t, expected.name, step["name"])
+		assert.Equal(t, expected.kind, step["type"])
+		assert.Equal(t, "repo", step["workingDirectory"])
+	}
+	openingPrompt, ok := implementationStep(t, agent, "Open pull requests")["prompt"].(string)
+	require.True(t, ok)
+	// These are tool and CLI contracts, not a snapshot of the writing instructions.
+	for _, contract := range []string{
+		"call the SuperPlane open_pull_request tool",
+		"directory repo", "context/<owner>/<name>",
+		"relative to the workspace root", "not the current repository directory",
+		"Run the fallback command from the workspace root",
+		"superplane task pr open --directory DIR --title TITLE --body-file FILE",
+		"list_pull_requests", "superplane task pr list",
+	} {
+		assert.Contains(t, openingPrompt, contract)
+	}
+	checkCommand, ok := implementationStep(t, agent, "Check pull requests")["command"].(string)
+	require.True(t, ok)
+	assert.Contains(t, checkCommand, "superplane task pr list")
+	assert.Contains(t, checkCommand, `if [ "$count" -eq 0 ]; then`)
 }
 
 func TestMaterializeRiskScoreTemplate(t *testing.T) {
