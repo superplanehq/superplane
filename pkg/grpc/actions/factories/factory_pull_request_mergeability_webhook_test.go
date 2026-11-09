@@ -654,7 +654,8 @@ func TestGitHubPullRequestDraftStateSynchronization(t *testing.T) {
 			if eventType == "" {
 				eventType = "pull_request"
 			}
-			body := []byte(fmt.Sprintf(`{"action":%q,"repository":{"full_name":%q},"pull_request":{"number":%d,"draft":%s,"head":{"sha":"abc123"}}}`, tc.action, repository, number, tc.draft))
+			updatedAt := time.Now().UTC().Format(time.RFC3339)
+			body := []byte(fmt.Sprintf(`{"action":%q,"repository":{"full_name":%q},"pull_request":{"number":%d,"draft":%s,"updated_at":%q,"head":{"sha":"abc123"}}}`, tc.action, repository, number, tc.draft, updatedAt))
 			deliver := func() {
 				RefreshFactoryPullRequestMergeabilityFromGitHubEvent(t.Context(), IntakeDependencies{}, &models.Webhook{AppInstallationID: &integration.ID}, eventType, body)
 			}
@@ -691,6 +692,84 @@ func TestGitHubPullRequestDraftStateSynchronization(t *testing.T) {
 			deliver()
 			assert.Equal(t, before+1, countUpdates())
 			assert.Equal(t, after, published)
+		})
+	}
+}
+
+func TestGitHubDraftStateIgnoresOlderEventsAndReconcilesLookups(t *testing.T) {
+	for _, tc := range []struct {
+		name                                                           string
+		failed, active, lookup, sameTimestamp, staleLookup, checksFail bool
+	}{
+		{name: "older event after ready event when lookup fails", failed: true},
+		{name: "older event after ready event during automation", active: true},
+		{name: "equal timestamp event cannot replace known state", failed: true, sameTimestamp: true},
+		{name: "lookup corrects stale draft state", lookup: true},
+		{name: "lookup corrects stale draft state during automation", lookup: true, active: true},
+		{name: "live lookup wins equal timestamp", lookup: true, sameTimestamp: true},
+		{name: "older lookup cannot replace newer event", staleLookup: true},
+		{name: "lookup updates state even when check lookup fails", lookup: true, checksFail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, pr := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 101)
+			api := mergeableFactoryGitHub("abc123")
+			if tc.failed {
+				api.getPullErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}}
+			}
+			if tc.checksFail {
+				api.combinedErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}}
+			}
+			stubFactoryGitHub(t, api)
+			if tc.active {
+				grantExclusivePullRequestAccess(t, db, r, factory, &pb.FactoryPullRequest{Id: pr.ID.String()})
+			}
+			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{})
+			require.NoError(t, err)
+			original := publishFactoryWorkOrderUpdated
+			published := 0
+			publishFactoryWorkOrderUpdated = func(string, string, string) error {
+				published++
+				return nil
+			}
+			t.Cleanup(func() { publishFactoryWorkOrderUpdated = original })
+			newer := time.Now().UTC().Truncate(time.Second)
+			older := newer.Add(-time.Minute)
+			if tc.sameTimestamp {
+				older = newer
+			}
+			if tc.staleLookup {
+				api.pullRequest.Draft = github.Ptr(true)
+				api.pullRequest.State = github.Ptr("open")
+				api.pullRequest.UpdatedAt = &github.Timestamp{Time: older}
+			}
+			deliver := func(draft bool, updatedAt time.Time) {
+				action := "ready_for_review"
+				if draft {
+					action = "converted_to_draft"
+				}
+				body := []byte(fmt.Sprintf(`{"action":%q,"repository":{"full_name":"acme/app"},"pull_request":{"number":101,"draft":%t,"updated_at":%q}}`, action, draft, updatedAt.Format(time.RFC3339)))
+				RefreshFactoryPullRequestMergeabilityFromGitHubEvent(t.Context(), IntakeDependencies{}, &models.Webhook{AppInstallationID: &integration.ID}, "pull_request", body)
+			}
+			if tc.lookup {
+				state := models.FactoryPullRequestStateDraft
+				require.NoError(t, pr.Update(db, models.FactoryPullRequestPatch{State: &state}))
+				api.pullRequest.UpdatedAt = &github.Timestamp{Time: newer}
+				api.pullRequest.State = github.Ptr("open")
+				// A delayed draft event must reconcile against the current GitHub value.
+				deliver(true, older)
+			} else {
+				// Even a ready event that does not change state must establish ordering.
+				deliver(false, newer)
+				deliver(true, older)
+			}
+			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pr.ID})
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
+			if tc.lookup {
+				assert.Positive(t, published, "a lookup-only state change must notify clients")
+			}
 		})
 	}
 }

@@ -101,18 +101,27 @@ func evaluateFactoryPullRequestMergeability(
 	if err != nil {
 		return nil, err
 	}
-	if active {
-		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN, mergeBlockedActiveRun), nil
-	}
-
 	githubPR, _, err := client.GetPullRequest(ctx, pullRequest.Repository, int(pullRequest.Number))
 	if err != nil {
+		if active {
+			return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN, mergeBlockedActiveRun), nil
+		}
 		return recoverFactoryPullRequestMergeability(ctx, factory, result, fmt.Errorf("get pull request: %w", err))
 	}
 	if githubPR == nil {
 		return nil, errFactoryPullRequestMissing
 	}
 	result.HeadSHA = githubPR.GetHead().GetSHA()
+	if githubPR.Draft != nil && strings.EqualFold(githubPR.GetState(), "open") {
+		if _, err := pullRequest.SyncDraftState(db, models.FactoryPullRequestDraftStateSnapshot{
+			Draft: githubPR.GetDraft(), UpdatedAt: githubPR.GetUpdatedAt().Time, FromLookup: true,
+		}); err != nil {
+			return nil, fmt.Errorf("sync pull request draft state: %w", err)
+		}
+	}
+	if active {
+		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN, mergeBlockedActiveRun), nil
+	}
 
 	if githubPR.GetDraft() || strings.EqualFold(githubPR.GetMergeableState(), "draft") {
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_DRAFT, mergeBlockedDraft), nil

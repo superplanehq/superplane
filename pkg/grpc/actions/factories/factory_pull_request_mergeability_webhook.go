@@ -83,7 +83,9 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	for i := range pullRequests {
 		pullRequest := &pullRequests[i]
 		if isGitHubPullRequestDraftStateEvent(eventType, payload) && pullRequest.Number == payload.PullRequest.Number {
-			changed, syncErr := pullRequest.SyncDraftState(db, *payload.PullRequest.Draft)
+			changed, syncErr := pullRequest.SyncDraftState(db, models.FactoryPullRequestDraftStateSnapshot{
+				Draft: *payload.PullRequest.Draft, UpdatedAt: payload.PullRequest.UpdatedAt,
+			})
 			if syncErr != nil {
 				log.WithError(syncErr).Warnf("factory mergeability: failed to sync draft state for pull request %s", pullRequest.ID)
 			}
@@ -219,22 +221,22 @@ func refreshFactoryPullRequestMergeability(
 	pullRequest *models.FactoryPullRequest,
 ) error {
 	before := storedFactoryPullRequestMergeability(pullRequest)
+	stateBefore := pullRequest.State
 	result, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
 	if err != nil {
 		return fmt.Errorf("failed to refresh pull request %s: %w", pullRequest.ID, err)
 	}
+	if storedFactoryPullRequestMergeability(pullRequest) != before || pullRequest.State != stateBefore {
+		if err := publishFactoryWorkOrderUpdated(
+			factory.ID.String(),
+			pullRequest.WorkOrderID.String(),
+			factoryevents.EventTypeOrderPullRequestUpdated,
+		); err != nil {
+			log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
+		}
+	}
 	if result != nil && result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE {
 		return unavailableFactoryPullRequestMergeabilityError(pullRequest.ID, result.canRetry)
-	}
-	if storedFactoryPullRequestMergeability(pullRequest) == before {
-		return nil
-	}
-	if err := publishFactoryWorkOrderUpdated(
-		factory.ID.String(),
-		pullRequest.WorkOrderID.String(),
-		factoryevents.EventTypeOrderPullRequestUpdated,
-	); err != nil {
-		log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
 	}
 	return nil
 }
@@ -265,13 +267,14 @@ type githubMergeabilityWebhookPayload struct {
 	} `json:"repository"`
 	Sender      *githubWebhookUser `json:"sender"`
 	PullRequest *struct {
-		Number   int64              `json:"number"`
-		Draft    *bool              `json:"draft"`
-		Merged   bool               `json:"merged"`
-		MergedAt string             `json:"merged_at"`
-		ClosedAt string             `json:"closed_at"`
-		MergedBy *githubWebhookUser `json:"merged_by"`
-		Head     struct {
+		Number    int64              `json:"number"`
+		Draft     *bool              `json:"draft"`
+		UpdatedAt time.Time          `json:"updated_at"`
+		Merged    bool               `json:"merged"`
+		MergedAt  string             `json:"merged_at"`
+		ClosedAt  string             `json:"closed_at"`
+		MergedBy  *githubWebhookUser `json:"merged_by"`
+		Head      struct {
 			SHA string `json:"sha"`
 		} `json:"head"`
 	} `json:"pull_request"`
