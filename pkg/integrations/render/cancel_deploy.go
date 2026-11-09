@@ -133,13 +133,11 @@ func (c *CancelDeploy) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	ctx.Integration.RequestWebhook(webhookConfigurationForResource(
+	return ctx.Integration.RequestWebhook(webhookConfigurationForResource(
 		ctx.Integration,
 		webhookResourceTypeDeploy,
 		[]string{"deploy_ended"},
 	))
-
-	return nil
 }
 
 func (c *CancelDeploy) Execute(ctx core.ExecutionContext) error {

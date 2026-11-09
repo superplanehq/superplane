@@ -291,11 +291,9 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	ctx.Integration.RequestWebhook(common.WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(common.WebhookConfiguration{
 		Project: project.Metadata.ProjectName,
 	})
-
-	return nil
 }
 
 func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {

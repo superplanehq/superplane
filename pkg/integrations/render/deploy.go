@@ -173,13 +173,11 @@ func (c *Deploy) Setup(ctx core.SetupContext) error {
 	}
 
 	// Request webhook for deploy_ended so this component can receive completion events
-	ctx.Integration.RequestWebhook(webhookConfigurationForResource(
+	return ctx.Integration.RequestWebhook(webhookConfigurationForResource(
 		ctx.Integration,
 		webhookResourceTypeDeploy,
 		[]string{"deploy_ended"},
 	))
-
-	return nil
 }
 
 func (c *Deploy) Execute(ctx core.ExecutionContext) error {

@@ -206,3 +206,16 @@ For a focused scan, pass lockfile paths to `bash scripts/license-check.sh`.
 This command suppresses vulnerability findings through a temporary configuration.
 The shared `osv-scanner.toml` does not suppress vulnerabilities.
 Vulnerability checks for dependencies and release images are a separate follow-up.
+
+## Go Security Checks
+
+Run `make check.gosec` after development setup to scan Go application code.
+After a tooling update, run `make dev.up` to rebuild the development image.
+The image installs gosec v2.30.0 in `/usr/local/bin`, outside the persistent Go cache volume.
+
+The scan covers `cmd/`, `pkg/`, and `ee/`. It excludes generated code and test files.
+Findings and scan errors fail the check. No severity filters or rule exclusions apply.
+
+The Semaphore Go SAST job runs the same check after Go setup.
+Findings appear in the job log. The job uploads `tmp/gosec/report.json` as an artifact,
+including when findings fail the job. Use this report to select the next fixes.
