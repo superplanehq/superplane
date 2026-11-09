@@ -33,9 +33,10 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 		max          int
 		instructions string
 		canvas       *models.Canvas
+		draft        bool
 	}{
-		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests."},
-		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request."},
+		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests.", draft: true},
+		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request.", draft: true},
 		{provider: models.ProviderGitHub, max: 3, instructions: ""},
 	}
 	for i := range cases {
@@ -53,7 +54,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
 			agent.Configuration["enabledAgentResourceTools"] = map[string]any{"github-resource": []any{"get_issue"}}
 			implementationStep(t, agent, "Implementation")["prompt"] = "Retired implementation prompt"
-			setResetTestDraftPullRequests(t, doc, true)
+			setResetTestDraftPullRequests(t, doc, tc.draft)
 		})
 	}
 	require.NoError(t, resetTestOrganization(t, r))
@@ -73,7 +74,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			require.NotNil(t, agent.Concurrency)
 			assert.Equal(t, tc.max, agent.Concurrency.EffectiveMax())
 			assert.Equal(t, "team", agent.Concurrency.Key)
-			assert.True(t, resetTestDraftPullRequests(t, version.Nodes))
+			assert.Equal(t, tc.draft, resetTestDraftPullRequests(t, version.Nodes))
 			assert.NotContains(t, liveCanvasJSON(t, tc.canvas), "retired implementation prompt")
 		})
 	}

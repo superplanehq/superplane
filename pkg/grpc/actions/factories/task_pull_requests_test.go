@@ -123,12 +123,14 @@ func TestOpenTaskPullRequest(t *testing.T) {
 	})
 
 	t.Run("updates the same pull request when the branch is opened again", func(t *testing.T) {
-		pullRequest, err := open(TaskPullRequestInput{Repository: "acme/api", Head: "feature", Title: "Change the API again"})
+		pullRequest, err := open(TaskPullRequestInput{Repository: "acme/api", Head: "feature", Title: "Change the API again", Draft: true})
 		require.NoError(t, err)
 
 		assert.Len(t, fake.created, 1)
 		require.Len(t, fake.edited, 1)
 		assert.Equal(t, "Change the API again", pullRequest.Title)
+		assert.Nil(t, fake.edited[0].Draft, "editing a pull request must not change its GitHub draft status")
+		assert.Equal(t, models.FactoryPullRequestStateOpen, pullRequest.State)
 		tracked, err := ListTaskPullRequests(db, order)
 		require.NoError(t, err)
 		assert.Len(t, tracked, 1)

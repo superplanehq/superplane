@@ -92,6 +92,7 @@ type FactoryPullRequest struct {
 	URL                     string
 	Title                   string
 	State                   string
+	DraftStateUpdatedAt     *time.Time
 	MergedAt                *time.Time
 	ClosedAt                *time.Time
 	CurrentRevisionID       *uuid.UUID
@@ -342,6 +343,56 @@ type FactoryPullRequestMergeabilitySnapshot struct {
 	BlockedMessage string
 	HeadSHA        string
 	AllowedMethods string
+}
+
+type FactoryPullRequestDraftStateSnapshot struct {
+	Draft      bool
+	UpdatedAt  time.Time
+	FromLookup bool
+}
+
+// SyncDraftState preserves terminal states and ignores stale provider snapshots.
+func (p *FactoryPullRequest) SyncDraftState(tx *gorm.DB, snapshot FactoryPullRequestDraftStateSnapshot) (bool, error) {
+	if snapshot.UpdatedAt.IsZero() {
+		return false, nil
+	}
+	state := FactoryPullRequestStateOpen
+	if snapshot.Draft {
+		state = FactoryPullRequestStateDraft
+	}
+	changed := false
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		// Startup and merge lock the task before the PR.
+		if err := LockFactoryWorkOrder(inner, p.WorkOrderID); err != nil {
+			return err
+		}
+		if err := p.LockForUpdate(inner); err != nil {
+			return err
+		}
+		if !slices.Contains([]string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}, p.State) {
+			return nil
+		}
+		if p.DraftStateUpdatedAt != nil {
+			// GitHub timestamps have second precision. A live lookup wins ties.
+			if snapshot.UpdatedAt.Before(*p.DraftStateUpdatedAt) ||
+				(snapshot.UpdatedAt.Equal(*p.DraftStateUpdatedAt) && !snapshot.FromLookup) {
+				return nil
+			}
+		}
+		if p.State != state {
+			if err := p.Update(inner, FactoryPullRequestPatch{State: &state}); err != nil {
+				return err
+			}
+			changed = true
+		}
+		// Advance ordering even when the state is unchanged.
+		if err := inner.Model(p).UpdateColumn("draft_state_updated_at", snapshot.UpdatedAt).Error; err != nil {
+			return err
+		}
+		p.DraftStateUpdatedAt = &snapshot.UpdatedAt
+		return nil
+	})
+	return changed && err == nil, err
 }
 
 func (p *FactoryPullRequest) SetMergeability(tx *gorm.DB, snapshot FactoryPullRequestMergeabilitySnapshot) error {

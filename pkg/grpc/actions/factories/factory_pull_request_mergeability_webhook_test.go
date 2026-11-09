@@ -572,6 +572,208 @@ func TestRefreshFactoryPullRequestMergeabilityPublishesOnlyOnStoredChange(t *tes
 	assert.Equal(t, 1, published)
 }
 
+func TestGitHubPullRequestDraftStateSynchronization(t *testing.T) {
+	for _, tc := range []struct {
+		name, initial, action, draft, repository, eventType string
+		active, failed, unchanged, ignore                   bool
+		otherOrganization, bitbucket                        bool
+		number                                              int64
+	}{
+		{name: "ready with unchanged mergeability", initial: "draft", action: "ready_for_review", draft: "false", unchanged: true},
+		{name: "converted to draft", initial: "open", action: "converted_to_draft", draft: "true"},
+		{name: "ready during active automation", initial: "draft", action: "ready_for_review", draft: "false", active: true},
+		{name: "ready when lookup fails", initial: "draft", action: "ready_for_review", draft: "false", failed: true},
+		{name: "missing draft", initial: "draft", action: "ready_for_review", draft: "null", ignore: true},
+		{name: "unrelated action", initial: "draft", action: "synchronize", draft: "false", ignore: true},
+		{name: "unrelated event", initial: "draft", action: "ready_for_review", draft: "false", eventType: "check_run", ignore: true},
+		{name: "other repository", initial: "draft", action: "ready_for_review", draft: "false", repository: "acme/other", ignore: true},
+		{name: "other organization", initial: "draft", action: "ready_for_review", draft: "false", otherOrganization: true, ignore: true},
+		{name: "Bitbucket record", initial: "draft", action: "ready_for_review", draft: "false", bitbucket: true, ignore: true},
+		{name: "other number with same sha", initial: "draft", action: "ready_for_review", draft: "false", number: 999, ignore: true},
+		{name: "closed record", initial: "closed", action: "converted_to_draft", draft: "true", ignore: true},
+		{name: "merged record", initial: "merged", action: "ready_for_review", draft: "false", ignore: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, pr := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 101)
+			require.NoError(t, pr.Update(db, models.FactoryPullRequestPatch{State: &tc.initial}))
+			if tc.bitbucket {
+				require.NoError(t, db.Model(pr).Updates(map[string]any{"provider": models.FactoryPullRequestProviderBitbucket, "url": "https://bitbucket.org/acme/app/pull-requests/101"}).Error)
+			}
+			api := mergeableFactoryGitHub("abc123")
+			if tc.failed || tc.ignore {
+				api.getPullErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}}
+			}
+			stubFactoryGitHub(t, api)
+			if tc.unchanged || tc.number != 0 {
+				require.NoError(t, pr.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{Mergeable: true, HeadSHA: "abc123", AllowedMethods: "SQUASH,MERGE,REBASE"}))
+			}
+			if tc.active {
+				grantExclusivePullRequestAccess(t, db, r, factory, &pb.FactoryPullRequest{Id: pr.ID.String()})
+			}
+			organizationID := r.Organization.ID
+			if tc.otherOrganization {
+				other, err := models.CreateOrganization(support.RandomName("org"), "")
+				require.NoError(t, err)
+				organizationID = other.ID
+			}
+			integration, err := models.CreateIntegration(uuid.New(), organizationID, "github", support.RandomName("github"), map[string]any{})
+			require.NoError(t, err)
+			published := 0
+			original := publishFactoryWorkOrderUpdated
+			publishFactoryWorkOrderUpdated = func(factoryID, orderID, reason string) error {
+				assert.Equal(t, factory.ID.String(), factoryID)
+				assert.Equal(t, pr.WorkOrderID.String(), orderID)
+				assert.Equal(t, factoryevents.EventTypeOrderPullRequestUpdated, reason)
+				published++
+				return nil
+			}
+			t.Cleanup(func() { publishFactoryWorkOrderUpdated = original })
+			order, err := factory.FindWorkOrder(db, pr.WorkOrderID)
+			require.NoError(t, err)
+			countUpdates := func() int {
+				events, err := order.ListEvents(db, 0, nil)
+				require.NoError(t, err)
+				count := 0
+				for _, event := range events {
+					if event.Type == factoryevents.EventTypeOrderPullRequestUpdated {
+						count++
+					}
+				}
+				return count
+			}
+			before := countUpdates()
+			repository, number, eventType := tc.repository, tc.number, tc.eventType
+			if repository == "" {
+				repository = "acme/app"
+			}
+			if number == 0 {
+				number = 101
+			}
+			if eventType == "" {
+				eventType = "pull_request"
+			}
+			updatedAt := time.Now().UTC().Format(time.RFC3339)
+			body := []byte(fmt.Sprintf(`{"action":%q,"repository":{"full_name":%q},"pull_request":{"number":%d,"draft":%s,"updated_at":%q,"head":{"sha":"abc123"}}}`, tc.action, repository, number, tc.draft, updatedAt))
+			deliver := func() {
+				RefreshFactoryPullRequestMergeabilityFromGitHubEvent(t.Context(), IntakeDependencies{}, &models.Webhook{AppInstallationID: &integration.ID}, eventType, body)
+			}
+			if tc.unchanged {
+				var deliveries sync.WaitGroup
+				deliveries.Add(2)
+				for range 2 {
+					go func() { defer deliveries.Done(); deliver() }()
+				}
+				deliveries.Wait()
+			} else {
+				deliver()
+			}
+			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pr.ID})
+			require.NoError(t, err)
+			if tc.ignore {
+				assert.Equal(t, tc.initial, stored.State)
+				assert.Equal(t, before, countUpdates())
+				assert.Zero(t, published)
+				return
+			}
+			want := models.FactoryPullRequestStateOpen
+			if tc.draft == "true" {
+				want = models.FactoryPullRequestStateDraft
+			}
+			assert.Equal(t, want, stored.State)
+			assert.Equal(t, before+1, countUpdates())
+			assert.Positive(t, published)
+			if tc.unchanged {
+				assert.Equal(t, 1, published)
+				assert.True(t, stored.Mergeable)
+			}
+			after := published
+			deliver()
+			assert.Equal(t, before+1, countUpdates())
+			assert.Equal(t, after, published)
+		})
+	}
+}
+
+func TestGitHubDraftStateIgnoresOlderEventsAndReconcilesLookups(t *testing.T) {
+	for _, tc := range []struct {
+		name                                                           string
+		failed, active, lookup, sameTimestamp, staleLookup, checksFail bool
+	}{
+		{name: "older event after ready event when lookup fails", failed: true},
+		{name: "older event after ready event during automation", active: true},
+		{name: "equal timestamp event cannot replace known state", failed: true, sameTimestamp: true},
+		{name: "lookup corrects stale draft state", lookup: true},
+		{name: "lookup corrects stale draft state during automation", lookup: true, active: true},
+		{name: "live lookup wins equal timestamp", lookup: true, sameTimestamp: true},
+		{name: "older lookup cannot replace newer event", staleLookup: true},
+		{name: "lookup updates state even when check lookup fails", lookup: true, checksFail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, pr := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 101)
+			api := mergeableFactoryGitHub("abc123")
+			if tc.failed {
+				api.getPullErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}}
+			}
+			if tc.checksFail {
+				api.combinedErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}}
+			}
+			stubFactoryGitHub(t, api)
+			if tc.active {
+				grantExclusivePullRequestAccess(t, db, r, factory, &pb.FactoryPullRequest{Id: pr.ID.String()})
+			}
+			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{})
+			require.NoError(t, err)
+			original := publishFactoryWorkOrderUpdated
+			published := 0
+			publishFactoryWorkOrderUpdated = func(string, string, string) error {
+				published++
+				return nil
+			}
+			t.Cleanup(func() { publishFactoryWorkOrderUpdated = original })
+			newer := time.Now().UTC().Truncate(time.Second)
+			older := newer.Add(-time.Minute)
+			if tc.sameTimestamp {
+				older = newer
+			}
+			if tc.staleLookup {
+				api.pullRequest.Draft = github.Ptr(true)
+				api.pullRequest.State = github.Ptr("open")
+				api.pullRequest.UpdatedAt = &github.Timestamp{Time: older}
+			}
+			deliver := func(draft bool, updatedAt time.Time) {
+				action := "ready_for_review"
+				if draft {
+					action = "converted_to_draft"
+				}
+				body := []byte(fmt.Sprintf(`{"action":%q,"repository":{"full_name":"acme/app"},"pull_request":{"number":101,"draft":%t,"updated_at":%q}}`, action, draft, updatedAt.Format(time.RFC3339)))
+				RefreshFactoryPullRequestMergeabilityFromGitHubEvent(t.Context(), IntakeDependencies{}, &models.Webhook{AppInstallationID: &integration.ID}, "pull_request", body)
+			}
+			if tc.lookup {
+				state := models.FactoryPullRequestStateDraft
+				require.NoError(t, pr.Update(db, models.FactoryPullRequestPatch{State: &state}))
+				api.pullRequest.UpdatedAt = &github.Timestamp{Time: newer}
+				api.pullRequest.State = github.Ptr("open")
+				// A delayed draft event must reconcile against the current GitHub value.
+				deliver(true, older)
+			} else {
+				// Even a ready event that does not change state must establish ordering.
+				deliver(false, newer)
+				deliver(true, older)
+			}
+			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pr.ID})
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
+			if tc.lookup {
+				assert.Positive(t, published, "a lookup-only state change must notify clients")
+			}
+		})
+	}
+}
+
 func createOpenGitHubFactoryPullRequest(
 	t *testing.T,
 	db *gorm.DB,
