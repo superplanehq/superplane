@@ -212,11 +212,16 @@ func (w *FactoryVelocitySyncWorker) SyncFactory(ctx context.Context, factoryID u
 		return false, nil
 	}
 
-	now := w.now()
-	from, until := velocityRefreshBounds(*target, now)
-	err = w.claimAndSync(ctx, *target, now.Add(-velocitySyncOnDemandGuard), from, until, now)
+	targets, err := models.FactoryVelocityRepositoryTargets(database.DB(ctx), *target)
 	if err != nil {
 		return false, err
+	}
+	for _, candidate := range targets {
+		now := w.now()
+		from, until := velocityRefreshBounds(candidate, now)
+		if err := w.claimAndSync(ctx, candidate, now.Add(-velocitySyncOnDemandGuard), from, until, now); err != nil {
+			return false, err
+		}
 	}
 	return true, nil
 }
@@ -272,7 +277,7 @@ func (w *FactoryVelocitySyncWorker) claimAndSync(
 		return fmt.Errorf("repository %q is not owner/name", target.Repository)
 	}
 
-	sync, err := models.ClaimFactoryVelocitySync(database.Conn(), target.FactoryID, claimableBefore)
+	sync, err := models.ClaimFactoryVelocitySync(database.DB(ctx), target.FactoryID, claimableBefore, target.Repository)
 	if err != nil {
 		return fmt.Errorf("claim velocity sync: %w", err)
 	}
@@ -392,19 +397,13 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 	)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		if repositoryChanged {
-			if err := models.DeleteFactoryVelocityRepositoryMerges(tx, target.FactoryID); err != nil {
-				return err
-			}
-		}
-
 		superplane, err := models.ListFactoryPullRequestNumbers(tx, target.FactoryID, target.Repository)
 		if err != nil {
 			return err
 		}
 
 		rows := repositoryMergeRows(target, merged, superplane)
-		return models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, effectiveVelocityProvider(target), replaceFrom, replaceTo, rows)
+		return models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, effectiveVelocityProvider(target), replaceFrom, replaceTo, rows, target.Repository)
 	})
 	if err != nil {
 		return fmt.Errorf("store repository merges: %w", err)
