@@ -208,7 +208,9 @@ The shared `osv-scanner.toml` does not suppress vulnerabilities.
 
 The Semaphore Dependency vulnerabilities job scans the same dependency files
 with `make check.vulnerabilities`. It uses the shared configuration without
-the temporary vulnerability suppression. Vulnerability findings fail this job.
+the temporary vulnerability suppression. High and critical vulnerabilities
+(CVSS 7.0 or higher) fail this job. Lower and unknown severities are reported
+without blocking. Scan errors also fail the job.
 Both checks invoke the native `osv-scanner` command.
 Semaphore prepares the project Go compiler and generated clients before the
 vulnerability scan. Go call analysis remains enabled.
@@ -222,4 +224,5 @@ go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0
 
 Add the Go binary directory to your `PATH`.
 Use the Go version from `go.mod` and generate the API clients before Go call analysis.
+The vulnerability script also requires Node.js to apply the severity policy.
 Run `bash scripts/vulnerability-check.sh` or `bash scripts/license-check.sh`.
