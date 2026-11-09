@@ -145,7 +145,7 @@ func (c *Client) do(method, path string, query url.Values) (*http.Response, erro
 
 func (c *Client) parseError(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 	apiErr := &APIError{StatusCode: resp.StatusCode, Body: string(body)}
 
 	var errPayload struct {

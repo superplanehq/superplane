@@ -54,7 +54,7 @@ func confirmONSSubscription(ctx core.WebhookRequestContext, confirmURL string) (
 
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

@@ -455,7 +455,7 @@ func (e *GraphQL) postGraphQLRequest(logger *log.Entry, httpCtx core.HTTPContext
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}

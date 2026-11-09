@@ -254,13 +254,13 @@ func (c *Client) connect() (smtpClient, error) {
 	}
 
 	if err := conn.Hello(c.Host); err != nil {
-		conn.Close()
+		_ = conn.Close() // Preserve the setup error; this connection is unusable.
 		return nil, fmt.Errorf("HELLO failed: %w", err)
 	}
 
 	if c.UseTLS {
 		if ok, _ := conn.Extension("STARTTLS"); !ok {
-			conn.Close()
+			_ = conn.Close() // Preserve the setup error; this connection is unusable.
 			return nil, fmt.Errorf("SMTP server does not support STARTTLS")
 		}
 
@@ -270,7 +270,7 @@ func (c *Client) connect() (smtpClient, error) {
 		}
 
 		if err := conn.StartTLS(tlsConfig); err != nil {
-			conn.Close()
+			_ = conn.Close() // Preserve the setup error; this connection is unusable.
 			return nil, fmt.Errorf("STARTTLS failed: %w", err)
 		}
 	}
@@ -278,7 +278,7 @@ func (c *Client) connect() (smtpClient, error) {
 	if c.Username != "" {
 		auth := smtp.PlainAuth("", c.Username, c.Password, c.Host)
 		if err := conn.Auth(auth); err != nil {
-			conn.Close()
+			_ = conn.Close() // Preserve the setup error; this connection is unusable.
 			return nil, fmt.Errorf("authentication failed: %w", err)
 		}
 	}

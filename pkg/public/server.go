@@ -2142,7 +2142,9 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", firstResponse.ContentType)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write(firstResponse.Body)
+		if _, err := w.Write(firstResponse.Body); err != nil {
+			log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write webhook response")
+		}
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}

@@ -186,7 +186,7 @@ func decodeJSON(r io.Reader, result any) error {
 
 func (c *Client) parseError(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 	apiErr := &APIError{StatusCode: resp.StatusCode, Body: string(body)}
 	var errPayload struct {
 		Error struct {
@@ -520,10 +520,10 @@ func (c *Client) ListImages() ([]ImageResponse, error) {
 			} `json:"meta"`
 		}
 		if err := decodeJSON(resp.Body, &out); err != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 			return nil, fmt.Errorf("decode list images response: %w", err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 
 		for _, img := range out.Images {
 			if _, ok := seen[img.ID]; ok {
@@ -651,10 +651,10 @@ func (c *Client) Verify() error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return c.parseError(resp)
 	}
+	_ = resp.Body.Close() // A successful verification does not need the response body.
 	return nil
 }
 

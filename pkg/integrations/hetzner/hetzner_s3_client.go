@@ -122,7 +122,7 @@ func (c *HetznerS3Client) doRequest(method, bucket, key string, headers map[stri
 
 func (c *HetznerS3Client) parseS3Error(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 	var s3Err struct {
 		XMLName xml.Name `xml:"Error"`
 		Code    string   `xml:"Code"`

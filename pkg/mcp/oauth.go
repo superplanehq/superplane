@@ -244,8 +244,8 @@ func RevokeToken(ctx context.Context, httpClient HTTPDoer, revocationEndpoint, c
 	if err != nil {
 		return
 	}
-	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body) // Best-effort drain for HTTP connection reuse.
+	_ = resp.Body.Close()                 // Response cleanup must not replace the read or operation result.
 }
 
 func ClientMetadataDocument(clientMetadataURL, redirectURI string) map[string]any {
@@ -325,8 +325,8 @@ func probeResourceMetadataURLs(ctx context.Context, httpClient HTTPDoer, mcpURL 
 	if err != nil {
 		return nil, false, fmt.Errorf("probe MCP URL: %w", err)
 	}
-	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body) // Best-effort drain for HTTP connection reuse.
+	_ = resp.Body.Close()                 // Response cleanup must not replace the read or operation result.
 
 	if headerURL := resourceMetadataFromWWWAuthenticate(resp.Header.Get("WWW-Authenticate")); headerURL != "" {
 		if err := ValidatePublicHTTPSURL(headerURL); err != nil {

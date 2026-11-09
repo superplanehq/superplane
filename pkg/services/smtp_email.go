@@ -143,17 +143,17 @@ var smtpDial smtpDialer = func(addr string) (smtpClient, error) {
 		return nil, err
 	}
 	if err := conn.SetDeadline(time.Now().Add(smtpConversationTimeout)); err != nil {
-		conn.Close()
+		_ = conn.Close() // Preserve the setup error; this connection is unusable.
 		return nil, err
 	}
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Preserve the setup error; this connection is unusable.
 		return nil, err
 	}
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Preserve the setup error; this connection is unusable.
 		return nil, err
 	}
 	return &smtpClientAdapter{client: client}, nil

@@ -681,14 +681,18 @@ func (a *AWS) handleEvent(ctx core.HTTPRequestContext) {
 	apiKey := ctx.Request.Header.Get(APIKeyHeaderName)
 	if apiKey == "" {
 		ctx.Response.WriteHeader(http.StatusBadRequest)
-		ctx.Response.Write([]byte("missing " + APIKeyHeaderName + " header"))
+		if _, writeErr := ctx.Response.Write([]byte("missing " + APIKeyHeaderName + " header")); writeErr != nil {
+			ctx.Logger.WithError(writeErr).Warn("failed to write AWS integration response")
+		}
 		return
 	}
 
 	secrets, err := ctx.Integration.GetSecrets()
 	if err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		ctx.Response.Write([]byte("error finding integration secrets: " + err.Error()))
+		if _, writeErr := ctx.Response.Write([]byte("error finding integration secrets: " + err.Error())); writeErr != nil {
+			ctx.Logger.WithError(writeErr).Warn("failed to write AWS integration response")
+		}
 		return
 	}
 
@@ -702,28 +706,36 @@ func (a *AWS) handleEvent(ctx core.HTTPRequestContext) {
 
 	if apiKey != secret {
 		ctx.Response.WriteHeader(http.StatusForbidden)
-		ctx.Response.Write([]byte("invalid " + APIKeyHeaderName + " header"))
+		if _, writeErr := ctx.Response.Write([]byte("invalid " + APIKeyHeaderName + " header")); writeErr != nil {
+			ctx.Logger.WithError(writeErr).Warn("failed to write AWS integration response")
+		}
 		return
 	}
 
 	subscriptions, err := ctx.Integration.ListSubscriptions()
 	if err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		ctx.Response.Write([]byte("error listing integration subscriptions: " + err.Error()))
+		if _, writeErr := ctx.Response.Write([]byte("error listing integration subscriptions: " + err.Error())); writeErr != nil {
+			ctx.Logger.WithError(writeErr).Warn("failed to write AWS integration response")
+		}
 		return
 	}
 
 	body, err := io.ReadAll(ctx.Request.Body)
 	if err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		ctx.Response.Write([]byte("error reading request body: " + err.Error()))
+		if _, writeErr := ctx.Response.Write([]byte("error reading request body: " + err.Error())); writeErr != nil {
+			ctx.Logger.WithError(writeErr).Warn("failed to write AWS integration response")
+		}
 		return
 	}
 
 	data := map[string]any{}
 	if err := json.Unmarshal(body, &data); err != nil {
 		ctx.Response.WriteHeader(http.StatusBadRequest)
-		ctx.Response.Write([]byte("error parsing request body: " + err.Error()))
+		if _, writeErr := ctx.Response.Write([]byte("error parsing request body: " + err.Error())); writeErr != nil {
+			ctx.Logger.WithError(writeErr).Warn("failed to write AWS integration response")
+		}
 		return
 	}
 

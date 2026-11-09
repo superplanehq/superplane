@@ -139,7 +139,7 @@ func (c *Client) ListDomains() ([]Domain, error) {
 		}
 
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
+		_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 		if err != nil {
 			return nil, fmt.Errorf("failed to read list domains response: %w", err)
 		}
@@ -239,7 +239,7 @@ func (c *Client) ListRepositories(domain string) ([]Repository, error) {
 		}
 
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
+		_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 		if err != nil {
 			return nil, fmt.Errorf("failed to read list repositories response: %w", err)
 		}
@@ -306,7 +306,7 @@ func (c *Client) CreateRepository(input CreateRepositoryInput) (*RepositoryDescr
 	}
 
 	body, err := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read create repository response: %w", err)
 	}
@@ -357,7 +357,7 @@ func (c *Client) DeleteRepository(input DeleteRepositoryInput) (*RepositoryDescr
 	}
 
 	body, err := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read delete repository response: %w", err)
 	}
@@ -453,7 +453,7 @@ func (c *Client) UpdatePackageVersionsStatus(input UpdatePackageVersionsStatusIn
 	}
 
 	body, err := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read update package versions status response: %w", err)
 	}
@@ -536,7 +536,7 @@ func (c *Client) CopyPackageVersions(input CopyPackageVersionsInput) (*CopyPacka
 	}
 
 	body, err := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read copy package versions response: %w", err)
 	}
@@ -610,7 +610,7 @@ func (c *Client) DeletePackageVersions(input DeletePackageVersionsInput) (*Delet
 	}
 
 	body, err := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read delete package versions response: %w", err)
 	}
@@ -690,7 +690,7 @@ func (c *Client) DisposePackageVersions(input DisposePackageVersionsInput) (*Dis
 	}
 
 	body, err := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read dispose package versions response: %w", err)
 	}
@@ -802,7 +802,7 @@ func (c *Client) ListPackageVersionAssets(input ListPackageVersionAssetsInput) (
 		}
 
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
+		_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 		if err != nil {
 			return nil, fmt.Errorf("failed to read list package version assets response: %w", err)
 		}

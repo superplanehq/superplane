@@ -129,8 +129,7 @@ func prepareDockerBashWorkDir(task *api.TaskPayload) (string, error) {
 		return "", err
 	}
 	if _, err := writeBashTaskFiles(dir, task.Script, task.MessageChain); err != nil {
-		os.RemoveAll(dir)
-		return "", err
+		return "", errors.Join(err, os.RemoveAll(dir))
 	}
 	return dir, nil
 }

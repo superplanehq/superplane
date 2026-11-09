@@ -640,7 +640,7 @@ func markVMResourcesForDeletion(ctx context.Context, provider *AzureProvider, re
 		if err != nil {
 			return fmt.Errorf("failed to patch VM delete options: %w", err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 	}
 
 	// Step 3: For each NIC, mark its public IPs for cascade deletion.
@@ -783,7 +783,7 @@ func markNICPublicIPsForDeletion(ctx context.Context, client *armClient, nicID s
 	if err != nil {
 		return fmt.Errorf("failed to patch NIC: %w", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 
 	return nil
 }

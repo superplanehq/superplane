@@ -1185,7 +1185,7 @@ func (c *Client) PutKVValue(accountID, namespaceID, key, value string, expiratio
 	if err := writer.WriteField("value", value); err != nil {
 		return fmt.Errorf("error writing value field: %v", err)
 	}
-	writer.Close()
+	_ = writer.Close() // The multipart writer uses a bytes.Buffer, whose writes cannot fail.
 
 	req, err := http.NewRequest(http.MethodPut, rawURL, buf)
 	if err != nil {

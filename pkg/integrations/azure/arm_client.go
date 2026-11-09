@@ -159,7 +159,7 @@ func (c *armClient) ensureResourceProviderRegistered(ctx context.Context, provid
 			providerNamespace, err, providerNamespace,
 		)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 
 	// Poll with a short timeout — registration typically takes 10-30s.
 	deadline := time.Now().Add(2 * time.Minute)

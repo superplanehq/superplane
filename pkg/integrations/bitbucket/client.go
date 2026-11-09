@@ -190,7 +190,7 @@ func (c *Client) ListRepositories(workspace string) ([]Repository, error) {
 		}
 
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 		if err != nil {
 			return nil, fmt.Errorf("error reading response body: %w", err)
 		}

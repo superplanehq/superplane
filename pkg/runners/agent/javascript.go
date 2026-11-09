@@ -142,8 +142,7 @@ func prepareDockerJavaScriptWorkDir(task *api.TaskPayload) (string, error) {
 		return "", err
 	}
 	if _, err := writeJavaScriptProgram(dir, task.Script, task.MessageChain); err != nil {
-		os.RemoveAll(dir)
-		return "", err
+		return "", errors.Join(err, os.RemoveAll(dir))
 	}
 	return dir, nil
 }

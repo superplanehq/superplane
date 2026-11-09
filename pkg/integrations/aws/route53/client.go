@@ -139,7 +139,7 @@ func (c *Client) GetChange(changeID string) (*ChangeInfo, error) {
 	}
 
 	body, err := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read get change response: %w", err)
 	}
@@ -189,7 +189,7 @@ func (c *Client) ListHostedZones() ([]HostedZoneSummary, error) {
 		}
 
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
+		_ = res.Body.Close() // Response cleanup must not replace the read or operation result.
 		if err != nil {
 			return nil, fmt.Errorf("failed to read list hosted zones response: %w", err)
 		}

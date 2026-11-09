@@ -284,7 +284,9 @@ func firstNonEmptyParameter(parameters map[string]string, keys ...string) string
 func (a *AzureIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Logger.Warnf("Unknown request path: %s %s", ctx.Request.Method, ctx.Request.URL.Path)
 	ctx.Response.WriteHeader(http.StatusNotFound)
-	ctx.Response.Write([]byte("not found"))
+	if _, err := ctx.Response.Write([]byte("not found")); err != nil {
+		ctx.Logger.WithError(err).Warn("failed to write Azure integration response")
+	}
 }
 
 // newProvider creates a new AzureProvider by reading config and the stored access

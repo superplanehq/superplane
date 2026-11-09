@@ -961,7 +961,7 @@ func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, ht
 	// See SuperPlane issue 3141.
 	//
 	bodyBytes, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close() // Response cleanup must not replace the read or operation result.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
