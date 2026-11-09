@@ -96,6 +96,13 @@ blocks:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       jobs:
+        - name: Go SAST (gosec)
+          commands:
+            - "cache restore go-mod-$(checksum go.sum),go-mod"
+            - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
+            - make ci.setup.go
+            - make check.gosec
+
         - name: Tool configs
           commands:
             - make check.tool.configs
@@ -116,6 +123,10 @@ blocks:
           commands:
             - bash scripts/license-check-test.sh
             - make test.license.check
+
+        - name: Dependency vulnerabilities (OSV-Scanner)
+          commands:
+            - make check.vulnerabilities
 
         - name: npm audit
           commands:

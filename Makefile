@@ -64,6 +64,10 @@ GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screensho
 lint:
 	$(COMPOSE) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... ./...
 
+.PHONY: check.gosec
+check.gosec: dev.test.is.running
+	$(COMPOSE) exec -T app gosec -exclude-generated -exclude-dir=pkg/protos -exclude-dir=pkg/openapi_client ./cmd/... ./pkg/... ./ee/...
+
 tidy:
 	$(COMPOSE) exec app go mod tidy
 
@@ -99,6 +103,10 @@ test.coverage.baseline.update:
 
 test.license.check:
 	bash ./scripts/license-check.sh
+
+.PHONY: check.vulnerabilities
+check.vulnerabilities:
+	bash ./scripts/vulnerability-check.sh
 
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
