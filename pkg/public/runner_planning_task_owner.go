@@ -77,7 +77,7 @@ func (s *Server) handleRunnerSuggestOwners(w http.ResponseWriter, r *http.Reques
 		suggestion = s.suggestCodeOwners(r.Context(), target, paths)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	_ = writeJSON(w, http.StatusOK, map[string]any{
 		"paths":          paths,
 		"current_owners": currentTaskOwners(target),
 		"code_owners":    suggestion.CodeOwners,
@@ -151,7 +151,7 @@ func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request,
 			return
 		}
 		target.order.Assignees = owners
-		writeJSON(w, http.StatusOK, map[string]any{
+		_ = writeJSON(w, http.StatusOK, map[string]any{
 			"status": "kept",
 			"owners": currentTaskOwners(target),
 		})
@@ -166,7 +166,7 @@ func (s *Server) handleRunnerAssignOwner(w http.ResponseWriter, r *http.Request,
 		http.Error(w, "Task owner assignment failed", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	_ = writeJSON(w, http.StatusOK, map[string]any{
 		"status": "assigned",
 		"owner":  taskowner.MemberOf(owner),
 	})

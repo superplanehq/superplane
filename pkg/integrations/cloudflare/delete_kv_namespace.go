@@ -128,8 +128,11 @@ func (c *DeleteKVNamespace) Execute(ctx core.ExecutionContext) error {
 	namespaceName := ""
 	if ctx.NodeMetadata != nil {
 		meta := KVNodeMetadata{}
-		mapstructure.Decode(ctx.NodeMetadata.Get(), &meta)
-		namespaceName = meta.NamespaceName
+		if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &meta); err != nil {
+			ctx.Logger.WithError(err).Warn("failed to decode deleted KV namespace metadata")
+		} else {
+			namespaceName = meta.NamespaceName
+		}
 	}
 
 	result := map[string]any{

@@ -365,12 +365,14 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(paginatedResponse{
+	if err := json.NewEncoder(w).Encode(paginatedResponse{
 		Items:  items,
 		Total:  total,
 		Limit:  limit,
 		Offset: offset,
-	})
+	}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) {
@@ -553,12 +555,14 @@ func (s *Server) adminListCanvases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(paginatedResponse{
+	if err := json.NewEncoder(w).Encode(paginatedResponse{
 		Items:  items,
 		Total:  total,
 		Limit:  limit,
 		Offset: offset,
-	})
+	}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // adminListOrgUsers returns paginated human users for a given organization.
@@ -602,12 +606,14 @@ func (s *Server) adminListOrgUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(paginatedResponse{
+	if err := json.NewEncoder(w).Encode(paginatedResponse{
 		Items:  items,
 		Total:  total,
 		Limit:  limit,
 		Offset: offset,
-	})
+	}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // startSupportSession begins a support session.
@@ -675,9 +681,11 @@ func (s *Server) startSupportSession(w http.ResponseWriter, r *http.Request) {
 	}).Info("admin support session started")
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"redirect_url": "/",
-	})
+	}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // endSupportSession ends the current support session.
@@ -710,9 +718,11 @@ func (s *Server) endSupportSession(w http.ResponseWriter, r *http.Request) {
 	supportsession.ClearCookie(w, r)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"redirect_url": "/admin",
-	})
+	}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // supportSessionStatus returns the current support session state.
@@ -720,14 +730,18 @@ func (s *Server) supportSessionStatus(w http.ResponseWriter, r *http.Request) {
 	tokenStr, err := supportsession.ReadCookie(r)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"active": false})
+		if err := json.NewEncoder(w).Encode(map[string]any{"active": false}); err != nil {
+			log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+		}
 		return
 	}
 
 	claims, err := supportsession.ValidateToken(s.jwt, tokenStr)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"active": false})
+		if err := json.NewEncoder(w).Encode(map[string]any{"active": false}); err != nil {
+			log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+		}
 		return
 	}
 
@@ -735,7 +749,9 @@ func (s *Server) supportSessionStatus(w http.ResponseWriter, r *http.Request) {
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok || claims.AdminAccountID != account.ID.String() {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"active": false})
+		if err := json.NewEncoder(w).Encode(map[string]any{"active": false}); err != nil {
+			log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+		}
 		return
 	}
 
@@ -743,16 +759,20 @@ func (s *Server) supportSessionStatus(w http.ResponseWriter, r *http.Request) {
 	if err != nil || target.IsBlocked() {
 		supportsession.ClearCookie(w, r)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"active": false})
+		if err := json.NewEncoder(w).Encode(map[string]any{"active": false}); err != nil {
+			log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+		}
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"active":           true,
 		"user_name":        target.Name,
 		"admin_account_id": claims.AdminAccountID,
-	})
+	}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // promoteAdmin promotes an account to installation admin.
@@ -787,7 +807,9 @@ func (s *Server) promoteAdmin(w http.ResponseWriter, r *http.Request) {
 	}).Info("account promoted to installation admin")
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "promoted"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "promoted"}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // demoteAdmin removes installation admin from an account.
@@ -828,7 +850,9 @@ func (s *Server) demoteAdmin(w http.ResponseWriter, r *http.Request) {
 	}).Info("account demoted from installation admin")
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "demoted"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "demoted"}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // blocks an account and invalidates its sessions and credentials.
@@ -869,7 +893,9 @@ func (s *Server) blockAccount(w http.ResponseWriter, r *http.Request) {
 	}).Info("account blocked")
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "blocked"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "blocked"}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 func (s *Server) unblockAccount(w http.ResponseWriter, r *http.Request) {
@@ -909,7 +935,9 @@ func (s *Server) unblockAccount(w http.ResponseWriter, r *http.Request) {
 	}).Info("account unblocked")
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "unblocked"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "unblocked"}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // adminDeleteAccount deletes an account, its sign-in methods, and every
@@ -987,10 +1015,12 @@ func (s *Server) adminListOrgExperimentalFeatures(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"features": experimentalFeatureItems(),
 		"enabled":  enabled,
-	})
+	}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // adminEnableOrgExperimentalFeature toggles an experimental feature on for
@@ -1025,7 +1055,9 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "enabled"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "enabled"}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // adminDisableOrgExperimentalFeature toggles an experimental feature off for
@@ -1056,7 +1088,9 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "disabled"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "disabled"}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 type adminOrgItem struct {

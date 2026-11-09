@@ -92,11 +92,11 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
-				w.sweepStartedRuns()
+				_ = w.sweepStartedRuns() // Sweep failures are logged before the next scheduled retry.
 			}()
 			go func() {
 				defer wg.Done()
-				w.sweepCancellingRuns()
+				_ = w.sweepCancellingRuns() // Sweep failures are logged before the next scheduled retry.
 			}()
 			wg.Wait()
 

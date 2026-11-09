@@ -54,7 +54,7 @@ func (s *Server) reportRunnerMergeConfidenceCheck(w http.ResponseWriter, r *http
 	if err := messages.PublishFactoryWorkOrderUpdated(order.FactoryID.String(), order.ID.String(), factoryevents.EventTypeOrderCheckReported); err != nil {
 		log.WithError(err).Warn("failed to publish merge confidence check")
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "reported"})
+	_ = writeJSON(w, http.StatusOK, map[string]any{"status": "reported"})
 }
 
 func writeMergeConfidenceLookupError(w http.ResponseWriter, err error) {

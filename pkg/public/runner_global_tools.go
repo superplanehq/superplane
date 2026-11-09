@@ -11,7 +11,7 @@ func (s *Server) handleRunnerTools(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	_ = writeJSON(w, http.StatusOK, map[string]any{
 		"tools": runneraction.AllowedRunnerTools(scope.Scopes),
 	})
 }

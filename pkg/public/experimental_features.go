@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/features"
 )
 
@@ -39,7 +40,9 @@ func experimentalFeatureItems() []experimentalFeatureItem {
 // and on the admin experimental-features route for installation admins.
 func (s *Server) listExperimentalFeatures(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"features": experimentalFeatureItems(),
-	})
+	}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }

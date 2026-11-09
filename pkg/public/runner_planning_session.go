@@ -119,7 +119,7 @@ func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Req
 	if written {
 		messages.PublishPlanningBoardStatus(session)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "stored"})
+	_ = writeJSON(w, http.StatusOK, map[string]any{"status": "stored"})
 }
 
 func validPlanningActivityStatus(status string) bool {
@@ -182,7 +182,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 
 	for {
 		if r.Context().Err() != nil {
-			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+			_ = writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 			return
 		}
 		session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
@@ -191,7 +191,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 			return
 		}
 		if session.State == models.PlanningSessionStateEnded {
-			writeJSON(w, http.StatusOK, map[string]any{"status": "ended"})
+			_ = writeJSON(w, http.StatusOK, map[string]any{"status": "ended"})
 			return
 		}
 		if session.WaitState == models.PlanningWaitResolved {
@@ -206,7 +206,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 			if consumed {
 				if r.Context().Err() != nil {
 					restorePlanningWait(session, result)
-					writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+					_ = writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 					return
 				}
 				text, files, err := mintPlanningWait(r.Context(), session, result)
@@ -235,12 +235,12 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 			return
 		}
 		if !time.Now().Before(deadline) {
-			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+			_ = writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 			return
 		}
 		select {
 		case <-r.Context().Done():
-			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+			_ = writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 			return
 		case <-ticker.C:
 		}
@@ -302,7 +302,7 @@ func (s *Server) runnerPlanningUpdate(w http.ResponseWriter, r *http.Request, sc
 		messages.PublishPlanningPlanReady(db, session)
 	}
 	messages.PublishPlanningBoardStatus(session)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+	_ = writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
 func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request) {
@@ -324,7 +324,7 @@ func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request
 		writeRunnerPlanningError(w, r, session, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+	_ = writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
 func (s *Server) handleRunnerPlanningClarity(w http.ResponseWriter, r *http.Request) {
@@ -359,7 +359,7 @@ func (s *Server) handleRunnerPlanningScore(
 		return
 	}
 	publishPlanningScore(session)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+	_ = writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
 func publishPlanningScore(session *models.FactoryPlanningSession) {
@@ -398,7 +398,7 @@ func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	messages.PublishPlanningBoardStatus(session)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+	_ = writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
 func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http.Request) {
@@ -425,7 +425,7 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 		return
 	}
 	messages.PublishPlanningBoardStatus(session)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+	_ = writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
 // parseOptionalActivityID reads an optional activity id from a request body.
@@ -616,12 +616,13 @@ func restorePlanningWait(session *models.FactoryPlanningSession, result models.P
 	}
 }
 
+// writeJSON logs response write failures before returning them.
 func writeJSON(w http.ResponseWriter, status int, body any) error {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(body); err != nil {
-		log.WithError(err).Error("failed to encode planning session runner response")
+		log.WithError(err).Error("failed to write JSON response")
 		return err
 	}
 	return nil
@@ -652,7 +653,7 @@ func isDroppedConnectionError(err error) bool {
 
 func writePlanningWaitError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
 	if isRunnerRequestCanceled(r, err) || isTransientPlanningWaitDBError(err) {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+		_ = writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 		return
 	}
 	writeRunnerPlanningError(w, r, session, err)

@@ -140,10 +140,12 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(SetupOwnerResponse{
+	if err := json.NewEncoder(w).Encode(SetupOwnerResponse{
 		OrganizationID:   organization.ID.String(),
 		OrganizationSlug: organization.Slug,
-	})
+	}); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 type SetupOwnerStatusResponse struct {

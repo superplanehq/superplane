@@ -477,7 +477,9 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, a
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
-	gothic.Logout(w, r)
+	if err := gothic.Logout(w, r); err != nil {
+		log.WithError(err).Warn("failed to clear OAuth session during logout")
+	}
 
 	ClearAccountCookie(w, r)
 	supportsession.ClearCookie(w, r)
@@ -696,9 +698,11 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 
 	successResponse := func() {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"message": "If an account exists with this email, a sign-in code has been sent.",
-		})
+		}); err != nil {
+			log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+		}
 	}
 
 	account, err := models.FindAccountByEmail(email)

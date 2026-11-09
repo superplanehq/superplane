@@ -1072,7 +1072,9 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 func (s *Server) describeOrganizationCreationStatus(
@@ -1211,7 +1213,9 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	response["id"] = organization.ID.String()
 	response["slug"] = organization.Slug
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 // createInitialWorkspace provisions the first organization and workspace for
@@ -1361,10 +1365,12 @@ func findInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID) (*models.
 
 func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.Organization, workspace *models.Factory) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(initialWorkspaceResponse{
+	if err := json.NewEncoder(w).Encode(initialWorkspaceResponse{
 		OrganizationSlug: organization.Slug,
 		WorkspaceKey:     workspace.Key,
-	})
+	}); err != nil {
+		log.WithError(err).WithField("workspace_id", workspace.ID).Warn("failed to write JSON response")
+	}
 }
 
 func recordOrganizationCreated(organization *models.Organization, account *models.Account, creationPath string) {
@@ -1683,7 +1689,9 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(accountResponse)
+	if err := json.NewEncoder(w).Encode(accountResponse); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request) {
@@ -1770,7 +1778,9 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.WithError(err).WithField("path", r.URL.Path).Warn("failed to write JSON response")
+	}
 }
 
 func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
