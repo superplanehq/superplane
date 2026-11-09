@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	githubauth "github.com/google/go-github/v75/github"
+	githubauth "github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
