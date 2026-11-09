@@ -337,7 +337,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 
 	ctx.Logger.Infof("New workflow created - workflow=%s, pipeline=%s", response.WorkflowID, response.PipelineID)
 
-	ctx.Metadata.Set(RunWorkflowExecutionMetadata{
+	err = ctx.Metadata.Set(RunWorkflowExecutionMetadata{
 		Workflow: &WorkflowMetadata{
 			ID:  response.WorkflowID,
 			URL: fmt.Sprintf("%s/workflows/%s", string(client.OrgURL), response.WorkflowID),
@@ -346,6 +346,9 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 			ID: response.PipelineID,
 		},
 	})
+	if err != nil {
+		return fmt.Errorf("failed to save workflow metadata: %w", err)
+	}
 
 	//
 	// This is what allows the component to associate a semaphore webhook

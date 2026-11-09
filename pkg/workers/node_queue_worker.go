@@ -688,7 +688,9 @@ func (c *MessageCollector) Publish() {
 	}
 
 	for _, event := range c.events {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			c.logger.WithError(err).WithField("event_id", event.ID).Error("failed to publish canvas event created message")
+		}
 	}
 
 	for _, queueItem := range c.queueItemsConsumed {

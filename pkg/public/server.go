@@ -1027,7 +1027,9 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			log.WithError(err).WithField("event_id", event.ID).Error("failed to publish canvas event created message")
+		}
 	}
 }
 
@@ -2102,7 +2104,9 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			log.WithError(err).WithField("event_id", event.ID).Error("failed to publish canvas event created message")
+		}
 	}
 
 	for executionID, workflowID := range touchedExecutions {

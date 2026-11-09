@@ -203,7 +203,9 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 
 	if len(createdQueueItems) > 0 {
 		for _, queueItem := range createdQueueItems {
-			messages.NewCanvasQueueItemMessage(queueItem).PublishCreated()
+			if err := messages.NewCanvasQueueItemMessage(queueItem).PublishCreated(); err != nil {
+				logger.WithError(err).WithField("queue_item_id", queueItem.ID).Error("failed to publish queue item created message")
+			}
 		}
 	}
 

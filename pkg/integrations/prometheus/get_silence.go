@@ -114,7 +114,9 @@ func (c *GetSilence) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get silence: %w", err)
 	}
 
-	ctx.Metadata.Set(GetSilenceNodeMetadata{SilenceID: silence.ID})
+	if err := ctx.Metadata.Set(GetSilenceNodeMetadata{SilenceID: silence.ID}); err != nil {
+		return fmt.Errorf("failed to save silence metadata: %w", err)
+	}
 
 	p := getSilencePayload{
 		SilenceID: silence.ID,

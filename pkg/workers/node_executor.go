@@ -373,7 +373,9 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			w.logger.WithError(err).WithField("event_id", event.ID).Error("failed to publish canvas event created message")
+		}
 	}
 
 	for _, pendingRun := range pendingRuns {

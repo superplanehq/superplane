@@ -144,7 +144,9 @@ func (c *QueryRange) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to execute query range: %w", err)
 	}
 
-	ctx.Metadata.Set(QueryRangeNodeMetadata{Query: config.Query})
+	if err := ctx.Metadata.Set(QueryRangeNodeMetadata{Query: config.Query}); err != nil {
+		return fmt.Errorf("failed to save query range metadata: %w", err)
+	}
 
 	payload := map[string]any{
 		"resultType": data["resultType"],

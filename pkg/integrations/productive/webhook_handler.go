@@ -100,7 +100,9 @@ func (h *ProductiveWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, e
 	for _, event := range remoteWebhookEvents {
 		webhook, err := client.CreateWebhook(eventTargetURL(ctx.Webhook.GetURL(), event.eventName), event.eventID, event.eventName)
 		if err != nil {
-			h.deleteRemoteWebhooks(client, ids)
+			if cleanupErr := h.deleteRemoteWebhooks(client, ids); cleanupErr != nil {
+				ctx.Logger.WithError(cleanupErr).Error("failed to roll back Productive webhooks")
+			}
 
 			if errors.Is(err, ErrWebhooksLimitExceeded) {
 				return nil, webhooksUnavailableError(err)
@@ -115,7 +117,9 @@ func (h *ProductiveWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, e
 		ids = append(ids, webhook.ID)
 		token := strings.TrimSpace(webhook.SignatureToken)
 		if token == "" {
-			h.deleteRemoteWebhooks(client, ids)
+			if err := h.deleteRemoteWebhooks(client, ids); err != nil {
+				ctx.Logger.WithError(err).Error("failed to roll back Productive webhooks")
+			}
 			return nil, fmt.Errorf("productive.io did not return a webhook signature token")
 		}
 
@@ -126,7 +130,9 @@ func (h *ProductiveWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, e
 	}
 
 	if err := ctx.Webhook.SetSecret([]byte(strings.Join(tokens, "\n"))); err != nil {
-		h.deleteRemoteWebhooks(client, ids)
+		if cleanupErr := h.deleteRemoteWebhooks(client, ids); cleanupErr != nil {
+			ctx.Logger.WithError(cleanupErr).Error("failed to roll back Productive webhooks")
+		}
 		return nil, fmt.Errorf("error storing webhook signature token: %v", err)
 	}
 
@@ -174,11 +180,11 @@ func eventTargetURL(webhookURL, eventName string) string {
 }
 
 func (h *ProductiveWebhookHandler) deleteRemoteWebhooks(client *Client, ids []string) error {
-	var first error
+	var errs []error
 	for _, id := range ids {
-		if err := client.DeleteWebhook(id); err != nil && first == nil {
-			first = fmt.Errorf("error deleting webhook: %v", err)
+		if err := client.DeleteWebhook(id); err != nil {
+			errs = append(errs, fmt.Errorf("error deleting webhook %s: %w", id, err))
 		}
 	}
-	return first
+	return errors.Join(errs...)
 }

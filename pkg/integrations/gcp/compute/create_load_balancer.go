@@ -287,7 +287,9 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	// operation poll fails, since rollback is best-effort and ignores not-found.
 	created := &lbResources{client: client, project: project, region: region}
 	fail := func(format string, args ...any) error {
-		created.rollback(callCtx)
+		if err := created.rollback(callCtx); err != nil {
+			ctx.Logger.WithError(err).Error("failed to roll back load balancer resources")
+		}
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf(format, args...))
 	}
 
@@ -383,16 +385,21 @@ type lbResources struct {
 	healthCheck, backendService, forwardingRule string
 }
 
-func (r *lbResources) rollback(ctx context.Context) {
-	if r.forwardingRule != "" {
-		deleteAndWait(ctx, r.client, r.project, r.region, "forwardingRules", r.forwardingRule)
+func (r *lbResources) rollback(ctx context.Context) error {
+	var errs []error
+	for _, resource := range []struct{ kind, name string }{
+		{"forwardingRules", r.forwardingRule},
+		{"backendServices", r.backendService},
+		{"healthChecks", r.healthCheck},
+	} {
+		if resource.name == "" {
+			continue
+		}
+		if err := deleteAndWait(ctx, r.client, r.project, r.region, resource.kind, resource.name); err != nil {
+			errs = append(errs, fmt.Errorf("delete %s %s: %w", resource.kind, resource.name, err))
+		}
 	}
-	if r.backendService != "" {
-		deleteAndWait(ctx, r.client, r.project, r.region, "backendServices", r.backendService)
-	}
-	if r.healthCheck != "" {
-		deleteAndWait(ctx, r.client, r.project, r.region, "healthChecks", r.healthCheck)
-	}
+	return errors.Join(errs...)
 }
 
 // createAndWait POSTs a regional resource, waits for the operation, and returns
@@ -435,7 +442,7 @@ func createAndWait(ctx context.Context, client Client, project, region, kind str
 }
 
 // deleteAndWait DELETEs a regional resource and waits for the operation,
-// ignoring errors (used for best-effort rollback / teardown of shared pieces).
+// returning any deletion or operation error to the caller.
 func deleteAndWait(ctx context.Context, client Client, project, region, kind, name string) error {
 	respBody, err := client.Delete(ctx, regionalPath(project, region, kind, name))
 	if err != nil {
