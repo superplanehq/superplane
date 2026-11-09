@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -73,11 +74,9 @@ func (s *FactoryVelocitySync) SyncInProgress() bool {
 // include merges made after the first slice. An active sync state
 // stays unfinished even when the stamp is set.
 func (s *FactoryVelocitySync) RecordProgress(tx *gorm.DB, repository string, backfilledFrom, newestReadAt time.Time) error {
-	now := time.Now()
 	s.Repository = strings.TrimSpace(repository)
 	s.BackfilledFrom = &backfilledFrom
 	s.Error = ""
-	s.UpdatedAt = now
 
 	var syncedAt any
 	if newestReadAt.IsZero() {
@@ -89,49 +88,34 @@ func (s *FactoryVelocitySync) RecordProgress(tx *gorm.DB, repository string, bac
 		syncedAt = s.SyncedAt
 	}
 
-	return tx.Model(s).
-		Where("factory_id = ? AND scope_repository = ?", s.FactoryID, s.ScopeRepository).
-		Updates(map[string]any{
-			"repository":      s.Repository,
-			"synced_at":       syncedAt,
-			"backfilled_from": s.BackfilledFrom,
-			"sync_state":      s.SyncState,
-			"error":           "",
-			"updated_at":      now,
-		}).Error
+	return s.recordUpdates(tx, map[string]any{
+		"repository":      s.Repository,
+		"synced_at":       syncedAt,
+		"backfilled_from": s.BackfilledFrom,
+		"sync_state":      s.SyncState,
+		"error":           "",
+	})
 }
 
 // RecordSuccess stamps a finished sync and clears any earlier failure.
 func (s *FactoryVelocitySync) RecordSuccess(tx *gorm.DB, repository string, syncedAt, backfilledFrom time.Time) error {
-	now := time.Now()
-	s.Repository = strings.TrimSpace(repository)
-	s.SyncedAt = &syncedAt
-	s.BackfilledFrom = &backfilledFrom
-	s.Error = ""
-	s.UpdatedAt = now
-
-	return tx.Model(s).
-		Where("factory_id = ? AND scope_repository = ?", s.FactoryID, s.ScopeRepository).
-		Updates(map[string]any{
-			"repository":      s.Repository,
-			"synced_at":       s.SyncedAt,
-			"backfilled_from": s.BackfilledFrom,
-			"sync_state":      s.SyncState,
-			"error":           "",
-			"updated_at":      now,
-		}).Error
+	return s.RecordProgress(tx, repository, backfilledFrom, syncedAt)
 }
 
 // RecordError keeps synced_at untouched so the next tick retries the same
 // window, and leaves the rows a previous sync stored in place.
 func (s *FactoryVelocitySync) RecordError(tx *gorm.DB, message string) error {
-	now := time.Now()
 	s.Error = message
-	s.UpdatedAt = now
+	return s.recordUpdates(tx, map[string]any{"error": message})
+}
 
-	return tx.Model(s).
-		Where("factory_id = ? AND scope_repository = ?", s.FactoryID, s.ScopeRepository).
-		Updates(map[string]any{"error": message, "updated_at": now}).Error
+// LockClaim fences a write against cleanup or a newer lease. The caller must
+// hold this row lock until both the merges and progress commit.
+func (s *FactoryVelocitySync) LockClaim(tx *gorm.DB) error {
+	var current FactoryVelocitySync
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("factory_id = ? AND scope_repository = ? AND updated_at = ?", s.FactoryID, s.ScopeRepository, s.UpdatedAt).
+		First(&current).Error
 }
 
 // FindFactoryVelocitySync returns the sync row of a workspace. A workspace that
@@ -194,7 +178,7 @@ func ListFactoryVelocitySyncTargets(
 	limit int,
 ) ([]FactoryVelocitySyncTarget, error) {
 	var targets []FactoryVelocitySyncTarget
-	err := tx.Raw(listFactoryVelocitySyncTargetsSQL, limit).
+	err := tx.Raw(listFactoryVelocitySyncTargetsSQL).
 		Scan(&targets).Error
 	if err != nil {
 		return nil, err
@@ -214,6 +198,9 @@ func ListFactoryVelocitySyncTargets(
 				continue
 			}
 			result = append(result, candidate)
+			if limit > 0 && len(result) >= limit {
+				return result, nil
+			}
 		}
 	}
 	return result, nil
@@ -227,7 +214,6 @@ WHERE f.deleted_at IS NULL
 	AND COALESCE(f.onboarding_config->>'vcs_integration_id', '') <> ''
 	AND COALESCE(f.onboarding_config->>'app_repository', '') <> ''
 ORDER BY s.synced_at ASC NULLS FIRST
-LIMIT ?
 `
 
 // FindFactoryVelocitySyncTarget returns one workspace's sync target, whatever
@@ -318,3 +304,20 @@ SET updated_at = ?
 WHERE factory_id = ? AND scope_repository = ? AND updated_at < ?
 RETURNING factory_id, scope_repository, repository, synced_at, backfilled_from, sync_state, error, created_at, updated_at
 `
+
+func (s *FactoryVelocitySync) recordUpdates(tx *gorm.DB, updates map[string]any) error {
+	// Match PostgreSQL timestamp precision so the next slice can use this token.
+	now := time.Now().Truncate(time.Microsecond)
+	updates["updated_at"] = now
+	result := tx.Model(&FactoryVelocitySync{}).
+		Where("factory_id = ? AND scope_repository = ? AND updated_at = ?", s.FactoryID, s.ScopeRepository, s.UpdatedAt).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	s.UpdatedAt = now
+	return nil
+}

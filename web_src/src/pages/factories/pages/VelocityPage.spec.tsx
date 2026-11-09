@@ -432,6 +432,26 @@ describe("VelocityPage shell", () => {
     expect(velocityHookCalls.at(-1)).toMatchObject({ peopleOffset: 0, peopleSort: "costUsd" });
   });
 
+  it("keeps the multi-repository report visible while a new People sort loads", async () => {
+    resetState();
+    multiRepoEnabled = true;
+    try {
+      velocityHookState.data = populatedResponse({ repositories: ["acme/api", "acme/web"] });
+      velocityHookState.allPeople = manyPeople(12);
+      renderShell(FACTORY_WITH_SETUP_REPO);
+      velocityHookState.holdsPreviousReport = true;
+      velocityHookState.isFetching = true;
+
+      await userEvent.click(screen.getByRole("button", { name: "Costs" }));
+
+      expect(velocityHookCalls.at(-1)).toMatchObject({ peopleOffset: 0, peopleSort: "costUsd" });
+      expect(screen.getByTestId("velocity-summary")).toBeVisible();
+      expect(screen.queryByTestId("velocity-loading-state")).not.toBeInTheDocument();
+    } finally {
+      multiRepoEnabled = false;
+    }
+  });
+
   it("explains an empty Manual work column when GitHub is not connected", () => {
     resetState();
     velocityHookState.data = populatedResponse({

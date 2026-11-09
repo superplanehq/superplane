@@ -182,7 +182,7 @@ export function useVelocityPageModel(
     },
 
     velocity: {
-      report: holdsPreviousReport && peopleSort.offset === 0 && multiRepo ? undefined : report,
+      report,
       isLoading: isVelocityLoading,
       error: velocityError,
       refetch: () => void refetchVelocity(),

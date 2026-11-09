@@ -363,6 +363,37 @@ func Test__FindFactoryVelocitySyncTarget(t *testing.T) {
 	assert.Nil(t, missing)
 }
 
+func Test__ListFactoryVelocitySyncTargets__LimitsOnlyAvailableRepositories(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	integrationID := uuid.New().String()
+	repository := "example/repo"
+	now := time.Now()
+	for range 3 {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID, AppRepository: &repository}))
+		sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now, repository)
+		require.NoError(t, err)
+		require.NoError(t, sync.RecordError(db, "provider unavailable"))
+	}
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID, AppRepository: &repository}))
+	sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now, repository)
+	require.NoError(t, err)
+	require.NoError(t, sync.RecordSuccess(db, repository, now, now.AddDate(0, 0, -60)))
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "example/context", Access: models.FactoryContextRepoAccessWrite})
+	require.NoError(t, err)
+
+	targets, err := models.ListFactoryVelocitySyncTargets(db, now.Add(-5*time.Minute), now.Add(-15*time.Minute), 1)
+	require.NoError(t, err)
+	require.Len(t, targets, 1)
+	assert.Equal(t, factory.ID, targets[0].FactoryID)
+	assert.Equal(t, "example/context", targets[0].Repository)
+}
+
 func factoryIDs(targets []models.FactoryVelocitySyncTarget) []uuid.UUID {
 	ids := make([]uuid.UUID, 0, len(targets))
 	for _, target := range targets {

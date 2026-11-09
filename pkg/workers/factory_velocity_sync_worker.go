@@ -397,30 +397,34 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 	)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := sync.LockClaim(tx); err != nil {
+			return err
+		}
 		superplane, err := models.ListFactoryPullRequestNumbers(tx, target.FactoryID, target.Repository)
 		if err != nil {
 			return err
 		}
 
 		rows := repositoryMergeRows(target, merged, superplane)
-		return models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, effectiveVelocityProvider(target), replaceFrom, replaceTo, rows, target.Repository)
+		if err := models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, effectiveVelocityProvider(target), replaceFrom, replaceTo, rows, target.Repository); err != nil {
+			return err
+		}
+		newestReadAt := preservedNewestSliceReadAt(sync, now)
+		if syncState == models.FactoryVelocitySyncStateCatchingUp {
+			// Keep the original window start so a retry cannot move it forward.
+			newestReadAt = bitbucketCatchUpWindowStart(sync, from)
+		}
+		sync.SyncState = syncState
+		if !coverage.Complete || syncState == models.FactoryVelocitySyncStateCatchUp {
+			return sync.RecordProgress(tx, target.Repository, backfilledFrom, newestReadAt)
+		}
+		return sync.RecordSuccess(tx, target.Repository, now, backfilledFrom)
 	})
 	if err != nil {
 		return fmt.Errorf("store repository merges: %w", err)
 	}
 
-	newestReadAt := preservedNewestSliceReadAt(sync, now)
-	if syncState == models.FactoryVelocitySyncStateCatchingUp {
-		// Keep the original window start so a retry cannot move it forward.
-		newestReadAt = bitbucketCatchUpWindowStart(sync, from)
-	}
-	sync.SyncState = syncState
-	if !coverage.Complete || syncState == models.FactoryVelocitySyncStateCatchUp {
-		// A rebuild keeps the newest-slice time; a catch-up keeps its window
-		// start. Neither is a finished sync until all slices are saved.
-		return sync.RecordProgress(database.Conn(), target.Repository, backfilledFrom, newestReadAt)
-	}
-	return sync.RecordSuccess(database.Conn(), target.Repository, now, backfilledFrom)
+	return nil
 }
 
 // preservedNewestSliceReadAt is when the newest pages of this rebuild were

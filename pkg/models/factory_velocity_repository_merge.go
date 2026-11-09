@@ -152,16 +152,19 @@ func ReconcileFactoryVelocityRepositories(tx *gorm.DB, factoryID uuid.UUID, repo
 	for _, repository := range repositories {
 		canonical = append(canonical, CanonicalContextRepo(repository))
 	}
-	merges := tx.Where("factory_id = ?", factoryID)
-	syncs := tx.Where("factory_id = ? AND scope_repository <> ''", factoryID)
-	if len(canonical) > 0 {
-		merges = merges.Where("repository NOT IN ?", canonical)
-		syncs = syncs.Where("scope_repository NOT IN ?", canonical)
-	}
-	if err := merges.Delete(&FactoryVelocityRepositoryMerge{}).Error; err != nil {
-		return err
-	}
-	return syncs.Delete(&FactoryVelocitySync{}).Error
+	return tx.Transaction(func(tx *gorm.DB) error {
+		merges := tx.Where("factory_id = ?", factoryID)
+		syncs := tx.Where("factory_id = ? AND scope_repository <> ''", factoryID)
+		if len(canonical) > 0 {
+			merges = merges.Where("repository NOT IN ?", canonical)
+			syncs = syncs.Where("scope_repository NOT IN ?", canonical)
+		}
+		// Lock progress before history, in the same order as a worker's save.
+		if err := syncs.Delete(&FactoryVelocitySync{}).Error; err != nil {
+			return err
+		}
+		return merges.Delete(&FactoryVelocityRepositoryMerge{}).Error
+	})
 }
 
 // DeleteFactoryVelocityRepositoryMerges drops every stored merge of a workspace.
