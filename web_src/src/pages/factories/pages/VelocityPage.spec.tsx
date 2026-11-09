@@ -35,7 +35,43 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => factoryWorkOrdersHookResult(),
 }));
 
+let multiRepoEnabled = false;
+vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => multiRepoEnabled }) }));
+
 describe("VelocityPage shell", () => {
+  it("filters enabled repositories and resets people pagination", async () => {
+    resetState();
+    multiRepoEnabled = true;
+    try {
+      velocityHookState.data = populatedResponse({ repositories: ["acme/api", "acme/web"] });
+      velocityHookState.allPeople = manyPeople(12);
+      renderShell(FACTORY_WITH_SETUP_REPO);
+      expect(velocityHookCalls.at(-1)?.repository).toBeUndefined();
+      await userEvent.click(screen.getByRole("button", { name: /show more/i }));
+      await userEvent.click(screen.getByRole("combobox", { name: "Repository" }));
+      await userEvent.click(screen.getByRole("option", { name: "acme/web" }));
+      expect(velocityHookCalls.at(-1)).toMatchObject({ repository: "acme/web", peopleOffset: 0 });
+      expect(screen.getByTestId("velocity-people")).not.toHaveTextContent("Contributor 12");
+      await userEvent.click(screen.getByRole("combobox", { name: "Repository" }));
+      await userEvent.click(screen.getByRole("option", { name: "All repositories" }));
+      expect(velocityHookCalls.at(-1)?.repository).toBeUndefined();
+      await userEvent.click(screen.getByRole("combobox", { name: "Repository" }));
+      await userEvent.click(screen.getByRole("option", { name: "acme/web" }));
+      velocityHookState.data = populatedResponse({ repositories: ["acme/api"] });
+      await userEvent.click(screen.getByRole("tab", { name: "14d" }));
+      expect(velocityHookCalls.at(-1)?.repository).toBeUndefined();
+      expect(screen.getByRole("combobox", { name: "Repository" })).toHaveTextContent("All repositories");
+    } finally {
+      multiRepoEnabled = false;
+    }
+  });
+
+  it("keeps the primary request without a repository selector when the flag is disabled", () => {
+    resetState();
+    renderShell(FACTORY_WITH_SETUP_REPO);
+    expect(velocityHookCalls.at(-1)?.repository).toBe("acme/api");
+    expect(screen.queryByRole("combobox", { name: "Repository" })).not.toBeInTheDocument();
+  });
   it("sets the document title from the page and workspace name", () => {
     resetState();
     renderShell();
@@ -394,6 +430,26 @@ describe("VelocityPage shell", () => {
 
     expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
     expect(velocityHookCalls.at(-1)).toMatchObject({ peopleOffset: 0, peopleSort: "costUsd" });
+  });
+
+  it("keeps the multi-repository report visible while a new People sort loads", async () => {
+    resetState();
+    multiRepoEnabled = true;
+    try {
+      velocityHookState.data = populatedResponse({ repositories: ["acme/api", "acme/web"] });
+      velocityHookState.allPeople = manyPeople(12);
+      renderShell(FACTORY_WITH_SETUP_REPO);
+      velocityHookState.holdsPreviousReport = true;
+      velocityHookState.isFetching = true;
+
+      await userEvent.click(screen.getByRole("button", { name: "Costs" }));
+
+      expect(velocityHookCalls.at(-1)).toMatchObject({ peopleOffset: 0, peopleSort: "costUsd" });
+      expect(screen.getByTestId("velocity-summary")).toBeVisible();
+      expect(screen.queryByTestId("velocity-loading-state")).not.toBeInTheDocument();
+    } finally {
+      multiRepoEnabled = false;
+    }
   });
 
   it("explains an empty Manual work column when GitHub is not connected", () => {

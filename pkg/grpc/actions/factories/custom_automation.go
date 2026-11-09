@@ -470,8 +470,15 @@ func buildCustomAutomationCanvas(
 		return nil, invalidArgument("workspace VCS integration is required")
 	}
 	provider := config.EffectiveVCSProvider()
+	workspaceScope, err := customAutomationListensOnWorkspace(tx, factory)
+	if err != nil {
+		return nil, err
+	}
+	if workspaceScope {
+		repository = models.WorkspaceRepositoriesExpression
+	}
 	if len(settings.Triggers) > 1 {
-		return buildMultiTriggerCustomAutomationCanvas(tx, factory, name, settings, repository, integrationID, provider)
+		return buildMultiTriggerCustomAutomationCanvas(tx, factory, name, settings, repository, integrationID, provider, workspaceScope)
 	}
 	mode := customAutomationStartModeName(settings.StartMode)
 	metadata := models.FactoryAppTemplateMetadataFor(
@@ -509,7 +516,7 @@ func buildCustomAutomationCanvas(
 	}
 	runnerConfiguration := customAutomationRunnerConfiguration(
 		tx, factory, settings,
-		customAutomationCheckoutEnvironment(factory, settings.StartMode, githubHostForFactory(tx, factory)),
+		customAutomationCheckoutEnvironment(factory, settings.StartMode, githubHostForFactory(tx, factory), workspaceScope),
 	)
 
 	doc := &yaml.Canvas{
@@ -574,6 +581,7 @@ func buildMultiTriggerCustomAutomationCanvas(
 	name string,
 	settings *customAutomationSettings,
 	repository, integrationID, provider string,
+	workspaceScope bool,
 ) (*yaml.Canvas, error) {
 	githubHost := githubHostForFactory(tx, factory)
 	backlog := settings.ColumnKey == models.CanvasColumnKeyBacklog
@@ -619,7 +627,7 @@ func buildMultiTriggerCustomAutomationCanvas(
 		if provider == models.ProviderGitHub {
 			taskConfiguration["ignoreDrafts"] = true
 		}
-		taskEnvironment := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_MANUAL, githubHost)
+		taskEnvironment := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_MANUAL, githubHost, workspaceScope)
 		runnerName := "Verify"
 		if backlog {
 			taskTriggerID = customAutomationTaskTriggerID
@@ -693,7 +701,7 @@ func buildMultiTriggerCustomAutomationCanvas(
 		if !shareRunner {
 			scheduleConfiguration := customAutomationRunnerConfiguration(
 				tx, factory, settings,
-				customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHost),
+				customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHost, false),
 			)
 			runnerName := "Run schedule"
 			if !hasTask {
@@ -873,8 +881,33 @@ func stripBacklogTaskInstructions(prompt string) string {
 	return prompt
 }
 
-func customAutomationCheckoutEnvironment(factory *models.Factory, mode pb.FactoryCustomAutomation_StartMode, githubHost string) []any {
+// customAutomationListensOnWorkspace reports whether a pull request
+// automation listens on every workspace repository. A Bitbucket workspace
+// does so only with multi-repo tasks.
+func customAutomationListensOnWorkspace(tx *gorm.DB, factory *models.Factory) (bool, error) {
+	switch factory.OnboardingConfigValue().EffectiveVCSProvider() {
+	case models.ProviderGitHub:
+		return true, nil
+	case models.ProviderBitbucket:
+		return factory.MultiRepoTasksEnabled(tx)
+	}
+	return false, nil
+}
+
+// customAutomationCheckoutEnvironment checks out the pull request that
+// started the run. A pull request automation that listens on every workspace
+// repository reads the repository from the event.
+func customAutomationCheckoutEnvironment(factory *models.Factory, mode pb.FactoryCustomAutomation_StartMode, githubHost string, workspaceScope bool) []any {
 	config := factory.OnboardingConfigValue()
+	if workspaceScope && mode != pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		return []any{
+			checkoutEnvironmentVar("REPO", prFeedbackEventRepositoryExpression),
+			checkoutEnvironmentVar("REPO_URL", runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), prFeedbackEventRepositoryExpression, githubHost)),
+			checkoutEnvironmentVar("SOURCE_REPO", prFeedbackEventRepositoryExpression),
+			checkoutEnvironmentVar("PR_NUMBER", prFeedbackPRNumberExpression()),
+			checkoutEnvironmentVar("PR_HEAD", prFeedbackPRHeadExpression()),
+		}
+	}
 	repository := strings.TrimSpace(config.AppRepository)
 	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository, githubHost)
 	env := []any{

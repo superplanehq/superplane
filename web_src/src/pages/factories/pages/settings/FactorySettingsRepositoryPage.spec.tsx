@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import {
@@ -161,6 +162,74 @@ describe("FactorySettingsRepositoryPage", () => {
       globalThis.fetch = currentFetch;
     }
   }, 10000);
+
+  it.each(["workspace/repository", "repository", "repositories"])(
+    "opens Agent from settings/%s when multi-repo is enabled without mounting the legacy editor",
+    async (path) => {
+      const mountedLegacyElements: Element[] = [];
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (!(node instanceof Element)) continue;
+            if (node.matches('[data-testid="factory-settings-repository"]')) mountedLegacyElements.push(node);
+            mountedLegacyElements.push(...node.querySelectorAll('[data-testid="factory-settings-repository"]'));
+          }
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      try {
+        render(
+          <FactoriesHarness
+            pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/${path}`}
+            factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent)}
+            orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+            experimentalFeatures={[FEATURE_FACTORY_MULTI_REPO_TASKS]}
+          />,
+        );
+
+        expect(await screen.findByTestId("factory-settings-agent")).toBeInTheDocument();
+        expect(mountedLegacyElements).toHaveLength(0);
+        expect(screen.queryByTestId("factory-settings-repository-save")).not.toBeInTheDocument();
+      } finally {
+        observer.disconnect();
+      }
+    },
+  );
+
+  it("waits for a delayed feature lookup before opening Agent", async () => {
+    const currentFetch = globalThis.fetch;
+    let releaseFeatures = () => {};
+    const featuresReady = new Promise<void>((resolve) => {
+      releaseFeatures = resolve;
+    });
+    let requestedFeatures = false;
+    globalThis.fetch = async (input, init) => {
+      if (requestTarget(input).includes("/account/experimental-features")) {
+        requestedFeatures = true;
+        await featuresReady;
+      }
+      return currentFetch(input, init);
+    };
+    try {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/repository`}
+          factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent)}
+          orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+          experimentalFeatures={[FEATURE_FACTORY_MULTI_REPO_TASKS]}
+        />,
+      );
+      await waitFor(() => expect(requestedFeatures).toBe(true));
+      expect(screen.queryByTestId("factory-settings-repository")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("factory-settings-repository-save")).not.toBeInTheDocument();
+      releaseFeatures();
+      expect(await screen.findByTestId("factory-settings-agent")).toBeInTheDocument();
+      expect(screen.queryByTestId("factory-settings-repository")).not.toBeInTheDocument();
+    } finally {
+      releaseFeatures();
+      globalThis.fetch = currentFetch;
+    }
+  });
 });
 
 function requestTarget(input: RequestInfo | URL): string {

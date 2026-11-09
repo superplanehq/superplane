@@ -209,6 +209,9 @@ func UpdateFactoryRepository(
 		}
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
+	// Workspace-scope triggers keep the same expression, so only a new Setup
+	// moves their webhooks to the new primary repository.
+	refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
 
 	lines, err := factory.ListLines(db)
 	if err != nil {
@@ -482,7 +485,7 @@ func refreshCustomAutomationCheckout(node *models.Node, factory *models.Factory,
 	if checkoutNamesUseExpressions(current, "REPO", "BASE") && !shared {
 		return false
 	}
-	checkout := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHost)
+	checkout := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHost, false)
 	if shared {
 		checkout = backlogSharedCheckoutEnvironment(factory, githubHost)
 	}

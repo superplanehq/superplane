@@ -99,6 +99,10 @@ spec:
                 name: {{ include "secrets.session.name" . }}
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
+            {{- if .Values.sentryApp.secretName }}
+            - secretRef:
+                name: {{ include "secrets.sentryApp.name" . }}
+            {{- end }}
             - secretRef:
                 name: {{ include "secrets.dash0Web.name" . }}
             {{- if .Values.posthog.enabled }}

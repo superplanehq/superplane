@@ -10,19 +10,16 @@ import {
   AlertDialogTitle,
 } from "@/ui/alertDialog";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { cn } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { Check, ChevronDown } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { RepositoryPicker } from "../onboarding/onboardingSteps";
 import type { VcsHostId } from "../onboarding/onboardingFixtures";
 
+import { BranchPicker } from "./BranchPicker";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { useFactoryRepositoryDraft } from "./useFactoryRepositoryDraft";
@@ -266,7 +263,7 @@ function DefaultBranchControl(props: {
   onChange: (branch: string) => void;
 }) {
   if (props.listedBranchNames.length > 0) {
-    return <BranchPicker {...props} />;
+    return <BranchPicker id={BRANCH_FIELD_ID} {...props} />;
   }
   return (
     <Input
@@ -276,57 +273,5 @@ function DefaultBranchControl(props: {
       onChange={(event) => props.onChange(event.target.value)}
       data-testid={BRANCH_FIELD_ID}
     />
-  );
-}
-
-function BranchPicker(props: {
-  branch: string;
-  choices: string[];
-  disabled: boolean;
-  onChange: (branch: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const selectBranch = (name: string) => {
-    props.onChange(name);
-    setOpen(false);
-  };
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          id={BRANCH_FIELD_ID}
-          role="combobox"
-          aria-expanded={open}
-          aria-haspopup="listbox"
-          disabled={props.disabled}
-          data-testid={BRANCH_FIELD_ID}
-          className="w-full justify-between rounded-md px-2.5 font-normal"
-        >
-          <span className={cn("min-w-0 truncate", props.branch ? "text-foreground" : "text-muted-foreground")}>
-            {props.branch || "Select a branch"}
-          </span>
-          <ChevronDown className="size-4 shrink-0 opacity-50" aria-hidden />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
-        <Command>
-          <CommandInput placeholder="Find a branch" autoFocus />
-          <CommandList>
-            <CommandEmpty>No branch found.</CommandEmpty>
-            <CommandGroup>
-              {props.choices.map((name) => (
-                <CommandItem key={name} value={name} onSelect={() => selectBranch(name)}>
-                  <span className="min-w-0 flex-1 truncate">{name}</span>
-                  <Check className={cn("size-4", name === props.branch ? "opacity-100" : "opacity-0")} aria-hidden />
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
   );
 }

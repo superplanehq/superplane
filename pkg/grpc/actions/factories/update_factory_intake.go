@@ -433,7 +433,21 @@ func applyIntakeBindingToGraph(
 
 	boundID := binding.integrationRef().ID
 	for i := range nodes {
-		if nodes[i].ID != graph.TriggerNodeID {
+		if nodes[i].ID != graph.TriggerNodeID && nodes[i].ID != graph.EnrichIssueNodeID &&
+			nodes[i].ID != graph.SentryIssueRequestNodeID && nodes[i].ID != graph.SentryEventRequestNodeID && nodes[i].ID != graph.SentryRecommendedEventRequestNodeID {
+			continue
+		}
+		if nodes[i].ID == graph.SentryIssueRequestNodeID || nodes[i].ID == graph.SentryEventRequestNodeID || nodes[i].ID == graph.SentryRecommendedEventRequestNodeID {
+			configuration := maps.Clone(nodes[i].Configuration)
+			if configuration == nil {
+				configuration = map[string]any{}
+			}
+			configuration["authorization"] = sentryRequestAuthorization(binding)
+			nodes[i].Configuration = configuration
+			continue
+		}
+		if nodes[i].ID == graph.EnrichIssueNodeID {
+			nodes[i].IntegrationID = &boundID
 			continue
 		}
 		configuration := maps.Clone(nodes[i].Configuration)

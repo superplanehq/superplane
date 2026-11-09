@@ -498,6 +498,8 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
 		exprruntime.DateFunctionOption(),
+		exprruntime.SentryIssueDescriptionOption(),
+		exprruntime.SentryEventHasStackOption(),
 		expr.Function("root", func(params ...any) (any, error) {
 			if len(params) != 0 {
 				return nil, fmt.Errorf("root() takes no arguments")
@@ -1030,12 +1032,17 @@ func (b *NodeConfigurationBuilder) resolveWorkspacePayload() (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("workspace() could not resolve the current workspace: %w", err)
 	}
+	repositories, err := factory.WorkspaceRepositories(b.tx)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not list the workspace repositories: %w", err)
+	}
 	config := factory.OnboardingConfigValue()
 	return map[string]any{
 		"id":                 factory.ID.String(),
 		"key":                factory.Key,
 		"name":               factory.Name,
 		"repository":         config.AppRepository,
+		"repositories":       repositories,
 		"backlog_repository": config.BacklogRepository,
 		"default_branch":     config.DefaultBranch,
 	}, nil

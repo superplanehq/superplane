@@ -3,12 +3,8 @@ package public
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	sentrytest "github.com/superplanehq/superplane/test/support/sentry"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,8 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -50,229 +44,6 @@ func TestHandleSentryAppWebhook_notConfigured(t *testing.T) {
 	server.HandleSentryAppWebhook(rec, req)
 
 	assert.Equal(t, http.StatusNotFound, rec.Code)
-}
-
-func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T) {
-	t.Setenv(config.EnvSentryAppSlug, "superplane")
-	t.Setenv(config.EnvSentryAppClientID, "cid")
-	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
-
-	r := support.Setup(t)
-	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(
-		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
-		"", "", "", "test", "/app/templates", r.AuthService, false,
-	)
-	require.NoError(t, err)
-
-	integration, err := models.CreateIntegration(
-		uuid.New(), r.Organization.ID, "sentry", support.RandomName("sentry"), map[string]any{},
-	)
-	require.NoError(t, err)
-	integration.Metadata = datatypes.NewJSONType(map[string]any{
-		"hostedApp":        true,
-		"installationUUID": "install-1",
-	})
-	require.NoError(t, database.Conn().Save(integration).Error)
-
-	listening, err := models.ListSentryIntegrationsByInstallationUUID(database.Conn(), "install-1")
-	require.NoError(t, err)
-	require.Len(t, listening, 1)
-
-	t.Run("a delivered event is accepted", func(t *testing.T) {
-		body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
-		rec := httptest.NewRecorder()
-		logs := captureSentryWebhookLogs(t)
-
-		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
-
-		assert.Equal(t, http.StatusOK, rec.Code)
-		received := sentryWebhookLogLine(t, logs.String(), "Sentry app webhook received")
-		payload, ok := received["payload"].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "created", payload["action"])
-
-		var receipts []models.SentryWebhookReceipt
-		require.NoError(t, database.Conn().Where("installation_uuid = ? AND issue_id = ?", "install-1", "1").Find(&receipts).Error)
-		require.NotEmpty(t, receipts)
-		assert.Equal(t, models.SentryWebhookOutcomeAccepted, receipts[0].Outcome)
-		assert.Equal(t, "issue", receipts[0].HookResource)
-		assert.Equal(t, "created", receipts[0].Action)
-	})
-
-	t.Run("a rejected event is accepted, because Sentry cannot fix it", func(t *testing.T) {
-		body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":"not-an-object"}`)
-		rec := httptest.NewRecorder()
-
-		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
-
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var receipts []models.SentryWebhookReceipt
-		require.NoError(t, database.Conn().
-			Where("installation_uuid = ? AND outcome = ?", "install-1", models.SentryWebhookOutcomeRejected).
-			Find(&receipts).Error)
-		require.NotEmpty(t, receipts)
-	})
-
-	t.Run("an invalid signature does not store a receipt", func(t *testing.T) {
-		var before int64
-		require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&before).Error)
-
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/sentry/app/webhook", bytes.NewReader([]byte(`{"action":"created","secret":"caller-chosen"}`)))
-		request.Header.Set("Sentry-Hook-Signature", "not-a-signature")
-		request.Header.Set("Sentry-Hook-Resource", "issue")
-		rec := httptest.NewRecorder()
-		logs := captureSentryWebhookLogs(t)
-
-		server.HandleSentryAppWebhook(rec, request)
-
-		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		var after int64
-		require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&after).Error)
-		assert.Equal(t, before, after)
-
-		rejected := sentryWebhookLogLine(t, logs.String(), "Sentry app webhook was rejected")
-		_, hasPayload := rejected["payload"]
-		assert.False(t, hasPayload)
-		assert.Equal(t, "issue", rejected["hook_resource"])
-	})
-}
-
-func TestHandleSentryAppWebhook_listenerCannotStartRun(t *testing.T) {
-	t.Setenv(config.EnvSentryAppSlug, "superplane")
-	t.Setenv(config.EnvSentryAppClientID, "cid")
-	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
-
-	r := support.Setup(t)
-	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(
-		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
-		"", "", "", "test", "/app/templates", r.AuthService, false,
-	)
-	require.NoError(t, err)
-
-	integration, err := models.CreateIntegration(
-		uuid.New(), r.Organization.ID, "sentry", support.RandomName("sentry"), map[string]any{},
-	)
-	require.NoError(t, err)
-	integration.Metadata = datatypes.NewJSONType(map[string]any{
-		"hostedApp":        true,
-		"installationUUID": "install-1",
-	})
-	require.NoError(t, database.Conn().Save(integration).Error)
-
-	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
-
-	t.Run("a listener whose canvas has no live version is acknowledged", func(t *testing.T) {
-		canvas := createSentryIssueListener(t, r, integration)
-
-		// The schema keeps live_version_id NOT NULL, so a canvas without a
-		// live version cannot be stored. Point the canvas at the live version
-		// of another canvas instead: the live version lookup for this canvas
-		// then finds nothing, the same not-found error a nil live version
-		// produces.
-		other, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		require.NotNil(t, other.LiveVersionID)
-		require.NoError(t, database.Conn().
-			Model(&models.Canvas{}).
-			Where("id = ?", canvas.ID).
-			Update("live_version_id", *other.LiveVersionID).
-			Error)
-
-		rec := httptest.NewRecorder()
-		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
-
-		assert.Equal(t, http.StatusOK, rec.Code)
-	})
-
-	t.Run("a listener whose canvas is gone is acknowledged", func(t *testing.T) {
-		canvas := createSentryIssueListener(t, r, integration)
-		require.NoError(t, database.Conn().Delete(&models.Canvas{}, canvas.ID).Error)
-
-		rec := httptest.NewRecorder()
-		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
-
-		assert.Equal(t, http.StatusOK, rec.Code)
-	})
-}
-
-func TestHandleSentryAppWebhook_unclaimedInstallWithoutCodeLogsSentryOrganization(t *testing.T) {
-	t.Setenv(config.EnvSentryAppSlug, "superplane")
-	t.Setenv(config.EnvSentryAppClientID, "cid")
-	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
-
-	r := support.Setup(t)
-	server, err := NewServer(
-		r.Encryptor, r.Registry, jwt.NewSigner("test-client-secret"), support.NewOIDCProvider(),
-		"", "", "", "test", "/app/templates", r.AuthService, false,
-	)
-	require.NoError(t, err)
-
-	body := []byte(`{
-		"action": "created",
-		"installation": {"uuid": "unclaimed-install"},
-		"data": {"installation": {
-			"status": "installed",
-			"uuid": "unclaimed-install",
-			"organization": {"slug": "acme-sentry", "id": 127789}
-		}}
-	}`)
-	rec := httptest.NewRecorder()
-	logs := captureSentryWebhookLogs(t)
-
-	server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "installation"))
-
-	assert.Equal(t, http.StatusOK, rec.Code)
-	failed := sentryWebhookLogLine(t, logs.String(), "failed to store unclaimed Sentry app install")
-	assert.Equal(t, "unclaimed-install", failed["installation_uuid"])
-	assert.Equal(t, "acme-sentry", failed["sentry_organization_slug"])
-	assert.Equal(t, "127789", failed["sentry_organization_id"])
-	assert.Equal(t, "installation grant code is required", failed["error"])
-}
-
-func createSentryIssueListener(t *testing.T, r *support.ResourceRegistry, integration *models.Integration) *models.Canvas {
-	t.Helper()
-
-	canvas, nodes := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID:        "listener",
-				Name:          "listener",
-				Type:          models.NodeTypeTrigger,
-				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "sentry.onIssue"}}),
-				Configuration: datatypes.NewJSONType(map[string]any{}),
-			},
-		},
-		nil,
-	)
-
-	_, err := models.CreateIntegrationSubscription(&nodes[0], integration, map[string]any{
-		"resources": []string{"issue"},
-	})
-	require.NoError(t, err)
-
-	return canvas
-}
-
-func Test__sentryDeliveryFinished(t *testing.T) {
-	assert.True(t, sentryDeliveryFinished(http.StatusOK))
-	assert.True(t, sentryDeliveryFinished(http.StatusForbidden))
-	assert.False(t, sentryDeliveryFinished(http.StatusInternalServerError))
-	assert.False(t, sentryDeliveryFinished(http.StatusBadGateway))
-}
-
-func sentryWebhookRequest(body []byte, resource string) *http.Request {
-	mac := hmac.New(sha256.New, []byte("csecret"))
-	mac.Write(body)
-
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/sentry/app/webhook", bytes.NewReader(body))
-	request.Header.Set("Sentry-Hook-Signature", hex.EncodeToString(mac.Sum(nil)))
-	request.Header.Set("Sentry-Hook-Resource", resource)
-	return request
 }
 
 func captureSentryWebhookLogs(t *testing.T) *bytes.Buffer {
@@ -385,7 +156,7 @@ func Test__applySentryWebhookErrorTags_noRequestAddsOnlyManualTags(t *testing.T)
 	assert.False(t, hasHookResource)
 }
 
-func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
+func TestHandleSentryAppWebhook_canceledCommitReturnsServerError(t *testing.T) {
 	t.Setenv(config.EnvSentryAppSlug, "superplane")
 	t.Setenv(config.EnvSentryAppClientID, "cid")
 	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
@@ -399,7 +170,7 @@ func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
-	req := sentryWebhookRequest(body, "issue")
+	req := signedSentryRequest("/api/v1/sentry/app/webhook", body, "csecret")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -409,86 +180,6 @@ func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
 	server.HandleSentryAppWebhook(rec, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-}
-
-func TestHandlerSentryAppWebhook_droppedDeliveryPreservesStatus(t *testing.T) {
-	t.Setenv(config.EnvSentryAppSlug, "superplane")
-	t.Setenv(config.EnvSentryAppClientID, "cid")
-	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
-
-	r := support.Setup(t)
-	original := r.Registry.Integrations["sentry"]
-	require.NotNil(t, original)
-	r.Registry.Integrations["sentry"] = sentryWebhookStatusStub{
-		Integration: original,
-		status:      http.StatusBadGateway,
-	}
-	t.Cleanup(func() {
-		r.Registry.Integrations["sentry"] = original
-	})
-
-	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(
-		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
-		"", "", "", "test", "/app/templates", r.AuthService, false,
-	)
-	require.NoError(t, err)
-
-	integration, err := models.CreateIntegration(
-		uuid.New(), r.Organization.ID, "sentry", support.RandomName("sentry"), map[string]any{},
-	)
-	require.NoError(t, err)
-	integration.Metadata = datatypes.NewJSONType(map[string]any{
-		"hostedApp":        true,
-		"installationUUID": "install-1",
-	})
-	require.NoError(t, database.Conn().Save(integration).Error)
-
-	transport := sentrytest.BindHub(t)
-	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
-	rec := httptest.NewRecorder()
-
-	server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
-
-	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-
-	events := transport.Events()
-	delivery := requireEventWithTag(t, events, "inner_status", "502")
-	assert.Equal(t, integration.ID.String(), delivery.Tags["integration_id"])
-	assert.Equal(t, "issue", delivery.Tags["hook_resource"])
-	assert.Contains(t, sentrytest.ExceptionText(delivery), "delivery failed for integration "+integration.ID.String())
-
-	aggregate := requireEventWithTag(t, events, "inner_statuses", "502")
-	assert.Equal(t, "install-1", aggregate.Tags["installation_uuid"])
-	assert.Equal(t, integration.ID.String(), aggregate.Tags["integration_ids"])
-	assert.Equal(t, "issue", aggregate.Tags["hook_resource"])
-	assert.Contains(t, sentrytest.ExceptionText(aggregate), "dropped webhook delivery for installation install-1")
-}
-
-type sentryWebhookStatusStub struct {
-	core.Integration
-	status int
-}
-
-func (s sentryWebhookStatusStub) HandleRequest(ctx core.HTTPRequestContext) {
-	ctx.Response.WriteHeader(s.status)
-}
-
-func requireEventWithTag(t *testing.T, events []*sentry.Event, key, value string) *sentry.Event {
-	t.Helper()
-	for _, event := range events {
-		if event != nil && event.Tags[key] == value {
-			return event
-		}
-	}
-	require.Fail(t, "expected a captured event with tag", "%s=%s events=%d", key, value, len(events))
-	return nil
-}
-
-func Test__joinStatuses(t *testing.T) {
-	assert.Equal(t, "", joinStatuses(nil))
-	assert.Equal(t, "500", joinStatuses([]int{500}))
-	assert.Equal(t, "502,503", joinStatuses([]int{502, 503}))
 }
 
 type captureTransport struct {

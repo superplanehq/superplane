@@ -11,7 +11,6 @@ import {
   FactorySettingsConnectPage,
   FactorySettingsMCPPage,
   FactorySettingsSkillsPage,
-  FactorySettingsRepositoryPage,
   OrganizationSettingsOverviewPage,
 } from "@/pages/factories";
 import {
@@ -46,6 +45,7 @@ import { BillingProductSettingsRoute } from "@/pages/factories/pages/settings/Bi
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
 import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
 import { FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCodexUsagePage";
+import { LegacyRepositorySettingsRoute } from "./LegacyRepositorySettingsRoute";
 
 export const factorySettingsSectionRoutes = [
   ...(
@@ -118,7 +118,7 @@ export const factorySettingsSectionRoutes = [
     path="workspace/repository"
     element={
       <RequirePermission resource="factories" action="update">
-        <FactorySettingsRepositoryPage />
+        <LegacyRepositorySettingsRoute />
       </RequirePermission>
     }
   />,

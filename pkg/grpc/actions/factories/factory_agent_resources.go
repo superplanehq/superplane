@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -68,11 +70,14 @@ func CreateFactoryAgentResource(
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
 
-	config, err := protoAgentResourceConfig(req.GetKind(), req.GetUrl(), req.GetAuth(), req.GetHeaders(), req.GetMarkdown(), req.GetRepository(), req.GetCommands(), req.GetVcsProvider())
+	config, err := protoAgentResourceConfig(req)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
-	if err := authorizeContextRepository(ctx, db, organizationID, factory, config); err != nil {
+	if err := requireContextRepoAccess(factory, req.GetKind(), req.GetAccess()); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create agent resource")
+	}
+	if err := authorizeContextRepository(ctx, db, deps, organizationID, factory, config); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
 	resource, err := factory.CreateAgentResource(
@@ -84,6 +89,9 @@ func CreateFactoryAgentResource(
 	)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
+	}
+	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
+		refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
 	}
 	if resource.Kind == models.FactoryAgentResourceKindMCPServer && resource.Config.Data().MCPAuth() == models.FactoryAgentResourceAuthHeaders {
 		applyDefaultMCPWriteTools(ctx, deps, db, resource)
@@ -143,13 +151,22 @@ func UpdateFactoryAgentResource(
 			config = &merged
 		}
 	} else if resource.Kind == models.FactoryAgentResourceKindContextRepo {
-		if req.Repository != nil || req.VcsProvider != nil {
+		if req.Repository != nil || req.VcsProvider != nil || req.Ref != nil || req.Access != nil {
 			merged := resource.Config.Data()
 			if req.Repository != nil {
 				merged.Repository = req.GetRepository()
 			}
 			if req.VcsProvider != nil {
 				merged.VCSProvider = req.GetVcsProvider()
+			}
+			if req.Ref != nil {
+				merged.Ref = req.GetRef()
+			}
+			if req.Access != nil {
+				if err := requireContextRepoAccess(factory, pb.FactoryAgentResource_KIND_CONTEXT_REPO, req.GetAccess()); err != nil {
+					return nil, factoryErrorToStatus(err, "failed to update agent resource")
+				}
+				merged.Access = req.GetAccess()
 			}
 			config = &merged
 		}
@@ -179,7 +196,7 @@ func UpdateFactoryAgentResource(
 		if config != nil {
 			merged = *config
 		}
-		if err := authorizeContextRepository(ctx, db, organizationID, factory, merged); err != nil {
+		if err := authorizeContextRepository(ctx, db, deps, organizationID, factory, merged); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update agent resource")
 		}
 	}
@@ -192,22 +209,29 @@ func UpdateFactoryAgentResource(
 		return nil, factoryErrorToStatus(err, "failed to update agent resource")
 	}
 	revocation.run(ctx, deps)
+	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
+		refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
+	}
 	return &pb.UpdateFactoryAgentResourceResponse{Resource: serializeFactoryAgentResource(resource)}, nil
 }
 
 // authorizeContextRepository rejects a GitHub context repository the caller
-// cannot access. The read token later covers every saved name on the
+// cannot access. The write token later covers every saved name on the
 // installation, so the save must use the same access check as workspace
 // repository selection. Workspaces that are not connected yet do not receive
 // that token.
 func authorizeContextRepository(
 	ctx context.Context,
 	db *gorm.DB,
+	deps IntakeDependencies,
 	organizationID string,
 	factory *models.Factory,
 	config models.FactoryAgentResourceConfig,
 ) error {
 	provider := strings.ToLower(strings.TrimSpace(config.VCSProvider))
+	if provider == models.ProviderBitbucket {
+		return authorizeBitbucketContextRepository(db, deps, factory, config)
+	}
 	if provider != "" && provider != models.ProviderGitHub {
 		return nil
 	}
@@ -225,7 +249,7 @@ func authorizeContextRepository(
 	binding, err := models.FindVCSProviderIntegrationBinding(db, bindingID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// A personal token or a customer GitHub App has no installation
-		// binding. Those automations do not receive the read-only token.
+		// binding. Its token already covers the whole installation.
 		return nil
 	}
 	if err != nil {
@@ -246,6 +270,37 @@ func authorizeContextRepository(
 		return grpcerrors.PermissionDenied(nil, "repository is not accessible")
 	}
 	return nil
+}
+
+// authorizeBitbucketContextRepository rejects a Read & Write Bitbucket
+// repository that the workspace token cannot reach. Bitbucket tokens cannot
+// be limited to some repositories, so agents push with the workspace token.
+// A repository access token reaches only its own repository.
+func authorizeBitbucketContextRepository(
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	config models.FactoryAgentResourceConfig,
+) error {
+	if !config.ContextRepoWritable() || strings.TrimSpace(config.Repository) == "" {
+		return nil
+	}
+	if strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID) == "" {
+		return nil
+	}
+	client, err := newFactoryBitbucketAPI(db, deps, factory)
+	if err != nil {
+		return err
+	}
+	if client.AuthType == bitbucketintegration.AuthTypeRepositoryAccessToken {
+		return grpcerrors.PermissionDenied(nil, "a repository access token cannot change other repositories")
+	}
+	_, err = client.GetRepository(config.Repository)
+	var apiError *bitbucketintegration.APIError
+	if errors.As(err, &apiError) && (apiError.StatusCode == http.StatusForbidden || apiError.StatusCode == http.StatusNotFound) {
+		return grpcerrors.PermissionDenied(err, "repository is not accessible")
+	}
+	return err
 }
 
 func DeleteFactoryAgentResource(
@@ -279,6 +334,9 @@ func DeleteFactoryAgentResource(
 		return nil, factoryErrorToStatus(err, "failed to delete agent resource")
 	}
 	revocation.run(ctx, deps)
+	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
+		refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
+	}
 	return &pb.DeleteFactoryAgentResourceResponse{}, nil
 }
 
@@ -314,6 +372,8 @@ func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.Fa
 	}
 	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
 		out.Repository = config.Repository
+		out.Ref = config.Ref
+		out.Access = models.NormalizeContextRepoAccess(config.Access)
 	}
 	if resource.OAuthConnectedBy != nil {
 		out.OauthConnectedByUserId = resource.OAuthConnectedBy.String()
@@ -324,34 +384,26 @@ func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.Fa
 	return out
 }
 
-func protoAgentResourceConfig(
-	kind pb.FactoryAgentResource_Kind,
-	rawURL string,
-	auth pb.FactoryAgentResource_Auth,
-	headers []*pb.FactoryAgentResource_Header,
-	markdown string,
-	repository string,
-	commands []string,
-	vcsProvider string,
-) (models.FactoryAgentResourceConfig, error) {
-	if kind == pb.FactoryAgentResource_KIND_SKILL {
+func protoAgentResourceConfig(req *pb.CreateFactoryAgentResourceRequest) (models.FactoryAgentResourceConfig, error) {
+	switch req.GetKind() {
+	case pb.FactoryAgentResource_KIND_SKILL:
 		return models.FactoryAgentResourceConfig{
 			Source:   models.FactoryAgentResourceSourceInline,
-			Markdown: markdown,
+			Markdown: req.GetMarkdown(),
 		}, nil
-	}
-	if kind == pb.FactoryAgentResource_KIND_SETUP_COMMAND {
+	case pb.FactoryAgentResource_KIND_SETUP_COMMAND:
 		return models.FactoryAgentResourceConfig{
-			Commands: models.NormalizeSetupCommands(commands),
+			Commands: models.NormalizeSetupCommands(req.GetCommands()),
 		}, nil
-	}
-	if kind == pb.FactoryAgentResource_KIND_CONTEXT_REPO {
+	case pb.FactoryAgentResource_KIND_CONTEXT_REPO:
 		return models.FactoryAgentResourceConfig{
-			Repository:  repository,
-			VCSProvider: vcsProvider,
+			Repository:  req.GetRepository(),
+			VCSProvider: req.GetVcsProvider(),
+			Ref:         req.GetRef(),
+			Access:      req.GetAccess(),
 		}, nil
 	}
-	return protoMCPConfig(rawURL, auth, headers)
+	return protoMCPConfig(req.GetUrl(), req.GetAuth(), req.GetHeaders())
 }
 
 func protoMCPConfig(rawURL string, auth pb.FactoryAgentResource_Auth, headers []*pb.FactoryAgentResource_Header) (models.FactoryAgentResourceConfig, error) {
@@ -407,6 +459,15 @@ func requireAgentResourceKindFeature(orgID uuid.UUID, kind string) error {
 		return nil
 	}
 	return requireEnabledFeature(orgID, features.FeatureWorkspaceSkills, errWorkspaceSkillsDisabled)
+}
+
+// requireContextRepoAccess rejects Read & Write context repositories when the
+// organization does not have multi-repo tasks.
+func requireContextRepoAccess(factory *models.Factory, kind pb.FactoryAgentResource_Kind, access string) error {
+	if kind != pb.FactoryAgentResource_KIND_CONTEXT_REPO || models.NormalizeContextRepoAccess(access) != models.FactoryContextRepoAccessWrite {
+		return nil
+	}
+	return requireEnabledFeature(factory.OrganizationID, features.FeatureFactoryMultiRepoTasks, errMultiRepoTasksDisabled)
 }
 
 func requireEnabledFeature(orgID uuid.UUID, featureID string, disabled error) error {

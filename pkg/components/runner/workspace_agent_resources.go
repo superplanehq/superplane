@@ -16,6 +16,7 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -39,8 +40,8 @@ const (
 	// leave it off so the helper never pushes an initial commit.
 	WorkspaceCheckoutCommitSetupEnv = "CHECKOUT_COMMIT_SETUP"
 	// GitHubContextTokenEnv is the read-only installation token used to
-	// clone context repositories. The GitHub integration sets it. The
-	// write token in GITHUB_TOKEN stays on the workspace repository.
+	// clone read-access workspace repositories. The GitHub integration sets
+	// it. GITHUB_TOKEN writes to the other workspace repositories.
 	GitHubContextTokenEnv = "SUPERPLANE_GITHUB_CONTEXT_TOKEN"
 )
 
@@ -64,6 +65,12 @@ type workspaceContextRepository struct {
 	Repository string `json:"repository"`
 	URL        string `json:"url"`
 	Directory  string `json:"directory"`
+	Branch     string `json:"branch,omitempty"`
+	ReadOnly   bool   `json:"readOnly,omitempty"`
+	// PushBlocked removes the push URL of a read-only clone. A Bitbucket
+	// token reaches every repository of its workspace, so the token cannot
+	// keep the repository read-only.
+	PushBlocked bool `json:"pushBlocked,omitempty"`
 }
 
 type workspaceContextFile struct {
@@ -126,7 +133,7 @@ func AttachWorkspaceAgentResources(
 			skills = nil
 		}
 	}
-	setupCommands, contextRepos, err := loadWorkspaceSetupAndContext(db, factory)
+	setupCommands, contextRepos, multiRepo, err := loadWorkspaceSetupAndContext(db, factory)
 	if err != nil {
 		logger.WithError(err).Warn("skip workspace setup and context: list failed")
 		setupCommands = nil
@@ -148,21 +155,32 @@ func AttachWorkspaceAgentResources(
 	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
 	files = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceSetupFiles(setupCommands, files)
-	files = appendWorkspaceContextFiles(db, factory, contextRepos, files)
+	files = appendWorkspaceContextFiles(db, factory, contextRepos, multiRepo, files)
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, setupCommands, contextRepos)
 	return environment, files
 }
 
-func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, error) {
+func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, bool, error) {
 	commands, err := factory.ListEnabledSetupCommands(db)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	repos, err := factory.ListEnabledContextRepos(db)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
-	return commands, repos, nil
+	multiRepo, err := factory.MultiRepoTasksEnabled(db)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if !multiRepo {
+		for i := range repos {
+			config := repos[i].Config.Data()
+			config.Access = models.FactoryContextRepoAccessRead
+			repos[i].Config = datatypes.NewJSONType(config)
+		}
+	}
+	return commands, repos, multiRepo, nil
 }
 
 func rejectDisabledSetupCommands(db *gorm.DB, factory *models.Factory, commands []string, disabled map[string]struct{}) []string {
@@ -299,7 +317,7 @@ func WorkspaceContextRepoDirectory(repository string) string {
 	return "context/" + repository
 }
 
-func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, files []TaskFile) []TaskFile {
+func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, multiRepo bool, files []TaskFile) []TaskFile {
 	if len(resources) == 0 {
 		return files
 	}
@@ -312,7 +330,7 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 			githubHost = host.WebHostname()
 		}
 	}
-	repos := make([]workspaceContextRepository, 0, len(resources))
+	repos := make([]workspaceContextRepository, 0, len(resources)+1)
 	for i := range resources {
 		config := resources[i].Config.Data()
 		repository := strings.TrimSpace(config.Repository)
@@ -326,15 +344,22 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 		if provider == "" {
 			provider = factoryProvider
 		}
+		readOnly := !config.ContextRepoWritable()
 		repos = append(repos, workspaceContextRepository{
-			Name:       resources[i].Name,
-			Repository: repository,
-			URL:        WorkspaceContextRepoURL(provider, repository, githubHost),
-			Directory:  WorkspaceContextRepoDirectory(repository),
+			Name:        resources[i].Name,
+			Repository:  repository,
+			URL:         WorkspaceContextRepoURL(provider, repository, githubHost),
+			Directory:   WorkspaceContextRepoDirectory(repository),
+			Branch:      strings.TrimSpace(config.Ref),
+			ReadOnly:    readOnly,
+			PushBlocked: multiRepo && readOnly && strings.EqualFold(provider, models.ProviderBitbucket),
 		})
 	}
 	if len(repos) == 0 {
 		return files
+	}
+	if primary, ok := workspacePrimaryContextRepository(factory, factoryProvider, githubHost); ok {
+		repos = append([]workspaceContextRepository{primary}, repos...)
 	}
 	payload, err := json.Marshal(workspaceContextFile{Repositories: repos})
 	if err != nil {
@@ -347,14 +372,38 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 	})
 }
 
+// workspacePrimaryContextRepository lists the primary repository next to the
+// context repositories. A pull request run in another workspace repository
+// checks that repository out in repo/, so the primary still needs a clone.
+func workspacePrimaryContextRepository(factory *models.Factory, provider, githubHost string) (workspaceContextRepository, bool) {
+	if factory == nil {
+		return workspaceContextRepository{}, false
+	}
+	onboarding := factory.OnboardingConfigValue()
+	repository := strings.TrimSpace(onboarding.AppRepository)
+	if repository == "" {
+		return workspaceContextRepository{}, false
+	}
+	return workspaceContextRepository{
+		Name:       models.NormalizeContextRepoName(repository),
+		Repository: repository,
+		URL:        WorkspaceContextRepoURL(provider, repository, githubHost),
+		Directory:  WorkspaceContextRepoDirectory(repository),
+		Branch:     strings.TrimSpace(onboarding.DefaultBranch),
+	}, true
+}
+
 // WorkspaceCheckoutScript is the checkout command the runner inserts before
 // factory agent steps. It checks out the main repo to repo/, positions a
 // pull request when the task environment describes one, then clones every
 // workspace_context.json entry. Setup commands are separate steps.
-// Authentication for the main repository comes from the VCS integration
+// Authentication for every repository comes from the VCS integration
 // setup that already ran (gh auth setup-git / Bitbucket credential
-// helper). GitHub context repositories use a read-only token from
-// SUPERPLANE_GITHUB_CONTEXT_TOKEN and skip the write credential helper.
+// helper), so the agent can push to each workspace repository. Read-only
+// GitHub entries use the read-only token from SUPERPLANE_GITHUB_CONTEXT_TOKEN
+// and skip the write credential helper. An entry with a branch clones that
+// branch and makes it origin/HEAD. The entry for the repository already
+// checked out in repo/ is skipped.
 // The script uses plain HTTPS URLs and never embeds tokens. It is idempotent: directories
 // that already contain a checkout are reused, never wiped. The factory
 // commit setup (agent git identity, trailer hook, branch handling) runs
@@ -642,20 +691,30 @@ if [ -f "$ctx" ]; then
     echo "node not found on PATH; skipping context repositories" >&2
   else
     _sp_tab="$(printf '\t')"
-    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();if(u&&dir){console.log(u+"\t"+dir);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx")" || exit 1
+    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];const url=(process.argv[3]||"").trim().replace(/\.git$/,"").match(/[\/:]([^\/:]+\/[^\/:]+)$/);const main=((process.argv[2]||"").trim()||(url?url[1]:"")).toLowerCase();for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();const repo=((e&&e.repository)||"").trim().toLowerCase();const b=((e&&e.branch)||"").trim()||"-";const ro=e&&e.readOnly?"1":"0";const np=e&&e.pushBlocked?"1":"0";if(main&&repo===main){continue;}if(u&&dir){console.log(u+"\t"+dir+"\t"+ro+"\t"+b+"\t"+np);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx" "${REPO:-}" "${REPO_URL:-}")" || exit 1
     if [ -n "$_sp_ctx_list" ]; then
       clone_context_repository() {
-        case "$1" in
-          ` + githubcommon.DotCom().WebURL() + `/*|https://www.` + githubcommon.DotCom().WebHostname() + `/*)
-            if [ -n "${` + GitHubContextTokenEnv + `:-}" ]; then
-              git -c credential.helper= -c 'credential.helper=!f() { echo username=superplane; echo "password=$` + GitHubContextTokenEnv + `"; }; f' clone --depth 1 "$1" "$2"
-              return
-            fi
-            ;;
-        esac
-        git clone --depth 1 "$1" "$2"
+        _sp_branch="$4"
+        if [ "$_sp_branch" = "-" ]; then
+          _sp_branch=""
+        fi
+        if [ "$3" = "1" ] && [ -n "${` + GitHubContextTokenEnv + `:-}" ]; then
+          case "$1" in
+            ` + githubcommon.DotCom().WebURL() + `/*|https://www.` + githubcommon.DotCom().WebHostname() + `/*)
+              git -c credential.helper= -c 'credential.helper=!f() { echo username=superplane; echo "password=$` + GitHubContextTokenEnv + `"; }; f' clone --depth 1 ${_sp_branch:+--branch "$_sp_branch"} "$1" "$2" || return 1
+              ;;
+            *)
+              git clone --depth 1 ${_sp_branch:+--branch "$_sp_branch"} "$1" "$2" || return 1
+              ;;
+          esac
+        else
+          git clone --depth 1 ${_sp_branch:+--branch "$_sp_branch"} "$1" "$2" || return 1
+        fi
+        if [ -n "$_sp_branch" ]; then
+          git -C "$2" remote set-head origin "$_sp_branch" || return 1
+        fi
       }
-      printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir; do
+      printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir readonly branch pushblocked; do
         case "$dir" in
           ""|"."|"/"|*..*)
             echo "Skipping context repository with unsafe directory: $dir" >&2
@@ -670,11 +729,17 @@ if [ -f "$ctx" ]; then
         esac
         if [ -d "$dir/.git" ]; then
           echo "$dir already checked out, reusing."
-          continue
+        else
+          mkdir -p "$(dirname "$dir")"
+          rm -rf "$dir"
+          clone_context_repository "$url" "$dir" "$readonly" "$branch" || exit 1
         fi
-        mkdir -p "$(dirname "$dir")"
-        rm -rf "$dir"
-        clone_context_repository "$url" "$dir" || exit 1
+        if [ "$pushblocked" = "1" ]; then
+          git -C "$dir" remote set-url --push origin read-only-repository || exit 1
+        fi
+        if [ "$readonly" = "0" ] && [ "${` + WorkspaceCheckoutCommitSetupEnv + `:-0}" = "1" ]; then
+          (cd "$dir" && bash -c ` + shellSingleQuoted(FactoryRepoCommitSetup()) + `) || exit 1
+        fi
       done
     fi
     unset _sp_tab _sp_ctx_list
@@ -731,6 +796,13 @@ fi
 `
 }
 
+// shellSingleQuoted quotes script as one shell word. Context repositories
+// run the commit setup with bash -c, because a subshell in an "|| exit 1"
+// list ignores set -e.
+func shellSingleQuoted(script string) string {
+	return "'" + strings.ReplaceAll(script, "'", `'\''`) + "'"
+}
+
 func appendWorkspaceCheckoutFile(files []TaskFile) []TaskFile {
 	for i := range files {
 		if files[i].Path == WorkspaceCheckoutScriptPath {
@@ -756,8 +828,8 @@ func taskShipsCheckout(files []TaskFile) bool {
 const (
 	setupHintPending   = "\nSetup commands (run in repo/ after clone, in order): "
 	setupHintDone      = "\nSetup commands already ran in repo/ after checkout, in order: "
-	contextHintPending = "\nCheckout: run `checkout` to check out repo/ and the context repositories. From repo/, read: "
-	contextHintDone    = "\nContext repositories are already checked out next to repo/. From repo/, read: "
+	contextHintPending = "\nCheckout: run `checkout` to check out repo/ and the other workspace repositories. From repo/, they are at: "
+	contextHintDone    = "\nThe other workspace repositories are already checked out next to repo/. From repo/, they are at: "
 )
 
 // ApplyFactoryCheckout inserts the checkout command after setup and before
@@ -1130,7 +1202,11 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 			if repository == "" {
 				repository = contextRepos[i].Name
 			}
-			names = append(names, repository+" (../"+WorkspaceContextRepoDirectory(repository)+")")
+			label := repository + " (../" + WorkspaceContextRepoDirectory(repository) + ")"
+			if !contextRepos[i].Config.Data().ContextRepoWritable() {
+				label += " (read only)"
+			}
+			names = append(names, label)
 		}
 		builder.WriteString(contextHintPending)
 		builder.WriteString(strings.Join(names, ", "))

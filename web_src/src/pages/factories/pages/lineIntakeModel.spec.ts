@@ -347,7 +347,24 @@ describe("lineIntakeModel", () => {
     const sentry = intakeAutomationFixture(lineIntakeSourceById("sentry-exceptions")!);
     expect(sentry.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "sentry.onIssue",
+      "if",
+      "http",
+      "http",
+      "if",
+      "http",
       "createWorkOrder",
+    ]);
+
+    const sentryCanvas = sentry.phases[0]!.canvas!;
+    const gate = sentryCanvas.nodes.find((node) => node.name === "Latest event has a stack?")!;
+    expect(gate.configuration?.expression).toBe('sentryEventHasStack($["Get Sentry Event"].data?.body)');
+    expect(sentryCanvas.edges.filter((edge) => edge.targetId === gate.id)).toEqual([
+      { channel: "success", sourceId: "sentry-exceptions-event-request", targetId: gate.id },
+      { channel: "failure", sourceId: "sentry-exceptions-event-request", targetId: gate.id },
+    ]);
+    expect(sentryCanvas.edges.filter((edge) => edge.sourceId === gate.id)).toEqual([
+      { channel: "true", sourceId: gate.id, targetId: "sentry-exceptions-create" },
+      { channel: "false", sourceId: gate.id, targetId: "sentry-exceptions-recommended-event-request" },
     ]);
 
     const pagerduty = intakeAutomationFixture(lineIntakeSourceById("pagerduty-incidents")!);

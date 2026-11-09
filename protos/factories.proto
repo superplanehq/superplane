@@ -2745,6 +2745,9 @@ message WorkOrderCheck {
   // automation for a SuperPlane check, agent for a check from add_checks
   // or from a person.
   string source = 16;
+  // Pull request repository of a merge confidence check. Empty for a check
+  // of the whole task.
+  string repository = 17;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.
@@ -2807,9 +2810,10 @@ message DescribeFactoryVelocityRequest {
   // Period window in days. Only 14 and 30 are supported by the UI today; any
   // other positive value is clamped server-side.
   int32 period_days = 2;
-  // Optional `owner/repo` the report is limited to. When it is empty the
-  // response returns SuperPlane data only and sets `has_people_cohort = false`
-  // so the UI can hide the People series.
+  // Optional workspace repository for delivery and manual authorship. With
+  // multi-repo tasks enabled, empty selects all enabled writable repositories.
+  // Task metrics, spending, and automations stay workspace-wide. With the flag
+  // disabled, empty keeps the legacy SuperPlane-only report.
   string repository = 3;
   // Column the People table sorts on. Defaults to PEOPLE_SORT_TOTAL.
   PeopleSort people_sort = 4;
@@ -2862,6 +2866,8 @@ message DescribeFactoryVelocityResponse {
   // One row per automation of the workspace that ran in the window, ordered by
   // run count. Empty when no automation ran.
   repeated DescribeFactoryVelocityAutomation automations = 14;
+  // Enabled writable workspace repositories, primary first.
+  repeated string repositories = 15;
 }
 
 message DescribeFactoryVelocityDay {
@@ -3191,6 +3197,8 @@ message FactoryAgentResource {
   repeated string commands = 20;
   string vcs_provider = 21;
   SystemSkill system_skill = 22;
+  // Context repository access: "write" or "read".
+  string access = 23;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -3214,6 +3222,8 @@ message CreateFactoryAgentResourceRequest {
   string repository = 9;
   repeated string commands = 10;
   string vcs_provider = 11;
+  string ref = 12;
+  string access = 13;
 }
 
 message CreateFactoryAgentResourceResponse {
@@ -3235,6 +3245,8 @@ message UpdateFactoryAgentResourceRequest {
   repeated string commands = 12;
   optional bool replace_commands = 13;
   optional string vcs_provider = 14;
+  optional string ref = 15;
+  optional string access = 16;
 }
 
 message UpdateFactoryAgentResourceResponse {
@@ -3545,6 +3557,7 @@ message PendingHandOff {
   string line_id = 1;
   string column = 2;
   string pull_request_url = 3;
+  repeated string pull_request_urls = 4;
 }
 
 message ResumeHandOffWorkOrderRequest {

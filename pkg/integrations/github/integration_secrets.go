@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	githubauth "github.com/google/go-github/v75/github"
+	githubauth "github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -128,8 +128,8 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 }
 
 // resolveContextAccessToken mints a contents:read installation token for
-// enabled GitHub context repositories on workspaces that use this integration.
-// The write token stays limited to the workspace and backlog repositories.
+// enabled read-access GitHub context repositories on workspaces that use this
+// integration. Write-access context repositories use the write token.
 // Names the catalog does not know yet schedule a full installation refresh.
 func resolveContextAccessToken(httpCtx core.HTTPContext, integrationCtx core.IntegrationContext) (string, error) {
 	if !integrationCtx.LegacySetup() {
@@ -143,7 +143,7 @@ func resolveContextAccessToken(httpCtx core.HTTPContext, integrationCtx core.Int
 	if err != nil {
 		return "", err
 	}
-	names, err := models.ListEnabledGitHubContextRepositoryNames(database.Conn(), integrationCtx.ID())
+	names, err := models.ListEnabledGitHubContextRepositoryNames(database.Conn(), integrationCtx.ID(), models.FactoryContextRepoAccessRead)
 	if err != nil {
 		return "", fmt.Errorf("failed to list context repositories: %w", err)
 	}

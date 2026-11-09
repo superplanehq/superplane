@@ -420,6 +420,28 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		assert.Contains(t, httpCtx.Requests[0].URL.Path, "/repos/acme/widgets/collaborators/octocat/permission")
 	})
 
+	t.Run("workspace trigger checks access on the repository that sent the event", func(t *testing.T) {
+		body := []byte(`{"action":"opened","repository":{"full_name":"acme/gadgets"},"issue":{"user":{"login":"octocat"}}}`)
+		events := &contexts.EventContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{"permission":"write","role_name":"write"}`),
+			},
+		}
+
+		code, _, err := trigger.HandleWebhook(signedIssueContext(body, map[string]any{
+			"repository":        "{{ workspace().repositories }}",
+			"actions":           []string{"opened"},
+			"authorsWithAccess": true,
+		}, events, httpCtx))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Contains(t, httpCtx.Requests[0].URL.Path, "/repos/acme/gadgets/collaborators/octocat/permission")
+	})
+
 	t.Run("collaborator filter does not emit when permission is none", func(t *testing.T) {
 		body := []byte(`{"action":"opened","issue":{"user":{"login":"octocat"}}}`)
 		events := &contexts.EventContext{}

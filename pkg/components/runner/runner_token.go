@@ -38,6 +38,9 @@ type RunnerScope struct {
 	// The backend reports a merge check only when its id is in MergeChecks.
 	MergeChecks      []string
 	MergeCheckLabels map[string]string
+	// MergeRepository is the pull request repository that a merge confidence
+	// run scores. The backend stores each check under it.
+	MergeRepository string
 }
 
 func (s *RunnerScope) HasScope(scope RunnerToolScope) bool {
@@ -84,6 +87,7 @@ func MintRunnerToken(signer *jwt.Signer, scope RunnerScope, ttl time.Duration) (
 		"flow":                string(scope.Flow),
 		"scopes":              joinRunnerScopes(scope.Scopes),
 		"merge_checks":        strings.Join(scope.MergeChecks, ","),
+		"merge_repository":    scope.MergeRepository,
 	}
 	if len(scope.MergeCheckLabels) > 0 {
 		encoded, err := json.Marshal(scope.MergeCheckLabels)
@@ -134,6 +138,7 @@ func ParseRunnerToken(signer *jwt.Signer, token string) (*RunnerScope, error) {
 	}
 	labels, _ := claims["merge_check_labels"].(string)
 	scope.MergeCheckLabels = parseMergeConfidenceCheckLabels(labels)
+	scope.MergeRepository, _ = claims["merge_repository"].(string)
 	if err := scope.complete(); err != nil {
 		return nil, err
 	}
@@ -182,6 +187,7 @@ func (s *RunnerScope) MergeConfidenceScope() (*MergeConfidenceScope, bool) {
 		NodeExecutionID: s.NodeExecutionID,
 		EnabledChecks:   s.MergeChecks,
 		CheckLabels:     s.MergeCheckLabels,
+		Repository:      s.MergeRepository,
 	}, true
 }
 

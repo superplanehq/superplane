@@ -353,6 +353,9 @@ func (c *Client) DeleteWebhook(workspace, repoSlug, webhookUID string) error {
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return errBitbucketWebhookNotFound
+	}
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))

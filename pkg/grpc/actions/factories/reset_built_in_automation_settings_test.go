@@ -4,6 +4,7 @@ import (
 	"context"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -51,7 +53,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
 			agent.Configuration["enabledAgentResourceTools"] = map[string]any{"github-resource": []any{"get_issue"}}
 			implementationStep(t, agent, "Implementation")["prompt"] = "Retired implementation prompt"
-			findYAMLNode(t, doc, "create-pr").Configuration["draft"] = true
+			setResetTestDraftPullRequests(t, doc, true)
 		})
 	}
 	require.NoError(t, resetTestOrganization(t, r))
@@ -71,19 +73,50 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			require.NotNil(t, agent.Concurrency)
 			assert.Equal(t, tc.max, agent.Concurrency.EffectiveMax())
 			assert.Equal(t, "team", agent.Concurrency.Key)
-			assert.Equal(t, true, findIntakeNode(version.Nodes, "create-pr").Configuration["draft"])
+			assert.True(t, resetTestDraftPullRequests(t, version.Nodes))
 			assert.NotContains(t, liveCanvasJSON(t, tc.canvas), "retired implementation prompt")
 		})
 	}
 }
 
+// setResetTestDraftPullRequests sets the "Create draft pull requests" setting.
+// Bitbucket holds it on the pull request node. GitHub holds it in the agent
+// environment.
+func setResetTestDraftPullRequests(t *testing.T, doc *yaml.Canvas, draft bool) {
+	t.Helper()
+	for i := range doc.Spec.Nodes {
+		node := &doc.Spec.Nodes[i]
+		if isFactoryPullRequestComponent(node.Component) {
+			node.Configuration["draft"] = draft
+			return
+		}
+	}
+	entry := factoryEnvironmentEntry(findYAMLNode(t, doc, implementationAgentNodeID).Configuration, factoryDraftPullRequestsEnv)
+	require.NotNil(t, entry, "expected the agent to declare %s", factoryDraftPullRequestsEnv)
+	entry["value"] = strconv.FormatBool(draft)
+}
+
+func resetTestDraftPullRequests(t *testing.T, nodes []models.Node) bool {
+	t.Helper()
+	for _, node := range nodes {
+		if draft, present := factoryDraftPullRequests(node.ComponentName(), node.Configuration); present {
+			return draft
+		}
+	}
+	require.Fail(t, "expected a draft pull request setting")
+	return false
+}
+
 func resetTestTemplate(t *testing.T, r *support.ResourceRegistry, factory *models.Factory, templateID, provider string, configure func(*yaml.Canvas)) *models.Canvas {
 	t.Helper()
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, templateID)
+	multiRepo, err := factory.MultiRepoTasksEnabled(database.DB(t.Context()))
+	require.NoError(t, err)
 	result, err := materializeFactoryTemplate(templateID, provider, factoryTemplateInput{
 		appID: canvas.ID.String(), appName: canvas.Name,
 		installParams: map[string]string{"appRepository": "acme/app", "defaultBranch": "main"},
 		agent:         &factoryTemplateAgent{component: models.SuperPlaneRunnerComponent, credentialSource: "hosted"},
+		multiRepo:     multiRepo,
 	})
 	require.NoError(t, err)
 	doc, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
@@ -250,7 +283,7 @@ func TestResetBuiltInSettingsFailureRollsBackOrganization(t *testing.T) {
 	r, factory := resetTestFactory(t)
 	for range 2 {
 		resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
-			findYAMLNode(t, doc, "create-pr").Configuration["draft"] = true
+			setResetTestDraftPullRequests(t, doc, true)
 		})
 	}
 	canvases, err := factory.ListCanvases(database.DB(t.Context()))
@@ -279,6 +312,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		{source: models.FactoryIntakeSourceGitHubIssues, paused: true},
 		{source: models.FactoryIntakeSourceJiraIssues},
 		{source: models.FactoryIntakeSourceSentryExceptions},
+		{source: models.FactoryIntakeSourceSentryExceptions, paused: true},
 		{source: models.FactoryIntakeSourceDependabotAlerts},
 		{source: models.FactoryIntakeSourceProductiveTasks},
 		{source: models.FactoryIntakeSourceDatadog},
@@ -334,9 +368,14 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.LinearLabels = []string{"bug"}
 			}
 			binding := &intakeBinding{Configuration: map[string]any{"repository": "acme/app", "project": "APP"}}
+			var sentryIntegrationID string
 			if source == models.FactoryIntakeSourceGitHubIssues {
 				id := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 				binding.Integration = &yaml.IntegrationRef{ID: id}
+			}
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				sentryIntegrationID = createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+				binding.Integration = &yaml.IntegrationRef{ID: sentryIntegrationID}
 			}
 			doc, err := buildIntakeCanvas(intakeCanvasRequest{
 				OrganizationID: r.Organization.ID, FactoryID: factory.ID, Source: source,
@@ -356,13 +395,16 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 					}
 				}
 			}
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				useUnconditionalSentryRequests(doc)
+			}
 			canvas := support.CreateFactoryCanvas(t, r, factory.ID, source)
 			resetTestPublishCanvas(t, r, canvas, doc)
 			intake, err := factory.CreateIntake(database.DB(t.Context()), canvas.ID, source)
 			require.NoError(t, err)
 			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 			var paused *bool
-			if source == models.FactoryIntakeSourceGitHubIssues {
+			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceSentryExceptions {
 				paused = &tc.paused
 			}
 			updated, err := UpdateFactoryIntake(ctx, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}, r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
@@ -370,6 +412,10 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			})
 			require.NoError(t, err)
 			assert.Equal(t, tc.paused, updated.Intake.GetPaused())
+			if source == models.FactoryIntakeSourceSentryExceptions {
+				version := resetTestLiveVersion(t, canvas)
+				assert.Nil(t, findIntakeNode(version.Nodes, intakeSentryEventHasStackNodeID), "settings updates preserve saved workflows")
+			}
 			expected := updated.Intake.Settings
 			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceJiraIssues {
 				// The editor action historically retains filters, but restores
@@ -411,6 +457,35 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				create := findIntakeNode(version.Nodes, resolveIntakeGraph(source, spec).CreateNodeID)
 				require.NotNil(t, create)
 				assert.Equal(t, r.User.String(), create.Configuration["defaultOwnerId"])
+				trigger := findIntakeNode(version.Nodes, intakeTriggerNodeID)
+				require.NotNil(t, trigger)
+				require.NotNil(t, trigger.IntegrationID)
+				assert.Equal(t, sentryIntegrationID, *trigger.IntegrationID)
+				integration, err := models.FindIntegrationInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(sentryIntegrationID))
+				require.NoError(t, err)
+				gate := findIntakeNode(version.Nodes, intakeSentryEventHasStackNodeID)
+				require.NotNil(t, gate)
+				assert.Equal(t, intakeFilterComponent, gate.ComponentName())
+				assert.Equal(t, `sentryEventHasStack($["Get Sentry Event"].data?.body)`, gate.Configuration["expression"])
+				for _, edge := range []models.Edge{
+					{SourceID: intakeSentryEventRequestNodeID, TargetID: gate.ID, Channel: "success"},
+					{SourceID: intakeSentryEventRequestNodeID, TargetID: gate.ID, Channel: "failure"},
+					{SourceID: gate.ID, TargetID: create.ID, Channel: "true"},
+					{SourceID: gate.ID, TargetID: intakeSentryRecommendedEventRequestNodeID, Channel: "false"},
+				} {
+					assert.Contains(t, spec.Edges, edge)
+				}
+				previous := intakeFilterNodeID
+				for _, id := range []string{intakeSentryIssueRequestNodeID, intakeSentryEventRequestNodeID, intakeSentryRecommendedEventRequestNodeID} {
+					request := findIntakeNode(version.Nodes, id)
+					require.NotNil(t, request)
+					assert.Equal(t, true, request.Configuration["redactSensitiveHeaders"])
+					authorization := request.Configuration["authorization"].(map[string]any)
+					assert.Equal(t, map[string]any{"name": integration.InstallationName}, authorization["integration"])
+					assert.True(t, hasCanvasPath(spec.Edges, previous, request.ID))
+					previous = request.ID
+				}
+				assert.True(t, hasCanvasPath(spec.Edges, previous, create.ID))
 			}
 			if tc.restrictAuthors {
 				require.NotNil(t, findIntakeNode(version.Nodes, intakeAuthorPermissionNodeID))
@@ -431,7 +506,8 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 			for _, source := range []string{models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, models.FactoryPRFeedbackHandlerSourcePullRequestChecks} {
 				t.Run(model+"/"+provider+"/"+source, func(t *testing.T) {
 					r, factory := resetTestFactory(t)
-					require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider}))
+					repository := "acme/app"
+					require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider, AppRepository: &repository}))
 					request := prFeedbackBuildRequest{
 						Repository: "acme/app", Mention: "@review", IgnoreBots: false, AddressAllBots: true, AllowedBots: []string{},
 						CheckNames: []string{"required-ci"}, MaximumAttempts: 8, VCSProvider: provider,
@@ -473,7 +549,7 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 					require.NoError(t, resetTestOrganization(t, r))
 					version := resetTestLiveVersion(t, canvas)
 					spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
-					actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
+					actual := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec).withPrimaryRepository(factory)
 					assert.Equal(t, "acme/app", actual.Repository)
 					if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
 						assert.Equal(t, "@review", actual.Mention)
@@ -494,6 +570,17 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 						assert.Contains(t, prompt, "Ignore comments SuperPlane already wrote.")
 					} else {
 						assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
+					}
+					if provider == models.ProviderGitHub {
+						scoped := workspaceScopeNodeIDs(spec, provider, true)
+						require.NotEmpty(t, scoped)
+						for _, id := range scoped {
+							node := findIntakeNode(version.Nodes, id)
+							assert.True(t, prFeedbackWorkspaceScope(node.Configuration), "node %s must listen on all workspace repositories", id)
+							if node.ComponentName() == prFeedbackWaitChecksComponent {
+								assert.Equal(t, prFeedbackEventRepositoryExpression, node.Configuration["repository"])
+							}
+						}
 					}
 					reloaded, err := models.FindPRFeedbackHandlerByCanvasID(database.DB(t.Context()), canvas.ID)
 					require.NoError(t, err)
@@ -648,7 +735,34 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 	assert.EqualValues(t, 3600, agent.Configuration["executionTimeoutSeconds"])
 	require.NotNil(t, agent.Concurrency)
 	assert.Equal(t, 5, agent.Concurrency.EffectiveMax())
-	assert.Equal(t, false, findIntakeNode(version.Nodes, "create-pr").Configuration["draft"])
+	assert.False(t, resetTestDraftPullRequests(t, version.Nodes))
+}
+
+func TestResetFollowsMultiRepoTasksForTheImplementationTemplate(t *testing.T) {
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			canvas := resetTestTemplate(t, r, factory, "line-implementation", provider, func(doc *yaml.Canvas) {
+				setResetTestDraftPullRequests(t, doc, true)
+			})
+			hasPullRequestNode := func(nodes []models.Node) bool {
+				return slices.ContainsFunc(nodes, func(node models.Node) bool { return isFactoryPullRequestComponent(node.ComponentName()) })
+			}
+
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+			require.NoError(t, resetTestOrganization(t, r))
+			current := resetTestLiveVersion(t, canvas)
+			assert.False(t, hasPullRequestNode(current.Nodes), "multi-repo agents open their own pull requests")
+			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+
+			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+			require.NoError(t, resetTestOrganization(t, r))
+			current = resetTestLiveVersion(t, canvas)
+			assert.True(t, hasPullRequestNode(current.Nodes))
+			assert.Nil(t, factoryEnvironmentEntry(findIntakeNode(current.Nodes, implementationAgentNodeID).Configuration, factoryDraftPullRequestsEnv))
+			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+		})
+	}
 }
 
 func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {

@@ -28,7 +28,7 @@ export function OrgExperimentalFeaturesTable({ orgId }: { orgId: string }) {
     toggleFeature.mutate(
       { featureId, enabled: next },
       {
-        onError: () => setError(`Failed to ${next ? "enable" : "disable"} ${featureId}`),
+        onError: (toggleError) => setError(toggleError.message),
       },
     );
   };
@@ -41,7 +41,7 @@ export function OrgExperimentalFeaturesTable({ orgId }: { orgId: string }) {
     toggleFeatures.mutate(
       { featureIds, enabled: next },
       {
-        onError: () => setError(`Failed to ${next ? "enable" : "disable"} experimental features`),
+        onError: (toggleError) => setError(toggleError.message),
       },
     );
   };

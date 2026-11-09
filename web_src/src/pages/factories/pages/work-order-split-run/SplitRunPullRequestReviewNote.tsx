@@ -5,13 +5,16 @@ import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequestMerge";
-import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
+import { PullRequestConfidence } from "./redesign/consoleCheckRows";
+import { ContinueFixesButton, MultiPullRequestReviewNote } from "./SplitRunMultiPullRequestReview";
 import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 import {
   isMergedPullRequest,
+  openReviewPullRequests,
   PULL_REQUEST_REVIEW_COPY,
   pullRequestForReviewHref,
   pullRequestReviewCopy,
@@ -204,6 +207,7 @@ function CompactPullRequestReviewNote({
       <div className="min-w-0">
         <h3 className="text-[14px] font-semibold leading-5 text-foreground">{copy.headline}</h3>
         <p className="mt-1 text-[12px] leading-4 text-foreground/70">{copy.closing}</p>
+        <PullRequestConfidence repository={trackedPullRequest?.repository} className="mt-3" />
         <div className="mt-3">
           <ReviewCallToAction
             ctaLabel={ctaLabel}
@@ -261,32 +265,6 @@ function ReviewCallToAction({
         compact
       />
     </div>
-  );
-}
-
-/** Resumes paused automatic fixes. Renders nothing when fixes are not paused. */
-function ContinueFixesButton({
-  onContinue,
-  disabled,
-  size = "sm",
-}: {
-  onContinue?: () => void;
-  disabled: boolean;
-  size?: "sm" | "lg";
-}) {
-  if (!onContinue) {
-    return null;
-  }
-  return (
-    <Button
-      type="button"
-      size={size}
-      disabled={disabled}
-      onClick={onContinue}
-      data-testid="split-run-footer-continue-fixes"
-    >
-      Continue fixes
-    </Button>
   );
 }
 
@@ -367,6 +345,7 @@ export function WaitingPullRequestReview({
   onAction?: (action: SplitRunFooterAction) => void;
   children?: ReactNode;
 }) {
+  const multiRepo = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_MULTI_REPO_TASKS);
   const pullRequest = tone === "waiting" && note.cta ? pullRequestReviewNote(note) : undefined;
   if (!pullRequest || !note.cta) {
     return null;
@@ -374,6 +353,21 @@ export function WaitingPullRequestReview({
   const continueAction = actions.find((action) => action.kind === "continue-fixes");
   if (actionsOnly) {
     return <MoreActionsMenu actions={actions} disabled={actionBusy} onAction={onAction} />;
+  }
+  const openPullRequests = multiRepo ? openReviewPullRequests(pullRequests) : [];
+  if (openPullRequests.length > 1) {
+    return (
+      <MultiPullRequestReviewNote
+        pullRequests={openPullRequests}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+        canAct={canAct}
+        stacked={stacked}
+        continueFixes={continueAction ? () => onAction?.(continueAction) : undefined}
+        actionBusy={actionBusy}
+      />
+    );
   }
   return (
     <SplitRunPullRequestReviewNote
