@@ -186,9 +186,9 @@ responses.
 ## Dependency License Checks
 
 Run `make test.license.check` before you submit dependency changes.
-The Semaphore Licenses job runs the same check with a pinned OSV-Scanner container.
-Docker and network access to OSV and deps.dev are required.
-Go and Node.js installations are not required for this check.
+The Semaphore Licenses job runs the same check in the development container.
+The development image installs OSV-Scanner v2.7.0 as a native Go tool.
+Docker and network access to OSV and deps.dev are required for the Make targets.
 
 The check reads `go.mod` and `web_src/package-lock.json`, including development
 and transitive dependencies. Unknown or unapproved licenses fail the check.
@@ -200,7 +200,7 @@ Review each violation before you change the policy:
 - Use `license.override` to correct missing or incorrect license metadata.
 - Use `license.ignore` only for a package with an approved license exception.
 
-Run `bash scripts/license-check-test.sh` to check the scanner integration.
+Run `make test.license.scanner` to check the scanner integration.
 For a focused scan, pass lockfile paths to `bash scripts/license-check.sh`.
 
 This command suppresses vulnerability findings through a temporary configuration.
@@ -209,10 +209,17 @@ The shared `osv-scanner.toml` does not suppress vulnerabilities.
 The Semaphore Dependency vulnerabilities job scans the same dependency files
 with `make check.vulnerabilities`. It uses the shared configuration without
 the temporary vulnerability suppression. Vulnerability findings fail this job.
-Both checks use the image pinned in `scripts/osv-scanner-image.txt`.
+Both checks invoke the native `osv-scanner` command.
+Semaphore prepares the project Go compiler and generated clients before the
+vulnerability scan. Go call analysis remains enabled.
 Release image vulnerability scanning remains a separate follow-up.
 
-The Semaphore Go SAST job runs `make check.gosec` after Go setup.
-It scans `cmd/`, `pkg/`, and `ee/` with gosec v2.30.0.
-It excludes generated code and does not scan test files.
-Findings and scan errors fail the job.
+To run the scripts directly on your host, install the same scanner version:
+
+```bash
+go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0
+```
+
+Add the Go binary directory to your `PATH`.
+Use the Go version from `go.mod` and generate the API clients before Go call analysis.
+Run `bash scripts/vulnerability-check.sh` or `bash scripts/license-check.sh`.

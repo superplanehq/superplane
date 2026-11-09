@@ -3,8 +3,6 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Pin the release and digest so local checks and CI use the same scanner.
-scanner_image=$(cat scripts/osv-scanner-image.txt)
 permitted_licenses=$(paste -sd, scripts/permitted-licenses.txt)
 
 config_directory=$(mktemp -d)
@@ -27,17 +25,13 @@ if [ "$#" -eq 0 ]; then
 fi
 lockfiles=()
 for lockfile in "$@"; do
-  lockfiles+=(--lockfile="/src/${lockfile#"$PWD"/}")
+  lockfiles+=(--lockfile="$lockfile")
 done
 
 status=0
 echo "Checking dependency licenses only. Vulnerability findings are suppressed for this command."
-docker run --rm \
-  --mount "type=bind,source=$PWD,target=/src,readonly" \
-  --mount "type=bind,source=$config_directory,target=/config,readonly" \
-  --workdir /src \
-  "$scanner_image" scan source \
-  --config=/config/osv-scanner.toml \
+osv-scanner scan source \
+  --config="$config_directory/osv-scanner.toml" \
   --licenses="$permitted_licenses" \
   "${lockfiles[@]}" || status=$?
 
