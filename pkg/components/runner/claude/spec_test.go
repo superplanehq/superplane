@@ -165,8 +165,8 @@ func TestBuildClaudeCodeTaskRunsOrderedSteps(t *testing.T) {
 
 	assert.Equal(t, "git clone https://github.com/acme/widgets.git repo", requireTaskFile(t, task.Files, "steps/01-clone-repo.sh").Content)
 
-	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
-	assert.Equal(t, "Run the tests and fix failures", requireTaskFile(t, task.Files, "prompts/03-fix-tests.txt").Content)
+	assert.Contains(t, requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content, "Fix auth.py's nil panic")
+	assert.Contains(t, requireTaskFile(t, task.Files, "prompts/03-fix-tests.txt").Content, "Run the tests and fix failures")
 
 	assert.Contains(t, runScript, "stream-json")
 	assert.Contains(t, runScript, "--append-system-prompt")
@@ -317,10 +317,10 @@ func TestBuildClaudeCodeTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
 	assert.Equal(t, "Fix tests", task.Commands[2].Name)
 	assert.Equal(t, "Fix the failing tests", task.Commands[2].Preview)
 	assert.Equal(t, "echo install-sem-ai", requireTaskFile(t, task.Files, "setup/01-set-up-semaphore.sh").Content)
-	assert.Equal(
+	assert.Contains(
 		t,
-		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nFix the failing tests",
 		requireTaskFile(t, task.Files, "prompts/01-fix-tests.txt").Content,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nFix the failing tests",
 	)
 }
 

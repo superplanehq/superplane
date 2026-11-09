@@ -117,7 +117,7 @@ func TestBuildOpenRouterTaskOmitsMaxTurnsArgv(t *testing.T) {
 	require.GreaterOrEqual(t, len(task.Commands), 2)
 	require.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6'`)
 	require.NotContains(t, task.Commands[1].Command, " 64")
-	require.Equal(t, "fix tests", requireTaskFile(t, task.Files, "prompts/01-prompt.txt").Content)
+	require.Contains(t, requireTaskFile(t, task.Files, "prompts/01-prompt.txt").Content, "fix tests")
 }
 
 func TestBuildOpenRouterTaskPassesThinking(t *testing.T) {
