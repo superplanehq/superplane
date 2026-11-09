@@ -4,6 +4,7 @@ import { AlertCircle, Loader2, MoreHorizontal, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { segmentedNavClassName } from "@/lib/segmentedNav";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { SegmentedNav } from "@/ui/SegmentedNav";
@@ -180,7 +181,13 @@ function VelocityHeaderBar({ model }: { model: VelocityPageModel }) {
               value={model.repositoryFilter.selected || "all"}
               onValueChange={(value) => model.repositoryFilter.select(value === "all" ? "" : value)}
             >
-              <SelectTrigger aria-label="Repository" className="h-7 w-44 text-xs">
+              <SelectTrigger
+                aria-label="Repository"
+                className={cn(
+                  segmentedNavClassName("xs"),
+                  "w-44 justify-between border-0 bg-slate-100! px-2 text-xs font-medium text-slate-500! shadow-none data-[size=default]:h-6 dark:bg-gray-800! dark:text-gray-400!",
+                )}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
