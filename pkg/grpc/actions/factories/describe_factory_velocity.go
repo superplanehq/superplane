@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -125,12 +126,44 @@ func DescribeFactoryVelocity(
 		PeopleSyncPending: cohort.pending,
 		PreviousTotals:    previousTotals,
 		HasPreviousWindow: hasVelocityOutput(previousTotals),
-		IntakeSources:     serializeVelocityIntakeSources(currentOrders, cohort.agentMergedIn(current)),
+		IntakeSources:     serializeVelocityIntakeSources(loaded.deliveryOrders, cohort.agentMergedIn(current)),
 		People:            people,
 		PeopleTotal:       int32(peopleTotal),
 		PeopleHasMore:     peopleOffset+len(people) < peopleTotal,
 		Automations:       serializeVelocityAutomations(automations),
+		Repositories:      loaded.repositories,
 	}, nil
+}
+
+func loadRepositoryMergeCohort(tx *gorm.DB, factoryID uuid.UUID, repositories []string, from, to time.Time) (mergeCohort, error) {
+	if len(repositories) == 0 {
+		return mergeCohort{}, nil
+	}
+	cohort := mergeCohort{hasPeople: true}
+	for _, repository := range repositories {
+		sync, err := models.FindFactoryVelocityRepositorySync(tx, factoryID, repository)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return mergeCohort{}, err
+		}
+		if err != nil || sync.SyncedAt == nil || sync.SyncInProgress() {
+			return mergeCohort{pending: true}, nil
+		}
+		if cohort.syncedOn == nil || sync.SyncedAt.Before(*cohort.syncedOn) {
+			cohort.syncedOn = sync.SyncedAt
+		}
+	}
+	merges, err := models.ListFactoryVelocityRepositoryMerges(tx, factoryID, from, to)
+	if err != nil {
+		return mergeCohort{}, err
+	}
+	for _, merge := range merges {
+		if slices.ContainsFunc(repositories, func(repository string) bool {
+			return models.CanonicalContextRepo(repository) == models.CanonicalContextRepo(merge.Repository)
+		}) {
+			cohort.merges = append(cohort.merges, merge)
+		}
+	}
+	return cohort, nil
 }
 
 func serializeVelocityAutomations(rows []models.FactoryAutomationRuns) []*pb.DescribeFactoryVelocityAutomation {
@@ -208,42 +241,6 @@ func (c mergeCohort) agentMergedIn(window velocityWindow) int {
 		}
 	}
 	return merged
-}
-
-// loadMergeCohort reads the repository merges the sync worker stored. A
-// workspace with no repository, or one whose first sync has not finished,
-// reports no cohort and the SuperPlane counts still return.
-func loadMergeCohort(
-	tx *gorm.DB,
-	factoryID uuid.UUID,
-	hasRepo bool,
-	from, to time.Time,
-) (mergeCohort, error) {
-	if !hasRepo {
-		return mergeCohort{}, nil
-	}
-
-	sync, err := models.FindFactoryVelocitySync(tx, factoryID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return mergeCohort{}, err
-	}
-	// A bounded rebuild stores the newest-slice time in SyncedAt so a later
-	// read can catch merges made after that slice. The report stays pending
-	// until that read finishes.
-	if sync == nil || sync.SyncedAt == nil || sync.SyncInProgress() {
-		return mergeCohort{pending: true}, nil
-	}
-
-	merges, err := models.ListFactoryVelocityRepositoryMerges(tx, factoryID, from, to)
-	if err != nil {
-		return mergeCohort{}, err
-	}
-
-	return mergeCohort{
-		merges:    merges,
-		hasPeople: true,
-		syncedOn:  sync.SyncedAt,
-	}, nil
 }
 
 // hasVelocityOutput reports whether a window holds enough output to compare
