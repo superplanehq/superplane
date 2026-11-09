@@ -113,11 +113,16 @@ func evaluateFactoryPullRequestMergeability(
 	}
 	result.HeadSHA = githubPR.GetHead().GetSHA()
 	if githubPR.Draft != nil && strings.EqualFold(githubPR.GetState(), "open") {
-		if _, err := pullRequest.SyncDraftState(db, models.FactoryPullRequestDraftStateSnapshot{
+		// Keep the pre-fetch mergeability snapshot for the stale-head write guard.
+		draftStatePullRequest := *pullRequest
+		if _, err := draftStatePullRequest.SyncDraftState(db, models.FactoryPullRequestDraftStateSnapshot{
 			Draft: githubPR.GetDraft(), UpdatedAt: githubPR.GetUpdatedAt().Time, FromLookup: true,
 		}); err != nil {
 			return nil, fmt.Errorf("sync pull request draft state: %w", err)
 		}
+		pullRequest.State = draftStatePullRequest.State
+		pullRequest.DraftStateUpdatedAt = draftStatePullRequest.DraftStateUpdatedAt
+		pullRequest.UpdatedAt = draftStatePullRequest.UpdatedAt
 	}
 	if active {
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN, mergeBlockedActiveRun), nil

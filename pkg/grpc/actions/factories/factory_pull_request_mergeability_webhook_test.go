@@ -160,6 +160,83 @@ func TestVerifyGitHubFactoryMergeabilitySignature(t *testing.T) {
 	})
 }
 
+func TestRefreshFactoryPullRequestMergeabilityPreservesNewerHead(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 96)
+	require.Nil(t, pullRequest.CurrentRevisionID)
+	require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable: true, HeadSHA: "initial-head", AllowedMethods: "SQUASH",
+	}))
+	older := mergeableGitHubPullRequest("older-head")
+	older.State = github.Ptr("open")
+	older.UpdatedAt = &github.Timestamp{Time: time.Now().UTC().Truncate(time.Second)}
+	older.Mergeable = github.Ptr(false)
+	older.MergeableState = github.Ptr("dirty")
+	api := &delayedPullRequestGitHub{
+		factoryGitHubAPI: mergeableFactoryGitHub("newer-head"),
+		older:            older,
+		started:          make(chan struct{}),
+		release:          make(chan struct{}),
+	}
+	stubFactoryGitHub(t, api)
+	original := publishFactoryWorkOrderUpdated
+	publishFactoryWorkOrderUpdated = func(string, string, string) error { return nil }
+	t.Cleanup(func() { publishFactoryWorkOrderUpdated = original })
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	finished := make(chan struct{})
+	var refreshErr error
+	go func() {
+		defer close(finished)
+		refreshErr = refreshFactoryPullRequestMergeability(ctx, db, IntakeDependencies{}, factory, pullRequest)
+	}()
+	t.Cleanup(func() { cancel(); <-finished })
+	select {
+	case <-api.started:
+	case <-ctx.Done():
+		t.Fatal("older refresh did not start")
+	}
+	newer, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	require.NoError(t, refreshFactoryPullRequestMergeability(ctx, db, IntakeDependencies{}, factory, newer))
+	close(api.release)
+	select {
+	case <-finished:
+		require.NoError(t, refreshErr)
+	case <-ctx.Done():
+		t.Fatal("older refresh did not finish")
+	}
+	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	assert.Equal(t, "newer-head", stored.MergeableHeadSHA)
+	assert.True(t, stored.Mergeable)
+	assert.Empty(t, stored.MergeBlockedReason)
+}
+
+type delayedPullRequestGitHub struct {
+	factoryGitHubAPI
+	once    sync.Once
+	older   *github.PullRequest
+	started chan struct{}
+	release chan struct{}
+}
+
+func (f *delayedPullRequestGitHub) GetPullRequest(ctx context.Context, repository string, number int) (*github.PullRequest, *github.Response, error) {
+	delayed := false
+	f.once.Do(func() { delayed = true })
+	if !delayed {
+		return f.factoryGitHubAPI.GetPullRequest(ctx, repository, number)
+	}
+	close(f.started)
+	select {
+	case <-f.release:
+		return f.older, nil, nil
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	}
+}
+
 func TestRefreshFactoryPullRequestMergeabilityReportsUnavailable(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
