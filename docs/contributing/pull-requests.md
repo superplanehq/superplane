@@ -209,8 +209,8 @@ The shared `osv-scanner.toml` does not suppress vulnerabilities.
 The Semaphore Dependency vulnerabilities job scans the same dependency files
 with `make check.vulnerabilities`. It uses the shared configuration without
 the temporary vulnerability suppression. High and critical vulnerabilities
-(CVSS 7.0 or higher) fail this job. Lower and unknown severities are reported
-without blocking. Scan errors also fail the job.
+(CVSS 7.0 or higher) and vulnerabilities with unknown severity fail this job.
+Lower severities are reported without blocking. Scan errors also fail the job.
 Both checks invoke the native `osv-scanner` command.
 Semaphore prepares the project Go compiler and generated clients before the
 vulnerability scan. Go call analysis remains enabled.
