@@ -11,9 +11,41 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/test/support"
 )
+
+func TestFactoryVelocitySync_RepositoryRetryKeepsOtherHistoryAndProgress(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	from := now.AddDate(0, 0, -60)
+	worker := NewFactoryVelocitySyncWorker("", nil, nil)
+	for _, repository := range []string{"example/first", "example/second"} {
+		sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now, repository)
+		require.NoError(t, err)
+		target := models.FactoryVelocitySyncTarget{FactoryID: factory.ID, OrganizationID: r.Organization.ID, Repository: repository}
+		merges := []repositoryMerge{{repository: repository, number: 1, source: models.FactoryVelocityMergeSourcePeople, mergedAt: now.Add(-time.Hour)}}
+		require.NoError(t, worker.storeMerges(target, sync, from, time.Time{}, merges, completeVelocityRead(), now, now))
+	}
+	first, err := models.FindFactoryVelocityRepositorySync(db, factory.ID, "example/first")
+	require.NoError(t, err)
+	require.NoError(t, first.RecordError(db, "retry"))
+	target := models.FactoryVelocitySyncTarget{FactoryID: factory.ID, OrganizationID: r.Organization.ID, Repository: "example/first"}
+	require.NoError(t, worker.storeMerges(target, first, from, time.Time{}, nil, completeVelocityRead(), now.Add(time.Minute), now))
+	rows, err := models.ListFactoryVelocityRepositoryMerges(db, factory.ID, from, now)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "example/second", rows[0].Repository)
+	second, err := models.FindFactoryVelocityRepositorySync(db, factory.ID, "example/second")
+	require.NoError(t, err)
+	assert.WithinDuration(t, now, *second.SyncedAt, time.Second)
+	assert.Empty(t, second.Error)
+}
 
 func Test__VelocitySyncWindow__BackfillsOnFirstSync(t *testing.T) {
 	now := time.Now()

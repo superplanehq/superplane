@@ -3,15 +3,18 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { factoriesDescribeFactoryVelocity } = vi.hoisted(() => ({
+const { factoriesDescribeFactoryVelocity, factoriesSyncFactoryVelocity } = vi.hoisted(() => ({
   factoriesDescribeFactoryVelocity: vi.fn(),
+  factoriesSyncFactoryVelocity: vi.fn(),
 }));
 
 vi.mock("@/api-client", () => ({
   factoriesDescribeFactoryVelocity,
+  factoriesSyncFactoryVelocity,
 }));
 
-import { useFactoryVelocity } from "./useFactoryVelocity";
+import { useFactoryVelocity, useSyncFactoryVelocity } from "./useFactoryVelocity";
+import { factoryQueryKeys } from "./useFactoryData";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -27,6 +30,49 @@ describe("useFactoryVelocity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  it("does not display a cached cohort for a new repository", async () => {
+    factoriesDescribeFactoryVelocity
+      .mockResolvedValueOnce(reportPage([{ id: "first" }]))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, rerender } = renderHook(
+      ({ repository }: { repository: string }) =>
+        useFactoryVelocity("org-1", "factory-1", { periodDays: 14, repository }),
+      { initialProps: { repository: "acme/api" }, wrapper: createWrapper(queryClient) },
+    );
+    await waitFor(() => expect(result.current.data?.people).toEqual([{ id: "first" }]));
+    rerender({ repository: "acme/web" });
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isPlaceholderData).toBe(false);
+  });
+
+  it("waits for the selected completed scope instead of another repository", async () => {
+    factoriesSyncFactoryVelocity.mockResolvedValue({ data: { started: true } });
+    const queryClient = new QueryClient();
+    const key = (repository: string) =>
+      factoryQueryKeys.velocity("org-1", "factory-1", {
+        periodDays: 14,
+        repository,
+        peopleSort: "total",
+        peopleSortDirection: "desc",
+        peopleOffset: 0,
+        peoplePageSize: 5,
+      });
+    const before = new Date(Date.now() - 60000).toISOString();
+    queryClient.setQueryData(key(""), { peopleSyncedAt: before });
+    const { result } = renderHook(() => useSyncFactoryVelocity("org-1", "factory-1", ""), {
+      wrapper: createWrapper(queryClient),
+    });
+    result.current.mutate();
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+    queryClient.setQueryData(key("acme/web"), { peopleSyncedAt: new Date().toISOString() });
+    queryClient.setQueryData(key(""), { peopleSyncPending: true, peopleSyncedAt: new Date().toISOString() });
+    await new Promise((resolve) => setTimeout(resolve, 3200));
+    expect(result.current.isPending).toBe(true);
+    queryClient.setQueryData(key(""), { peopleSyncPending: false, peopleSyncedAt: new Date().toISOString() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 4000 });
+  }, 10000);
 
   /**
    * The People offset is part of the query key, so "Show more" starts a new
