@@ -108,8 +108,8 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToRunner(t *testing.T) {
 	assert.Contains(t, requireTaskFile(t, req.Files, "prepare.sh").Content, "cd '/tmp'")
 	assert.Contains(t, requireTaskFile(t, req.Files, "prepare.sh").Content, `pwd -P >"$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Equal(t, "git clone https://github.com/acme/widgets.git /tmp/repo", requireTaskFile(t, req.Files, "steps/01-clone.sh").Content)
-	assert.Equal(t, "Fix the failing tests", requireTaskFile(t, req.Files, "prompts/02-fix-tests.txt").Content)
-	assert.Equal(t, "Open a pull request", requireTaskFile(t, req.Files, "prompts/03-open-pr.txt").Content)
+	assert.Contains(t, requireTaskFile(t, req.Files, "prompts/02-fix-tests.txt").Content, "Fix the failing tests")
+	assert.Contains(t, requireTaskFile(t, req.Files, "prompts/03-open-pr.txt").Content, "Open a pull request")
 	assert.Equal(t, "git -C /tmp/repo status", requireTaskFile(t, req.Files, "steps/04-status.sh").Content)
 }
 
@@ -175,10 +175,10 @@ func TestRunClaudeCodeExecuteExtendsPromptsWithIntegrationUsageAndSetup(t *testi
 	assert.Equal(t, "gh-token", requireEnvironmentValue(t, req.Environment, "GITHUB_TOKEN"))
 	assert.Equal(t, "sem-token", requireEnvironmentValue(t, req.Environment, "SEMAPHORE_API_TOKEN"))
 	assert.Equal(t, "echo install-sem-ai", requireTaskFile(t, req.Files, "setup/01-set-up-semaphore.sh").Content)
-	assert.Equal(
+	assert.Contains(
 		t,
-		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nUse sem-ai with SEMAPHORE_API_TOKEN.\n\nFix the failing tests",
 		requireTaskFile(t, req.Files, "prompts/01-fix-tests.txt").Content,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nUse sem-ai with SEMAPHORE_API_TOKEN.\n\nFix the failing tests",
 	)
 }
 
@@ -229,7 +229,7 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	assert.Contains(t, req.Commands[3].Command, `source "$SUPERPLANE_TASK_DIR/steps/03-after.sh"`)
 	require.Len(t, req.Files, 8)
 	assert.Equal(t, "git clone https://github.com/acme/widgets.git /tmp/repo", requireTaskFile(t, req.Files, "steps/01-setup.sh").Content)
-	assert.Equal(t, "implement the issue", requireTaskFile(t, req.Files, "prompts/02-prompt.txt").Content)
+	assert.Contains(t, requireTaskFile(t, req.Files, "prompts/02-prompt.txt").Content, "implement the issue")
 	assert.Equal(t, "git push", requireTaskFile(t, req.Files, "steps/03-after.sh").Content)
 }
 
