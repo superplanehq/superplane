@@ -205,4 +205,14 @@ For a focused scan, pass lockfile paths to `bash scripts/license-check.sh`.
 
 This command suppresses vulnerability findings through a temporary configuration.
 The shared `osv-scanner.toml` does not suppress vulnerabilities.
-Vulnerability checks for dependencies and release images are a separate follow-up.
+
+The Semaphore Dependency vulnerabilities job scans the same dependency files
+with `make check.vulnerabilities`. It uses the shared configuration without
+the temporary vulnerability suppression. Vulnerability findings fail this job.
+Both checks use the image pinned in `scripts/osv-scanner-image.txt`.
+Release image vulnerability scanning remains a separate follow-up.
+
+The Semaphore Go SAST job runs `make check.gosec` after Go setup.
+It scans `cmd/`, `pkg/`, and `ee/` with gosec v2.30.0.
+It excludes generated code and does not scan test files.
+Findings and scan errors fail the job.

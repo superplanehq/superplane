@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Pin the release and digest so local checks and CI use the same scanner.
-scanner_image="ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0"
+scanner_image=$(cat scripts/osv-scanner-image.txt)
 permitted_licenses=$(paste -sd, scripts/permitted-licenses.txt)
 
 config_directory=$(mktemp -d)
