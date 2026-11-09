@@ -118,11 +118,12 @@ describe("useFactoryWebsocket", () => {
     expect(enabled).toBe(false);
   });
 
-  it("loads that task and patches the cached row", async () => {
+  it("refreshes task and pull request state in board and detail caches", async () => {
     const describeWorkOrder = vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue(
       describeResponse({
         id: "order-1",
         title: "New",
+        pullRequests: [{ id: "pr-1", state: "STATE_OPEN" }],
         checks: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5, analysis: "long" }],
         planningSession: {
           id: "ps-1",
@@ -134,14 +135,17 @@ describe("useFactoryWebsocket", () => {
       }),
     );
     const { queryClient, invalidateSpy } = renderFactoryWebsocket();
+    const old = { id: "order-1", title: "Old", pullRequests: [{ id: "pr-1", state: "STATE_DRAFT" }] };
+    const detailKey = factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1");
+    queryClient.setQueryData(detailKey, old);
     queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [
-      { id: "order-1", title: "Old" },
+      old,
       { id: "order-2", title: "Other" },
     ]);
 
     await emit({
       event: "work_order_updated",
-      payload: { factoryId: "factory-1", orderId: "order-1", reason: "order.agent_question" },
+      payload: { factoryId: "factory-1", orderId: "order-1", reason: "order.pull_request.updated" },
     });
 
     expect(describeWorkOrder).toHaveBeenCalledTimes(1);
@@ -151,6 +155,7 @@ describe("useFactoryWebsocket", () => {
     expect(orders?.[0]).toMatchObject({
       id: "order-1",
       title: "New",
+      pullRequests: [{ id: "pr-1", state: "STATE_OPEN" }],
       checkScores: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5 }],
       planningSession: {
         id: "ps-1",
@@ -161,6 +166,9 @@ describe("useFactoryWebsocket", () => {
       },
     });
     expect(orders?.[1]).toEqual({ id: "order-2", title: "Other" });
+    expect(queryClient.getQueryData<FactoriesWorkOrder>(detailKey)?.pullRequests).toEqual([
+      { id: "pr-1", state: "STATE_OPEN" },
+    ]);
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrderEvents("org-1", "factory-1", "order-1"),
     });
