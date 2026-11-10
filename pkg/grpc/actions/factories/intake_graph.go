@@ -325,7 +325,8 @@ func isIntakeAuthorPermissionNode(node *models.Node) bool {
 func isIntakeAuthorFilterNode(node *models.Node) bool {
 	return node.ID == intakeAuthorFilterNodeID ||
 		(node.ComponentName() == intakeFilterComponent &&
-			node.Configuration["expression"] == `root().data.permission != "none"`)
+			(node.Configuration["expression"] == `root().data.permission != "none"` ||
+				node.Configuration["expression"] == intakeAuthorPermissionCondition))
 }
 
 func resolveIntakeNode(nodes []models.Node, preferredID string, matches func(*models.Node) bool) string {

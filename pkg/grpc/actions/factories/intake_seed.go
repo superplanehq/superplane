@@ -179,13 +179,8 @@ func liveIntakeBinding(tx *gorm.DB, intake *models.FactoryIntake) (*intakeBindin
 		return nil, fmt.Errorf("load intake graph: %w", err)
 	}
 
-	var trigger *models.Node
-	for i := range version.Nodes {
-		if version.Nodes[i].ID == intakeTriggerNodeID {
-			trigger = &version.Nodes[i]
-			break
-		}
-	}
+	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+	trigger := findIntakeNode(version.Nodes, resolveIntakeGraph(intake.Source, spec).TriggerNodeID)
 	if trigger == nil || trigger.IntegrationID == nil {
 		return nil, nil
 	}
@@ -1069,7 +1064,22 @@ func emitIntakeEvents(tx *gorm.DB, canvasID uuid.UUID, payloadType string, paylo
 		return nil
 	}
 
-	node, err := models.FindCanvasNode(tx, canvasID, intakeTriggerNodeID)
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, canvasID)
+	if err != nil {
+		return err
+	}
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+	if err != nil {
+		return err
+	}
+	triggerID := resolveIntakeNode(version.Nodes, intakeTriggerNodeID, func(node *models.Node) bool {
+		return node.Type == models.NodeTypeTrigger
+	})
+	if payloadType == intakeGitHubIssuePayloadType {
+		spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+		triggerID = resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec).TriggerNodeID
+	}
+	node, err := models.FindCanvasNode(tx, canvasID, triggerID)
 	if err != nil {
 		return fmt.Errorf("failed to load the intake trigger: %w", err)
 	}
