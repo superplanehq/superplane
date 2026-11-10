@@ -96,19 +96,33 @@ func (w *EventRouter) StartRabbitMQConsumer(ctx context.Context) {
 	consumer := tackle.NewConsumer()
 	consumer.SetLogger(logging.NewTackleLogger(w.logger))
 	w.consumer = consumer
+	go func() {
+		<-ctx.Done()
+		consumer.Stop()
+	}()
 
 	for {
+		if ctx.Err() != nil {
+			return
+		}
 		log.Infof("Connecting to RabbitMQ queue for %s events", messages.EventCreatedRoutingKey)
 
 		err := w.consumer.Start(&options, w.Consume)
+		if ctx.Err() != nil {
+			return
+		}
 		if err != nil {
 			w.logger.Errorf("Error consuming messages from %s: %v", messages.EventCreatedRoutingKey, err)
-			time.Sleep(5 * time.Second)
+			if !waitForConsumerRetry(ctx) {
+				return
+			}
 			continue
 		}
 
 		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.EventCreatedRoutingKey)
-		time.Sleep(5 * time.Second)
+		if !waitForConsumerRetry(ctx) {
+			return
+		}
 	}
 }
 

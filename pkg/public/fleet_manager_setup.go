@@ -182,7 +182,7 @@ func loadFleetManagerSetupConfig(path string) (fleetManagerSetupConfig, error) {
 		return setup, nil
 	}
 
-	contents, err := os.ReadFile(path)
+	contents, err := os.ReadFile(path) // #nosec G304 G703 -- the path comes from trusted deployment configuration.
 	if err != nil {
 		return fleetManagerSetupConfig{}, err
 	}

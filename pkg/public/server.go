@@ -629,17 +629,17 @@ func (s *Server) RegisterOpenAPIHandler() {
 		return
 	}
 
-	if _, err := os.Stat(swaggerFilesPath); os.IsNotExist(err) {
+	if _, err := os.Stat(swaggerFilesPath); os.IsNotExist(err) { // #nosec G703 -- the path comes from trusted server configuration.
 		log.Errorf("API documentation directory %s does not exist", swaggerFilesPath)
 		return
 	}
 
 	s.Router.HandleFunc(s.BasePath+"/docs", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, swaggerFilesPath+"/swagger-ui.html")
+		http.ServeFile(w, r, swaggerFilesPath+"/swagger-ui.html") // #nosec G703 -- the configured directory is combined with a fixed filename.
 	})
 
 	s.Router.HandleFunc(s.BasePath+"/docs/superplane.swagger.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, swaggerFilesPath+"/superplane.swagger.json")
+		http.ServeFile(w, r, swaggerFilesPath+"/superplane.swagger.json") // #nosec G703 -- the configured directory is combined with a fixed filename.
 	})
 
 	log.Infof("OpenAPI specification available at %s", swaggerFilesPath)
@@ -1784,7 +1784,7 @@ func (s *Server) Serve(host string, port int) error {
 
 	handler := http.Handler(s.Router)
 	if os.Getenv("REDIRECT_HTTP_REQUESTS") == "yes" {
-		handler = middleware.RedirectInsecureForwardedHTTP(handler)
+		handler = middleware.RedirectInsecureForwardedHTTP(handler, s.BaseURL)
 	}
 
 	s.httpServer = &http.Server{
@@ -2540,7 +2540,7 @@ func (s *Server) setupDevProxy(webBasePath string) {
 		log.Fatalf("Error parsing Vite dev server URL: %v", err)
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy := httputil.NewSingleHostReverseProxy(target) // #nosec G704 -- the proxy target comes only from trusted development configuration.
 
 	proxy.ModifyResponse = func(res *http.Response) error {
 		contentType := res.Header.Get("Content-Type")
