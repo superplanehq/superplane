@@ -84,6 +84,11 @@ func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent
 	if prID == uuid.Nil {
 		return nil
 	}
+	// Activity admission locks the PR. Take the publication lock first, in
+	// the same order as reconciliation, before linking this new assessment.
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", "human-review:"+prID.String()).Error; err != nil {
+		return err
+	}
 	if err := maybeLinkFactoryColumnAppRun(tx, canvas, event, run, "risk-score", "Merge confidence"); err != nil {
 		return err
 	}
@@ -106,7 +111,15 @@ func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent
 			return err
 		}
 	}
-	return nil
+	factory, err := FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return err
+	}
+	pr, err := factory.FindPullRequest(tx, FactoryPullRequestLookup{ID: activity.PullRequestID})
+	if err != nil {
+		return err
+	}
+	return pr.queueHumanReviewAssessment(tx, event, run)
 }
 
 func maybeLinkFactoryColumnAppRun(

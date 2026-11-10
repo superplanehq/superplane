@@ -151,6 +151,7 @@ describe("Reset one built-in automation", () => {
             last_reset_by: "Ada Admin",
           },
           { id: "pr-feedback:discussion", name: "Pull request discussion" },
+          { id: "human-review", name: "Request review" },
           { id: "line-implementation", name: "Implement" },
           { id: "pr-closure", name: "Pull request closure" },
         ]),
@@ -167,6 +168,7 @@ describe("Reset one built-in automation", () => {
     expect(within(intake).queryByRole("row", { name: /Pull request discussion/ })).not.toBeInTheDocument();
     expect(within(implementation).getByRole("button", { name: "Reset Implement" })).toBeInTheDocument();
     expect(within(verify).getByRole("row", { name: /Pull request discussion/ })).toBeInTheDocument();
+    expect(within(verify).getByRole("button", { name: "Reset Request review" })).toBeInTheDocument();
     expect(within(verify).queryByRole("button", { name: "Reset Pull request closure" })).not.toBeInTheDocument();
     expect(within(done).getByRole("button", { name: "Reset Pull request closure" })).toBeInTheDocument();
 

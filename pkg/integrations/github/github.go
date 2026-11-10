@@ -965,6 +965,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"statuses":                    "write",
 			"deployments":                 "write",
 			"organization_administration": "read",
+			"members":                     "read",
 			"vulnerability_alerts":        "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),

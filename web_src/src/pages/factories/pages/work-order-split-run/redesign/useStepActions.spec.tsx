@@ -95,4 +95,37 @@ describe("useStepActions", () => {
     render(<Probe phases={[phase]} />);
     expect(fetchNextPage).toHaveBeenCalled();
   });
+
+  it("shows review reasons only on the selected review run and behind the flag", () => {
+    gate.on = false;
+    gate.events = [];
+    gate.hasNextPage = false;
+    const reviewPhase: SplitRunPhase = {
+      ...phase,
+      pullRequestActivity: {
+        pullRequest: {
+          id: "pr",
+          currentRevision: { sha: "head" },
+          humanReview: {
+            runId: "run-1",
+            assessedCommit: "head",
+            status: "decided",
+            reviewRequired: true,
+            rationale: "A security finding requires review.",
+            selectedReviewers: [{ login: "alex", reason: "Owns the affected files." }],
+          },
+        },
+      },
+    };
+    const view = render(<Probe phases={[reviewPhase]} />);
+    expect(screen.queryByText(/A security finding/)).not.toBeInTheDocument();
+
+    gate.on = true;
+    view.rerender(<Probe phases={[reviewPhase]} />);
+    expect(screen.getByText(/A security finding requires review/)).toBeInTheDocument();
+    expect(screen.getByText(/Selected @alex.*Owns the affected files/)).toBeInTheDocument();
+
+    view.rerender(<Probe phases={[{ ...reviewPhase, runId: "another-run" }]} />);
+    expect(screen.queryByText(/A security finding/)).not.toBeInTheDocument();
+  });
 });

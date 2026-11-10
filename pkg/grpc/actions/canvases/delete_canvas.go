@@ -14,8 +14,24 @@ import (
 func DeleteCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.DeleteCanvasResponse, error) {
 	// Perform soft delete on the canvas with name suffix
 	// The cleanup worker will handle the actual deletion of nodes and related data
-	err := canvas.SoftDeleteInTransaction(db)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		current, err := models.LockCanvasForUpdate(tx, canvas.OrganizationID, canvas.ID)
+		if err != nil {
+			return err
+		}
+		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, current)
+		if err != nil {
+			return err
+		}
+		if models.FactoryAppTemplateID(version.Nodes) == models.FactoryAppTemplateHumanReviewID {
+			return grpcerrors.FailedPrecondition(nil, "Disable Request review in the automation settings")
+		}
+		return current.SoftDeleteInTransaction(tx)
+	})
 	if err != nil {
+		if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+			return nil, err
+		}
 		log.Errorf("failed to delete canvas %s: %v", canvas.ID.String(), err)
 		return nil, grpcerrors.Internal(err, "failed to delete canvas")
 	}

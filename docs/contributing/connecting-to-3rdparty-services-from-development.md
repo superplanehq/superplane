@@ -143,7 +143,7 @@ installation row.
 5. Grant repository permissions that match the workspace GitHub App manifest:
    - Issues: Read and write
    - Actions: Read and write
-   - Checks: Read-only
+   - Checks: Read and write
    - Contents: Read and write
    - Pull requests: Read and write
    - Repository hooks: Read and write
@@ -233,6 +233,57 @@ If Connect cannot create the app, confirm `BASE_URL` and
 
 CI sets dummy GitHub App values so factory E2E can skip create-app.
 Local `make test.e2e` needs the same dummy values or a real app.
+
+## Request review rollout
+
+Request review is an optional GitHub automation. It starts disabled.
+It uses the existing GitHub integration and agent configuration.
+No new environment variables or Secret keys are required.
+
+1. Upgrade the applicable GitHub App to **Checks: Read and write**.
+2. Retain **Pull requests: Read and write**. Optional GitHub team fallbacks also require **Members: Read-only**.
+3. Ask existing installation owners to accept the permission update.
+4. Apply the Request review migration before deploying API and worker code. Keep Request review disabled during deployment.
+5. Add Request review from the Verify automation catalog.
+6. Select a default GitHub reviewer and configure review instructions as a SuperPlane organization administrator.
+7. Test assessment completion, reviewer selection, approval, dismissal, new commits, and disablement in a test repository.
+8. Enable Request review only after these lifecycle checks pass.
+9. Configure GitHub branch protection separately to require `merge-confidence/merge-gate` from the correct GitHub App.
+10. Preserve existing CI requirements and verify bypass settings.
+
+The local and self-hosted manifests request the required permissions for new
+Apps. They do not update existing Apps or installations.
+Hosted App owners must update the hosted GitHub App configuration before enablement.
+This repository does not verify that configuration or live branch protection.
+
+The API receives authenticated review events. Workers select reviewers and
+publish checks through the existing integration credentials. Runner agents
+return scoped decisions; they do not publish checks or approve pull requests.
+The default reviewer must be a human with repository write access or higher.
+Personal GitHub repositories do not require a GitHub organization team.
+Existing team fallbacks remain supported. The pull request author cannot review their own pull request.
+The existing App credentials must remain available to the API and workers.
+No Helm value changes are required for this feature.
+
+The four superseded review migrations have not reached shared environments.
+Existing local databases with those versions need separate reconciliation before
+switching migration history. Do not reset those databases.
+
+Runner installation tokens cannot publish GitHub checks or commit statuses.
+The Publish Commit Status component uses server credentials and retains write access.
+
+A required check applies to the protected branch, including untracked pull
+requests. Those pull requests wait until Factory imports or accepts them.
+Without a required-check rule, the results remain advisory.
+Review event delivery and reconciliation have latency. Approval revocation
+cannot update a published check immediately in every case.
+SuperPlane does not change repository protection.
+
+Hosted API and workers use the existing `SUPERPLANE_GITHUB_APP_*` configuration.
+Workers must retain `START_NODE_REQUEST_WORKER=yes`. The hosted chart references
+the GitHub App Secret for workers. Launchpad references `superplane-github-app`
+in production and `superplane-github-app-staging` in staging. These source
+references do not verify deployed Secret contents or accepted App permissions.
 
 ## Bitbucket Forge local development
 

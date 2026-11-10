@@ -53,6 +53,93 @@ func TestMergeConfidenceActivityKeepsItsAssessedRevision(t *testing.T) {
 	}
 }
 
+func TestMergeConfidenceStartInvalidatesTheCurrentHumanReviewDecision(t *testing.T) {
+	for _, scenario := range []struct {
+		name          string
+		previousState string
+	}{
+		{name: "a new assessment retires the successful decision", previousState: models.FactoryHumanReviewStateDecided},
+		{name: "disabled enforcement stays disabled", previousState: models.FactoryHumanReviewStateDisabled},
+		{name: "an absent gate stays absent"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Review the change", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			pullRequestURL := "https://github.com/acme/app/pull/42"
+			pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: pullRequestURL})
+			require.NoError(t, err)
+			revision, err := pr.ObserveRevision(db, "current-head")
+			require.NoError(t, err)
+			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+				NodeID: "on-pr-risk", Type: models.NodeTypeTrigger,
+				Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata("risk-score", 1)),
+			}}, nil)
+			require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+			canvas.FactoryID = &factory.ID
+			older, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "on-pr-risk", models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+			require.NoError(t, err)
+			_, err = pr.CreateActivity(db, models.FactoryPullRequestActivityParams{RunID: older.ID, Title: "Merge confidence", Access: models.FactoryPullRequestAccessConcurrent})
+			require.NoError(t, err)
+			var previous *models.FactoryHumanReviewDecision
+			if scenario.previousState != "" {
+				previous, err = pr.NewHumanReviewDecision(db, models.FactoryHumanReviewDecision{
+					RevisionID: revision.Revision.ID, SourceRunID: &older.ID, AssessedCommit: "current-head", State: scenario.previousState,
+					ConfigurationVersion: uuid.NewString(), CheckRunID: 123, CheckURL: "https://github.com/acme/app/runs/123",
+					Rationale: "The previous assessment was favorable.", Result: datatypes.JSONMap{"reviewRequired": false},
+				})
+				require.NoError(t, err)
+			}
+			run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "on-pr-risk", models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			event := &models.CanvasEvent{WorkflowID: canvas.ID, NodeID: "on-pr-risk", Data: models.NewJSONValue(map[string]any{"data": map[string]any{
+				"pullRequest":  map[string]any{"id": pr.ID.String()},
+				"pull_request": map[string]any{"head": map[string]any{"sha": "current-head"}},
+			}})}
+			link := func() {
+				t.Helper()
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return models.MaybeLinkMergeConfidenceRun(tx, canvas, event, run) }))
+			}
+			link()
+			link()
+			current, err := pr.CurrentHumanReview(db)
+			require.NoError(t, err)
+			if previous == nil {
+				require.Nil(t, current)
+				return
+			}
+			if previous.State == models.FactoryHumanReviewStateDisabled {
+				require.Equal(t, previous.ID, current.ID)
+				require.Equal(t, models.FactoryHumanReviewStateDisabled, current.State)
+				return
+			}
+			require.NotEqual(t, previous.ID, current.ID)
+			require.Equal(t, models.FactoryHumanReviewStateWaitingAssessment, current.State)
+			require.Equal(t, run.ID, *current.SourceRunID)
+			require.Equal(t, int64(123), current.CheckRunID)
+			require.Equal(t, previous.ConfigurationVersion, current.ConfigurationVersion)
+			require.Empty(t, current.Result)
+			retired, err := models.FindFactoryHumanReviewDecision(db, previous.ID)
+			require.NoError(t, err)
+			require.Equal(t, models.FactoryHumanReviewStateSuperseded, retired.State)
+			link()
+			repeated, err := pr.CurrentHumanReview(db)
+			require.NoError(t, err)
+			require.Equal(t, current.ID, repeated.ID)
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return models.MaybeLinkMergeConfidenceRun(tx, canvas, event, older) }))
+			repeated, err = pr.CurrentHumanReview(db)
+			require.NoError(t, err)
+			require.Equal(t, current.ID, repeated.ID, "a delayed older hook cannot restore its assessment")
+			var count int64
+			require.NoError(t, db.Model(&models.FactoryHumanReviewDecision{}).Where("pull_request_id = ?", pr.ID).Count(&count).Error)
+			require.EqualValues(t, 2, count)
+		})
+	}
+}
+
 func TestMaybeLinkVisualEvidenceRunShowsTheRunOnThePullRequest(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
