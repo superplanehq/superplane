@@ -33,8 +33,7 @@ func SecurityEvent(ctx context.Context, action, outcome, targetType, targetID st
 	identity := SecurityIdentity{}
 	if known := SecurityIdentityFrom(ctx); known != nil {
 		identity = *known
-	}
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
+	} else if md, ok := metadata.FromIncomingContext(ctx); ok {
 		for key, dest := range map[string]*string{
 			"x-account-id": &identity.AccountID, "x-user-id": &identity.UserID,
 			"x-organization-id": &identity.OrganizationID,

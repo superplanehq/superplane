@@ -15,6 +15,7 @@ import (
 /*
  * CloneGatewayRequest copies the request the gateway handler forwards.
  * The copy keeps the caller context so a later error report can still find it.
+ * Identity and scope headers must be set from authenticated context by the caller.
  */
 func CloneGatewayRequest(r *http.Request) *http.Request {
 	if r == nil {
@@ -23,6 +24,11 @@ func CloneGatewayRequest(r *http.Request) *http.Request {
 
 	cloned := new(http.Request)
 	*cloned = *r
+	cloned.Header = r.Header.Clone()
+	for _, key := range []string{"X-User-Id", "X-Organization-Id", "X-Account-Id", "X-Token-Scopes", "X-Support-Session"} {
+		cloned.Header.Del(key)
+		cloned.Header.Del("Grpc-Metadata-" + key)
+	}
 	if r.URL != nil {
 		cloned.URL = new(url.URL)
 		*cloned.URL = *r.URL
