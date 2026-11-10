@@ -27,8 +27,9 @@ const (
 	intakeSentryEventHasStackNodeID           = "latest-sentry-event-has-stack"
 	intakeCreateNodeID                        = "create-work-order"
 
-	intakeAuthorPermissionNodeID = "get-author-permission"
-	intakeAuthorFilterNodeID     = "author-has-repository-access"
+	intakeAuthorPermissionNodeID    = "get-author-permission"
+	intakeAuthorFilterNodeID        = "author-has-repository-access"
+	intakeAuthorPermissionCondition = `previous().data.permission in ["read", "triage", "write", "maintain", "admin"]`
 
 	// Legacy node identifiers. A graph generated before intake became
 	// create-only still resolves so settings and health keep working.
@@ -463,8 +464,9 @@ func configureIntakeAuthorAccess(
 			Component: &models.ComponentRef{Name: intakeAuthorPermissionComponent},
 		},
 		Configuration: map[string]any{
-			"repository": repository,
-			"username":   "{{ root().data.issue.user.login }}",
+			"repository":       repository,
+			"username":         "{{ root().data.issue.user.login }}",
+			"fallbackUsername": `{{ root().data.action in ["labeled", "reopened"] ? (root().data.sender?.login ?? "") : "" }}`,
 		},
 		Position:      models.Position{X: 160, Y: 440},
 		Concurrency:   intakeModelConcurrency(),
@@ -481,7 +483,7 @@ func configureIntakeAuthorAccess(
 			Component: &models.ComponentRef{Name: intakeFilterComponent},
 		},
 		Configuration: map[string]any{
-			"expression": `root().data.permission != "none"`,
+			"expression": intakeAuthorPermissionCondition,
 		},
 		Position:    models.Position{X: 160, Y: 620},
 		Concurrency: intakeModelConcurrency(),

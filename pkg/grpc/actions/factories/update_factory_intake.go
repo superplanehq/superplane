@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
@@ -206,8 +207,19 @@ func applyIntakeUpdate(
 		userID = uuid.MustParse(rawID)
 	}
 
+	replay := false
 	err := db.Transaction(func(tx *gorm.DB) error {
 		if settings != nil || binding != nil {
+			if settings != nil && intake.Source == models.FactoryIntakeSourceGitHubIssues {
+				version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+				if err != nil {
+					return err
+				}
+				spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+				current := intakeSettingsFromGraph(intake.Source, resolveIntakeGraph(intake.Source, spec), spec)
+				updated := parseIntakeSettings(current, settings)
+				replay = current.AuthorsWithAccess && !updated.AuthorsWithAccess && !intakeSettingsOnlyDefaultOwner(settings)
+			}
 			if err := applyIntakeGraphUpdate(ctx, deps, tx, intake, canvas, userID, settings, binding); err != nil {
 				return err
 			}
@@ -233,6 +245,12 @@ func applyIntakeUpdate(
 
 	if name != nil {
 		canvases.PublishCanvasUpdated(canvas)
+	}
+	if replay && !intake.Paused() {
+		if err := replaySkippedGitHubIssues(ctx, deps, db, intake); err != nil {
+			log.WithError(err).WithField("intake_id", intake.ID).WithField("factory_id", intake.FactoryID).
+				Warn("failed to replay skipped GitHub issues after saving intake settings")
+		}
 	}
 
 	return nil
