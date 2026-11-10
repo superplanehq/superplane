@@ -106,7 +106,15 @@ func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent
 			return err
 		}
 	}
-	return nil
+	factory, err := FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return err
+	}
+	pr, err := factory.FindPullRequest(tx, FactoryPullRequestLookup{ID: activity.PullRequestID})
+	if err != nil {
+		return err
+	}
+	return run.QueueMergeConfidenceCheck(tx, pr)
 }
 
 func maybeLinkFactoryColumnAppRun(

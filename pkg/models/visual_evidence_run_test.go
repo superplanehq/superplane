@@ -53,6 +53,68 @@ func TestMergeConfidenceActivityKeepsItsAssessedRevision(t *testing.T) {
 	}
 }
 
+func TestMergeConfidenceStartQueuesOneDurableCheck(t *testing.T) {
+	for _, scenario := range []struct {
+		name          string
+		provider      string
+	}{
+		{name: "GitHub queues one durable check"},
+		{name: "Bitbucket skips GitHub check publication", provider: models.FactoryPullRequestProviderBitbucket},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Review the change", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			pullRequestURL := "https://github.com/acme/app/pull/42"
+			if scenario.provider == models.FactoryPullRequestProviderBitbucket {
+				pullRequestURL = "https://bitbucket.org/acme/app/pull-requests/42"
+			}
+			pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{Provider: scenario.provider, URL: pullRequestURL})
+			require.NoError(t, err)
+			_, err = pr.ObserveRevision(db, "current-head")
+			require.NoError(t, err)
+			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+				NodeID: "on-pr-risk", Type: models.NodeTypeTrigger,
+				Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata("risk-score", 1)),
+			}}, nil)
+			require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+			canvas.FactoryID = &factory.ID
+			older, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "on-pr-risk", models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+			require.NoError(t, err)
+			_, err = pr.CreateActivity(db, models.FactoryPullRequestActivityParams{RunID: older.ID, Title: "Merge confidence", Access: models.FactoryPullRequestAccessConcurrent})
+			require.NoError(t, err)
+			run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "on-pr-risk", models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			event := &models.CanvasEvent{WorkflowID: canvas.ID, NodeID: "on-pr-risk", Data: models.NewJSONValue(map[string]any{"data": map[string]any{
+				"pullRequest":  map[string]any{"id": pr.ID.String()},
+				"pull_request": map[string]any{"head": map[string]any{"sha": "current-head"}},
+			}})}
+			link := func() {
+				t.Helper()
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return models.MaybeLinkMergeConfidenceRun(tx, canvas, event, run) }))
+			}
+			link()
+			link()
+			var publications []models.CanvasNodeRequest
+			require.NoError(t, db.Where("workflow_id = ? AND type = ?", canvas.ID, models.NodeRequestTypeMergeConfidenceCheck).Find(&publications).Error)
+			if scenario.provider == models.FactoryPullRequestProviderBitbucket {
+				require.Empty(t, publications)
+				return
+			}
+			require.Len(t, publications, 1, "repeated run admission must keep one durable publication")
+			require.Nil(t, publications[0].ExecutionID, "run cancellation must not discard check publication")
+			publication := publications[0].Spec.Data().MergeConfidenceCheck
+			require.NotNil(t, publication)
+			require.Equal(t, pr.ID, publication.PullRequestID)
+			require.Equal(t, run.ID, publication.RunID)
+
+		})
+	}
+}
+
 func TestMaybeLinkVisualEvidenceRunShowsTheRunOnThePullRequest(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
