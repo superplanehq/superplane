@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	githubauth "github.com/google/go-github/v75/github"
 	"github.com/google/go-github/v84/github"
+	githubauth "github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"

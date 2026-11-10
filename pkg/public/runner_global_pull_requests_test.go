@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
+	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -68,4 +69,19 @@ func TestRunnerPullRequestErrorReportsAGitHubTimeout(t *testing.T) {
 	writeRunnerPullRequestError(rec, fmt.Errorf("%w: %w", factoryactions.ErrTaskPullRequestGitHubTimeout, context.DeadlineExceeded))
 
 	assert.Equal(t, http.StatusGatewayTimeout, rec.Code)
+}
+
+func TestRunnerPullRequestErrorReportsBitbucketFailures(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeRunnerPullRequestError(rec, fmt.Errorf("%w: %w", factoryactions.ErrTaskPullRequestBitbucketTimeout, context.DeadlineExceeded))
+	assert.Equal(t, http.StatusGatewayTimeout, rec.Code)
+
+	rec = httptest.NewRecorder()
+	writeRunnerPullRequestError(rec, &bitbucket.APIError{StatusCode: http.StatusBadRequest, Message: "branch not found"})
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.Contains(t, rec.Body.String(), "branch not found")
+
+	rec = httptest.NewRecorder()
+	writeRunnerPullRequestError(rec, factoryactions.ErrTaskPullRequestBitbucketNotConnected)
+	assert.Equal(t, http.StatusConflict, rec.Code)
 }

@@ -242,6 +242,34 @@ func Test__WaitForBuilds__HandleWebhook(t *testing.T) {
 		assert.Equal(t, waitBuildsEvaluateHook, requests.Action)
 	})
 
+	t.Run("a workspace wait finds the execution by the event repository", func(t *testing.T) {
+		body := []byte(`{"repository": {"full_name": "Acme/Web"}, "commit_status": {"key": "build-a", "state": "SUCCESSFUL", "commit": {"hash": "abc123"}}}`)
+		headers := http.Header{}
+		headers.Set("X-Event-Key", "repo:commit_status_updated")
+		headers.Set("X-Hub-Signature", "sha256="+signBitbucketPayload("test-secret", body))
+
+		requests := &contexts.RequestContext{}
+		lookedUp := ""
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Configuration: map[string]any{
+				"repository": "{{ root().data.repository.full_name }}",
+				"ref":        "abc123",
+				"buildKeys":  []string{"build-a"},
+			},
+			FindActiveExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				lookedUp = value
+				return &core.ExecutionContext{ExecutionState: &contexts.ExecutionStateContext{}, Requests: requests}, nil
+			},
+		})
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, waitBuildsRefValue("acme/web", "abc123"), lookedUp)
+		assert.Equal(t, waitBuildsEvaluateHook, requests.Action)
+	})
+
 	t.Run("falls back to legacy lookup when active lookup is absent", func(t *testing.T) {
 		body := []byte(`{"repository": {"full_name": "acme/widgets"}, "commit_status": {"key": "build-a", "state": "SUCCESSFUL", "commit": {"hash": "abc123"}}}`)
 		headers := http.Header{}

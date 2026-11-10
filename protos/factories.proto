@@ -2833,9 +2833,10 @@ message DescribeFactoryVelocityRequest {
   // Period window in days. Only 14 and 30 are supported by the UI today; any
   // other positive value is clamped server-side.
   int32 period_days = 2;
-  // Optional `owner/repo` the report is limited to. When it is empty the
-  // response returns SuperPlane data only and sets `has_people_cohort = false`
-  // so the UI can hide the People series.
+  // Optional workspace repository for delivery and manual authorship. With
+  // multi-repo tasks enabled, empty selects all enabled writable repositories.
+  // Task metrics, spending, and automations stay workspace-wide. With the flag
+  // disabled, empty keeps the legacy SuperPlane-only report.
   string repository = 3;
   // Column the People table sorts on. Defaults to PEOPLE_SORT_TOTAL.
   PeopleSort people_sort = 4;
@@ -2888,6 +2889,8 @@ message DescribeFactoryVelocityResponse {
   // One row per automation of the workspace that ran in the window, ordered by
   // run count. Empty when no automation ran.
   repeated DescribeFactoryVelocityAutomation automations = 14;
+  // Enabled writable workspace repositories, primary first.
+  repeated string repositories = 15;
 }
 
 message DescribeFactoryVelocityDay {

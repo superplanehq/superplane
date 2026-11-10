@@ -179,6 +179,25 @@ func TestBuildAgentTaskAppliesStepWorkingDirectory(t *testing.T) {
 	assert.Equal(t, ActivityStreamScript, requireBrokerFile(t, files, "activity_stream.js").Content)
 }
 
+func TestBuildAgentTaskDeliversBrowserGuidanceWithoutVisualEvidence(t *testing.T) {
+	t.Parallel()
+
+	prompt := "Use the browser to open the UI and inspect its rendered content."
+	commands, files := BuildAgentTask(AgentTaskInput{
+		Steps: []AgentStep{{Name: "Navigate", Type: AgentStepPrompt, Prompt: &prompt}},
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName
+		},
+	})
+
+	file := requireBrokerFile(t, files, "prompts/01-navigate.txt")
+	assert.Contains(t, file.Content, "Run the installed `playwright cli` on the runner host, not in the repository container.")
+	assert.Contains(t, file.Content, "snapshot")
+	assert.NotContains(t, file.Content, "## Visual evidence protocol")
+	assert.NotContains(t, file.Content, "upload at least one screenshot")
+	assert.Equal(t, prompt, commands[1].Preview)
+}
+
 func TestBuildAgentTaskPreviewKeepsFullMultilineBody(t *testing.T) {
 	t.Parallel()
 
@@ -286,10 +305,10 @@ func TestBuildAgentTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
 	assert.Contains(t, commands[2].Command, `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"`)
 
 	assert.Equal(t, "echo install-sem-ai", requireBrokerFile(t, files, "setup/01-set-up-semaphore.sh").Content)
-	assert.Equal(
+	assert.Contains(
 		t,
-		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nimplement the change",
 		requireBrokerFile(t, files, "prompts/01-implement.txt").Content,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nimplement the change",
 	)
 }
 

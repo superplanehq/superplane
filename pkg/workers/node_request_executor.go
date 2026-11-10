@@ -513,7 +513,7 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 		HTTP:           e.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
-		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Requests:       contexts.NewExecutionRequestContext(tx, execution).WithCurrentRequest(request),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, e.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, e.registry, workflow.OrganizationID, e.encryptor),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),

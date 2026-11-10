@@ -42,10 +42,11 @@ func refreshWorkspaceRepositoryAutomations(ctx context.Context, deps IntakeDepen
 // republishWorkspaceRepositoryAutomations turns on the workspace scope on
 // the pull request closure, merge confidence, Visual Evidence, and PR
 // feedback nodes. It then runs Setup again on those nodes and on every other
-// GitHub node that listens on the workspace, so each webhook covers the
-// current workspace repositories.
+// node of the workspace provider that listens on the workspace, so each
+// webhook covers the current workspace repositories.
 func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, factory *models.Factory) error {
-	if factory.OnboardingConfigValue().EffectiveVCSProvider() != models.ProviderGitHub {
+	provider := factory.OnboardingConfigValue().EffectiveVCSProvider()
+	if provider != models.ProviderGitHub && provider != models.ProviderBitbucket {
 		return nil
 	}
 	options := changesets.CanvasPublisherOptions{
@@ -79,8 +80,8 @@ func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, d
 			return err
 		}
 		spec := models.LiveCanvasSpec{Nodes: liveVersion.Nodes, Edges: liveVersion.Edges}
-		nodeIDs := workspaceScopeNodeIDs(spec, handlerCanvasIDs[canvas.ID])
-		setupNodeIDs := withWorkspaceListenerNodeIDs(nodeIDs, liveVersion.Nodes)
+		nodeIDs := workspaceScopeNodeIDs(spec, provider, handlerCanvasIDs[canvas.ID])
+		setupNodeIDs := withWorkspaceListenerNodeIDs(nodeIDs, provider, liveVersion.Nodes)
 		if len(setupNodeIDs) == 0 {
 			continue
 		}
@@ -111,10 +112,10 @@ func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, d
 	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
 }
 
-// workspaceScopeNodeIDs lists the GitHub nodes that listen for pull request
-// events of the workspace: the closure, merge confidence, and Visual Evidence
-// triggers and the PR feedback nodes.
-func workspaceScopeNodeIDs(spec models.LiveCanvasSpec, prFeedback bool) []string {
+// workspaceScopeNodeIDs lists the nodes of the workspace provider that listen
+// for pull request events of the workspace: the closure, merge confidence, and
+// Visual Evidence triggers and the PR feedback nodes.
+func workspaceScopeNodeIDs(spec models.LiveCanvasSpec, provider string, prFeedback bool) []string {
 	nodeIDs := []string{}
 	if template, ok := resolveFactoryTemplate(spec.Nodes); ok {
 		switch template.id {
@@ -136,18 +137,19 @@ func workspaceScopeNodeIDs(spec models.LiveCanvasSpec, prFeedback bool) []string
 
 	return slices.DeleteFunc(nodeIDs, func(nodeID string) bool {
 		node := findIntakeNode(spec.Nodes, nodeID)
-		return node == nil || !strings.HasPrefix(node.ComponentName(), "github.")
+		return node == nil || !strings.HasPrefix(node.ComponentName(), provider+".")
 	})
 }
 
-// withWorkspaceListenerNodeIDs adds the GitHub nodes that users pointed at
-// {{ workspace().repositories }}, for example in custom automations. Their
-// webhooks must also cover repositories added after the last publish.
-func withWorkspaceListenerNodeIDs(nodeIDs []string, nodes []models.Node) []string {
+// withWorkspaceListenerNodeIDs adds the nodes of the workspace provider that
+// users pointed at {{ workspace().repositories }}, for example in custom
+// automations. Their webhooks must also cover repositories added after the
+// last publish.
+func withWorkspaceListenerNodeIDs(nodeIDs []string, provider string, nodes []models.Node) []string {
 	setupNodeIDs := slices.Clone(nodeIDs)
 	for _, node := range nodes {
 		repository, _ := node.Configuration["repository"].(string)
-		if !strings.HasPrefix(node.ComponentName(), "github.") || !models.IsWorkspaceRepositoriesExpression(repository) {
+		if !strings.HasPrefix(node.ComponentName(), provider+".") || !models.IsWorkspaceRepositoriesExpression(repository) {
 			continue
 		}
 		if !slices.Contains(setupNodeIDs, node.ID) {
@@ -167,7 +169,7 @@ func withWorkspaceScope(nodes []models.Node, nodeIDs []string) ([]models.Node, b
 			continue
 		}
 		repository := models.WorkspaceRepositoriesExpression
-		if nodes[i].ComponentName() == prFeedbackWaitChecksComponent {
+		if isPrFeedbackWaitComponent(nodes[i].ComponentName()) {
 			repository = prFeedbackEventRepositoryExpression
 		}
 		if nodes[i].Configuration["repository"] == repository {
