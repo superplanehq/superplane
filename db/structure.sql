@@ -597,6 +597,17 @@ CREATE TABLE public.factory_human_review_decisions (
 
 
 --
+-- Name: factory_human_review_publication_leases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_human_review_publication_leases (
+    pull_request_id uuid NOT NULL,
+    token uuid NOT NULL,
+    expires_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2693,6 +2704,14 @@ ALTER TABLE ONLY public.factory_codex_leases
 
 ALTER TABLE ONLY public.factory_human_review_decisions
     ADD CONSTRAINT factory_human_review_decisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_human_review_publication_leases factory_human_review_publication_leases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_human_review_publication_leases
+    ADD CONSTRAINT factory_human_review_publication_leases_pkey PRIMARY KEY (pull_request_id);
 
 
 --
@@ -5411,6 +5430,14 @@ ALTER TABLE ONLY public.factory_human_review_decisions
 
 
 --
+-- Name: factory_human_review_publication_leases factory_human_review_publication_leases_pull_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_human_review_publication_leases
+    ADD CONSTRAINT factory_human_review_publication_leases_pull_request_id_fkey FOREIGN KEY (pull_request_id) REFERENCES public.factory_pull_requests(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_intakes factory_intakes_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6626,7 +6653,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261110174140	f
+20261110183029	f
 \.
 
 

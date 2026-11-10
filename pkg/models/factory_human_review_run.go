@@ -52,7 +52,7 @@ func MaybeLinkHumanReviewRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, ru
 	if err != nil {
 		return err
 	}
-	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", "human-review:"+pr.ID.String()).Error; err != nil {
+	if err := pr.RequireHumanReviewPublicationIdle(tx); err != nil {
 		return err
 	}
 	canvas, err = FindCanvasWithoutOrgScopeInTransaction(tx, canvas.ID)

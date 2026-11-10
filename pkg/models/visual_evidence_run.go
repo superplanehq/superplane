@@ -84,9 +84,9 @@ func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent
 	if prID == uuid.Nil {
 		return nil
 	}
-	// Activity admission locks the PR. Take the publication lock first, in
-	// the same order as reconciliation, before linking this new assessment.
-	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", "human-review:"+prID.String()).Error; err != nil {
+	// Retry admission if publication still uses the previous assessment.
+	publicationPR := &FactoryPullRequest{ID: prID}
+	if err := publicationPR.RequireHumanReviewPublicationIdle(tx); err != nil {
 		return err
 	}
 	if err := maybeLinkFactoryColumnAppRun(tx, canvas, event, run, "risk-score", "Merge confidence"); err != nil {

@@ -41,7 +41,7 @@ type humanReviewAutomation struct {
 }
 
 // reconcileFactoryHumanReview reads current provider state on every attempt.
-// A per-PR advisory lock serializes requests, webhook refreshes, and retries.
+// A per-PR lease serializes requests, webhook refreshes, and retries.
 // Pending publication stays in the decision row across worker restarts.
 func reconcileFactoryHumanReview(ctx context.Context, deps IntakeDependencies, pullRequest models.FactoryPullRequest) error {
 	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
@@ -70,22 +70,26 @@ func reconcileFactoryHumanReview(ctx context.Context, deps IntakeDependencies, p
 	if err := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository); err != nil {
 		return err
 	}
-	return pullRequest.WithHumanReviewPublicationLock(db, func(tx *gorm.DB) error {
-		if err := pullRequest.LockForUpdate(tx); err != nil {
+	err = pullRequest.WithHumanReviewPublicationLease(db, func(db *gorm.DB) error {
+		if err := pullRequest.LockForUpdate(db); err != nil {
 			return err
 		}
-		// Reload policy after the lock. A disabled or replaced policy invalidates
-		// previous agent output before any new request or check publication.
-		current, err := findHumanReviewAutomation(tx, factory)
+		// Reload policy after claiming publication. A disabled or replaced policy
+		// invalidates previous agent output before any new publication.
+		current, err := findHumanReviewAutomation(db, factory)
 		if err != nil || current == nil {
 			return err
 		}
 		requestID := pullRequest.HumanReviewRequestID
-		if err := reconcileHumanReview(ctx, tx, deps, factory, &pullRequest, current, client); err != nil {
+		if err := reconcileHumanReview(ctx, db, deps, factory, &pullRequest, current, client); err != nil {
 			return err
 		}
-		return pullRequest.CompleteHumanReviewReconciliation(tx, requestID)
+		return pullRequest.CompleteHumanReviewReconciliation(db, requestID)
 	})
+	if errors.Is(err, models.ErrHumanReviewPublicationBusy) {
+		return nil // Polling retries; a pending reopen request remains durable.
+	}
+	return err
 }
 
 func findHumanReviewAutomation(db *gorm.DB, factory *models.Factory) (*humanReviewAutomation, error) {

@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -44,6 +45,9 @@ func (p *CanvasPublisher) validateHumanReviewPolicy(ctx context.Context) error {
 			}
 		}
 		if err := factory.LockHumanReviewPublications(p.tx); err != nil {
+			if errors.Is(err, models.ErrHumanReviewPublicationBusy) {
+				return grpcerrors.FailedPrecondition(err, "Request review is updating GitHub. Try saving again shortly")
+			}
 			return err
 		}
 	}

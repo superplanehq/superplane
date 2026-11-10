@@ -29,7 +29,7 @@ type sectionPublication struct {
 }
 
 // publishBodySection reads the latest description on every attempt without a
-// database transaction. Human review shares a connection lock when configured.
+// database transaction. Human review shares a publication lease when configured.
 func publishBodySection(ctx context.Context, db *gorm.DB, deps IntakeDependencies, publication sectionPublication) (bodySectionPublicationOutcome, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
@@ -79,7 +79,7 @@ func publishBodySection(ctx context.Context, db *gorm.DB, deps IntakeDependencie
 		return skippedBodySection("Pull request provider is unavailable."), nil
 	}
 	ref := vcs.PullRequestRef{Provider: pr.Provider, Repository: pr.Repository, Number: pr.Number}
-	outcome, err := withHumanReviewBodyPublicationLock(db, pr, func(conn *gorm.DB) (bodySectionPublicationOutcome, error) {
+	outcome, err := withHumanReviewBodyPublicationLease(db, pr, func(conn *gorm.DB) (bodySectionPublicationOutcome, error) {
 		return prbody.Publish(ctx, factoryBodySectionClient{client: client, ref: ref}, prbody.Configuration{
 			Repository: ref.Repository, PullNumber: strconv.FormatInt(ref.Number, 10), SectionKey: cfg.SectionKey,
 			Body: cfg.Body, ExpectedHeadSHA: cfg.ExpectedHeadSHA, Enabled: cfg.Enabled,
@@ -91,7 +91,7 @@ func publishBodySection(ctx context.Context, db *gorm.DB, deps IntakeDependencie
 	return outcome, nil
 }
 
-func withHumanReviewBodyPublicationLock(db *gorm.DB, pr *models.FactoryPullRequest, publish func(*gorm.DB) (bodySectionPublicationOutcome, error)) (bodySectionPublicationOutcome, error) {
+func withHumanReviewBodyPublicationLease(db *gorm.DB, pr *models.FactoryPullRequest, publish func(*gorm.DB) (bodySectionPublicationOutcome, error)) (bodySectionPublicationOutcome, error) {
 	if pr == nil || pr.Provider != models.ProviderGitHub {
 		return publish(db)
 	}
@@ -109,7 +109,7 @@ func withHumanReviewBodyPublicationLock(db *gorm.DB, pr *models.FactoryPullReque
 	// Both sections replace the full description. Serialize their read and write
 	// even when Human review is disabled and publishes an explanatory summary.
 	var outcome bodySectionPublicationOutcome
-	err = pr.WithHumanReviewPublicationLock(db, func(conn *gorm.DB) error {
+	err = pr.WithHumanReviewPublicationLease(db, func(conn *gorm.DB) error {
 		var err error
 		outcome, err = publish(conn)
 		return err

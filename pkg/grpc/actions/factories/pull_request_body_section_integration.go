@@ -50,7 +50,7 @@ func (a *bodySectionActionAttempt) publish(ctx context.Context, db *gorm.DB, dep
 	if err != nil {
 		return bodySectionPublicationOutcome{}, err
 	}
-	outcome, err := withHumanReviewBodyPublicationLock(db, pr, func(conn *gorm.DB) (bodySectionPublicationOutcome, error) {
+	outcome, err := withHumanReviewBodyPublicationLease(db, pr, func(conn *gorm.DB) (bodySectionPublicationOutcome, error) {
 		return prbody.Publish(ctx, client, config, func() (bool, error) { return a.integrationPublicationEligible(conn) })
 	})
 	if err != nil {

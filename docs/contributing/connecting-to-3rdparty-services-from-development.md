@@ -243,7 +243,7 @@ No new environment variables or Secret keys are required.
 1. Upgrade the applicable GitHub App to **Checks: Read and write**.
 2. Retain **Pull requests: Read and write**. Optional GitHub team fallbacks also require **Members: Read-only**.
 3. Ask existing installation owners to accept the permission update.
-4. Apply the Request review migration before deploying API and worker code. Keep Request review disabled during deployment.
+4. Apply the Request review migrations before deploying API and worker code. Keep Request review disabled during deployment.
 5. Add Request review from the Verify automation catalog.
 6. Select a default GitHub reviewer and configure review instructions as a SuperPlane organization administrator.
 7. Test assessment completion, reviewer selection, approval, dismissal, new commits, and disablement in a test repository.
@@ -268,6 +268,18 @@ No Helm value changes are required for this feature.
 The four superseded review migrations have not reached shared environments.
 Existing local databases with those versions need separate reconciliation before
 switching migration history. Do not reset those databases.
+
+Request review uses a database lease to coordinate GitHub publication across
+API and worker processes. Apply the publication lease migration before deploying
+these processes. If upgrading an earlier Request review build, stop its API and
+worker processes before starting the new version. The old advisory locks and
+new leases do not coordinate with each other.
+
+Publication releases database connections before GitHub calls. Reconciliation
+has a 90-second deadline. Description publication has a two-minute deadline.
+A claim expires 30 seconds after its operation deadline. Cancelled operations
+retain their claims until expiry; polling or the action queue then retries.
+Policy changes during publication return a retry message.
 
 Runner installation tokens cannot publish GitHub checks or commit statuses.
 The Publish Commit Status component uses server credentials and retains write access.

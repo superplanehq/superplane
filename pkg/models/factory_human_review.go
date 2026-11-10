@@ -27,7 +27,7 @@ type FactoryHumanReviewReviewer struct {
 }
 
 // Each policy evaluation owns its immutable assessment and agent result. The
-// current decision and all external publication are serialized by the PR lock.
+// current decision uses the PR row lock; external publication uses a per-PR lease.
 type FactoryHumanReviewDecision struct {
 	ID                   uuid.UUID
 	OrganizationID       uuid.UUID

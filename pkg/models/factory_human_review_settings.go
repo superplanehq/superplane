@@ -63,15 +63,15 @@ func (s HumanReviewSettings) Validate() error {
 }
 
 // LockHumanReviewPolicy serializes policy saves without blocking foreign-key
-// checks from decision inserts that hold a publication lock.
+// checks from decision inserts that hold a publication lease.
 func (f *Factory) LockHumanReviewPolicy(tx *gorm.DB) error {
 	return tx.Clauses(clause.Locking{Strength: lockingForUpdateNoKey}).
 		Where("id = ? AND organization_id = ?", f.ID, f.OrganizationID).
 		First(f).Error
 }
 
-// LockHumanReviewPublications waits for in-flight provider mutations before a
-// new policy becomes visible. The worker takes the same lock for one PR.
+// LockHumanReviewPublications prevents a new policy from becoming visible
+// during provider publication. Busy publications require a retry, not a wait.
 func (f *Factory) LockHumanReviewPublications(tx *gorm.DB) error {
 	var ids []uuid.UUID
 	if err := tx.Model(&FactoryPullRequest{}).
@@ -80,7 +80,8 @@ func (f *Factory) LockHumanReviewPublications(tx *gorm.DB) error {
 		return err
 	}
 	for _, id := range ids {
-		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", "human-review:"+id.String()).Error; err != nil {
+		pr := &FactoryPullRequest{ID: id}
+		if err := pr.RequireHumanReviewPublicationIdle(tx); err != nil {
 			return err
 		}
 	}

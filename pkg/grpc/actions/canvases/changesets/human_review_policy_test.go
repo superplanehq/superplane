@@ -1,7 +1,6 @@
 package changesets
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -28,7 +26,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestCanvasPublisherHumanReviewAllowsConcurrentDecision(t *testing.T) {
+func TestCanvasPublisherHumanReviewRetriesDuringPublication(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -53,54 +51,37 @@ func TestCanvasPublisherHumanReviewAllowsConcurrentDecision(t *testing.T) {
 	policy.Configuration = map[string]any{"enabled": false, "fallbackTeam": "acme/reviewers"}
 	draft, err := models.CreateCommitVersionWithSpecInTransaction(db, canvas.ID, r.User, "Disable Human review", []models.Node{policy}, nil)
 	require.NoError(t, err)
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	ctx = authentication.SetUserIdInMetadata(ctx, r.User.String())
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
 	options := canvasPublisherOptions(r)
-	save := db.WithContext(ctx).Begin()
-	require.NoError(t, save.Error)
-	defer save.Rollback()
-	var savePID int
-	require.NoError(t, save.Raw("SELECT pg_backend_pid()").Scan(&savePID).Error)
-	publisher, err := NewCanvasPublisher(save, canvas, draft, live, options)
+	claim, err := pr.ClaimHumanReviewPublication(db, time.Minute)
 	require.NoError(t, err)
-	saved := make(chan error, 1)
-	publicationErr := pr.WithHumanReviewPublicationLock(db.WithContext(ctx), func(conn *gorm.DB) error {
-		var workerPID int
-		if err := conn.Raw("SELECT pg_backend_pid()").Scan(&workerPID).Error; err != nil {
-			return err
-		}
-		go func() {
-			if err := publisher.Publish(ctx); err != nil {
-				save.Rollback()
-				saved <- err
-				return
-			}
-			saved <- save.Commit().Error
-		}()
-		// Observe the save waiting for this worker before inserting the decision.
-		assert.Eventually(t, func() bool {
-			var blocked bool
-			err := db.Raw("SELECT ? = ANY(pg_blocking_pids(?))", workerPID, savePID).Scan(&blocked).Error
-			return err == nil && blocked
-		}, 3*time.Second, 10*time.Millisecond)
-		return conn.Transaction(func(tx *gorm.DB) error {
-			if err := pr.LockForUpdate(tx); err != nil {
+	require.NotEqual(t, uuid.Nil, claim)
+	publish := func() error {
+		return db.Transaction(func(tx *gorm.DB) error {
+			publisher, err := NewCanvasPublisher(tx, canvas, draft, live, options)
+			if err != nil {
 				return err
 			}
-			_, err := pr.NewHumanReviewDecision(tx, models.FactoryHumanReviewDecision{
-				RevisionID: observed.Revision.ID, AssessedCommit: "current-head", State: models.FactoryHumanReviewStateWaitingAssessment,
-			})
-			return err
+			return publisher.Publish(ctx)
 		})
-	})
-	select {
-	case err := <-saved:
-		require.NoError(t, err, "policy save must complete")
-	case <-ctx.Done():
-		t.Fatal("policy save did not finish")
 	}
-	require.NoError(t, publicationErr, "decision creation must complete")
+	err = publish()
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	unchanged, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, live.ID, unchanged.ID)
+	// The active publisher can still record its decision after the save retries.
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		if err := pr.LockForUpdate(tx); err != nil {
+			return err
+		}
+		_, err := pr.NewHumanReviewDecision(tx, models.FactoryHumanReviewDecision{
+			RevisionID: observed.Revision.ID, AssessedCommit: "current-head", State: models.FactoryHumanReviewStateWaitingAssessment,
+		})
+		return err
+	}))
+	require.NoError(t, pr.ReleaseHumanReviewPublication(db, claim))
+	require.NoError(t, publish())
 	decision, err := pr.CurrentHumanReview(db)
 	require.NoError(t, err)
 	require.NotNil(t, decision)

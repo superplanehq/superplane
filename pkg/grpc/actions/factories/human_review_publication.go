@@ -25,7 +25,7 @@ type humanReviewCheckPublisher interface {
 type humanReviewPublication struct{ Status, Conclusion, Reason string }
 
 func publishHumanReviewCheck(ctx context.Context, db *gorm.DB, client humanReviewCheckPublisher, pr *models.FactoryPullRequest, decision *models.FactoryHumanReviewDecision, publication humanReviewPublication) error {
-	// Callers hold the PR lock. The current revision and superseded flag are
+	// Callers hold the publication lease. The current revision and superseded flag are
 	// checked again immediately before the network mutation.
 	current, err := pr.CurrentHumanReview(db)
 	if err != nil {
