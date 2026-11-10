@@ -1,7 +1,10 @@
 package ssh
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -34,8 +37,38 @@ func TestSSHCommand_ValidateConfiguration_LegacyConfigWithoutCommandSource(t *te
 	require.NoError(t, configuration.ValidateConfiguration(fields, legacyConfig))
 }
 
+func TestSSHCommand_ConfigurationDescribesHostKeyFingerprint(t *testing.T) {
+	fields := (&SSHCommand{}).Configuration()
+	index := slices.IndexFunc(fields, func(field configuration.Field) bool {
+		return field.Name == "hostKeyFingerprint"
+	})
+	require.NotEqual(t, -1, index)
+
+	field := fields[index]
+	assert.Equal(t, "Host key fingerprint", field.Label)
+	assert.Equal(t, "Verify the server with its SHA-256 host key fingerprint. This will become required.", field.Description)
+	assert.Equal(t, "SHA256:...", field.Placeholder)
+	assert.False(t, field.Required)
+}
+
 type testMetadataContext struct {
 	value any
+}
+
+type staticSecretsContext struct {
+	value []byte
+}
+
+func (c *staticSecretsContext) GetKey(string, string) ([]byte, error) {
+	return c.value, nil
+}
+
+func (c *staticSecretsContext) GetSecretKeys(string) (map[string][]byte, error) {
+	return nil, nil
+}
+
+func (c *staticSecretsContext) GetIntegrationSecrets(string) (core.IntegrationSecrets, error) {
+	return core.IntegrationSecrets{}, nil
 }
 
 func (m *testMetadataContext) Get() any {
@@ -168,6 +201,44 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("valid host key fingerprint", func(t *testing.T) {
+		fingerprint := validTestHostKeyFingerprint()
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"host":               "example.com",
+				"hostKeyFingerprint": fingerprint,
+				"username":           "root",
+				"authentication":     authWithPass,
+				"commands":           "whoami",
+				"timeout":            60,
+			},
+		})
+		require.NoError(t, err)
+	})
+
+	for name, fingerprint := range map[string]string{
+		"wrong algorithm": "MD5:aa:bb",
+		"invalid base64":  "SHA256:not-valid!",
+		"wrong length":    "SHA256:" + base64.RawStdEncoding.EncodeToString([]byte("short")),
+		"padded base64":   "SHA256:" + base64.StdEncoding.EncodeToString(make([]byte, sha256.Size)),
+		"leading space":   " " + validTestHostKeyFingerprint(),
+	} {
+		t.Run("invalid host key fingerprint "+name, func(t *testing.T) {
+			err := c.Setup(core.SetupContext{
+				Configuration: map[string]any{
+					"host":               "example.com",
+					"hostKeyFingerprint": fingerprint,
+					"username":           "root",
+					"authentication":     authWithPass,
+					"commands":           "whoami",
+					"timeout":            60,
+				},
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "host key fingerprint")
+		})
+	}
+
 	t.Run("execution retry invalid retries", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -270,12 +341,13 @@ func TestSSHCommand_Execute_StoresInlineCommandsInMetadata(t *testing.T) {
 	metadata := &testMetadataContext{}
 	err := c.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"host":          "example.com",
-			"port":          22,
-			"username":      "root",
-			"timeout":       60,
-			"commandSource": CommandSourceInline,
-			"commands":      "echo hi",
+			"host":               "example.com",
+			"hostKeyFingerprint": validTestHostKeyFingerprint(),
+			"port":               22,
+			"username":           "root",
+			"timeout":            60,
+			"commandSource":      CommandSourceInline,
+			"commands":           "echo hi",
 			"authentication": map[string]any{
 				"authMethod": "invalid",
 			},
@@ -289,6 +361,11 @@ func TestSSHCommand_Execute_StoresInlineCommandsInMetadata(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, CommandSourceInline, saved.CommandSource)
 	assert.Equal(t, "echo hi", saved.Commands)
+	assert.Equal(t, validTestHostKeyFingerprint(), saved.HostKeyFingerprint)
+}
+
+func validTestHostKeyFingerprint() string {
+	return "SHA256:" + base64.RawStdEncoding.EncodeToString(make([]byte, sha256.Size))
 }
 
 func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
@@ -321,14 +398,47 @@ func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
 	assert.Equal(t, 0, saved.ExecutionAttempt)
 }
 
+func TestSSHCommand_CreateClientPreservesHostKeyFingerprint(t *testing.T) {
+	fingerprint := validTestHostKeyFingerprint()
+	credentials := configuration.SecretKeyRef{Secret: "server", Key: "credential"}
+	tests := map[string]AuthSpec{
+		"password": {
+			Method:   AuthMethodPassword,
+			Password: credentials,
+		},
+		"private key": {
+			Method:     AuthMethodSSHKey,
+			PrivateKey: credentials,
+		},
+	}
+
+	for name, authentication := range tests {
+		t.Run(name, func(t *testing.T) {
+			client, err := (&SSHCommand{}).createClient(
+				&staticSecretsContext{value: []byte("credential")},
+				ExecutionMetadata{
+					Host:               "example.com",
+					Port:               22,
+					User:               "root",
+					HostKeyFingerprint: fingerprint,
+					Authentication:     authentication,
+				},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, fingerprint, client.HostKeyFingerprint)
+		})
+	}
+}
+
 func TestSSHCommand_MetadataHelpersSupportStructMetadata(t *testing.T) {
 	c := &SSHCommand{}
 	metadata := &testMetadataContext{
 		value: ExecutionMetadata{
-			Host:     "example.com",
-			User:     "root",
-			Commands: "exit 1",
-			Attempt:  0,
+			Host:               "example.com",
+			HostKeyFingerprint: validTestHostKeyFingerprint(),
+			User:               "root",
+			Commands:           "exit 1",
+			Attempt:            0,
 		},
 	}
 
@@ -340,6 +450,7 @@ func TestSSHCommand_MetadataHelpersSupportStructMetadata(t *testing.T) {
 	assert.Equal(t, "example.com", current["host"])
 	assert.Equal(t, "root", current["user"])
 	assert.Equal(t, "exit 1", current["commands"])
+	assert.Equal(t, validTestHostKeyFingerprint(), current["hostKeyFingerprint"])
 	assert.Equal(t, 1, c.getRetryAttempt(metadata))
 
 	err = c.incrementExecutionRetryCount(metadata)
