@@ -3679,6 +3679,13 @@ CREATE UNIQUE INDEX factory_human_review_current ON public.factory_human_review_
 
 
 --
+-- Name: factory_human_review_factory; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX factory_human_review_factory ON public.factory_human_review_decisions USING btree (factory_id);
+
+
+--
 -- Name: factory_human_review_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6621,7 +6628,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261110124636	f
+20261110144318	f
 \.
 
 
