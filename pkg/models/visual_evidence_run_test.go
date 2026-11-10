@@ -10,7 +10,48 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
+
+func TestMergeConfidenceActivityKeepsItsAssessedRevision(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Assess the change", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/42"})
+	require.NoError(t, err)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "on-pr-risk", Type: models.NodeTypeTrigger,
+		Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata("risk-score", 1)),
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	canvas.FactoryID = &factory.ID
+	event := &models.CanvasEvent{WorkflowID: canvas.ID, NodeID: "on-pr-risk", Data: models.NewJSONValue(map[string]any{"data": map[string]any{
+		"pullRequest":  map[string]any{"id": pr.ID.String()},
+		"pull_request": map[string]any{"head": map[string]any{"sha": "assessed-head"}},
+	}})}
+	_, err = pr.ObserveRevision(db, "assessed-head")
+	require.NoError(t, err)
+	for _, head := range []string{"assessed-head", "newer-head"} {
+		t.Run(head, func(t *testing.T) {
+			current, err := pr.ObserveRevision(db, head)
+			require.NoError(t, err)
+			run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, event.NodeID, models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return models.MaybeLinkMergeConfidenceRun(tx, canvas, event, run) }))
+			linked, err := models.ListPullRequestRuns(db, []uuid.UUID{pr.ID})
+			require.NoError(t, err)
+			for _, activity := range linked[pr.ID] {
+				require.NotNil(t, activity.Revision)
+				require.Equal(t, "assessed-head", activity.Revision.SHA)
+			}
+			require.NoError(t, pr.LockForUpdate(db))
+			require.Equal(t, current.Revision.ID, *pr.CurrentRevisionID, "delayed admission must not restore an old head")
+		})
+	}
+}
 
 func TestMaybeLinkVisualEvidenceRunShowsTheRunOnThePullRequest(t *testing.T) {
 	r := support.Setup(t)
