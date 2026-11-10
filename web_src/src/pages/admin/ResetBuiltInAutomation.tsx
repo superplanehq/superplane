@@ -39,7 +39,7 @@ const AUTOMATION_GROUPS = [
 type AutomationGroupId = (typeof AUTOMATION_GROUPS)[number]["id"];
 
 const IMPL_AUTOMATION_IDS = new Set(["line-implementation"]);
-const VERIFY_AUTOMATION_IDS = new Set(["risk-score", "visual-evidence"]);
+const VERIFY_AUTOMATION_IDS = new Set(["risk-score", "visual-evidence", "human-review"]);
 const DONE_AUTOMATION_IDS = new Set(["pr-closure"]);
 
 function automationGroup(id: string): AutomationGroupId {

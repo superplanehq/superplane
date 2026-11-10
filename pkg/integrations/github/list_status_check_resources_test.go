@@ -51,6 +51,11 @@ func Test__MergeStatusCheckResources(t *testing.T) {
 		t.Parallel()
 		assert.Empty(t, mergeStatusCheckResources([]string{" "}, []observedStatusCheck{{Name: ""}}))
 	})
+	t.Run("human approval is excluded from CI repair selection", func(t *testing.T) {
+		t.Parallel()
+		resources := mergeStatusCheckResources([]string{"lint", "merge-confidence/merge-gate"}, []observedStatusCheck{{Name: "merge-confidence/merge-gate"}})
+		assert.Equal(t, []core.IntegrationResource{{Type: "status_check", Name: "lint", ID: "lint"}}, resources)
+	})
 }
 
 type fakeGitHubReviewBotAPI struct {
